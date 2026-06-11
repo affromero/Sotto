@@ -105,7 +105,7 @@ export function QueueDashboard() {
 
   const fetchQueues = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/queues');
+      const res = await fetch('/api/v1/admin/queues');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setQueues(data.queues);

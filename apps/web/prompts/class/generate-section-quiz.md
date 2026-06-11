@@ -7,6 +7,7 @@ Target vocabulary (lemma (gloss); …): {{VOCAB}}
 Variation token: {{SEED}}
 Produce a DIFFERENT set of items than any previous attempt for this lesson — do not reuse the same sentences, examples, or distractors. Cover the same competencies with fresh material.
 {{NOTES}}
+{{SOURCE}}
 ## Requirements
 
 - skill = grammar: each question tests one of the listed grammar points in the target language.

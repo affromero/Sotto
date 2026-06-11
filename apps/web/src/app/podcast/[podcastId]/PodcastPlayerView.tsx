@@ -11,14 +11,11 @@ import {
   Download,
   Pencil,
   RefreshCw,
-  ListMusic,
   Trash2,
-  BarChart2,
   Shield,
   Video,
   Users,
   X,
-  Music,
   MessageCircleQuestion,
   Check,
   AlertTriangle,
@@ -32,13 +29,9 @@ import { ReferenceList } from '@/components/player/ReferenceList';
 import { VocabularyList } from '@/components/player/VocabularyList';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { Modal } from '@/components/ui/Modal';
-import { Contributors } from '@/components/player/Contributors';
-import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
-import { VoiceTrackSelector } from '@/components/player/VoiceTrackSelector';
 import { VersionHistory } from '@/components/player/VersionHistory';
-import { PostListenRating } from '@/components/player/PostListenRating';
 import { Badge } from '@/components/ui/Badge';
 import { SottoBadge } from '@/components/ui/SottoBadge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
@@ -53,7 +46,6 @@ import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
 import { VideoEditor } from '@/components/player/VideoEditor';
-import { MusicGenerator } from '@/components/player/MusicGenerator';
 import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
@@ -64,12 +56,8 @@ import type { SegmentVisualData } from '@/lib/segment-utils';
 import styles from './page.module.css';
 
 export interface VideoGenerationStatus {
-  dailyUsed: number;
-  dailyLimit: number;
-  dailyRemaining: number;
-  resetInSeconds?: number;
-  isByokUser: boolean;
-  isProUser: boolean;
+  available: boolean;
+  hasByokKey: boolean;
 }
 
 interface PodcastPlayerViewProps {
@@ -79,14 +67,12 @@ interface PodcastPlayerViewProps {
   isAuthenticated: boolean;
   videoStatus?: VideoGenerationStatus;
   avatarStatus?: VideoGenerationStatus;
-  musicStatus?: VideoGenerationStatus;
 }
 
 type ViewMode = 'transcript' | 'teleprompter' | 'video';
 
 const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
   {
-    DRAFT: 'default',
     PENDING: 'default',
     DISCOVERING: 'info',
     EXTRACTING: 'info',
@@ -158,17 +144,14 @@ export function PodcastPlayerView({
   isAuthenticated,
   videoStatus,
   avatarStatus,
-  musicStatus,
 }: PodcastPlayerViewProps) {
   const router = useRouter();
-  const player = usePlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const seekRef = useRef<((time: number) => void) | null>(null);
   const [showInterruptChat, setShowInterruptChat] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('transcript');
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [liveStatus, setLiveStatus] = useState(podcast.status);
   const [liveFailureReason, setLiveFailureReason] = useState(podcast.failureReason);
   const [liveFailedAtStatus, setLiveFailedAtStatus] = useState(podcast.failedAtStatus);
@@ -188,10 +171,6 @@ export function PodcastPlayerView({
   );
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
-  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
-  const [hasRated, setHasRated] = useState(false);
-  const completionPercentRef = useRef(0);
-  const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
     podcast.videoUrl ? 'ready' : 'idle'
   );
@@ -211,55 +190,12 @@ export function PodcastPlayerView({
   const [classificationId, setClassificationId] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showVideoEditor, setShowVideoEditor] = useState(false);
-  const [showMusicModal, setShowMusicModal] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [avatarsVisible, setAvatarsVisible] = useState(true);
   const [avatarGenerating, setAvatarGenerating] = useState(false);
   const [avatarDone, setAvatarDone] = useState(false);
 
-  // Filter avatar overlays to match the active audio source (original or voice track)
-  const activeVoiceTrackId = player.activeVoiceTrackId;
-  const filteredAvatarOverlays = useMemo(
-    () =>
-      avatarOverlays.filter((o) =>
-        activeVoiceTrackId ? o.voiceTrackId === activeVoiceTrackId : !o.voiceTrackId
-      ),
-    [avatarOverlays, activeVoiceTrackId]
-  );
-  // Load background music on mount if available (skip if already baked into audio)
-  useEffect(() => {
-    if (podcast.musicUrl && player && !podcast.musicBaked) {
-      player.loadMusic(podcast.musicUrl, podcast.musicVolume);
-    }
-  }, [podcast.musicUrl, podcast.musicVolume, podcast.musicBaked]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Check if user has already rated this podcast
-  useEffect(() => {
-    if (!isAuthenticated || liveStatus !== 'READY') return;
-    fetch(`/api/podcasts/${podcast.id}/rating`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.rating) setHasRated(true);
-      })
-      .catch(() => {});
-  }, [isAuthenticated, liveStatus, podcast.id]);
-
-  // Fetch knowledge gaps for owner
-  useEffect(() => {
-    if (!isOwner || podcast.status !== 'READY') return;
-    fetch(`/api/podcasts/${podcast.id}/knowledge-gaps`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.segments) {
-          const counts = new Map<number, number>();
-          for (const seg of data.segments) {
-            counts.set(seg.segmentOrder, seg.questionCount);
-          }
-          setQuestionCounts(counts);
-        }
-      })
-      .catch(() => {});
-  }, [isOwner, podcast.id, podcast.status]);
+  const filteredAvatarOverlays = useMemo(() => avatarOverlays, [avatarOverlays]);
 
   // Fetch script turns for review when SCRIPT_READY or FAILED (for AudioConfigPanel speakers)
   const needsScript =
@@ -268,7 +204,7 @@ export function PodcastPlayerView({
       ['GENERATING_AUDIO', 'STITCHING'].includes(liveFailedAtStatus ?? ''));
   useEffect(() => {
     if (!needsScript || !isOwner) return;
-    fetch(`/api/podcasts/${podcast.id}/script`)
+    fetch(`/api/v1/podcasts/${podcast.id}/script`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.turns) setScriptTurns(data.turns);
@@ -308,20 +244,20 @@ export function PodcastPlayerView({
           router.refresh();
         }
       },
+      // `podcast` appears only in a `typeof` type cast above (no runtime use), so it is not a real dependency.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [router]
     ),
   });
 
-  // Check existing video generation status on mount / track switch
+  // Check existing video generation status on mount
   useEffect(() => {
     if (liveStatus !== 'READY') return;
-    // Reset video state while fetching for the new track
     setVideoState('idle');
     setSegmentVisuals([]);
     setVideoGenerationId(null);
     setVideoError(null);
-    const vtParam = activeVoiceTrackId ? `?voiceTrackId=${activeVoiceTrackId}` : '';
-    fetch(`/api/podcasts/${podcast.id}/video${vtParam}`)
+    fetch(`/api/v1/podcasts/${podcast.id}/video`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
@@ -355,14 +291,14 @@ export function PodcastPlayerView({
         }
       })
       .catch(() => {});
-  }, [isOwner, liveStatus, podcast.id, activeVoiceTrackId]);
+  }, [isOwner, liveStatus, podcast.id]);
 
   // Poll avatar overlay status while avatars are generating (independent of video state)
   useEffect(() => {
     if (!avatarGenerating) return;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/podcasts/${podcast.id}/video`);
+        const res = await fetch(`/api/v1/podcasts/${podcast.id}/video`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.avatarOverlays) {
@@ -403,7 +339,7 @@ export function PodcastPlayerView({
       // If we already have pipeline data in memory, just reopen the editor
       if (pipelineData && !override && !forceReclassify) {
         if (!falModels) {
-          const res = await fetch('/api/fal-models');
+          const res = await fetch('/api/v1/fal-models');
           if (res.ok) setFalModels(await res.json());
         }
         setShowPipelineEditor(true);
@@ -416,8 +352,8 @@ export function PodcastPlayerView({
         // Check for a saved draft before triggering classification
         if (!override && !forceReclassify) {
           const [draftRes, modelsRes] = await Promise.all([
-            fetch(`/api/podcasts/${podcast.id}/video/pipeline`),
-            !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+            fetch(`/api/v1/podcasts/${podcast.id}/video/pipeline`),
+            !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
           ]);
           if (modelsRes?.ok) setFalModels(await modelsRes.json());
           if (draftRes.ok) {
@@ -432,10 +368,7 @@ export function PodcastPlayerView({
         }
 
         // No saved draft — trigger classification
-        const pipelineBody = {
-          ...override,
-          ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }),
-        };
+        const pipelineBody = { ...override };
         const hasBody = Object.keys(pipelineBody).length > 0;
         const pipelineOpts: RequestInit = hasBody
           ? {
@@ -445,8 +378,8 @@ export function PodcastPlayerView({
             }
           : { method: 'POST' };
         const [pipelineRes, modelsRes] = await Promise.all([
-          fetch(`/api/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
-          !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+          fetch(`/api/v1/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
+          !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
         ]);
         if (modelsRes?.ok) setFalModels(await modelsRes.json());
         if (!pipelineRes.ok) {
@@ -467,7 +400,7 @@ export function PodcastPlayerView({
         setPipelineLoading(false);
       }
     },
-    [podcast.id, activeVoiceTrackId, pipelineData, falModels]
+    [podcast.id, pipelineData, falModels]
   );
 
   // Poll for pipeline classification result
@@ -477,7 +410,7 @@ export function PodcastPlayerView({
     const poll = async () => {
       try {
         const res = await fetch(
-          `/api/podcasts/${podcast.id}/video/pipeline?classificationId=${classificationId}`
+          `/api/v1/podcasts/${podcast.id}/video/pipeline?classificationId=${classificationId}`
         );
         if (cancelled) return;
         if (!res.ok) {
@@ -521,13 +454,10 @@ export function PodcastPlayerView({
       setVideoState('generating');
       setVideoLoading(true);
       try {
-        const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
+        const res = await fetch(`/api/v1/podcasts/${podcast.id}/video`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pipeline,
-            ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }),
-          }),
+          body: JSON.stringify({ pipeline }),
         });
         if (!res.ok) throw new Error('Failed to start video generation');
         const data = await res.json();
@@ -555,7 +485,7 @@ export function PodcastPlayerView({
       // Debounce API call
       if (avatarPositionTimerRef.current) clearTimeout(avatarPositionTimerRef.current);
       avatarPositionTimerRef.current = setTimeout(() => {
-        fetch(`/api/podcasts/${podcast.id}/video/avatars/positions`, {
+        fetch(`/api/v1/podcasts/${podcast.id}/video/avatars/positions`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ positions: [{ speaker, ...pos }] }),
@@ -570,7 +500,7 @@ export function PodcastPlayerView({
       setAvatarOverlays((prev) =>
         prev.map((o) => (o.speaker === speaker ? { ...o, maskShape: shape } : o))
       );
-      fetch(`/api/podcasts/${podcast.id}/video/avatars/positions`, {
+      fetch(`/api/v1/podcasts/${podcast.id}/video/avatars/positions`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ positions: [{ speaker, maskShape: shape }] }),
@@ -590,7 +520,7 @@ export function PodcastPlayerView({
         body.ttsProvider = provider;
         if (modelParts.length) body.ttsModel = modelParts.join(':');
       }
-      const response = await fetch(`/api/podcasts/${podcast.id}/generate`, {
+      const response = await fetch(`/api/v1/podcasts/${podcast.id}/generate`, {
         method: 'POST',
         ...(Object.keys(body).length > 0
           ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
@@ -607,7 +537,7 @@ export function PodcastPlayerView({
   const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
-      const response = await fetch(`/api/podcasts/${podcast.id}`, {
+      const response = await fetch(`/api/v1/podcasts/${podcast.id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -630,7 +560,7 @@ export function PodcastPlayerView({
 
     setPdfLoading(true);
     try {
-      const response = await fetch(`/api/podcasts/${podcast.id}/export`, {
+      const response = await fetch(`/api/v1/podcasts/${podcast.id}/export`, {
         method: 'POST',
       });
       const data = await response.json();
@@ -645,7 +575,7 @@ export function PodcastPlayerView({
       // Poll for completion
       const pollInterval = setInterval(async () => {
         try {
-          const pollResponse = await fetch(`/api/podcasts/${podcast.id}/export`);
+          const pollResponse = await fetch(`/api/v1/podcasts/${podcast.id}/export`);
           const pollData = await pollResponse.json();
           if (pollData.status === 'ready' && pollData.pdfUrl) {
             clearInterval(pollInterval);
@@ -697,14 +627,8 @@ export function PodcastPlayerView({
       <PlayerBridge
         onTimeUpdate={(time) => {
           setCurrentTime(time);
-          if (podcast.duration && podcast.duration > 0) {
-            completionPercentRef.current = Math.min((time / podcast.duration) * 100, 100);
-          }
         }}
         seekRef={seekRef}
-        onComplete={() => {
-          if (isAuthenticated && !hasRated) setShowRatingPrompt(true);
-        }}
       />
       <div className={styles.playerView}>
         {/* Back nav */}
@@ -938,26 +862,15 @@ export function PodcastPlayerView({
                       showModelPicker ||
                       pipelineLoading ||
                       videoLoading ||
-                      (videoStatus
-                        ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser
-                        : !isAdmin)
+                      (!videoStatus?.available && !isAdmin)
                     }
                     aria-label="Generate Video"
-                    title={
-                      videoStatus && !videoStatus.isByokUser && videoStatus.dailyRemaining <= 0
-                        ? `Daily video limit reached — resets in ~${Math.ceil((videoStatus.resetInSeconds ?? 86400) / 3600)}h`
-                        : 'Generate a video from your podcast with AI visuals'
-                    }
+                    title="Generate a video from your podcast with AI visuals"
                     type="button"
                     data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
                   >
                     <Video size={14} />
                     Video
-                    {videoStatus && !videoStatus.isByokUser && (
-                      <span className={styles.quotaBadge}>
-                        {videoStatus.dailyRemaining}/{videoStatus.dailyLimit}
-                      </span>
-                    )}
                   </button>
                   <button
                     className={styles.toolbarBtn}
@@ -969,35 +882,6 @@ export function PodcastPlayerView({
                   >
                     <Users size={14} />
                     Avatars
-                    {avatarStatus && !avatarStatus.isByokUser && (
-                      <span className={styles.quotaBadge}>
-                        {avatarStatus.dailyRemaining}/{avatarStatus.dailyLimit}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowMusicModal(true)}
-                    disabled={
-                      musicStatus
-                        ? musicStatus.dailyRemaining <= 0 && !musicStatus.isByokUser
-                        : false
-                    }
-                    aria-label="Add Music"
-                    title={
-                      musicStatus && !musicStatus.isByokUser && musicStatus.dailyRemaining <= 0
-                        ? `Daily music limit reached — resets in ~${Math.ceil((musicStatus.resetInSeconds ?? 86400) / 3600)}h`
-                        : 'Add background music to your podcast'
-                    }
-                    type="button"
-                  >
-                    <Music size={14} />
-                    Music
-                    {musicStatus && !musicStatus.isByokUser && (
-                      <span className={styles.quotaBadge}>
-                        {musicStatus.dailyRemaining}/{musicStatus.dailyLimit}
-                      </span>
-                    )}
                   </button>
                 </div>
                 {showModelPicker && !videoError && (
@@ -1008,11 +892,6 @@ export function PodcastPlayerView({
                     }}
                     onCancel={() => setShowModelPicker(false)}
                     loading={pipelineLoading}
-                    activeVoiceTrackName={
-                      activeVoiceTrackId
-                        ? podcast.voiceTracks.find((t) => t.id === activeVoiceTrackId)?.name
-                        : undefined
-                    }
                   />
                 )}
                 {videoError && (
@@ -1026,11 +905,6 @@ export function PodcastPlayerView({
                         }}
                         onCancel={() => setVideoError(null)}
                         loading={pipelineLoading}
-                        activeVoiceTrackName={
-                          activeVoiceTrackId
-                            ? podcast.voiceTracks.find((t) => t.id === activeVoiceTrackId)?.name
-                            : undefined
-                        }
                       />
                     )}
                   </div>
@@ -1041,7 +915,6 @@ export function PodcastPlayerView({
               <VideoProgress
                 podcastId={podcast.id}
                 videoGenerationId={videoGenerationId}
-                voiceTrackId={activeVoiceTrackId}
                 onComplete={(visuals) => {
                   setVideoState('ready');
                   setSegmentVisuals(visuals);
@@ -1049,7 +922,7 @@ export function PodcastPlayerView({
                 onRequestEdit={async (visuals) => {
                   setSegmentVisuals(visuals as SegmentVisualData[]);
                   if (!falModels) {
-                    const res = await fetch('/api/fal-models');
+                    const res = await fetch('/api/v1/fal-models');
                     if (res.ok) setFalModels(await res.json());
                   }
                   setVideoState('failed');
@@ -1067,7 +940,7 @@ export function PodcastPlayerView({
                   className={styles.toolbarBtn}
                   onClick={async () => {
                     if (!falModels) {
-                      const res = await fetch('/api/fal-models');
+                      const res = await fetch('/api/v1/fal-models');
                       if (res.ok) setFalModels(await res.json());
                     }
                     setShowVideoEditor(true);
@@ -1082,11 +955,7 @@ export function PodcastPlayerView({
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowAvatarPicker(true)}
-                  disabled={
-                    !avatarGenerating && !avatarDone && avatarStatus
-                      ? avatarStatus.dailyRemaining <= 0 && !avatarStatus.isByokUser
-                      : false
-                  }
+                  disabled={!avatarGenerating && !avatarDone && !avatarStatus?.available}
                   aria-label={
                     avatarGenerating
                       ? 'Generating avatars'
@@ -1099,9 +968,7 @@ export function PodcastPlayerView({
                   title={
                     avatarGenerating
                       ? 'Generating avatars...'
-                      : avatarStatus && !avatarStatus.isByokUser && avatarStatus.dailyRemaining <= 0
-                        ? `Daily avatar limit reached — resets in ~${Math.ceil((avatarStatus.resetInSeconds ?? 86400) / 3600)}h`
-                        : avatarOverlays.length > 0
+                      : avatarOverlays.length > 0
                           ? 'Change the speaker avatars'
                           : 'Add AI-generated speaker avatars'
                   }
@@ -1129,34 +996,7 @@ export function PodcastPlayerView({
                     <>
                       <Users size={14} />
                       Avatars
-                      {avatarStatus && !avatarStatus.isByokUser && (
-                        <span className={styles.quotaBadge}>
-                          {avatarStatus.dailyRemaining}/{avatarStatus.dailyLimit}
-                        </span>
-                      )}
                     </>
-                  )}
-                </button>
-                <button
-                  className={styles.toolbarBtn}
-                  onClick={() => setShowMusicModal(true)}
-                  disabled={
-                    musicStatus ? musicStatus.dailyRemaining <= 0 && !musicStatus.isByokUser : false
-                  }
-                  aria-label="Add Music"
-                  title={
-                    musicStatus && !musicStatus.isByokUser && musicStatus.dailyRemaining <= 0
-                      ? `Daily music limit reached — resets in ~${Math.ceil((musicStatus.resetInSeconds ?? 86400) / 3600)}h`
-                      : 'Add background music to your podcast'
-                  }
-                  type="button"
-                >
-                  <Music size={14} />
-                  Music
-                  {musicStatus && !musicStatus.isByokUser && (
-                    <span className={styles.quotaBadge}>
-                      {musicStatus.dailyRemaining}/{musicStatus.dailyLimit}
-                    </span>
                   )}
                 </button>
               </div>
@@ -1181,9 +1021,9 @@ export function PodcastPlayerView({
                     className={styles.toolbarBtn}
                     onClick={async () => {
                       const [falRes, visualRes] = await Promise.all([
-                        !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+                        !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
                         segmentVisuals.length === 0
-                          ? fetch(`/api/podcasts/${podcast.id}/video`)
+                          ? fetch(`/api/v1/podcasts/${podcast.id}/video`)
                           : Promise.resolve(null),
                       ]);
                       if (falRes?.ok) setFalModels(await falRes.json());
@@ -1209,7 +1049,7 @@ export function PodcastPlayerView({
                       setVideoLoading(true);
                       setVideoError(null);
                       try {
-                        const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
+                        const res = await fetch(`/api/v1/podcasts/${podcast.id}/video`, {
                           method: 'POST',
                         });
                         if (!res.ok) {
@@ -1247,16 +1087,6 @@ export function PodcastPlayerView({
                     <Users size={14} />
                     Avatars
                   </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowMusicModal(true)}
-                    aria-label="Add Music"
-                    title="Add background music to your podcast"
-                    type="button"
-                  >
-                    <Music size={14} />
-                    Music
-                  </button>
                 </div>
               </>
             )}
@@ -1275,32 +1105,7 @@ export function PodcastPlayerView({
               audioUrl={podcast.audioUrl!}
               podcastTitle={podcast.title}
             />
-            {(podcast.voiceTracks.length > 0 || isOwner) && (
-              <VoiceTrackSelector
-                podcastId={podcast.id}
-                podcastAudioUrl={podcast.audioUrl!}
-                podcastTitle={podcast.title}
-                voiceTracks={podcast.voiceTracks}
-                defaultVoiceTrackId={podcast.defaultVoiceTrackId}
-                originalTrackName={podcast.originalTrackName}
-                isOwner={isOwner}
-                speakers={[...new Set(podcast.segments.map((s) => s.speaker))]}
-              />
-            )}
           </section>
-        )}
-
-        {/* Post-Listen Rating Prompt */}
-        {showRatingPrompt && !hasRated && (
-          <PostListenRating
-            podcastId={podcast.id}
-            isOwner={isOwner}
-            completionPercent={completionPercentRef.current}
-            onDismiss={() => {
-              setShowRatingPrompt(false);
-              setHasRated(true);
-            }}
-          />
         )}
 
         {/* Stats & Actions */}
@@ -1354,24 +1159,6 @@ export function PodcastPlayerView({
               <OverflowMenu
                 triggerClassName={styles.actionBtn}
                 items={[
-                  ...(isAuthenticated
-                    ? [
-                        {
-                          icon: <ListMusic size={16} />,
-                          label: 'Add to Collection',
-                          onClick: () => setShowAddToCollection(true),
-                        },
-                      ]
-                    : []),
-                  ...(isOwner
-                    ? [
-                        {
-                          icon: <BarChart2 size={16} />,
-                          label: 'Analytics',
-                          onClick: () => router.push(`/podcast/${podcast.id}/analytics`),
-                        },
-                      ]
-                    : []),
                   ...(isOwner
                     ? [
                         {
@@ -1412,34 +1199,15 @@ export function PodcastPlayerView({
           </div>
         </div>
 
-        {/* Collapsible details: Contributors and Version History */}
+        {/* Collapsible details: Version History */}
         {(() => {
-          const contributorMap = new Map<
-            string,
-            {
-              contributor: NonNullable<(typeof podcast.voiceTracks)[0]['contributor']>;
-              count: number;
-            }
-          >();
-          for (const t of podcast.voiceTracks) {
-            if (t.contributor && t.proposalStatus === 'ACCEPTED') {
-              const existing = contributorMap.get(t.contributor.id);
-              if (existing) {
-                existing.count++;
-              } else {
-                contributorMap.set(t.contributor.id, { contributor: t.contributor, count: 1 });
-              }
-            }
-          }
-          const contributors = Array.from(contributorMap.values());
           const hasVersions = podcast.versions.length > 1;
-          const hasDetails = contributors.length > 0 || hasVersions;
+          const hasDetails = hasVersions;
           if (!hasDetails) return null;
           return (
             <details className={styles.detailsSection}>
               <summary className={styles.detailsSummary}>More details</summary>
               <div className={styles.detailsContent}>
-                {contributors.length > 0 && <Contributors contributors={contributors} />}
                 {hasVersions && (
                   <VersionHistory
                     versions={podcast.versions}
@@ -1506,8 +1274,6 @@ export function PodcastPlayerView({
                     vocabularyEntries={podcast.vocabularyEntries}
                     currentTime={currentTime}
                     onSegmentClick={handleSegmentClick}
-                    questionCounts={isOwner ? questionCounts : undefined}
-                    podcastId={podcast.id}
                   />
                 ) : viewMode === 'teleprompter' ? (
                   <Teleprompter
@@ -1529,7 +1295,7 @@ export function PodcastPlayerView({
                     avatarsVisible={avatarsVisible}
                     onAvatarsVisibleChange={async (visible) => {
                       setAvatarsVisible(visible);
-                      await fetch(`/api/podcasts/${podcast.id}/video`, {
+                      await fetch(`/api/v1/podcasts/${podcast.id}/video`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ avatarsVisible: visible }),
@@ -1613,18 +1379,6 @@ export function PodcastPlayerView({
           </div>
         )}
 
-        {/* Music Modal */}
-        {isReady && isOwner && (
-          <MusicGenerator
-            podcastId={podcast.id}
-            initialMusicUrl={podcast.musicUrl}
-            onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
-            onMusicRemoved={() => player?.clearMusic()}
-            isOpen={showMusicModal}
-            onClose={() => setShowMusicModal(false)}
-          />
-        )}
-
         {/* Avatar Picker Modal */}
         <Modal
           isOpen={showAvatarPicker}
@@ -1676,7 +1430,7 @@ export function PodcastPlayerView({
                 setPipelineData(edited);
                 setShowPipelineEditor(false);
                 // Persist edits to DRAFT (fire-and-forget via PATCH)
-                fetch(`/api/podcasts/${podcast.id}/video/pipeline`, {
+                fetch(`/api/v1/podcasts/${podcast.id}/video/pipeline`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(edited),
@@ -1706,12 +1460,7 @@ export function PodcastPlayerView({
               segments={podcast.segments}
               segmentVisuals={segmentVisuals}
               falModels={falModels}
-              voices={
-                (activeVoiceTrackId
-                  ? podcast.voiceTracks.find((t) => t.id === activeVoiceTrackId)?.voices
-                  : podcast.voiceTracks.find((t) => t.id === podcast.defaultVoiceTrackId)
-                      ?.voices) ?? []
-              }
+              voices={[]}
               onRegenerate={(genId) => {
                 setShowVideoEditor(false);
                 setVideoState('generating');
@@ -1722,12 +1471,6 @@ export function PodcastPlayerView({
           )}
         </Modal>
 
-        {/* Add to Collection Modal */}
-        <AddToCollectionModal
-          podcastId={podcast.id}
-          isOpen={showAddToCollection}
-          onClose={() => setShowAddToCollection(false)}
-        />
       </div>
 
       {/* Persistent footer mini-player */}

@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { StartNextClass } from '@/components/learn/StartNextClass';
+import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
+import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
+import { PedagogySelector } from '@/components/learn/PedagogySelector';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +60,7 @@ export default async function LearnPage() {
       targetLang: true,
       currentLevel: true,
       activeClassId: true,
+      pedagogy: true,
       curriculum: { select: { title: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -73,6 +77,7 @@ export default async function LearnPage() {
           Each course moves through mastery-gated classes. Resume the next class, or sharpen a
           single skill in ungated practice.
         </p>
+        <CefrDisclaimer />
       </header>
 
       {courses.length === 0 ? (
@@ -152,7 +157,30 @@ export default async function LearnPage() {
                   >
                     Practice
                   </Link>
+                  <Link
+                    href={`/learn/live?course=${course.id}`}
+                    className={styles.practiceLink}
+                    aria-label={`Live conversation for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
+                  >
+                    Live
+                  </Link>
+                  <Link
+                    href={`/learn/exams?course=${course.id}`}
+                    className={styles.practiceLink}
+                    aria-label={`Practice exam for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
+                  >
+                    Exam
+                  </Link>
                   <StartNextClass courseId={course.id} activeClassId={course.activeClassId ?? null} />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <SourcedClassEntry
+                    courseId={course.id}
+                    activeClassId={course.activeClassId ?? null}
+                  />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <PedagogySelector courseId={course.id} current={course.pedagogy} />
                 </div>
               </li>
             );

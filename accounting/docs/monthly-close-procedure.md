@@ -27,29 +27,17 @@ uv run import-api-usage --month 2026-02
 
 This queries PostgreSQL and appends transactions to `ledger/2026/02-february.beancount`.
 
-### 2. Import Stripe Revenue
-
-Pull subscription payments, fees, and payouts:
-
-```bash
-# Preview first
-uv run import-stripe --month 2026-02 --dry-run
-
-# Import
-uv run import-stripe --month 2026-02
-```
-
-### 3. Record Manual Expenses
+### 2. Record Manual Expenses
 
 Check Gmail for invoices from:
 - **Hetzner** — VPS compute (monthly)
 - **Namecheap** — Domain renewal (annual, amortized monthly)
-- **ElevenLabs** — Subscription overage (if applicable)
+- **ElevenLabs** — Provider usage or account charges (if applicable)
 - **Anthropic** — API invoices (if on invoiced plan)
 
 Use templates in `accounting/templates/` or ask Claude Code to record them.
 
-### 4. Record Domain Amortization
+### 3. Record Domain Amortization
 
 If not already recorded, add the monthly domain amortization entry:
 
@@ -59,7 +47,7 @@ YYYY-MM-28 * "Domain amortization" "Project domain - Month YYYY (N/12)"
   Assets:Prepaid:Domain  -5.42 USD
 ```
 
-### 5. Validate the Ledger
+### 4. Validate the Ledger
 
 ```bash
 uv run bean-check ledger/main.beancount
@@ -70,7 +58,7 @@ Fix any errors before proceeding. Common issues:
 - Duplicate entries from re-running imports
 - Account names with typos
 
-### 6. Generate Reports
+### 5. Generate Reports
 
 ```bash
 uv run reports --month 2026-02
@@ -81,7 +69,7 @@ Reports are saved to `accounting/reports/`:
 - `income-statement-YYYY-MM.txt` — Revenue minus expenses (P&L)
 - `trial-balance-YYYY-MM.txt` — All account balances
 
-### 7. Review in Fava
+### 6. Review in Fava
 
 ```bash
 uv run fava ledger/main.beancount
@@ -92,7 +80,7 @@ Open http://localhost:5000 and verify:
 - Income statement matches expectations
 - No unexpected accounts or balances
 
-### 8. Commit
+### 7. Commit
 
 ```bash
 git add accounting/

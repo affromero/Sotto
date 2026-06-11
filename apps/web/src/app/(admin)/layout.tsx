@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { AdminShell } from './AdminShell';
 
 export const metadata: Metadata = {
@@ -21,17 +20,5 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect('/dashboard');
   }
 
-  const [reportCount, claimCount, pendingDuplicateCount] = await Promise.all([
-    prisma.report.count({ where: { status: 'PENDING' } }),
-    prisma.claimReport.count({ where: { status: 'PENDING' } }),
-    prisma.duplicateMatch.count({ where: { status: 'PENDING' } }),
-  ]);
-
-  const pendingReportCount = reportCount + claimCount;
-
-  return (
-    <AdminShell pendingReportCount={pendingReportCount} pendingDuplicateCount={pendingDuplicateCount}>
-      {children}
-    </AdminShell>
-  );
+  return <AdminShell>{children}</AdminShell>;
 }

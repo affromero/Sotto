@@ -13,7 +13,8 @@ import {
   lessonTitle,
 } from '../data';
 import type { CefrLevel } from '../data';
-import type { AgentState, VoiceState } from '../WelcomeFlow';
+import type { AgentState, VoiceState, OnboardingConfig } from '../WelcomeFlow';
+import { resolveAi, resolveTts, resolveStt, type KeyPost } from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.module.css';
@@ -26,6 +27,7 @@ interface Props {
   agent: AgentState;
   voice: VoiceState;
   note: string;
+  config: OnboardingConfig;
   onRestart: () => void;
 }
 
@@ -37,10 +39,13 @@ export function StepReady({
   agent,
   voice,
   note,
+  config,
   onRestart,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const lang = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
   const base = BASE_LANGS.find((b) => b.code === baseLang) ?? BASE_LANGS[0];
@@ -53,68 +58,82 @@ export function StepReady({
   const sttName =
     (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
 
-  async function finishOnboarding() {
-    setLoading(true);
-    let courseId: string | null = null;
+  async function postKey(post: KeyPost): Promise<boolean> {
     try {
-      // 1. Create course
-      const res = await fetch('/api/courses', {
+      const res = await fetch(`/api/v1/settings/${post.endpoint}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ native: baseLang, target: language }),
+        body: JSON.stringify({ provider: post.provider, apiKey: post.apiKey }),
       });
-      if (res.ok) {
-        const data = (await res.json()) as { course?: { id?: string } };
-        courseId = data.course?.id ?? null;
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function finishOnboarding() {
+    setLoading(true);
+    setError(null);
+    setWarnings([]);
+
+    // Managed showcase (SELF_HOSTED=false): a non-persisting demo — just enter.
+    if (!config.selfHosted) {
+      router.push('/learn');
+      return;
+    }
+
+    // Translate the wizard's selections to real backend providers + infra.
+    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
+    const tts = resolveTts(voice.tts, voice.keys[voice.tts] ?? '', voice.baseUrls[voice.tts] ?? '');
+    const stt = resolveStt(voice.stt, voice.keys[voice.stt] ?? '', voice.baseUrls[voice.stt] ?? '');
+
+    // BYOK keys → the validated settings routes. Surface failures (don't swallow)
+    // but don't block onboarding — keys are editable later in Settings.
+    const failures: string[] = [];
+    for (const post of [ai.keyPost, tts.keyPost, stt.keyPost]) {
+      if (!post) continue;
+      const ok = await postKey(post);
+      if (!ok) failures.push(post.provider);
+    }
+    if (failures.length) {
+      setWarnings([
+        `Couldn't verify your ${failures.join(', ')} key${failures.length > 1 ? 's' : ''}. Add ${failures.length > 1 ? 'them' : 'it'} later in Settings.`,
+      ]);
+    }
+
+    // Everything else (course, note, preferences, owner infra) in one call.
+    const infra = config.isOwner
+      ? { ...ai.infra, ...tts.infra, ...stt.infra }
+      : undefined;
+
+    try {
+      const res = await fetch('/api/v1/onboarding/save', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course: { native: baseLang, target: language, ...(level && { level }) },
+          ...(note.trim() && { note }),
+          preferred: {
+            language,
+            ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),
+            ...(ai.preferredAiModel && { aiModel: ai.preferredAiModel }),
+            ...(tts.preferredTtsProvider && { ttsProvider: tts.preferredTtsProvider }),
+          },
+          ...(infra && Object.keys(infra).length > 0 && { infra }),
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ?? 'Could not finish setup. Please try again.');
+        setLoading(false);
+        return;
       }
     } catch {
-      // Non-fatal — proceed regardless
-    }
-
-    // 1b. Best-effort persist the learner's context note for this course
-    if (courseId && note.trim()) {
-      try {
-        await fetch(`/api/courses/${courseId}/notes`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body: note }),
-        });
-      } catch {
-        // Swallow — editable later
-      }
-    }
-
-    // 2. Best-effort persist AI key
-    if (agent.method === 'key' && agent.value.trim()) {
-      const aiProvider = agent.provider === 'claude' ? 'anthropic' : 'openai';
-      try {
-        await fetch('/api/settings/ai-keys', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: aiProvider, apiKey: agent.value }),
-        });
-      } catch {
-        // Swallow — editable in settings
-      }
-    }
-
-    // 3. Best-effort persist voice keys
-    const voiceKeyEntries = Object.entries(voice.keys);
-    for (const [providerId, apiKey] of voiceKeyEntries) {
-      if (!apiKey.trim()) continue;
-      try {
-        await fetch('/api/settings/byok', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: providerId, apiKey }),
-        });
-      } catch {
-        // Swallow — editable in settings
-      }
+      setError('Could not reach the server. Check your connection and try again.');
+      setLoading(false);
+      return;
     }
 
     router.push('/learn');
@@ -179,6 +198,19 @@ export function StepReady({
           </div>
         </div>
       </div>
+
+      {warnings.map((w) => (
+        <div key={w} className={c.locknote} role="status">
+          <Glyph name="shield" size={15} />
+          {w}
+        </div>
+      ))}
+      {error && (
+        <div className={c.locknote} role="alert">
+          <Glyph name="lock" size={15} />
+          {error}
+        </div>
+      )}
 
       <div className={t.actions}>
         <button className={`${t.btn} ${t.btnBare}`} onClick={onRestart}>

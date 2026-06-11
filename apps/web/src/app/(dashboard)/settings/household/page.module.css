@@ -1,0 +1,551 @@
+/* Household Settings Page */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+/* Page intro — the "roofline" accent lives on the top border. */
+.intro {
+  position: relative;
+  padding-top: var(--spacing-md);
+  border-top: 2px solid var(--color-primary);
+}
+
+.pageTitle {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.introText {
+  margin-top: var(--spacing-xs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 56ch;
+}
+
+/* Shared section title typography */
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.sectionHint {
+  margin-top: var(--spacing-xxs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Invite card — the single focal element, echoing the roofline accent. */
+.inviteCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  animation: rise 0.4s ease both;
+}
+
+.inviteHead {
+  display: flex;
+  flex-direction: column;
+}
+
+.inviteCta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+/* "Who can join" toggle row: current mode badge + switch button. */
+.signupControl {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.inviteCtaText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 52ch;
+}
+
+/* Result state: link readout + QR tile, stacked on mobile. */
+.inviteResult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.inviteLinkBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.inviteLinkLabel {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inviteLinkRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.inviteUrl {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+.inviteExpiry {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.inviteAgain {
+  margin-top: var(--spacing-xxs);
+}
+
+/* QR tile — cream mat framing a surface tile, matching worksheet QR feel. */
+.qrTile {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.qrImage {
+  display: block;
+  width: 160px;
+  height: 160px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.qrCaption {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+/* List cards — mirror the API keys list aesthetic. */
+.listCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  animation: rise 0.4s ease both;
+  animation-delay: 0.06s;
+}
+
+.listHeader {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.listTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.listEmpty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Invite rows */
+.inviteRow,
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inviteRow:last-child,
+.memberRow:last-child {
+  border-bottom: none;
+}
+
+.inviteRowInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  min-width: 0;
+  flex: 1;
+}
+
+.inviteCode {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.rowMeta {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.inviteRowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+/* Member rows — stack the identity line, actions, and any reveal panel. */
+.memberRow {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.memberMain {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  min-width: 0;
+}
+
+.memberTile {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.memberInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.memberName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberSub {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.memberAside {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+/* Per-member actions: wrap on narrow screens, keep 44px targets. */
+.memberActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.confirmGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.confirmLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+}
+
+/* Inline edit panel under a member row. */
+.editPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.memberErrorBar {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ---- shared form fields (add + edit) ---- */
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.fieldLabel {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fieldHint {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.textInput {
+  height: 48px;
+  padding: 0 var(--spacing-md);
+  font: var(--text-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  max-width: 360px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.textInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- avatar picker ---- */
+.avatarGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  max-width: 360px;
+}
+
+@media (min-width: 480px) {
+  .avatarGrid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+.avatarItem {
+  display: flex;
+  justify-content: center;
+}
+
+.avatarBtn {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  min-width: 44px;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.avatarBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.avatarBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.avatarBtnSelected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--color-primary);
+  pointer-events: none;
+}
+
+/* ---- temporary password readout ---- */
+.tempRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.tempValue,
+.credentialValue {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-md);
+  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  word-break: break-all;
+}
+
+/* ---- credential result (new member + reset) ---- */
+.credentialResult,
+.resetResult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  padding: var(--spacing-md);
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary-light);
+  border-radius: var(--radius-lg);
+}
+
+.resetResult {
+  margin-top: var(--spacing-md);
+}
+
+.credentialTitle {
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.credentialRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.credentialLabel {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.credentialNote {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 52ch;
+}
+
+.credentialActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.errorText {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+}
+
+/* Entrance motion — transform/opacity only. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 600px) {
+  .inviteCard {
+    padding: var(--spacing-xl);
+  }
+
+  .inviteResult {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-xl);
+  }
+
+  .inviteLinkBlock {
+    flex: 1;
+  }
+
+  .inviteLinkRow {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .qrTile {
+    align-self: stretch;
+  }
+
+  .listHeader,
+  .inviteRow,
+  .memberRow {
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inviteCard,
+  .listCard {
+    animation: none;
+  }
+}

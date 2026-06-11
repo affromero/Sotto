@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { PlaybackControls } from './PlaybackControls';
-import { ListeningQueue } from './ListeningQueue';
 import styles from './AudioPlayer.module.css';
 
 function formatTime(seconds: number): string {
@@ -40,14 +39,6 @@ export function AudioPlayer({ podcastId: initialPodcastId, audioUrl, podcastTitl
     [player]
   );
 
-  const handlePlayFromQueue = useCallback(
-    (podcastId: string, audioUrl: string, title?: string) => {
-      player.loadPodcast(podcastId, audioUrl, title);
-      player.play();
-    },
-    [player]
-  );
-
   if (!player || !player.podcastId) return null;
 
   const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
@@ -77,7 +68,6 @@ export function AudioPlayer({ podcastId: initialPodcastId, audioUrl, podcastTitl
 
       <div className={styles.controlsRow}>
         <PlaybackControls />
-        <ListeningQueue onPlayPodcast={handlePlayFromQueue} />
       </div>
     </div>
   );

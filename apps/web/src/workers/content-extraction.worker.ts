@@ -109,13 +109,12 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   await job.updateProgress(50);
 
   // Pre-flight feasibility check — only for WEB-sourced podcasts (user is at browser).
-  // Twitter/Telegram/API sources have pre-validated topics and no interactive retry.
+  // API sources have pre-validated topics and no interactive retry.
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
     select: {
       source: true,
       aiModel: true,
-      user: { select: { plan: true } },
     },
   });
 
@@ -131,7 +130,6 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       const { model, provider } = await resolveAiModelAndProvider({
         podcastAiModel: podcast.aiModel,
         aiKey: initialAiKey,
-        plan: podcast.user.plan as 'FREE' | 'PRO',
       });
 
       const providerAiKey =

@@ -2,11 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
-const mockAuth = vi.fn();
-const mockCheckSuspension = vi.fn();
 const mockRequireAdmin = vi.fn();
 const mockCheckRateLimit = vi.fn();
-const mockCheckGenerationGate = vi.fn();
 const mockGetJobPriority = vi.fn();
 const mockIsModelAllowedForUser = vi.fn();
 const mockGetModelRequiredPlan = vi.fn();
@@ -49,12 +46,7 @@ vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
-
 vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: (...args: unknown[]) => mockCheckSuspension(...args),
   requireAdmin: (...args: unknown[]) => mockRequireAdmin(...args),
 }));
 
@@ -62,11 +54,7 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-}));
-
-vi.mock('@/lib/tier-features', () => ({
+vi.mock('@/lib/generation-features', () => ({
   getJobPriority: (...args: unknown[]) => mockGetJobPriority(...args),
   isModelAllowedForUser: (...args: unknown[]) => mockIsModelAllowedForUser(...args),
 }));
@@ -87,7 +75,7 @@ vi.mock('@/lib/slugify', () => ({
   generatePodcastSlug: (...args: unknown[]) => mockGeneratePodcastSlug(...args),
 }));
 
-import { POST } from '@/app/api/ingest/agent/route';
+import { POST } from '@/app/api/v1/ingest/agent/route';
 
 function createRequest(body: unknown, authHeader?: string): NextRequest {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -95,7 +83,7 @@ function createRequest(body: unknown, authHeader?: string): NextRequest {
     headers.authorization = authHeader;
   }
 
-  return new NextRequest('http://localhost:3000/api/ingest/agent', {
+  return new NextRequest('http://localhost:3000/api/v1/ingest/agent', {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -121,23 +109,13 @@ const validPayload = {
   ttsModel: 'gpt-4o-mini-tts',
 };
 
-describe('POST /api/ingest/agent', () => {
+describe('POST /api/v1/ingest/agent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockCheckSuspension.mockReturnValue(null);
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({
-      allowed: true,
-      reason: 'ok',
-      dailyUsed: 0,
-      dailyLimit: 100,
-      isByokUser: true,
-      isProUser: false,
-    });
     mockGetJobPriority.mockReturnValue(1);
     mockIsModelAllowedForUser.mockReturnValue(true);
     mockGetModelRequiredPlan.mockReturnValue(null);
@@ -188,7 +166,6 @@ describe('POST /api/ingest/agent', () => {
       source: 'AGENT',
       discoveryId: 'disc-agent-1',
     });
-    expect(mockAuth).not.toHaveBeenCalled();
     expect(mockPodcastCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
@@ -263,22 +240,4 @@ describe('POST /api/ingest/agent', () => {
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
-  it('blocks ingestion when the generation gate is closed', async () => {
-    mockCheckGenerationGate.mockResolvedValue({
-      allowed: false,
-      reason: 'generation_in_progress',
-      dailyUsed: 1,
-      dailyLimit: 1,
-      isByokUser: false,
-      isProUser: false,
-    });
-
-    const response = await POST(createRequest(validPayload));
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toMatchObject({ code: 'generation_in_progress' });
-    expect(mockPodcastCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
-  });
 });

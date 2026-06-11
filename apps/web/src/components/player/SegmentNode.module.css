@@ -54,12 +54,12 @@
   font-size: 13px;
   font-weight: 600;
   flex-shrink: 0;
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(63, 79, 176, 0.12);
   color: var(--color-primary);
 }
 
 .sceneNumber[data-speaker-index='1'] {
-  background: rgba(30, 58, 95, 0.2);
+  background: rgba(42, 53, 80, 0.2);
   color: #93c5fd;
 }
 
@@ -108,12 +108,12 @@
 }
 
 .badgeAmber {
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
 }
 
 .badgeNavy {
-  background: rgba(30, 58, 95, 0.15);
+  background: rgba(42, 53, 80, 0.15);
   color: #93c5fd;
 }
 
@@ -288,12 +288,12 @@
 }
 
 .pillAmber {
-  background: rgba(217, 119, 6, 0.15);
+  background: rgba(63, 79, 176, 0.15);
   color: var(--color-primary);
 }
 
 .pillNavy {
-  background: rgba(30, 58, 95, 0.25);
+  background: rgba(42, 53, 80, 0.25);
   color: #93c5fd;
 }
 

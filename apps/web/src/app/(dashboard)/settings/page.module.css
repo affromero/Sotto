@@ -346,34 +346,7 @@
   margin-bottom: var(--spacing-md);
 }
 
-/* Twitter Integration */
-
-.twitterDescription {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-xs);
-}
-
-.twitterDisclaimer {
-  font: var(--text-body-sm);
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  margin-bottom: var(--spacing-md);
-}
-
-.twitterHandle {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.twitterModelHint {
-  font: var(--text-caption);
-  color: var(--color-text-tertiary);
-  margin-top: var(--spacing-xs);
-}
-
-.twitterSelect {
+.modelSelect {
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-border);
@@ -391,7 +364,7 @@
   padding-right: calc(var(--spacing-md) + 20px);
 }
 
-.twitterSelect:focus {
+.modelSelect:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
@@ -401,17 +374,6 @@
 .sectionDescription {
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-md);
-}
-
-.referralBonus {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  display: inline-block;
   margin-bottom: var(--spacing-md);
 }
 
@@ -531,6 +493,41 @@
   margin-bottom: var(--spacing-md);
 }
 
+/* Household Section link */
+
+.householdLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 44px;
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+
+.householdLink:hover {
+  transform: translateX(2px);
+}
+
+.householdLinkText {
+  font: var(--text-body-sm);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .householdLink {
+    transition: none;
+  }
+
+  .householdLink:hover {
+    transform: none;
+  }
+}
+
 .byokInputRow {
   display: flex;
   gap: var(--spacing-sm);
@@ -577,4 +574,3 @@
     flex-direction: column;
   }
 }
-

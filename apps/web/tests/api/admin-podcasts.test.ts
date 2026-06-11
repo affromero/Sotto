@@ -8,6 +8,7 @@ const mockPodcastCreate = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockAddJob = vi.fn();
+const mockGetAutoModelConfig = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -50,19 +51,15 @@ vi.mock('@/lib/queue', () => ({
   JobType: { EXTRACT_CONTENT: 'extract_content' },
 }));
 
-const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
-  aiModel: 'gpt-5-mini',
-});
-
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
-import { POST } from '@/app/api/admin/podcasts/create-as-system-owner/route';
-import { DELETE } from '@/app/api/admin/podcasts/[podcastId]/route';
+import { POST } from '@/app/api/v1/admin/podcasts/create-as-system-owner/route';
+import { DELETE } from '@/app/api/v1/admin/podcasts/[podcastId]/route';
 
 function createPostRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/create-as-system-owner'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/podcasts/create-as-system-owner'), {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -70,7 +67,7 @@ function createPostRequest(body: Record<string, unknown>): NextRequest {
 }
 
 function createDeleteRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/pod-1'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/podcasts/pod-1'), {
     method: 'DELETE',
   });
 }
@@ -79,10 +76,20 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
-describe('POST /api/admin/podcasts/create-as-system-owner', () => {
+describe('POST /api/v1/admin/podcasts/create-as-system-owner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: {
+        aiProvider: 'openai',
+        aiModel: 'gpt-5-mini',
+        ttsProvider: 'openai',
+        ttsModel: 'tts-1-hd',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+      },
+    });
   });
 
   afterEach(() => {
@@ -192,9 +199,9 @@ describe('POST /api/admin/podcasts/create-as-system-owner', () => {
 
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ id: 'pod-2', status: 'EXTRACTING' });
-    expect(mockSelectFreeTierProviders).toHaveBeenCalledWith('system-owner-id');
     expect(mockPodcastCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        aiProvider: 'openai',
         aiModel: 'gpt-5-mini',
       }),
     });
@@ -223,7 +230,7 @@ describe('POST /api/admin/podcasts/create-as-system-owner', () => {
   });
 });
 
-describe('DELETE /api/admin/podcasts/[podcastId]', () => {
+describe('DELETE /api/v1/admin/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

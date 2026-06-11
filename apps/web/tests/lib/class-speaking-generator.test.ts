@@ -64,6 +64,7 @@ vi.mock('@/lib/prompt-loader', () => ({
 vi.mock('@/lib/providers/tts', () => ({
   canResolveTts: (...args: unknown[]) => mockCanResolveTts(...args),
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
+  getConfiguredTtsProviderId: () => null,
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
@@ -126,7 +127,16 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
   });
   mockCanResolveTts.mockResolvedValue(withTts);
   if (withTts) {
-    mockGetAutoModelConfig.mockResolvedValue({ free: { ttsProvider: 'elevenlabs' } });
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_multilingual_v2',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+      },
+    });
     mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
     mockResolveTtsProvider.mockResolvedValue({
       provider: { generateSpeech: mockGenerateSpeech, getVoiceId: mockGetVoiceId },

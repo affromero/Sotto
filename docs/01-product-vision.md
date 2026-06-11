@@ -2,36 +2,37 @@
 
 > **Date**: 2026-05-15
 >
-> **Summary**: Sotto is private-first open source infrastructure for turning personal agents, meetings, sources, bots, and manual requests into owned audio briefings. The product is not a public podcast network and should not compete as a generic AI content wrapper. Its value is the private delivery layer, simple provider onboarding, and optional managed infrastructure for people who do not want to operate the stack themselves.
+> **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure. Learners bring their own agent, keys, and context, then work through mastery-gated CEFR courses across grammar, reading, adaptive listening, speaking, and writing. Its value is learner progress, data ownership, explicit provider control, and a private vocabulary memory graph, not generic AI content generation, billing gates, or social discovery.
 
 ---
 
 ## 1. Thesis
 
-People are increasingly tired of generic AI-generated content sold back to them as a product. A paid service that exists only to call a model, produce a synthetic conversation, and host the output is weak. The durable value is different:
+Most serious language-learning products are closed, hosted, and subscription-funded. The learner's progress, vocabulary, recordings, and teaching model live on someone else's servers. Sotto inverts that:
 
-- Give users private ownership of recurring audio workflows.
-- Let technical users bring their own agents, models, TTS providers, storage, and hosting.
-- Let non-technical users pay for managed infrastructure after a short trial.
-- Keep the core product private by default and open source.
-- Remove the public social layer completely.
+- Give learners ownership of the learning stack, progress data, vocabulary graph, audio, and recordings.
+- Let technical users bring their own Claude Code, Codex, OpenClaw, Hermes, local models, TTS, STT, storage, and hosting.
+- Make the core product free, open source, self-hostable, and useful without any Sotto billing path.
+- Use mastery-gated CEFR progression, spaced repetition, adaptive listening, speaking feedback, and writing correction as the core loop.
+- Keep social primitives out of the product completely.
 
-Sotto should feel less like a content platform and more like a private audio operating system for the user's work and information streams.
+Sotto should feel less like a content platform and more like a private language tutor running on infrastructure the learner controls.
 
 ---
 
 ## 2. Product Definition
 
-Sotto turns structured input into private podcasts:
+Sotto teaches a language in the learner's own context:
 
-- Local agent outputs from Claude Code, Codex, OpenClaw, Hermes, or another assistant.
-- Meeting recordings, transcripts, and notes.
-- Manual topics and URLs.
-- Imported audio that the user owns or has permission to process.
-- Scheduled news digests for a separate "world briefing" podcast.
-- Twitter, Telegram, or webhook events when self-hosted or managed.
+- A placement test assigns the starting CEFR level for a native-language to target-language course.
+- Mastery-gated classes cover grammar, reading, adaptive listening, speaking, and writing.
+- Ungated practice lets a learner drill one skill without advancing the course.
+- Mock exams provide self-assessment modeled on the format of flagship CEFR exams where available.
+- Course notes, learner interests, sourced class inputs, and agent-provided context personalize lessons.
+- A course-scoped memory graph tracks vocabulary and grammar with SM-2 spaced repetition.
+- The audio engine is reused for adaptive listening lessons and spoken reference audio.
 
-The output is a private library plus private RSS delivery. The user can listen in Sotto or subscribe from any podcast app that accepts an authenticated RSS URL.
+The output is progress through a private course and a memory graph the learner owns. Sotto can run locally, on a VPS, or on managed infrastructure if that product surface exists, but the self-hosted build remains free and fully featured.
 
 ---
 
@@ -39,32 +40,34 @@ The output is a private library plus private RSS delivery. The user can listen i
 
 Sotto must keep these boundaries clear:
 
-- Private by default. New episodes start private unless the user explicitly changes visibility.
-- Private/unlisted access is not a paid feature.
+- Free and self-hostable by default. Full learning features are not gated by plans, tiers, quotas, or payment state.
+- BYOK and local-agent operation are first-class. Provider choice must be explicit and observable.
 - No public discovery feed.
-- No follows, follower counts, likes, comments, forks, remix graph, or public activity ranking.
-- No implicit provider fallback chains. Provider choice must be explicit and observable.
+- No follows, follower counts, likes, comments, forks, remix graph, leaderboards, community rank, or public activity ranking.
+- No implicit provider fallback chains. If the selected provider is missing credentials or capability, show a precise setup error.
 - No legacy social compatibility mode.
-- Hosted billing charges for infrastructure and convenience, not for the idea of AI-generated audio.
+- No podcast-platform, briefing, news-digest, or creator-network positioning as current behavior.
 
-These boundaries make the open source release credible. Reviewers should be able to scan the schema, API routes, docs, and tests and see the same product.
+These boundaries make the open source release credible. Reviewers should be able to scan the README, schema, API routes, docs, and tests and see the same language-learning product.
 
 ---
 
-## 4. Why This Is Not A NotebookLM Wrapper
+## 4. Why This Is Not A Generic AI Tutor Wrapper
 
-NotebookLM-style products usually start with documents and produce a one-off synthetic conversation. Sotto is useful when the audio is part of a recurring private workflow:
+Generic AI tutor products usually start with a chat box and leave the learner to manage structure, recall, level, and review. Sotto is useful because the language-learning loop is explicit and durable:
 
-| Dimension | Notebook-style generator | Sotto |
+| Dimension | Generic AI tutor | Sotto |
 |---|---|---|
-| Starting point | Uploaded documents | Agents, meetings, bots, URLs, imports, news, manual topics |
-| Cadence | One-off generation | Scheduled or event-driven briefings |
-| Delivery | Product-specific playback or export | Private RSS owned by the user |
-| Configuration | Vendor-managed model choices | Explicit local, BYOK, or managed provider selection |
-| Privacy posture | Vendor workspace | Self-hosted or managed private workspace |
-| Business model | Content generation product | Infrastructure, hosting, automation, and operations |
+| Starting point | Open-ended chat prompt | Placement into a native-language to target-language course |
+| Progression | User asks for the next thing | Mastery-gated CEFR class sequence |
+| Skills | Whatever the chat covers | Grammar, reading, adaptive listening, speaking, and writing |
+| Review | Manual or ad hoc | Course-scoped vocabulary and grammar memory graph |
+| Audio | Optional generated clip | Reused audio engine for adaptive listening and pronunciation support |
+| Configuration | Vendor-managed model choices | Explicit local, BYOK, or configured provider selection |
+| Privacy posture | Hosted vendor workspace | Self-hosted or learner-controlled workspace |
+| Business model | Subscription or usage gates | Free OSS self-hosting; provider costs belong to the key owner |
 
-The goal is not to be "NotebookLM with a different UI." The goal is a private audio router that turns the user's existing information systems into listenable briefings.
+The goal is not to be "chat with a language model." The goal is a self-hostable learning system that turns the learner's own context into structured practice and measurable progress.
 
 ---
 
@@ -75,67 +78,67 @@ The goal is not to be "NotebookLM with a different UI." The goal is a private au
 These users already run tools on a laptop, workstation, or VPS. They want Sotto because it gives them:
 
 - A local-first app they can inspect and modify.
-- A private RSS delivery path.
-- Explicit model and TTS routing.
-- Agent integrations that work with their existing CLI tools.
-- Bot endpoints they can host on Hetzner, Fly, Render, or their own hardware.
+- A full language-learning loop without a hosted subscription.
+- Explicit LLM, TTS, and STT routing.
+- Local-agent integrations that work with their existing CLI tools.
+- A course, practice, exam, and memory graph system they can keep on their own hardware.
 
-Their ideal onboarding is: clone, run setup, add one provider key or local agent, create a private RSS token, subscribe in a podcast app.
+Their ideal onboarding is: run the installer or source setup, connect one provider key or local agent, choose a language pair, take placement, and start the first class.
 
-### 5.2 AI-Experienced Knowledge Workers
+### 5.2 AI-Experienced Learners
 
-These users understand API keys but do not want to maintain a full pipeline. They want:
+These users understand API keys but do not want to assemble a learning system from scratch. They want:
 
-- One-key setup when possible.
-- Clear provider cost expectations.
-- Private meeting and news briefings.
-- No public sharing pressure.
-- A dashboard that explains what is configured and what is missing.
+- One-key or clearly separated BYOK setup for LLM, TTS, and STT.
+- Clear provider readiness and setup errors.
+- A course that adapts to their goals, work, interests, and current level.
+- Speaking and writing feedback without giving up ownership of recordings or progress.
+- No public sharing pressure, streak manipulation, or leaderboard dynamics.
 
-Their ideal onboarding is: sign in, paste one key, choose a voice, generate a daily briefing, subscribe privately.
+Their ideal onboarding is: sign in, add the needed keys or local agent, take placement, add a short course note, and begin a class or practice session.
 
-### 5.3 Non-Technical Users
+### 5.3 Household And Non-Technical Learners
 
-These users want the outcome but not the infrastructure. They should be offered:
+These users want the outcome but not the operational details. They should be offered:
 
-- Managed hosting with a short trial.
-- Provider and storage managed by Sotto.
-- Private RSS setup handled by the app.
-- Simple cancellation and data export.
+- A simple first-run flow on an existing self-hosted instance.
+- Owner-managed household invites where each learner's courses, keys, progress, and memory graph stay isolated.
+- Web and iPad access to the same course data.
+- Clear data export and deletion paths.
 
-Charging here is defensible because the user is paying for operated infrastructure, monitoring, scheduled jobs, storage, bot hosting, and updates.
+No user should need a paid plan to unlock privacy or the full learning loop in the self-hosted product.
 
 ---
 
 ## 6. Core Workflows
 
-### 6.1 Private Briefing Creation
+### 6.1 Placement And Course Creation
 
-The user provides a topic, URL, transcript, file, or agent output. Sotto extracts the important structure, writes an audio-native script, verifies references, generates audio, stitches the final episode, and places it in the private library.
+The learner chooses a native language and target language. Sotto generates or serves placement questions, scores the result, creates a `Course`, stores the `PlacementResult`, and sets the starting CEFR level.
 
-### 6.2 Interactive Playback
+### 6.2 Mastery-Gated Classes
 
-The user can pause an episode and ask a contextual question. Sotto answers using the episode script, current timestamp, source material, and user settings. If the user chooses, the answer can be adapted into the episode so the private recording improves over time.
+The learner starts the next class in the course sequence. Sotto instantiates a `CourseClass` from the curriculum and generates grammar, reading, listening, speaking, and writing sections. The learner advances only after demonstrating mastery. Failed sections regenerate in a similar-but-not-identical form.
 
-### 6.3 Private RSS
+### 6.3 Adaptive Listening
 
-The user creates one or more private RSS tokens. Tokens are displayed once, stored only as hashes, and can be revoked. Podcast apps receive only the user's ready, non-deleted private and unlisted episodes.
+The listening section reuses the existing audio-generation engine: content specification, script generation, script verification, reference validation where applicable, TTS generation, stitching, and playback. Listening lessons are seeded by the lesson objective and weak or due vocabulary from the memory graph.
 
-### 6.4 Agent Ingestion
+### 6.4 Speaking And Writing Feedback
 
-Agents can send summaries, logs, task outcomes, diffs, and links into Sotto. The user can route those inputs into a daily work briefing, a project-specific podcast, or an on-demand episode.
+Speaking prompts capture learner recordings, run STT, and return pronunciation feedback through the configured STT and scoring path. Writing prompts are graded synchronously by the resolved learning LLM and return inline corrections, feedback, and a score.
 
-### 6.5 Meeting Ingestion
+### 6.5 Memory Graph And Ungated Practice
 
-Sotto should allow a user to invite an agent or recorder to meetings. The transcript and action items can become a meeting recap episode and can also be rolled into the user's daily briefing.
+Classes and practice sessions update a course-scoped graph of vocabulary and grammar. Due items drive SM-2 review, seed listening lessons, and appear in ungated practice sessions for vocabulary, grammar, reading, listening, speaking, and writing.
 
-### 6.6 World News Briefing
+### 6.6 Practice Exams
 
-News should be a separate podcast stream from personal work. The user chooses sources and cadence. Sotto summarizes what happened in the world, cites source material, and avoids mixing public news with private meeting or agent content unless the user explicitly creates a combined briefing.
+Mock exams are self-assessment only. They are modeled on available flagship exam formats for the target language or on a generic CEFR structure. They return a mock band and feedback but never advance the learner's course level.
 
-### 6.7 Bot Workflows
+### 6.7 Contextual Inputs
 
-Twitter, Telegram, and webhook integrations should create private episodes for the owner. A self-hosted user can run the bot on their own VPS. A managed user can pay Sotto to host polling, webhooks, retries, and reply handling.
+Sotto can personalize learning with course notes, interests, sourced class inputs, and agent-provided context. Those inputs should feed course generation and memory extraction, not create public content streams.
 
 ---
 
@@ -143,34 +146,32 @@ Twitter, Telegram, and webhook integrations should create private episodes for t
 
 Onboarding must aggressively reduce manual setup:
 
-- The local path starts with `npm run setup`.
-- The one-key path uses a single provider for LLM, TTS, and transcription when supported.
+- The local path starts with the installer or `npm run setup`.
+- The BYOK path uses explicit provider choices for LLM, TTS, and STT.
 - The local-agent path detects available CLIs and explains only the missing pieces.
-- The hosted path hides infrastructure choices during trial setup.
+- The first learning action should be placement or resuming an existing course.
 - Every setup screen should show exact missing requirements, not generic failure messages.
-- Users should be able to create a private RSS token during first-run setup.
+- No onboarding step should introduce billing, plans, quotas, public sharing, or social ranking.
 
-The first-run state should answer four questions:
+The first-run state should answer five questions:
 
-1. Where will generation run?
-2. Which provider or local agent is selected?
-3. Where will audio be stored?
-4. How will the user listen?
+1. Which native and target languages will this learner use?
+2. Where will generation run?
+3. Which provider or local agent is selected?
+4. Which TTS and STT providers are selected?
+5. What course note or context should personalize the first class?
 
 ---
 
-## 8. Business Model
+## 8. Operating Model
 
-The open source product should be useful without paying Sotto. Monetization should be optional managed infrastructure:
+The open source product should be useful without paying Sotto. The default operating model is self-hosted BYOK:
 
-- Hosted workers.
-- Hosted PostgreSQL, Redis, and storage.
-- Scheduled news and meeting ingestion.
-- Twitter, Telegram, and webhook hosting.
-- Provider-key custody for users who choose managed mode.
-- Monitoring, updates, backups, and support.
-
-The first paid plan should be activated only after a short trial. The trial should prove the recurring workflow: at least one generated episode, one private RSS subscription, and one scheduled or event-driven source.
+- The operator hosts PostgreSQL, Redis, storage, web, and workers.
+- Learners or operators provide provider keys for AI, speech, image, video, and related services when those features need external providers.
+- Local LLM, STT, and TTS paths can run without cloud keys when explicitly configured.
+- Sotto does not sell feature tiers, daily quota upgrades, generation credits, or paid unlocks.
+- Provider costs belong to the key owner and remain visible for operations, not monetization.
 
 ---
 
@@ -179,11 +180,12 @@ The first paid plan should be activated only after a short trial. The trial shou
 The open source release is credible when:
 
 - A technical user can run the app locally from the README without Doppler.
-- A user can generate an episode with a single provider key.
-- A user can use a local agent plus a TTS provider.
-- A user can create and revoke private RSS tokens.
-- Social schema tables, social routes, and social UI are absent.
-- Docs and tests consistently describe the private-first product.
-- The hosted plan is framed as managed infrastructure, not gated privacy.
+- A learner can take placement and start a course for a language pair.
+- A learner can complete or retry a mastery-gated class across the five skills.
+- Listening sections use the reused audio engine without presenting Sotto as a podcast platform.
+- Speaking, writing, practice, exams, notes, and the memory graph are documented as current behavior where they exist.
+- BYOK and local-agent setup errors are explicit.
+- Social schema tables, social routes, social UI, billing gates, plans, tiers, and quota language are absent from the current product docs.
+- Full learning features are available without Sotto billing or plan state.
 
-Longer-term product success is visible when users keep recurring private audio streams connected after the novelty of generation wears off.
+Longer-term product success is visible when learners keep returning because the memory graph, mastery gates, and contextual lessons measurably help them progress.

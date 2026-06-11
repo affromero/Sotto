@@ -7,8 +7,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { ContentModerationError } from '@/lib/moderation';
-import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
@@ -20,33 +19,10 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   logger.info('Processing interaction', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  const [hasTts, podcast, user, userPlan] = await Promise.all([
-    hasByokKey(userId),
+  const [podcast, user] = await Promise.all([
     prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true, aiModel: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
-
-  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts, userPlan.role);
-
-  // Enforce Q&A interaction limit for free users
-  if (isFinite(tierFeatures.maxQaInteractions)) {
-    const existingCount = await prisma.interaction.count({
-      where: { podcastId, userId, answer: { not: null } },
-    });
-    if (existingCount >= tierFeatures.maxQaInteractions) {
-      await prisma.interaction.update({
-        where: { id: interactionId },
-        data: {
-          answer: `You've reached the Q&A limit for free podcasts (${tierFeatures.maxQaInteractions} questions). Upgrade to Pro for unlimited Q&A.`,
-          status: 'ANSWERED',
-        },
-      });
-      logger.info('Q&A limit reached', { userId, podcastId, limit: tierFeatures.maxQaInteractions });
-      await job.updateProgress(100);
-      return;
-    }
-  }
 
   const aiKey = podcast?.aiModel ? null : await getAiKey(userId);
   if (!podcast?.aiModel && !aiKey) {
@@ -57,7 +33,6 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast?.aiModel,
     aiKey,
-    plan: userPlan.plan as 'FREE' | 'PRO',
   });
 
   const providerAiKey =

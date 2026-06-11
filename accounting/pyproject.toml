@@ -7,12 +7,10 @@ dependencies = [
     "beancount>=3.0.0",
     "fava>=1.29",
     "psycopg[binary]>=3.1",
-    "stripe>=8.0",
 ]
 
 [project.scripts]
 import-api-usage = "scripts.import_api_usage:main"
-import-stripe = "scripts.import_stripe:main"
 monthly-close = "scripts.monthly_close:main"
 reports = "scripts.generate_reports:main"
 

@@ -25,7 +25,7 @@ export async function processSegmentRegeneration(
   logger.info('Regenerating segment', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  // Fetch podcast + user plan to determine voice configuration
+  // Fetch podcast to determine voice configuration
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
     select: {
@@ -34,7 +34,6 @@ export async function processSegmentRegeneration(
       voices: { select: { speaker: true, voiceId: true, provider: true } },
       ttsProvider: true,
       ttsModel: true,
-      user: { select: { plan: true } },
     },
   });
 
@@ -64,7 +63,6 @@ export async function processSegmentRegeneration(
     podcastId,
     requestedProvider: podcast.ttsProvider as TtsProviderId,
     requestedModel: podcast.ttsModel,
-    plan: podcast.user.plan as 'FREE' | 'PRO',
     language: podcast.language,
   });
 
@@ -176,12 +174,6 @@ export async function processSegmentRegeneration(
   await prisma.interaction.update({
     where: { id: interactionId },
     data: { status: 'INCORPORATED', incorporated: true },
-  });
-
-  // Mark all READY voice tracks as stale — they're missing the new segment's audio
-  await prisma.voiceTrack.updateMany({
-    where: { podcastId, status: 'READY' },
-    data: { status: 'STALE' },
   });
 
   // Mark READY video generation as stale — segment timeline has shifted

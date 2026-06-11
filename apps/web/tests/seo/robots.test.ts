@@ -28,17 +28,14 @@ describe('robots.ts', () => {
   it('disallows private paths for all user agents', () => {
     const defaultRule = rules.find((r) => r.userAgent === '*')!;
     const disallowed = defaultRule.disallow;
-    expect(disallowed).toContain('/api/');
+    expect(disallowed).toContain('/api/v1/');
     expect(disallowed).toContain('/admin');
     expect(disallowed).toContain('/auth/');
     expect(disallowed).toContain('/dashboard');
     expect(disallowed).toContain('/create');
     expect(disallowed).toContain('/settings');
-    expect(disallowed).toContain('/billing');
-    expect(disallowed).toContain('/analytics');
-    expect(disallowed).toContain('/onboarding');
+    expect(disallowed).toContain('/welcome');
     expect(disallowed).toContain('/team');
-    expect(disallowed).toContain('/pitch');
     expect(disallowed).toContain('/_next/');
     expect(disallowed).not.toContain('/profile/');
   });

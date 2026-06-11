@@ -16,7 +16,7 @@ test.describe('Landing Page', () => {
   });
 
   test('static pages load without errors', async ({ page }) => {
-    const staticPages = ['/about', '/pricing', '/changelog', '/support', '/privacy', '/terms'];
+    const staticPages = ['/about', '/changelog', '/support', '/privacy', '/terms'];
     for (const path of staticPages) {
       await page.goto(path);
       await expect(page.locator('body')).toBeVisible();

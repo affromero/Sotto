@@ -283,6 +283,66 @@ describe('generateScript', () => {
     });
   });
 
+  describe('language learning instructions', () => {
+    it('injects the target-language and vocabulary instructions into the system prompt for a learning podcast', async () => {
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          turns: [{ speaker: 'HOST', text: '[V1:Guten Morgen]!' }, { speaker: 'EXPERT', text: 'Ja.' }],
+          soundCues: [],
+          references: [],
+          vocabulary: [],
+        }),
+        inputTokens: 400,
+        outputTokens: 500,
+      });
+
+      await generateScript({
+        topic: 'Daily greetings',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        focusAreas: [],
+        tone: 'casual',
+        durationTarget: 4,
+        targetLanguage: 'de',
+        languageMode: 'conversational_mix',
+        forLearning: true,
+        mustIncludeVocabulary: [{ word: 'sprechen', translation: 'to speak' }],
+      });
+
+      const systemPrompt = mockGenerateResponse.mock.calls[0][0] as string;
+      expect(systemPrompt).toContain('LANGUAGE LEARNING');
+      expect(systemPrompt).toContain('[V{N}:word]');
+      expect(systemPrompt).toContain('"vocabulary" array');
+      // the learner's required SRS review item must reach the prompt
+      expect(systemPrompt).toContain('sprechen');
+    });
+
+    it('omits language instructions for a standard English podcast', async () => {
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          turns: [{ speaker: 'HOST', text: 'Hello.' }, { speaker: 'EXPERT', text: 'Hi.' }],
+          soundCues: [],
+          references: [],
+        }),
+        inputTokens: 300,
+        outputTokens: 400,
+      });
+
+      await generateScript({
+        topic: 'Quantum Computing',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'casual',
+        durationTarget: 10,
+      });
+
+      const systemPrompt = mockGenerateResponse.mock.calls[0][0] as string;
+      expect(systemPrompt).not.toContain('LANGUAGE LEARNING');
+      expect(systemPrompt).not.toContain('[V{N}:word]');
+    });
+  });
+
   describe('citation parsing', () => {
     it('parses inline citations from script turns', async () => {
       const mockResponse = {

@@ -30,9 +30,9 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---- Imports under test ----
-import { GET, POST } from '@/app/api/classes/[classId]/route';
-import { POST as POSTSubmit } from '@/app/api/classes/[classId]/submit/route';
-import { POST as POSTNextClass } from '@/app/api/courses/[courseId]/next-class/route';
+import { GET, POST } from '@/app/api/v1/classes/[classId]/route';
+import { POST as POSTSubmit } from '@/app/api/v1/classes/[classId]/submit/route';
+import { POST as POSTNextClass } from '@/app/api/v1/courses/[courseId]/next-class/route';
 import { CourseNotFoundError } from '@/lib/class-service';
 
 // ---- Helpers ----
@@ -127,9 +127,9 @@ const SAMPLE_CLASS_SUBMITTED = {
   submission: { passed: true, overallScore: 1, submittedAt: new Date('2026-01-01T00:00:00Z') },
 };
 
-// ---- GET /api/classes/[classId] ----
+// ---- GET /api/v1/classes/[classId] ----
 
-describe('GET /api/classes/[classId]', () => {
+describe('GET /api/v1/classes/[classId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
@@ -139,7 +139,7 @@ describe('GET /api/classes/[classId]', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -152,7 +152,7 @@ describe('GET /api/classes/[classId]', () => {
     mockGetClassForUser.mockResolvedValue(null);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -163,7 +163,7 @@ describe('GET /api/classes/[classId]', () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_UNSUBMITTED);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -184,7 +184,7 @@ describe('GET /api/classes/[classId]', () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_SPEAKING);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -204,7 +204,7 @@ describe('GET /api/classes/[classId]', () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_LISTENING);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -221,7 +221,7 @@ describe('GET /api/classes/[classId]', () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_SUBMITTED);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -238,7 +238,7 @@ describe('GET /api/classes/[classId]', () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_UNSUBMITTED);
 
     const res = await GET(
-      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
       classParams('class-1'),
     );
 
@@ -251,9 +251,9 @@ describe('GET /api/classes/[classId]', () => {
   });
 });
 
-// ---- POST /api/classes/[classId] (regenerate) ----
+// ---- POST /api/v1/classes/[classId] (regenerate) ----
 
-describe('POST /api/classes/[classId] (regenerate)', () => {
+describe('POST /api/v1/classes/[classId] (regenerate)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
@@ -263,7 +263,7 @@ describe('POST /api/classes/[classId] (regenerate)', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
     const res = await POST(
-      makeRequest('http://localhost/api/classes/class-1', 'POST'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
       classParams('class-1'),
     );
 
@@ -274,7 +274,7 @@ describe('POST /api/classes/[classId] (regenerate)', () => {
     mockRegenerateFailedSections.mockResolvedValue(true);
 
     const res = await POST(
-      makeRequest('http://localhost/api/classes/class-1', 'POST'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
       classParams('class-1'),
     );
 
@@ -287,7 +287,7 @@ describe('POST /api/classes/[classId] (regenerate)', () => {
     mockRegenerateFailedSections.mockResolvedValue(false);
 
     const res = await POST(
-      makeRequest('http://localhost/api/classes/class-1', 'POST'),
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
       classParams('class-1'),
     );
 
@@ -295,9 +295,9 @@ describe('POST /api/classes/[classId] (regenerate)', () => {
   });
 });
 
-// ---- POST /api/classes/[classId]/submit ----
+// ---- POST /api/v1/classes/[classId]/submit ----
 
-describe('POST /api/classes/[classId]/submit', () => {
+describe('POST /api/v1/classes/[classId]/submit', () => {
   const VALID_ANSWERS = [
     { questionId: 'q1', selectedIndex: 0 },
     { questionId: 'q2', selectedIndex: 1 },
@@ -320,7 +320,7 @@ describe('POST /api/classes/[classId]/submit', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
       classParams('class-1'),
     );
 
@@ -329,7 +329,7 @@ describe('POST /api/classes/[classId]/submit', () => {
 
   it('returns 400 when answers array is empty', async () => {
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/classes/class-1/submit', 'POST', { answers: [] }),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: [] }),
       classParams('class-1'),
     );
 
@@ -339,7 +339,7 @@ describe('POST /api/classes/[classId]/submit', () => {
 
   it('returns 400 when answers field is missing', async () => {
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/classes/class-1/submit', 'POST', {}),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {}),
       classParams('class-1'),
     );
 
@@ -351,7 +351,7 @@ describe('POST /api/classes/[classId]/submit', () => {
     mockSubmitClass.mockResolvedValue(null);
 
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
       classParams('class-1'),
     );
 
@@ -362,7 +362,7 @@ describe('POST /api/classes/[classId]/submit', () => {
     mockSubmitClass.mockResolvedValue(SUBMIT_RESULT);
 
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
       classParams('class-1'),
     );
 
@@ -376,7 +376,7 @@ describe('POST /api/classes/[classId]/submit', () => {
 
   it('rejects selectedIndex outside 0-3', async () => {
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/classes/class-1/submit', 'POST', {
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
         answers: [{ questionId: 'q1', selectedIndex: 5 }],
       }),
       classParams('class-1'),
@@ -387,9 +387,9 @@ describe('POST /api/classes/[classId]/submit', () => {
   });
 });
 
-// ---- POST /api/courses/[courseId]/next-class ----
+// ---- POST /api/v1/courses/[courseId]/next-class ----
 
-describe('POST /api/courses/[courseId]/next-class', () => {
+describe('POST /api/v1/courses/[courseId]/next-class', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
@@ -399,7 +399,7 @@ describe('POST /api/courses/[courseId]/next-class', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
     const res = await POSTNextClass(
-      makeRequest('http://localhost/api/courses/course-1/next-class', 'POST'),
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
       courseParams('course-1'),
     );
 
@@ -410,7 +410,7 @@ describe('POST /api/courses/[courseId]/next-class', () => {
     mockCreateNextClass.mockResolvedValue({ kind: 'created', classId: 'class-new' });
 
     const res = await POSTNextClass(
-      makeRequest('http://localhost/api/courses/course-1/next-class', 'POST'),
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
       courseParams('course-1'),
     );
 
@@ -427,7 +427,7 @@ describe('POST /api/courses/[courseId]/next-class', () => {
     });
 
     const res = await POSTNextClass(
-      makeRequest('http://localhost/api/courses/course-1/next-class', 'POST'),
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
       courseParams('course-1'),
     );
 
@@ -441,7 +441,7 @@ describe('POST /api/courses/[courseId]/next-class', () => {
     mockCreateNextClass.mockResolvedValue({ kind: 'done' });
 
     const res = await POSTNextClass(
-      makeRequest('http://localhost/api/courses/course-1/next-class', 'POST'),
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
       courseParams('course-1'),
     );
 
@@ -454,7 +454,7 @@ describe('POST /api/courses/[courseId]/next-class', () => {
     mockCreateNextClass.mockRejectedValue(new CourseNotFoundError('Course not found'));
 
     const res = await POSTNextClass(
-      makeRequest('http://localhost/api/courses/course-1/next-class', 'POST'),
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
       courseParams('course-1'),
     );
 
@@ -467,7 +467,7 @@ describe('POST /api/courses/[courseId]/next-class', () => {
     mockCreateNextClass.mockRejectedValue(new Error('AI meltdown'));
 
     const res = await POSTNextClass(
-      makeRequest('http://localhost/api/courses/course-1/next-class', 'POST'),
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
       courseParams('course-1'),
     );
 

@@ -113,8 +113,6 @@ export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
 
 // ---------------------------------------------------------------------------
 // Mistral Voxtral TTS voices — voice_id values for the Mistral API.
-// Voxtral also supports zero-shot voice cloning via ref_audio (base64).
-// When cloned voice is available, it's used instead of these presets.
 // ---------------------------------------------------------------------------
 
 // Verified against Mistral API 2026-03-29. Preset voices (user_id=null).
@@ -132,6 +130,40 @@ export const MISTRAL_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Kokoro-82M voices — local sidecar (keyless). Voice ids follow Kokoro's
+// `{lang}{gender}_{name}` convention; the sidecar derives the synthesis language
+// from the id prefix. Curated cross-section across the 8 supported languages
+// (en/es/fr/it/pt/hi/ja/zh), balanced by gender. Voices are cross-lingual.
+// ---------------------------------------------------------------------------
+
+export const KOKORO_VOICE_POOL: ProviderVoice[] = [
+  // English (US + UK)
+  { id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' },
+  { id: 'af_bella', name: 'Bella', gender: 'female', character: 'engaging storyteller' },
+  { id: 'am_adam', name: 'Adam', gender: 'male', character: 'confident presenter' },
+  { id: 'am_michael', name: 'Michael', gender: 'male', character: 'authoritative expert' },
+  { id: 'bf_emma', name: 'Emma', gender: 'female', character: 'polished professional' },
+  { id: 'bm_george', name: 'George', gender: 'male', character: 'warm mentor' },
+  // Spanish
+  { id: 'ef_dora', name: 'Dora', gender: 'female', character: 'friendly conversationalist' },
+  { id: 'em_alex', name: 'Alex', gender: 'male', character: 'casual and curious' },
+  // French
+  { id: 'ff_siwis', name: 'Siwis', gender: 'female', character: 'enthusiastic explainer' },
+  // Italian
+  { id: 'if_sara', name: 'Sara', gender: 'female', character: 'calm and authoritative' },
+  { id: 'im_nicola', name: 'Nicola', gender: 'male', character: 'polished professional' },
+  // Portuguese
+  { id: 'pf_dora', name: 'Dora', gender: 'female', character: 'upbeat storyteller' },
+  { id: 'pm_alex', name: 'Alex', gender: 'male', character: 'friendly conversationalist' },
+  // Hindi
+  { id: 'hf_alpha', name: 'Alpha', gender: 'female', character: 'articulate intellectual' },
+  // Japanese
+  { id: 'jf_alpha', name: 'Alpha', gender: 'female', character: 'engaging storyteller' },
+  // Chinese
+  { id: 'zm_yunjian', name: 'Yunjian', gender: 'male', character: 'authoritative expert' },
+];
+
+// ---------------------------------------------------------------------------
 // Provider → voice pool map (auto-populated, never needs manual updates)
 // ---------------------------------------------------------------------------
 
@@ -144,6 +176,7 @@ const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
   replicate: FAL_VOICE_POOL,
   minimax: MINIMAX_VOICE_POOL,
   mistral: MISTRAL_VOICE_POOL,
+  kokoro: KOKORO_VOICE_POOL,
 };
 
 /** Voice IDs that can't be derived from a pool (legacy IDs, sidecar presets). */

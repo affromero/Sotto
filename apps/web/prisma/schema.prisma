@@ -21,11 +21,6 @@ enum UserRole {
   SYSTEM
 }
 
-enum UserPlan {
-  FREE
-  PRO
-}
-
 // ============ VIDEO GENERATION ============
 
 enum VisualType {
@@ -55,13 +50,6 @@ enum VideoStatus {
   STALE
 }
 
-enum MusicStatus {
-  PENDING
-  GENERATING
-  READY
-  FAILED
-}
-
 // ============ USERS & AUTH ============
 
 model User {
@@ -76,9 +64,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Twitter integration
-  twitterHandle        String? @unique
-  twitterEnabled       Boolean @default(false)
+  // Local profile sign-in (self-hosted). passwordHash is scrypt (lib/password.ts);
+  // forcePasswordChange makes a member set a new password on first sign-in;
+  // tokenVersion is bumped to invalidate active JWT sessions (member removal,
+  // password reset). All null/zero for OAuth-only accounts.
+  passwordHash        String?
+  forcePasswordChange Boolean @default(false)
+  tokenVersion        Int     @default(0)
+
   preferredLanguage    String?
   preferredTtsProvider String?
   preferredTtsModel    String?
@@ -88,10 +81,6 @@ model User {
   // Notification preferences
   emailNotifications Boolean @default(true)
   pushNotifications  Boolean @default(true)
-
-  // Telegram integration
-  telegramEnabled Boolean @default(false)
-  telegramChatId  String?
 
   // Relations
   accounts            Account[]
@@ -104,14 +93,13 @@ model User {
   apiUsageLogs        ApiUsageLog[]
   pushSubscriptions   PushSubscription[]
   expoPushTokens      ExpoPushToken[]
-  voiceClones         VoiceClone[]
 
   // Saves
   saves Save[]
 
   // API Keys
-  apiKeys           ApiKey[]
-  privateFeedTokens PrivateFeedToken[]
+  apiKeys       ApiKey[]
+  pairingTokens PairingToken[]
 
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
@@ -119,60 +107,17 @@ model User {
   // BYOK AI keys (LLM providers)
   userAiKeys UserAiKey[]
 
-  // Collections
-  collections Collection[]
-
   // Interests (onboarding + settings)
   interests              UserInterest[]
   hasCompletedOnboarding Boolean        @default(false)
 
-  // Voice requests
-  voiceRequestsSent     VoiceRequest[] @relation("VoiceRequester")
-  voiceRequestsReceived VoiceRequest[] @relation("VoiceOwner")
-
-  // Voice allowlist
-  voiceAllowlistEntries VoiceAllowlist[] @relation("VoiceAllowlisted")
-
-  // Podcast ratings
-  podcastRatings PodcastRating[]
-
   // Taste quiz
   tasteQuizAnswers TasteQuizAnswer[]
-
-  // Saved ideas
-  savedIdeas SavedIdea[]
-
-  // Podcast ideas (from Telegram bot)
-  podcastIdeas PodcastIdea[]
 
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
 
-  // Free tier
-  dailyGenerationOverride Int? // null = use global, 0 = unlimited, N = custom daily limit
-
-  // Budget enforcement
-  spentMonthCents   Int       @default(0)
-  budgetMonthCents  Int       @default(0) // 0 = no budget limit
-  spentMonthResetAt DateTime?
-
-  // Subscription plan
-  plan         UserPlan      @default(FREE)
-  subscription Subscription?
-
-  // Moderation
-  bannedAt        DateTime?
-  bannedReason    String?   @db.Text
-  suspendedUntil  DateTime?
-  suspendedReason String?   @db.Text
-  warningCount    Int       @default(0)
-
-  // Moderation relations
-  moderationActions   ModerationAction[] @relation("ModeratedUser")
-  moderationPerformed ModerationAction[] @relation("Moderator")
-  reports             Report[]           @relation("Reporter")
-  claimReports        ClaimReport[]      @relation("ClaimReporter")
-
+  warningCount Int @default(0)
   // Referrals
   referredById       String?
   referredBy         User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
@@ -180,59 +125,25 @@ model User {
   referralVerified   Boolean   @default(false)
   referralVerifiedAt DateTime?
 
-  // Stripe Connect (voice monetization)
-  stripeAccountId String?
-  stripeOnboarded Boolean @default(false)
-
-  // Voice purchases
-  voicePurchases VoicePurchase[] @relation("VoiceBuyer")
-
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
-
-  // Per-provider free tier usage tracking
-  freeProviderUsage FreeProviderUsage[]
-
-  // Voice track contributions (re-voice proposals)
-  voiceTrackContributions VoiceTrack[] @relation("VoiceTrackContributions")
 
   // Invitation links created by admin
   invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
 
-  // Demo projects (admin video studio)
-  demoProjects DemoProject[]
-
   // Avatar images (lip-sync)
-  avatarImages         AvatarImage[]
-  avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
-  avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
+  avatarImages AvatarImage[]
 
   // Language learning
   courses            Course[]
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
+  mockExams          MockExam[]
 
   @@index([role])
   @@index([handle])
   @@index([referredById])
-}
-
-model Subscription {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId     String   @unique
-  stripeSubscriptionId String   @unique
-  stripePriceId        String
-  status               String // active | canceled | past_due | trialing
-  currentPeriodEnd     DateTime
-  cancelAtPeriodEnd    Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  @@index([stripeCustomerId])
-  @@index([stripeSubscriptionId])
 }
 
 model Account {
@@ -332,26 +243,10 @@ model Podcast {
   waveformUrl    String?
   spectrogramUrl String?
 
-  // Background music
-  musicUrl    String?
-  musicVolume Float   @default(0.15)
-  musicBaked  Boolean @default(false)
-
-  // Import fields
-  importedAudioKey     String?
-  originalFormat       String?
-  transcriptProvided   Boolean @default(false)
-  isHumanContent       Boolean @default(false)
+  // Content/verification flags
   lowReferences        Boolean @default(false)
   verificationProgress Json? // transient progress during reference validation
   sourcePlatform       String? // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
-
-  // AI-suggested metadata (for imports where user provided their own)
-  suggestedTitle String?
-  suggestedTopic String? @db.Text
-
-  // Draft data (voice/config JSON, cleared on generation)
-  draftData Json?
 
   // Relations
   user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -365,29 +260,17 @@ model Podcast {
   pipelineEvents      PipelineEvent[]
   references          Reference[]
   versions            PodcastVersion[]
-  playbackSessions    PlaybackSession[]
-  podcastFeature      PodcastFeature?
-  listeningQueues     ListeningQueue[]
-  collectionItems     CollectionItem[]
-  savedIdea           SavedIdea?
   voices              PodcastVoice[]
-  voicePurchases      VoicePurchase[]
-  ratings             PodcastRating[]
-  claimReports        ClaimReport[]
-  voiceTracks         VoiceTrack[]
-  voiceTrackProposals VoiceTrack[]       @relation("VoiceTrackProposals")
-  defaultVoiceTrackId String?
   videoGenerations    VideoGeneration[]
-  musicGenerations    MusicGeneration[]
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   agentIngestion      AgentIngestion?
-  landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
   vocabularyEntries   VocabularyEntry[]
   classSection        ClassSection?
+  examSection         ExamSection?
   practiceSession     PracticeSession?
 
   @@unique([userId, slug])
@@ -400,7 +283,6 @@ model Podcast {
 }
 
 enum PodcastStatus {
-  DRAFT
   PENDING
   DISCOVERING
   EXTRACTING
@@ -605,7 +487,6 @@ model Segment {
   updatedAt DateTime @updatedAt
 
   podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  voiceTrackSegments VoiceTrackSegment[]
   segmentVisuals     SegmentVisual[]
   transitionsFrom    SegmentTransition[] @relation("TransitionFrom")
   transitionsTo      SegmentTransition[] @relation("TransitionTo")
@@ -736,33 +617,6 @@ model Save {
   @@index([podcastId])
 }
 
-// ============ PODCAST RATINGS ============
-
-model PodcastRating {
-  id        String @id @default(cuid())
-  userId    String
-  podcastId String
-
-  voiceNaturalness    Int // 1-5: "How natural do the voices sound?"
-  contentAccuracy     Int // 1-5: "Did the AI get the facts right?"
-  conversationFlow    Int // 1-5: "Does the back-and-forth feel natural?"
-  overallSatisfaction Int // 1-5: overall summary
-
-  comment           String? @db.Text
-  isCreator         Boolean @default(true)
-  completionPercent Float?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, podcastId])
-  @@index([podcastId])
-  @@index([podcastId, isCreator])
-}
-
 // ============ TAGS ============
 
 model Tag {
@@ -829,25 +683,6 @@ model TasteQuizAnswer {
   @@index([userId])
 }
 
-// ============ SAVED IDEAS ============
-
-model SavedIdea {
-  id         String   @id @default(cuid())
-  userId     String
-  questionId String
-  question   String
-  tagSlugs   String[]
-  category   String
-  podcastId  String?  @unique
-  createdAt  DateTime @default(now())
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-
-  @@unique([userId, questionId])
-  @@index([userId, createdAt])
-}
-
 // ============ NOTIFICATIONS ============
 
 model Notification {
@@ -871,54 +706,16 @@ enum NotificationType {
   PODCAST_READY
   PODCAST_FAILED
   KEY_INVALID
-  VOICE_REQUEST_RECEIVED
-  VOICE_REQUEST_APPROVED
-  VOICE_REQUEST_DENIED
   QUESTION_ON_YOUR_PODCAST
   SCRIPT_READY
   ACCOUNT_WARNING
-  ACCOUNT_SUSPENDED
-  ACCOUNT_BANNED
   CONTENT_REMOVED
   PLATFORM_ANNOUNCEMENT
-  VOICE_VERIFICATION_REQUIRED
-  VOICE_VERIFICATION_PASSED
-  VOICE_VERIFICATION_FAILED
-  VOICE_BLOCKED_DUPLICATE
-  VOICE_OWNERSHIP_ALERT
-  CLAIM_REPORT_ON_YOUR_PODCAST
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
-  VOICE_TRACK_FAILED
   VIDEO_READY
   VIDEO_FAILED
   AVATAR_FAILED
-  MUSIC_READY
-  MUSIC_FAILED
-  RENDITION_PROPOSED
-  RENDITION_ACCEPTED
-  RENDITION_REJECTED
-  AVATAR_IMAGE_REQUEST_RECEIVED
-  AVATAR_IMAGE_REQUEST_APPROVED
-  AVATAR_IMAGE_REQUEST_DENIED
-  AVATAR_IMAGE_REQUEST_REVOKED
-}
-
-// ============ MODERATION ============
-
-model ModerationAction {
-  id          String   @id @default(cuid())
-  userId      String
-  moderatorId String
-  action      String // 'warn' | 'suspend' | 'ban' | 'unban' | 'unsuspend' | 'remove_content'
-  reason      String   @db.Text
-  metadata    Json?
-  createdAt   DateTime @default(now())
-
-  user      User @relation("ModeratedUser", fields: [userId], references: [id], onDelete: Cascade)
-  moderator User @relation("Moderator", fields: [moderatorId], references: [id])
-
-  @@index([userId, createdAt])
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -1058,256 +855,6 @@ enum FeedbackStatus {
   ARCHIVED
 }
 
-// ============ PODCAST IDEAS (Telegram Save-for-Later) ============
-
-model PodcastIdea {
-  id        String   @id @default(cuid())
-  userId    String
-  text      String   @db.Text
-  sourceUrl String?
-  source    String   @default("telegram")
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-}
-
-// ============ RECOMMENDATION ENGINE ============
-
-model RecommendationLog {
-  id              String   @id @default(cuid())
-  userId          String
-  podcastId       String
-  surface         String // picks, explore, trending
-  position        Int
-  score           Float
-  signals         Json // {relevance, collaborative, quality, freshness, novelty}
-  explanation     String   @db.Text
-  impressed       Boolean  @default(false)
-  clicked         Boolean  @default(false)
-  queued          Boolean  @default(false)
-  listenedPercent Float?
-  refreshBatch    Int      @default(0)
-  createdAt       DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@index([podcastId, createdAt])
-  @@index([surface, createdAt])
-}
-
-model ListeningQueue {
-  id        String   @id @default(cuid())
-  userId    String
-  podcastId String
-  position  Int
-  addedAt   DateTime @default(now())
-  source    String // picks, explore, search
-
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, podcastId])
-  @@index([userId, position])
-}
-
-// ============ ML FEATURE STORE ============
-
-model UserFeature {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  // Engagement
-  totalListenMinutes    Float @default(0)
-  totalPodcastsListened Int   @default(0)
-  avgCompletionRate     Float @default(0)
-  avgListenSpeed        Float @default(1)
-
-  // Abandonment
-  avgAbandonPercent Float @default(0)
-  optimalDuration   Float @default(10) // minutes where highest completion
-
-  // Preferences (inferred from behavior)
-  preferredDepth         String? // eli5, quick_overview, standard, deep_dive
-  preferredTone          String? // casual, professional, socratic
-  preferredAudienceLevel String? // beginner, intermediate, expert
-  preferredDuration      Float? // minutes
-
-  // Affinities
-  topicAffinity Json? // [{tagId, weight}]
-  voiceAffinity Json? // [{voiceId, completionRate}]
-
-  // Private activity
-  interactionRate Float @default(0)
-  creatorLoyalty  Float @default(0)
-
-  // Behavioral
-  archetype           String? // deep_listener, skimmer, explorer, completer, active_learner
-  speakerPreference   Float   @default(0) // -1 to 1
-  noveltyResponseRate Float   @default(0)
-
-  // Temporal
-  peakListeningHours   Json? // [{hour, listenMinutes}]
-  postListenBehavior   Json? // {saved: pct, asked: pct, rated: pct, ...}
-  topicProgressionPath Json? // [{topic, depth, timestamp}]
-
-  // Recency
-  daysSinceLastListen Float @default(0)
-  listenFrequency     Float @default(0)
-
-  // Vector (pgvector)
-  embedding Unsupported("vector(384)")?
-
-  computedAt DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([userId])
-  @@index([archetype])
-}
-
-model PodcastFeature {
-  id        String @id @default(cuid())
-  podcastId String @unique
-
-  // Quality
-  avgCompletionRate    Float @default(0)
-  medianCompletionRate Float @default(0)
-  totalUniqueListeners Int   @default(0)
-  totalListenMinutes   Float @default(0)
-
-  // Private activity
-  saveToListenRatio Float @default(0)
-  interactionRate   Float @default(0)
-
-  // Abandonment
-  abandonmentCurve        Json? // [{percentBucket, abandonRate}] in 5% increments
-  segmentAbandonRates     Json? // [{segmentOrder, speaker, abandonRate}]
-  questionThenAbandonRate Float @default(0)
-
-  // Playback
-  avgListenSpeed    Float @default(1)
-  speedDistribution Json? // {1x: pct, 1.25x: pct, ...}
-  dropoffPoints     Json? // [{position, dropoffRate}]
-  seekHotspots      Json? // [{position, seekCount}]
-
-  // Re-engagement
-  relistenRate       Float @default(0)
-  completionBySource Json? // {feed: pct, recommendation: pct, search: pct, direct: pct}
-
-  // Content
-  segmentCount              Int   @default(0)
-  durationSeconds           Int   @default(0)
-  referenceCount            Int   @default(0)
-  verifiedReferenceRate     Float @default(0)
-  questionDensityByPosition Json? // [{percentBucket, questionsPerListener}]
-
-  // Vector (pgvector)
-  embedding Unsupported("vector(384)")?
-
-  podcast    Podcast  @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  computedAt DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([podcastId])
-  @@index([avgCompletionRate])
-}
-
-// ============ BEHAVIORAL EVENTS (ML Data Pipeline) ============
-
-model BehavioralEvent {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  userId    String?
-  sessionId String
-  eventType String // e.g. playback.play, feed.impression
-  eventData Json // event-specific payload
-
-  podcastId  String?
-  pageUrl    String?   @db.Text
-  deviceType String?
-  userAgent  String?   @db.VarChar(512)
-  referrer   String?   @db.Text
-  clientTs   DateTime?
-
-  @@index([userId, eventType, createdAt])
-  @@index([podcastId, eventType, createdAt])
-  @@index([sessionId, createdAt])
-  @@index([eventType, createdAt])
-  @@index([createdAt])
-}
-
-model UserSession {
-  id         String   @id @default(cuid())
-  sessionId  String   @unique
-  userId     String?
-  startedAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
-
-  deviceType String?
-  userAgent  String? @db.VarChar(512)
-  ipHash     String? @db.VarChar(64) // SHA-256 of IP, never raw
-  country    String? @db.VarChar(2) // ISO 3166-1 alpha-2 (e.g. "US")
-  referrer   String? @db.Text
-  pageCount  Int     @default(1)
-
-  @@index([userId, startedAt])
-  @@index([sessionId])
-  @@index([country])
-}
-
-model PlaybackSession {
-  id        String    @id @default(cuid())
-  userId    String?
-  sessionId String
-  podcastId String
-  startedAt DateTime  @default(now())
-  endedAt   DateTime?
-
-  // Aggregates
-  totalListenSeconds Float @default(0)
-  maxPosition        Float @default(0)
-  completionPercent  Float @default(0)
-
-  // Behavior
-  pauseCount     Int   @default(0)
-  seekCount      Int   @default(0)
-  speedChanges   Int   @default(0)
-  lastSpeed      Float @default(1)
-  interruptCount Int   @default(0)
-
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([userId, podcastId])
-  @@index([podcastId, startedAt])
-  @@index([userId, startedAt])
-}
-
-// ============ WAITLIST ============
-
-enum WaitlistStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model Waitlist {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  twitterHandle String?
-  source        String?
-  wishlist      String?
-  referralCode  String?
-  status        WaitlistStatus @default(PENDING)
-  unsubscribed  Boolean        @default(false)
-  approvedAt    DateTime?
-  approvedBy    String?
-  signedUpAt    DateTime?
-  createdAt     DateTime       @default(now())
-
-  @@index([createdAt])
-  @@index([status])
-}
-
 // ============ INVITATION LINKS ============
 
 model InvitationLink {
@@ -1344,138 +891,24 @@ model ApiKey {
   @@index([keyHash])
 }
 
-// ============ PRIVATE RSS FEEDS ============
+// ============ DEVICE PAIRING ============
 
-model PrivateFeedToken {
-  id         String    @id @default(cuid())
-  userId     String
-  name       String    @default("Private Sotto Feed")
-  tokenHash  String    @unique
-  feedType   String    @default("all")
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+// Short-lived, single-use "scan to connect" token. The QR a learner shows on the
+// server renders {serverUrl, token}; a phone/tablet redeems it for a long-lived
+// ApiKey. Only the hash is stored — the raw token lives in the QR for a few minutes.
+model PairingToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  name      String    @default("Paired device")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([revokedAt])
-}
-
-// ============ VOICE CLONES ============
-
-model VoiceClone {
-  id                 String                  @id @default(cuid())
-  userId             String
-  name               String
-  provider           String                  @default("elevenlabs")
-  externalVoiceId    String
-  sourceType         VoiceCloneSource
-  sampleUrl          String?
-  description        String?                 @db.VarChar(200)
-  requestable        Boolean                 @default(false)
-  priceInCents       Int? // null = free, 0+ = paid per-podcast
-  verificationStatus VoiceVerificationStatus @default(PENDING_VERIFICATION)
-  createdAt          DateTime                @default(now())
-
-  user                   User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  voiceRequests          VoiceRequest[]
-  allowlist              VoiceAllowlist[]
-  voicePurchases         VoicePurchase[]
-  fingerprint            VoiceFingerprint?
-  verificationChallenges VoiceVerificationChallenge[]
-  similarityMatchesAs    VoiceSimilarityMatch[]       @relation("MatchedVoice")
-  blockedMatchesAs       VoiceSimilarityMatch[]       @relation("BlockedVoice")
-
-  @@unique([userId, provider, externalVoiceId])
-  @@index([userId])
-  @@index([verificationStatus])
-}
-
-enum VoiceCloneSource {
-  UPLOAD
-  RECORD
-  IMPORT
-}
-
-enum VoiceVerificationStatus {
-  PENDING_VERIFICATION
-  AWAITING_CHALLENGE
-  CHALLENGE_SUBMITTED
-  VERIFIED
-  BLOCKED
-  REJECTED
-  ADMIN_VERIFIED
-  ADMIN_BLOCKED
-  PROTECTED
-}
-
-// ============ VOICE ALLOWLIST ============
-
-model VoiceAllowlist {
-  id            String   @id @default(cuid())
-  voiceCloneId  String
-  allowedUserId String
-  createdAt     DateTime @default(now())
-
-  voiceClone  VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-  allowedUser User       @relation("VoiceAllowlisted", fields: [allowedUserId], references: [id], onDelete: Cascade)
-
-  @@unique([voiceCloneId, allowedUserId])
-  @@index([allowedUserId])
-}
-
-// ============ VOICE FINGERPRINTS ============
-
-model VoiceFingerprint {
-  id           String   @id @default(cuid())
-  voiceCloneId String   @unique
-  embedding    Float[]
-  modelVersion String
-  audioUrl     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-}
-
-// ============ VOICE VERIFICATION CHALLENGES ============
-
-model VoiceVerificationChallenge {
-  id            String   @id @default(cuid())
-  voiceCloneId  String
-  phrase        String
-  recordingUrl  String?
-  similarity    Float?
-  passed        Boolean?
-  attemptNumber Int
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-
-  @@index([voiceCloneId])
-}
-
-// ============ VOICE SIMILARITY MATCHES ============
-
-model VoiceSimilarityMatch {
-  id             String   @id @default(cuid())
-  matchedVoiceId String
-  blockedVoiceId String
-  similarity     Float
-  resolvedBy     String?
-  resolution     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  matchedVoice VoiceClone @relation("MatchedVoice", fields: [matchedVoiceId], references: [id], onDelete: Cascade)
-  blockedVoice VoiceClone @relation("BlockedVoice", fields: [blockedVoiceId], references: [id], onDelete: Cascade)
-
-  @@index([matchedVoiceId])
-  @@index([blockedVoiceId])
+  @@index([tokenHash])
 }
 
 // ============ REFERENCES (Citations) ============
@@ -1550,34 +983,6 @@ model ReservedHandle {
   createdAt DateTime @default(now())
 }
 
-// ============ VOICE REQUESTS ============
-
-model VoiceRequest {
-  id           String             @id @default(cuid())
-  requesterId  String
-  voiceOwnerId String
-  voiceCloneId String
-  status       VoiceRequestStatus @default(PENDING)
-  message      String?            @db.Text
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-
-  requester  User       @relation("VoiceRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  voiceOwner User       @relation("VoiceOwner", fields: [voiceOwnerId], references: [id], onDelete: Cascade)
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-
-  @@unique([requesterId, voiceCloneId])
-  @@index([voiceOwnerId])
-  @@index([status])
-}
-
-enum VoiceRequestStatus {
-  PENDING
-  APPROVED
-  DENIED
-  REVOKED
-}
-
 // ============ USER TTS KEYS (Multi-Provider BYOK) ============
 
 model UserTtsKey {
@@ -1617,108 +1022,37 @@ model UserAiKey {
   @@index([userId])
 }
 
-// ============ COLLECTIONS (Curated Playlists) ============
-
-model Collection {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?  @db.Text
-  userId       String
-  isPublic     Boolean  @default(true)
-  podcastCount Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items CollectionItem[]
-
-  @@index([userId])
-}
-
-model CollectionItem {
-  id           String   @id @default(cuid())
-  collectionId String
-  podcastId    String
-  order        Int      @default(0)
-  addedAt      DateTime @default(now())
-
-  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  podcast    Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([collectionId, podcastId])
-  @@index([collectionId])
-}
-
 // ============ AUTO MODEL CONFIG ============
 
 model AutoModelConfig {
-  id                       String   @id @default("singleton")
-  freeAiProvider           String   @default("anthropic")
-  freeAiModel              String   @default("claude-haiku-4-5-20251001")
-  freeTtsProvider          String   @default("openai")
-  freeTtsModel             String   @default("tts-1-hd")
-  freeSttProvider          String   @default("openai")
-  freeSttModel             String   @default("whisper-large-v3-turbo")
-  proAiProvider            String   @default("anthropic")
-  proAiModel               String   @default("claude-haiku-4-5-20251001")
-  proTtsProvider           String   @default("elevenlabs")
-  proTtsModel              String   @default("eleven_v3")
-  proSttProvider           String   @default("openai")
-  proSttModel              String   @default("whisper-large-v3-turbo")
-  platformAiProvider       String   @default("anthropic")
-  platformAiModel          String   @default("claude-haiku-4-5-20251001")
-  freeIncludedModels       Json?
-  proIncludedModels        Json?
-  freeIncludedTtsModels    Json?
-  proIncludedTtsModels     Json?
-  freeIncludedSttModels    Json?
-  proIncludedSttModels     Json?
+  id                  String   @id @default("singleton")
+  aiProvider          String   @default("anthropic")
+  aiModel             String   @default("claude-haiku-4-5-20251001")
+  ttsProvider         String   @default("openai")
+  ttsModel            String   @default("tts-1-hd")
+  sttProvider         String   @default("openai")
+  sttModel            String   @default("whisper-large-v3-turbo")
+  platformAiProvider  String   @default("anthropic")
+  platformAiModel     String   @default("claude-haiku-4-5-20251001")
+  includedModels      Json?
+  includedTtsModels   Json?
+  includedSttModels   Json?
   // Image (still images for video visuals)
-  freeImageProvider        String   @default("fal")
-  freeImageModel           String   @default("fal-flux-1-schnell")
-  proImageProvider         String   @default("fal")
-  proImageModel            String   @default("fal-flux-1-schnell")
-  freeIncludedImageModels  Json?
-  proIncludedImageModels   Json?
+  imageProvider       String   @default("fal")
+  imageModel          String   @default("fal-flux-1-schnell")
+  includedImageModels Json?
   // Video (text-to-video)
-  freeVideoProvider        String   @default("fal")
-  freeVideoModel           String   @default("fal-wan2.5-480p")
-  proVideoProvider         String   @default("fal")
-  proVideoModel            String   @default("fal-wan2.5-480p")
-  freeIncludedVideoModels  Json?
-  proIncludedVideoModels   Json?
+  videoProvider       String   @default("fal")
+  videoModel          String   @default("fal-wan2.5-480p")
+  includedVideoModels Json?
   // Avatar (lip-sync avatar overlays)
-  freeAvatarProvider       String   @default("heygen")
-  freeAvatarModel          String   @default("heygen-avatar-standard")
-  proAvatarProvider        String   @default("heygen")
-  proAvatarModel           String   @default("heygen-avatar-standard")
-  freeIncludedAvatarModels Json?
-  proIncludedAvatarModels  Json?
-  // Music (AI-generated background music)
-  freeMusicProvider        String   @default("suno")
-  freeMusicModel           String   @default("suno-v5")
-  proMusicProvider         String   @default("suno")
-  proMusicModel            String   @default("suno-v5")
-  freeIncludedMusicModels  Json?
+  avatarProvider      String   @default("heygen")
+  avatarModel         String   @default("heygen-avatar-standard")
+  includedAvatarModels Json?
   // Motion (programmatic visual rendering)
-  freeMotionProvider       String   @default("remotion")
-  proMotionProvider        String   @default("remotion")
-  proIncludedMusicModels   Json?
-  // Admin view mode: "ALL" = see everything, "PRO" = see curated PRO set
-  adminViewMode            String   @default("ALL")
-  // Daily limits (migrated from FreeTierConfig)
-  dailyGenerationLimit     Int      @default(1)
-  dailyGenerationLimitPro  Int      @default(5)
-  dailyVideoLimit          Int      @default(1)
-  dailyVideoLimitPro       Int      @default(2)
-  dailyMusicLimit          Int      @default(1)
-  dailyMusicLimitPro       Int      @default(3)
-  dailyAvatarLimit         Int      @default(1)
-  dailyAvatarLimitPro      Int      @default(1)
-  aiAllocations            Json     @default("[]")
-  ttsAllocations           Json     @default("[]")
-  updatedAt                DateTime @updatedAt
-  updatedBy                String?
+  motionProvider      String   @default("remotion")
+  updatedAt           DateTime @updatedAt
+  updatedBy           String?
 }
 
 // ============ SITE CONFIG ============
@@ -1726,283 +1060,29 @@ model AutoModelConfig {
 model SiteConfig {
   id         String   @id @default("singleton")
   openSignup Boolean  @default(false)
-  updatedAt  DateTime @updatedAt
-  updatedBy  String?
-}
 
-// ============ PLAN FEATURE CONFIG ============
+  // Local profile sign-in (the Netflix-style picker). When true, the Credentials
+  // provider is active and the profile picker is the primary sign-in. Owner-set.
+  // null means "use the default": on for self-hosted instances with no ADMIN_EMAILS.
+  localAuth Boolean?
 
-model PlanFeatureConfig {
-  id                      String   @id @default("singleton")
-  // Voice cloning (recording + ElevenLabs import) per plan
-  freeVoiceCloningEnabled Boolean  @default(false)
-  proVoiceCloningEnabled  Boolean  @default(true)
-  // Voice tracks per plan
-  freeVoiceTracksEnabled  Boolean  @default(false)
-  proVoiceTracksEnabled   Boolean  @default(true)
-  freeMaxVoiceTracks      Int      @default(0)
-  proMaxVoiceTracks       Int      @default(3)
-  // Optional paid voice sharing (disabled by default for private-first installs)
-  voiceMarketplaceEnabled Boolean  @default(false)
-  // Avatar image controls
-  avatarUploadsEnabled    Boolean  @default(true)
-  avatarGenerationEnabled Boolean  @default(false)
-  updatedAt               DateTime @updatedAt
-  updatedBy               String?
-}
-
-model FreeProviderUsage {
-  id       String @id @default(cuid())
-  userId   String
-  category String // 'ai' | 'tts'
-  provider String
-  used     Int    @default(0)
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, category, provider])
-  @@index([userId])
-}
-
-// ============ VOICE PURCHASES (Stripe) ============
-
-model VoicePurchase {
-  id                  String   @id @default(cuid())
-  buyerId             String
-  voiceCloneId        String
-  podcastId           String
-  amountCents         Int
-  platformFeeCents    Int
-  stripePaymentIntent String   @unique
-  status              String   @default("authorized") // authorized | captured | cancelled | refunded
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  buyer      User       @relation("VoiceBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-  podcast    Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([buyerId])
-  @@index([voiceCloneId])
-  @@index([podcastId])
-  @@index([stripePaymentIntent])
-}
-
-// ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============
-
-model LandingShowcase {
-  id        String @id @default("singleton")
-  podcastId String @unique
-
-  // JourneyChapter Step 2 — Script excerpt range
-  scriptTurnStart Int @default(0)
-  scriptTurnCount Int @default(2)
-
-  // JourneyChapter Step 3 — Audio clip range (seconds)
-  audioClipStart Float  @default(0)
-  audioClipEnd   Float? // null = 30s from start
-
-  // ShowcaseChapter — Video segment range
-  videoSegmentStart Int @default(0)
-  videoSegmentCount Int @default(4)
-
-  // Feature toggles — controls whether landing page shows interactive toggles
-  showAvatar Boolean @default(false)
-  showVideo  Boolean @default(false)
-
-  // BotChapter — Twitter/Telegram overrides
-  twitterHandle String  @default("andres")
-  twitterName   String  @default("Andres")
-  telegramTopic String? // null = derive from podcast topic
+  // Owner-set server infrastructure (non-secret selection only; null = fall back to env).
+  // Secrets (provider keys, R2/S3 credentials) never live here — they stay in env or the
+  // encrypted BYOK store. Set by the owner through the onboarding wizard.
+  aiProvider      String?
+  aiModel         String?
+  aiBaseUrl       String?
+  sttProvider     String?
+  sttBaseUrl      String?
+  sttModel        String?
+  ttsProvider     String?
+  ttsBaseUrl      String?
+  storageProvider String?
+  s3Bucket        String?
+  s3Region        String?
 
   updatedAt DateTime @updatedAt
   updatedBy String?
-
-  podcast Podcast @relation(fields: [podcastId], references: [id])
-
-  @@index([podcastId])
-}
-
-// ============ REPORTS ============
-
-enum ReportReason {
-  HARASSMENT
-  HATE_SPEECH
-  VIOLENCE
-  SEXUAL_CONTENT
-  MISINFORMATION
-  SPAM
-  IMPERSONATION
-  COPYRIGHT
-  VOICE_THEFT
-  MUSIC_UPLOAD
-  FALSE_HUMAN_BADGE
-  FALSE_CLAIM
-  OTHER
-}
-
-enum ReportStatus {
-  PENDING
-  REVIEWING
-  RESOLVED_ACTIONED
-  RESOLVED_DISMISSED
-  ASSET_REPLACED
-  DELISTED
-}
-
-model Report {
-  id          String       @id @default(cuid())
-  reporterId  String
-  targetType  String // 'podcast' | 'comment' | 'user'
-  targetId    String
-  reason      ReportReason
-  description String?      @db.Text
-  status      ReportStatus @default(PENDING)
-  resolvedBy  String?
-  resolution  String?      @db.Text
-  resolvedAt  DateTime?
-  createdAt   DateTime     @default(now())
-
-  // Copyright claim fields (used when reason = COPYRIGHT)
-  claimantEmail   String?
-  claimantName    String?
-  evidenceUrl     String?
-  segmentVisualId String?
-  counterNotice   String? @db.Text
-
-  reporter      User           @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  segmentVisual SegmentVisual? @relation(fields: [segmentVisualId], references: [id], onDelete: SetNull)
-
-  @@unique([reporterId, targetType, targetId])
-  @@index([status, createdAt])
-  @@index([targetType, targetId])
-}
-
-model ContentFlag {
-  id         String   @id @default(cuid())
-  targetType String // 'podcast' | 'comment' | 'discovery_message'
-  targetId   String
-  userId     String?
-  categories String[]
-  scores     Json
-  source     String // 'auto_input' | 'auto_output' | 'worker_scan'
-  reviewed   Boolean  @default(false)
-  createdAt  DateTime @default(now())
-
-  @@index([reviewed, createdAt])
-  @@index([targetType, targetId])
-}
-
-// ============ CLAIM REPORTS ============
-
-enum ClaimReportStatus {
-  PENDING
-  REVIEWING
-  RESOLVED_VERIFIED
-  RESOLVED_INACCURATE
-  DISMISSED
-}
-
-model ClaimReport {
-  id          String            @id @default(cuid())
-  reporterId  String
-  podcastId   String
-  turnIndex   Int
-  turnText    String            @db.Text
-  description String            @db.Text
-  status      ClaimReportStatus @default(PENDING)
-  resolvedBy  String?
-  resolution  String?           @db.Text
-  resolvedAt  DateTime?
-  createdAt   DateTime          @default(now())
-
-  reporter User    @relation("ClaimReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  podcast  Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([reporterId, podcastId, turnIndex])
-  @@index([podcastId, status])
-  @@index([status, createdAt])
-}
-
-// ============ VOICE TRACKS ============
-
-enum VoiceTrackStatus {
-  PENDING
-  GENERATING_AUDIO
-  STITCHING
-  READY
-  FAILED
-  STALE
-}
-
-enum ProposalStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-}
-
-model VoiceTrack {
-  id            String           @id @default(cuid())
-  podcastId     String
-  name          String
-  status        VoiceTrackStatus @default(PENDING)
-  audioUrl      String?
-  duration      Int?
-  fileSize      Int?
-  ttsProvider   String?
-  ttsModel      String?
-  failureReason String?          @db.Text
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  // Re-voice proposal fields
-  contributorId         String?
-  proposalStatus        ProposalStatus?
-  proposalMessage       String?         @db.Text
-  proposedFromPodcastId String?
-  reviewedAt            DateTime?
-  rejectionReason       String?         @db.Text
-
-  podcast             Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  contributor         User?               @relation("VoiceTrackContributions", fields: [contributorId], references: [id], onDelete: SetNull)
-  proposedFromPodcast Podcast?            @relation("VoiceTrackProposals", fields: [proposedFromPodcastId], references: [id], onDelete: SetNull)
-  voices              VoiceTrackVoice[]
-  segments            VoiceTrackSegment[]
-  avatarOverlays      AvatarOverlay[]
-  videoGenerations    VideoGeneration[]
-
-  @@index([podcastId])
-  @@index([status])
-  @@index([contributorId])
-  @@index([proposalStatus])
-}
-
-model VoiceTrackVoice {
-  id           String  @id @default(cuid())
-  voiceTrackId String
-  speaker      String
-  voiceId      String
-  provider     String? // TTS provider that assigned the voiceId
-  ttsModel     String? // TTS model for this speaker's provider
-
-  voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
-
-  @@unique([voiceTrackId, speaker])
-}
-
-model VoiceTrackSegment {
-  id           String  @id @default(cuid())
-  voiceTrackId String
-  segmentId    String
-  audioUrl     String?
-  duration     Float?
-  startTime    Float?
-  order        Int
-
-  voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
-  segment    Segment    @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-
-  @@unique([voiceTrackId, segmentId])
-  @@index([voiceTrackId])
 }
 
 // ============ AUDIO FINGERPRINTING & DUPLICATE DETECTION ============
@@ -2044,29 +1124,6 @@ model DuplicateMatch {
   @@index([status])
 }
 
-// ============ R2 USAGE MONITORING ============
-
-model R2UsageSnapshot {
-  id                  String   @id @default(cuid())
-  bucket              String
-  payloadSizeBytes    Float
-  metadataSizeBytes   Float
-  objectCount         Int
-  uploadCount         Int
-  classAOps           Int      @default(0)
-  classBOps           Int      @default(0)
-  freeOps             Int      @default(0)
-  storageCostEstimate Float    @default(0)
-  classACostEstimate  Float    @default(0)
-  classBCostEstimate  Float    @default(0)
-  totalCostEstimate   Float    @default(0)
-  prefixBreakdown     Json?
-  createdAt           DateTime @default(now())
-
-  @@index([createdAt])
-  @@index([bucket, createdAt])
-}
-
 // ============ MODEL PRICING SNAPSHOTS ============
 
 model ModelPricingSnapshot {
@@ -2089,7 +1146,6 @@ model ModelPricingSnapshot {
 model VideoGeneration {
   id             String      @id @default(cuid())
   podcastId      String
-  voiceTrackId   String?
   status         VideoStatus @default(PENDING)
   videoUrl       String?
   duration       Int? // seconds
@@ -2108,37 +1164,11 @@ model VideoGeneration {
   updatedAt      DateTime    @updatedAt
 
   podcast        Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  voiceTrack     VoiceTrack?         @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
   visuals        SegmentVisual[]
   avatarOverlays AvatarOverlay[]
   transitions    SegmentTransition[]
 
-  @@unique([podcastId, voiceTrackId])
   @@index([podcastId])
-}
-
-// ============ MUSIC GENERATION ============
-
-model MusicGeneration {
-  id             String      @id @default(cuid())
-  podcastId      String
-  status         MusicStatus @default(PENDING)
-  musicUrl       String?
-  duration       Int? // seconds
-  fileSize       Int? // bytes
-  provider       String? // 'suno' | 'elevenlabs'
-  model          String? // e.g., 'suno-v5', 'eleven-music-v1'
-  prompt         String?     @db.Text
-  externalTaskId String? // Suno taskId for async polling
-  failureReason  String?     @db.Text
-  selected       Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([podcastId])
-  @@index([podcastId, selected])
 }
 
 model SegmentTransition {
@@ -2199,8 +1229,6 @@ model SegmentVisual {
 
   videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
   segment         Segment         @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-  reports         Report[]
-
   @@index([videoGenerationId])
   @@index([segmentId])
   @@index([segmentId, subOrder])
@@ -2232,7 +1260,6 @@ model AvatarOverlay {
   chunkVideoUrl        String?
   chunkDurationSeconds Float?
   enabledSegmentIds    String[] @default([])
-  voiceTrackId         String?
   posX                 Float    @default(0.02)
   posY                 Float    @default(0.55)
   width                Float    @default(0.25)
@@ -2241,11 +1268,9 @@ model AvatarOverlay {
   updatedAt            DateTime @updatedAt
 
   videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
-  voiceTrack      VoiceTrack?     @relation(fields: [voiceTrackId], references: [id], onDelete: SetNull)
 
   @@unique([videoGenerationId, speaker])
   @@index([videoGenerationId])
-  @@index([voiceTrackId])
 }
 
 enum AvatarImageSource {
@@ -2263,152 +1288,10 @@ model AvatarImage {
   sourceType            AvatarImageSource
   prompt                String?           @db.Text
   consentAcknowledgedAt DateTime?
-  shareable             Boolean           @default(false)
   createdAt             DateTime          @default(now())
-
-  shares AvatarImageShare[]
 
   @@unique([userId, name])
   @@index([userId])
-}
-
-enum AvatarImageShareStatus {
-  PENDING
-  APPROVED
-  DENIED
-  REVOKED
-}
-
-model AvatarImageShare {
-  id            String                 @id @default(cuid())
-  requesterId   String
-  imageOwnerId  String
-  avatarImageId String
-  status        AvatarImageShareStatus @default(PENDING)
-  message       String?                @db.Text
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-
-  requester   User        @relation("AvatarShareRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  imageOwner  User        @relation("AvatarShareOwner", fields: [imageOwnerId], references: [id], onDelete: Cascade)
-  avatarImage AvatarImage @relation(fields: [avatarImageId], references: [id], onDelete: Cascade)
-
-  @@unique([requesterId, avatarImageId])
-  @@index([imageOwnerId])
-  @@index([status])
-}
-
-// ============ DEMO VIDEO STUDIO ============
-
-enum DemoProjectStatus {
-  DRAFT
-  SCRIPT_READY
-  GENERATING_ASSETS
-  COMPOSING
-  READY
-  FAILED
-}
-
-enum DemoSceneAssetStatus {
-  PENDING
-  GENERATING
-  READY
-  FAILED
-}
-
-model DemoProject {
-  id           String            @id @default(cuid())
-  userId       String
-  user         User              @relation(fields: [userId], references: [id])
-  title        String
-  description  String?
-  features     String[] // feature slugs to demonstrate
-  aiModel      String? // AI model for script generation (e.g. "claude-sonnet-4-20250514")
-  status       DemoProjectStatus @default(DRAFT)
-  failedReason String?
-  videoUrl     String? // final composed video
-  audioUrl     String? // final stitched voiceover
-
-  // Default TTS config — applied to all new scenes
-  defaultTtsProvider String?
-  defaultTtsModel    String?
-  defaultTtsVoiceId  String?
-
-  // TTS providers to showcase — voice comparison baked into the creation flow
-  showcaseProviders String[]
-
-  // Launch video fields
-  backgroundMusicUrl    String?
-  backgroundMusicVolume Float?
-  podcastId             String? // links to the podcast being showcased
-  avatarClipUrl         String? // pre-generated avatar clip R2 URL
-
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  scenes    DemoScene[]
-
-  @@index([userId])
-}
-
-model DemoScene {
-  id        String      @id @default(cuid())
-  projectId String
-  project   DemoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  order     Int // 0-indexed scene order
-  title     String // "User creates a podcast"
-  narration String // voiceover text for this scene
-  actions   Json // DemoAction[] — browser automation steps
-  duration  Float? // estimated duration in seconds
-
-  // Independent asset URLs — each generated separately
-  recordingUrl     String?
-  recordingStatus  DemoSceneAssetStatus @default(PENDING)
-  voiceoverUrl     String?
-  voiceoverStatus  DemoSceneAssetStatus @default(PENDING)
-  visualUrl        String?
-  visualStatus     DemoSceneAssetStatus @default(PENDING)
-  visualType       String? // 'ai_image' | 'ai_video' | 'map' | null
-  visualPrompt     String? // editable prompt for AI visual
-  compositedUrl    String? // scene-level composite (recording + voiceover + visual)
-  compositedStatus DemoSceneAssetStatus @default(PENDING)
-  failedReason     String? // last error message from any asset worker
-
-  // Timing — speed zones within the recording
-  // TimingSegment[]: [{ start: 0, end: 5, speed: 1 }, { start: 5, end: 25, speed: 8 }, ...]
-  // speed: 0 = skip/cut, null = play entire recording at 1x
-  timingSegments Json?
-
-  // TTS config per scene (admin picks voice)
-  ttsProvider String?
-  ttsModel    String?
-  ttsVoiceId  String?
-
-  // Transition to next scene
-  transitionType   String? // 'fade' | 'dissolve' | 'wipe' | null
-  transitionUrl    String? // generated transition clip
-  transitionStatus DemoSceneAssetStatus @default(PENDING)
-
-  // Launch video cinematic fields
-  sfxConfig       Json? // SceneSfxConfig
-  providerBanner  Json? // ProviderBannerConfig
-  avatarConfig    Json? // AvatarConfig
-  overlays        Json? // TextOverlayConfig[]
-  subtitles       Json? // SubtitleConfig
-  actionTimingLog Json? // ActionTimingEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([projectId, order])
-}
-
-model ShowcaseSet {
-  id        String   @id @default(cuid())
-  name      String
-  items     Json // Array of ShowcaseItem: { visualType, label, description, url, mediaType, credits? }
-  active    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 // ============ LANGUAGE LEARNING — CURRICULUM ============
@@ -2420,6 +1303,17 @@ enum CefrLevel {
   B2
   C1
   C2
+}
+
+// The learner's chosen teaching approach, grounded in second-language-acquisition
+// research. Shapes how content is generated so a learner can switch methods if one
+// is not working for them. See lib/pedagogy.ts for the evidence behind each.
+enum PedagogyStyle {
+  BALANCED // mix of comprehensible input, form-focus, and retrieval practice
+  IMMERSION // comprehensible input (Krashen i+1), target-language-first
+  GRAMMAR // explicit, form-focused instruction
+  COMMUNICATION // communicative output (Swain), fluency-first
+  INTENSIVE // retrieval practice + spaced repetition (the testing effect)
 }
 
 // Global curriculum: one per native→target language pair.
@@ -2480,6 +1374,7 @@ model Course {
   curriculumId  String
   currentLevel  CefrLevel @default(A1) // "you are here"; assigned by placement, advances with mastery
   startLevel    CefrLevel @default(A1) // immutable placement result
+  pedagogy      PedagogyStyle @default(BALANCED) // teaching approach; shapes generation
   activeClassId String? // current in-flight class (gating convenience cache)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -2493,6 +1388,7 @@ model Course {
   vocabEdges       VocabEdge[]
   practiceSessions PracticeSession[]
   note             CourseNote?
+  mockExams        MockExam[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -2571,6 +1467,8 @@ model CourseClass {
   adaptiveSeed    Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
   passThreshold   Float       @default(0.7) // fraction of sections that must pass
   worksheetPdfUrl String?
+  sourceUrl       String? // sourced class: the real article/paper/link it was built from (null = curriculum class)
+  sourceTitle     String? // human-readable source title for display
   submittedAt     DateTime?
   passedAt        DateTime?
   failedAt        DateTime?
@@ -2644,7 +1542,8 @@ model LessonQuestion {
   explanation  String   @db.Text
   vocabIds     String[] @default([]) // memory-graph linkage (later phases)
   grammarKeys  String[] @default([])
-  passageRef   String?  @db.Text // reading passage / listening turn anchor
+  passageRef   String?  @db.Text // short label/anchor for the passage or listening turn
+  passageText  String?  @db.Text // the actual reading passage (sourced classes: a CEFR-leveled excerpt with [N] citations)
   createdAt    DateTime @default(now())
 
   section ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
@@ -2700,6 +1599,7 @@ model SpeakingPrompt {
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   order             Int
   targetPhrase      String   @db.Text
   translation       String   @db.Text
@@ -2709,12 +1609,15 @@ model SpeakingPrompt {
 
   section         ClassSection?    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  examSection     ExamSection?     @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
   recordings      SpeakingRecording[]
 
   @@unique([sectionId, order])
   @@unique([practiceSessionId, order])
+  @@unique([examSectionId, order])
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
 }
 
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
@@ -2722,6 +1625,7 @@ model SpeakingRecording {
   id                String              @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   promptId          String
   userId            String
   audioUrl          String
@@ -2740,6 +1644,7 @@ model SpeakingRecording {
 
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
   @@index([promptId])
   @@index([userId])
 }
@@ -2750,6 +1655,7 @@ model WritingPrompt {
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   order             Int
   task              String   @db.Text // the writing task the learner responds to
   guidance          String?  @db.Text // optional hints / what to include
@@ -2757,12 +1663,15 @@ model WritingPrompt {
 
   section         ClassSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession?  @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  examSection     ExamSection?      @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
   responses       WritingResponse[]
 
   @@unique([sectionId, order])
   @@unique([practiceSessionId, order])
+  @@unique([examSectionId, order])
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
 }
 
 // A learner's writing response, graded synchronously by the LLM (corrections +
@@ -2771,6 +1680,7 @@ model WritingResponse {
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   promptId          String
   userId            String
   text              String   @db.Text
@@ -2786,8 +1696,124 @@ model WritingResponse {
 
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
   @@index([promptId])
   @@index([userId])
+}
+
+// ============ LANGUAGE LEARNING — MOCK EXAMS ============
+
+// Flagship CEFR exam whose FORMAT a mock exam is modeled on. Never affiliated
+// with the real institution; we replicate structure only, never exam content.
+enum ExamInstitution {
+  GOETHE // German (Goethe-Institut)
+  DELE // Spanish (Instituto Cervantes)
+  CAMBRIDGE // English (Cambridge English Qualifications)
+  CEFR_GENERIC // institution-agnostic CEFR mock
+}
+
+enum MockExamStatus {
+  GENERATING
+  READY
+  IN_PROGRESS
+  SUBMITTED
+  SCORED
+  FAILED
+}
+
+// An ungated, full-length practice exam modeled on a flagship CEFR exam format.
+// Self-assessment only: it NEVER advances Course.currentLevel.
+model MockExam {
+  id          String          @id @default(cuid())
+  userId      String
+  courseId    String
+  institution ExamInstitution
+  level       CefrLevel
+  status      MockExamStatus  @default(GENERATING)
+  blueprintId String // catalog id, e.g. "goethe/b1"
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sections   ExamSection[]
+  submission ExamSubmission?
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+// One part of a mock exam (e.g. "Leseverstehen Teil 1"). LISTENING reuses Podcast;
+// speaking/writing reuse SpeakingPrompt/WritingPrompt via their examSectionId FK.
+model ExamSection {
+  id        String        @id @default(cuid())
+  examId    String
+  skill     SkillType
+  part      String // institution-flavored part name
+  order     Int
+  format    String // 'mc' | 'listening' | 'speaking' | 'writing'
+  weight    Float         @default(0) // share of the overall band; sums to ~1 per exam
+  status    SectionStatus @default(PENDING)
+  podcastId String?       @unique // LISTENING section -> reuse Podcast
+  score     Float?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  exam            MockExam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  podcast         Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  questions       ExamQuestion[]
+  speakingPrompts SpeakingPrompt[]
+  writingPrompts  WritingPrompt[]
+
+  @@index([examId, order])
+}
+
+// MC question for an exam section. Mirrors LessonQuestion; MC has no async grading
+// so a separate model keeps exams decoupled from ClassSection.
+model ExamQuestion {
+  id           String   @id @default(cuid())
+  sectionId    String
+  order        Int
+  skill        SkillType
+  question     String   @db.Text
+  options      Json // ["A","B","C","D"]
+  correctIndex Int
+  explanation  String   @db.Text
+  passageRef   String?  @db.Text
+  passageText  String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  section ExamSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// One submission per exam: the mock band + overall feedback. Does not change level.
+model ExamSubmission {
+  id           String   @id @default(cuid())
+  examId       String   @unique
+  overallScore Float?
+  band         String? // e.g. "B2 (mock)"
+  feedback     String?  @db.Text
+  submittedAt  DateTime @default(now())
+
+  exam           MockExam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sectionResults ExamSectionResult[]
+}
+
+model ExamSectionResult {
+  id           String  @id @default(cuid())
+  submissionId String
+  sectionId    String
+  skill        SkillType
+  score        Float // 0..1
+  feedback     String? @db.Text
+
+  submission ExamSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, sectionId])
+  @@index([sectionId])
 }
 
 // ============ LANGUAGE LEARNING — MEMORY GRAPH (SRS) ============

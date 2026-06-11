@@ -34,8 +34,22 @@ export interface ClassQuestion {
   question: string;
   options: string[];
   passageRef?: string | null;
+  /** Sourced classes: the real CEFR-leveled reading passage (may contain [N] markers). */
+  passageText?: string | null;
   correctIndex?: number;
   explanation?: string;
+}
+
+/** A verified source attached to a sourced class. */
+export interface ClassReference {
+  number: number;
+  title: string;
+  authors: string[];
+  year: number | null;
+  url: string | null;
+  type: string;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
+  contentDomain: string | null;
 }
 
 export interface ClassPrompt {
@@ -54,7 +68,7 @@ export interface ClassSectionData {
   attempt: number;
   score: number | null;
   passed: boolean | null;
-  podcast: { id: string; audioUrl: string | null; title: string } | null;
+  podcast: { id: string; audioUrl: string | null; title: string; references?: ClassReference[] } | null;
   questions: ClassQuestion[];
   prompts: ClassPrompt[];
 }
@@ -67,6 +81,9 @@ export interface ClassData {
   lesson: { title: string; level: string; objective: string };
   submitted: boolean;
   submission: { passed: boolean; overallScore: number } | null;
+  /** Sourced classes: the real link/title this class was built from. */
+  sourceUrl?: string | null;
+  sourceTitle?: string | null;
   sections: ClassSectionData[];
 }
 
@@ -107,26 +124,26 @@ export type NextClassResult =
 // API functions
 // ---------------------------------------------------------------------------
 
-/** GET /api/courses — list the signed-in learner's courses. */
+/** GET /courses — list the signed-in learner's courses. */
 export async function listCourses(): Promise<CourseSummary[]> {
-  const res = await api.get<{ courses: CourseSummary[] }>('/api/courses');
+  const res = await api.get<{ courses: CourseSummary[] }>('/courses');
   return res.data.courses;
 }
 
-/** GET /api/placement?pair=... — fetch an adaptive placement question batch. */
+/** GET /placement?pair=... — fetch an adaptive placement question batch. */
 export async function fetchPlacement(pair: string): Promise<PlacementQuestion[]> {
-  const res = await api.get<{ questions: PlacementQuestion[] }>('/api/placement', {
+  const res = await api.get<{ questions: PlacementQuestion[] }>('/placement', {
     params: { pair },
   });
   return res.data.questions;
 }
 
-/** POST /api/placement — submit placement answers, get courseId + level back. */
+/** POST /placement — submit placement answers, get courseId + level back. */
 export async function submitPlacement(
   pair: string,
   responses: { questionId: string; selectedIndex: number }[],
 ): Promise<{ courseId: string; level: string }> {
-  const res = await api.post<{ courseId: string; level: string }>('/api/placement', {
+  const res = await api.post<{ courseId: string; level: string }>('/placement', {
     pair,
     answers: responses.map(({ questionId, selectedIndex }) => ({
       id: questionId,
@@ -136,11 +153,11 @@ export async function submitPlacement(
   return res.data;
 }
 
-/** POST /api/courses/[courseId]/next-class — create or resume the next gated class. */
+/** POST /courses/[courseId]/next-class — create or resume the next gated class. */
 export async function startNextClass(courseId: string): Promise<NextClassResult> {
   try {
     const res = await api.post<{ classId?: string; done?: boolean }>(
-      `/api/courses/${courseId}/next-class`,
+      `/courses/${courseId}/next-class`,
     );
     if (res.data.done) return { kind: 'done' };
     return { kind: 'created', classId: res.data.classId as string };
@@ -159,22 +176,22 @@ export async function startNextClass(courseId: string): Promise<NextClassResult>
   }
 }
 
-/** GET /api/classes/[classId] — full class with sections, questions, prompts. */
+/** GET /classes/[classId] — full class with sections, questions, prompts. */
 export async function fetchClass(classId: string): Promise<ClassData> {
-  const res = await api.get<ClassData>(`/api/classes/${classId}`);
+  const res = await api.get<ClassData>(`/classes/${classId}`);
   return res.data;
 }
 
-/** POST /api/classes/[classId]/submit — grade MC answers. */
+/** POST /classes/[classId]/submit — grade MC answers. */
 export async function submitClass(
   classId: string,
   answers: { questionId: string; selectedIndex: number }[],
 ): Promise<SubmitResultData> {
-  const res = await api.post<SubmitResultData>(`/api/classes/${classId}/submit`, { answers });
+  const res = await api.post<SubmitResultData>(`/classes/${classId}/submit`, { answers });
   return res.data;
 }
 
-/** POST /api/classes/[classId]/speaking/[promptId] — upload a speaking recording. */
+/** POST /classes/[classId]/speaking/[promptId] — upload a speaking recording. */
 export async function uploadSpeaking(
   classId: string,
   promptId: string,
@@ -188,37 +205,37 @@ export async function uploadSpeaking(
   } as unknown as Blob);
 
   const res = await api.post<{ recordingId: string; status: string }>(
-    `/api/classes/${classId}/speaking/${promptId}`,
+    `/classes/${classId}/speaking/${promptId}`,
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   );
   return res.data;
 }
 
-/** GET /api/classes/[classId]/speaking/[promptId]?recordingId=... — poll grading status. */
+/** GET /classes/[classId]/speaking/[promptId]?recordingId=... — poll grading status. */
 export async function pollSpeaking(
   classId: string,
   promptId: string,
   recordingId: string,
 ): Promise<SpeakingScore> {
   const res = await api.get<SpeakingScore>(
-    `/api/classes/${classId}/speaking/${promptId}`,
+    `/classes/${classId}/speaking/${promptId}`,
     { params: { recordingId } },
   );
   return res.data;
 }
 
-/** GET /api/courses/[courseId]/graph — vocabulary + grammar memory graph. */
+/** GET /courses/[courseId]/graph — vocabulary + grammar memory graph. */
 export async function fetchGraph(courseId: string): Promise<MemoryGraphData> {
-  const res = await api.get<MemoryGraphData>(`/api/courses/${courseId}/graph`);
+  const res = await api.get<MemoryGraphData>(`/courses/${courseId}/graph`);
   return res.data;
 }
 
-/** POST /api/classes/[classId]/ink — upsert an ink/handwriting layer. */
+/** POST /classes/[classId]/ink — upsert an ink/handwriting layer. */
 export async function saveInk(
   classId: string,
   surface: string,
   strokes: string,
 ): Promise<void> {
-  await api.post(`/api/classes/${classId}/ink`, { surface, strokes });
+  await api.post(`/classes/${classId}/ink`, { surface, strokes });
 }

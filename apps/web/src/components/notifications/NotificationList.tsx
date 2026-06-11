@@ -8,17 +8,10 @@ import {
   AlertOctagon,
   HelpCircle,
   FileText,
-  ShieldCheck,
-  ShieldAlert,
   Trash2,
   Gift,
-  ImagePlus,
   Video,
-  Music,
-  MicVocal,
   Megaphone,
-  Flag,
-  Mic,
 } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
 import { getNotificationUrl } from '@/lib/notification-utils';
@@ -36,52 +29,23 @@ const typeIcons: Record<string, typeof Bell> = {
   PODCAST_READY: Headphones,
   SCRIPT_READY: FileText,
   VIDEO_READY: Video,
-  MUSIC_READY: Music,
 
   // Pipeline — failure
   PODCAST_FAILED: AlertTriangle,
   VIDEO_FAILED: AlertTriangle,
-  MUSIC_FAILED: AlertTriangle,
   AVATAR_FAILED: AlertTriangle,
-  VOICE_TRACK_FAILED: AlertTriangle,
   KEY_INVALID: AlertTriangle,
   PIPELINE_FAILURE: AlertTriangle,
 
   QUESTION_ON_YOUR_PODCAST: HelpCircle,
   REFERRAL_SIGNUP: Gift,
 
-  // Voice verification
-  VOICE_VERIFICATION_REQUIRED: ShieldCheck,
-  VOICE_VERIFICATION_PASSED: ShieldCheck,
-  VOICE_VERIFICATION_FAILED: ShieldCheck,
-  VOICE_BLOCKED_DUPLICATE: ShieldAlert,
-  VOICE_OWNERSHIP_ALERT: ShieldAlert,
-
-  // Voice access requests
-  VOICE_REQUEST_RECEIVED: Mic,
-  VOICE_REQUEST_APPROVED: Mic,
-  VOICE_REQUEST_DENIED: Mic,
-
-  // Voice tracks (renditions)
-  RENDITION_PROPOSED: MicVocal,
-  RENDITION_ACCEPTED: MicVocal,
-  RENDITION_REJECTED: MicVocal,
-
   // Moderation
   CONTENT_REMOVED: Trash2,
   ACCOUNT_WARNING: AlertOctagon,
-  ACCOUNT_SUSPENDED: AlertOctagon,
-  ACCOUNT_BANNED: AlertOctagon,
-  CLAIM_REPORT_ON_YOUR_PODCAST: Flag,
 
   // System
   PLATFORM_ANNOUNCEMENT: Megaphone,
-
-  // Avatar images
-  AVATAR_IMAGE_REQUEST_RECEIVED: ImagePlus,
-  AVATAR_IMAGE_REQUEST_APPROVED: ImagePlus,
-  AVATAR_IMAGE_REQUEST_DENIED: ImagePlus,
-  AVATAR_IMAGE_REQUEST_REVOKED: ImagePlus,
 };
 
 function getRelativeTime(dateString: string): string {

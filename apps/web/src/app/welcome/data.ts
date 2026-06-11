@@ -27,7 +27,7 @@ export interface Provider {
   rec?: boolean;
   cli?: ProviderCli;
   keyHint?: string;
-  kind?: 'url';
+  kind?: 'url' | 'key';
   hint?: string;
 }
 
@@ -124,6 +124,14 @@ export const PROVIDERS: Provider[] = [
     icon: 'plug',
     cli: { label: 'Codex CLI', bin: 'codex', ver: '0.9.1', path: '/opt/homebrew/bin/codex' },
     keyHint: 'sk-…',
+  },
+  {
+    id: 'google',
+    name: 'Gemini',
+    meta: 'Google · API key · unlocks live translation',
+    icon: 'key',
+    kind: 'key',
+    keyHint: 'AIza…',
   },
   {
     id: 'local',

@@ -9,6 +9,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { parseTextWithCitations } from '@/lib/citation-parser';
+import type { ReferenceData } from '@/types/reference';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, DotRail, MasteryMeter, type DotState } from './ClassWidgets';
 import type { ClassQuestion } from './classTypes';
@@ -19,6 +21,11 @@ interface GrammarSectionProps {
   questions: ClassQuestion[];
   gate: number; // 0..100
   nextName: string | null;
+  /**
+   * The class's verified sources, used to resolve `[N]` markers inside a sourced
+   * READING passage. Empty for curriculum classes (markers then stay plain text).
+   */
+  references?: ReferenceData[];
   /** Record a selected answer into the shell's answer map. */
   onAnswer: (questionId: string, selectedIndex: number) => void;
   /** Report the running 0..100 score for the rail/meter. */
@@ -45,6 +52,7 @@ export function GrammarSection({
   questions,
   gate,
   nextName,
+  references = [],
   onAnswer,
   onScore,
   onContinue,
@@ -112,7 +120,13 @@ export function GrammarSection({
 
         {!done && cur ? (
           <div className={styles.drillCard} key={cur.id}>
-            {cur.passageRef && <blockquote className={styles.passage}>{cur.passageRef}</blockquote>}
+            {cur.passageText ? (
+              <blockquote className={styles.passage}>
+                {parseTextWithCitations(cur.passageText, references)}
+              </blockquote>
+            ) : (
+              cur.passageRef && <blockquote className={styles.passage}>{cur.passageRef}</blockquote>
+            )}
 
             <div className={styles.drillMeta}>
               <span className={styles.verb}>{skill === 'READING' ? 'comprehension' : 'choose'}</span>

@@ -49,7 +49,6 @@ interface VideoStatusResponse {
 interface VideoProgressProps {
   podcastId: string;
   videoGenerationId: string;
-  voiceTrackId?: string | null;
   onComplete: (visuals: SegmentVisual[]) => void;
   onFailed?: (reason: string) => void;
   onRequestEdit?: (visuals: SegmentVisual[]) => void;
@@ -176,7 +175,7 @@ function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
   );
 }
 
-export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onComplete, onFailed, onRequestEdit, onChangeAvatars, onDismiss }: VideoProgressProps) {
+export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit, onChangeAvatars, onDismiss }: VideoProgressProps) {
   const [data, setData] = useState<VideoStatusResponse | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -192,8 +191,7 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
 
   const poll = useCallback(async () => {
     try {
-      const vtParam = voiceTrackId ? `?voiceTrackId=${voiceTrackId}` : '';
-      const res = await fetch(`/api/podcasts/${podcastId}/video${vtParam}`);
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
       if (!res.ok) { schedulePoll(5000); return; }
       const json = await res.json() as VideoStatusResponse;
       if (!json.status) { schedulePoll(5000); return; }
@@ -221,7 +219,7 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
     } catch {
       schedulePoll(5000);
     }
-  }, [podcastId, voiceTrackId, onComplete, onFailed, schedulePoll]);
+  }, [podcastId, onComplete, onFailed, schedulePoll]);
 
   useEffect(() => {
     pollRef.current = poll;
@@ -257,10 +255,8 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
     setRetrying(true);
     setRetryError(null);
     try {
-      const retryBody = voiceTrackId ? JSON.stringify({ voiceTrackId }) : undefined;
-      const res = await fetch(`/api/podcasts/${podcastId}/video`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`, {
         method: 'POST',
-        ...(retryBody && { headers: { 'Content-Type': 'application/json' }, body: retryBody }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: 'Retry failed' })) as { error?: string };

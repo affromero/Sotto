@@ -34,14 +34,12 @@ export interface ResolvedAvatarProvider {
  */
 export async function resolveAvatarProvider(context: {
   userId: string;
-  plan?: 'FREE' | 'PRO';
 }): Promise<ResolvedAvatarProvider> {
   const { userId } = context;
 
   const config = await getAutoModelConfig();
-  const tier = context.plan ?? 'PRO';
-  const resolvedProvider = (tier === 'FREE' ? config.freeAvatarProvider : config.proAvatarProvider) as AvatarProviderId;
-  const model = tier === 'FREE' ? config.freeAvatarModel : config.proAvatarModel;
+  const resolvedProvider = config.avatarProvider as AvatarProviderId;
+  const model = config.avatarModel;
 
   // Skip disabled providers
   const providerMeta = getAvatarProviderMeta(resolvedProvider);

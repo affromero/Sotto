@@ -199,35 +199,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.savedIdeasRow, pressed && styles.savedIdeasRowPressed]}
-        onPress={() => router.push('/ideas')}
-        testID="profile-saved-ideas-link"
-      >
-        <Ionicons
-          name="bookmark-outline"
-          size={20}
-          color={colors.primary}
-          style={styles.savedIdeasIcon}
-        />
-        <Text style={styles.savedIdeasLabel}>Saved Ideas</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-      </Pressable>
-
-      <Pressable
-        style={({ pressed }) => [styles.savedIdeasRow, pressed && styles.savedIdeasRowPressed]}
-        onPress={() => router.push('/collections')}
-        testID="profile-collections-link"
-      >
-        <Ionicons
-          name="albums-outline"
-          size={20}
-          color={colors.primary}
-          style={styles.savedIdeasIcon}
-        />
-        <Text style={styles.savedIdeasLabel}>Collections</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-      </Pressable>
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Podcasts</Text>
@@ -370,35 +341,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontBody,
     fontSize: 13,
     color: colors.textSecondary,
-  },
-  savedIdeasRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadowSm,
-  },
-  savedIdeasRowPressed: {
-    backgroundColor: colors.surfaceHover,
-  },
-  savedIdeasIcon: {
-    fontSize: 20,
-    marginRight: spacing.sm + 4,
-  },
-  savedIdeasLabel: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  savedIdeasChevron: {
-    fontFamily: typography.fontBody,
-    fontSize: 22,
-    color: colors.textTertiary,
-    fontWeight: '300',
   },
   sectionHeader: {
     marginBottom: spacing.md,

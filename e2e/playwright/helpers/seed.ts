@@ -23,7 +23,6 @@ export async function seedTestUser() {
       name: TEST_USER_NAME,
       handle: 'e2e-test',
       role: 'USER',
-      plan: 'FREE',
     },
   });
 
@@ -68,7 +67,6 @@ export async function seedTestUser() {
       name: 'E2E Other User',
       handle: 'e2e-other',
       role: 'USER',
-      plan: 'FREE',
     },
   });
 
@@ -83,22 +81,6 @@ export async function seedTestUser() {
       status: 'READY',
       audioUrl: 'https://media.example.com/e2e/test-audio-other.mp3',
       duration: 240,
-      visibility: 'PUBLIC',
-      userId: otherUser.id,
-    },
-  });
-
-  // Third podcast (otherUser) for alternate voice-track ownership
-  const otherPodcast2 = await prisma.podcast.upsert({
-    where: { id: 'e2e-other-podcast-2' },
-    update: {},
-    create: {
-      id: 'e2e-other-podcast-2',
-      title: 'E2E Voice Track Source',
-      topic: 'Voice track testing',
-      status: 'READY',
-      audioUrl: 'https://media.example.com/e2e/test-audio-voice-track.mp3',
-      duration: 180,
       visibility: 'PUBLIC',
       userId: otherUser.id,
     },
@@ -166,21 +148,6 @@ export async function seedTestUser() {
     },
   });
 
-  // PodcastFeature for testPodcast (non-zero values for quality route)
-  await prisma.podcastFeature.upsert({
-    where: { podcastId: testPodcast.id },
-    update: {},
-    create: {
-      podcastId: testPodcast.id,
-      avgCompletionRate: 0.75,
-      medianCompletionRate: 0.8,
-      totalUniqueListeners: 10,
-      totalListenMinutes: 50.0,
-      segmentCount: 2,
-      durationSeconds: 300,
-    },
-  });
-
   // Save (user → otherPodcast)
   await prisma.save.upsert({
     where: { userId_podcastId: { userId: user.id, podcastId: otherPodcast.id } },
@@ -200,45 +167,6 @@ export async function seedTestUser() {
       name: 'AI Ethics',
       slug: 'e2e-subtag',
       parentId: techTag?.id,
-    },
-  });
-
-  // VoiceTrack (READY) on testPodcast
-  const voiceTrack = await prisma.voiceTrack.upsert({
-    where: { id: 'e2e-voice-track' },
-    update: {},
-    create: {
-      id: 'e2e-voice-track',
-      podcastId: testPodcast.id,
-      name: 'E2E Voice Track',
-      status: 'READY',
-      audioUrl: 'https://media.example.com/e2e/test-voice-track.mp3',
-      duration: 300,
-    },
-  });
-
-  // Collection owned by test user
-  const collection = await prisma.collection.upsert({
-    where: { id: 'e2e-collection' },
-    update: {},
-    create: {
-      id: 'e2e-collection',
-      name: 'E2E Test Collection',
-      description: 'Collection for E2E tests',
-      userId: user.id,
-      isPublic: true,
-      podcastCount: 1,
-    },
-  });
-
-  // Add podcast to collection
-  await prisma.collectionItem.upsert({
-    where: { collectionId_podcastId: { collectionId: collection.id, podcastId: testPodcast.id } },
-    update: {},
-    create: {
-      collectionId: collection.id,
-      podcastId: testPodcast.id,
-      order: 0,
     },
   });
 
@@ -267,32 +195,6 @@ export async function seedTestUser() {
         title: 'Script ready',
         message: 'Your script is ready for review.',
         read: false,
-      },
-    }),
-  ]);
-
-  // Saved Ideas (2 for test user)
-  const ideas = await Promise.all([
-    prisma.savedIdea.upsert({
-      where: { userId_questionId: { userId: user.id, questionId: 'q-ai' } },
-      update: {},
-      create: {
-        userId: user.id,
-        questionId: 'q-ai',
-        question: 'What if AI could write music?',
-        category: 'Technology',
-        tagSlugs: ['technology', 'music'],
-      },
-    }),
-    prisma.savedIdea.upsert({
-      where: { userId_questionId: { userId: user.id, questionId: 'q-space' } },
-      update: {},
-      create: {
-        userId: user.id,
-        questionId: 'q-space',
-        question: 'Could we terraform Mars?',
-        category: 'Science',
-        tagSlugs: ['science', 'space'],
       },
     }),
   ]);
@@ -336,7 +238,6 @@ export async function seedTestUser() {
       name: 'E2E Empty User',
       handle: 'e2e-empty',
       role: 'USER',
-      plan: 'FREE',
     },
   });
 
@@ -383,14 +284,9 @@ export async function seedTestUser() {
     sessionToken,
     testPodcast,
     otherPodcast,
-    otherPodcast2,
     scriptReadyPodcast,
     interaction,
-    comment,
-    voiceTrack,
     subTag,
-    collection,
-    ideas,
     notifications,
     failedPodcast,
     emptyUser,

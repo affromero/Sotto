@@ -1,5 +1,5 @@
 /**
- * Shared TTS generation core — used by audio-generation and voice-track-audio workers.
+ * Shared TTS generation core — used by the listening audio pipeline.
  *
  * Handles: API key resolution → concurrency limit → semaphore acquire/release →
  * text cleaning → generateSpeech (full params) → BYOK 404 fallback → 429 concurrency
@@ -33,7 +33,7 @@ import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
 
 // ---------------------------------------------------------------------------
-// Platform key helper — shared by audio-generation, voice-track, demo-voiceover
+// Platform key helper — shared by audio-generation and TTS tooling.
 // ---------------------------------------------------------------------------
 
 /** Return the platform API key for a given TTS provider (not BYOK). */
@@ -54,6 +54,12 @@ export function getPlatformTtsKey(pid: TtsProviderId): string | undefined {
       return process.env.REPLICATE_API_TOKEN;
     case 'mistral':
       return process.env.MISTRAL_API_KEY;
+    case 'kokoro':
+      // Keyless local sidecar — the Kokoro server ignores auth, but callers that
+      // gate on "has a platform key" need a non-empty value. Return a placeholder
+      // so kokoro is never rejected for a missing key (mirrors getSttPlatformKey('local')).
+      // TTS_API_KEY overrides it only when the sidecar sits behind auth.
+      return process.env.TTS_API_KEY?.trim() || 'kokoro';
     default:
       return undefined;
   }
@@ -84,17 +90,16 @@ export interface TtsGenerationParams {
   podcastId: string;
 
   requestedModel?: string | null;
-  plan: 'FREE' | 'PRO';
 
-  /** Usage logging category (e.g. 'audio_generation', 'voice_track_audio'). */
+  /** Usage logging category (e.g. 'audio_generation', 'segment_regeneration'). */
   usageCategory: string;
 
-  /** Extra metadata merged into logUsage (e.g. { voiceTrackId }). */
+  /** Extra metadata merged into logUsage (e.g. { segmentId }). */
   extraMetadata?: Record<string, unknown>;
 
   /**
    * Fail-fast callback: called during semaphore wait to check if the parent
-   * entity (Podcast or VoiceTrack) has already failed. Return true to abort.
+   * entity has already failed. Return true to abort.
    */
   isAborted: () => Promise<boolean>;
 }
@@ -133,7 +138,6 @@ export async function generateTtsAudio(
     userId,
     podcastId,
     requestedModel: _requestedModel,
-    plan: _plan,
     usageCategory,
     extraMetadata,
     isAborted,

@@ -1,3 +1,5 @@
+import { getStoredServerUrl } from './server-url';
+
 const API_URL_ENV = 'EXPO_PUBLIC_API_URL';
 
 export class MobileConfigError extends Error {
@@ -27,11 +29,13 @@ function parseExplicitUrl(value: string, envName: string): URL {
 }
 
 export function getApiBaseUrl(): string {
-  const value = process.env.EXPO_PUBLIC_API_URL?.trim();
+  // Prefer the server paired at runtime ("scan to connect"); fall back to a
+  // build-time EXPO_PUBLIC_API_URL so dev/baked builds keep working.
+  const value = (getStoredServerUrl() ?? process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 
   if (!value) {
     throw new MobileConfigError(
-      `${API_URL_ENV} is required. Set it to your Sotto deployment API URL, for example http://localhost:3000/api.`
+      `No Sotto server is configured. Connect to your server first, or set ${API_URL_ENV} for a baked-in build.`
     );
   }
 
@@ -39,12 +43,14 @@ export function getApiBaseUrl(): string {
   const pathname = trimTrailingSlashes(url.pathname);
 
   if (!pathname || pathname === '/') {
-    url.pathname = '/api';
-  } else if (pathname.endsWith('/api')) {
+    url.pathname = '/api/v1';
+  } else if (pathname.endsWith('/api/v1')) {
     url.pathname = pathname;
+  } else if (pathname.endsWith('/api')) {
+    url.pathname = `${pathname}/v1`;
   } else {
     throw new MobileConfigError(
-      `${API_URL_ENV} must point to a Sotto deployment root or API path ending in /api.`
+      `${API_URL_ENV} must point to a Sotto deployment root or API path ending in /api/v1.`
     );
   }
 
@@ -55,8 +61,12 @@ export function getAppBaseUrl(): string {
   const apiUrl = new URL(getApiBaseUrl());
   const pathname = trimTrailingSlashes(apiUrl.pathname);
 
-  if (pathname === '/api') {
+  if (pathname === '/api/v1') {
     apiUrl.pathname = '/';
+  } else if (pathname === '/api') {
+    apiUrl.pathname = '/';
+  } else if (pathname.endsWith('/api/v1')) {
+    apiUrl.pathname = pathname.slice(0, -7) || '/';
   } else if (pathname.endsWith('/api')) {
     apiUrl.pathname = pathname.slice(0, -4) || '/';
   }

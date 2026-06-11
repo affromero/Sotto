@@ -147,7 +147,7 @@ describe('processCreativePlanning', () => {
     });
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
     mockPrismaPodcastUpdate.mockResolvedValue({});
-    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO' });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
     mockAddJob.mockResolvedValue({ id: 'write-job-1' });
     mockLogUsage.mockResolvedValue(undefined);
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
@@ -194,7 +194,6 @@ describe('processCreativePlanning', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'PRO',
       });
       expect(mockCreateCreativeOutline).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -215,7 +214,6 @@ describe('processCreativePlanning', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'PRO',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
@@ -259,7 +257,6 @@ describe('processCreativePlanning', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'PRO',
       });
       expect(mockCreateCreativeOutline).toHaveBeenCalledWith(
         expect.objectContaining({

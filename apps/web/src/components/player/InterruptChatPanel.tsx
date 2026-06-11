@@ -56,7 +56,7 @@ export function InterruptChatPanel({
     setError(null);
 
     try {
-      const response = await fetch(`/api/podcasts/${podcastId}/interact`, {
+      const response = await fetch(`/api/v1/podcasts/${podcastId}/interact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question.trim(), timestamp: currentTime }),
@@ -75,7 +75,7 @@ export function InterruptChatPanel({
       pollRef.current = setInterval(async () => {
         if (document.visibilityState === 'hidden') return;
         try {
-          const pollRes = await fetch(`/api/podcasts/${podcastId}/interact/${data.id}`);
+          const pollRes = await fetch(`/api/v1/podcasts/${podcastId}/interact/${data.id}`);
           if (!pollRes.ok) return;
           const pollData = await pollRes.json();
 
@@ -115,7 +115,7 @@ export function InterruptChatPanel({
       // First resolve with helpful feedback
       setState('resolving');
       try {
-        await fetch(`/api/podcasts/${podcastId}/interact/${activeInteractionId}/resolve`, {
+        await fetch(`/api/v1/podcasts/${podcastId}/interact/${activeInteractionId}/resolve`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ helpful }),
@@ -124,16 +124,12 @@ export function InterruptChatPanel({
         if (incorporate && isOwner) {
           setState('incorporating');
           const incRes = await fetch(
-            `/api/podcasts/${podcastId}/interact/${activeInteractionId}/incorporate`,
+            `/api/v1/podcasts/${podcastId}/interact/${activeInteractionId}/incorporate`,
             { method: 'POST' }
           );
           if (incRes.ok) {
             setState('incorporated');
           } else {
-            const incData = await incRes.json().catch(() => ({}));
-            if (incData.code === 'daily_limit_reached') {
-              setError('Daily limit reached. Try again tomorrow or add your own API keys.');
-            }
             setState('resolved');
           }
         } else {

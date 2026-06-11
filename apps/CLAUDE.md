@@ -27,4 +27,3 @@ npm run ci           # lint + type-check + test + build (web)
 | State | React Server Components + hooks | Zustand + React Query |
 | Audio | HTML5 Audio API | react-native-track-player |
 | Database | Prisma (direct) | API calls to web backend |
-| Creation flow | 5-step: discovery → voice → scripting → preview → generating | Same 5-step flow (read-only script preview) |

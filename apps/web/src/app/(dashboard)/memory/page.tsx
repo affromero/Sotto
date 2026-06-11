@@ -5,7 +5,7 @@ import { MemoryGraph } from '@/components/memory/MemoryGraph';
 import type { MemoryGraphData } from '@/components/memory/MemoryGraph';
 import styles from './memory.module.css';
 
-// Shape returned by GET /api/courses
+// Shape returned by GET /api/v1/courses
 interface CourseItem {
   id: string;
   pair: string;
@@ -52,7 +52,7 @@ export default function MemoryPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/courses');
+        const res = await fetch('/api/v1/courses');
         if (!res.ok) throw new Error('Failed to load courses');
         const data = (await res.json()) as { courses: CourseItem[] };
         setCourses(data.courses);
@@ -70,7 +70,7 @@ export default function MemoryPage() {
     setGraphState('loading');
     setGraph(null);
     try {
-      const res = await fetch(`/api/courses/${courseId}/graph`);
+      const res = await fetch(`/api/v1/courses/${courseId}/graph`);
       if (!res.ok) throw new Error('Failed to load graph');
       const data = (await res.json()) as MemoryGraphData;
       setGraph(data);

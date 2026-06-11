@@ -40,7 +40,7 @@ def main():
     parser.add_argument(
         "--skip-imports",
         action="store_true",
-        help="Skip API usage and Stripe imports (just validate + report)",
+        help="Skip API usage import (just validate + report)",
     )
     args = parser.parse_args()
 
@@ -60,16 +60,6 @@ def main():
             steps_passed += 1
         else:
             print("Warning: API usage import failed — continuing anyway")
-
-        # Step 2: Import Stripe revenue
-        steps_total += 1
-        if run_step(
-            "Import Stripe Revenue",
-            [sys.executable, "-m", "scripts.import_stripe", "--month", month],
-        ):
-            steps_passed += 1
-        else:
-            print("Warning: Stripe import failed — continuing anyway")
 
     # Step 3: Validate ledger
     steps_total += 1

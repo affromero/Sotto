@@ -1,11 +1,11 @@
 /**
  * Browser automation action executor.
- * Adapted from scripts/recording/lib/actions.ts for use in the Remotion sidecar.
+ * Used by the Remotion sidecar for browser-driven render actions.
  */
 import type { Page } from 'playwright';
 import { setupInterceptor, clearInterceptor } from './interceptors';
 
-interface DemoAction {
+interface BrowserAction {
   type: string;
   [key: string]: unknown;
 }
@@ -351,11 +351,11 @@ async function humanClick(
 // ---------------------------------------------------------------------------
 
 /**
- * Execute a sequence of DemoAction steps on a Playwright page.
+ * Execute a sequence of browser action steps on a Playwright page.
  * Injects a visible cursor on the first navigate action.
  * Returns an action timing log for SFX placement.
  */
-export async function executeActions(page: Page, actions: DemoAction[]): Promise<ActionTimingEntry[]> {
+export async function executeActions(page: Page, actions: BrowserAction[]): Promise<ActionTimingEntry[]> {
   let cursorInjected = false;
   const startTime = Date.now();
   const timingLog: ActionTimingEntry[] = [];

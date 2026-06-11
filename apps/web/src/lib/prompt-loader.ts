@@ -1,7 +1,13 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const PROMPTS_DIR = join(process.cwd(), 'prompts');
+// Runtime and CI run with cwd=apps/web, so prompts live at <cwd>/prompts. Some
+// tooling (e.g. the pre-commit test runner) invokes from the monorepo root, so
+// fall back to apps/web/prompts. Still cwd-based, no __dirname across packages.
+const PROMPTS_DIR =
+  [join(process.cwd(), 'prompts'), join(process.cwd(), 'apps', 'web', 'prompts')].find(
+    existsSync
+  ) ?? join(process.cwd(), 'prompts');
 const cache = new Map<string, string>();
 
 /**

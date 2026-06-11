@@ -10,7 +10,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [],
       ttsProviders: [],
       sttProviders: [],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
@@ -29,7 +28,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [{ provider: 'openai', isValid: true }],
       ttsProviders: [{ provider: 'openai', isValid: true }],
       sttProviders: [],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
       env: {},
@@ -60,7 +58,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [{ provider: 'openai', isValid: true }],
       ttsProviders: [{ provider: 'openai', isValid: true }],
       sttProviders: [{ provider: 'openai', isValid: true }],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
@@ -73,27 +70,6 @@ describe('buildSetupReadiness', () => {
     expect(readiness.nextAction?.id).toBe('generation');
   });
 
-  it('requires a private RSS token even when infrastructure and providers are ready', () => {
-    const readiness = buildSetupReadiness({
-      hasDatabase: true,
-      hasQueue: true,
-      storageProvider: 'local',
-      aiProviders: [{ provider: 'anthropic', isValid: true }],
-      ttsProviders: [{ provider: 'elevenlabs', isValid: true }],
-      sttProviders: [{ provider: 'elevenlabs', isValid: true }],
-      privateFeedTokenCount: 0,
-      selectedAiProvider: 'anthropic',
-      selectedTtsProvider: 'elevenlabs',
-      selectedSttProvider: 'elevenlabs',
-      env: {},
-    });
-    const privateRss = readiness.capabilities.find((capability) => capability.id === 'private-rss');
-
-    expect(readiness.ready).toBe(false);
-    expect(privateRss?.status).toBe('action_required');
-    expect(readiness.nextAction?.id).toBe('private-rss');
-  });
-
   it('treats Claude Code as a local generation provider when its CLI is available', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
@@ -102,7 +78,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [],
       ttsProviders: [{ provider: 'openai', isValid: true }],
       sttProviders: [{ provider: 'openai', isValid: true }],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'claude-code:sonnet',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
@@ -123,7 +98,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [],
       ttsProviders: [{ provider: 'openai', isValid: true }],
       sttProviders: [{ provider: 'openai', isValid: true }],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'claude-code:sonnet',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
@@ -145,7 +119,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [{ provider: 'anthropic', isValid: true }],
       ttsProviders: [{ provider: 'elevenlabs', isValid: true }],
       sttProviders: [{ provider: 'elevenlabs', isValid: true }],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'elevenlabs',
       selectedSttProvider: 'elevenlabs',
@@ -166,7 +139,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [{ provider: 'openai', isValid: true }],
       ttsProviders: [{ provider: 'openai', isValid: true }],
       sttProviders: [{ provider: 'openai', isValid: true }],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
       env: {},
@@ -176,7 +148,7 @@ describe('buildSetupReadiness', () => {
     expect(readiness.ready).toBe(true);
     expect(stt?.status).toBe('optional');
     expect(stt?.detail).toBe(
-      'Transcript ingestion works without STT. Add STT only for raw meeting audio.'
+      'Transcript ingestion works without STT. Add STT only for speaking-practice scoring or raw audio imports.'
     );
     expect(stt?.required).toBe(false);
     expect(readiness.nextAction).toBeNull();
@@ -190,7 +162,6 @@ describe('buildSetupReadiness', () => {
       aiProviders: [{ provider: 'openai', isValid: true }],
       ttsProviders: [{ provider: 'openai', isValid: true }],
       sttProviders: [{ provider: 'openai', isValid: true }],
-      privateFeedTokenCount: 1,
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'deepgram',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -28,18 +28,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
-import { PostListenRating } from '../../components/PostListenRating';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
-import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
-import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 import { ReferencesTab } from '../../components/ReferencesTab';
-import { VoiceTrackPicker } from '../../components/VoiceTrackPicker';
 import { VersionHistory } from '../../components/VersionHistory';
-import { AddToCollectionSheet } from '../../components/AddToCollectionSheet';
 import { usePlayerStore } from '../../lib/player-store';
-import type { VoiceTrackSummary } from '@sotto/shared';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -67,15 +61,8 @@ export default function PodcastScreen() {
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
-  const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
-  const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
-  const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
-  const [showRating, setShowRating] = useState(false);
-  const playbackEndedRef = useRef(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
-  const lastSeekFromRef = useRef<number | undefined>(undefined);
-  const interactionCountRef = useRef(0);
 
   // TrackPlayer hooks are safe — they return defaults when player isn't ready.
   // But wrap in try/catch at the usage sites to prevent native exceptions from crashing the app.
@@ -84,20 +71,6 @@ export default function PodcastScreen() {
   const trackDuration = progress.duration;
   const playbackState = usePlaybackState();
   const isPlaying = playerReady && playbackState.state === State.Playing;
-
-  // Detect playback completion → show post-listen rating
-  useEffect(() => {
-    if (
-      !playbackEndedRef.current &&
-      trackDuration > 0 &&
-      position > 0 &&
-      position >= trackDuration - 1 &&
-      !isPlaying
-    ) {
-      playbackEndedRef.current = true;
-      setShowRating(true);
-    }
-  }, [position, trackDuration, isPlaying]);
 
   // Animation values for player buttons
   const playScale = useSharedValue(1);
@@ -180,8 +153,6 @@ export default function PodcastScreen() {
       setQuestionText('');
       Alert.alert('Answer', data.answer ?? 'Your question is being processed.');
       queryClient.invalidateQueries({ queryKey: ['podcast', id] });
-      interactionCountRef.current++;
-      incrementInteraction();
     },
     onError: () => {
       Alert.alert('Error', 'Failed to submit your question. Please try again.');
@@ -240,7 +211,6 @@ export default function PodcastScreen() {
     if (!playerReady) return;
     try {
       const current = await TrackPlayer.getProgress();
-      lastSeekFromRef.current = current.position;
       await TrackPlayer.seekTo(current.position + 15);
     } catch {
       // Ignore native player errors
@@ -251,7 +221,6 @@ export default function PodcastScreen() {
     if (!playerReady) return;
     try {
       const current = await TrackPlayer.getProgress();
-      lastSeekFromRef.current = current.position;
       await TrackPlayer.seekTo(Math.max(0, current.position - 15));
     } catch {
       // Ignore native player errors
@@ -274,13 +243,12 @@ export default function PodcastScreen() {
       if (!playerReady) return;
       const totalDuration = podcast?.duration ?? trackDuration;
       if (totalDuration > 0) {
-        lastSeekFromRef.current = position;
         try {
           await TrackPlayer.seekTo(ratio * totalDuration);
         } catch {}
       }
     },
-    [podcast?.duration, trackDuration, position, playerReady]
+    [podcast?.duration, trackDuration, playerReady]
   );
 
   const handleAskQuestion = useCallback(async () => {
@@ -293,43 +261,6 @@ export default function PodcastScreen() {
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
-
-  const handleVoiceTrackSelect = useCallback(
-    async (track: VoiceTrackSummary) => {
-      if (!track.audioUrl) return;
-      setActiveVoiceTrackId(track.id);
-      setVoicePickerVisible(false);
-      try {
-        await loadTrack(
-          podcast?.id ?? id,
-          track.audioUrl,
-          podcast?.title ?? '',
-          track.contributor?.name ?? 'Sotto'
-        );
-      } catch {}
-    },
-    [podcast?.id, podcast?.title, id]
-  );
-
-  // Playback telemetry
-  const playbackSnapshot: PlaybackSnapshot = useMemo(
-    () => ({
-      podcastId: id,
-      isPlaying,
-      position,
-      duration: podcast?.duration ?? trackDuration,
-      playbackRate: PLAYBACK_SPEEDS[speedIndex],
-      lastSeekFrom: lastSeekFromRef.current,
-      interactionCount: interactionCountRef.current,
-    }),
-    [id, isPlaying, position, podcast?.duration, trackDuration, speedIndex]
-  );
-
-  const clearLastSeekFrom = useCallback(() => {
-    lastSeekFromRef.current = undefined;
-  }, []);
-
-  const { incrementInteraction } = usePlaybackTelemetry(playbackSnapshot, clearLastSeekFrom);
 
   const totalDuration = podcast?.duration ?? trackDuration;
   const progressRatio = totalDuration > 0 ? position / totalDuration : 0;
@@ -452,22 +383,8 @@ export default function PodcastScreen() {
         </Text>
         <Text style={styles.creator}>{podcast.user?.name ?? 'Unknown Creator'}</Text>
         <View style={styles.podcastBadgeRow}>
-          <View
-            style={[
-              styles.podcastContentBadge,
-              podcast.source !== 'IMPORT' || !podcast.isHumanContent
-                ? styles.podcastContentBadgeAi
-                : styles.podcastContentBadgeHuman,
-            ]}
-          >
-            <Text
-              style={[
-                styles.podcastContentBadgeText,
-                podcast.source !== 'IMPORT' || !podcast.isHumanContent
-                  ? styles.podcastContentBadgeTextAi
-                  : styles.podcastContentBadgeTextHuman,
-              ]}
-            >
+          <View style={styles.podcastContentBadge}>
+            <Text style={styles.podcastContentBadgeText}>
               {getContentBadgeLabel(podcast)}
             </Text>
           </View>
@@ -567,10 +484,8 @@ export default function PodcastScreen() {
                 );
                 saveMutation.mutate();
               }}
-              onLongPress={() => setCollectionSheetVisible(true)}
               style={styles.actionIcon}
               accessibilityLabel={podcast.isSaved ? 'Unsave podcast' : 'Save podcast'}
-              accessibilityHint="Long press to add to collection"
               accessibilityRole="button"
               testID="player-save-button"
             >
@@ -583,17 +498,6 @@ export default function PodcastScreen() {
               </Animated.View>
               {isOwner && <Text style={styles.actionCount}>{podcast.saveCount}</Text>}
             </Pressable>
-
-            {podcast.voiceTracks?.length > 1 && (
-              <Pressable
-                onPress={() => setVoicePickerVisible(true)}
-                style={styles.actionIcon}
-                accessibilityLabel="Voice tracks"
-                accessibilityRole="button"
-              >
-                <Ionicons name="mic-outline" size={22} color={colors.textSecondary} />
-              </Pressable>
-            )}
 
             {podcast.versions?.length > 1 && (
               <Pressable
@@ -797,42 +701,12 @@ export default function PodcastScreen() {
         </View>
       </Modal>
 
-      <VoiceTrackPicker
-        visible={voicePickerVisible}
-        onClose={() => setVoicePickerVisible(false)}
-        voiceTracks={podcast.voiceTracks}
-        activeTrackId={activeVoiceTrackId ?? podcast.defaultVoiceTrackId}
-        onSelect={handleVoiceTrackSelect}
-      />
-
       <VersionHistory
         visible={versionHistoryVisible}
         onClose={() => setVersionHistoryVisible(false)}
         versions={podcast.versions}
         currentVersion={podcast.currentVersion}
       />
-
-      <AddToCollectionSheet
-        visible={collectionSheetVisible}
-        onClose={() => setCollectionSheetVisible(false)}
-        podcastId={podcast.id}
-      />
-
-      {/* Post-listen rating */}
-      <Modal
-        visible={showRating}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setShowRating(false)}
-      >
-        <View style={styles.quizModal}>
-          <PostListenRating
-            podcastId={podcast.id}
-            completionPercent={trackDuration > 0 ? (position / trackDuration) * 100 : undefined}
-            onDismiss={() => setShowRating(false)}
-          />
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -947,23 +821,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
-  },
-  podcastContentBadgeAi: {
     backgroundColor: colors.primaryLighter,
-  },
-  podcastContentBadgeHuman: {
-    backgroundColor: colors.successLighter,
   },
   podcastContentBadgeText: {
     fontFamily: typography.fontBody,
     fontSize: 11,
     fontWeight: '600',
-  },
-  podcastContentBadgeTextAi: {
     color: colors.primary,
-  },
-  podcastContentBadgeTextHuman: {
-    color: colors.success,
   },
   durationBadge: {
     fontFamily: typography.fontBody,

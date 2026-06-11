@@ -49,7 +49,7 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-import { GET, PATCH } from '@/app/api/users/me/route';
+import { GET, PATCH } from '@/app/api/v1/users/me/route';
 
 const mockPrisma = {
   user: {
@@ -59,12 +59,12 @@ const mockPrisma = {
 };
 
 function createGetRequest(): NextRequest {
-  const url = new URL('http://localhost:3000/api/users/me');
+  const url = new URL('http://localhost:3000/api/v1/users/me');
   return new NextRequest(url, { method: 'GET' });
 }
 
 function createPatchRequest(body: Record<string, unknown>): NextRequest {
-  const url = new URL('http://localhost:3000/api/users/me');
+  const url = new URL('http://localhost:3000/api/v1/users/me');
   return new NextRequest(url, {
     method: 'PATCH',
     body: JSON.stringify(body),
@@ -79,8 +79,6 @@ const mockUser = {
   image: 'https://example.com/alice.jpg',
   bio: 'Science educator and podcast creator',
   createdAt: new Date('2025-01-10T10:00:00Z'),
-  twitterHandle: '@alicejohnson',
-  twitterEnabled: true,
   preferredHostVoiceId: 'voice-host-1',
   preferredExpertVoiceId: 'voice-expert-1',
 };
@@ -92,13 +90,11 @@ const mockUserMinimal = {
   image: null,
   bio: null,
   createdAt: new Date('2025-01-15T10:00:00Z'),
-  twitterHandle: null,
-  twitterEnabled: false,
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
 };
 
-describe('GET /api/users/me', () => {
+describe('GET /api/v1/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPodcastCount.mockResolvedValue(0);
@@ -142,8 +138,6 @@ describe('GET /api/users/me', () => {
     expect(response.status).toBe(200);
     expect(body.image).toBeNull();
     expect(body.bio).toBeNull();
-    expect(body.twitterHandle).toBeNull();
-    expect(body.twitterEnabled).toBe(false);
   });
 
   it('returns 404 when user not found in database', async () => {
@@ -160,7 +154,7 @@ describe('GET /api/users/me', () => {
 
 });
 
-describe('PATCH /api/users/me', () => {
+describe('PATCH /api/v1/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

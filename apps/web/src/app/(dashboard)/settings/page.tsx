@@ -4,8 +4,6 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import { getMusicByokProviderMeta } from '@/lib/providers/music-registry';
-import { getReferralBonus, getActiveReferralCount } from '@/lib/referrals';
 import { getAppBaseUrl } from '@/lib/urls';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
@@ -24,14 +22,12 @@ export default async function SettingsPage() {
   const [
     user,
     accounts,
-    voiceClones,
     userInterests,
     categories,
     byokKeys,
     aiKeys,
     tasteQuizAnswerCount,
     referredUsers,
-    privateFeedTokens,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -42,13 +38,8 @@ export default async function SettingsPage() {
         image: true,
         bio: true,
         role: true,
-        twitterHandle: true,
-        twitterEnabled: true,
-        voicePreferences: { select: { speaker: true, voiceId: true } },
         preferredLanguage: true,
         preferredAiModel: true,
-        preferredTtsProvider: true,
-        preferredTtsModel: true,
         emailNotifications: true,
         pushNotifications: true,
       },
@@ -57,14 +48,6 @@ export default async function SettingsPage() {
       where: { userId },
       select: {
         provider: true,
-      },
-    }),
-    prisma.voiceClone.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        externalVoiceId: true,
       },
     }),
     prisma.userInterest.findMany({
@@ -92,24 +75,12 @@ export default async function SettingsPage() {
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
-    prisma.privateFeedToken.findMany({
-      where: { userId, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        feedType: true,
-        createdAt: true,
-        lastUsedAt: true,
-      },
-    }),
   ]);
 
   if (!user) return null;
 
   const connectedProviders = accounts.map((a) => a.provider);
   const selectedInterestTagIds = userInterests.map((i) => i.tagId);
-  const activeReferralCount = await getActiveReferralCount(userId);
 
   // Sort categories by the order defined in ONBOARDING_TAG_SLUGS
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
@@ -119,13 +90,7 @@ export default async function SettingsPage() {
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
-  const musicProviderMeta = getMusicByokProviderMeta();
 
-  const configuredMusicProviders = configuredProviders.filter(
-    (p) => (p.provider as string) === 'suno'
-  );
-  const isTwitterProviderAvailable =
-    !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
   const appBaseUrl = getAppBaseUrl();
 
   return (
@@ -140,32 +105,16 @@ export default async function SettingsPage() {
         image={user.image}
         role={user.role}
         connectedProviders={connectedProviders}
-        twitterHandle={user.twitterHandle}
-        twitterEnabled={user.twitterEnabled}
-        voicePreferences={user.voicePreferences}
         preferredLanguage={user.preferredLanguage}
         initialPreferredAiModel={user.preferredAiModel}
-        initialPreferredTtsProvider={user.preferredTtsProvider}
-        initialPreferredTtsModel={user.preferredTtsModel}
-        voiceClones={voiceClones}
         interestCategories={categories}
         selectedInterestTagIds={selectedInterestTagIds}
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
         aiProviderMeta={aiProviderMeta}
         ttsProviderMeta={ttsProviderMeta}
-        musicProviderMeta={musicProviderMeta}
-        configuredMusicProviders={configuredMusicProviders}
-        isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        privateFeedTokens={privateFeedTokens.map((token) => ({
-          id: token.id,
-          name: token.name,
-          feedType: token.feedType,
-          createdAt: token.createdAt.toISOString(),
-          lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
-        }))}
         quizAnswerCount={tasteQuizAnswerCount}
         referredUsers={referredUsers.map((u) => ({
           name: u.name,
@@ -174,7 +123,6 @@ export default async function SettingsPage() {
           joinedAt: u.createdAt.toISOString(),
           verified: u.referralVerified,
         }))}
-        referralBonus={getReferralBonus(activeReferralCount)}
         appBaseUrl={appBaseUrl}
       />
     </main>

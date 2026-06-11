@@ -7,43 +7,22 @@ import {
   LayoutDashboard,
   Users,
   Radio,
-  Mail,
-  BarChart2,
-  Shield,
   AtSign,
   Star,
-  Sparkles,
-  DollarSign,
-  Wallet,
-  Headphones,
-  Activity,
-  TrendingUp,
-  Brain,
-  Target,
   FlaskConical,
-  Gauge,
-  HardDrive,
-  Tag,
   Wand2,
   HeartPulse,
   ListTodo,
-  Globe,
-  Scale,
-  Receipt,
-  Film,
   Clapperboard,
   ArrowLeft,
   Menu,
   ChevronDown,
-  SlidersHorizontal,
   ToggleRight,
 } from 'lucide-react';
 import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
 import styles from './AdminShell.module.css';
 
 interface AdminShellProps {
-  pendingReportCount?: number;
-  pendingDuplicateCount?: number;
   children: React.ReactNode;
 }
 
@@ -70,44 +49,17 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/users', label: 'Users', icon: Users },
       { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
-      { href: '/admin/moderation', label: 'Moderation', icon: Shield },
-      { href: '/admin/duplicates', label: 'Duplicates', icon: Scale },
-    ],
-  },
-  {
-    label: 'Business',
-    items: [
-      { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
-      { href: '/admin/costs', label: 'Costs', icon: DollarSign },
-      { href: '/admin/pricing', label: 'Pricing', icon: Tag },
-      { href: '/admin/expenses', label: 'Expenses', icon: Receipt },
-      { href: '/admin/storage', label: 'Storage', icon: HardDrive },
-    ],
-  },
-  {
-    label: 'Metrics',
-    items: [
-      { href: '/admin/engagement', label: 'Activity', icon: Activity },
-      { href: '/admin/playback', label: 'Playback', icon: Headphones },
-      { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
-      { href: '/admin/retention', label: 'Retention', icon: TrendingUp },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
-      { href: '/admin/analytics/live', label: 'Live Map', icon: Globe },
     ],
   },
   {
     label: 'Tools',
     items: [
-      { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
       { href: '/admin/handles', label: 'Handles', icon: AtSign },
       { href: '/admin/auto-models', label: 'Auto Models', icon: Wand2 },
-{ href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
+      { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
       { href: '/admin/health', label: 'System Health', icon: HeartPulse },
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
       { href: '/admin/site-config', label: 'Site Config', icon: ToggleRight },
-      { href: '/admin/plan-features', label: 'Voice Features', icon: SlidersHorizontal },
-      { href: '/admin/landing', label: 'Landing', icon: Globe },
-      { href: '/admin/showcase', label: 'Showcase', icon: Film },
       { href: '/admin/video-tests', label: 'Video Tests', icon: Clapperboard },
     ],
   },
@@ -115,10 +67,6 @@ const navGroups: NavGroup[] = [
     label: 'AI / ML',
     items: [
       { href: '/admin/ratings', label: 'Quality Ratings', icon: Star },
-      { href: '/admin/quality', label: 'Quality Analytics', icon: Gauge },
-      { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
-      { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
-      { href: '/admin/recommendations', label: 'Recommendations', icon: Target },
     ],
   },
 ];
@@ -133,7 +81,7 @@ function getInitialExpanded(pathname: string): Record<string, boolean> {
   return expanded;
 }
 
-export function AdminShell({ pendingReportCount, pendingDuplicateCount, children }: AdminShellProps) {
+export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => getInitialExpanded(pathname));
@@ -199,19 +147,6 @@ export function AdminShell({ pendingReportCount, pendingDuplicateCount, children
                   <div className={styles.navGroupItems}>
                     {group.items.map(({ href, label, icon: Icon }) => {
                       const isActive = pathname === href;
-                      const showBadge =
-                        (href === '/admin/moderation' &&
-                          pendingReportCount !== undefined &&
-                          pendingReportCount > 0) ||
-                        (href === '/admin/duplicates' &&
-                          pendingDuplicateCount !== undefined &&
-                          pendingDuplicateCount > 0);
-                      const badgeCount =
-                        href === '/admin/moderation'
-                          ? pendingReportCount
-                          : href === '/admin/duplicates'
-                            ? pendingDuplicateCount
-                            : 0;
                       return (
                         <Link
                           key={href}
@@ -222,11 +157,6 @@ export function AdminShell({ pendingReportCount, pendingDuplicateCount, children
                         >
                           <Icon className={styles.navIcon} aria-hidden="true" />
                           {label}
-                          {showBadge && (
-                            <span className={styles.navBadge} aria-label={`${badgeCount} pending`}>
-                              {badgeCount}
-                            </span>
-                          )}
                         </Link>
                       );
                     })}

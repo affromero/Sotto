@@ -95,16 +95,8 @@ export default function LibraryScreen() {
       <View style={styles.titleRow}>
         <View>
           <Text style={styles.kicker}>Private library</Text>
-          <Text style={styles.title}>Your podcasts</Text>
+          <Text style={styles.title}>Your lessons</Text>
         </View>
-        <Pressable
-          style={styles.createButton}
-          onPress={() => router.push('/create')}
-          accessibilityLabel="Create podcast"
-          accessibilityRole="button"
-        >
-          <Ionicons name="add" size={22} color={colors.textInverse} />
-        </Pressable>
       </View>
 
       <View style={styles.statsRow}>
@@ -222,14 +214,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontHeading,
     fontSize: 28,
     color: colors.textPrimary,
-  },
-  createButton: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   statsRow: {
     flexDirection: 'row',

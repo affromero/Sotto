@@ -193,7 +193,7 @@ describe('useAuth', () => {
         result.current.signIn();
       });
 
-      expect(mockSignIn).toHaveBeenCalledWith(undefined, { callbackUrl: '/dashboard' });
+      expect(mockSignIn).toHaveBeenCalledWith(undefined, { callbackUrl: '/learn' });
     });
 
   });

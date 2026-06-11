@@ -204,11 +204,11 @@
   border-radius: inherit;
   background: conic-gradient(
     from var(--snake-angle, 0deg),
-    #d97706 0%,
+    var(--color-primary) 0%,
     #fbbf24 25%,
     transparent 50%,
     #fbbf24 75%,
-    #d97706 100%
+    var(--color-primary) 100%
   );
   animation: snakeBorder 3s linear infinite;
   z-index: -2;

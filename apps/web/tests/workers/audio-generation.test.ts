@@ -16,7 +16,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   voices: [],
   ttsProvider: 'elevenlabs',
   ttsModel: null,
-  user: { plan: 'FREE' },
+  user: {},
 });
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
@@ -277,7 +277,7 @@ describe('processAudioGeneration', () => {
       voices: [],
       ttsProvider: 'elevenlabs',
       ttsModel: null,
-      user: { plan: 'FREE' },
+      user: {},
     });
     // Default: no pending segments (all done)
     mockPrismaSegmentCount.mockResolvedValue(0);
@@ -352,13 +352,12 @@ describe('processAudioGeneration', () => {
           voices: { select: { speaker: true, voiceId: true, provider: true } },
           ttsProvider: true,
           ttsModel: true,
-          user: { select: { plan: true } },
         },
       });
     });
   });
 
-  describe('premium voice selection', () => {
+  describe('voice selection', () => {
     it('calls provider getVoiceId with speaker and podcastId for voice diversity', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
@@ -402,7 +401,7 @@ describe('processAudioGeneration', () => {
         voices: [{ speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processAudioGeneration(job);
@@ -419,7 +418,7 @@ describe('processAudioGeneration', () => {
         voices: [{ speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processAudioGeneration(job);
@@ -436,7 +435,7 @@ describe('processAudioGeneration', () => {
         voices: [{ speaker: 'HOST', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' }],
         ttsProvider: 'hume',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupHumeProvider();
       mockProviderGetVoiceId.mockReturnValue('hume-pool-voice');
@@ -456,7 +455,7 @@ describe('processAudioGeneration', () => {
         voices: [{ speaker: 'HOST', voiceId: 'old-voice-id', provider: null }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       mockProviderGetVoiceId.mockReturnValue('pool-voice');
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
@@ -491,7 +490,7 @@ describe('processAudioGeneration', () => {
         voices: [{ speaker: 'HOST', voiceId: 'old-elevenlabs-voice', provider: 'elevenlabs' }],
         ttsProvider: 'hume',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupHumeProvider();
       mockProviderGetVoiceId.mockReturnValue('hume-pool-voice');
@@ -517,7 +516,7 @@ describe('processAudioGeneration', () => {
         voices: [{ speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processAudioGeneration(job);
@@ -575,7 +574,7 @@ describe('processAudioGeneration', () => {
         voices: [],
         ttsProvider: 'openai',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupStandardProvider();
     });
@@ -845,7 +844,7 @@ describe('processAudioGeneration', () => {
         voices: [],
         ttsProvider: 'elevenlabs',
         ttsModel: 'eleven_v3',
-        user: { plan: 'FREE' },
+        user: {},
       });
     });
 
@@ -982,7 +981,7 @@ describe('processAudioGeneration', () => {
         voices: [],
         ttsProvider: 'elevenlabs',
         ttsModel: 'eleven_v3',
-        user: { plan: 'FREE' },
+        user: {},
       });
 
       const job = createMockJob({
@@ -1166,7 +1165,7 @@ describe('processAudioGeneration', () => {
         voices: [],
         ttsProvider: null,
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob(defaultPayload);
 

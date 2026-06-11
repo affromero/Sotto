@@ -53,7 +53,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { GET, POST } from '@/app/api/placement/route';
+import { GET, POST } from '@/app/api/v1/placement/route';
 
 const SAMPLE_QUESTIONS = [
   {
@@ -77,21 +77,21 @@ const SAMPLE_QUESTIONS = [
 ];
 
 function makeGetRequest(params?: { native?: string; target?: string }): NextRequest {
-  const url = new URL('http://localhost:3000/api/placement');
+  const url = new URL('http://localhost:3000/api/v1/placement');
   if (params?.native) url.searchParams.set('native', params.native);
   if (params?.target) url.searchParams.set('target', params.target);
   return new NextRequest(url.toString(), { method: 'GET' });
 }
 
 function makePostRequest(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/placement', {
+  return new NextRequest('http://localhost:3000/api/v1/placement', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-describe('GET /api/placement', () => {
+describe('GET /api/v1/placement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
@@ -195,7 +195,7 @@ describe('GET /api/placement', () => {
   });
 });
 
-describe('POST /api/placement', () => {
+describe('POST /api/v1/placement', () => {
   const answers = [
     { id: 'pq_0', selectedIndex: 1 },
     { id: 'pq_1', selectedIndex: 2 },

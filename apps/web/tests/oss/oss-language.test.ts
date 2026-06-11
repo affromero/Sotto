@@ -18,14 +18,11 @@ describe('open-source language-learning OSS surfaces', () => {
     'src/components/layout/TopBar.tsx',
     'src/components/layout/PublicNav.tsx',
     'src/components/layout/Footer.tsx',
-    'src/components/landing/LandingNav.tsx',
-    'src/components/landing/AuthCTA.tsx',
-    'src/components/landing/chapters/ConvertChapter.tsx',
-    'src/components/landing/chapters/JourneyChapter.tsx',
+    'src/components/landing/LandingHeader.tsx',
+    'src/components/landing/LandingCTA.tsx',
     'src/components/landing/JsonLd.tsx',
+    'src/app/page.tsx',
     'src/app/(dashboard)/dashboard/page.tsx',
-    'src/app/(dashboard)/dashboard/DashboardStats.tsx',
-    'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
     'src/app/podcast/[podcastId]/PodcastPlayerView.tsx',
   ];
 
@@ -48,8 +45,9 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('positions the product as open-source language-learning infrastructure, not a social podcast network', () => {
     const landingSource = [
-      'src/components/landing/chapters/ConvertChapter.tsx',
-      'src/components/landing/chapters/JourneyChapter.tsx',
+      'src/app/page.tsx',
+      'src/components/landing/LandingHeader.tsx',
+      'src/components/landing/LandingCTA.tsx',
     ]
       .map(readSource)
       .join('\n');
@@ -83,20 +81,17 @@ describe('open-source language-learning OSS surfaces', () => {
     const webCopySources = [
       'src/app/about/page.tsx',
       'src/app/join/page.tsx',
-      'src/app/pricing/page.tsx',
       'src/app/developers/page.tsx',
       'src/app/terms/page.tsx',
       'src/app/privacy/page.tsx',
       'src/app/support/page.tsx',
       'src/app/layout.tsx',
-      'src/app/(admin)/admin/showcase/ActionEditor.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
       'src/components/referral/JoinCTA.tsx',
-      'src/components/voices/VoicePaymentModal.tsx',
     ]
       .map(readSource)
       .join('\n');
-    const mobileCopySources = ['apps/mobile/app/settings/referral.tsx']
+    const mobileCopySources = ['apps/mobile/app/settings.tsx']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
     const copySources = [webCopySources, mobileCopySources].join('\n');
@@ -115,13 +110,9 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('keeps dashboard data access scoped to private workspace metrics', () => {
-    const dashboardSource = [
-      'src/app/(dashboard)/dashboard/page.tsx',
-      'src/app/(dashboard)/dashboard/DashboardStats.tsx',
-      'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
+    // The old podcast dashboard surfaces (DashboardStats, MyPodcastsSection) are
+    // retired; /dashboard is now a redirect to /learn. Guard what remains.
+    const dashboardSource = ['src/app/(dashboard)/dashboard/page.tsx'].map(readSource).join('\n');
 
     expect(dashboardSource).not.toContain('TrendingToForkSection');
     expect(dashboardSource).not.toContain('ReferralSharePrompt');
@@ -135,28 +126,18 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx')).not.toContain(
       'canMakePrivate'
     );
-    expect(readSource('src/app/(dashboard)/dashboard/MyPodcastsSection.tsx')).not.toContain(
-      'getTierFeatures'
-    );
   });
 
   it('does not ship the public feed page or feed API route', () => {
-    const creatorMetricsSource = readSource('src/lib/creator-metrics.ts');
-
     expect(existsSync(resolve(webRoot, 'src/app/feed/page.tsx'))).toBe(false);
-    expect(existsSync(resolve(webRoot, 'src/app/api/feed/route.ts'))).toBe(false);
-    expect(existsSync(resolve(webRoot, 'src/app/api/activity/route.ts'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/app/api/v1/feed/route.ts'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/app/api/v1/activity/route.ts'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/components/feed/ActivityFeed.tsx'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/components/feed/ActivityItem.tsx'))).toBe(false);
     expect(existsSync(resolve(repoRoot, 'e2e/playwright/tests/feed.spec.ts'))).toBe(false);
     expect(existsSync(resolve(repoRoot, 'e2e/playwright/tests/api/feed-social.api.spec.ts'))).toBe(
       false
     );
-    expect(existsSync(resolve(repoRoot, 'scripts/recording/flows/01-feed-browsing.ts'))).toBe(
-      false
-    );
-    expect(creatorMetricsSource).not.toContain("LIKE '%/feed%'");
-    expect(creatorMetricsSource).not.toContain("THEN 'feed'");
   });
 
   it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
@@ -166,33 +147,12 @@ describe('open-source language-learning OSS surfaces', () => {
     const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const eventSources = [
-      'src/types/events.ts',
-      'src/lib/validations/events.ts',
-      'src/components/feed/PodcastCard.tsx',
-      'src/components/feed/SearchBar.tsx',
-      'src/lib/hooks/useImpressionTracker.ts',
-    ]
-      .map(readSource)
-      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/events.ts'), 'utf8'))
-      .join('\n');
-
     expect(mobileSources).not.toContain("'/feed'");
     expect(mobileSources).not.toContain('"/feed"');
     expect(mobileSources).not.toContain('/users/discover');
     expect(mobileSources).not.toContain('/users/suggested');
     expect(mcpSources).not.toContain('browse_feed');
-    expect(mcpSources).not.toContain('/api/feed');
-    expect(eventSources).not.toContain('feed.impression');
-    expect(eventSources).not.toContain('feed.click');
-    expect(eventSources).not.toContain('feed.search');
-    expect(eventSources).not.toContain('feedSort');
-    expect(eventSources).not.toContain('social.like');
-    expect(eventSources).not.toContain('social.follow');
-    expect(eventSources).not.toContain('social.fork');
-    expect(eventSources).toContain('library.impression');
-    expect(eventSources).toContain('library.click');
-    expect(eventSources).toContain('library.search');
+    expect(mcpSources).not.toContain('/api/v1/feed');
     expect(existsSync(resolve(repoRoot, 'packages/shared/src/types/feed.ts'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
@@ -224,7 +184,7 @@ describe('open-source language-learning OSS surfaces', () => {
       .join('\n');
 
     expect(mcpSources).toContain('ingest_agent_output');
-    expect(mcpSources).toContain('/api/ingest/agent');
+    expect(mcpSources).toContain('/api/v1/ingest/agent');
     expect(mcpSources).toContain('tts_provider');
     expect(mcpSources).toContain('idempotency_key');
     expect(mcpSources).toContain('never publishes the result publicly');
@@ -253,25 +213,14 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/robots.ts',
       'src/app/sitemap.ts',
       'src/app/podcast/[podcastId]/page.tsx',
-      'src/app/collections/[collectionId]/page.tsx',
       'src/components/player/PodcastJsonLd.tsx',
       'src/components/landing/JsonLd.tsx',
-      'src/app/api/oembed/route.ts',
-      'src/app/api/billing/checkout/route.ts',
-      'src/app/api/billing/portal/route.ts',
-      'src/app/api/stripe/connect/route.ts',
-      'src/app/api/stripe/connect/callback/route.ts',
-      'src/app/api/admin/invitations/route.ts',
-      'src/app/api/users/unsubscribe/route.ts',
-      'src/lib/rss.ts',
-      'src/lib/providers/music/suno.provider.ts',
+      'src/app/api/v1/admin/invitations/route.ts',
+      'src/app/api/v1/users/unsubscribe/route.ts',
       'src/lib/extractors/index.ts',
       'src/lib/extractors/html.ts',
       'src/lib/email-templates.ts',
-      'src/components/player/EmbedCodeModal.tsx',
-      'src/components/player/EmbedPlayer.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
-      'src/components/referral/ReferralSharePrompt.tsx',
     ]
       .map(readSource)
       .join('\n');
@@ -284,14 +233,10 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(generatedUrlSources).not.toContain("|| 'http://localhost:3000'");
   });
 
-  it('requires mobile and extension clients to use explicit deployment URLs', () => {
+  it('requires mobile clients to use explicit deployment URLs', () => {
     const mobileRuntimeSources = [
       'apps/mobile/lib/config.ts',
       'apps/mobile/lib/api.ts',
-      'apps/mobile/lib/event-buffer.ts',
-      'apps/mobile/app/(tabs)/create.tsx',
-      'apps/mobile/app/settings/billing.tsx',
-      'apps/mobile/app/settings/referral.tsx',
       'apps/mobile/app/auth/login.tsx',
       'apps/mobile/app/settings.tsx',
     ]
@@ -304,37 +249,23 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const extensionSources = [
-      'extension/background.js',
-      'extension/popup.js',
-      'extension/popup.html',
-      'extension/manifest.json',
-      'extension/ADAPTATION.md',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-
-    expect(mobileRuntimeSources).toContain('is required. Set it to your Sotto deployment API URL');
+    // The client must point at an explicit deployment — paired at runtime
+    // ("scan to connect") or baked in via EXPO_PUBLIC_API_URL — and never
+    // silently default to a hosted sotto.fm. getApiBaseUrl throws when no server
+    // is configured at all.
+    expect(mobileRuntimeSources).toContain('No Sotto server is configured');
     expect(mobileRuntimeSources).toContain('getApiBaseUrl');
     expect(mobileRuntimeSources).not.toContain('https://sotto.fm');
     expect(mobileRuntimeSources).not.toContain("?? 'https://sotto.fm/api'");
     expect(mobileRuntimeSources).not.toContain("|| 'https://sotto.fm/api'");
 
-    expect(mobileBuildConfigSources).toContain('EXPO_PUBLIC_API_URL is required for mobile builds');
+    // The build is driven by the explicit EXPO_PUBLIC_API_URL knob and also
+    // supports a runtime-config build (no baked-in server) — never a hardcoded host.
+    expect(mobileBuildConfigSources).toContain('EXPO_PUBLIC_API_URL');
+    expect(mobileBuildConfigSources).toContain('runtime-config');
     expect(mobileBuildConfigSources).not.toContain('applinks:sotto.fm');
     expect(mobileBuildConfigSources).not.toContain('"host": "sotto.fm"');
     expect(mobileBuildConfigSources).not.toContain('https://sotto.fm/api');
-
-    expect(extensionSources).toContain('Sotto deployment URL is required');
-    expect(extensionSources).toContain('SET_CONFIG');
-    expect(extensionSources).toContain('"https://*/*"');
-    expect(extensionSources).toContain('optional import adapter');
-    expect(extensionSources).not.toContain('https://sotto.fm');
-    expect(extensionSources).not.toContain('sotto.fm/api');
-    expect(extensionSources).not.toContain('Send NotebookLM to Sotto');
-    expect(extensionSources).not.toContain('Send NotebookLM audio overviews');
-    expect(extensionSources).not.toContain('SET_API_KEY');
-    expect(extensionSources).not.toContain('CLEAR_API_KEY');
   });
 
   it('keeps the local setup script OSS-first and template-driven', () => {
@@ -357,7 +288,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSource).not.toContain('set_env_value NEXTAUTH_SECRET');
 
     expect(installDepsSource).toContain('install_ffmpeg');
-    expect(localSetupDocs).toContain('EXPO_PUBLIC_API_URL="http://localhost:3000/api"');
+    expect(localSetupDocs).toContain('EXPO_PUBLIC_API_URL="http://localhost:3000/api/v1"');
     expect(localSetupDocs).toContain('LOCAL_STORAGE_DIR="./.sotto/storage"');
     expect(localSetupDocs).not.toContain(
       'Compatibility scripts are still available for the old hosted setup'
@@ -382,7 +313,8 @@ describe('open-source language-learning OSS surfaces', () => {
     const commandSources = [packageJson, envRunner, e2eSources].join('\n');
 
     expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
-    expect(packageJson).toContain('"record": "scripts/run-with-env.sh');
+    expect(packageJson).not.toContain('"record": "scripts/run-with-env.sh');
+    expect(packageJson).not.toContain('"narrate": "scripts/run-with-env.sh');
     expect(packageJson).not.toContain('"db:sync"');
     expect(existsSync(resolve(repoRoot, 'scripts/sync-prod-db.sh'))).toBe(false);
     expect(envRunner).toContain('SOTTO_ENV_FILE');
@@ -417,7 +349,7 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(packageJson).toContain('"mobile:env": "bash scripts/sync-mobile-env.sh"');
     expect(syncMobileEnv).toContain('ENV_SOURCE="$REPO_ROOT/.env.local"');
-    expect(syncMobileEnv).toContain('EXPO_PUBLIC_API_URL="${NEXT_PUBLIC_APP_URL%/}/api"');
+    expect(syncMobileEnv).toContain('EXPO_PUBLIC_API_URL="${NEXT_PUBLIC_APP_URL%/}/api/v1"');
     expect(syncMobileEnv).toContain('MOBILE_ENV_OUTPUT');
     expect(mobileSetupSources).toContain('EXPO_PUBLIC_API_URL');
     expect(mobileSetupSources).not.toContain('LAN_IP');
@@ -434,7 +366,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(envExample).toContain('Use your own secret manager');
     expect(envExample).toContain('copy .env.oss.example to .env.local');
-    expect(envExample).toContain('Use the exact public host from NEXT_PUBLIC_APP_URL');
     expect(envTemplateSources).toContain('AUTH_SECRET');
     expect(envTemplateSources).not.toContain('NEXTAUTH_SECRET');
     expect(envTemplateSources).not.toContain('dashboard.doppler.com/workplace/projects/sotto');
@@ -451,17 +382,8 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/auth.ts',
       'apps/web/src/middleware.ts',
       'apps/web/src/lib/email-templates.ts',
-      'apps/web/src/app/api/access/route.ts',
-      'apps/web/src/app/api/users/unsubscribe/route.ts',
-      'apps/web/src/app/api/waitlist/unsubscribe/route.ts',
-      'apps/web/src/app/api/pitch/[...path]/route.ts',
-      'apps/web/src/app/api/pitch/auth/route.ts',
-      'apps/web/src/workers/demo-recording.worker.ts',
+      'apps/web/src/app/api/v1/users/unsubscribe/route.ts',
       'apps/web/src/lib/health.ts',
-      'scripts/capture-pitch-screenshots.ts',
-      'scripts/recording/index.ts',
-      'scripts/recording/lib/browser.ts',
-      'scripts/recording/narrate.ts',
       'docs/17-authentication-setup.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -482,7 +404,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const runtimeInfraSources = [
       'packages/shared/src/brand.ts',
       'apps/maps/src/components/SottoLogo.tsx',
-      'apps/maps/src/app/api/health/route.ts',
+      'apps/maps/src/app/api/v1/health/route.ts',
       'apps/web/src/lib/push-notifications.ts',
       'apps/web/src/lib/reference-validator.ts',
     ]
@@ -503,16 +425,13 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps public contact and demo surfaces self-host neutral', () => {
     const publicContactSources = [
       'apps/web/src/app/about/page.tsx',
-      'apps/web/src/app/banned/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/app/terms/page.tsx',
       'apps/web/src/app/privacy/page.tsx',
       'apps/web/src/app/feedback/page.tsx',
       'apps/web/src/app/join/page.tsx',
-      'apps/web/src/app/api/auth/mobile/route.ts',
+      'apps/web/src/app/api/v1/auth/mobile/route.ts',
       'apps/web/src/app/opengraph-image.tsx',
-      'apps/web/src/app/(admin)/admin/showcase/AvatarPrep.tsx',
-      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
       'apps/web/public/manifest.json',
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
@@ -527,19 +446,12 @@ describe('open-source language-learning OSS surfaces', () => {
       'packages/verification-standard/package.json',
       'packages/verification-standard/README.md',
       'packages/verification-standard/CONTRIBUTING.md',
-      'scripts/capture-pitch-screenshots.ts',
-      'scripts/launch-video/AUTHORING_GUIDE.md',
-      'scripts/launch-video/SYSTEM_PROMPT.md',
-      'scripts/launch-video/sotto-launch.json',
-      'scripts/recording/index.ts',
-      'scripts/recording/lib/browser.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
     expect(publicContactSources).toContain('support@example.com');
     expect(publicContactSources).toContain('https://your-domain.example');
-    expect(publicContactSources).toContain('https://media.example.com/demos/');
     expect(publicContactSources).not.toContain('sotto.fm');
     expect(publicContactSources).not.toContain('@sottofm');
     expect(publicContactSources).not.toContain('r2.sotto.fm');
@@ -556,22 +468,18 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(publicContactSources).not.toContain('Every voice. Every topic. One feed.');
   });
 
-  it('keeps bot identity configurable for self-hosted deployments', () => {
-    const botIdentitySources = [
+  it('keeps removed bot identity config out of self-hosted deployments', () => {
+    const removedBotSources = [
       '.env.example',
       '.env.oss.example',
       'docs/07-ai-prompts.md',
       'docs/17-authentication-setup.md',
-      'docs/25-twitter-integration.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
-      'apps/web/src/app/(dashboard)/ideas/tabs/IdeasTab.tsx',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
-      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
       'apps/web/src/components/layout/Footer.tsx',
-      'apps/web/src/lib/bot-identity.ts',
       'apps/web/src/lib/email-templates.ts',
       'apps/web/src/workers/CLAUDE.md',
       'packages/shared/src/brand.ts',
@@ -579,18 +487,20 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(botIdentitySources).toContain('NEXT_PUBLIC_TWITTER_BOT_HANDLE');
-    expect(botIdentitySources).toContain('NEXT_PUBLIC_TELEGRAM_BOT_USERNAME');
-    expect(botIdentitySources).toContain('TWITTER_BOT_USER_ID');
-    expect(botIdentitySources).toContain('your configured Twitter bot');
-    expect(botIdentitySources).not.toContain('@sottofm');
-    expect(botIdentitySources).not.toContain('@SottoFM');
-    expect(botIdentitySources).not.toContain('@SottoFMBot');
-    expect(botIdentitySources).not.toContain('SottoFMBot');
-    expect(botIdentitySources).not.toContain('TWITTER_SOTTO_USER_ID');
-    expect(botIdentitySources).not.toContain('TWITTER_ACCESS_TOKEN_SECRET');
-    expect(botIdentitySources).not.toContain('https://x.com/sottofm');
-    expect(botIdentitySources).not.toContain('https://twitter.com/SottoFM');
+    expect(removedBotSources).not.toContain('NEXT_PUBLIC_TWITTER_BOT_HANDLE');
+    expect(removedBotSources).not.toContain('NEXT_PUBLIC_TELEGRAM_BOT_USERNAME');
+    expect(removedBotSources).not.toContain('TWITTER_BOT_USER_ID');
+    expect(removedBotSources).not.toContain('TELEGRAM_BOT_TOKEN');
+    expect(removedBotSources).not.toContain('your configured Twitter bot');
+    expect(removedBotSources).not.toContain('your Telegram bot');
+    expect(removedBotSources).not.toContain('@sottofm');
+    expect(removedBotSources).not.toContain('@SottoFM');
+    expect(removedBotSources).not.toContain('@SottoFMBot');
+    expect(removedBotSources).not.toContain('SottoFMBot');
+    expect(removedBotSources).not.toContain('TWITTER_SOTTO_USER_ID');
+    expect(removedBotSources).not.toContain('TWITTER_ACCESS_TOKEN_SECRET');
+    expect(removedBotSources).not.toContain('https://x.com/sottofm');
+    expect(removedBotSources).not.toContain('https://twitter.com/SottoFM');
   });
 
   it('keeps system owner identity configurable for self-hosted deployments', () => {
@@ -600,13 +510,11 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/prisma/seed.ts',
       'apps/web/src/lib/system-user.ts',
       'apps/web/src/workers/CLAUDE.md',
-      'apps/web/src/app/api/admin/podcasts/create-as-system-owner/route.ts',
-      'apps/web/src/app/api/admin/landing-showcase/bootstrap/route.ts',
-      'apps/web/src/app/api/admin/impersonate/targets/route.ts',
+      'apps/web/src/app/api/v1/admin/podcasts/create-as-system-owner/route.ts',
+      'apps/web/src/app/api/v1/admin/impersonate/targets/route.ts',
       'apps/web/src/app/(admin)/admin/podcasts/CreateAsSystemOwnerButton.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.module.css',
-      'apps/web/src/app/create/CreatePageClient.tsx',
       'apps/web/src/components/layout/AccountSwitcher.tsx',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -617,7 +525,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(systemOwnerSources).toContain('create-as-system-owner');
     expect(systemOwnerSources).toContain('configured system owner');
     expect(
-      existsSync(resolve(repoRoot, 'apps/web/src/app/api/admin/podcasts/create-as-sotto'))
+      existsSync(resolve(repoRoot, 'apps/web/src/app/api/v1/admin/podcasts/create-as-sotto'))
     ).toBe(false);
     expect(systemOwnerSources).not.toContain("handle: 'sotto'");
     expect(systemOwnerSources).not.toContain('create-as-sotto');
@@ -637,9 +545,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/public-links.ts',
       'apps/web/src/components/player/ReferenceList.tsx',
       'apps/web/src/components/create/GenerationProgress.tsx',
-      'apps/web/src/components/landing/chapters/TrustChapter.tsx',
-      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
-      'scripts/recording/flows/07-verification-github.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -683,13 +588,11 @@ describe('open-source language-learning OSS surfaces', () => {
       'SECURITY.md',
       'scripts/generate-apple-secret.mjs',
       'docs/05-plan.md',
-      'docs/10-stripe-billing.md',
       'docs/23-local-development.md',
       'docs/27-launch-readiness-status.md',
       'apps/maps/CLAUDE.md',
       'apps/web/scripts/test-runway-browser.ts',
       'apps/web/scripts/test-runway-native.ts',
-      'apps/web/src/app/(admin)/admin/storage/page.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/providers/video.ts',
       'packages/maps/CLAUDE.md',
@@ -702,8 +605,8 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
-    expect(releaseHygieneSources).toContain('deployment secret manager or env file');
-    expect(releaseHygieneSources).toContain('Environment variables:');
+    expect(releaseHygieneSources).toContain('secret manager or env file');
+    expect(releaseHygieneSources).toContain('Set in your deployment environment:');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
     expect(releaseHygieneSources).not.toContain('sotto.fm/api');
     expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');
@@ -755,7 +658,7 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const releaseIndexSources = ['docs/CLAUDE.md', 'scripts/rebuild-pitch.sh']
+    const releaseIndexSources = ['docs/CLAUDE.md']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -781,9 +684,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/next.config.js',
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
-      'apps/web/src/lib/recommendation-engine.ts',
-      'apps/web/src/lib/providers/ml.ts',
-      'apps/web/src/workers/feature-computation.worker.ts',
       'apps/web/src/lib/CLAUDE.md',
       'CHANGELOG.md',
     ]
@@ -805,17 +705,17 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('does not ship podcast social action routes or player widgets', () => {
     const removedRoutes = [
-      'src/app/api/podcasts/[podcastId]/fork/route.ts',
-      'src/app/api/podcasts/[podcastId]/fork-voice/route.ts',
-      'src/app/api/podcasts/[podcastId]/like/route.ts',
-      'src/app/api/podcasts/[podcastId]/comments/route.ts',
-      'src/app/api/podcasts/[podcastId]/comments/[commentId]/route.ts',
-      'src/app/api/podcasts/[podcastId]/comments/[commentId]/replies/route.ts',
-      'src/app/api/podcasts/[podcastId]/interact/[interactionId]/vote/route.ts',
-      'src/app/api/podcasts/[podcastId]/lineage/route.ts',
-      'src/app/api/podcasts/[podcastId]/questions/route.ts',
-      'src/app/api/podcasts/[podcastId]/voice-tracks/[trackId]/propose/route.ts',
-      'src/app/api/users/[userId]/liked/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/fork/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/fork-voice/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/like/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/comments/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/comments/[commentId]/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/comments/[commentId]/replies/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/interact/[interactionId]/vote/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/lineage/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/questions/route.ts',
+      'src/app/api/v1/podcasts/[podcastId]/voice-tracks/[trackId]/propose/route.ts',
+      'src/app/api/v1/users/[userId]/liked/route.ts',
     ];
     const removedComponents = [
       'src/components/player/ForkRemixModal.tsx',
@@ -831,13 +731,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/components/player/ProposeRenditionButton.tsx',
     ];
     const playerSource = readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx');
-    const podcastCardSource = [
-      'src/components/feed/PodcastCard.tsx',
-      'src/components/feed/PodcastCard.module.css',
-      'src/components/landing/chapters/AudioClipPlayer.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
 
     for (const route of removedRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
@@ -849,12 +742,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(playerSource).not.toContain('/fork');
     expect(playerSource).not.toContain('/comments');
     expect(playerSource).not.toContain('ShareMenu');
-    expect(podcastCardSource).not.toContain('router.push');
-    expect(podcastCardSource).not.toContain('?fork=1');
-    expect(podcastCardSource).not.toContain('forkButton');
-    expect(podcastCardSource).not.toContain('Remix of');
-    expect(podcastCardSource).not.toContain('likeCount');
-    expect(podcastCardSource).not.toContain('forkCount');
   });
 
   it('does not keep social notification types or public Q&A voting tests', () => {
@@ -876,7 +763,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'e2e/playwright/tests/api/feed-social.api.spec.ts',
       'e2e/playwright/tests/api/users-public.api.spec.ts',
       'e2e/playwright/tests/fork.spec.ts',
-      'scripts/recording/flows/04-fork-flow.ts',
     ];
 
     for (const testPath of removedTests) {
@@ -891,19 +777,14 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(notificationSources).not.toContain('COMMENT_REPLY');
   });
 
-  it('keeps demo and automation harnesses private-first', () => {
+  it('keeps automation harnesses private-first', () => {
     const harnessSources = [
       'e2e/llmock/setup.ts',
       'e2e/playwright/tests/podcast-player.spec.ts',
-      'scripts/launch-video/SYSTEM_PROMPT.md',
-      'scripts/launch-video/AUTHORING_GUIDE.md',
-      'scripts/recording/index.ts',
-      'scripts/ml/prepare-quality-training.ts',
       'apps/web/src/app/changelog/page.tsx',
-      'apps/web/src/app/onboarding/KeySetupForm.tsx',
+      'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/auth-guards.ts',
-      'apps/web/src/lib/demo-context.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -919,9 +800,6 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps onboarding setup explicit about transcription readiness', () => {
     const setupSources = [
       'apps/web/src/lib/setup-readiness.ts',
-      'apps/web/src/app/onboarding/page.tsx',
-      'apps/web/src/app/api/onboarding/readiness/route.ts',
-      'apps/web/src/components/create/SttModelDropdown.tsx',
       'apps/web/prisma/schema.prisma',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -938,21 +816,19 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSources).not.toContain('sttProvider      String? // null = auto');
   });
 
-  it('keeps BYOK voice generation explicit instead of submitting Auto', () => {
+  it('keeps voice generation on concrete TTS provider options', () => {
     const ttsSources = [
-      'apps/web/src/app/api/podcasts/route.ts',
-      'apps/web/src/app/api/tts-options/route.ts',
-      'apps/web/src/components/create/TtsModelDropdown.tsx',
+      'apps/web/src/app/api/v1/podcasts/route.ts',
+      'apps/web/src/app/api/v1/tts-options/route.ts',
       'apps/web/prisma/schema.prisma',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(ttsSources).toContain('tts_provider_required');
-    expect(ttsSources).toContain('const options: TtsOption[] = [];');
-    expect(ttsSources).toContain("mapped[0].id !== 'auto'");
-    expect(ttsSources).toContain('explicit or platform-resolved provider required');
+    expect(ttsSources).toContain('optionsById');
+    expect(ttsSources).toContain('resolveTtsIncludedModels');
     expect(ttsSources).not.toContain('ttsProvider      String? // null = auto');
+    expect(ttsSources).not.toContain("id: 'auto'");
   });
 
   it('keeps release docs aligned with open-source language-learning strategy', () => {
@@ -975,7 +851,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const releaseDocPaths = [
       'README.md',
       'CLAUDE.md',
-      'scripts/rebuild-pitch.sh',
       ...readdirSync(docsDir)
         .filter((name) => name.endsWith('.md'))
         .map((name) => `docs/${name}`),
@@ -1000,7 +875,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'NEW_FOLLOWER',
       'Explore Feed',
       'Public Feed',
-      '/api/feed',
+      '/api/v1/feed',
       '/profile/[userId]',
       'All secrets via **Doppler**',
       'Syncs prod DB + starts web + workers',
@@ -1015,111 +890,73 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocsSource).toContain('Learn a language, taught in your own context.');
     expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
-    expect(releaseDocsSource).toContain('Managed hosting');
+    expect(releaseDocsSource).toContain('self-hosted paths');
   });
 
-  it('keeps admin activity metrics private instead of social', () => {
-    const activityMetricSources = [
-      'src/lib/engagement-metrics.ts',
-      'src/app/(admin)/admin/engagement/page.tsx',
-      'src/app/(admin)/AdminShell.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
+  it('does not ship creator or per-podcast analytics product routes', () => {
+    const removedAnalyticsPaths = [
+      'apps/web/src/lib/podcast-analytics.ts',
+      'apps/web/src/lib/creator-metrics.ts',
+      'apps/web/src/app/api/v1/podcasts/[podcastId]/analytics',
+      'apps/web/src/app/api/v1/creator-analytics',
+      'apps/web/src/app/(dashboard)/analytics',
+      'apps/web/src/types/analytics.ts',
+      'packages/shared/src/types/analytics.ts',
+    ];
+    for (const path of removedAnalyticsPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
 
-    expect(activityMetricSources).toContain('Private Activity');
-    expect(activityMetricSources).toContain('getTopSaved');
-    expect(activityMetricSources).not.toContain('getTopLiked');
-    expect(activityMetricSources).not.toContain('getTopForked');
-    expect(activityMetricSources).not.toContain('likeCount');
-    expect(activityMetricSources).not.toContain('forkCount');
-    expect(activityMetricSources).not.toContain('followerCount');
-    expect(activityMetricSources).not.toContain('prisma.like');
-    expect(activityMetricSources).not.toContain('prisma.follow');
+    const sidebarSource = readSource('src/components/layout/Sidebar.tsx');
+
+    expect(sidebarSource).not.toContain("href: '/analytics'");
+    expect(sidebarSource).not.toContain('getCreatorEngagement');
+    expect(sidebarSource).not.toContain('getPodcastEngagement');
+    expect(sidebarSource).not.toContain('likeCount');
+    expect(sidebarSource).not.toContain('forkCount');
   });
 
-  it('keeps podcast analytics scoped to private listener activity', () => {
-    const podcastAnalyticsSources = [
-      'src/lib/podcast-analytics.ts',
-      'src/app/podcast/[podcastId]/analytics/page.tsx',
-      'src/app/api/podcasts/[podcastId]/analytics/route.ts',
-    ]
-      .map(readSource)
-      .join('\n');
+  it('does not ship the podcast recommendation engine or feed', () => {
+    const removedRecommendationPaths = [
+      'apps/web/src/lib/recommendation-engine.ts',
+      'apps/web/src/lib/recommendations.ts',
+      'apps/web/src/lib/recommendation-metrics.ts',
+      'apps/web/src/app/api/v1/recommendations',
+      'apps/web/src/app/api/v1/picks',
+      'apps/web/src/app/api/v1/users/me/recommendations',
+      'apps/web/src/app/api/v1/inspire/all',
+      'apps/web/src/app/(admin)/admin/recommendations',
+    ];
+    for (const path of removedRecommendationPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
 
-    expect(podcastAnalyticsSources).toContain('getPodcastPrivateActivity');
-    expect(podcastAnalyticsSources).toContain('Private Activity');
-    expect(podcastAnalyticsSources).not.toContain('getPodcastEngagement');
-    expect(podcastAnalyticsSources).not.toContain('likeCount');
-    expect(podcastAnalyticsSources).not.toContain('forkCount');
-    expect(podcastAnalyticsSources).not.toContain('commentCount');
-    expect(podcastAnalyticsSources).not.toContain('Upvotes');
-    expect(podcastAnalyticsSources).not.toContain("label: 'Likes'");
-    expect(podcastAnalyticsSources).not.toContain("label: 'Forks'");
-    expect(podcastAnalyticsSources).not.toContain("label: 'Comments'");
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    expect(schemaSource).not.toContain('model RecommendationLog');
   });
 
-  it('keeps creator analytics scoped to private activity', () => {
-    const creatorAnalyticsSources = [
-      'src/lib/creator-metrics.ts',
-      'src/app/(dashboard)/analytics/AnalyticsClient.tsx',
-      'src/app/(dashboard)/analytics/page.tsx',
-      'src/app/api/creator-analytics/route.ts',
-      'src/types/analytics.ts',
-    ]
-      .map(readSource)
-      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/analytics.ts'), 'utf8'))
-      .join('\n');
+  it('does not ship voice-track APIs and keeps live podcast status owner-gated', () => {
+    const removedVoiceTrackPaths = [
+      'apps/web/src/app/api/v1/podcasts/[podcastId]/voice-tracks',
+      'apps/web/src/app/api/v1/podcasts/[podcastId]/default-track',
+    ];
+    for (const path of removedVoiceTrackPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
 
-    expect(creatorAnalyticsSources).toContain('privateActivity');
-    expect(creatorAnalyticsSources).toContain('getCreatorPrivateActivity');
-    expect(creatorAnalyticsSources).not.toContain('getCreatorEngagement');
-    expect(creatorAnalyticsSources).not.toContain('CreatorEngagement');
-    expect(creatorAnalyticsSources).not.toContain('data.engagement');
-    expect(creatorAnalyticsSources).not.toContain('likeCount');
-    expect(creatorAnalyticsSources).not.toContain('forkCount');
-    expect(creatorAnalyticsSources).not.toContain('prisma.like');
-    expect(creatorAnalyticsSources).not.toContain('prisma.follow');
-    expect(creatorAnalyticsSources).not.toContain("label: 'Likes'");
-    expect(creatorAnalyticsSources).not.toContain("label: 'Forks'");
-    expect(creatorAnalyticsSources).not.toContain("label: 'Follows'");
-  });
-
-  it('keeps similar-podcast recommendations free of social ranking payloads', () => {
-    const recommendationSources = [
-      'src/lib/recommendations.ts',
-      'src/app/api/recommendations/route.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(recommendationSources).toContain("saveCount: 'desc'");
-    expect(recommendationSources).toContain('userId: params.userId');
-    expect(recommendationSources).toContain("errorResponse('Unauthorized', 401)");
-    expect(recommendationSources).not.toContain('likeCount');
-    expect(recommendationSources).not.toContain('forkCount');
-    expect(recommendationSources).not.toContain("visibility: 'PUBLIC'");
-    expect(recommendationSources).not.toContain('excludeUserId');
-  });
-
-  it('keeps live podcast status and voice tracks owner-gated', () => {
-    const livePodcastSources = [
-      'src/app/api/podcasts/[podcastId]/stream/route.ts',
-      'src/app/api/podcasts/[podcastId]/voice-tracks/route.ts',
-    ]
+    const livePodcastSources = ['src/app/api/v1/podcasts/[podcastId]/route.ts']
       .map(readSource)
       .join('\n');
 
     expect(livePodcastSources).toContain("errorResponse('Unauthorized', 401)");
-    expect(livePodcastSources).toContain('podcast.userId !== userId');
+    expect(livePodcastSources).toContain('podcast.userId !== authResult.userId');
     expect(livePodcastSources).not.toContain('No auth required');
     expect(livePodcastSources).not.toContain('Auth is optional');
     expect(livePodcastSources).not.toContain('public podcasts visible to all');
-    expect(livePodcastSources).not.toContain("visibility === 'PRIVATE'");
   });
 
   it('keeps local ingestion surfaces authenticated and private-only', () => {
-    const agentIngestRouteSource = readSource('src/app/api/ingest/agent/route.ts');
+    const agentIngestRouteSource = readSource('src/app/api/v1/ingest/agent/route.ts');
     const privateIngestionSource = readSource('src/lib/private-ingestion.ts');
     const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
     const sharedEnumsSource = readFileSync(
@@ -1149,11 +986,10 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps workspace connector onboarding private and explicit', () => {
     const sourceConnectorSource = readSource('src/lib/source-connectors.ts');
     const sourceConnectorRouteSource = readSource(
-      'src/app/api/source-connectors/readiness/route.ts'
+      'src/app/api/v1/source-connectors/readiness/route.ts'
     );
     const onboardingSources = [
-      readSource('src/app/onboarding/page.tsx'),
-      readSource('src/app/onboarding/KeySetupForm.tsx'),
+      readSource('src/app/welcome/steps/StepContext.tsx'),
       sourceConnectorSource,
       sourceConnectorRouteSource,
       readFileSync(resolve(repoRoot, '.env.example'), 'utf8'),
@@ -1171,7 +1007,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(sourceConnectorSource).toContain("command: 'codex'");
     expect(sourceConnectorSource).toContain('SLACK_BOT_TOKEN');
     expect(sourceConnectorSource).toContain('GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE');
-    expect(onboardingSources).toContain('Private Sources');
+    expect(onboardingSources).toContain('Nothing leaves your machine');
     expect(onboardingSources).toContain('privateOnly: true');
     expect(onboardingSources).not.toContain("visibility: 'PUBLIC'");
     expect(onboardingSources).not.toContain('shared content feed');
@@ -1180,7 +1016,7 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('requires explicit provider selection for BYOK key deletion', () => {
     const byokSources = [
-      'src/app/api/settings/byok/route.ts',
+      'src/app/api/v1/settings/byok/route.ts',
       'src/lib/validations.ts',
       'src/lib/CLAUDE.md',
     ]
@@ -1197,7 +1033,7 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('rejects invalid voice provider selection instead of switching providers', () => {
-    const voiceProviderSources = ['src/app/api/voices/route.ts', 'tests/api/voices.test.ts']
+    const voiceProviderSources = ['src/app/api/v1/voices/route.ts', 'tests/api/voices.test.ts']
       .map(readSource)
       .join('\n');
 
@@ -1208,142 +1044,20 @@ describe('open-source language-learning OSS surfaces', () => {
     );
   });
 
-  it('keeps daily picks and trending free of social ranking payloads', () => {
-    const recommendationEngineSource = readSource('src/lib/recommendation-engine.ts');
-
-    expect(recommendationEngineSource).toContain("saveCount: 'desc'");
-    expect(recommendationEngineSource).toContain('Listen velocity');
-    expect(recommendationEngineSource).not.toContain('likeCount');
-    expect(recommendationEngineSource).not.toContain('forkCount');
-    expect(recommendationEngineSource).not.toContain('forkedFromId');
-    expect(recommendationEngineSource).not.toContain("likeCount: 'desc'");
-  });
-
-  it('keeps recommendation training exports free of social labels', () => {
-    const trainingExportSources = [
-      'src/workers/data-export.worker.ts',
-      '../../scripts/ml/prepare-recommendation-training.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(trainingExportSources).toContain('trainingLabel');
-    expect(trainingExportSources).toContain('saved');
-    expect(trainingExportSources).not.toContain('liked');
-    expect(trainingExportSources).not.toContain('forked');
-    expect(trainingExportSources).not.toContain('forkedFromId');
-    expect(trainingExportSources).not.toContain('engagementLabel');
-    expect(trainingExportSources).not.toContain('prisma.like');
-  });
-
-  it('keeps reports and content moderation free of comment targets', () => {
-    const reportModerationSources = [
-      'src/app/api/reports/route.ts',
-      'src/lib/validations.ts',
-      'src/components/ui/ReportModal.tsx',
-      'src/components/ui/ReportButton.tsx',
-      'src/app/(admin)/admin/moderation/ReportQueue.tsx',
-      'src/lib/queue.ts',
-      'src/workers/content-moderation.worker.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(reportModerationSources).not.toContain('prisma.comment');
-    expect(reportModerationSources).not.toContain("targetType === 'comment'");
-    expect(reportModerationSources).not.toContain("'podcast' | 'comment'");
-    expect(reportModerationSources).not.toContain("'podcast', 'comment', 'user'");
-    expect(reportModerationSources).not.toContain('value="comment"');
-    expect(reportModerationSources).not.toContain('Comment not found');
-    expect(reportModerationSources).not.toContain('(podcast scripts, comments)');
-  });
-
-  it('keeps admin storage inspector private-activity scoped', () => {
-    const storageInspectorSources = [
-      'src/app/(admin)/admin/storage/[podcastId]/page.tsx',
-      'src/app/(admin)/admin/storage/[podcastId]/InspectorContent.tsx',
-      'src/app/(admin)/admin/storage/[podcastId]/page.module.css',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(storageInspectorSources).toContain('Private Activity');
-    expect(storageInspectorSources).toContain('privateActivityGrid');
-    expect(storageInspectorSources).not.toContain('likeCount');
-    expect(storageInspectorSources).not.toContain('forkCount');
-    expect(storageInspectorSources).not.toContain('commentCount');
-    expect(storageInspectorSources).not.toContain('Likes');
-    expect(storageInspectorSources).not.toContain('Forks');
-    expect(storageInspectorSources).not.toContain('Comments');
-  });
-
-  it('keeps traffic report and MCP contracts private-activity scoped', () => {
-    const trafficReportSource = readSource('src/lib/traffic-report.ts');
-    const librarySource = readSource('src/app/(dashboard)/ideas/LibraryClient.tsx');
-    const collectionE2ESource = readFileSync(
-      resolve(repoRoot, 'e2e/playwright/tests/api/collections.api.spec.ts'),
-      'utf8'
-    );
+  it('keeps MCP contracts private-activity scoped', () => {
     const mcpSources = ['packages/mcp/src/types.ts', 'packages/mcp/src/format.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const privateContractSources = [
-      trafficReportSource,
-      librarySource,
-      collectionE2ESource,
-      mcpSources,
-    ].join('\n');
 
-    expect(trafficReportSource).toContain('PrivateActivitySection');
-    expect(trafficReportSource).toContain('privateActivity');
-    expect(trafficReportSource).toContain('topSaved');
-    expect(trafficReportSource).toContain('largestByItems');
-    expect(privateContractSources).not.toContain('EngagementSection');
-    expect(privateContractSources).not.toContain('collectionFollow');
-    expect(privateContractSources).not.toContain('followerCount');
-    expect(privateContractSources).not.toContain('followingCount');
-    expect(privateContractSources).not.toContain('likeCount');
-    expect(privateContractSources).not.toContain('forkCount');
-    expect(privateContractSources).not.toContain('forkedFromId');
-    expect(privateContractSources).not.toContain('isLiked');
-    expect(privateContractSources).not.toContain('Forked from');
-    expect(collectionE2ESource).not.toContain('/follow');
-  });
-
-  it('keeps feature computation private-signal scoped', () => {
-    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
-    const userFeatureModel = schemaSource.slice(
-      schemaSource.indexOf('model UserFeature'),
-      schemaSource.indexOf('model PodcastFeature')
-    );
-    const podcastFeatureModel = schemaSource.slice(
-      schemaSource.indexOf('model PodcastFeature'),
-      schemaSource.indexOf('model BehavioralEvent')
-    );
-    const featureSources = [
-      'src/workers/feature-computation.worker.ts',
-      'src/workers/data-export.worker.ts',
-      'src/app/api/podcasts/[podcastId]/quality/route.ts',
-      'src/workers/CLAUDE.md',
-    ]
-      .map(readSource)
-      .concat(userFeatureModel, podcastFeatureModel)
-      .join('\n');
-
-    expect(featureSources).toContain('Private activity');
-    expect(featureSources).toContain('saveToListenRatio');
-    expect(featureSources).toContain('interactionRate');
-    expect(featureSources).not.toContain('prisma.like');
-    expect(featureSources).not.toContain('prisma.follow');
-    expect(featureSources).not.toContain('followingCount');
-    expect(featureSources).not.toContain('followerCount');
-    expect(featureSources).not.toContain('likeRate');
-    expect(featureSources).not.toContain('forkRate');
-    expect(featureSources).not.toContain('likeToListenRatio');
-    expect(featureSources).not.toContain('forkToListenRatio');
-    expect(featureSources).not.toContain('forkedFromId');
-    expect(featureSources).not.toContain('liked: pct');
-    expect(featureSources).not.toContain('forked: pct');
+    expect(mcpSources).not.toContain('EngagementSection');
+    expect(mcpSources).not.toContain('collectionFollow');
+    expect(mcpSources).not.toContain('followerCount');
+    expect(mcpSources).not.toContain('followingCount');
+    expect(mcpSources).not.toContain('likeCount');
+    expect(mcpSources).not.toContain('forkCount');
+    expect(mcpSources).not.toContain('forkedFromId');
+    expect(mcpSources).not.toContain('isLiked');
+    expect(mcpSources).not.toContain('Forked from');
   });
 
   it('keeps Prisma schema and seeds free of social tables', () => {
@@ -1384,21 +1098,14 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/types/CLAUDE.md',
       'src/lib/podcast-select.ts',
       'src/lib/podcast-data.ts',
-      'src/app/api/saved/route.ts',
-      'src/app/api/queue/route.ts',
-      'src/app/api/users/me/podcasts/route.ts',
-      'src/app/api/collections/[collectionId]/route.ts',
-      'src/app/collections/[collectionId]/page.tsx',
-      'src/app/api/inspire/all/route.ts',
-      'src/components/feed/DailyPicks.tsx',
+      'src/app/api/v1/saved/route.ts',
       'src/app/podcast/[podcastId]/page.tsx',
-      'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
     ]
       .map(readSource)
       .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/podcast.ts'), 'utf8'))
       .join('\n');
-    const podcastRouteSource = readSource('src/app/api/podcasts/[podcastId]/route.ts');
-    const adminPodcastRouteSource = readSource('src/app/api/admin/podcasts/[podcastId]/route.ts');
+    const podcastRouteSource = readSource('src/app/api/v1/podcasts/[podcastId]/route.ts');
+    const adminPodcastRouteSource = readSource('src/app/api/v1/admin/podcasts/[podcastId]/route.ts');
 
     expect(summaryContractSources).toContain('saveCount');
     expect(summaryContractSources).not.toContain('likeCount');
@@ -1458,13 +1165,11 @@ describe('open-source language-learning OSS surfaces', () => {
     const removedMobileRoutes = [
       'apps/mobile/app/user/[userId].tsx',
       'apps/mobile/app/settings/notifications.tsx',
+      'apps/mobile/app/analytics.tsx',
     ];
     const mobilePrivateSources = [
       'apps/mobile/app/_layout.tsx',
       'apps/mobile/app/settings.tsx',
-      'apps/mobile/app/collections/index.tsx',
-      'apps/mobile/app/collections/[id].tsx',
-      'apps/mobile/app/analytics.tsx',
       'apps/mobile/app/(tabs)/notifications.tsx',
       'apps/mobile/CLAUDE.md',
     ]
@@ -1520,44 +1225,32 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(maestroSources).not.toContain('E2E_OTHER_USER_HANDLE');
   });
 
-  it('does not require public demo podcasts for screenshot capture', () => {
-    const pitchScreenshotSource = readFileSync(
-      resolve(repoRoot, 'scripts/capture-pitch-screenshots.ts'),
-      'utf8'
-    );
+  it('does not ship the curated-playlist collections feature', () => {
+    const removedCollectionPaths = [
+      'apps/web/src/app/api/v1/collections',
+      'apps/web/src/app/collections',
+      'apps/web/src/components/collections',
+      'apps/mobile/app/collections',
+      'apps/mobile/components/AddToCollectionSheet.tsx',
+      'e2e/playwright/tests/api/collections.api.spec.ts',
+    ];
+    for (const path of removedCollectionPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
 
-    expect(pitchScreenshotSource).toContain('Find a READY demo podcast');
-    expect(pitchScreenshotSource).not.toContain("visibility: 'PUBLIC'");
-  });
-
-  it('does not ship collection follow contracts', () => {
-    const collectionSources = [
-      'src/app/collections/[collectionId]/page.tsx',
-      'src/app/api/collections/route.ts',
-      'src/app/api/collections/[collectionId]/route.ts',
-      'src/components/collections/CollectionDetail.tsx',
-      'src/components/collections/CollectionCard.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(
-      existsSync(resolve(webRoot, 'src/app/api/collections/[collectionId]/follow/route.ts'))
-    ).toBe(false);
-    expect(collectionSources).not.toContain('/follow');
-    expect(collectionSources).not.toContain('collectionFollow');
-    expect(collectionSources).not.toContain('followerCount');
-    expect(collectionSources).not.toContain('isFollowing');
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    expect(schemaSource).not.toContain('model Collection');
+    expect(schemaSource).not.toContain('model CollectionItem');
   });
 
   it('does not ship user follow or discovery social contracts', () => {
     const removedUserSocialRoutes = [
-      'src/app/api/users/[userId]/follow/route.ts',
-      'src/app/api/users/[userId]/followers/route.ts',
-      'src/app/api/users/[userId]/following/route.ts',
-      'src/app/api/users/[userId]/activity/route.ts',
-      'src/app/api/users/discover/route.ts',
-      'src/app/api/users/suggested/route.ts',
+      'src/app/api/v1/users/[userId]/follow/route.ts',
+      'src/app/api/v1/users/[userId]/followers/route.ts',
+      'src/app/api/v1/users/[userId]/following/route.ts',
+      'src/app/api/v1/users/[userId]/activity/route.ts',
+      'src/app/api/v1/users/discover/route.ts',
+      'src/app/api/v1/users/suggested/route.ts',
     ];
     const removedDiscoverySocialComponents = [
       'src/components/discovery/CreatorSuggestion.tsx',
@@ -1566,21 +1259,18 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/components/discovery/RecommendationCard.module.css',
     ];
     const userApiSources = [
-      'src/app/api/users/me/route.ts',
-      'src/app/api/users/me/export/route.ts',
+      'src/app/api/v1/users/me/route.ts',
+      'src/app/api/v1/users/me/export/route.ts',
       'src/lib/notification-utils.ts',
       'src/components/notifications/NotificationList.tsx',
       'src/components/CLAUDE.md',
     ]
       .map(readSource)
       .join('\n');
-    const userValidationSources = ['src/lib/validations.ts', 'src/app/api/queue/route.ts']
+    const userValidationSources = ['src/lib/validations.ts']
       .map(readSource)
       .join('\n');
-    const activityWriteSources = [
-      'src/app/api/podcasts/route.ts',
-      'src/app/api/collections/route.ts',
-    ]
+    const activityWriteSources = ['src/app/api/v1/podcasts/route.ts']
       .map(readSource)
       .join('\n');
 
@@ -1612,121 +1302,50 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(userValidationSources).not.toContain("'following'");
   });
 
-  it('keeps voice sharing user lookup explicit instead of directory-style search', () => {
-    const userSearchRouteSource = readSource('src/app/api/users/search/route.ts');
-    const voiceManagerSource = readSource('src/app/(dashboard)/settings/voices/VoiceManager.tsx');
+  it('does not ship directory-style user search', () => {
+    expect(existsSync(resolve(webRoot, 'src/app/api/v1/users/search'))).toBe(false);
     const validationSource = readSource('src/lib/validations.ts');
-    const userLookupSources = [userSearchRouteSource, voiceManagerSource, validationSource].join(
-      '\n'
-    );
 
-    expect(userSearchRouteSource).toContain('prisma.user.findUnique');
-    expect(userSearchRouteSource).toContain('where: { handle: parsed.data.handle }');
-    expect(userSearchRouteSource).toContain('select: {');
-    expect(userSearchRouteSource).toContain('handle: true');
     expect(validationSource).toContain('handle: handleSchema');
-    expect(voiceManagerSource).toContain('Enter exact handle');
-    expect(userLookupSources).not.toContain('prisma.user.findMany');
-    expect(userLookupSources).not.toContain('contains: parsed.data.handle');
-    expect(userLookupSources).not.toContain("mode: 'insensitive'");
-    expect(userLookupSources).not.toContain('Search by @handle');
+    expect(validationSource).not.toContain('Search by @handle');
   });
 
-  it('keeps optional paid voice sharing disabled by default', () => {
-    const voiceSettingsRouteSource = readSource('src/app/api/voices/route.ts');
-    const voiceCloneRouteSource = readSource('src/app/api/voices/clone/route.ts');
-    const voiceManagerSource = readSource('src/app/(dashboard)/settings/voices/VoiceManager.tsx');
-    const voiceNotificationSource = readSource('src/lib/notification-utils.ts');
-    const defaultVoiceSharingCopySources = [
-      'src/app/terms/page.tsx',
-      'src/app/privacy/page.tsx',
-      'src/app/changelog/page.tsx',
-      'src/lib/demo-context.ts',
-      'src/lib/notification-utils.ts',
-      'src/components/notifications/NotificationList.tsx',
-      'src/workers/voice-verification.worker.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-    const internalVoiceSharingCopySources = [
-      'src/app/(admin)/admin/revenue/page.tsx',
-      'src/app/(admin)/admin/plan-features/PlanFeaturesForm.tsx',
-      'src/app/(admin)/admin/queues/queue-metadata.ts',
-      'src/lib/revenue-metrics.ts',
-      'src/lib/CLAUDE.md',
-      'src/components/CLAUDE.md',
-    ]
-      .map(readSource)
-      .concat(
-        readFileSync(resolve(repoRoot, 'docs/10-stripe-billing.md'), 'utf8'),
-        readFileSync(resolve(repoRoot, 'docs/20-roles-and-dashboards.md'), 'utf8')
-      )
-      .join('\n');
+  it('does not ship the voice marketplace', () => {
+    const removedMarketplacePaths = [
+      'apps/web/src/lib/voice-pricing.ts',
+      'apps/web/src/lib/revenue-metrics.ts',
+      'apps/web/src/app/api/v1/voices/request',
+      'apps/web/src/app/api/v1/voices/allowlist',
+      'apps/web/src/app/api/v1/stripe/connect',
+      'apps/web/src/app/api/v1/stripe/payment-intent',
+      'apps/web/src/app/(admin)/admin/revenue',
+      'apps/mobile/app/voices.tsx',
+      'e2e/maestro/flows/21-voice-marketplace.yaml',
+    ];
+    for (const path of removedMarketplacePaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
+
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    expect(schemaSource).not.toContain('model VoiceRequest');
+    expect(schemaSource).not.toContain('model VoicePurchase');
+    expect(schemaSource).not.toContain('model VoiceAllowlist');
+
+    // The shared voice directory still redirects to /learn.
+    expect(readSource('src/app/voices/page.tsx')).toContain("redirect('/learn')");
+
+    // Mobile settings no longer exposes a voice marketplace or a /voices route.
     const mobileSettingsSource = readFileSync(
       resolve(repoRoot, 'apps/mobile/app/settings.tsx'),
       'utf8'
     );
+    expect(mobileSettingsSource).not.toContain('Voice Marketplace');
+    expect(mobileSettingsSource).not.toContain("router.push('/voices')");
     const mobileLayoutSource = readFileSync(
       resolve(repoRoot, 'apps/mobile/app/_layout.tsx'),
       'utf8'
     );
-    const voiceMarketplaceSources = [
-      'src/app/voices/page.tsx',
-      'src/app/api/voices/request/route.ts',
-      'src/app/CLAUDE.md',
-    ]
-      .map(readSource)
-      .concat(
-        voiceSettingsRouteSource,
-        voiceCloneRouteSource,
-        voiceManagerSource,
-        readSource('src/app/api/voices/browse/route.ts'),
-        readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8')
-      )
-      .join('\n');
-
-    expect(voiceMarketplaceSources).toContain('voiceMarketplaceEnabled Boolean  @default(false)');
-    expect(voiceMarketplaceSources).toContain('getPlanFeatureConfig');
-    expect(voiceMarketplaceSources).toContain("redirect(currentUserId ? '/settings/voices' : '/')");
-    expect(voiceSettingsRouteSource).toContain(
-      'voiceMarketplaceEnabled: voiceConfig.voiceMarketplaceEnabled'
-    );
-    expect(voiceManagerSource).toContain(
-      'setVoiceMarketplaceEnabled(voiceData.voiceMarketplaceEnabled ?? false)'
-    );
-    expect(voiceManagerSource.indexOf('{voiceMarketplaceEnabled && (')).toBeLessThan(
-      voiceManagerSource.indexOf('Stripe Payouts')
-    );
-    expect(voiceCloneRouteSource).toContain('const enablesMarketplaceListing');
-    expect(voiceCloneRouteSource).toContain('requestable === true');
-    expect(voiceMarketplaceSources).toContain('Paid voice sharing is currently unavailable.');
-    expect(voiceMarketplaceSources).toContain('disabled by default');
-    expect(existsSync(resolve(repoRoot, 'apps/mobile/app/voices.tsx'))).toBe(false);
-    expect(existsSync(resolve(repoRoot, 'e2e/maestro/flows/21-voice-marketplace.yaml'))).toBe(
-      false
-    );
-    expect(mobileSettingsSource).not.toContain('settings-voice-marketplace');
-    expect(mobileSettingsSource).not.toContain("router.push('/voices')");
-    expect(mobileSettingsSource).not.toContain('Voice Marketplace');
     expect(mobileLayoutSource).not.toContain('Stack.Screen name="voices"');
-    expect(defaultVoiceSharingCopySources).toContain('paid voice sharing disabled by default');
-    expect(voiceNotificationSource).toContain("return '/settings/voices'");
-    expect(voiceNotificationSource).not.toContain("return '/voices'");
-    expect(defaultVoiceSharingCopySources).not.toContain('Voice Marketplace');
-    expect(defaultVoiceSharingCopySources).not.toContain('voice marketplace');
-    expect(defaultVoiceSharingCopySources).not.toContain('marketplace transactions');
-    expect(defaultVoiceSharingCopySources).not.toContain('live on the marketplace');
-    expect(internalVoiceSharingCopySources).toContain('Paid Voice Sharing');
-    expect(internalVoiceSharingCopySources).toContain('optional paid voice sharing');
-    expect(internalVoiceSharingCopySources).not.toContain('Voice Marketplace');
-    expect(internalVoiceSharingCopySources).not.toContain('voice marketplace');
-    expect(internalVoiceSharingCopySources).not.toContain('community marketplace');
-    expect(internalVoiceSharingCopySources).not.toContain('marketplace revenue');
-    expect(internalVoiceSharingCopySources).not.toContain('voice marketplace tracks');
-    expect(voiceMarketplaceSources).not.toContain(
-      'voiceMarketplaceEnabled Boolean  @default(true)'
-    );
-    expect(voiceMarketplaceSources).not.toContain('Voice marketplace |');
   });
 
   it('does not ship public profile pages or creator RSS routes', () => {
@@ -1750,21 +1369,17 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/components/profile/ProfileHeader.module.css',
       'src/components/profile/PodcastList.tsx',
       'src/components/profile/PodcastList.module.css',
-      'src/app/api/users/[userId]/route.ts',
-      'src/app/api/users/[userId]/collections/route.ts',
-      'src/app/api/users/[userId]/rss/route.ts',
-      'src/app/api/users/handle/[handle]/rss/route.ts',
+      'src/app/api/v1/users/[userId]/route.ts',
+      'src/app/api/v1/users/[userId]/collections/route.ts',
+      'src/app/api/v1/users/[userId]/rss/route.ts',
+      'src/app/api/v1/users/handle/[handle]/rss/route.ts',
     ];
     const removedPublicProfileTests = ['apps/web/tests/api/users-profile.test.ts'];
     const publicProfileSources = [
       'src/app/profile/page.tsx',
       'src/lib/urls.ts',
-      'src/lib/rss.ts',
       'src/lib/CLAUDE.md',
-      'src/app/api/oembed/route.ts',
       'src/app/sitemap.ts',
-      'src/components/player/Contributors.tsx',
-      'src/components/voices/VoiceMarketplaceCard.tsx',
       'src/app/CLAUDE.md',
       'src/components/CLAUDE.md',
     ]
@@ -1780,13 +1395,13 @@ describe('open-source language-learning OSS surfaces', () => {
       expect(existsSync(resolve(repoRoot, file)), file).toBe(false);
     }
     expect(profileShortcutSource).toContain("redirect('/settings')");
-    expect(publicProfileSources).not.toContain('/api/users/[id]');
-    expect(publicProfileSources).not.toContain('/api/users/[id]/collections');
-    expect(publicProfileSources).not.toContain('/api/users/[id]/activity');
+    expect(publicProfileSources).not.toContain('/api/v1/users/[id]');
+    expect(publicProfileSources).not.toContain('/api/v1/users/[id]/collections');
+    expect(publicProfileSources).not.toContain('/api/v1/users/[id]/activity');
     expect(publicProfileSources).not.toContain('profileUrl');
     expect(publicProfileSources).not.toContain('absoluteProfileUrl');
     expect(publicProfileSources).not.toContain('generateCreatorRssFeed');
-    expect(publicProfileSources).not.toContain('/api/users/${user.id}/rss');
+    expect(publicProfileSources).not.toContain('/api/v1/users/${user.id}/rss');
     expect(publicProfileSources).not.toContain('ProfileClient');
     expect(publicProfileSources).not.toContain('ProfileHeader');
     expect(publicProfileSources).not.toContain('FollowerCount');

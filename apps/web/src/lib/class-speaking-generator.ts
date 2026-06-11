@@ -10,7 +10,7 @@ import { resolveLearningAi } from './learning-ai';
 import { formatNotesForPrompt } from './course-notes';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
-import { canResolveTts, resolveTtsProvider } from './providers/tts';
+import { canResolveTts, resolveTtsProvider, getConfiguredTtsProviderId } from './providers/tts';
 import { getAutoModelConfig } from './auto-model-config';
 import { uploadFile } from './r2';
 import { logUsage } from './usage-logger';
@@ -121,15 +121,23 @@ export async function composeSpeakingPrompts(
     throw new Error('Speaking prompt generation produced no usable phrases.');
   }
 
-  // Step 3: resolve TTS for reference audio (graceful degrade on failure)
+  // Step 3: resolve TTS for reference audio (graceful degrade on failure).
+  // Prefer the server-configured provider (TTS_PROVIDER) so a self-hoster on
+  // TTS_PROVIDER=kokoro renders reference audio with the local sidecar; otherwise
+  // fall back to the admin auto-model default.
   const ttsAvailable = await canResolveTts(p.userId);
   let requestedTtsProvider: string | null = null;
   if (ttsAvailable) {
-    try {
-      const config = await getAutoModelConfig();
-      requestedTtsProvider = config.free.ttsProvider;
-    } catch {
-      requestedTtsProvider = null;
+    const configured = getConfiguredTtsProviderId();
+    if (configured) {
+      requestedTtsProvider = configured;
+    } else {
+      try {
+        const config = await getAutoModelConfig();
+        requestedTtsProvider = config.model.ttsProvider;
+      } catch {
+        requestedTtsProvider = null;
+      }
     }
   }
 

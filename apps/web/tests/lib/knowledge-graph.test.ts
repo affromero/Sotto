@@ -37,6 +37,7 @@ import {
   applyReviewOutcome,
   getDueItems,
   getMemoryGraph,
+  upsertLiveVocab,
 } from '@/lib/knowledge-graph';
 
 // ---- Helpers ----
@@ -388,5 +389,41 @@ describe('getMemoryGraph', () => {
 
     expect(graph.nodes).toEqual([]);
     expect(graph.edges).toEqual([]);
+  });
+});
+
+describe('upsertLiveVocab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLearnerVocabUpsert.mockResolvedValue({});
+  });
+
+  it('returns 0 and skips the DB for an empty list', async () => {
+    const added = await upsertLiveVocab('course-1', []);
+    expect(added).toBe(0);
+    expect(mockLearnerVocabFindMany).not.toHaveBeenCalled();
+    expect(mockLearnerVocabUpsert).not.toHaveBeenCalled();
+  });
+
+  it('counts only newly created lemmas, leaving known words untouched', async () => {
+    // 'hola' already exists; 'mundo' is new.
+    mockLearnerVocabFindMany.mockResolvedValue([{ lemma: 'hola' }]);
+    const added = await upsertLiveVocab(
+      'course-1',
+      [
+        { lemma: 'hola', gloss: 'hello' },
+        { lemma: 'mundo', gloss: 'world', pos: 'noun' },
+      ],
+      'B1',
+    );
+    expect(added).toBe(1);
+    expect(mockLearnerVocabUpsert).toHaveBeenCalledTimes(2);
+    // Known words upsert with an empty update so SRS state is preserved.
+    const calls = mockLearnerVocabUpsert.mock.calls.map((c) => c[0]);
+    expect(calls.every((c) => Object.keys(c.update).length === 0)).toBe(true);
+    // New live vocab carries no class provenance.
+    const mundo = calls.find((c) => c.where.courseId_lemma.lemma === 'mundo');
+    expect(mundo.create.firstSeenClassId).toBeNull();
+    expect(mundo.create.cefrLevel).toBe('B1');
   });
 });

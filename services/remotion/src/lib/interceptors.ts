@@ -1,6 +1,6 @@
 /**
  * API interceptors for browser recording.
- * Adapted from scripts/recording/lib/interceptors.ts for use in the Remotion sidecar.
+ * Used by the Remotion sidecar when a browser-driven render needs mocked API calls.
  */
 import type { Page, Route } from 'playwright';
 
@@ -39,21 +39,21 @@ export async function setupInterceptor(
 export async function clearInterceptor(page: Page, name: string): Promise<void> {
   switch (name) {
     case 'discovery':
-      await page.unroute('**/api/discovery');
+      await page.unroute('**/api/v1/discovery');
       break;
     case 'interact':
       // Interact uses two routes — unroute both patterns
-      await page.unroute('**/api/podcasts/*/interact');
-      await page.unroute('**/api/podcasts/*/interact/*');
+      await page.unroute('**/api/v1/podcasts/*/interact');
+      await page.unroute('**/api/v1/podcasts/*/interact/*');
       break;
     case 'fork':
-      await page.unroute('**/api/podcasts/*/fork');
+      await page.unroute('**/api/v1/podcasts/*/fork');
       break;
     case 'scriptApprove':
-      await page.unroute('**/api/podcasts/*/script/approve');
+      await page.unroute('**/api/v1/podcasts/*/script/approve');
       break;
     case 'avatar':
-      await page.unroute('**/api/podcasts/*/avatar/session');
+      await page.unroute('**/api/v1/podcasts/*/avatar/session');
       break;
     default:
       console.warn(`Unknown interceptor to clear: ${name}`);
@@ -68,7 +68,7 @@ async function interceptDiscovery(
   const chips = (options.chips as string[]) ?? [];
   const metadata = (options.metadata as Record<string, unknown>) ?? {};
 
-  await page.route('**/api/discovery', async (route: Route) => {
+  await page.route('**/api/v1/discovery', async (route: Route) => {
     let body = '';
     for (const text of textChunks) {
       body += sseEvent({ text });
@@ -96,8 +96,8 @@ async function interceptInteract(
   const answer = options.answer as string;
   const answerDelay = (options.answerDelay as number) ?? 1500;
 
-  const postPattern = `**/api/podcasts/${podcastId}/interact`;
-  const pollPattern = `**/api/podcasts/${podcastId}/interact/${interactionId}`;
+  const postPattern = `**/api/v1/podcasts/${podcastId}/interact`;
+  const pollPattern = `**/api/v1/podcasts/${podcastId}/interact/${interactionId}`;
 
   await page.route(postPattern, async (route: Route) => {
     if (route.request().method() !== 'POST') {
@@ -147,7 +147,7 @@ async function interceptFork(
   const podcastId = options.podcastId as string;
   const forkId = options.forkId as string;
 
-  await page.route(`**/api/podcasts/${podcastId}/fork`, async (route: Route) => {
+  await page.route(`**/api/v1/podcasts/${podcastId}/fork`, async (route: Route) => {
     await route.fulfill({
       status: 201,
       contentType: 'application/json',
@@ -163,7 +163,7 @@ async function interceptScriptApprove(
   const podcastId = options.podcastId as string;
 
   await page.route(
-    `**/api/podcasts/${podcastId}/script/approve`,
+    `**/api/v1/podcasts/${podcastId}/script/approve`,
     async (route: Route) => {
       await route.fulfill({
         status: 200,
@@ -186,7 +186,7 @@ async function interceptAvatar(
   const videoUrl = options.videoUrl as string;
 
   await page.route(
-    `**/api/podcasts/${podcastId}/avatar/session`,
+    `**/api/v1/podcasts/${podcastId}/avatar/session`,
     async (route: Route) => {
       await route.fulfill({
         status: 200,

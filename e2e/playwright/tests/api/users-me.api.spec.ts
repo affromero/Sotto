@@ -2,7 +2,7 @@ import { test, expect } from '../../fixtures/auth';
 
 test.describe('Users /me API routes', () => {
   test('GET me returns profile', async ({ authedRequest }) => {
-    const res = await authedRequest.get('/api/users/me');
+    const res = await authedRequest.get('/api/v1/users/me');
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('id');
@@ -11,7 +11,7 @@ test.describe('Users /me API routes', () => {
   });
 
   test('PATCH me updates bio', async ({ authedRequest }) => {
-    const res = await authedRequest.patch('/api/users/me', {
+    const res = await authedRequest.patch('/api/v1/users/me', {
       data: { bio: 'Updated bio from E2E test' },
     });
     expect(res.status()).toBe(200);
@@ -20,28 +20,23 @@ test.describe('Users /me API routes', () => {
   });
 
   test('PATCH me rejects invalid handle', async ({ authedRequest }) => {
-    const res = await authedRequest.patch('/api/users/me', {
+    const res = await authedRequest.patch('/api/v1/users/me', {
       data: { handle: 'e2e-other' },
     });
     expect([400, 409]).toContain(res.status());
   });
 
   test('GET me/podcasts returns list', async ({ authedRequest }) => {
-    const res = await authedRequest.get('/api/users/me/podcasts');
+    const res = await authedRequest.get('/api/v1/users/me/podcasts');
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('podcasts');
   });
 
   test('GET me/export returns data', async ({ authedRequest }) => {
-    const res = await authedRequest.get('/api/users/me/export');
+    const res = await authedRequest.get('/api/v1/users/me/export');
     expect(res.status()).toBe(200);
     const contentDisposition = res.headers()['content-disposition'];
     expect(contentDisposition).toBeTruthy();
-  });
-
-  test('DELETE me/recommendations succeeds', async ({ authedRequest }) => {
-    const res = await authedRequest.delete('/api/users/me/recommendations');
-    expect(res.status()).toBe(200);
   });
 });

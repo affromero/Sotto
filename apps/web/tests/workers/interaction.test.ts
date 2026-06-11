@@ -10,7 +10,7 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
 });
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ language: null });
 const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ preferredLanguage: null });
-const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ plan: 'FREE', role: 'USER' });
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
@@ -81,8 +81,8 @@ vi.mock('@/lib/byok', () => ({
   hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 40,
     maxSpeakers: 4,
     maxQaInteractions: Infinity,
@@ -91,9 +91,6 @@ vi.mock('@/lib/tier-features', () => ({
     privateAllowed: true,
     priorityQueue: true,
     analyticsEnabled: true,
-    voiceTracksEnabled: true,
-    maxVoiceTracks: 3,
-    voiceCloningEnabled: true,
   }),
 }));
 
@@ -139,7 +136,7 @@ describe('processInteraction', () => {
     vi.clearAllMocks();
     mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: null });
     mockPrismaUserFindUnique.mockResolvedValue({ preferredLanguage: null });
-    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockPrismaScriptFindUnique.mockResolvedValue({
       turns: [
         { speaker: 'HOST', text: 'Welcome to the show!' },
@@ -191,7 +188,6 @@ describe('processInteraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'FREE',
       });
       expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
       expect(mockGenerateResponse).toHaveBeenCalledWith(
@@ -214,7 +210,6 @@ describe('processInteraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');

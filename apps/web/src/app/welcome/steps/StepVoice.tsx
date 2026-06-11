@@ -14,11 +14,26 @@ interface VoicePickerProps {
   onChange: (id: string) => void;
   keys: Record<string, string>;
   onKey: (id: string, val: string) => void;
+  baseUrls: Record<string, string>;
+  onBaseUrl: (id: string, val: string) => void;
+  localPlaceholder: string;
 }
 
-function VoicePicker({ label, sub, providers, value, onChange, keys, onKey }: VoicePickerProps) {
+function VoicePicker({
+  label,
+  sub,
+  providers,
+  value,
+  onChange,
+  keys,
+  onKey,
+  baseUrls,
+  onBaseUrl,
+  localPlaceholder,
+}: VoicePickerProps) {
   const sel = providers.find((p) => p.id === value) ?? providers[0];
   const k = keys[sel.id] ?? '';
+  const bu = baseUrls[sel.id] ?? '';
 
   return (
     <div className={c.voiceBlock}>
@@ -54,9 +69,27 @@ function VoicePicker({ label, sub, providers, value, onChange, keys, onKey }: Vo
       </div>
 
       {sel.local ? (
-        <div className={c.voiceNote}>
-          <Glyph name="lock" size={13} />
-          {sel.name} · {sel.note} · runs on-device, no key needed
+        <div className={c.voiceKey}>
+          <div className={c.voiceNote}>
+            <Glyph name="lock" size={13} />
+            {sel.name} · {sel.note} · runs on-device, no key needed
+          </div>
+          <div className={c.vkRow}>
+            <span className={c.vkLabel}>
+              <Glyph name="link" size={13} /> {sel.name} endpoint
+            </span>
+            <input
+              className={c.vkInput}
+              type="text"
+              placeholder={localPlaceholder}
+              value={bu}
+              onChange={(e) => onBaseUrl(sel.id, e.target.value)}
+              aria-label={`${sel.name} endpoint URL (optional)`}
+            />
+          </div>
+          <div className={c.vkNote}>
+            Optional · leave blank to use the default local endpoint.
+          </div>
         </div>
       ) : (
         <div className={c.voiceKey}>
@@ -94,6 +127,8 @@ interface Props {
 export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
   const setKey = (id: string, val: string) =>
     setVoice((s) => ({ ...s, keys: { ...s.keys, [id]: val } }));
+  const setBaseUrl = (id: string, val: string) =>
+    setVoice((s) => ({ ...s, baseUrls: { ...s.baseUrls, [id]: val } }));
 
   return (
     <div className={t.stepEnter}>
@@ -117,6 +152,9 @@ export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
         onChange={(v) => setVoice((s) => ({ ...s, tts: v }))}
         keys={voice.keys}
         onKey={setKey}
+        baseUrls={voice.baseUrls}
+        onBaseUrl={setBaseUrl}
+        localPlaceholder="http://localhost:8000"
       />
 
       <VoicePicker
@@ -127,6 +165,9 @@ export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
         onChange={(v) => setVoice((s) => ({ ...s, stt: v }))}
         keys={voice.keys}
         onKey={setKey}
+        baseUrls={voice.baseUrls}
+        onBaseUrl={setBaseUrl}
+        localPlaceholder="http://localhost:8000/v1"
       />
 
       <div className={`${c.locknote} ${c.voiceFoot}`}>

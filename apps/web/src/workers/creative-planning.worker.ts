@@ -47,7 +47,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   }
 
   // Load dossier + discovery metadata
-  const [dossier, discovery, podcast, user] = await Promise.all([
+  const [dossier, discovery, podcast] = await Promise.all([
     prisma.researchDossier.findUniqueOrThrow({
       where: { id: dossierId },
       select: { sources: true, evidence: true, recommendedAngle: true },
@@ -68,7 +68,6 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
       where: { id: podcastId },
       select: { aiModel: true },
     }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   await job.updateProgress(15);
@@ -81,7 +80,6 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
-    plan: user.plan as 'FREE' | 'PRO',
   });
 
   const providerAiKey =

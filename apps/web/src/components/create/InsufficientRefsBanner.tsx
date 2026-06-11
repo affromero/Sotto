@@ -57,7 +57,7 @@ export function InsufficientRefsBanner({
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/script/regenerate`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/script/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

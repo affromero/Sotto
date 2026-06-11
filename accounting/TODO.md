@@ -14,13 +14,9 @@
 
 - [ ] **Record first Hetzner charge** — Add VPS + backup transactions to the current month file. Hetzner bills in EUR; for now record the USD amount your bank charged. See multi-currency section below for proper EUR handling later.
 
-## When Stripe / API services go live
+## When API services go live
 
-- [ ] **Idempotent imports** — Running `import-api-usage` or `import-stripe` twice creates duplicates. Add dedup: check for `; Period: YYYY-MM` marker in the target file before appending.
-
-- [ ] **Stripe charge classification** — `classify_charge()` in `import_stripe.py` guesses Pro vs Creator from description text. Wire it to actual Stripe product/price IDs from `src/lib/stripe.ts`.
-
-- [ ] **Stripe balance transaction expansion** — The import needs `expand=['data.balance_transaction']` in the `Charge.list()` call to get accurate fee amounts.
+- [ ] **Idempotent imports** — Running `import-api-usage` twice creates duplicates. Add dedup: check for `; Period: YYYY-MM` marker in the target file before appending.
 
 ## Automation (after first real monthly close)
 

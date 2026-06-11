@@ -3,7 +3,6 @@
 export type UserRole = 'USER' | 'ADMIN' | 'SYSTEM';
 
 export type PodcastStatus =
-  | 'DRAFT'
   | 'PENDING'
   | 'DISCOVERING'
   | 'EXTRACTING'
@@ -49,80 +48,16 @@ export type NotificationType =
   | 'PODCAST_READY'
   | 'PODCAST_FAILED'
   | 'KEY_INVALID'
-  | 'VOICE_REQUEST_RECEIVED'
-  | 'VOICE_REQUEST_APPROVED'
-  | 'VOICE_REQUEST_DENIED'
   | 'QUESTION_ON_YOUR_PODCAST'
   | 'SCRIPT_READY'
   | 'ACCOUNT_WARNING'
-  | 'ACCOUNT_SUSPENDED'
-  | 'ACCOUNT_BANNED'
   | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
-  | 'VOICE_VERIFICATION_REQUIRED'
-  | 'VOICE_VERIFICATION_PASSED'
-  | 'VOICE_VERIFICATION_FAILED'
-  | 'VOICE_BLOCKED_DUPLICATE'
-  | 'VOICE_OWNERSHIP_ALERT'
-  | 'VOICE_TRACK_FAILED'
-  | 'VOICE_TRACK_READY'
   | 'VIDEO_READY'
-  | 'MUSIC_READY'
-  | 'MUSIC_FAILED'
+  | 'VIDEO_FAILED'
+  | 'AVATAR_FAILED'
   | 'PIPELINE_FAILURE'
-  | 'REFERRAL_SIGNUP'
-  | 'AVATAR_IMAGE_REQUEST_RECEIVED'
-  | 'AVATAR_IMAGE_REQUEST_APPROVED'
-  | 'AVATAR_IMAGE_REQUEST_DENIED'
-  | 'AVATAR_IMAGE_REQUEST_REVOKED';
-
-export type ReportReason =
-  | 'HARASSMENT'
-  | 'HATE_SPEECH'
-  | 'VIOLENCE'
-  | 'SEXUAL_CONTENT'
-  | 'MISINFORMATION'
-  | 'SPAM'
-  | 'IMPERSONATION'
-  | 'COPYRIGHT'
-  | 'VOICE_THEFT'
-  | 'MUSIC_UPLOAD'
-  | 'FALSE_HUMAN_BADGE'
-  | 'FALSE_CLAIM'
-  | 'OTHER';
-
-export type ReportStatus =
-  | 'PENDING'
-  | 'REVIEWING'
-  | 'RESOLVED_ACTIONED'
-  | 'RESOLVED_DISMISSED'
-  | 'ASSET_REPLACED'
-  | 'DELISTED';
-
-export type VoiceCloneSource = 'UPLOAD' | 'RECORD' | 'IMPORT';
-
-export type VoiceVerificationStatus =
-  | 'PENDING_VERIFICATION'
-  | 'AWAITING_CHALLENGE'
-  | 'CHALLENGE_SUBMITTED'
-  | 'VERIFIED'
-  | 'BLOCKED'
-  | 'REJECTED'
-  | 'ADMIN_VERIFIED'
-  | 'ADMIN_BLOCKED'
-  | 'PROTECTED';
-
-export type VoiceRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED' | 'REVOKED';
-
-export type VoiceTrackStatus =
-  | 'PENDING'
-  | 'GENERATING_AUDIO'
-  | 'STITCHING'
-  | 'READY'
-  | 'FAILED'
-  | 'STALE';
-
-export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  | 'REFERRAL_SIGNUP';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
@@ -149,12 +84,6 @@ export type VideoStatus =
   | 'GENERATING_TRANSITIONS'
   | 'GENERATING_AVATARS'
   | 'COMPOSING'
-  | 'READY'
-  | 'FAILED';
-
-export type MusicStatus =
-  | 'PENDING'
-  | 'GENERATING'
   | 'READY'
   | 'FAILED';
 
@@ -195,3 +124,19 @@ export type EdgeType =
 export type PracticeKind = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'VOCAB';
 
 export type PracticeStatus = 'ACTIVE' | 'COMPLETED';
+
+// Mock exams: a full-length practice exam modeled on a flagship CEFR exam's FORMAT.
+// Never affiliated with the real institution; structure only, never exam content.
+export type ExamInstitution = 'GOETHE' | 'DELE' | 'CAMBRIDGE' | 'CEFR_GENERIC';
+
+export type MockExamStatus =
+  | 'GENERATING'
+  | 'READY'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'SCORED'
+  | 'FAILED';
+
+// The learner's chosen teaching approach, grounded in SLA research. Shapes how
+// content is generated so a learner can switch methods if one is not working.
+export type PedagogyStyle = 'BALANCED' | 'IMMERSION' | 'GRAMMAR' | 'COMMUNICATION' | 'INTENSIVE';

@@ -27,14 +27,14 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { GET, POST } from '@/app/api/courses/route';
+import { GET, POST } from '@/app/api/v1/courses/route';
 
 function makeGetRequest(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/courses', { method: 'GET' });
+  return new NextRequest('http://localhost:3000/api/v1/courses', { method: 'GET' });
 }
 
 function makePostRequest(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/courses', {
+  return new NextRequest('http://localhost:3000/api/v1/courses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -64,7 +64,7 @@ const SAMPLE_COURSES = [
   },
 ];
 
-describe('GET /api/courses', () => {
+describe('GET /api/v1/courses', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
@@ -115,7 +115,7 @@ describe('GET /api/courses', () => {
   });
 });
 
-describe('POST /api/courses', () => {
+describe('POST /api/v1/courses', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });

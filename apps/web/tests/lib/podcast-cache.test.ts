@@ -36,7 +36,7 @@ vi.mock('@/lib/prisma', () => {
     },
     like: { findUnique: (...args: unknown[]) => mockLikeFindUnique(...args) },
     save: { findUnique: (...args: unknown[]) => mockSaveFindUnique(...args) },
-    user: { findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE', role: 'USER' }) },
+    user: { findUniqueOrThrow: vi.fn().mockResolvedValue({ role: 'USER' }) },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
   return { prisma: txProxy, prismaUnfiltered: txProxy };
@@ -59,8 +59,8 @@ vi.mock('@/lib/slugify', () => ({
   generatePodcastSlug: vi.fn().mockResolvedValue('new-title'),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({ privateAllowed: false }),
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({ privateAllowed: false }),
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -75,12 +75,8 @@ vi.mock('@/lib/api-response', () => ({
   errorResponse: (msg: string, status: number) => new Response(JSON.stringify({ error: msg }), { status }),
 }));
 
-vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: vi.fn().mockReturnValue(null),
-}));
-
 import { NextRequest } from 'next/server';
-import { GET as getPodcast, PATCH as updatePodcast } from '@/app/api/podcasts/[podcastId]/route';
+import { GET as getPodcast, PATCH as updatePodcast } from '@/app/api/v1/podcasts/[podcastId]/route';
 
 const basePodcast = {
   id: 'pod-1',
@@ -97,7 +93,7 @@ const basePodcast = {
 };
 
 function makeRequest(method = 'GET', body?: Record<string, unknown>) {
-  const url = 'http://localhost:3000/api/podcasts/pod-1';
+  const url = 'http://localhost:3000/api/v1/podcasts/pod-1';
   if (body) {
     return new NextRequest(url, {
       method,

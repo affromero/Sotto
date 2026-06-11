@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kokoro';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -25,7 +25,6 @@ export interface TtsProviderMeta {
   displayName: string;
   getApiKeyUrl: string;
   supportsSfx: boolean;
-  supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
   maxSegmentChars: number;
   defaultModel: string;
@@ -76,6 +75,8 @@ const LANG_QWEN3: ReadonlySet<string> = new Set(['en','es','fr','de','ja','ko','
 const LANG_MISTRAL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh']);
 /** Replicate Inworld TTS — 15 languages */
 const LANG_INWORLD: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
+/** Kokoro-82M (local sidecar) — 8 languages */
+const LANG_KOKORO: ReadonlySet<string> = new Set(['en','es','fr','hi','it','pt','ja','zh']);
 
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
@@ -83,7 +84,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'ElevenLabs',
     getApiKeyUrl: 'https://elevenlabs.io/app/settings/api-keys',
     supportsSfx: true,
-    supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'eleven_v3',
@@ -121,7 +121,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'OpenAI',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: true,
     maxSegmentChars: 4096,
     defaultModel: 'tts-1-hd',
@@ -158,7 +157,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Cartesia',
     getApiKeyUrl: 'https://play.cartesia.ai/keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'sonic-3',
@@ -198,7 +196,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Hume AI',
     getApiKeyUrl: 'https://platform.hume.ai/settings/keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'octave-v2',
@@ -243,7 +240,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Fal',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'qwen3-tts-1.7b',
@@ -279,7 +275,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'MiniMax',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'speech-02-hd',
@@ -315,7 +310,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Mistral (Voxtral)',
     getApiKeyUrl: 'https://console.mistral.ai/api-keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 4096,
     defaultModel: 'voxtral-mini-tts-2603',
@@ -350,7 +344,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Replicate',
     getApiKeyUrl: 'https://replicate.com/account/api-tokens',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'inworld-tts-1.5-max',
@@ -379,6 +372,39 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
           return false;
         }
       },
+    },
+  },
+
+  // Keyless, server-configured local provider — talks to the Kokoro FastAPI
+  // sidecar at TTS_BASE_URL (no cloud key). Selected explicitly via
+  // TTS_PROVIDER=kokoro; never auto-selected by key availability. Like the
+  // keyless local AI/STT backends, it carries no auth fields and is filtered out
+  // of the BYOK client DTO (see getAllTtsProviderClientMeta).
+  kokoro: {
+    id: 'kokoro',
+    displayName: 'Kokoro (Local)',
+    getApiKeyUrl: '',
+    supportsSfx: false,
+    supportsStreaming: false,
+    maxSegmentChars: 4096,
+    defaultModel: 'kokoro',
+    models: [
+      { id: 'kokoro', displayName: 'Kokoro 82M', tier: 'standard', supportedLanguages: LANG_KOKORO },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'standard',
+    platformCostPerKChar: 0,
+    modelsWithoutTextContext: ['kokoro'],
+    languageDetection: 'optional_hint',
+    languageParam: 'language',
+    voicesAreCrossLingual: true,
+    auth: {
+      fields: [],
+      // Keyless — no credentials to validate. Reachability is checked at
+      // generation time by the provider (clear error if TTS_BASE_URL is unset
+      // or the sidecar is unreachable).
+      validate: async () => true,
     },
   },
 
@@ -440,7 +466,6 @@ export interface TtsProviderClientMeta {
   getApiKeyUrl: string;
   qualityTier: 'standard' | 'premium' | 'ultra';
   supportsSfx: boolean;
-  supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
   models: TtsModelClientOption[];
   authFields: TtsProviderAuthField[];
@@ -455,13 +480,16 @@ export interface TtsProviderClientMeta {
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
   return Object.values(TTS_PROVIDERS)
+    // kokoro is a keyless, server-configured local backend (no API-key fields) —
+    // never surfaced in BYOK client metadata, mirroring how the AI registry
+    // excludes the keyless `local` and `claude-code` providers.
+    .filter((p) => p.id !== 'kokoro')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
       getApiKeyUrl: p.getApiKeyUrl,
       qualityTier: p.qualityTier,
       supportsSfx: p.supportsSfx,
-      supportsVoiceCloning: p.supportsVoiceCloning,
       supportsStreaming: p.supportsStreaming,
       models: p.models.map((m) => ({
         id: m.id,

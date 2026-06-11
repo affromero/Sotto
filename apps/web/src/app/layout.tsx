@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { DM_Serif_Display, Inter } from 'next/font/google';
+import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
-import { EventProvider } from '@/components/providers/EventProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
-import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
@@ -13,33 +11,40 @@ import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import { getAppBaseUrl } from '@/lib/urls';
-import { getTwitterBotHandle } from '@/lib/bot-identity';
 import '@/styles/globals.css';
 
-const dmSerifDisplay = DM_Serif_Display({
+const newsreader = Newsreader({
   subsets: ['latin'],
-  weight: '400',
+  style: ['normal', 'italic'],
+  weight: ['400', '500'],
   variable: '--font-heading',
   display: 'swap',
 });
 
-const inter = Inter({
+const ibmPlexSans = IBM_Plex_Sans({
   subsets: ['latin'],
+  weight: ['400', '500', '600'],
   variable: '--font-body',
   display: 'swap',
 });
 
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-mono',
+  display: 'swap',
+});
+
 const appBaseUrl = getAppBaseUrl();
-const twitterSite = getTwitterBotHandle();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appBaseUrl),
   title: {
-    default: `${BRAND.name} — ${BRAND.cta}`,
+    default: `${BRAND.name}: ${BRAND.cta}`,
     template: `%s | ${BRAND.name}`,
   },
   description: BRAND.description,
-  keywords: ['podcast', 'AI', 'private', 'briefing', 'BYOK', 'import', 'interactive', 'learning'],
+  keywords: ['language learning', 'CEFR', 'self-hosted', 'open-source', 'BYOK', 'grammar', 'speaking', 'pronunciation', 'private'],
   alternates: {
     canonical: '/',
   },
@@ -53,15 +58,19 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    ...(twitterSite ? { site: twitterSite } : {}),
     title: BRAND.title,
     description: BRAND.description,
   },
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'Sotto',
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#D97706',
+  themeColor: '#3F4FB0',
   viewportFit: 'cover',
   maximumScale: 1,
   interactiveWidget: 'resizes-content',
@@ -71,7 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${dmSerifDisplay.variable} ${inter.variable}`}
+      className={`${newsreader.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -84,14 +93,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             <ToastProvider>
               <NotificationProvider>
-                <EventProvider>
-                  <AudioPlayerProvider>
-                    <PageViewTracker />
-                    {children}
-                    <GlobalMiniPlayer />
-                    <CommandPaletteLoader />
-                  </AudioPlayerProvider>
-                </EventProvider>
+                <AudioPlayerProvider>
+                  {children}
+                  <GlobalMiniPlayer />
+                  <CommandPaletteLoader />
+                </AudioPlayerProvider>
               </NotificationProvider>
             </ToastProvider>
           </ThemeProvider>

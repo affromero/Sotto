@@ -2,7 +2,7 @@
 
 .root {
   width: 100%;
-  background: #1a1a1a;
+  background: var(--color-text-primary);
   border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid #333;
@@ -28,7 +28,7 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text-primary);
-  font-family: var(--font-heading, 'DM Serif Display', serif);
+  font-family: var(--font-heading, 'Newsreader', serif);
 }
 
 .headerHint {
@@ -123,7 +123,7 @@
 .regenerateAllBtn:hover {
   color: var(--color-text-inverse);
   border-color: #a16207;
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(63, 79, 176, 0.12);
 }
 
 .regenerateAllBtn:focus-visible {

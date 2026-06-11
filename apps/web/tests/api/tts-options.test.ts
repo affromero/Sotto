@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET as getTtsOptions } from '@/app/api/tts-options/route';
+import { GET as getTtsOptions } from '@/app/api/v1/tts-options/route';
 
 const mockAuthenticateRequest = vi.fn();
 const mockListByokProviders = vi.fn();
@@ -25,10 +25,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-  resolveTtsIncludedModels: () => ({
-    freeTtsModels: ['openai:tts-1'],
-    proTtsModels: ['openai:tts-1'],
-  }),
+  resolveTtsIncludedModels: () => ['openai:tts-1'],
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({
@@ -48,18 +45,18 @@ vi.mock('@/lib/providers/tts-registry', () => ({
   ],
 }));
 
-describe('GET /api/tts-options', () => {
+describe('GET /api/v1/tts-options', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUnique.mockResolvedValue({ plan: 'FREE', role: 'USER' });
-    mockGetAutoModelConfig.mockResolvedValue({ adminViewMode: 'FREE' });
+    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockGetAutoModelConfig.mockResolvedValue({ includedTtsModels: ['openai:tts-1'] });
   });
 
-  it('omits Auto for BYOK users so creation submits a concrete provider', async () => {
+  it('returns concrete BYOK options without an Auto placeholder', async () => {
     mockListByokProviders.mockResolvedValue([{ provider: 'openai', isValid: true }]);
 
-    const request = new NextRequest('https://sotto.test/api/tts-options');
+    const request = new NextRequest('https://sotto.test/api/v1/tts-options');
     const response = await getTtsOptions(request);
     const body = await response.json();
 

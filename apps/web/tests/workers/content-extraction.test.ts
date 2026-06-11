@@ -12,7 +12,7 @@ const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'WEB',
   aiModel: 'gpt-5-mini',
-  user: { plan: 'FREE' },
+  user: {},
 });
 
 vi.mock('@/lib/prisma', () => {
@@ -155,7 +155,7 @@ describe('processContentExtraction', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       source: 'WEB',
       aiModel: 'gpt-5-mini',
-      user: { plan: 'FREE' },
+      user: {},
     });
     mockAddJob.mockResolvedValue({ id: 'script-job-1' });
     mockAssessTopicFeasibility.mockResolvedValue({
@@ -476,7 +476,6 @@ describe('processContentExtraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
@@ -523,7 +522,6 @@ describe('processContentExtraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -539,7 +537,7 @@ describe('processContentExtraction', () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       mockGetAiKey.mockResolvedValue(aiKey);
       mockResolveAiModelAndProvider.mockResolvedValue({
@@ -557,7 +555,6 @@ describe('processContentExtraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'FREE',
       });
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -572,7 +569,7 @@ describe('processContentExtraction', () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       mockGetAiKey.mockResolvedValue(null);
 
@@ -591,7 +588,7 @@ describe('processContentExtraction', () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: 'claude-code:opus',
-        user: { plan: 'PRO' },
+        user: {},
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'claude-code:opus',

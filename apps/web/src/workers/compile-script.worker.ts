@@ -6,9 +6,8 @@ import { compileScript } from '@/lib/script-compiler';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
-import { hasByokKey } from '@/lib/byok';
-import { getTierFeatures } from '@/lib/tier-features';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { getGenerationFeatures } from '@/lib/generation-features';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
@@ -102,17 +101,10 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
   );
 
   // Determine whether to auto-approve or pause at SCRIPT_READY
-  const [userRecord, isByok] = await Promise.all([
-    prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { plan: true, role: true },
-    }),
-    hasByokKey(userId),
-  ]);
-  const tierFeatures = getTierFeatures(userRecord.plan as 'FREE' | 'PRO', isByok, userRecord.role);
+  const genFeatures = getGenerationFeatures();
 
   const isWebOrImport = podcast.source === 'WEB' || podcast.source === 'IMPORT';
-  const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport || podcast.zeroCostVideo;
+  const shouldAutoApprove = genFeatures.autoApproveScript || !isWebOrImport || podcast.zeroCostVideo;
 
   if (!shouldAutoApprove) {
     // Pause for user review
@@ -133,12 +125,16 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
 
     logger.info('Script compiled, paused at SCRIPT_READY for review', { podcastId });
   } else {
-    // Auto-approve: select TTS provider and create segments
-    if (!isByok) {
-      const selected = await selectFreeTierProviders(userId);
+    // Auto-approve: select the configured TTS provider and create segments.
+    const existingPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    if (!existingPodcast.ttsProvider) {
+      const selected = await getAutoModelConfig();
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+        data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
       });
     }
 

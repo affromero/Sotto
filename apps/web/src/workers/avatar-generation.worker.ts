@@ -10,37 +10,12 @@ import { concatenateSpeakerAudio } from '@/lib/avatar-audio-concat';
 
 /**
  * Fetch segments for avatar audio concatenation.
- * When voiceTrackId is set, reads from VoiceTrackSegment (alternate audio).
- * Otherwise reads from the main Segment table (default behavior).
  */
 async function fetchAvatarSegments(opts: {
   podcastId: string;
   speaker: string;
-  voiceTrackId?: string;
   enabledSegmentIds: string[];
 }): Promise<Array<{ id: string; order: number; audioUrl: string | null }>> {
-  if (opts.voiceTrackId) {
-    const vtSegments = await prisma.voiceTrackSegment.findMany({
-      where: {
-        voiceTrackId: opts.voiceTrackId,
-        segment: { podcastId: opts.podcastId, speaker: opts.speaker },
-      },
-      orderBy: { order: 'asc' },
-      select: { id: true, segmentId: true, order: true, audioUrl: true },
-    });
-
-    if (vtSegments.length === 0) {
-      throw new Error(`No voice track segments found for speaker "${opts.speaker}"`);
-    }
-
-    const enabled = opts.enabledSegmentIds;
-    const filtered = enabled.length > 0
-      ? vtSegments.filter((s) => enabled.includes(s.segmentId))
-      : vtSegments;
-
-    return filtered.map((s) => ({ id: s.segmentId, order: s.order, audioUrl: s.audioUrl }));
-  }
-
   const segments = await prisma.segment.findMany({
     where: { podcastId: opts.podcastId, speaker: opts.speaker },
     orderBy: { order: 'asc' },
@@ -74,7 +49,7 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
 // ── HeyGen path (existing logic, extracted verbatim) ──
 
 async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, voiceTrackId } = job.data;
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId } = job.data;
 
   logger.info('Starting HeyGen avatar generation', { podcastId, speaker, avatarId });
 
@@ -125,7 +100,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       await job.updateProgress(10);
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
+        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -254,7 +229,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 // ── Fal lip-sync path (VEED Fabric / Kling Avatar) ──
 
 async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, voiceTrackId, avatarImageUrl, avatarModelId } = job.data;
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarImageUrl, avatarModelId } = job.data;
 
   logger.info('Starting Fal lip-sync avatar generation', { podcastId, speaker, avatarModelId });
 
@@ -307,7 +282,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       });
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
+        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -502,7 +477,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
 // ── Replicate lip-sync path (Wav2Lip / SadTalker / VEED Fabric) ──
 
 async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, voiceTrackId, avatarImageUrl, avatarModelId } = job.data;
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarImageUrl, avatarModelId } = job.data;
 
   logger.info('Starting Replicate lip-sync avatar generation', { podcastId, speaker, avatarModelId });
 
@@ -555,7 +530,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       });
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
+        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -729,7 +704,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
 // ── Runway path (realtime sessions via Playwright) ──
 
 async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, isPreset, voiceTrackId } = job.data;
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, isPreset } = job.data;
 
   logger.info('Starting Runway avatar generation', { podcastId, speaker, avatarId });
 
@@ -776,7 +751,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       });
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
+        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);

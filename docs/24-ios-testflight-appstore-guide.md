@@ -183,7 +183,7 @@ Go to App Store Connect → My Apps → Sotto → App Store tab:
 - Secondary category: News
 - Age rating: 12+ (AI-generated content)
 
-**Pricing**: Free (billing handled via web, not IAP)
+**Pricing**: Free
 
 **Version Information** (for each localization):
 - Description (see `docs/15-ios-app-strategy.md` for copy)

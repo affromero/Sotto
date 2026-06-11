@@ -4,7 +4,7 @@
  */
 
 interface TtsProviderLogoProps {
-  provider: 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'anthropic' | 'google' | 'together' | 'deepgram' | 'assemblyai';
+  provider: 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kokoro' | 'anthropic' | 'google' | 'together' | 'deepgram' | 'assemblyai';
   size?: number;
   className?: string;
 }
@@ -140,6 +140,13 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">AI</text>
         </svg>
       );
+    case 'kokoro':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="var(--color-accent)" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">K</text>
+        </svg>
+      );
     default:
       return null;
   }
@@ -154,6 +161,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   replicate: 'Replicate',
   minimax: 'MiniMax',
   mistral: 'Mistral',
+  kokoro: 'Kokoro',
   anthropic: 'Anthropic',
   google: 'Google',
   together: 'Together AI',

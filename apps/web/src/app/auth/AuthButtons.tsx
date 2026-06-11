@@ -61,7 +61,7 @@ const providerConfig: Record<ProviderId, { icon: React.FC; label: string }> = {
   apple: { icon: AppleIcon, label: 'Continue with Apple' },
 };
 
-export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
+export function AuthButtons({ callbackUrl = '/learn' }: AuthButtonsProps) {
   const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
   const [hasResend, setHasResend] = useState(false);
   const [email, setEmail] = useState('');
@@ -91,7 +91,7 @@ export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
     try {
       const result = await signIn('resend', { email: trimmed, callbackUrl, redirect: false });
       if (result?.error) {
-        setEmailError('Unable to send magic link. You may not be on the waitlist yet.');
+        setEmailError('Unable to send magic link. Please check your email address and try again.');
       } else {
         setEmailSent(true);
       }

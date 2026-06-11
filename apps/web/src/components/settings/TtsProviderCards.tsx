@@ -56,7 +56,7 @@ export function TtsProviderCards({
         }
       }
 
-      const res = await fetch('/api/settings/byok', {
+      const res = await fetch('/api/v1/settings/byok', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -95,7 +95,7 @@ export function TtsProviderCards({
   const handleRemoveKey = async (providerId: string) => {
     setSavingId(providerId);
     try {
-      await fetch('/api/settings/byok', {
+      await fetch('/api/v1/settings/byok', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: providerId }),
@@ -140,9 +140,6 @@ export function TtsProviderCards({
                     {qualityLabel} · {modelCount} {modelCount === 1 ? 'model' : 'models'}
                   </span>
                   <div className={styles.capabilityRow}>
-                    {provider.supportsVoiceCloning && (
-                      <span className={styles.capabilityPill}>Voice Cloning</span>
-                    )}
                     {provider.supportsSfx && (
                       <span className={styles.capabilityPill}>SFX</span>
                     )}

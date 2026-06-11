@@ -35,20 +35,11 @@
 ;   openai/tts             → Expenses:TTS:OpenAI:Standard
 ;   ffmpeg/*               → (compute cost, negligible, tracked but not billed)
 
-; Stripe Revenue
-
-; Stripe revenue is imported via:
-;   uv run import-stripe --month 2026-02
-;
-; Subscription payments → Income:Subscriptions:Pro|Creator
-; Stripe fees → Expenses:PaymentProcessing:StripeFees
-; Payouts → Assets:Current:Cash:Stripe → Assets:Current:Cash:Bank
-
 2026-02-17 * "Apple" "Developer Program — annual membership"
   Expenses:Software:DevTools                   99.00 USD
   Assets:Current:Cash:Bank                    -99.00 USD
 
-2026-02-17 * "ElevenLabs" "Pro subscription — February 2026"
+2026-02-17 * "ElevenLabs" "Provider account charge — February 2026"
   Expenses:TTS:ElevenLabs:Standard             99.00 USD
   Liabilities:AccountsPayable:ElevenLabs      -99.00 USD
 

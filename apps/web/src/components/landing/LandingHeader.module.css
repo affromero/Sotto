@@ -1,0 +1,169 @@
+/*
+ * LandingHeader.module.css — top nav for the aula landing.
+ * Consumes the aula tokens defined on the page root (--serif/--mono/--sans,
+ * --accent, --ink, --paper, --line). Mobile-first; links collapse behind a
+ * toggle below 720px.
+ */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--paper) 86%, transparent);
+  backdrop-filter: saturate(1.2) blur(8px);
+  -webkit-backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.nav {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 14px clamp(18px, 5vw, 44px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  min-height: 44px;
+}
+
+.wordmarkBead {
+  /* bead sizes off the wordmark font-size (0.44em) automatically */
+  margin-bottom: 1px;
+}
+
+.wordmarkText {
+  padding-top: 2px;
+  /* Gradient fill on the name — blue → pink, matching the glass bead. */
+  background: linear-gradient(100deg, #6aa0ff, #ff8fb1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-contrast: more) {
+  .wordmarkText {
+    background: none;
+    color: var(--ink);
+  }
+}
+
+.menuToggle {
+  margin-left: auto;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.menuBar {
+  display: block;
+  height: 1.5px;
+  width: 100%;
+  background: var(--ink);
+}
+
+.links {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.link {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 11px 12px;
+  border-radius: var(--r);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.2s var(--ease);
+}
+
+.link:hover {
+  color: var(--ink);
+}
+
+.navCta {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-fg);
+  background: var(--accent);
+  text-decoration: none;
+  padding: 11px 18px;
+  border-radius: var(--r);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  transition: filter 0.2s var(--ease);
+}
+
+.navCta:hover {
+  filter: brightness(1.06);
+}
+
+@media (max-width: 720px) {
+  .menuToggle {
+    display: flex;
+  }
+
+  .links {
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    margin: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.25s var(--ease), opacity 0.2s var(--ease);
+  }
+
+  .linksOpen {
+    max-height: 360px;
+    opacity: 1;
+    padding-top: 10px;
+  }
+
+  .link,
+  .navCta {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .nav {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .links {
+    transition: none;
+  }
+}

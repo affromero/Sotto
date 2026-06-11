@@ -8,11 +8,8 @@ Sentry.init({
 import {
   createWorker,
   keyValidationQueue,
-  draftCleanupQueue,
-  r2UsageQueue,
   pricingFetchQueue,
   ttsProviderMonitorQueue,
-  featureComputationQueue,
   JobType,
 } from '@/lib/queue';
 import { logger } from '@/lib/logger';
@@ -29,17 +26,7 @@ import { processInteraction } from './interaction.worker';
 import { processSegmentRegeneration } from './segment-regeneration.worker';
 import { processNotification } from './notification.worker';
 import { processPdfGeneration } from './pdf-generation.worker';
-import { processEventIngestion } from './event-ingestion.worker';
-import { processFeatureComputation } from './feature-computation.worker';
-import { processDataExport } from './data-export.worker';
-import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
-import { processContentModeration } from './content-moderation.worker';
-import { processVoiceVerification } from './voice-verification.worker';
-import { processVoiceTrackAudio } from './voice-track-audio.worker';
-import { processVoiceTrackStitching } from './voice-track-stitching.worker';
-import { processDraftCleanup } from './draft-cleanup.worker';
-import { processR2Usage } from './r2-usage.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
 import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
 import { processVisualClassification } from './visual-classification.worker';
@@ -49,20 +36,12 @@ import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
 import { processTransitionGeneration } from './transition-generation.worker';
 import { processSegmentPreview } from './segment-preview.worker';
-import { processDemoScriptGeneration } from './demo-script-generation.worker';
-import { processDemoRecording } from './demo-recording.worker';
-import { processDemoVoiceover } from './demo-voiceover.worker';
-import { processDemoVisual } from './demo-visual.worker';
-import { processDemoTransition } from './demo-transition.worker';
-import { processDemoComposition } from './demo-composition.worker';
-import { processDemoSceneComposition } from './demo-scene-composition.worker';
-import { processMusicGeneration } from './music-generation.worker';
 import { processLipSyncTest } from './lip-sync-test.worker';
 import { processWaveformGeneration } from './waveform-generation.worker';
 import { processPipelineClassification } from './pipeline-classification.worker';
 import { processSpeakingGrading } from './speaking-grading.worker';
 import { processWorksheetPdf } from './worksheet-pdf.worker';
-import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
+import { processVerifyClassReferences } from './verify-class-references.worker';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
@@ -123,17 +102,7 @@ const workers = [
   shouldRun('segment-regeneration') && createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
   shouldRun('notifications') && createWorker('notifications', processNotification, { concurrency: 5 }),
   shouldRun('pdf-generation') && createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
-  shouldRun('event-ingestion') && createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
-  shouldRun('feature-computation') && createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
-  shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
-  shouldRun('audio-import') && createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
-  shouldRun('content-moderation') && createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
-  shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
-  shouldRun('voice-track-audio') && createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
-  shouldRun('voice-track-stitching') && createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
-  shouldRun('draft-cleanup') && createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
-  shouldRun('r2-usage') && createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
   shouldRun('tts-provider-monitor') && createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
   shouldRun('visual-classification') && createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
@@ -143,47 +112,23 @@ const workers = [
   shouldRun('place-enrichment') && createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   shouldRun('transition-generation') && createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
   shouldRun('segment-preview') && createWorker('segment-preview', processSegmentPreview, { concurrency: 3, lockDuration: 300000 }),
-  shouldRun('demo-script') && createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
-  shouldRun('demo-recording') && createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),
-  shouldRun('demo-voiceover') && createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
-  shouldRun('demo-visual') && createWorker('demo-visual', processDemoVisual, { concurrency: 3 }),
-  shouldRun('demo-transition') && createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
-  shouldRun('demo-composition') && createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
-  shouldRun('demo-scene-composition') && createWorker('demo-scene-composition', processDemoSceneComposition, { concurrency: 2, lockDuration: 600000 }),
-  shouldRun('music-generation') && createWorker('music-generation', processMusicGeneration, { concurrency: 2, lockDuration: 600000 }),
   shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
   shouldRun('pipeline-classification') && createWorker('pipeline-classification', processPipelineClassification, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('speaking-grading') && createWorker('speaking-grading', processSpeakingGrading, { concurrency: 5 }),
   shouldRun('worksheet-pdf') && createWorker('worksheet-pdf', processWorksheetPdf, { concurrency: 2 }),
+  shouldRun('verify-class-references') && createWorker('verify-class-references', processVerifyClassReferences, { concurrency: 2 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 // Schedule cleanup every 2 hours (stale drafts + stuck video generations)
-if (shouldRun('draft-cleanup')) {
-  draftCleanupQueue
-    .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 2 * 60 * 60 * 1000 } })
-    .then(() => logger.info('Cleanup scheduled', { intervalMs: '7200000' }))
-    .catch((err) => logger.error('Failed to schedule cleanup', { error: err.message }));
-}
-
 // Schedule BYOK key re-validation every 24 hours
 if (shouldRun('key-validation')) {
   keyValidationQueue
     .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
     .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
     .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
-}
-
-// Schedule daily R2 usage collection if Cloudflare API token is configured
-if (shouldRun('r2-usage') && isR2MonitoringConfigured()) {
-  r2UsageQueue
-    .add(JobType.COLLECT_R2_USAGE, {}, { repeat: { every: 86400000 } })
-    .then(() => logger.info('R2 usage monitoring scheduled', { intervalMs: '86400000' }))
-    .catch((err) => logger.error('Failed to schedule R2 usage monitoring', { error: err.message }));
-} else if (shouldRun('r2-usage')) {
-  logger.info('R2 monitoring not configured — usage collection disabled');
 }
 
 // Schedule daily TTS provider monitor (6am UTC)
@@ -200,14 +145,6 @@ if (shouldRun('pricing-fetch')) {
     .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
     .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
     .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
-}
-
-// Schedule daily ML feature computation catch-up (every 24 hours)
-if (shouldRun('feature-computation')) {
-  featureComputationQueue
-    .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
-    .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
-    .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
 }
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)

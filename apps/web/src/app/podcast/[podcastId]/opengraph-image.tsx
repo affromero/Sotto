@@ -33,11 +33,11 @@ export default async function OgImage({ params }: { params: Promise<{ podcastId:
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#FEFCF8',
+          backgroundColor: '#F5F4F0',
           fontFamily: 'sans-serif',
         }}
       >
-        <span style={{ fontSize: 48, color: '#1A1A1A' }}>Podcast Not Found</span>
+        <span style={{ fontSize: 48, color: '#1E2128' }}>Podcast Not Found</span>
       </div>,
       { ...size }
     );
@@ -53,13 +53,13 @@ export default async function OgImage({ params }: { params: Promise<{ podcastId:
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#FEFCF8',
+        backgroundColor: '#F5F4F0',
         fontFamily: 'sans-serif',
         padding: 60,
         position: 'relative',
       }}
     >
-      {/* Amber accent bar at top */}
+      {/* Accent bar at top */}
       <div
         style={{
           position: 'absolute',
@@ -67,7 +67,7 @@ export default async function OgImage({ params }: { params: Promise<{ podcastId:
           left: 0,
           right: 0,
           height: 8,
-          backgroundColor: '#D97706',
+          backgroundColor: '#3F4FB0',
         }}
       />
 
@@ -83,7 +83,7 @@ export default async function OgImage({ params }: { params: Promise<{ podcastId:
           style={{
             fontSize: 32,
             fontWeight: 700,
-            color: '#D97706',
+            color: '#3F4FB0',
             letterSpacing: '-0.02em',
           }}
         >
@@ -104,7 +104,7 @@ export default async function OgImage({ params }: { params: Promise<{ podcastId:
           style={{
             fontSize: 56,
             fontWeight: 700,
-            color: '#1A1A1A',
+            color: '#1E2128',
             lineHeight: 1.2,
             margin: 0,
             maxWidth: '90%',

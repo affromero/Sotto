@@ -69,12 +69,11 @@ DIRECT_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sotto?schema=
 REDIS_URL="redis://localhost:6379"
 NEXTAUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-EXPO_PUBLIC_API_URL="http://localhost:3000/api"
+EXPO_PUBLIC_API_URL="http://localhost:3000/api/v1"
 AUTH_SECRET="<generated>"
 BYOK_ENCRYPTION_KEY="<generated>"
 STORAGE_PROVIDER="local"
 LOCAL_STORAGE_DIR="./.sotto/storage"
-PAYMENT_PROVIDER="none"
 ```
 
 Add provider settings only for the workflow you are testing.
@@ -130,7 +129,6 @@ Local agent CLIs must be installed and authenticated outside Sotto. Sotto should
 | plus selected LLM or local agent | discovery, scripting, Q&A text paths |
 | plus selected TTS | end-to-end audio generation |
 | plus selected STT | meeting/audio transcription |
-| plus bot credentials | Twitter or Telegram source testing |
 
 No missing capability should be hidden by an implicit provider fallback.
 
@@ -141,10 +139,10 @@ No missing capability should be hidden by an implicit provider fallback.
 After signing in:
 
 ```http
-POST /api/rss/private
-GET /api/rss/private
-DELETE /api/rss/private/tokens/:tokenId
-GET /api/rss/private/:token
+POST /api/v1/rss/private
+GET /api/v1/rss/private
+DELETE /api/v1/rss/private/tokens/:tokenId
+GET /api/v1/rss/private/:token
 ```
 
 Expected behavior:

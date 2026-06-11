@@ -70,7 +70,6 @@ async function executeRender(jobId: string, compositionId: CompositionId, input:
       outputLocation: outputPath,
       inputProps: input,
       concurrency: RENDER_CONCURRENCY,
-      enableMultiProcessOnLinux: true,
       onProgress: ({ progress }: { progress: number }) => {
         job.progress = Math.round(progress * 100);
       },

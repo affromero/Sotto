@@ -1,4 +1,4 @@
-import type { PodcastSource, PodcastStatus, PodcastVisibility, Speaker, VoiceTrackStatus } from './enums';
+import type { PodcastSource, PodcastStatus, PodcastVisibility, Speaker } from './enums';
 import type { ReferenceData } from './reference';
 import type { PodcastVersionSummary } from './version';
 
@@ -13,7 +13,6 @@ export interface PodcastSummary {
   playCount: number;
   createdAt: string;
   source: PodcastSource;
-  isHumanContent: boolean;
   lowReferences?: boolean;
   sourcePlatform?: string | null;
   aiProvider?: string | null;
@@ -45,31 +44,6 @@ export interface PodcastDetail extends PodcastSummary {
   isSaved: boolean;
   /** Owner-only: reason the generation pipeline failed (null for non-owners or non-failed podcasts) */
   failureReason?: string | null;
-  voiceTracks: VoiceTrackSummary[];
-  defaultVoiceTrackId: string | null;
-  originalTrackName: string;
-}
-
-export interface VoiceTrackContributor {
-  id: string;
-  name: string | null;
-  handle: string | null;
-  image: string | null;
-}
-
-export interface VoiceTrackSummary {
-  id: string;
-  name: string;
-  status: VoiceTrackStatus;
-  audioUrl: string | null;
-  duration: number | null;
-  ttsProvider: string | null;
-  ttsModel: string | null;
-  failureReason: string | null;
-  voices: Array<{ speaker: string; voiceId: string; provider?: string | null; voiceName?: string | null }>;
-  contributor: VoiceTrackContributor | null;
-  proposalStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED' | null;
-  proposalMessage: string | null;
 }
 
 export interface WordTiming {

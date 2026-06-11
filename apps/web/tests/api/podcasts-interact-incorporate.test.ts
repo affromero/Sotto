@@ -89,16 +89,11 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-const mockCheckGenerationGate = vi.fn();
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-}));
-
-import { POST } from '@/app/api/podcasts/[podcastId]/interact/[interactionId]/incorporate/route';
+import { POST } from '@/app/api/v1/podcasts/[podcastId]/interact/[interactionId]/incorporate/route';
 
 function createRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/podcast-001/interact/interaction-001/incorporate'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/podcast-001/interact/interaction-001/incorporate'), {
     method: 'POST',
   });
 }
@@ -126,13 +121,12 @@ function createInteraction(aiModel: string | null = null) {
   };
 }
 
-describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', () => {
+describe('POST /api/v1/podcasts/[podcastId]/interact/[interactionId]/incorporate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockAuth.mockResolvedValue({ user: { id: 'user-001' } });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockPrismaInteractionFindUnique.mockResolvedValue(createInteraction());
     mockPrismaInteractionUpdate.mockResolvedValue({});
     mockPrismaPodcastUpdate.mockResolvedValue({});
@@ -141,7 +135,7 @@ describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', 
       { order: 2, startTime: 15, duration: 20, speaker: 'EXPERT', text: 'Relevant context.' },
       { order: 3, startTime: 35, duration: 15, speaker: 'HOST', text: 'Follow-up context.' },
     ]);
-    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO' });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockResolveAiModelAndProvider.mockResolvedValue({
       model: 'claude-haiku-4-5-20251001',
@@ -172,7 +166,6 @@ describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', 
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
       podcastAiModel: null,
       aiKey,
-      plan: 'PRO',
     });
     expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
     expect(mockGenerateResponse).toHaveBeenCalledWith(
@@ -207,7 +200,6 @@ describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', 
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
       podcastAiModel: 'gpt-5-mini',
       aiKey: null,
-      plan: 'PRO',
     });
     expect(mockGetAiKey).toHaveBeenCalledTimes(1);
     expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');

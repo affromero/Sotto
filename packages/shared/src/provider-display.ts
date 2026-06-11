@@ -3,6 +3,7 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
   openai: { label: 'OpenAI', shortLabel: 'GPT' },
   google: { label: 'Google (Gemini)', shortLabel: 'Gemini' },
   'claude-code': { label: 'Claude Code (Local)', shortLabel: 'Claude' },
+  local: { label: 'Local model (Ollama / vLLM)', shortLabel: 'Local' },
   together: { label: 'Together AI', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
   assemblyai: { label: 'AssemblyAI', shortLabel: 'AssemblyAI' },
@@ -17,6 +18,7 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   replicate: { label: 'Replicate', shortLabel: 'Replicate' },
   minimax: { label: 'MiniMax', shortLabel: 'MiniMax' },
   mistral: { label: 'Mistral (Voxtral)', shortLabel: 'Mistral' },
+  kokoro: { label: 'Kokoro (Local)', shortLabel: 'Kokoro' },
 };
 
 export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
@@ -139,6 +141,7 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   'gpt-4o-mini-tts': 'GPT-4o Mini TTS',
   'inworld-tts-1.5-max': 'Inworld 1.5 Max',
   'inworld-tts-1.5-mini': 'Inworld 1.5 Mini',
+  kokoro: 'Kokoro 82M',
 };
 
 export function getAiProviderLabel(id: string | null | undefined): string | null {

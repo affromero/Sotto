@@ -49,7 +49,7 @@ This is the current safe operating mode.
 
 ### 6. Avatar route Redis connection leak
 
-`GET /api/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
+`GET /api/v1/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
 
 ## What Is Still Not Solved
 
@@ -114,7 +114,7 @@ Safe-for-launch core flow:
 2. content extraction runs
 3. script generation and verification run (≤3 loops)
 4. reference validation runs (if references exist)
-5. SCRIPT_READY pause (Pro/BYOK web users review and approve; Twitter/API/Telegram auto-approve)
+5. SCRIPT_READY pause (Pro/BYOK web users review and approve; API sources auto-approve)
 6. audio generation (parallel per segment) and stitching run
 7. notifications run
 

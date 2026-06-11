@@ -179,7 +179,7 @@ describe('processScriptWriting', () => {
       speakers: [{ name: 'Host', description: 'Curious host' }],
     });
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
-    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO' });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
     mockPrismaScriptCreate.mockResolvedValue({ id: 'script-001' });
     mockPrismaReferenceCreateMany.mockResolvedValue({ count: 1 });
     mockPrismaTagFindMany.mockResolvedValue([]);
@@ -226,7 +226,6 @@ describe('processScriptWriting', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'PRO',
       });
       expect(mockWriteScript).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -255,7 +254,6 @@ describe('processScriptWriting', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'PRO',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
@@ -307,7 +305,6 @@ describe('processScriptWriting', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'PRO',
       });
       expect(mockWriteScript).toHaveBeenCalledWith(
         expect.objectContaining({

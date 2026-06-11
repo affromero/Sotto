@@ -55,7 +55,7 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
     },
     user: {
-      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE' }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({}),
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
@@ -126,8 +126,8 @@ vi.mock('@/lib/byok', () => ({
   hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 40,
     maxSpeakers: 4,
     maxQaInteractions: Infinity,
@@ -136,9 +136,6 @@ vi.mock('@/lib/tier-features', () => ({
     privateAllowed: true,
     priorityQueue: true,
     analyticsEnabled: true,
-    voiceTracksEnabled: true,
-    maxVoiceTracks: 3,
-    voiceCloningEnabled: true,
   }),
 }));
 
@@ -159,6 +156,11 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/pipeline-events', () => ({
   logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -311,7 +313,6 @@ describe('processScriptGeneration', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'FREE',
       });
       expect(mockGenerateScript).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -348,7 +349,6 @@ describe('processScriptGeneration', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
@@ -409,7 +409,6 @@ describe('processScriptGeneration', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGenerateScript).toHaveBeenCalledWith(
         expect.objectContaining({

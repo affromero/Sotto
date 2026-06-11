@@ -10,10 +10,10 @@ import { useFonts } from 'expo-font';
 import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
+import { loadStoredServerUrl, hasServerConfigured } from '../lib/server-url';
 import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
-import { EventProvider } from '../components/EventProvider';
 import { MiniPlayer } from '../components/MiniPlayer';
 import { AppErrorBoundary } from '../components/AppErrorBoundary';
 
@@ -65,6 +65,17 @@ function useProtectedRoute() {
     let cancelled = false;
 
     async function checkAuth() {
+      // Connect gate: a runtime-config build must be paired to a server before
+      // anything else. Load the stored URL, then route to /connect if none.
+      await loadStoredServerUrl();
+      if (!hasServerConfigured()) {
+        if (!cancelled) {
+          setIsReady(true);
+          if (segments[0] !== 'connect') router.replace('/connect');
+        }
+        return;
+      }
+
       const hasToken = await isAuthenticated();
       if (!hasToken) {
         if (!cancelled) {
@@ -109,7 +120,7 @@ function useProtectedRoute() {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional: runs once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: runs once on mount
 
   return { isChecking: !isReady };
 }
@@ -146,26 +157,21 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <QueryClientProvider client={queryClient}>
-            <EventProvider>
-              <StatusBar style={isDark ? 'light' : 'dark'} />
-              <Stack
-                screenOptions={{
-                  headerStyle: { backgroundColor: colors.background },
-                  headerTintColor: colors.textPrimary,
-                  contentStyle: { backgroundColor: colors.background },
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
-                <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
-                <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
-                <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
-                <Stack.Screen name="collections/index" options={{ title: 'Collections' }} />
-                <Stack.Screen name="collections/[id]" options={{ title: '' }} />
-              </Stack>
-              <MiniPlayer />
-            </EventProvider>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.background },
+                headerTintColor: colors.textPrimary,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
+              <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
+            </Stack>
+            <MiniPlayer />
           </QueryClientProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>

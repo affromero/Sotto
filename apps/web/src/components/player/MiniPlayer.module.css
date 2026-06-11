@@ -47,7 +47,7 @@
 }
 
 .seekBar:hover .seekFill {
-  box-shadow: 0 0 8px rgba(217, 119, 6, 0.4);
+  box-shadow: 0 0 8px rgba(63, 79, 176, 0.4);
 }
 
 .content {
@@ -135,7 +135,7 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: all var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);
+  box-shadow: 0 2px 8px rgba(63, 79, 176, 0.2);
 }
 
 .playButton:hover {

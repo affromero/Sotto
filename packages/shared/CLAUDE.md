@@ -7,21 +7,18 @@ Prisma-free package consumed by both `apps/web/` and `apps/mobile/`.
 ```
 src/
 ├── types/
-│   ├── enums.ts          # String union equivalents of Prisma enums — includes language-learning enums: CefrLevel, SkillType, ClassStatus, SectionStatus, SpeakingGradeStatus, EdgeType, PracticeKind, PracticeStatus (language pairs are flexible native→target ISO codes, no enum)
+│   ├── enums.ts          # String union equivalents of Prisma enums — includes language-learning enums: CefrLevel, SkillType, ClassStatus, SectionStatus, SpeakingGradeStatus, EdgeType, PracticeKind, PracticeStatus, ExamInstitution, MockExamStatus, PedagogyStyle (language pairs are flexible native→target ISO codes, no enum)
 │   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData (includes contentDomain: string | null), VerificationLayerResult
 │   ├── class-document.ts # ClassDocument, ClassDocumentSection, ClassDocumentQuestion, ClassDocumentPrompt — render contract for web worksheet page and mobile PencilKit ClassWorksheet
-│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, InspireSection, NewsTimeRange, INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS
+│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, VerificationMode, TasteQuestion, TasteAnswer
 │   ├── player.ts         # PlayerState, PlayerControls
 │   ├── interaction.ts    # InteractionRequest, InteractionResponse
 │   ├── notification.ts   # NotificationData, PushSubscriptionData
 │   ├── version.ts        # PodcastVersionSummary, PodcastVersionDetail
 │   ├── analytics.ts      # AnalyticsResponse, AnalyticsSummary
-│   ├── api-key.ts        # ApiKeyData, ApiKeyCreated
-│   ├── import.ts         # ImportPodcastRequest, ImportProgress
-│   ├── events.ts         # EventPayload (17 private workspace event types), EventContext
-│   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
-├── brand.ts              # BRAND constant — single source of truth for product tagline, descriptions, and pitch copy
+│   └── api-key.ts        # ApiKeyData, ApiKeyCreated
+├── brand.ts              # BRAND constant — single source of truth for product tagline and descriptions
 ├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
 ├── provider-display.ts   # AI_PROVIDER_DISPLAY, TTS_PROVIDER_DISPLAY, AI_MODEL_DISPLAY, LANGUAGE_DISPLAY maps + label helpers
 ├── generation-messages.ts # STAGE_MESSAGES pools + resolveMessage() — rotating sub-messages for pipeline generation stages

@@ -40,24 +40,24 @@ vi.mock('@/lib/handles', () => ({
   isValidHandleFormat: (...args: unknown[]) => mockIsValidHandleFormat(...args),
 }));
 
-import { GET, POST, DELETE } from '@/app/api/admin/handles/route';
+import { GET, POST, DELETE } from '@/app/api/v1/admin/handles/route';
 
 function createRequest(body?: Record<string, unknown>): NextRequest {
   if (body) {
-    return new NextRequest(new URL('http://localhost:3000/api/admin/handles'), {
+    return new NextRequest(new URL('http://localhost:3000/api/v1/admin/handles'), {
       method: 'POST',
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  return new NextRequest(new URL('http://localhost:3000/api/admin/handles'));
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/handles'));
 }
 
 function mockAdmin() {
   mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 }
 
-describe('GET /api/admin/handles', () => {
+describe('GET /api/v1/admin/handles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -98,7 +98,7 @@ describe('GET /api/admin/handles', () => {
   });
 });
 
-describe('POST /api/admin/handles', () => {
+describe('POST /api/v1/admin/handles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -166,7 +166,7 @@ describe('POST /api/admin/handles', () => {
   });
 });
 
-describe('DELETE /api/admin/handles', () => {
+describe('DELETE /api/v1/admin/handles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

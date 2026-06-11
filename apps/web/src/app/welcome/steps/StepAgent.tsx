@@ -21,8 +21,9 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
     if (!p) return;
     setAgent(() => ({
       provider: id,
-      method: p.cli ? 'cli' : 'url',
+      method: p.cli ? 'cli' : p.kind === 'key' ? 'key' : 'url',
       value: '',
+      model: '',
       status: 'idle',
     }));
   }
@@ -142,6 +143,22 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
                   {agent.status === 'connected' ? 'Connected' : 'Verify'}
                 </button>
               </div>
+
+              {agent.method === 'url' && (
+                <>
+                  <div className={c.fieldLabel}>Model</div>
+                  <div className={c.field}>
+                    <input
+                      className={c.fieldInput}
+                      type="text"
+                      placeholder="qwen3 · llama3.3 · gemma3"
+                      value={agent.model}
+                      onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
+                      aria-label="Local model name"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 

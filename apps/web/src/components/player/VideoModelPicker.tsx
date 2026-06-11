@@ -10,7 +10,6 @@ interface VideoModelPickerProps {
   onGenerate: (override?: { aiModel: string }) => void;
   onCancel: () => void;
   loading: boolean;
-  activeVoiceTrackName?: string;
 }
 
 const AUTO_OPTION: ModelOption = {
@@ -19,23 +18,21 @@ const AUTO_OPTION: ModelOption = {
   hint: 'Sotto picks the best model',
 };
 
-export function VideoModelPicker({ onGenerate, onCancel, loading, activeVoiceTrackName }: VideoModelPickerProps) {
+export function VideoModelPicker({ onGenerate, onCancel, loading }: VideoModelPickerProps) {
   const [models, setModels] = useState<ModelOption[]>([AUTO_OPTION]);
   const [selected, setSelected] = useState<string | undefined>('__auto__');
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/ai-models')
+    fetch('/api/v1/ai-models')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data?.models) return;
-        const mapped: ModelOption[] = data.models.map((m: { id: string; displayName: string; group?: string; hint?: string; requiredPlan?: string }) => ({
+        const mapped: ModelOption[] = data.models.map((m: { id: string; displayName: string; group?: string; hint?: string }) => ({
           id: m.id,
           displayName: m.displayName,
           group: m.group,
           hint: m.hint,
-          badge: m.requiredPlan === 'PRO' && data.userPlan === 'FREE' ? 'Pro' : undefined,
-          unavailable: m.requiredPlan === 'PRO' && data.userPlan === 'FREE' && !data.isByok,
         }));
         setModels([AUTO_OPTION, ...mapped]);
       })
@@ -55,11 +52,6 @@ export function VideoModelPicker({ onGenerate, onCancel, loading, activeVoiceTra
 
   return (
     <div className={styles.root}>
-      {activeVoiceTrackName && (
-        <p className={styles.trackNote}>
-          Generating video for: <strong>{activeVoiceTrackName}</strong>
-        </p>
-      )}
       <ModelDropdown
         label="AI Model"
         options={models}

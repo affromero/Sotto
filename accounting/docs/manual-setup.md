@@ -9,7 +9,7 @@ All items verified and applied to the ledger.
 - [x] **Opening balance** — $70.00 (total spent to date = domain only)
 - [x] **Domain** — project domain $70/yr from Namecheap, amortized at $5.83/mo
 - [x] **Hetzner** — Not yet provisioned, no transactions recorded
-- [x] **Anthropic / ElevenLabs / Stripe / other platforms** — No accounts opened yet
+- [x] **Anthropic / ElevenLabs / other platforms** — No accounts opened yet
 - [x] **Payment tracking** — Simple model (single cash pool)
 - [x] **Validation** — `bean-check` passes clean
 

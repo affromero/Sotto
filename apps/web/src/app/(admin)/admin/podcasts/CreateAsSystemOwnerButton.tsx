@@ -27,7 +27,7 @@ export function CreateAsSystemOwnerButton() {
   const handleTemplate = useCallback(async (template: MarketingTemplate) => {
     setLoading(template.id);
     try {
-      const res = await fetch('/api/admin/podcasts/create-as-system-owner', {
+      const res = await fetch('/api/v1/admin/podcasts/create-as-system-owner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

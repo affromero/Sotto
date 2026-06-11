@@ -6,29 +6,10 @@
 ;   2. Replace DESCRIPTION with the revenue source
 ;   3. Replace REVENUE_ACCOUNT with the appropriate account
 ;   4. Replace AMOUNT with the dollar amount
-;   5. Add Stripe fee line if applicable
 ;
 ; Revenue accounts:
-;   Income:Subscriptions:Pro          (Pro tier: $14/mo)
-;   Income:Subscriptions:Creator      (Creator tier: $29/mo)
-;   Income:APIKeys                    (Developer API access)
 ;   Income:Other                      (Tips, sponsorships, etc.)
 ;
-; Typical subscription with Stripe fees (2.9% + $0.30):
-;
-; DATE * "Stripe" "DESCRIPTION"
-;   Assets:Current:Cash:Stripe  NET_AMOUNT USD
-;   Expenses:PaymentProcessing:StripeFees  FEE_AMOUNT USD
-;   REVENUE_ACCOUNT  -GROSS_AMOUNT USD
-
-; Example — Pro subscription:
-; 2026-02-15 * "Stripe" "Pro subscription — user@example.com"
-;   Assets:Current:Cash:Stripe  13.29 USD
-;   Expenses:PaymentProcessing:StripeFees  0.71 USD
-;   Income:Subscriptions:Pro  -14.00 USD
-
-; Example — Creator subscription:
-; 2026-02-15 * "Stripe" "Creator subscription — creator@example.com"
-;   Assets:Current:Cash:Stripe  27.86 USD
-;   Expenses:PaymentProcessing:StripeFees  1.14 USD
-;   Income:Subscriptions:Creator  -29.00 USD
+; DATE * "PAYEE" "DESCRIPTION"
+;   Assets:Current:Cash:Bank  AMOUNT USD
+;   REVENUE_ACCOUNT  -AMOUNT USD

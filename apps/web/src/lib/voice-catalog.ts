@@ -18,6 +18,7 @@ import {
   INWORLD_VOICE_POOL,
   MINIMAX_VOICE_POOL,
   MISTRAL_VOICE_POOL,
+  KOKORO_VOICE_POOL,
   type ProviderVoice,
 } from './providers/tts-voices';
 import { cache } from './redis';
@@ -248,6 +249,9 @@ export async function getVoiceCatalog(
 
     case 'mistral':
       return providerVoiceToCatalog(MISTRAL_VOICE_POOL);
+
+    case 'kokoro':
+      return providerVoiceToCatalog(KOKORO_VOICE_POOL);
 
     default:
       return voicePoolToCatalog(VOICE_POOL, 'elevenlabs');

@@ -21,12 +21,12 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey, hasByokKey } from '@/lib/byok';
+import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { buildRenumberMap, cleanAndRenumberCitations } from '@/lib/script-updater';
@@ -48,12 +48,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   logger.info('Starting script verification', { podcastId });
   await job.updateProgress(5);
 
-  const [hasTts, userPlan] = await Promise.all([
-    useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
-  ]);
-
-  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts, userPlan.role);
+  const genFeatures = getGenerationFeatures();
 
   const [script, discovery, references, podcastRecord] = await Promise.all([
     prisma.script.findUniqueOrThrow({
@@ -98,7 +93,6 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcastRecord.aiModel,
     aiKey,
-    plan: userPlan.plan as 'FREE' | 'PRO',
   });
 
   const verificationModel = model;
@@ -112,8 +106,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   }
 
   const requestedDuration = discovery.durationTarget || 10;
-  const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
-    ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
+  const maxDurationMinutes = isFinite(genFeatures.maxDurationMinutes)
+    ? Math.min(requestedDuration, genFeatures.maxDurationMinutes)
     : requestedDuration;
 
   const generatedRefs: GeneratedReference[] = references.map((r) => ({
@@ -324,7 +318,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       });
 
       // Free users auto-approve (no script review pause)
-      const shouldAutoApprove = tierFeatures.autoApproveScript ||
+      const shouldAutoApprove = genFeatures.autoApproveScript ||
         (podcast.source !== 'WEB' && podcast.source !== 'IMPORT');
 
       if (!shouldAutoApprove) {
@@ -346,13 +340,16 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
         logger.info('Script verified (no refs), paused at SCRIPT_READY for review', { podcastId });
       } else {
-        // Auto-approve for TWITTER/API sources (no user at browser)
-        // Select TTS provider at auto-approve time (deferred from pipeline start)
-        if (!hasTts) {
-          const selected = await selectFreeTierProviders(userId);
+        // Auto-approve for non-WEB/IMPORT sources (no user at browser).
+        const svExistingPodcast = await prisma.podcast.findUniqueOrThrow({
+          where: { id: podcastId },
+          select: { ttsProvider: true },
+        });
+        if (!svExistingPodcast.ttsProvider) {
+          const selected = await getAutoModelConfig();
           await prisma.podcast.update({
             where: { id: podcastId },
-            data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+            data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
           });
         }
 

@@ -5,8 +5,7 @@ export type SetupCapabilityId =
   | 'generation'
   | 'tts'
   | 'agent-ingestion'
-  | 'stt'
-  | 'private-rss';
+  | 'stt';
 
 export type SetupCapabilityStatus = 'ready' | 'action_required' | 'optional';
 
@@ -41,7 +40,6 @@ interface BuildSetupReadinessInput {
   aiProviders: ProviderStatus[];
   ttsProviders: ProviderStatus[];
   sttProviders: ProviderStatus[];
-  privateFeedTokenCount: number;
   selectedAiProvider?: string | null;
   selectedTtsProvider?: string | null;
   selectedSttProvider?: string | null;
@@ -154,7 +152,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     {
       id: 'database',
       label: 'Database',
-      description: 'Stores your private library, settings, sources, and RSS tokens.',
+      description: 'Stores your private library, settings, and sources.',
       status: input.hasDatabase ? 'ready' : 'action_required',
       detail: input.hasDatabase ? 'Connected' : 'Database connection is not available.',
     },
@@ -169,7 +167,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     {
       id: 'storage',
       label: 'Storage',
-      description: 'Keeps generated audio available for app playback and private RSS.',
+      description: 'Keeps generated audio available for app playback.',
       status: storageReady ? 'ready' : 'action_required',
       actionLabel: 'Open setup guide',
       actionHref: '/settings',
@@ -219,7 +217,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     {
       id: 'stt',
       label: 'Speech-to-text',
-      description: 'Optional transcription for raw meeting audio and imports without transcripts.',
+      description: 'Optional transcription for speaking-practice scoring and audio imports without transcripts.',
       status: sttReady ? 'ready' : selectedSttProvider ? 'action_required' : 'optional',
       actionLabel: 'Add optional transcription provider',
       actionHref: '/settings',
@@ -229,20 +227,8 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
           ? sttProviderKnown
             ? `Add the ${selectedSttProvider} STT key.`
             : `Unknown STT provider: ${selectedSttProvider}`
-          : 'Transcript ingestion works without STT. Add STT only for raw meeting audio.',
+          : 'Transcript ingestion works without STT. Add STT only for speaking-practice scoring or raw audio imports.',
       required: false,
-    },
-    {
-      id: 'private-rss',
-      label: 'Private RSS',
-      description: 'Lets you subscribe from any podcast app with a revocable private URL.',
-      status: input.privateFeedTokenCount > 0 ? 'ready' : 'action_required',
-      actionLabel: 'Create RSS token',
-      actionHref: '/settings',
-      detail:
-        input.privateFeedTokenCount > 0
-          ? `${input.privateFeedTokenCount} private feed URL${input.privateFeedTokenCount === 1 ? '' : 's'}`
-          : 'Create a private RSS token.',
     },
   ];
 

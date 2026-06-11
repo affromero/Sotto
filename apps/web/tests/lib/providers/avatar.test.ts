@@ -10,10 +10,8 @@ vi.mock('@/lib/byok', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: vi.fn().mockResolvedValue({
-    freeAvatarProvider: 'heygen',
-    proAvatarProvider: 'heygen',
-    freeAvatarModel: 'heygen-avatar-v2',
-    proAvatarModel: 'heygen-avatar-v2',
+    avatarProvider: 'heygen',
+    avatarModel: 'heygen-avatar-standard',
   }),
 }));
 
@@ -124,13 +122,11 @@ describe('resolveAvatarProvider', () => {
     process.env.RUNWAY_API_KEY = 'runway-platform';
     process.env.HEYGEN_API_KEY = 'heygen-key';
     vi.mocked(getAutoModelConfig).mockResolvedValue({
-      freeAvatarProvider: 'heygen',
-      proAvatarProvider: 'runway',
-      freeAvatarModel: 'heygen-avatar-v2',
-      proAvatarModel: 'runway-characters',
+      avatarProvider: 'runway',
+      avatarModel: 'runway-characters',
     } as never);
 
-    const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'PRO' });
+    const result = await resolveAvatarProvider({ userId: 'user-1' });
 
     // Runway is disabled, falls back to HeyGen
     expect(result.providerId).toBe('heygen');
@@ -141,13 +137,11 @@ describe('resolveAvatarProvider', () => {
     vi.mocked(getByokKey).mockResolvedValue(null);
     process.env.FAL_KEY = 'fal-platform';
     vi.mocked(getAutoModelConfig).mockResolvedValue({
-      freeAvatarProvider: 'fal',
-      proAvatarProvider: 'fal',
-      freeAvatarModel: 'fal-veed-fabric-1.0',
-      proAvatarModel: 'fal-veed-fabric-1.0',
+      avatarProvider: 'fal',
+      avatarModel: 'fal-veed-fabric-1.0',
     } as never);
 
-    const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'PRO' });
+    const result = await resolveAvatarProvider({ userId: 'user-1' });
 
     expect(result.providerId).toBe('fal');
     expect(result.apiKey).toBe('fal-platform');
@@ -157,13 +151,11 @@ describe('resolveAvatarProvider', () => {
     vi.mocked(getByokKey).mockResolvedValue(null);
     process.env.HEYGEN_API_KEY = 'heygen-key';
     vi.mocked(getAutoModelConfig).mockResolvedValue({
-      freeAvatarProvider: 'heygen',
-      proAvatarProvider: 'runway',
-      freeAvatarModel: 'heygen-avatar-v2',
-      proAvatarModel: 'runway-characters',
+      avatarProvider: 'runway',
+      avatarModel: 'runway-characters',
     } as never);
 
-    const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'PRO' });
+    const result = await resolveAvatarProvider({ userId: 'user-1' });
 
     expect(result.providerId).toBe('heygen');
   });
@@ -176,13 +168,11 @@ describe('resolveAvatarProvider', () => {
   it('Fal provider listAvatars returns empty array', async () => {
     process.env.FAL_KEY = 'fal-key';
     vi.mocked(getAutoModelConfig).mockResolvedValue({
-      freeAvatarProvider: 'fal',
-      proAvatarProvider: 'fal',
-      freeAvatarModel: 'fal-veed-fabric-1.0',
-      proAvatarModel: 'fal-veed-fabric-1.0',
+      avatarProvider: 'fal',
+      avatarModel: 'fal-veed-fabric-1.0',
     } as never);
 
-    const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'FREE' });
+    const result = await resolveAvatarProvider({ userId: 'user-1' });
     const avatars = await result.provider.listAvatars();
 
     expect(avatars).toEqual([]);
@@ -191,13 +181,11 @@ describe('resolveAvatarProvider', () => {
   it('Fal provider generateAvatar throws', async () => {
     process.env.FAL_KEY = 'fal-key';
     vi.mocked(getAutoModelConfig).mockResolvedValue({
-      freeAvatarProvider: 'fal',
-      proAvatarProvider: 'fal',
-      freeAvatarModel: 'fal-veed-fabric-1.0',
-      proAvatarModel: 'fal-veed-fabric-1.0',
+      avatarProvider: 'fal',
+      avatarModel: 'fal-veed-fabric-1.0',
     } as never);
 
-    const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'FREE' });
+    const result = await resolveAvatarProvider({ userId: 'user-1' });
 
     await expect(result.provider.generateAvatar({
       avatarId: 'test',

@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPodcastFindMany = vi.fn();
-const mockCollectionFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: {
       findMany: (...args: unknown[]) => mockPodcastFindMany(...args),
-    },
-    collection: {
-      findMany: (...args: unknown[]) => mockCollectionFindMany(...args),
     },
   },
 }));
@@ -34,9 +30,6 @@ describe('sitemap', () => {
         user: { handle: null },
       },
     ]);
-    mockCollectionFindMany.mockResolvedValue([
-      { id: 'collection-1', updatedAt: new Date('2026-05-15T12:00:00Z') },
-    ]);
   });
 
   afterEach(() => {
@@ -50,7 +43,6 @@ describe('sitemap', () => {
     expect(urls).toContain('https://selfhost.example.com');
     expect(urls).toContain('https://selfhost.example.com/@alice/daily-brief');
     expect(urls).toContain('https://selfhost.example.com/podcast/pod-2');
-    expect(urls).toContain('https://selfhost.example.com/collections/collection-1');
     expect(urls.some((url) => url.startsWith('https://sotto.fm'))).toBe(false);
   });
 });

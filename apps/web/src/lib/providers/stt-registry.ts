@@ -2,9 +2,13 @@
  * Declarative STT provider registry — models and metadata for every
  * supported speech-to-text provider.
  */
-import type { SttProviderId } from '@sotto/shared';
-
-export type { SttProviderId };
+export type SttProviderId =
+  | 'openai'
+  | 'elevenlabs'
+  | 'together'
+  | 'deepgram'
+  | 'assemblyai'
+  | 'local';
 
 export interface SttModelOption {
   id: string;
@@ -74,6 +78,20 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
       { id: 'universal-3-pro', displayName: 'Universal-3 Pro', tier: 'max' },
     ],
     platformCostPerMinute: 0.0025,
+  },
+
+  // Local OpenAI-compatible Whisper server (faster-whisper-server / Speaches /
+  // whisper.cpp server). Keyless and free; the served model is host-defined via
+  // STT_MODEL (default whisper-1; recommend Whisper large-v3-turbo for broad
+  // multilingual coverage). Endpoint via STT_BASE_URL.
+  local: {
+    id: 'local',
+    displayName: 'Local Whisper',
+    defaultModel: 'whisper-1',
+    models: [
+      { id: 'whisper-1', displayName: 'Local Whisper (OpenAI-compatible)', tier: 'balanced' },
+    ],
+    platformCostPerMinute: 0,
   },
 };
 

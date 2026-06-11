@@ -7,7 +7,7 @@
  * `new`, a `why` tooltip), a ScoreDial, and feedback.
  *
  * Generalized like SpeakingExercise: it takes an `endpointBase`
- * (`/api/classes/{classId}/writing` for class, `/api/practice/{sessionId}/writing`
+ * (`/api/v1/classes/{classId}/writing` for class, `/api/v1/practice/{sessionId}/writing`
  * for practice) and appends the prompt id.
  *
  * Adaptation to our data: the design matched a fixed set of seeded errors in
@@ -25,7 +25,7 @@ import styles from './WritingSection.module.css';
 
 interface WritingSectionProps {
   /** Endpoint prefix; the prompt id is appended, e.g.
-   *  `/api/classes/{classId}/writing` or `/api/practice/{sessionId}/writing`. */
+   *  `/api/v1/classes/{classId}/writing` or `/api/v1/practice/{sessionId}/writing`. */
   endpointBase: string;
   prompts: WritingPromptData[];
   /** Reports the running average 0..100 score upward (class gate / rail). */

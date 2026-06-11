@@ -58,7 +58,7 @@ if ! xcrun simctl get_app_container booted fm.sotto.app &>/dev/null; then
   echo "  npm run mobile:ios:build"
   echo "  # or: npx expo run:ios --device"
   echo ""
-  echo "Make sure EXPO_PUBLIC_API_URL points to http://localhost:3000/api"
+  echo "Make sure EXPO_PUBLIC_API_URL points to http://localhost:3000/api/v1"
   exit 1
 fi
 

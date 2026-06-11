@@ -14,7 +14,7 @@ Sotto is open-source, self-hostable language-learning infrastructure. Learners w
 6. Non-technical learners can use managed Sotto-hosted infrastructure when the product offers it.
 7. There is no social layer: no public feed, follows, likes, comments, leaderboards, or community ranking.
 
-Hosted billing, if present, must charge for infrastructure and convenience: workers, storage, scheduled lesson generation, agent hosting, provider routing, monitoring, and updates. Do not position generic AI-generated content as the core value — learner progress and ownership of the learning stack are the differentiators.
+Sotto is fully free and self-hosted: there is no billing, no payment path, and no plans, tiers, quotas, or daily limits — every learner gets full access on infrastructure they control. Do not reintroduce billing, plans, free/pro tiers, generation quotas, or position generic AI-generated content as the core value — learner progress and ownership of the learning stack are the differentiators.
 
 ## Tech Stack
 
@@ -74,9 +74,9 @@ npm run ci                     # lint + type-check + test + build
 
 ## Design System
 
-Primary: `#D97706` (Golden Amber). Accent: `#1E3A5F` (Deep Navy). Background: `#FEFCF8` (Soft Cream). Surface: `#FFFFFF`. Text: `#1A1A1A` / `#6B7280`.
+SottoDesign "aula": Primary `#3F4FB0` (aula blue). Accent `#2A3550` (ink slate). Background `#F5F4F0` (paper). Surface `#FFFFFF`. Text `#1E2128` (ink) / `#565B68`. Dark mode uses the "terminal" palette (`#121310` paper, `#E9E3D3` ink, `#6A9BFF` primary). The wordmark name carries a blue to pink gradient (`#6AA0FF` to `#FF8FB1`), and the glass-bead mark uses the same.
 
-Fonts: DM Serif Display for headings, Inter for body text.
+Fonts: Newsreader (serif) for headings and voice, IBM Plex Sans for body and UI, IBM Plex Mono for labels. Tokens live in `apps/web/src/styles/globals.css` and mirror to `packages/shared/src/theme.ts`.
 
 ## Generation Pipeline
 
@@ -165,7 +165,7 @@ Run `npm run ci` before every commit. No exceptions.
 
 Local OSS development uses `.env.oss.example` copied to `.env.local`. Root npm scripts source `.env.local` through `scripts/run-with-env.sh`; set `SOTTO_ENV_FILE` to point them at a different env file.
 
-Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
+Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`.
 
 Provider variables are optional until the selected workflow needs them. Common examples: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`.
 
@@ -174,6 +174,7 @@ Provider variables are optional until the selected workflow needs them. Common e
 - Alpine + Chromium: pin Alpine version to match the Chromium version available in its repos. Alpine 3.22+ works with Chromium 136+.
 - Docker service names: workers reach sidecars via Docker service names such as `http://remotion:3100`; use `localhost` only for local dev outside Docker.
 - Prisma in Docker: always run `npx prisma generate` inside the Docker build because the generated client is platform-specific.
+- Compose files stay at the repo root: the `docker-compose*.yml` files resolve `build.context: .`, `env_file: .env`, and `${VAR}` substitution from the project directory (their own location). Moving them to a subfolder breaks every invocation in `scripts/install.sh`, `scripts/deploy.sh`, `.github/workflows/logs.yml`, and the docs unless each adds `--project-directory`/`--env-file`, and `docker-compose.selfhost.yml` is downloaded standalone by the installer and must keep flat paths. None of this is CI-verifiable, so a wrong path silently breaks deploy or self-host install. Keep them at root.
 - Monorepo paths: avoid `__dirname`-relative paths across package boundaries. Use `process.cwd()` for cross-package references.
 - DB enum values are uppercase, for example `AI_ILLUSTRATION`, `STOCK_FOOTAGE`, and `TEXT_CARD`.
 

@@ -4,18 +4,18 @@
  */
 
 const PALETTES = [
-  { from: '#D97706', to: '#B45309' },   // golden amber → deep amber
-  { from: '#1E3A5F', to: '#0F4C75' },   // deep navy → ocean blue
-  { from: '#D97706', to: '#1E3A5F' },   // amber → navy (brand pair)
-  { from: '#92400E', to: '#D97706' },   // brown → amber
-  { from: '#1E3A5F', to: '#065F46' },   // navy → dark emerald
-  { from: '#D97706', to: '#065F46' },   // amber → dark emerald
-  { from: '#0F4C75', to: '#1E3A5F' },   // ocean blue → navy
-  { from: '#B45309', to: '#78350F' },   // deep amber → espresso
-  { from: '#065F46', to: '#0F4C75' },   // dark emerald → ocean
-  { from: '#1E3A5F', to: '#92400E' },   // navy → brown
-  { from: '#78350F', to: '#D97706' },   // espresso → amber
-  { from: '#0F4C75', to: '#D97706' },   // ocean blue → amber
+  { from: '#3F4FB0', to: '#34419A' },   // aula indigo → deep indigo
+  { from: '#2A3550', to: '#1E2A47' },   // aula slate → deep slate
+  { from: '#3F4FB0', to: '#2A3550' },   // indigo → slate (brand pair)
+  { from: '#2A3580', to: '#3F4FB0' },   // ink indigo → indigo
+  { from: '#2A3550', to: '#1F4A5C' },   // slate → deep teal
+  { from: '#3F4FB0', to: '#1F4A5C' },   // indigo → deep teal
+  { from: '#1E2A47', to: '#2A3550' },   // deep slate → slate
+  { from: '#34419A', to: '#262E6E' },   // deep indigo → midnight indigo
+  { from: '#1F4A5C', to: '#1E2A47' },   // deep teal → deep slate
+  { from: '#2A3550', to: '#2A3580' },   // slate → ink indigo
+  { from: '#262E6E', to: '#3F4FB0' },   // midnight indigo → indigo
+  { from: '#1E2A47', to: '#3F4FB0' },   // deep slate → indigo
 ] as const;
 
 function hashString(str: string): number {

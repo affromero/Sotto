@@ -147,7 +147,7 @@
 
 @keyframes bgPulse {
   0%, 100% { background: var(--color-primary-subtle); }
-  50% { background: rgba(217, 119, 6, 0.12); }
+  50% { background: rgba(63, 79, 176, 0.12); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
 
 > **Date**: 2026-02-08
 >
-> **Summary**: Comprehensive logo design brief for Sotto, an interactive AI podcast platform. This document is self-contained — no codebase access required. It provides brand context, creative directions, AI generation prompts, technical specifications, and usage guidelines. Suitable for human designers and AI generation tools (Midjourney, DALL-E, Ideogram, etc.).
+> **Summary**: Comprehensive logo design brief for Sotto, an open-source self-hostable language-learning platform. This document is self-contained — no codebase access required. It provides brand context, creative directions, AI generation prompts, technical specifications, and usage guidelines. Suitable for human designers and AI generation tools (Midjourney, DALL-E, Ideogram, etc.).
 
 ---
 
@@ -10,9 +10,9 @@
 
 ### 1.1 What is Sotto?
 
-Sotto is an AI-powered podcast platform where users describe a topic through natural conversation, and the platform generates a personalized two-voice podcast they can listen to anywhere. The core innovation: listeners can **interrupt mid-playback** to ask questions, get contextual answers, and optionally update the podcast with those clarifications for all future listeners.
+Sotto is an open-source, self-hostable language-learning platform. Learners work through mastery-gated CEFR courses across grammar, reading, adaptive listening, speaking, and writing - running the whole stack on their own infrastructure with their own AI/TTS/STT keys. The adaptive listening lessons are AI-generated audio a learner can **pause mid-playback** to ask contextual questions and get spoken clarifications.
 
-Think of it as "where podcasts get social."
+Think of it as the language tutor that already knows you - private, on infrastructure you control.
 
 ### 1.2 Name Etymology
 
@@ -20,9 +20,9 @@ Think of it as "where podcasts get social."
 
 This etymology carries three layers of meaning for the brand:
 
-1. **Intimacy**: The product creates a private, personalized listening experience — like having two knowledgeable friends explain something quietly, just for you
-2. **Voice as medium**: The entire product is built around the human voice — AI-generated but emotionally expressive, conversational, warm
-3. **Subtlety over spectacle**: Sotto is not loud, flashy, or attention-seeking. It fits into the quiet moments of life — commutes, walks, cooking — without demanding visual attention
+1. **Intimacy**: The product creates a private, personalized learning experience - like having a patient tutor adjust to your level and context
+2. **Voice as medium**: Listening and speaking practice are built around the human voice - AI-generated where appropriate, but expressive, conversational, and warm
+3. **Subtlety over spectacle**: Sotto is not loud, flashy, or attention-seeking. It fits into quiet study moments without demanding constant visual attention
 
 ### 1.3 Brand Personality
 
@@ -34,26 +34,29 @@ If Sotto were a person, they would be:
 | **Intelligent** | Knowledgeable without being pretentious, explains clearly      | Academic, jargon-heavy, condescending |
 | **Calm**        | Composed, unhurried, confident — no urgency or anxiety         | Energetic, loud, excitable, flashy    |
 | **Trustworthy** | Reliable, consistent, grounded — you believe what it tells you | Trendy, gimmicky, hype-driven         |
-| **Intimate**    | Personal, focused, attentive — like a 1-on-1 conversation      | Broadcast-y, mass-market, impersonal  |
+| **Intimate**    | Personal, focused, attentive - like a 1-on-1 tutoring session  | Broadcast-y, mass-market, impersonal  |
 
-**Brand voice in one sentence**: A thoughtful friend who happens to know a lot about everything and explains things at exactly the right level for you.
+**Brand voice in one sentence**: A thoughtful tutor who knows your context and explains at exactly the right level for you.
 
 ### 1.4 Color Context
 
 The logo must work with Sotto's existing color system:
 
-| Color            | Hex       | Role                                                   |
-| ---------------- | --------- | ------------------------------------------------------ |
-| **Golden Amber** | `#D97706` | Primary brand color — warmth, action, the "Host" voice |
-| **Deep Navy**    | `#1E3A5F` | Secondary — depth, authority, the "Expert" voice       |
-| **Soft Cream**   | `#FEFCF8` | Background — warmth, comfort                           |
-| **Near-Black**   | `#1A1A1A` | Text — grounding, readability                          |
+| Color              | Hex       | Role                                      |
+| ------------------ | --------- | ----------------------------------------- |
+| **Aula Blue**      | `#3F4FB0` | Primary brand color - learning and focus  |
+| **Ink Slate**      | `#2A3550` | Accent - authority and readability        |
+| **Paper**          | `#F5F4F0` | Background - calm study surface           |
+| **Surface**        | `#FFFFFF` | Cards, panels, and high-contrast variants |
+| **Ink**            | `#1E2128` | Text - grounding and readability          |
+| **Gradient Blue**  | `#6AA0FF` | Wordmark/accent gradient start            |
+| **Gradient Pink**  | `#FF8FB1` | Wordmark/accent gradient end              |
 
-The amber-and-navy pairing is central to the brand. The logo should feel at home alongside these colors but also work independently in monochrome.
+The aula blue, ink slate, and paper palette is central to the current brand. The logo should feel at home alongside these colors, support the blue-to-pink wordmark accent where appropriate, and also work independently in monochrome.
 
 ### 1.5 Typography Context
 
-Sotto uses **DM Serif Display** for headings and **Inter** for body text. The logo wordmark (if applicable) does not need to use these fonts but should harmonize with them. DM Serif Display has an editorial, literary quality — the logo should not clash with this by being overly geometric, techy, or playful.
+Sotto uses **Newsreader** for headings and voice, **IBM Plex Sans** for body/UI, and **IBM Plex Mono** for labels. The logo wordmark (if applicable) does not need to use these fonts but should harmonize with them. Newsreader has an editorial, literary quality, while IBM Plex Sans keeps the UI practical; the logo should not clash by being overly geometric, techy, or playful.
 
 ---
 
@@ -63,14 +66,14 @@ Four distinct creative directions follow. Each is viable. A designer may pursue 
 
 ### Direction A: "The Quiet Waveform"
 
-**Concept**: An abstract audio waveform rendered in a minimal, organic style — soft curves rather than sharp digital peaks. The waveform subtly suggests two voices (two overlapping wave patterns or two distinct amplitude levels) and is contained within or adjacent to the wordmark "Sotto."
+**Concept**: An abstract listening waveform rendered in a minimal, organic style - soft curves rather than sharp digital peaks. The waveform subtly suggests adaptive input and spoken practice, and is contained within or adjacent to the wordmark "Sotto."
 
-**Visual description**: Imagine a sound wave where the peaks are smooth and rolling like hills rather than jagged like a traditional equalizer. Two wave patterns interweave — one in amber, one in navy — creating a sense of dialogue. The overall silhouette is horizontal and calm, not spiky or aggressive.
+**Visual description**: Imagine a sound wave where the peaks are smooth and rolling like hills rather than jagged like a traditional equalizer. Two wave patterns interweave - one in aula blue, one in gradient pink or ink slate - creating a sense of guided call-and-response. The overall silhouette is horizontal and calm, not spiky or aggressive.
 
 **Why it works**:
 
-- Immediately communicates "audio" without being a generic podcast icon
-- The dual waves encode the product's core concept (two voices in conversation)
+- Immediately communicates listening and speaking practice without being a generic media icon
+- The dual waves encode guided exchange between learner and tutor
 - The softness aligns with "sotto voce" — quiet, intimate, gentle
 - Scalable from favicon to billboard
 
@@ -82,33 +85,33 @@ Four distinct creative directions follow. Each is viable. A designer may pursue 
 
 ### Direction B: "The Listening Ear"
 
-**Concept**: A stylized ear combined with a speech bubble or sound wave element, representing the product's unique quality — interactive podcasts you can interrupt and question. The ear is rendered in a warm, organic line style (not medical or anatomical).
+**Concept**: A stylized ear combined with a speech bubble or sound wave element, representing the product's listening and speaking loop. The ear is rendered in a warm, organic line style (not medical or anatomical).
 
 **Visual description**: A single continuous line drawing of a human ear, where the inner spiral transitions into a small speech bubble or sound wave. The line is warm and slightly imperfect (not ruler-straight), suggesting human touch. The overall feel is editorial illustration, not technical diagram.
 
 **Why it works**:
 
-- Encodes the product's interactive nature directly into the mark
-- An ear is distinctive in the podcast/audio space — most competitors use microphones, headphones, or play buttons
+- Encodes listening practice and spoken feedback directly into the mark
+- An ear is distinctive in language learning without resorting to flags, owls, microphones, headphones, or play buttons
 - The continuous-line style aligns with the brand's warmth and intimacy
 - Memorable and recognizable at small sizes
 
 **Variations to explore**:
 
 - Ear outline that also reads as the letter "S" for Sotto
-- Ear with a subtle question mark integrated into the inner spiral (representing the Q&A feature)
-- Pair of ears facing each other (representing dialogue)
+- Ear with a subtle question mark integrated into the inner spiral (representing contextual clarifications)
+- Pair of ears or speech marks facing each other (representing tutor/learner dialogue)
 
 ### Direction C: "The Intimate Conversation"
 
-**Concept**: Two abstract forms in close proximity — representing the Host and Expert voices — rendered as overlapping circles, speech bubbles, or quotation marks. The forms are warm and organic, suggesting closeness without touching.
+**Concept**: Two abstract forms in close proximity - representing learner and tutor, or native and target language - rendered as overlapping circles, speech bubbles, or quotation marks. The forms are warm and organic, suggesting closeness without touching.
 
-**Visual description**: Two rounded shapes (could be circles, soft rectangles, or speech bubble forms), one in amber and one in navy, overlapping slightly or positioned very close together. The overlap zone is a blend of both colors. The overall composition suggests two entities in intimate dialogue.
+**Visual description**: Two rounded shapes (could be circles, soft rectangles, or speech bubble forms), one in aula blue and one in soft pink or ink slate, overlapping slightly or positioned very close together. The overlap zone is a blend of both colors. The overall composition suggests guided practice and private study.
 
 **Why it works**:
 
-- Directly represents the product's core mechanic (two voices having a conversation)
-- The amber/navy pairing is immediately brand-ownable
+- Directly represents the product's core mechanic: guided practice in context
+- The aula blue/gradient accent pairing is immediately brand-ownable
 - Abstract enough to scale across contexts without literal interpretation
 - The "closeness" of the forms conveys intimacy
 
@@ -120,16 +123,16 @@ Four distinct creative directions follow. Each is viable. A designer may pursue 
 
 ### Direction D: "The Sotto Ligature"
 
-**Concept**: A custom typographic wordmark where the double "t" in "Sotto" becomes a distinctive ligature or visual element. The two t's could interlock, share a crossbar, or transform into an abstract symbol (like a tuning fork, sound wave, or two microphones).
+**Concept**: A custom typographic wordmark where the double "t" in "Sotto" becomes a distinctive ligature or visual element. The two t's could interlock, share a crossbar, or transform into an abstract symbol like a tuning fork, sound wave, or paired study marks.
 
-**Visual description**: The word "Sotto" in a warm serif or semi-serif typeface where the "tt" is the hero moment. The crossbars of the two t's might merge into a single flowing line (like a waveform), or the vertical strokes might lean toward each other (like two people in conversation). The rest of the letters are elegant and understated, letting the "tt" carry the creative weight.
+**Visual description**: The word "Sotto" in a warm serif or semi-serif typeface where the "tt" is the hero moment. The crossbars of the two t's might merge into a single flowing line (like a waveform), or the vertical strokes might lean toward each other (like a tutor and learner at the same table). The rest of the letters are elegant and understated, letting the "tt" carry the creative weight.
 
 **Why it works**:
 
 - Leverages the natural typographic opportunity in the brand name
 - Creates a wordmark that is both functional (readable) and distinctive (ownable)
 - The double-t as two voices/entities is a subtle conceptual layer
-- Strong for text-heavy applications (headers, packaging, social media)
+- Strong for text-heavy applications (headers, documentation, app navigation)
 
 **Variations to explore**:
 
@@ -149,41 +152,41 @@ The following prompts are ready to paste into AI image generation tools. Each is
 **Direction A — Quiet Waveform**:
 
 ```
-Minimalist logo design for "Sotto," an AI podcast platform. Abstract audio waveform with two interweaving soft curves — one golden amber (#D97706), one deep navy (#1E3A5F) — representing two voices in conversation. The waveform is organic and smooth like rolling hills, not sharp digital peaks. Clean white background. Modern, warm, editorial aesthetic. Suitable for app icon and wordmark. --ar 1:1 --style raw --v 6.1
+Minimalist logo design for "Sotto," an open-source self-hostable language-learning platform. Abstract listening waveform with two interweaving soft curves - one aula blue (#3F4FB0), one soft gradient pink (#FF8FB1) - representing adaptive listening and spoken practice. The waveform is organic and smooth like rolling hills, not sharp digital peaks. Clean paper background (#F5F4F0). Modern, warm, editorial aesthetic. Suitable for app icon and wordmark. --ar 1:1 --style raw --v 6.1
 ```
 
 ```
-Logo mark for a podcast app called "Sotto" (meaning "soft voice" in Italian). Two gentle sound waves overlapping, creating an intimate visual rhythm. Colors: warm amber and deep navy on cream (#FEFCF8) background. Minimal, sophisticated, no gradients. The feeling of two friends having a quiet, knowledgeable conversation. Flat design, vector-ready. --ar 1:1 --style raw --v 6.1
+Logo mark for a language-learning app called "Sotto" (meaning "soft voice" in Italian). Two gentle sound waves overlapping, creating an intimate study rhythm. Colors: aula blue and ink slate on paper (#F5F4F0) background. Minimal, sophisticated, flat design, vector-ready. The feeling of a private tutor guiding listening practice at the right level. --ar 1:1 --style raw --v 6.1
 ```
 
 **Direction B — Listening Ear**:
 
 ```
-Minimalist logo: a stylized human ear drawn in a single continuous golden amber (#D97706) line, where the inner spiral transitions into a small speech bubble. Clean, warm, editorial illustration style. Not anatomical or medical — organic and inviting. White background. The concept is "where podcasts get social." Suitable as an app icon. --ar 1:1 --style raw --v 6.1
+Minimalist logo: a stylized human ear drawn in a single continuous aula blue (#3F4FB0) line, where the inner spiral transitions into a small speech bubble. Clean, warm, editorial illustration style. Not anatomical or medical - organic and inviting. White background. The concept is contextual listening and speaking practice. Suitable as an app icon. --ar 1:1 --style raw --v 6.1
 ```
 
 ```
-Logo design for "Sotto," an interactive podcast platform. A continuous line drawing of an ear that subtly forms the letter S. Warm amber line on white. Minimalist, sophisticated, organic curves. The ear represents active listening, not passive consumption. Modern editorial style. --ar 1:1 --style raw --v 6.1
+Logo design for "Sotto," a self-hostable language-learning platform. A continuous line drawing of an ear that subtly forms the letter S. Aula blue line on white. Minimalist, sophisticated, organic curves. The ear represents active listening and spoken feedback. Modern editorial style. --ar 1:1 --style raw --v 6.1
 ```
 
 **Direction C — Intimate Conversation**:
 
 ```
-Abstract minimalist logo: two overlapping soft rounded shapes — one golden amber (#D97706), one deep navy (#1E3A5F) — representing two voices in dialogue. The shapes are close together like two people leaning in to talk quietly. Where they overlap, the colors blend. Clean white background. Warm, intimate, modern. Suitable for tech brand app icon. --ar 1:1 --style raw --v 6.1
+Abstract minimalist logo: two overlapping soft rounded shapes - one aula blue (#3F4FB0), one soft pink (#FF8FB1) - representing learner and tutor in guided practice. The shapes are close together like a private study session. Where they overlap, the colors blend. Clean white background. Warm, intimate, modern. Suitable for a language-learning app icon. --ar 1:1 --style raw --v 6.1
 ```
 
 ```
-Logo mark for "Sotto" — two speech bubbles that share a common edge, creating a Venn diagram of conversation. One amber, one navy. Soft rounded corners, no outlines. Minimalist flat design, modern editorial aesthetic. The feeling of intimate knowledge-sharing. --ar 1:1 --style raw --v 6.1
+Logo mark for "Sotto" - two speech bubbles that share a common edge, creating a Venn diagram of language practice. One aula blue, one ink slate or soft pink. Soft rounded corners, no outlines. Minimalist flat design, modern editorial aesthetic. The feeling of private tutoring and owned progress. --ar 1:1 --style raw --v 6.1
 ```
 
 **Direction D — Sotto Ligature**:
 
 ```
-Custom typographic wordmark logo: the word "Sotto" in an elegant warm serif typeface. The double-t in the center is the focal point — the crossbars merge into a flowing audio waveform. Golden amber (#D97706) color. Clean, editorial, sophisticated. Not playful or techy. The feeling of a literary magazine meets a podcast studio. White background. --ar 3:1 --style raw --v 6.1
+Custom typographic wordmark logo: the word "Sotto" in an elegant warm serif typeface. The double-t in the center is the focal point - the crossbars merge into a flowing listening waveform. Aula blue (#3F4FB0) color. Clean, editorial, sophisticated. Not playful or techy. The feeling of a literary study notebook meets a private language tutor. White background. --ar 3:1 --style raw --v 6.1
 ```
 
 ```
-Wordmark logo design for "Sotto" (Italian for "soft voice"). Warm serif typography where the two t's share a single crossbar styled as a gentle sound wave. The letters have subtle personality — slightly organic, not perfectly geometric. Deep navy (#1E3A5F) on cream (#FEFCF8). Modern editorial aesthetic. --ar 3:1 --style raw --v 6.1
+Wordmark logo design for "Sotto" (Italian for "soft voice"). Warm serif typography where the two t's share a single crossbar styled as a gentle listening wave. The letters have subtle personality - slightly organic, not perfectly geometric. Ink slate (#2A3550) on paper (#F5F4F0). Modern editorial aesthetic. --ar 3:1 --style raw --v 6.1
 ```
 
 ### 3.2 DALL-E Prompts
@@ -191,25 +194,25 @@ Wordmark logo design for "Sotto" (Italian for "soft voice"). Warm serif typograp
 **Direction A — Quiet Waveform**:
 
 ```
-A minimalist logo design for a podcast platform called "Sotto." The logo features an abstract audio waveform made of two interweaving smooth curves — one in golden amber (#D97706) and one in deep navy (#1E3A5F). The curves are organic and flowing like rolling hills, representing two voices in conversation. The design is clean, modern, and sophisticated on a white background. Flat vector style, suitable for an app icon.
+A minimalist logo design for a language-learning platform called "Sotto." The logo features an abstract listening waveform made of two interweaving smooth curves - one in aula blue (#3F4FB0) and one in soft pink (#FF8FB1). The curves are organic and flowing like rolling hills, representing adaptive listening and spoken practice. The design is clean, modern, and sophisticated on a paper background. Flat vector style, suitable for an app icon.
 ```
 
 **Direction B — Listening Ear**:
 
 ```
-A minimalist logo for "Sotto," an interactive podcast app. The design shows a stylized human ear drawn with a single continuous line in golden amber (#D97706). The inner spiral of the ear transitions seamlessly into a small speech bubble shape. The style is organic and warm — an editorial illustration, not a medical diagram. White background, flat design, suitable for an app icon.
+A minimalist logo for "Sotto," a self-hostable language-learning app. The design shows a stylized human ear drawn with a single continuous line in aula blue (#3F4FB0). The inner spiral of the ear transitions seamlessly into a small speech bubble shape. The style is organic and warm - an editorial illustration, not a medical diagram. White background, flat design, suitable for an app icon.
 ```
 
 **Direction C — Intimate Conversation**:
 
 ```
-A minimalist abstract logo for "Sotto." Two soft, rounded shapes overlap slightly — one in golden amber (#D97706) and one in deep navy (#1E3A5F). The shapes represent two voices in quiet dialogue. Where they overlap, the colors blend subtly. The composition feels intimate and warm, like two people leaning in to share knowledge. White background, flat design.
+A minimalist abstract logo for "Sotto." Two soft, rounded shapes overlap slightly - one in aula blue (#3F4FB0) and one in soft pink (#FF8FB1). The shapes represent a learner and tutor in quiet practice. Where they overlap, the colors blend subtly. The composition feels intimate and warm, like a private study session. White background, flat design.
 ```
 
 **Direction D — Sotto Ligature**:
 
 ```
-A custom wordmark logo for "Sotto" in an elegant serif typeface. The distinctive feature is the double-t in the center — the crossbars of both t's merge into a single flowing audio waveform. The typography is warm and editorial, not cold or geometric. Golden amber (#D97706) on white background. The design conveys intelligent conversation and quiet sophistication.
+A custom wordmark logo for "Sotto" in an elegant serif typeface. The distinctive feature is the double-t in the center - the crossbars of both t's merge into a single flowing listening waveform. The typography is warm and editorial, not cold or geometric. Aula blue (#3F4FB0) on white background. The design conveys contextual learning and quiet sophistication.
 ```
 
 ### 3.3 Ideogram Prompts
@@ -217,13 +220,13 @@ A custom wordmark logo for "Sotto" in an elegant serif typeface. The distinctive
 **Direction A — Quiet Waveform**:
 
 ```
-Minimalist logo for "Sotto," a podcast platform. Two smooth, interweaving audio waveforms in amber (#D97706) and navy (#1E3A5F). Organic curves, not digital-looking. Represents two voices in dialogue. Clean white background, flat vector, app icon ready.
+Minimalist logo for "Sotto," a language-learning platform. Two smooth, interweaving listening waveforms in aula blue (#3F4FB0) and soft pink (#FF8FB1). Organic curves, not digital-looking. Represents adaptive listening and spoken practice. Clean white background, flat vector, app icon ready.
 ```
 
 **Direction C — Intimate Conversation**:
 
 ```
-Abstract logo: two overlapping soft shapes in amber (#D97706) and navy (#1E3A5F), like two speech bubbles sharing a wall. Intimate, minimal, warm. Logo for a podcast app. White background, vector flat design.
+Abstract logo: two overlapping soft shapes in aula blue (#3F4FB0) and ink slate (#2A3550), like two speech bubbles sharing a wall. Intimate, minimal, warm. Logo for a language-learning app. White background, vector flat design.
 ```
 
 ### 3.4 FLUX (Black Forest Labs) Prompts
@@ -233,25 +236,25 @@ FLUX models excel at precise color control, typography, and clean composition. U
 **Direction A — Quiet Waveform**:
 
 ```
-Minimalist logo design for "Sotto," a podcast platform. Abstract audio waveform made of two interweaving smooth curves, one golden amber #D97706 and one deep navy #1E3A5F. Organic flowing curves like rolling hills, not sharp digital peaks. Clean white background. Flat vector style, modern editorial aesthetic. Suitable as app icon.
+Minimalist logo design for "Sotto," a language-learning platform. Abstract listening waveform made of two interweaving smooth curves, one aula blue #3F4FB0 and one soft pink #FF8FB1. Organic flowing curves like rolling hills, not sharp digital peaks. Clean white background. Flat vector style, modern editorial aesthetic. Suitable as app icon.
 ```
 
 **Direction B — Listening Ear**:
 
 ```
-Minimalist logo for "Sotto." A stylized human ear drawn in a single continuous golden amber #D97706 line. The inner spiral of the ear transitions into a small speech bubble. Organic and warm editorial illustration style, not anatomical. White background, flat design. The concept is where podcasts get social.
+Minimalist logo for "Sotto." A stylized human ear drawn in a single continuous aula blue #3F4FB0 line. The inner spiral of the ear transitions into a small speech bubble. Organic and warm editorial illustration style, not anatomical. White background, flat design. The concept is contextual listening and speaking practice.
 ```
 
 **Direction C — Intimate Conversation**:
 
 ```
-Abstract minimalist logo for "Sotto." Two overlapping soft rounded shapes, one golden amber #D97706 and one deep navy #1E3A5F, representing two voices in dialogue. Shapes are close together like two people leaning in to talk quietly. Where they overlap the colors blend. White background, flat design, warm and intimate.
+Abstract minimalist logo for "Sotto." Two overlapping soft rounded shapes, one aula blue #3F4FB0 and one soft pink #FF8FB1, representing learner and tutor in guided practice. Shapes are close together like a private study session. Where they overlap the colors blend. White background, flat design, warm and intimate.
 ```
 
 **Direction D — Sotto Ligature**:
 
 ```
-Custom typographic wordmark logo: the word "Sotto" in an elegant warm serif typeface. The double-t crossbars merge into a flowing audio waveform. Golden amber #D97706 on white background. Editorial, sophisticated, not playful or techy. The feeling of a literary magazine meets a podcast studio.
+Custom typographic wordmark logo: the word "Sotto" in an elegant warm serif typeface. The double-t crossbars merge into a flowing listening waveform. Aula blue #3F4FB0 on white background. Editorial, sophisticated, not playful or techy. The feeling of a literary study notebook meets a private language tutor.
 ```
 
 **FLUX model recommendations for logo work**:
@@ -271,23 +274,23 @@ Custom typographic wordmark logo: the word "Sotto" in an elegant warm serif type
 | Deliverable                        | Format   | Size                    | Purpose                              |
 | ---------------------------------- | -------- | ----------------------- | ------------------------------------ |
 | **Primary logo** (mark + wordmark) | SVG, PNG | Vector / 1200x400px @2x | Website header, marketing            |
-| **Logomark only** (icon/symbol)    | SVG, PNG | Vector / 512x512px @2x  | Standalone use, social avatars       |
+| **Logomark only** (icon/symbol)    | SVG, PNG | Vector / 512x512px @2x  | Standalone use, profile/avatar use   |
 | **Wordmark only** (text)           | SVG, PNG | Vector / 800x200px @2x  | Contexts where the mark is too small |
 | **Favicon**                        | ICO, PNG | 16x16, 32x32, 180x180   | Browser tab, bookmarks               |
 | **App icon**                       | PNG      | 512x512, 1024x1024      | PWA manifest, iOS/Android            |
-| **Social media avatar**            | PNG      | 400x400                 | Profile pictures                     |
+| **Profile/avatar image**           | PNG      | 400x400                 | Profile pictures and external links  |
 | **Open Graph image**               | PNG      | 1200x630                | Link previews (Twitter, Slack, etc.) |
 
 ### 4.2 Color Versions Required
 
 | Version                                      | When to use                         |
 | -------------------------------------------- | ----------------------------------- |
-| **Full color** (amber + navy)                | Primary use on light backgrounds    |
-| **Single color — amber** (`#D97706`)         | Monochrome contexts, brand accents  |
-| **Single color — navy** (`#1E3A5F`)          | Formal/editorial contexts           |
-| **Single color — black** (`#1A1A1A`)         | Print, high-contrast needs          |
-| **Single color — white** (`#FFFFFF`)         | Dark backgrounds, overlays, photos  |
-| **Reversed** (light mark on dark background) | Dark mode, navy backgrounds, photos |
+| **Full color** (aula blue + accent)          | Primary use on light backgrounds        |
+| **Single color - aula blue** (`#3F4FB0`)     | Monochrome contexts, brand accents      |
+| **Single color - ink slate** (`#2A3550`)     | Formal/editorial contexts               |
+| **Single color - black** (`#1E2128`)         | Print, high-contrast needs              |
+| **Single color - white** (`#FFFFFF`)         | Dark backgrounds, overlays, photos      |
+| **Reversed** (light mark on dark background) | Dark mode, ink slate backgrounds, photos |
 
 ### 4.3 Minimum Size
 
@@ -310,22 +313,22 @@ sotto-logo/
 ├── primary/
 │   ├── sotto-logo-full-color.svg
 │   ├── sotto-logo-full-color@2x.png
-│   ├── sotto-logo-amber.svg
-│   ├── sotto-logo-navy.svg
+│   ├── sotto-logo-aula-blue.svg
+│   ├── sotto-logo-ink-slate.svg
 │   ├── sotto-logo-black.svg
 │   ├── sotto-logo-white.svg
 │   └── sotto-logo-reversed.svg
 ├── mark-only/
 │   ├── sotto-mark-full-color.svg
 │   ├── sotto-mark-full-color@2x.png
-│   ├── sotto-mark-amber.svg
-│   ├── sotto-mark-navy.svg
+│   ├── sotto-mark-aula-blue.svg
+│   ├── sotto-mark-ink-slate.svg
 │   ├── sotto-mark-black.svg
 │   └── sotto-mark-white.svg
 ├── wordmark-only/
 │   ├── sotto-wordmark-full-color.svg
-│   ├── sotto-wordmark-amber.svg
-│   ├── sotto-wordmark-navy.svg
+│   ├── sotto-wordmark-aula-blue.svg
+│   ├── sotto-wordmark-ink-slate.svg
 │   ├── sotto-wordmark-black.svg
 │   └── sotto-wordmark-white.svg
 ├── favicons/
@@ -336,7 +339,7 @@ sotto-logo/
 ├── app-icons/
 │   ├── app-icon-512.png
 │   └── app-icon-1024.png
-└── social/
+└── link-preview/
     ├── avatar-400x400.png
     └── og-image-1200x630.png
 ```
@@ -349,21 +352,21 @@ The logo should be distinctly Sotto, not reminiscent of these existing brands:
 
 | Brand                             | Logo Style                                  | Why to Avoid                                                          |
 | --------------------------------- | ------------------------------------------- | --------------------------------------------------------------------- |
-| **Spotify**                       | Green circle with three curved sound lines  | Sotto is not a streaming service; avoid the "broadcast" metaphor      |
-| **Apple Podcasts**                | Purple gradient with concentric radio waves | The radio wave icon is overused in the podcast space                  |
-| **Google NotebookLM**             | Google's standard product icon style        | Sotto is the direct competitor; differentiation is critical           |
-| **Anchor/Spotify for Podcasters** | Microphone + anchor imagery                 | Sotto is listener-first, not creator-first; avoid microphone cliches  |
-| **Audible**                       | Orange with speech/audio marks              | Similar warm color — ensure Sotto's mark is not confused with Audible |
-| **Overcast**                      | Orange circle with antenna lines            | Very similar color territory — the mark must be distinct              |
-| **Clubhouse**                     | Simple hand-drawn avatar                    | The "casual sketch" style does not convey Sotto's sophistication      |
+| **Duolingo**                      | Mascot-driven bright green identity         | Sotto is calm infrastructure, not a gamified mascot product           |
+| **OpenLingo**                     | LLM-native language-learning app styling    | Sotto needs its own self-hostable, context-aware visual language      |
+| **Speak**                         | Speech-first consumer app identity          | Avoid looking like a hosted speaking coach                            |
+| **Praktika**                      | Avatar/tutor character system               | Sotto should not imply a social avatar network or animated persona    |
+| **TalkPal**                       | Chat/speech companion branding              | Avoid generic AI-chat language symbols                                |
+| **Pimsleur**                      | Audio-course branding                       | Sotto's listening is adaptive and part of a broader learning system   |
+| **Spotify / Apple Podcasts**      | Curved broadcast or radio-wave marks        | Sotto is not a streaming or podcast platform                          |
 
-**General podcast logo cliches to avoid**:
+**General language-learning logo cliches to avoid**:
 
-- Microphones (creator-centric, not listener-centric)
-- Headphones (generic, overused)
-- Play buttons (too generic, every media app uses these)
-- Radio tower / broadcast waves (implies one-to-many, not intimate conversation)
-- Headphone jack / audio plug (dated technology reference)
+- Owls, mascots, or streak-fire imagery
+- Graduation caps, diplomas, books, or school crests
+- Flags, globes, or generic translation arrows
+- Microphones, headphones, play buttons, or radio towers as the primary metaphor
+- AI robots, chips, circuits, or magic-sparkle marks
 
 ---
 
@@ -376,17 +379,17 @@ The logo should be distinctly Sotto, not reminiscent of these existing brands:
 | Use organic, smooth curves                                   | Aligns with "warm intimacy" design philosophy — Sotto is soft, not sharp                            |
 | Keep the mark simple enough for a 24px favicon               | The logo will appear at tiny sizes in browser tabs and app lists                                    |
 | Ensure the wordmark is readable at body text sizes           | "Sotto" appears in headers, footers, and navigation                                                 |
-| Design for both light (cream `#FEFCF8`) and dark backgrounds | Dark mode support is planned; the logo needs to work on both                                        |
+| Design for both light (paper `#F5F4F0`) and dark backgrounds | Dark mode support is planned; the logo needs to work on both                                        |
 | Test at small sizes first, then scale up                     | Mobile is the primary platform; design for the smallest context first                               |
 | Make the mark meaningful but not literal                     | The best logos suggest rather than depict — imply "conversation" without drawing two people talking |
-| Ensure the amber (#D97706) reads as warm gold, not orange    | The brand is warm and sophisticated, not energetic and sporty                                       |
+| Ensure aula blue (#3F4FB0) reads as focused and calm         | The brand is thoughtful and study-oriented, not generic SaaS blue                                   |
 
 ### Don'ts
 
 | Guideline                                              | Rationale                                                                                                    |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | Don't use gradients in the primary mark                | Gradients complicate reproduction at small sizes and in print; flat is preferred                             |
-| Don't use more than 2 colors in the mark               | The amber + navy pair is the brand's color identity; adding colors dilutes it                                |
+| Don't use more than 2 colors in the mark               | The aula blue + accent pair is the brand's color identity; adding colors dilutes it                          |
 | Don't make the logo overly detailed or illustrative    | Complexity fails at small sizes and feels at odds with the minimal UI                                        |
 | Don't use drop shadows or 3D effects                   | The design system uses subtle, flat aesthetics; dimensionality feels out of place                            |
 | Don't reference AI, robots, or circuits in the mark    | Sotto is human-feeling despite being AI-powered; tech imagery undermines the intimacy                        |
@@ -442,7 +445,7 @@ AI image generators produce raster concepts, not production-ready logos. Every A
 5. **Logo sheet prompt**: Append this to your winning concept's prompt to generate a consistency sheet:
 
 ```
-logo design sheet showing the same logo mark in 6 variations: full color on white, single color amber, single color navy, reversed on dark background, small favicon size, and app icon with rounded corners. Consistent mark across all variations. --ar 3:2 --style raw --v 6.1
+logo design sheet showing the same logo mark in 6 variations: full color on white, single color aula blue, single color ink slate, reversed on dark background, small favicon size, and app icon with rounded corners. Consistent mark across all variations. --ar 3:2 --style raw --v 6.1
 ```
 
 **DALL-E consistency techniques**:
@@ -459,7 +462,7 @@ logo design sheet showing the same logo mark in 6 variations: full color on whit
 
 **FLUX consistency techniques**:
 
-1. **Kontext for controlled editing**: FLUX.1 Kontext is purpose-built for iterating on an existing image. Upload your winning concept and use natural language to make targeted changes while preserving the rest. Be explicit about what to keep: "Change the background from white to dark navy #1E3A5F. Keep the exact same logo mark, shapes, proportions, and amber color."
+1. **Kontext for controlled editing**: FLUX.1 Kontext is purpose-built for iterating on an existing image. Upload your winning concept and use natural language to make targeted changes while preserving the rest. Be explicit about what to keep: "Change the background from white to ink slate #2A3550. Keep the exact same logo mark, shapes, proportions, and aula blue color."
 
 2. **Preservation phrasing**: Kontext responds to explicit preservation instructions. Always state what must NOT change: "Maintaining the same logo shape, line weight, and proportions" or "Preserving the exact mark design." Avoid vague verbs like "transform" which signal wholesale change.
 
@@ -476,13 +479,13 @@ logo design sheet showing the same logo mark in 6 variations: full color on whit
 **Midjourney logo sheet prompt template** (fill in `[DESCRIPTION]` with your winning concept):
 
 ```
-Professional logo presentation sheet for "Sotto" podcast brand. The logo is [DESCRIPTION]. Sheet shows: (1) primary full-color logo on white, (2) logo mark only without text, (3) wordmark only without mark, (4) single-color black version, (5) reversed white version on dark navy background, (6) small 32px favicon rendering. All six renderings show the exact same logo design, consistent shapes and proportions. Clean white presentation background with subtle grid. --ar 16:9 --style raw --v 6.1
+Professional logo presentation sheet for "Sotto" language-learning brand. The logo is [DESCRIPTION]. Sheet shows: (1) primary full-color logo on white, (2) logo mark only without text, (3) wordmark only without mark, (4) single-color black version, (5) reversed white version on dark ink-slate background, (6) small 32px favicon rendering. All six renderings show the exact same logo design, consistent shapes and proportions. Clean white presentation background with subtle grid. --ar 16:9 --style raw --v 6.1
 ```
 
 **Midjourney app context sheet prompt template**:
 
 ```
-Mockup sheet showing the "Sotto" logo [DESCRIPTION] applied in real contexts: (1) mobile app icon with rounded corners on an iPhone home screen, (2) website header on cream background next to navigation, (3) social media avatar in a circle crop, (4) browser favicon in a Chrome tab, (5) podcast card watermark at low opacity. Same logo throughout, consistent. --ar 16:9 --style raw --v 6.1
+Mockup sheet showing the "Sotto" logo [DESCRIPTION] applied in real contexts: (1) mobile app icon with rounded corners on an iPhone home screen, (2) website header on paper background next to navigation, (3) profile avatar in a circle crop, (4) browser favicon in a Chrome tab, (5) learning dashboard watermark at low opacity. Same logo throughout, consistent. --ar 16:9 --style raw --v 6.1
 ```
 
 **FLUX logo sheet approach**:
@@ -493,7 +496,7 @@ FLUX does not generate multi-panel sheets as reliably as Midjourney. Instead, us
 2. Generate each variant via Kontext with explicit instructions:
 
 ```
-Change the background to dark navy #1E3A5F and make the logo mark white. Keep the exact same logo shape, proportions, and design. Nothing else changes.
+Change the background to ink slate #2A3550 and make the logo mark white. Keep the exact same logo shape, proportions, and design. Nothing else changes.
 ```
 
 ```
@@ -523,7 +526,7 @@ AI-generated logos are never production-ready because:
 
 2. **Manual cleanup**: Redraw the logo using the auto-trace as an underlay. Snap to grid, enforce symmetry, clean up curves, simplify path count. A good logo has fewer than 20 anchor points in its mark.
 
-3. **Color assignment**: Replace approximate colors with exact brand hex values (`#D97706`, `#1E3A5F`, etc.).
+3. **Color assignment**: Replace approximate colors with exact brand hex values (`#3F4FB0`, `#2A3550`, `#F5F4F0`, etc.).
 
 4. **Size testing**: Export at 16px, 24px, 32px, 64px, 128px, 256px, 512px and verify legibility at every size. Simplify the mark if it breaks below 32px.
 
@@ -558,7 +561,7 @@ When reviewing logo concepts, score each on these dimensions:
 | Criterion            | Weight | Description                                                                                |
 | -------------------- | ------ | ------------------------------------------------------------------------------------------ |
 | **Brand alignment**  | 25%    | Does it feel warm, intimate, intelligent, and calm?                                        |
-| **Distinctiveness**  | 20%    | Is it clearly different from Spotify, Apple Podcasts, NotebookLM, and other audio brands?  |
+| **Distinctiveness**  | 20%    | Is it clearly different from Duolingo, OpenLingo, Speak, Praktika, TalkPal, Pimsleur, and podcast/audio marks? |
 | **Scalability**      | 20%    | Does it work at 24px (favicon) and 400px (hero) equally well?                              |
 | **Memorability**     | 15%    | After seeing it once, could someone describe it from memory?                               |
 | **Versatility**      | 10%    | Does it work in full color, single color, reversed, on dark and light backgrounds?         |
@@ -571,16 +574,16 @@ When reviewing logo concepts, score each on these dimensions:
 | Item                   | Value                                             |
 | ---------------------- | ------------------------------------------------- |
 | **Brand name**         | Sotto                                             |
-| **Tagline**            | Where Podcasts Get Social                         |
+| **Tagline**            | Learn a language, taught in your own context.     |
 | **Origin**             | Italian: "sotto voce" = soft voice, intimate tone |
-| **Product**            | AI-generated interactive podcasts with Q&A        |
-| **Primary color**      | Golden Amber `#D97706`                            |
-| **Secondary color**    | Deep Navy `#1E3A5F`                               |
-| **Background color**   | Soft Cream `#FEFCF8`                              |
-| **Text color**         | Near-Black `#1A1A1A`                              |
-| **Heading font**       | DM Serif Display (serif, editorial)               |
-| **Body font**          | Inter (sans-serif, clean)                         |
-| **Design philosophy**  | "Warm Intimacy" — podcast studio + reading nook   |
-| **Target audience**    | Curious learners, busy professionals, educators   |
-| **Competitors**        | NotebookLM, Spotify, Apple Podcasts, Podbean AI   |
-| **Key differentiator** | Mid-playback Q&A that updates the episode         |
+| **Product**            | Free, open-source, self-hostable BYOK language learning |
+| **Primary color**      | Aula Blue `#3F4FB0`                               |
+| **Secondary color**    | Ink Slate `#2A3550`                               |
+| **Background color**   | Paper `#F5F4F0`                                   |
+| **Text color**         | Ink `#1E2128`                                     |
+| **Heading font**       | Newsreader (serif, editorial)                     |
+| **Body font**          | IBM Plex Sans (sans-serif, practical)             |
+| **Design philosophy**  | "Aula" - calm study surface + private tutor       |
+| **Target audience**    | Self-hosters, serious learners, households, educators |
+| **Competitors**        | OpenLingo, Duolingo, Speak, Praktika, TalkPal, Pimsleur |
+| **Key differentiator** | Context-aware CEFR learning on infrastructure the learner controls |
