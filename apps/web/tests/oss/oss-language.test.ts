@@ -601,7 +601,8 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(releaseHygieneSources).toContain('security@example.com');
+    expect(releaseHygieneSources).toContain('security/advisories/new');
+    expect(releaseHygieneSources).not.toContain('security@example.com');
     expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
