@@ -35,7 +35,7 @@
     "@aws-sdk/s3-request-presigner": "^3.975.0",
     "@google/genai": "^2.8.0",
     "@mozilla/readability": "^0.6.0",
-    "@prisma/client": "~6.19.2",
+    "@prisma/client": "~7.8.0",
     "@sentry/nextjs": "^10.40.0",
     "@sotto/shared": "*",
     "@sotto/verification-standard": "*",
