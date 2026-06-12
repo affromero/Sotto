@@ -91,10 +91,7 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
-    const mobileCopySources = ['apps/mobile/app/settings.tsx']
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-    const copySources = [webCopySources, mobileCopySources].join('\n');
+    const copySources = webCopySources;
 
     expect(copySources).not.toContain('social episode network');
     expect(copySources).not.toContain('social feed');
@@ -140,17 +137,10 @@ describe('open-source language-learning OSS surfaces', () => {
     );
   });
 
-  it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
-    const mobileSources = ['apps/mobile/app/(tabs)/index.tsx', 'apps/mobile/app/(tabs)/search.tsx']
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
+  it('does not keep public feed contracts in shared or MCP packages', () => {
     const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    expect(mobileSources).not.toContain("'/feed'");
-    expect(mobileSources).not.toContain('"/feed"');
-    expect(mobileSources).not.toContain('/users/discover');
-    expect(mobileSources).not.toContain('/users/suggested');
     expect(mcpSources).not.toContain('browse_feed');
     expect(mcpSources).not.toContain('/api/v1/feed');
     expect(existsSync(resolve(repoRoot, 'packages/shared/src/types/feed.ts'))).toBe(false);
@@ -232,41 +222,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(generatedUrlSources).not.toContain("|| 'http://localhost:3000'");
   });
 
-  it('requires mobile clients to use explicit deployment URLs', () => {
-    const mobileRuntimeSources = [
-      'apps/mobile/lib/config.ts',
-      'apps/mobile/lib/api.ts',
-      'apps/mobile/app/auth/login.tsx',
-      'apps/mobile/app/settings.tsx',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-    const mobileBuildConfigSources = [
-      'apps/mobile/app.config.js',
-      'apps/mobile/app.json',
-      'apps/mobile/eas.json',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-    // The client must point at an explicit deployment — paired at runtime
-    // ("scan to connect") or baked in via EXPO_PUBLIC_API_URL — and never
-    // silently default to a hosted sotto.fm. getApiBaseUrl throws when no server
-    // is configured at all.
-    expect(mobileRuntimeSources).toContain('No Sotto server is configured');
-    expect(mobileRuntimeSources).toContain('getApiBaseUrl');
-    expect(mobileRuntimeSources).not.toContain('https://sotto.fm');
-    expect(mobileRuntimeSources).not.toContain("?? 'https://sotto.fm/api'");
-    expect(mobileRuntimeSources).not.toContain("|| 'https://sotto.fm/api'");
-
-    // The build is driven by the explicit EXPO_PUBLIC_API_URL knob and also
-    // supports a runtime-config build (no baked-in server) — never a hardcoded host.
-    expect(mobileBuildConfigSources).toContain('EXPO_PUBLIC_API_URL');
-    expect(mobileBuildConfigSources).toContain('runtime-config');
-    expect(mobileBuildConfigSources).not.toContain('applinks:sotto.fm');
-    expect(mobileBuildConfigSources).not.toContain('"host": "sotto.fm"');
-    expect(mobileBuildConfigSources).not.toContain('https://sotto.fm/api');
-  });
-
   it('keeps the local setup script OSS-first and template-driven', () => {
     const setupSource = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
     const installDepsSource = readFileSync(resolve(repoRoot, 'scripts/install-deps.sh'), 'utf8');
@@ -287,7 +242,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSource).not.toContain('set_env_value NEXTAUTH_SECRET');
 
     expect(installDepsSource).toContain('install_ffmpeg');
-    expect(localSetupDocs).toContain('EXPO_PUBLIC_API_URL="http://localhost:3000/api/v1"');
     expect(localSetupDocs).toContain('LOCAL_STORAGE_DIR="./.sotto/storage"');
     expect(localSetupDocs).not.toContain(
       'Compatibility scripts are still available for the old hosted setup'
@@ -302,8 +256,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'e2e/playwright/playwright.config.ts',
       'e2e/playwright/fixtures/auth.ts',
       'e2e/playwright/helpers/seed.ts',
-      'e2e/maestro/config.yaml',
-      'e2e/maestro/run.sh',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -332,30 +284,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(rootClaude).toContain(
       'Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`'
     );
-  });
-
-  it('keeps mobile env sync local and Doppler-free by default', () => {
-    const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
-    const syncMobileEnv = readFileSync(resolve(repoRoot, 'scripts/sync-mobile-env.sh'), 'utf8');
-    const mobileEnvExample = readFileSync(resolve(repoRoot, 'apps/mobile/.env.example'), 'utf8');
-    const mobileInstructions = readFileSync(resolve(repoRoot, 'apps/mobile/CLAUDE.md'), 'utf8');
-    const mobileSetupSources = [
-      packageJson,
-      syncMobileEnv,
-      mobileEnvExample,
-      mobileInstructions,
-    ].join('\n');
-
-    expect(packageJson).toContain('"mobile:env": "bash scripts/sync-mobile-env.sh"');
-    expect(syncMobileEnv).toContain('ENV_SOURCE="$REPO_ROOT/.env.local"');
-    expect(syncMobileEnv).toContain('EXPO_PUBLIC_API_URL="${NEXT_PUBLIC_APP_URL%/}/api/v1"');
-    expect(syncMobileEnv).toContain('MOBILE_ENV_OUTPUT');
-    expect(mobileSetupSources).toContain('EXPO_PUBLIC_API_URL');
-    expect(mobileSetupSources).not.toContain('LAN_IP');
-    expect(mobileSetupSources).not.toContain('auto-syncs env from Doppler');
-    expect(mobileSetupSources).not.toContain("grep '^EXPO_PUBLIC_'");
-    expect(mobileSetupSources).not.toContain('doppler secrets download');
-    expect(mobileSetupSources).not.toContain('All `EXPO_PUBLIC_*` via **Doppler**');
   });
 
   it('keeps environment templates deployment-neutral', () => {
@@ -1117,114 +1045,11 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(adminEpisodeRouteSource).not.toContain('forkCount');
   });
 
-  it('does not ship mobile episode social actions or widgets', () => {
-    const removedMobileComponents = [
-      'apps/mobile/components/ForkModal.tsx',
-      'apps/mobile/components/ForkLineage.tsx',
-      'apps/mobile/components/CommentSection.tsx',
-      'apps/mobile/components/CommentItem.tsx',
-    ];
-    const mobilePlayerSource = readFileSync(
-      resolve(repoRoot, 'apps/mobile/app/episode/[id].tsx'),
-      'utf8'
-    );
-    const mobileCardSource = readFileSync(
-      resolve(repoRoot, 'apps/mobile/components/EpisodeCard.tsx'),
-      'utf8'
-    );
-    const mobileProfileSource = readFileSync(
-      resolve(repoRoot, 'apps/mobile/app/(tabs)/profile.tsx'),
-      'utf8'
-    );
-    const mobileEpisodeSurfaces = [mobilePlayerSource, mobileCardSource, mobileProfileSource].join(
-      '\n'
-    );
-
-    for (const component of removedMobileComponents) {
-      expect(existsSync(resolve(repoRoot, component)), component).toBe(false);
-    }
-    expect(mobilePlayerSource).not.toContain('/like');
-    expect(mobilePlayerSource).not.toContain('/fork');
-    expect(mobilePlayerSource).not.toContain('/comments');
-    expect(mobilePlayerSource).not.toContain('Share.share');
-    expect(mobilePlayerSource).not.toContain('ForkModal');
-    expect(mobilePlayerSource).not.toContain('ForkLineage');
-    expect(mobilePlayerSource).not.toContain('CommentSection');
-    expect(mobileEpisodeSurfaces).not.toContain('likeCount');
-    expect(mobileEpisodeSurfaces).not.toContain('forkCount');
-  });
-
-  it('does not ship mobile follow surfaces or social notification settings', () => {
-    const removedMobileRoutes = [
-      'apps/mobile/app/user/[userId].tsx',
-      'apps/mobile/app/settings/notifications.tsx',
-      'apps/mobile/app/analytics.tsx',
-    ];
-    const mobilePrivateSources = [
-      'apps/mobile/app/_layout.tsx',
-      'apps/mobile/app/settings.tsx',
-      'apps/mobile/app/(tabs)/notifications.tsx',
-      'apps/mobile/CLAUDE.md',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-
-    for (const route of removedMobileRoutes) {
-      expect(existsSync(resolve(repoRoot, route)), route).toBe(false);
-    }
-    expect(mobilePrivateSources).not.toContain('/follow');
-    expect(mobilePrivateSources).not.toContain('followerCount');
-    expect(mobilePrivateSources).not.toContain('followingCount');
-    expect(mobilePrivateSources).not.toContain('followMutation');
-    expect(mobilePrivateSources).not.toContain('settings/notifications');
-    expect(mobilePrivateSources).not.toContain('NEW_FOLLOWER');
-    expect(mobilePrivateSources).not.toContain('NEW_LIKE');
-    expect(mobilePrivateSources).not.toContain('NEW_FORK');
-    expect(mobilePrivateSources).not.toContain('NEW_COMMENT');
-  });
-
-  it('keeps mobile e2e flows aligned to private library contracts', () => {
-    const maestroFlowDir = resolve(repoRoot, 'e2e/maestro/flows');
-    const removedSocialFlows = [
-      '02-feed-browse.yaml',
-      '09-fork.yaml',
-      '15-user-profile.yaml',
-      '25-error-empty-feed.yaml',
-      '30-comments.yaml',
-    ];
-    const maestroSources = [
-      ...readdirSync(maestroFlowDir)
-        .filter((file) => file.endsWith('.yaml'))
-        .map((file) => readFileSync(resolve(maestroFlowDir, file), 'utf8')),
-      readFileSync(resolve(repoRoot, 'e2e/maestro/config.yaml'), 'utf8'),
-      readFileSync(resolve(repoRoot, 'e2e/maestro/helpers/login.yaml'), 'utf8'),
-    ].join('\n');
-
-    for (const flow of removedSocialFlows) {
-      expect(existsSync(resolve(maestroFlowDir, flow)), flow).toBe(false);
-    }
-    expect(maestroSources).toContain('library-episode-list');
-    expect(maestroSources).toContain('library-filter-all');
-    expect(maestroSources).not.toContain('feed-episode-list');
-    expect(maestroSources).not.toContain('feed-mode-');
-    expect(maestroSources).not.toContain('feed-sort-');
-    expect(maestroSources).not.toContain('search-mode-people');
-    expect(maestroSources).not.toContain('comments-section');
-    expect(maestroSources).not.toContain('player-like-button');
-    expect(maestroSources).not.toContain('player-fork-button');
-    expect(maestroSources).not.toContain('fork-angle-input');
-    expect(maestroSources).not.toContain('user-profile-follow-button');
-    expect(maestroSources).not.toContain('collection-detail-follow-button');
-    expect(maestroSources).not.toContain('E2E_OTHER_USER_HANDLE');
-  });
-
   it('does not ship the curated-playlist collections feature', () => {
     const removedCollectionPaths = [
       'apps/web/src/app/api/v1/collections',
       'apps/web/src/app/collections',
       'apps/web/src/components/collections',
-      'apps/mobile/app/collections',
-      'apps/mobile/components/AddToCollectionSheet.tsx',
       'e2e/playwright/tests/api/collections.api.spec.ts',
     ];
     for (const path of removedCollectionPaths) {
@@ -1312,8 +1137,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/api/v1/stripe/connect',
       'apps/web/src/app/api/v1/stripe/payment-intent',
       'apps/web/src/app/(admin)/admin/revenue',
-      'apps/mobile/app/voices.tsx',
-      'e2e/maestro/flows/21-voice-marketplace.yaml',
     ];
     for (const path of removedMarketplacePaths) {
       expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
@@ -1326,19 +1149,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
     // The shared voice directory still redirects to /learn.
     expect(readSource('src/app/voices/page.tsx')).toContain("redirect('/learn')");
-
-    // Mobile settings no longer exposes a voice marketplace or a /voices route.
-    const mobileSettingsSource = readFileSync(
-      resolve(repoRoot, 'apps/mobile/app/settings.tsx'),
-      'utf8'
-    );
-    expect(mobileSettingsSource).not.toContain('Voice Marketplace');
-    expect(mobileSettingsSource).not.toContain("router.push('/voices')");
-    const mobileLayoutSource = readFileSync(
-      resolve(repoRoot, 'apps/mobile/app/_layout.tsx'),
-      'utf8'
-    );
-    expect(mobileLayoutSource).not.toContain('Stack.Screen name="voices"');
   });
 
   it('does not ship public profile pages or creator RSS routes', () => {
