@@ -32,7 +32,7 @@ export default function PrivacyPage() {
 
           <h3>Content You Create</h3>
           <p>
-            We store lessons you generate, discovery chat conversations, scripts,
+            We store lessons you generate, lesson creation chat conversations, scripts,
             interactions (questions and answers), and saved lesson ideas.
           </p>
 
@@ -60,9 +60,9 @@ export default function PrivacyPage() {
 
           <h2>2. Personalization</h2>
           <p>
-            Personalized recommendations use information you provide directly,
-            such as onboarding interests, taste quiz answers, saved lessons, and
-            course context. Sotto does not maintain behavior-derived vectors or
+            Learning personalization uses information you provide directly,
+            such as interest-seeded sourced classes, course context, and saved lessons.
+            Sotto does not maintain behavior-derived vectors or
             anonymous session profiles.
           </p>
           <p>
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
               your account, generate lessons, and deliver the service you requested
             </li>
             <li>
-              <strong>Legitimate interest</strong>: personalized recommendations,
+              <strong>Legitimate interest</strong>: learning personalization,
               abuse prevention, rate limiting, and service improvement. We balance
               these interests against your privacy rights and provide opt-out
               mechanisms where feasible.
@@ -88,7 +88,7 @@ export default function PrivacyPage() {
           <h2>4. How We Use Your Information</h2>
           <ul>
             <li>Generate and deliver lessons you request</li>
-            <li>Provide private library, discovery, and recommendation features</li>
+            <li>Provide private library, interest-seeded sourced classes, and course personalization</li>
             <li>Send notifications about your lessons and interactions</li>
             <li>Moderate content for safety and policy compliance</li>
             <li>Improve service quality, fix bugs, and analyze usage patterns</li>
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <ul>
             <li>
               <strong>AI Providers</strong> (Anthropic, OpenAI): lesson script
-              generation, Q&amp;A, discovery chat, content moderation
+              generation, Q&amp;A, lesson creation chat, content moderation
             </li>
             <li>
               <strong>Speech-to-Text</strong> (OpenAI Whisper): audio

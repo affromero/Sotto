@@ -565,7 +565,7 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Interests</h2>
         <p className={styles.interestsDescription}>
-          Select topics you&apos;re curious about. This helps us recommend better lessons for you.
+          Select topics you want to study. Sotto uses these to suggest sourced-class topics on things that interest you.
         </p>
         <InterestGrid
           categories={interestCategories}
@@ -761,7 +761,7 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>AI Providers</h2>
         <p className={styles.sectionDesc}>
-          Configure your preferred AI providers for scripts, Q&amp;A, and discovery chat.
+          Configure your preferred AI providers for lesson generation, Q&amp;A, and live conversation.
           Keys are encrypted with AES-256-GCM.
         </p>
         <AiProviderCards initialConfigured={configuredAiProviders} providerMeta={aiProviderMeta} />

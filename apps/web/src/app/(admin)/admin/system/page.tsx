@@ -31,7 +31,7 @@ const TOOLS: Tool[] = [
     href: '/admin/episodes',
     glyph: 'book',
     name: 'Lessons',
-    desc: 'All generated lessons with status, plays, and failed-pipeline triage.',
+    desc: 'All generated lessons with status and failed-pipeline triage.',
   },
   {
     href: '/admin/site-config',
