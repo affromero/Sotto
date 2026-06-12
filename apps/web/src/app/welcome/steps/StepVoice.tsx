@@ -37,6 +37,8 @@ function VoicePicker({
   const k = keys[sel.id] ?? '';
   const bu = baseUrls[sel.id] ?? '';
   const selectedLinkLabel = sel.apiLabel === 'API' ? 'Get key' : (sel.apiLabel ?? 'Get key');
+  const selectedLinkAria =
+    sel.apiLabel === 'Docs' ? `Open ${sel.name} docs page` : `Open ${sel.name} API page`;
 
   return (
     <div className={c.voiceBlock}>
@@ -82,7 +84,13 @@ function VoicePicker({
             <Glyph name="lock" size={13} />
             Hosted demo preview · no key or local endpoint is requested or saved.
             {sel.apiUrl ? (
-              <a className={c.voiceInlineLink} href={sel.apiUrl} target="_blank" rel="noreferrer">
+              <a
+                className={c.voiceInlineLink}
+                href={sel.apiUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={selectedLinkAria}
+              >
                 {selectedLinkLabel}
               </a>
             ) : null}
@@ -107,7 +115,13 @@ function VoicePicker({
               aria-label={`${sel.name} endpoint URL (optional)`}
             />
             {sel.apiUrl ? (
-              <a className={c.vkActionLink} href={sel.apiUrl} target="_blank" rel="noreferrer">
+              <a
+                className={c.vkActionLink}
+                href={sel.apiUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={selectedLinkAria}
+              >
                 {selectedLinkLabel}
               </a>
             ) : null}
@@ -129,7 +143,13 @@ function VoicePicker({
               aria-label={`${sel.name} API key`}
             />
             {sel.apiUrl ? (
-              <a className={c.vkActionLink} href={sel.apiUrl} target="_blank" rel="noreferrer">
+              <a
+                className={c.vkActionLink}
+                href={sel.apiUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={selectedLinkAria}
+              >
                 {selectedLinkLabel}
               </a>
             ) : null}
