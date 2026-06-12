@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import Image from 'next/image';
 import { UserActions } from './UserActions';
-import { HandleManager } from '../handles/HandleManager';
 import { Glyph } from '@/components/Glyph';
 import styles from '../../adminTheme.module.css';
 
@@ -67,17 +66,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await auth();
   const currentUserId = session?.user?.id;
 
-  const [{ users, total, totalPages }, handles] = await Promise.all([
-    getUsers(search, page),
-    prisma.reservedHandle.findMany({ orderBy: { handle: 'asc' } }),
-  ]);
-
-  const serializedHandles = handles.map((h) => ({
-    id: h.id,
-    handle: h.handle,
-    reason: h.reason,
-    createdAt: h.createdAt.toISOString(),
-  }));
+  const { users, total, totalPages } = await getUsers(search, page);
 
   return (
     <>
@@ -85,7 +74,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         <div>
           <h1>Users &amp; access</h1>
           <div className={styles.ahSub}>
-            {total.toLocaleString()} learners · roles, levels, and reserved handles
+            {total.toLocaleString()} learners · roles and levels
           </div>
         </div>
       </div>
@@ -188,17 +177,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <div className={`${styles.panel} ${styles.section}`}>
-        <div className={styles.panelHead}>
-          <div className={styles.phTitle}>
-            <Glyph name="lock" size={15} /> Reserved handles
-          </div>
-          <div className={styles.phNote}>{handles.length} reserved</div>
-        </div>
-        <div className={styles.panelBody}>
-          <HandleManager initialHandles={serializedHandles} />
-        </div>
-      </div>
     </>
   );
 }

@@ -53,8 +53,7 @@ export type NotificationType =
   | 'ACCOUNT_WARNING'
   | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
-  | 'PIPELINE_FAILURE'
-  | 'REFERRAL_SIGNUP';
+  | 'PIPELINE_FAILURE';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
