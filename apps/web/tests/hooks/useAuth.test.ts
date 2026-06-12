@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import * as nextAuthReact from 'next-auth/react';
-import type { UserRole } from '@prisma/client';
+import type { UserRole } from '@/generated/prisma/client';
 
 vi.mock('next-auth/react', () => ({
   useSession: vi.fn(),

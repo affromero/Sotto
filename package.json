@@ -49,12 +49,14 @@
     "lint-staged": "^17.0.7",
     "next-auth": "^5.0.0-beta.30",
     "prettier": "^3.8.1",
-    "prisma": "^6.19.2",
+    "prisma": "7.8.0",
     "sort-package-json": "^4.0.0"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
     "geoip-lite": "^2.0.2",
+    "pg": "^8.13.0",
     "pricetoken": "^0.13.9"
   },
   "optionalDependencies": {

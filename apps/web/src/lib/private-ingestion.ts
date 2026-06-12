@@ -1,4 +1,4 @@
-import { Prisma, type EpisodeSource } from '@prisma/client';
+import { Prisma, type EpisodeSource } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { addJob, contentExtractionQueue, JobType } from './queue';
 import type { ExtractContentPayload } from './queue';

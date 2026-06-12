@@ -2,7 +2,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { extractHtmlContent } from '@/lib/extractors/html';
 import { logger } from '@/lib/logger';
 import type { ExtractedFigure, ExtractedTable } from '@/lib/extractors/types';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 
 const MAX_DISCOVERY_FIGURES = 20;
 const MAX_DISCOVERY_TABLES = 10;

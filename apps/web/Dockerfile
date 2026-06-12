@@ -34,6 +34,12 @@ COPY apps/web ./apps/web/
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY tsconfig.base.json ./
 
+# Prisma 7's `prisma-client` generator writes the client to apps/web/src/generated,
+# which is gitignored on the host (so the apps/web COPY above omitted it).
+# Regenerate it here, against the schema + node_modules already present, so
+# `next build` can resolve @/generated/prisma/client.
+RUN npx prisma generate --schema=apps/web/prisma/schema.prisma
+
 ARG COMMIT_SHA=dev
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -86,6 +92,7 @@ COPY --chown=sotto:sotto accounting/ledger ./accounting/ledger/
 
 # Copy Prisma schema and generated client for runtime
 COPY --from=builder --chown=sotto:sotto /app/apps/web/prisma ./apps/web/prisma
+COPY --from=builder --chown=sotto:sotto /app/apps/web/src/generated ./apps/web/src/generated
 COPY --from=deps --chown=sotto:sotto /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=sotto:sotto /app/node_modules/@prisma ./node_modules/@prisma
 

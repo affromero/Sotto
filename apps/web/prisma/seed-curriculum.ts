@@ -1,10 +1,11 @@
 // Seeds the fixed CEFR curriculum skeleton from prisma/curricula/<pair>/.
 // Idempotent: upserts Curriculum (by pair) and Lessons (by curriculumId + slug).
 // Run: npm run seed:curriculum   (or via scripts/setup.sh on fresh installs)
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@/generated/prisma/client';
 import { loadAllCurricula } from './curricula/schema';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL }) });
 
 async function main(): Promise<void> {
   const curricula = loadAllCurricula();

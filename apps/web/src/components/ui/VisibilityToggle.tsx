@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Globe, Link2, Lock } from 'lucide-react';
-import type { EpisodeVisibility } from '@prisma/client';
+import type { EpisodeVisibility } from '@/generated/prisma/client';
 import styles from './VisibilityToggle.module.css';
 
 const ALL_VISIBILITIES: EpisodeVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];

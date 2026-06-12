@@ -2,7 +2,7 @@
 // CourseClass: short, repeatable, and only consolidates the memory graph via
 // spaced-repetition (SM-2). Grounded in retrieval practice + spacing +
 // interleaving — practice selects due-or-weak items and updates their SRS state.
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateSectionQuestions } from './class-generation';
