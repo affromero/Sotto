@@ -997,7 +997,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(sourceConnectorSource).toContain("command: 'codex'");
     expect(sourceConnectorSource).toContain('SLACK_BOT_TOKEN');
     expect(sourceConnectorSource).toContain('GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE');
-    expect(onboardingSources).toContain('Nothing leaves your machine');
+    expect(onboardingSources).toContain('read locally');
     expect(onboardingSources).toContain('privateOnly: true');
     expect(onboardingSources).not.toContain("visibility: 'PUBLIC'");
     expect(onboardingSources).not.toContain('shared content feed');
