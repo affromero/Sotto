@@ -115,7 +115,7 @@ export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsR
 }
 
 /**
- * STT → backend. "whisper" is the keyless local server (infra + base URL);
+ * STT → backend. "whisper" and "local" are keyless local servers (infra + base URL);
  * "assembly" → assemblyai. ElevenLabs keys live in the TTS/BYOK store; every
  * other cloud STT key lives in the AI-key store (matching resolveSttProvider).
  */

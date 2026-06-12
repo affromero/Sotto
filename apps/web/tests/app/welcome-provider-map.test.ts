@@ -96,6 +96,12 @@ describe('resolveStt', () => {
     expect(r.infra).toEqual({ sttProvider: 'local', sttBaseUrl: 'http://localhost:8000/v1' });
   });
 
+  it('maps the local STT sidecar option to the keyless local STT server', () => {
+    const r = resolveStt('local', '', 'http://localhost:8001/v1');
+    expect(r.keyPost).toBeNull();
+    expect(r.infra).toEqual({ sttProvider: 'local', sttBaseUrl: 'http://localhost:8001/v1' });
+  });
+
   it('remaps the assembly label to the assemblyai provider (AI-key store)', () => {
     const r = resolveStt('assembly', 'aai_key', '');
     expect(r.keyPost).toEqual({ endpoint: 'ai-keys', provider: 'assemblyai', apiKey: 'aai_key' });
