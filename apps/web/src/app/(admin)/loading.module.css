@@ -1,61 +1,64 @@
+/*
+ * Admin loading skeleton. Renders inside AdminShell's .adminInner, so it inherits
+ * the aula tokens (--line-strong, --well, --r) from .shell and tracks light/dark.
+ */
+
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  max-width: var(--max-content-width);
+  gap: 18px;
 }
 
 .bone {
-  background: var(--color-border);
-  border-radius: var(--radius-md);
-  animation: pulse 1.5s ease-in-out infinite;
+  background: var(--line-strong, rgba(0, 0, 0, 0.12));
+  border-radius: 9px;
+  animation: adminBonePulse 1.5s ease-in-out infinite;
 }
 
 .header {
-  width: 200px;
-  height: 28px;
+  width: 220px;
+  height: 30px;
 }
 
-/* Stat cards grid */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: var(--spacing-md);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
 }
 
 .statCard {
-  height: 100px;
-  border-radius: var(--radius-xl);
+  height: 96px;
 }
 
-/* Table placeholder */
 .table {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
+  gap: 12px;
+  margin-top: 6px;
 }
 
 .tableRow {
-  height: 20px;
-  border-radius: var(--radius-sm);
+  height: 22px;
 }
 
-/* Staggered animation delays */
-.delay1 { animation-delay: 100ms; }
-.delay2 { animation-delay: 200ms; }
-.delay3 { animation-delay: 300ms; }
-.delay4 { animation-delay: 400ms; }
-
-@media (max-width: 899px) {
-  .statsGrid {
-    grid-template-columns: repeat(3, 1fr);
+@keyframes adminBonePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 
-@media (max-width: 599px) {
+@media (max-width: 720px) {
   .statsGrid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bone {
+    animation: none;
   }
 }

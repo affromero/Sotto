@@ -1,0 +1,912 @@
+/*
+ * adminTheme.module.css — the aula admin console design system.
+ * Ported from SottoDesign sotto.css (admin block) + theme.css palettes.
+ * Tokens live on .shell; dark mode swaps to the terminal palette off the global
+ * [data-theme='dark'] set by ThemeProvider. Imported by AdminShell + every admin page.
+ */
+
+.shell {
+  /* typography — wired from next/font via (admin)/layout.tsx */
+  --serif: var(--font-newsreader, 'Georgia', serif);
+  --mono: var(--font-ibm-plex-mono, 'ui-monospace', monospace);
+  --sans: var(--font-ibm-plex-sans, 'system-ui', sans-serif);
+
+  /* accent — aula blue (light); accent-soft/line track --accent so dark recomputes */
+  --accent: #3f4fb0;
+  --accent-fg: #f0f2ff;
+  --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent);
+  --accent-line: color-mix(in oklab, var(--accent) 42%, transparent);
+
+  /* status hues (shared across modes) */
+  --ok: #1c7a6b;
+  --warn: #b5772a;
+  --danger: #b5462a;
+
+  /* aula light palette */
+  --paper: #f5f4f0;
+  --paper-2: #e9e9e3;
+  --well: #efeeea;
+  --ink: #1e2128;
+  --ink-soft: #565b68;
+  --ink-mute: #8a8f9c;
+  --line: rgba(30, 33, 40, 0.12);
+  --line-strong: rgba(30, 33, 40, 0.24);
+  --voice-bg: #1c1f27;
+  --voice-bg-2: #262a35;
+  --voice-fg: #ecedf2;
+  --voice-soft: #969baa;
+  --grain: 0.04;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --r: 4px;
+
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  position: relative;
+}
+
+/* dark mode — terminal palette (set by ThemeProvider on <html>) */
+:global(html[data-theme='dark']) .shell {
+  --accent: #6a9bff;
+  --accent-fg: #0b0c09;
+  --paper: #121310;
+  --paper-2: #1b1d17;
+  --well: #15170f;
+  --ink: #e9e3d3;
+  --ink-soft: #9d9684;
+  --ink-mute: #6e6857;
+  --line: rgba(233, 227, 211, 0.13);
+  --line-strong: rgba(233, 227, 211, 0.26);
+  --voice-bg: #0b0c09;
+  --voice-bg-2: #131510;
+  --voice-fg: #e9e3d3;
+  --voice-soft: #8c8675;
+  --grain: 0.05;
+}
+
+/* grain overlay */
+.shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------------- rail ---------------- */
+.adminNav {
+  background: var(--voice-bg);
+  color: var(--voice-fg);
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+.adminBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 18px;
+  text-decoration: none;
+  color: var(--voice-fg);
+}
+/* size the glass bead (0.44em) to ~16px via its own font-size */
+.brandBead {
+  font-size: 36px;
+}
+.abWord {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 20px;
+}
+.abTag {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 20px;
+  padding: 2px 7px;
+  margin-left: auto;
+}
+.anavItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--voice-soft);
+  transition: all 0.18s;
+  text-decoration: none;
+}
+.anavItem:hover {
+  color: var(--voice-fg);
+  background: rgba(255, 255, 255, 0.04);
+}
+.anavItem.on {
+  color: var(--voice-fg);
+  background: rgba(255, 255, 255, 0.07);
+}
+.anavItem.on svg {
+  color: var(--accent);
+}
+.anavItem svg {
+  flex: none;
+}
+.badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 20px;
+  padding: 2px 7px;
+}
+.anavFoot {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.anavBack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--voice-soft);
+  padding: 8px;
+  transition: color 0.2s;
+  text-decoration: none;
+}
+.anavBack:hover {
+  color: var(--voice-fg);
+}
+
+/* light/dark toggle in the rail foot */
+.modeToggle {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+  width: fit-content;
+}
+.modeToggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 16px;
+  padding: 6px 11px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--voice-soft);
+  transition: all 0.15s;
+}
+.modeToggle button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* ---------------- main ---------------- */
+.adminMain {
+  overflow-y: auto;
+  background: var(--paper);
+}
+.adminInner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 30px clamp(20px, 3.5vw, 44px) 70px;
+}
+
+.adminHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+}
+.adminHead h1,
+.adminHead h2 {
+  font-family: var(--serif);
+  font-size: 28px;
+  color: var(--ink);
+  margin: 0;
+  font-weight: 420;
+}
+.ahSub {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.headLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+/* size the glass bead in a page header (~30px from 0.44em) */
+.headBead {
+  font-size: 68px;
+}
+
+/* empty / zero-state inside a panel body */
+.empty {
+  font-size: 13px;
+  color: var(--ink-mute);
+  font-style: italic;
+  padding: 8px 2px;
+}
+.ahActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btnSm {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 5px;
+  padding: 9px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+  color: var(--ink-soft);
+  transition: all 0.18s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btnSm:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+.btnSm.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.btnSm.primary:hover {
+  filter: brightness(1.07);
+}
+
+/* ---------------- stat cards ---------------- */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 16px 18px;
+}
+.stLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.stLabel svg {
+  color: var(--accent);
+}
+.stVal {
+  font-family: var(--serif);
+  font-size: 30px;
+  color: var(--ink);
+  margin-top: 8px;
+  line-height: 1;
+}
+.stVal small {
+  font-size: 15px;
+  color: var(--ink-mute);
+}
+.stDelta {
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.stDelta.up {
+  color: var(--danger);
+}
+.stDelta.down {
+  color: var(--ok);
+}
+.stDelta.flat {
+  color: var(--ink-mute);
+}
+
+/* ---------------- panel ---------------- */
+.panel {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.phTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.phTitle svg {
+  color: var(--accent);
+}
+.phNote {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-mute);
+}
+.panelBody {
+  padding: 18px;
+}
+.panel2col {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+}
+
+/* ---------------- legend ---------------- */
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.legendRow {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 11px;
+}
+.lgDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+.lgName {
+  font-size: 13px;
+  color: var(--ink);
+}
+.lgName small {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  display: block;
+  margin-top: 1px;
+}
+.lgVal {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink);
+  text-align: right;
+}
+.lgVal small {
+  display: block;
+  color: var(--ink-mute);
+  font-size: 10px;
+}
+
+/* ---------------- data table ---------------- */
+.dtable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dtable th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-strong);
+  font-weight: 400;
+}
+.dtable td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink);
+  vertical-align: middle;
+}
+.dtable tr:last-child td {
+  border-bottom: 0;
+}
+.dtable tr:hover td {
+  background: color-mix(in oklab, var(--accent) 4%, transparent);
+}
+.uCell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.uAv {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: #fff;
+  flex: none;
+}
+.uAv::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.32), transparent 50%);
+}
+.uAv .ini {
+  position: relative;
+  z-index: 1;
+}
+.uName b {
+  font-weight: 600;
+}
+.uName span {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  display: block;
+}
+.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+/* ---------------- status pill ---------------- */
+.pillStatus {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pillStatus::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pillStatus.ok {
+  color: var(--ok);
+  background: color-mix(in oklab, var(--ok) 13%, transparent);
+}
+.pillStatus.warn {
+  color: var(--warn);
+  background: color-mix(in oklab, var(--warn) 14%, transparent);
+}
+.pillStatus.suspended,
+.pillStatus.err {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 13%, transparent);
+}
+
+.rowActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.iconBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-mute);
+  transition: all 0.15s;
+}
+.iconBtn:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+/* ---------------- provider rows ---------------- */
+.provRow {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.provRow:last-child {
+  border-bottom: 0;
+}
+.provIco {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.provName {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.provMeta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-top: 3px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.provRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ---------------- model select cards ---------------- */
+.modelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.modelCard {
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 14px 15px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  position: relative;
+  width: 100%;
+}
+.modelCard:hover {
+  border-color: var(--ink-soft);
+}
+.modelCard.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mcName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mcRec {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 20px;
+  padding: 1px 6px;
+}
+.mcNote {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 5px;
+}
+.mcPrice {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  margin-top: 9px;
+}
+.mcCheck {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.modelCard.on .mcCheck {
+  opacity: 1;
+}
+.mcLocal {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ok);
+  border: 1px solid color-mix(in oklab, var(--ok) 40%, transparent);
+  border-radius: 20px;
+  padding: 1px 6px;
+}
+
+/* ---------------- routing rows ---------------- */
+.routeRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.routeRow:last-child {
+  border-bottom: 0;
+}
+.routeTask {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.routeTask svg {
+  color: var(--ink-mute);
+}
+
+/* ---------------- system ---------------- */
+.sysGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.meterLine {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--line-strong);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.meterLine i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 5px;
+}
+.svcRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.svcRow:last-child {
+  border-bottom: 0;
+}
+.svcName {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+.svcNote {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-left: auto;
+}
+.logbox {
+  background: var(--voice-bg);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+
+.updateBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  background: linear-gradient(100deg, var(--accent-soft), transparent);
+  border: 1px solid var(--accent-line);
+}
+.updateBanner svg {
+  color: var(--accent);
+  flex: none;
+}
+.ubText {
+  font-size: 14px;
+  color: var(--ink);
+}
+.ubText b {
+  color: var(--accent);
+}
+.ubSpacer {
+  flex: 1;
+}
+
+/* ---------------- segmented control (sub-tabs) ---------------- */
+.seg {
+  display: inline-flex;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.seg button {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.seg button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* ---------------- scrollbars ---------------- */
+.adminMain::-webkit-scrollbar,
+.adminNav::-webkit-scrollbar {
+  width: 10px;
+}
+.adminMain::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 10px;
+  border: 3px solid var(--paper);
+}
+
+/* ---------------- mobile rail ---------------- */
+.menuButton {
+  display: none;
+}
+.topBar {
+  display: none;
+}
+.overlay {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .topBar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--voice-bg);
+    color: var(--voice-fg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .menuButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: var(--voice-fg);
+    cursor: pointer;
+  }
+  .adminNav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 248px;
+    z-index: 95;
+    transform: translateX(-100%);
+    transition: transform 0.2s var(--ease);
+  }
+  .adminNav.open {
+    transform: none;
+  }
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 94;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .statGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .panel2col,
+  .sysGrid {
+    grid-template-columns: 1fr;
+  }
+  .adminInner {
+    padding: 22px 16px 70px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adminNav {
+    transition: none;
+  }
+}
