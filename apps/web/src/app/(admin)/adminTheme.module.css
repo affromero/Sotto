@@ -825,6 +825,40 @@
   color: var(--accent-fg);
 }
 
+/* sub-tab strip above an embedded section */
+.subTabs {
+  margin-bottom: 22px;
+}
+
+/* explanatory note block */
+.note {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-top: 18px;
+}
+.noteTitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.noteTitle svg {
+  color: var(--accent);
+}
+.note p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 8px 0 0;
+  max-width: 70ch;
+}
+
 /* ---------------- scrollbars ---------------- */
 .adminMain::-webkit-scrollbar,
 .adminNav::-webkit-scrollbar {
