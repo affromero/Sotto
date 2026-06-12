@@ -14,11 +14,11 @@ Sotto is an open-source, self-hostable language-learning platform. Learners work
 
 Think of it as the language tutor that already knows you - private, on infrastructure you control.
 
-### 1.2 Name Etymology
+### 1.2 Name Meaning
 
-**Sotto** comes from the Italian musical term **"sotto voce"** (pronounced SOH-toh VOH-cheh), meaning "under the voice" or "in a soft voice." In music and theater, it refers to speaking or singing in a deliberately quiet, intimate tone — as if sharing something meant just for you.
+**Sotto** should feel compact, quiet, and personal: a language tutor that adapts to the learner's level and chosen context without turning study into spectacle.
 
-This etymology carries three layers of meaning for the brand:
+This name direction carries three layers of meaning for the brand:
 
 1. **Intimacy**: The product creates a private, personalized learning experience - like having a patient tutor adjust to your level and context
 2. **Voice as medium**: Listening and speaking practice are built around the human voice - AI-generated where appropriate, but expressive, conversational, and warm
@@ -74,7 +74,7 @@ Four distinct creative directions follow. Each is viable. A designer may pursue 
 
 - Immediately communicates listening and speaking practice without being a generic media icon
 - The dual waves encode guided exchange between learner and tutor
-- The softness aligns with "sotto voce" — quiet, intimate, gentle
+- The softness aligns with quiet, intimate study
 - Scalable from favicon to billboard
 
 **Variations to explore**:
@@ -575,7 +575,7 @@ When reviewing logo concepts, score each on these dimensions:
 | ---------------------- | ------------------------------------------------- |
 | **Brand name**         | Sotto                                             |
 | **Tagline**            | Learn a language, taught in your own context.     |
-| **Origin**             | Italian: "sotto voce" = soft voice, intimate tone |
+| **Origin**             | Quiet, personal study on infrastructure the learner controls |
 | **Product**            | Free, open-source, self-hostable BYOK language learning |
 | **Primary color**      | Aula Blue `#3F4FB0`                               |
 | **Secondary color**    | Ink Slate `#2A3550`                               |

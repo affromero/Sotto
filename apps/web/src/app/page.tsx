@@ -368,9 +368,8 @@ export default function LandingPage() {
           <LandingCTA withGhost demoMode={demoMode} />
 
           <p className={styles.whisper}>
-            <span className={styles.whisperTag}>sotto voce</span>
-            Spoken softly, kept private. The agent that already knows you, now teaching you to
-            speak.
+            <span className={styles.whisperTag}>private by design</span>
+            The agent that already knows you, now teaching you to speak.
           </p>
         </section>
 
@@ -565,8 +564,8 @@ export default function LandingPage() {
           <LandingCTA demoMode={demoMode} />
 
           <p className={styles.whisper}>
-            <span className={styles.whisperTag}>sotto voce</span>
-            {BRAND.origin}.
+            <span className={styles.whisperTag}>context you control</span>
+            {BRAND.origin}
           </p>
         </section>
       </main>

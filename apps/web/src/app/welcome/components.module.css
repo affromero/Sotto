@@ -169,8 +169,7 @@
   background: var(--well);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 16px 18px;
-  cursor: pointer;
+  padding: 14px 14px 14px 18px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -179,6 +178,26 @@
     background 0.2s,
     transform 0.15s var(--ease);
   min-height: 44px;
+}
+
+.providerSelect {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.providerSelect:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .providerCard:hover {
@@ -225,15 +244,26 @@
   letter-spacing: 0.02em;
 }
 
-.recTag {
+.providerLink {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent);
   border: 1px solid var(--accent-line);
-  border-radius: 20px;
-  padding: 2px 7px;
+  border-radius: var(--r);
+  text-decoration: none;
+  padding: 0 10px;
+}
+
+.providerLink:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 /* connect box */
@@ -462,6 +492,12 @@
   margin-top: 12px;
 }
 
+.voiceChoice {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
 .voiceChip {
   display: inline-flex;
   align-items: center;
@@ -492,15 +528,27 @@
   background: var(--accent-soft);
 }
 
-.vcTag {
+.voiceProviderLink {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
+  font-size: 9px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  border: 1px solid currentColor;
+  color: var(--accent);
+  background: var(--paper);
+  border: 1px solid var(--accent-line);
   border-radius: 20px;
-  padding: 1px 6px;
-  opacity: 0.8;
+  padding: 0 10px;
+  text-decoration: none;
+}
+
+.voiceProviderLink:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .vcLocal {
@@ -786,15 +834,33 @@
 }
 
 .sourceList {
-  margin-top: 26px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.sourceIntro {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.sourceIntroLabel {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
 .sourceRow {
   display: grid;
-  grid-template-columns: 38px 1fr auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   background: var(--well);
@@ -831,6 +897,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .slabel {
@@ -844,7 +911,6 @@
   font-size: 10.5px;
   color: var(--ink-mute);
   letter-spacing: 0.03em;
-  white-space: nowrap;
 }
 
 .ssample {
@@ -865,35 +931,28 @@
   margin-top: 5px;
 }
 
-.switch {
-  width: 40px;
-  height: 23px;
-  border-radius: 20px;
-  flex: none;
-  background: var(--line-strong);
-  position: relative;
-  transition: background 0.25s var(--ease);
-}
-
-.switch::after {
-  content: '';
-  position: absolute;
-  top: 2.5px;
-  left: 2.5px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+.sourceState {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 86px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
   background: var(--paper);
-  transition: transform 0.25s var(--ease);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.sourceRowOn .switch {
-  background: var(--accent);
-}
-
-.sourceRowOn .switch::after {
-  transform: translateX(17px);
+.sourceStateOn {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
 }
 
 .ctxTally {

@@ -25,7 +25,6 @@ interface Props {
 }
 
 const MAX_FILE_CHARS = 1800;
-const MAX_FILES_PER_PICK = 5;
 const TEXT_FILE_EXTENSIONS = new Set([
   'csv',
   'html',
@@ -162,14 +161,19 @@ export function StepContext({
     setUploading(true);
     setFileError(null);
     try {
-      const selected = files.slice(0, MAX_FILES_PER_PICK);
-      const items = await Promise.all(selected.map(contextItemFromFile));
+      const results = await Promise.allSettled(files.map(contextItemFromFile));
+      const items = results.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : []
+      );
+      const failed = results.length - items.length;
       addContextItems(items);
-      if (files.length > MAX_FILES_PER_PICK) {
-        setFileError(`Added the first ${MAX_FILES_PER_PICK} files.`);
+      if (failed > 0) {
+        setFileError(
+          `Added ${items.length} file${items.length === 1 ? '' : 's'}; ${failed} could not be read.`
+        );
       }
     } catch {
-      setFileError('Could not read that file.');
+      setFileError('Could not read those files.');
     } finally {
       setUploading(false);
       input.value = '';
@@ -191,7 +195,7 @@ export function StepContext({
       <p className={t.lede}>
         {demoMode
           ? 'This is the part that makes Sotto yours. In the hosted demo, these are mock context signals so you can see how a course gets shaped without connecting anything.'
-          : 'This is the part that makes Sotto yours. Choose what the agent may read — it draws every lesson, reading, and audio lesson from the context you share. Nothing leaves your machine.'}
+          : 'This is the part that makes Sotto yours. Choose what the agent may read, then add any links, notes, topics, or files you want woven into the course.'}
       </p>
 
       <form className={c.contextBar} onSubmit={submitEntry}>
@@ -213,11 +217,11 @@ export function StepContext({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          aria-label="Upload context file"
-          title="Upload context file"
+          aria-label="Upload context files"
+          title="Upload context files"
         >
           <Glyph name="upload" size={17} />
-          {uploading ? 'Reading' : 'Upload'}
+          {uploading ? 'Reading' : 'Upload files'}
         </button>
         <input
           ref={fileInputRef}
@@ -253,17 +257,23 @@ export function StepContext({
       ) : null}
       {fileError ? <div className={c.contextNotice}>{fileError}</div> : null}
 
+      <div className={c.sourceIntro}>
+        <span className={c.sourceIntroLabel}>Context sources</span>
+        <span>Selected sources and uploaded files shape lesson topics and examples.</span>
+      </div>
+
       <div className={c.sourceList}>
         {SOURCES.map((s) => {
           const on = sources.has(s.id);
+          const sourceAction = on ? 'Included' : 'Include';
           return (
             <button
               key={s.id}
+              type="button"
               className={`${c.sourceRow} ${on ? c.sourceRowOn : ''}`}
               onClick={() => toggle(s.id)}
-              role="switch"
-              aria-checked={on}
-              aria-label={`${s.label}: ${s.meta}`}
+              aria-pressed={on}
+              aria-label={`${on ? 'Remove' : 'Include'} ${s.label} context: ${s.meta}`}
             >
               <span className={c.sico}>
                 <Glyph name={iconFor(s.id)} size={20} />
@@ -275,7 +285,10 @@ export function StepContext({
                 </div>
                 <div className={c.ssample}>e.g. {s.sample}</div>
               </div>
-              <span className={c.switch} aria-hidden="true" />
+              <span className={`${c.sourceState} ${on ? c.sourceStateOn : ''}`} aria-hidden="true">
+                {on ? <Glyph name="check" size={13} /> : null}
+                {sourceAction}
+              </span>
             </button>
           );
         })}

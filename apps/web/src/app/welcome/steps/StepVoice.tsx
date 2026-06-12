@@ -47,25 +47,36 @@ function VoicePicker({
         {providers.map((p) => {
           const set = !p.local && (keys[p.id] ?? '').trim().length > 0;
           return (
-            <button
-              key={p.id}
-              className={`${c.voiceChip} ${value === p.id ? c.voiceChipSel : ''}`}
-              onClick={() => onChange(p.id)}
-              aria-pressed={value === p.id}
-            >
-              {p.name}
-              {p.rec && <span className={c.vcTag}>rec</span>}
-              {p.local && (
-                <span className={c.vcLocal}>
-                  <Glyph name="shield" size={12} />
-                </span>
-              )}
-              {set && (
-                <span className={c.vcSet}>
-                  <Glyph name="check" size={12} />
-                </span>
-              )}
-            </button>
+            <span key={p.id} className={c.voiceChoice}>
+              <button
+                className={`${c.voiceChip} ${value === p.id ? c.voiceChipSel : ''}`}
+                onClick={() => onChange(p.id)}
+                aria-pressed={value === p.id}
+              >
+                {p.name}
+                {p.local && (
+                  <span className={c.vcLocal}>
+                    <Glyph name="shield" size={12} />
+                  </span>
+                )}
+                {set && (
+                  <span className={c.vcSet}>
+                    <Glyph name="check" size={12} />
+                  </span>
+                )}
+              </button>
+              {p.apiUrl ? (
+                <a
+                  className={c.voiceProviderLink}
+                  href={p.apiUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${p.name} ${p.apiLabel ?? 'API'} page`}
+                >
+                  {p.apiLabel ?? 'API'}
+                </a>
+              ) : null}
+            </span>
           );
         })}
       </div>

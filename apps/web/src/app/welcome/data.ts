@@ -25,7 +25,8 @@ export interface Provider {
   name: string;
   meta: string;
   icon: GlyphName;
-  rec?: boolean;
+  apiUrl?: string;
+  apiLabel?: string;
   cli?: ProviderCli;
   keyHint?: string;
   kind?: 'url' | 'key';
@@ -36,7 +37,8 @@ export interface VoiceProvider {
   id: string;
   name: string;
   note: string;
-  rec?: boolean;
+  apiUrl?: string;
+  apiLabel?: string;
   local?: boolean;
   keyHint?: string;
 }
@@ -252,7 +254,8 @@ export const PROVIDERS: Provider[] = [
     name: 'Claude',
     meta: 'Anthropic · CLI or API',
     icon: 'plug',
-    rec: true,
+    apiUrl: 'https://platform.claude.com/',
+    apiLabel: 'API',
     cli: { label: 'Claude Code', bin: 'claude', ver: '1.2.4', path: '/usr/local/bin/claude' },
     keyHint: 'sk-ant-…',
   },
@@ -261,6 +264,8 @@ export const PROVIDERS: Provider[] = [
     name: 'Codex',
     meta: 'OpenAI · CLI or API',
     icon: 'plug',
+    apiUrl: 'https://platform.openai.com/api-keys',
+    apiLabel: 'API',
     cli: { label: 'Codex CLI', bin: 'codex', ver: '0.9.1', path: '/opt/homebrew/bin/codex' },
     keyHint: 'sk-…',
   },
@@ -269,6 +274,8 @@ export const PROVIDERS: Provider[] = [
     name: 'Local',
     meta: 'Ollama · llama.cpp · LM Studio',
     icon: 'link',
+    apiUrl: 'https://ollama.com/',
+    apiLabel: 'Docs',
     kind: 'url',
     hint: 'http://localhost:11434',
   },
@@ -287,58 +294,122 @@ export const TTS_PROVIDERS: VoiceProvider[] = [
     id: 'elevenlabs',
     name: 'ElevenLabs',
     note: 'expressive multilingual voices',
-    rec: true,
+    apiUrl: 'https://elevenlabs.io/app/settings/api-keys',
+    apiLabel: 'API',
     keyHint: 'xi-api-key…',
   },
-  { id: 'hume', name: 'Hume', note: 'emotionally-aware prosody', keyHint: 'hume_…' },
-  { id: 'openai', name: 'OpenAI', note: 'natural, low cost', keyHint: 'sk-…' },
-  { id: 'cartesia', name: 'Cartesia', note: 'low-latency Sonic voices', keyHint: 'sk_car_…' },
-  { id: 'kokoro', name: 'Kokoro', note: 'runs on-device', local: true },
+  {
+    id: 'hume',
+    name: 'Hume',
+    note: 'emotionally-aware prosody',
+    apiUrl: 'https://dev.hume.ai/docs/introduction/api-key',
+    apiLabel: 'API',
+    keyHint: 'hume_…',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    note: 'natural, low cost',
+    apiUrl: 'https://platform.openai.com/api-keys',
+    apiLabel: 'API',
+    keyHint: 'sk-…',
+  },
+  {
+    id: 'cartesia',
+    name: 'Cartesia',
+    note: 'low-latency Sonic voices',
+    apiUrl: 'https://play.cartesia.ai/keys',
+    apiLabel: 'API',
+    keyHint: 'sk_car_…',
+  },
+  {
+    id: 'kokoro',
+    name: 'Kokoro',
+    note: 'runs on-device',
+    apiUrl: 'https://github.com/hexgrad/kokoro',
+    apiLabel: 'Docs',
+    local: true,
+  },
 ];
 
 export const STT_PROVIDERS: VoiceProvider[] = [
-  { id: 'whisper', name: 'Whisper', note: 'on-device, private', local: true, rec: true },
-  { id: 'deepgram', name: 'Deepgram', note: 'word-level timing', keyHint: 'dg_…' },
-  { id: 'elevenlabs', name: 'ElevenLabs Scribe', note: 'high accuracy', keyHint: 'xi-api-key…' },
-  { id: 'assembly', name: 'AssemblyAI', note: 'phoneme-level scoring', keyHint: 'aai_…' },
-  { id: 'openai', name: 'OpenAI', note: 'gpt-4o transcribe', keyHint: 'sk-…' },
+  {
+    id: 'whisper',
+    name: 'Whisper',
+    note: 'on-device, private',
+    apiUrl: 'https://github.com/openai/whisper',
+    apiLabel: 'Docs',
+    local: true,
+  },
+  {
+    id: 'deepgram',
+    name: 'Deepgram',
+    note: 'word-level timing',
+    apiUrl: 'https://developers.deepgram.com/docs/create-additional-api-keys',
+    apiLabel: 'API',
+    keyHint: 'dg_…',
+  },
+  {
+    id: 'elevenlabs',
+    name: 'ElevenLabs Scribe',
+    note: 'high accuracy',
+    apiUrl: 'https://elevenlabs.io/app/settings/api-keys',
+    apiLabel: 'API',
+    keyHint: 'xi-api-key…',
+  },
+  {
+    id: 'assembly',
+    name: 'AssemblyAI',
+    note: 'phoneme-level scoring',
+    apiUrl: 'https://www.assemblyai.com/dashboard/signup',
+    apiLabel: 'API',
+    keyHint: 'aai_…',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    note: 'gpt-4o transcribe',
+    apiUrl: 'https://platform.openai.com/api-keys',
+    apiLabel: 'API',
+    keyHint: 'sk-…',
+  },
 ];
 
 export const SOURCES: Source[] = [
   {
     id: 'repos',
     label: 'Code & repos',
-    meta: 'what you build',
-    sample: 'deploy pipelines, Rust, k8s manifests',
+    meta: 'project terms and docs',
+    sample: 'pull requests, READMEs, deploy notes',
   },
   {
     id: 'reading',
     label: 'Reading list',
-    meta: 'what you follow',
+    meta: 'articles and saved links',
     sample: 'papers on distributed systems, sci-fi',
   },
   {
     id: 'notes',
     label: 'Notes & docs',
-    meta: 'what you think about',
+    meta: 'personal notes and drafts',
     sample: 'design docs, daily journal',
   },
   {
     id: 'calendar',
     label: 'Calendar',
-    meta: 'your week',
+    meta: 'events and routines',
     sample: 'standups, a trip to Bologna in May',
   },
   {
     id: 'music',
     label: 'Listening history',
-    meta: 'your ear',
+    meta: 'audio interests',
     sample: 'jazz, lo-fi, Italian lessons',
   },
   {
     id: 'manual',
     label: 'Topics, by hand',
-    meta: 'tell it directly',
+    meta: 'manual interests',
     sample: 'cooking, climbing, opera',
   },
 ];

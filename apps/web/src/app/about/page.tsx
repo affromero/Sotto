@@ -19,8 +19,8 @@ export default function AboutPage() {
             <p className={styles.heroSubtitle}>
               Sotto is open-source, self-hostable language-learning infrastructure.
               You learn a language in the context of your own work and interests,
-              on a stack you run and control. The name is Italian. Sotto voce.
-              Spoken softly, kept private.
+              on a stack you run and control. It stays private because you own the
+              agent, keys, data, and infrastructure.
             </p>
           </header>
 

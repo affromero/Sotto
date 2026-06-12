@@ -121,6 +121,15 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByRole('button', { name: /Codex/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Local/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Custom/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open claude api page/i })).toHaveAttribute(
+      'href',
+      'https://platform.claude.com/'
+    );
+    expect(screen.getByRole('link', { name: /open codex api page/i })).toHaveAttribute(
+      'href',
+      'https://platform.openai.com/api-keys'
+    );
+    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Gemini')).not.toBeInTheDocument();
   });
 
@@ -190,6 +199,15 @@ describe('welcome hosted-demo mode', () => {
     );
 
     expect(screen.getAllByText(/no key or local endpoint is requested or saved/i)).toHaveLength(2);
+    expect(screen.getByRole('link', { name: /open elevenlabs api page/i })).toHaveAttribute(
+      'href',
+      'https://elevenlabs.io/app/settings/api-keys'
+    );
+    expect(screen.getByRole('link', { name: /open whisper docs page/i })).toHaveAttribute(
+      'href',
+      'https://github.com/openai/whisper'
+    );
+    expect(screen.queryByText(/^rec$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/ElevenLabs API key/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Deepgram API key/i)).not.toBeInTheDocument();
   });
@@ -231,16 +249,70 @@ describe('welcome hosted-demo mode', () => {
     );
     await user.click(screen.getByRole('button', { name: /^Add$/i }));
 
-    const file = new File(['Italian notes from a design doc'], 'notes.md', {
-      type: 'text/markdown',
-    });
-    await user.upload(screen.getByLabelText(/Choose context files/i), file);
+    const files = Array.from(
+      { length: 7 },
+      (_, index) =>
+        new File([`Italian notes from design doc ${index + 1}`], `notes-${index + 1}.md`, {
+          type: 'text/markdown',
+        })
+    );
+    await user.upload(screen.getByLabelText(/Choose context files/i), files);
     await waitFor(() => {
-      expect(contextItems.map((item) => item.kind)).toEqual(['link', 'text', 'file']);
+      expect(contextItems.map((item) => item.kind)).toEqual([
+        'link',
+        'text',
+        'file',
+        'file',
+        'file',
+        'file',
+        'file',
+        'file',
+        'file',
+      ]);
     });
     rerender(renderStep());
 
-    expect(screen.getByText('notes.md')).toBeInTheDocument();
+    expect(screen.getByText('notes-7.md')).toBeInTheDocument();
+    expect(screen.queryByText(/Added the first/i)).not.toBeInTheDocument();
+  });
+
+  it('labels source selections as included context instead of opaque toggles', async () => {
+    const user = userEvent.setup();
+    const selected = new Set<string>();
+    const toggle = vi.fn((id: string) => {
+      if (selected.has(id)) selected.delete(id);
+      else selected.add(id);
+    });
+
+    const renderStep = () => (
+      <StepContext
+        sources={selected}
+        toggle={toggle}
+        contextItems={[]}
+        setContextItems={vi.fn()}
+        demoMode={false}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    const { rerender } = render(renderStep());
+
+    const reading = screen.getByRole('button', {
+      name: /include reading list context: articles and saved links/i,
+    });
+    expect(reading).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getAllByText('Include').length).toBeGreaterThan(0);
+
+    await user.click(reading);
+    rerender(renderStep());
+
+    expect(
+      screen.getByRole('button', {
+        name: /remove reading list context: articles and saved links/i,
+      })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Included')).toBeInTheDocument();
   });
 
   it('finishes the hosted demo without saving or navigating into the app', async () => {
@@ -329,6 +401,9 @@ describe('welcome hosted-demo mode', () => {
     });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain(
       'https://example.com/paper'
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain(
+      'Allowed context sources:'
     );
     expect(mockPush).toHaveBeenCalledWith('/learn');
   });
