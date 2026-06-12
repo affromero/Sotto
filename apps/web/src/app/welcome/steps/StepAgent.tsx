@@ -59,22 +59,35 @@ export function StepAgent({ agent, demoMode, setAgent, onNext, onBack }: Props) 
 
       <div className={c.providerGrid}>
         {PROVIDERS.map((p) => (
-          <button
+          <div
             key={p.id}
             className={`${c.providerCard} ${agent.provider === p.id ? c.providerCardSel : ''}`}
-            onClick={() => pick(p.id)}
-            aria-pressed={agent.provider === p.id}
           >
-            <span className={c.pico}>
-              <Glyph name={p.icon} size={20} />
-            </span>
-            <div>
-              <div className={c.pname}>
-                {p.name} {p.rec && <span className={c.recTag}>recommended</span>}
+            <button
+              className={c.providerSelect}
+              onClick={() => pick(p.id)}
+              aria-pressed={agent.provider === p.id}
+            >
+              <span className={c.pico}>
+                <Glyph name={p.icon} size={20} />
+              </span>
+              <div>
+                <div className={c.pname}>{p.name}</div>
+                <div className={c.pmeta}>{p.meta}</div>
               </div>
-              <div className={c.pmeta}>{p.meta}</div>
-            </div>
-          </button>
+            </button>
+            {p.apiUrl ? (
+              <a
+                className={c.providerLink}
+                href={p.apiUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${p.name} ${p.apiLabel ?? 'API'} page`}
+              >
+                {p.apiLabel ?? 'API'}
+              </a>
+            ) : null}
+          </div>
         ))}
       </div>
 

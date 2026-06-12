@@ -20,7 +20,6 @@ export interface PronunciationRule {
  */
 export const BRAND_PRONUNCIATIONS: PronunciationRule[] = [
   { grapheme: 'Sotto', alias: 'Sot-toe' },
-  { grapheme: 'sotto voce', alias: 'sot-toe voh-chay' },
   { grapheme: 'BYOK', alias: 'bee-yok' },
   { grapheme: 'BullMQ', alias: 'bull M Q' },
 ];
