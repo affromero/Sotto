@@ -16,6 +16,14 @@
   overflow: hidden;
 }
 
+/* dark mode — deepen the rail "voice" surface to the terminal palette */
+:global(html[data-theme='dark']) .cshell {
+  --voice-bg: #0b0c09;
+  --voice-fg: #e9e3d3;
+  --voice-soft: #8c8675;
+  --grain: 0.05;
+}
+
 .cshell::before {
   content: '';
   position: fixed;

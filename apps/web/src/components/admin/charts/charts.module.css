@@ -1,0 +1,101 @@
+/*
+ * charts.module.css — styles for the dependency-free admin SVG charts.
+ * Colors inherit the aula token vars (--accent, --ink-mute, --line-strong)
+ * from the surrounding admin .shell, so these track light/dark automatically.
+ */
+
+.chart {
+  overflow: visible;
+}
+.chartX {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: var(--ink-mute);
+}
+
+/* horizontal stacked share bar */
+.sharebar {
+  display: flex;
+  height: 12px;
+  border-radius: 7px;
+  overflow: hidden;
+  gap: 2px;
+  margin: 6px 0 16px;
+}
+.sharebarSeg {
+  transition: width 0.5s var(--ease);
+}
+
+/* vertical bar set (per-row labelled) */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.barsRow {
+  display: grid;
+  grid-template-columns: 96px 1fr 76px;
+  align-items: center;
+  gap: 12px;
+}
+.barsLabel {
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barsTrack {
+  height: 9px;
+  background: var(--line-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.barsFill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.6s var(--ease);
+}
+.barsVal {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+/* donut */
+.donutWrap {
+  position: relative;
+  flex: none;
+}
+.donutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.donutNum {
+  font-family: var(--serif);
+  font-size: 22px;
+  color: var(--ink);
+}
+.donutSub {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.sparkline {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sharebarSeg,
+  .barsFill {
+    transition: none;
+  }
+}

@@ -3,20 +3,20 @@ import { auth } from '@/lib/auth';
 import Link from 'next/link';
 import Image from 'next/image';
 import { UserActions } from './UserActions';
-import styles from './page.module.css';
+import { HandleManager } from '../handles/HandleManager';
+import { Glyph } from '@/components/Glyph';
+import styles from '../../adminTheme.module.css';
+
+export const metadata = { title: 'Users & access · Sotto admin' };
 
 interface PageProps {
-  searchParams: Promise<{
-    search?: string;
-    page?: string;
-  }>;
+  searchParams: Promise<{ search?: string; page?: string }>;
 }
 
 const USERS_PER_PAGE = 25;
 
 async function getUsers(search: string | undefined, page: number) {
   const skip = (page - 1) * USERS_PER_PAGE;
-
   const where = search
     ? {
         OR: [
@@ -36,13 +36,11 @@ async function getUsers(search: string | undefined, page: number) {
         image: true,
         role: true,
         createdAt: true,
-        _count: {
-          select: {
-            episodes: true,
-            userAiKeys: { where: { isValid: true } },
-            userTtsKeys: { where: { isValid: true } },
-          },
+        courses: {
+          select: { startLevel: true, currentLevel: true, targetLang: true },
+          orderBy: { createdAt: 'asc' },
         },
+        _count: { select: { episodes: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -54,7 +52,7 @@ async function getUsers(search: string | undefined, page: number) {
   return { users, total, totalPages: Math.ceil(total / USERS_PER_PAGE) };
 }
 
-function buildPaginationHref(page: number, search?: string) {
+function pageHref(page: number, search?: string) {
   const params = new URLSearchParams();
   params.set('page', String(page));
   if (search) params.set('search', search);
@@ -69,69 +67,77 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await auth();
   const currentUserId = session?.user?.id;
 
-  const { users, total, totalPages } = await getUsers(search, page);
+  const [{ users, total, totalPages }, handles] = await Promise.all([
+    getUsers(search, page),
+    prisma.reservedHandle.findMany({ orderBy: { handle: 'asc' } }),
+  ]);
+
+  const serializedHandles = handles.map((h) => ({
+    id: h.id,
+    handle: h.handle,
+    reason: h.reason,
+    createdAt: h.createdAt.toISOString(),
+  }));
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <>
+      <div className={styles.adminHead}>
         <div>
-          <h1 className={styles.title}>Users</h1>
-          <p className={styles.subtitle}>{total.toLocaleString()} total users</p>
+          <h1>Users &amp; access</h1>
+          <div className={styles.ahSub}>
+            {total.toLocaleString()} learners · roles, levels, and reserved handles
+          </div>
         </div>
       </div>
 
-      <div className={styles.filterRow}>
-        <form className={styles.searchForm} action="/admin/users" method="get">
-          <input
-            type="text"
-            name="search"
-            placeholder="Search by name or email..."
-            defaultValue={search}
-            className={styles.searchInput}
-            aria-label="Search users"
-          />
-          <button type="submit" className={styles.searchButton}>
-            Search
-          </button>
-        </form>
-      </div>
+      <form className={styles.searchRow} action="/admin/users" method="get">
+        <input
+          type="text"
+          name="search"
+          placeholder="Search by name or email"
+          defaultValue={search}
+          className={styles.searchInput}
+          aria-label="Search learners"
+        />
+        <button type="submit" className={`${styles.btnSm} ${styles.primary}`}>
+          <Glyph name="graph" size={13} /> Search
+        </button>
+      </form>
 
-      <div className={styles.tableContainer}>
-        <table className={styles.table}>
+      <div className={styles.panel}>
+        <table className={styles.dtable}>
           <thead>
             <tr>
-              <th>User</th>
-              <th>Email</th>
+              <th>Learner</th>
               <th>Role</th>
-              <th>Episodes</th>
+              <th>Level</th>
+              <th>Lessons</th>
               <th>Joined</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => {
               const displayName = user.name || user.email || 'Unknown';
-              const initials = displayName.charAt(0).toUpperCase();
-
+              const initial = displayName.charAt(0).toUpperCase();
+              const course = user.courses[0];
+              const extra = user.courses.length - 1;
               return (
                 <tr key={user.id}>
                   <td>
-                    <div className={styles.userCell}>
-                      <div className={styles.avatar}>
+                    <div className={styles.uCell}>
+                      <div className={styles.uAv}>
                         {user.image ? (
-                          <Image
-                            src={user.image}
-                            alt={`${displayName}'s avatar`}
-                            width={32}
-                            height={32}
-                          />
+                          <Image src={user.image} alt="" width={30} height={30} />
                         ) : (
-                          initials
+                          <span className={styles.ini}>{initial}</span>
                         )}
                       </div>
-                      <span className={styles.userName}>{displayName}</span>
+                      <div className={styles.uName}>
+                        <b>{displayName}</b>
+                        <span>{user.email}</span>
+                      </div>
                     </div>
                   </td>
-                  <td className={styles.emailCell}>{user.email}</td>
                   <td>
                     <UserActions
                       userId={user.id}
@@ -139,8 +145,18 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                       isOwnUser={user.id === currentUserId}
                     />
                   </td>
-                  <td className={styles.numberCell}>{user._count.episodes}</td>
-                  <td className={styles.dateCell}>
+                  <td className={styles.mono}>
+                    {course ? (
+                      <>
+                        {course.startLevel} → {course.currentLevel} · {course.targetLang}
+                        {extra > 0 && ` +${extra}`}
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className={styles.mono}>{user._count.episodes}</td>
+                  <td className={`${styles.mono} ${styles.dimCell}`}>
                     {new Date(user.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
@@ -157,26 +173,32 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       {totalPages > 1 && (
         <div className={styles.pagination}>
           {page > 1 && (
-            <Link
-              href={buildPaginationHref(page - 1, search)}
-              className={styles.pageButton}
-            >
-              Previous
+            <Link href={pageHref(page - 1, search)} className={styles.btnSm}>
+              <Glyph name="back" size={13} /> Previous
             </Link>
           )}
           <span className={styles.pageInfo}>
             Page {page} of {totalPages}
           </span>
           {page < totalPages && (
-            <Link
-              href={buildPaginationHref(page + 1, search)}
-              className={styles.pageButton}
-            >
-              Next
+            <Link href={pageHref(page + 1, search)} className={styles.btnSm}>
+              Next <Glyph name="arrow" size={13} />
             </Link>
           )}
         </div>
       )}
-    </div>
+
+      <div className={`${styles.panel} ${styles.section}`}>
+        <div className={styles.panelHead}>
+          <div className={styles.phTitle}>
+            <Glyph name="lock" size={15} /> Reserved handles
+          </div>
+          <div className={styles.phNote}>{handles.length} reserved</div>
+        </div>
+        <div className={styles.panelBody}>
+          <HandleManager initialHandles={serializedHandles} />
+        </div>
+      </div>
+    </>
   );
 }

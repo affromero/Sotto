@@ -36,28 +36,19 @@
   cursor: not-allowed;
 }
 
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid color-mix(in oklab, var(--accent-fg) 40%, transparent);
-  border-top-color: var(--accent-fg);
-  border-radius: 50%;
-  flex-shrink: 0;
-  animation: spin 0.7s linear infinite;
+/* orb-led "composing" state while the next class generates */
+.composing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 0 12px;
 }
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-    border-top-color: color-mix(in oklab, var(--accent-fg) 40%, transparent);
-  }
+.composingLabel {
+  font-family: var(--serif, 'Newsreader', Georgia, serif);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-soft, var(--color-text-secondary));
 }
 
 .done {

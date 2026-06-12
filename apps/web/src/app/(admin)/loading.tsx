@@ -8,7 +8,7 @@ export default function AdminLoading() {
 
       {/* Stat cards */}
       <div className={styles.statsGrid}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
+        {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
             className={`${styles.bone} ${styles.statCard}`}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from './page.module.css';
+import styles from '../../adminTheme.module.css';
 
 interface UserActionsProps {
   userId: string;
@@ -52,17 +52,15 @@ export function UserActions({
   }
 
   return (
-    <div className={styles.actionsCell}>
-      <select
-        value={role}
-        onChange={(e) => handleRoleChange(e.target.value)}
-        disabled={isOwnUser || isLoading}
-        className={styles.roleSelect}
-        aria-label="User role"
-      >
-        <option value="USER">User</option>
-        <option value="ADMIN">Admin</option>
-      </select>
-    </div>
+    <select
+      value={role}
+      onChange={(e) => handleRoleChange(e.target.value)}
+      disabled={isOwnUser || isLoading}
+      className={styles.uselect}
+      aria-label="User role"
+    >
+      <option value="USER">User</option>
+      <option value="ADMIN">Admin</option>
+    </select>
   );
 }

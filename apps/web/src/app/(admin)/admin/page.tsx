@@ -1,221 +1,139 @@
-import { prisma } from '@/lib/prisma';
-import { DURATION_TOLERANCE_SECONDS } from '@/lib/duration';
-import styles from './page.module.css';
+import Link from 'next/link';
+import {
+  getUsageHeadline,
+  getSpendByService,
+  getSpendByDay,
+  getLearnerCounts,
+} from '@/lib/admin/usage-stats';
+import { fmtUSD, fmtCompact, fmtInt, pctChange } from '@/lib/admin/format';
+import { colorForService } from '@/components/admin/serviceColors';
+import { AreaChart } from '@/components/admin/charts/AreaChart';
+import { ShareBar } from '@/components/admin/charts/ShareBar';
+import { Glyph } from '@/components/Glyph';
+import { GlassOrb } from '@/components/landing/GlassOrb';
+import styles from '../adminTheme.module.css';
 
-async function getDurationAccuracyStats() {
-  const [tracked, withinTarget, deviationStats] = await Promise.all([
-    prisma.episode.count({
-      where: { durationDeviation: { not: null }, status: 'READY' },
-    }),
-    prisma.episode.count({
-      where: {
-        durationDeviation: {
-          gte: -DURATION_TOLERANCE_SECONDS,
-          lte: DURATION_TOLERANCE_SECONDS,
-        },
-        status: 'READY',
-      },
-    }),
-    prisma.$queryRaw<[{ mean_abs: number | null; avg_dev: number | null }]>`
-      SELECT
-        AVG(ABS("durationDeviation"))::float AS mean_abs,
-        AVG("durationDeviation")::float AS avg_dev
-      FROM "Episode"
-      WHERE "durationDeviation" IS NOT NULL
-        AND "status" = 'READY'
-        AND "deletedAt" IS NULL
-    `,
-  ]);
-
-  return {
-    tracked,
-    withinTargetPct: tracked > 0 ? Math.round((withinTarget / tracked) * 100) : 0,
-    meanAbsDeviation: Math.round(deviationStats[0]?.mean_abs ?? 0),
-    avgDeviation: Math.round(deviationStats[0]?.avg_dev ?? 0),
-  };
-}
-
-async function getOverviewStats() {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date(today);
-  monthAgo.setDate(monthAgo.getDate() - 30);
-
-  const [
-    totalUsers,
-    totalEpisodes,
-    readyEpisodes,
-    failedEpisodes,
-    signupsToday,
-    signupsThisWeek,
-    signupsThisMonth,
-    totalPlays,
-    apiCostAgg,
-    pipelineAttempted,
-    pipelineFailed,
-    byokUsersRow,
-  ] = await Promise.all([
-    prisma.user.count(),
-    prisma.episode.count(),
-    prisma.episode.count({ where: { status: 'READY' } }),
-    prisma.episode.count({ where: { status: 'FAILED' } }),
-    prisma.user.count({
-      where: { createdAt: { gte: today } },
-    }),
-    prisma.user.count({
-      where: { createdAt: { gte: weekAgo } },
-    }),
-    prisma.user.count({
-      where: { createdAt: { gte: monthAgo } },
-    }),
-    prisma.episode.aggregate({
-      _sum: { playCount: true },
-    }),
-    // API costs (30d)
-    prisma.apiUsageLog.aggregate({
-      where: { createdAt: { gte: monthAgo } },
-      _sum: { totalCost: true },
-    }),
-    // Pipeline (30d)
-    prisma.episode.count({
-      where: { createdAt: { gte: monthAgo }, source: { not: 'IMPORT' } },
-    }),
-    prisma.episode.count({
-      where: { createdAt: { gte: monthAgo }, status: 'FAILED', source: { not: 'IMPORT' } },
-    }),
-    // BYOK users
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(DISTINCT ak."userId")::bigint AS count
-      FROM "UserAiKey" ak
-      JOIN "UserTtsKey" tk ON tk."userId" = ak."userId"
-      WHERE ak."isValid" = true AND tk."isValid" = true
-    `,
-  ]);
-
-  return {
-    totalUsers,
-    totalEpisodes,
-    readyEpisodes,
-    failedEpisodes,
-    signupsToday,
-    signupsThisWeek,
-    signupsThisMonth,
-    totalPlays: totalPlays._sum.playCount ?? 0,
-    apiCosts: apiCostAgg._sum.totalCost ?? 0,
-    pipelineSuccessRate:
-      pipelineAttempted > 0
-        ? Math.round(((pipelineAttempted - pipelineFailed) / pipelineAttempted) * 100)
-        : 0,
-    byokUsers: Number(byokUsersRow[0]?.count ?? 0),
-  };
-}
+const WINDOW_DAYS = 30;
 
 export default async function AdminOverviewPage() {
-  const [stats, durationStats] = await Promise.all([
-    getOverviewStats(),
-    getDurationAccuracyStats(),
+  const [headline, byService, byDay, learners] = await Promise.all([
+    getUsageHeadline(WINDOW_DAYS),
+    getSpendByService(WINDOW_DAYS),
+    getSpendByDay(WINDOW_DAYS),
+    getLearnerCounts(),
   ]);
+  const { total: totalUsers, signupsThisWeek } = learners;
+
+  const delta = pctChange(headline.spend, headline.spendPrev);
+  const spendTotal = byDay.reduce((a, d) => a + d.usd, 0);
+  const areaData = byDay.map((d, i) => ({
+    v: d.usd,
+    m: i % 6 === 0 ? Number(d.day.slice(8, 10)) : '',
+  }));
+  const services = byService.map((s, i) => ({ ...s, color: colorForService(s.service, i) }));
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Admin Overview</h1>
-        <p className={styles.subtitle}>Platform-wide statistics and metrics</p>
-      </div>
-
-      <div className={styles.grid}>
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Total Users</span>
+    <>
+      <div className={styles.adminHead}>
+        <div className={styles.headLeft}>
+          <GlassOrb size={40} />
+          <div>
+            <h1>Overview</h1>
+            <div className={styles.ahSub}>Self-hosted · last {WINDOW_DAYS} days</div>
           </div>
-          <div className={styles.cardValue}>{stats.totalUsers.toLocaleString()}</div>
         </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Total Lessons</span>
-          </div>
-          <div className={styles.cardValue}>{stats.totalEpisodes.toLocaleString()}</div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Ready Lessons</span>
-          </div>
-          <div className={styles.cardValue}>{stats.readyEpisodes.toLocaleString()}</div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Failed Lessons</span>
-          </div>
-          <div className={styles.cardValue}>{stats.failedEpisodes.toLocaleString()}</div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Total Plays</span>
-          </div>
-          <div className={styles.cardValue}>{stats.totalPlays.toLocaleString()}</div>
+        <div className={styles.ahActions}>
+          <Link href="/admin/usage" className={`${styles.btnSm} ${styles.primary}`}>
+            <Glyph name="graph" size={13} /> Full cost report
+          </Link>
         </div>
       </div>
 
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Signups</h2>
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Today</span>
-            <span className={styles.statValue}>{stats.signupsToday.toLocaleString()}</span>
+      <div className={styles.statGrid}>
+        <div className={styles.stat}>
+          <div className={styles.stLabel}>
+            <Glyph name="spark" size={13} /> Spend · {WINDOW_DAYS}d
           </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>This Week</span>
-            <span className={styles.statValue}>{stats.signupsThisWeek.toLocaleString()}</span>
+          <div className={styles.stVal}>{fmtUSD(headline.spend)}</div>
+          {delta !== null && (
+            <div className={`${styles.stDelta} ${delta >= 0 ? styles.up : styles.down}`}>
+              <Glyph name={delta >= 0 ? 'arrow' : 'check'} size={12} /> {Math.abs(delta)}% vs prior{' '}
+              {WINDOW_DAYS}d
+            </div>
+          )}
+        </div>
+        <div className={styles.stat}>
+          <div className={styles.stLabel}>
+            <Glyph name="headset" size={13} /> Active learners
           </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>This Month</span>
-            <span className={styles.statValue}>{stats.signupsThisMonth.toLocaleString()}</span>
+          <div className={styles.stVal}>{fmtInt(headline.activeLearners)}</div>
+          <div className={`${styles.stDelta} ${styles.flat}`}>
+            <Glyph name="dot" size={10} /> generated in window
+          </div>
+        </div>
+        <div className={styles.stat}>
+          <div className={styles.stLabel}>
+            <Glyph name="dot" size={13} /> Requests · {WINDOW_DAYS}d
+          </div>
+          <div className={styles.stVal}>{fmtCompact(headline.requests)}</div>
+          <div className={`${styles.stDelta} ${styles.flat}`}>
+            <Glyph name="clock" size={11} /> {headline.avgLatencyMs}ms avg
+          </div>
+        </div>
+        <div className={styles.stat}>
+          <div className={styles.stLabel}>
+            <Glyph name="today" size={13} /> Learners
+          </div>
+          <div className={styles.stVal}>{fmtInt(totalUsers)}</div>
+          <div className={`${styles.stDelta} ${styles.flat}`}>
+            <Glyph name="plus" size={11} /> {signupsThisWeek} this week
           </div>
         </div>
       </div>
 
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Costs (30d)</h2>
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>API Costs</span>
-            <span className={styles.statValue}>${stats.apiCosts.toFixed(2)}</span>
+      <div className={styles.panel2col}>
+        <div className={styles.panel}>
+          <div className={styles.panelHead}>
+            <div className={styles.phTitle}>
+              <Glyph name="graph" size={15} /> Spend, last {WINDOW_DAYS} days
+            </div>
+            <div className={styles.phNote}>{fmtUSD(spendTotal)}</div>
           </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Pipeline Success</span>
-            <span className={styles.statValue}>{stats.pipelineSuccessRate}%</span>
+          <div className={styles.panelBody}>
+            {spendTotal > 0 ? (
+              <AreaChart id="overviewSpend" data={areaData} height={150} />
+            ) : (
+              <div className={styles.empty}>No usage logged yet in this window.</div>
+            )}
           </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>BYOK Users</span>
-            <span className={styles.statValue}>{stats.byokUsers.toLocaleString()}</span>
+        </div>
+
+        <div className={styles.panel}>
+          <div className={styles.panelHead}>
+            <div className={styles.phTitle}>
+              <Glyph name="plug" size={15} /> Where it goes
+            </div>
+          </div>
+          <div className={styles.panelBody}>
+            {services.length > 0 ? (
+              <>
+                <ShareBar rows={services} />
+                <div className={styles.legend}>
+                  {services.slice(0, 5).map((p) => (
+                    <div className={styles.legendRow} key={p.service}>
+                      <span className={styles.lgDot} style={{ background: p.color }} />
+                      <span className={styles.lgName}>{p.service}</span>
+                      <span className={styles.lgVal}>{p.usd === 0 ? 'free' : fmtUSD(p.usd)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className={styles.empty}>No provider spend yet.</div>
+            )}
           </div>
         </div>
       </div>
-
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Duration Accuracy</h2>
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Tracked</span>
-            <span className={styles.statValue}>{durationStats.tracked.toLocaleString()}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Within ±30s</span>
-            <span className={styles.statValue}>{durationStats.withinTargetPct}%</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Mean Abs. Deviation</span>
-            <span className={styles.statValue}>{durationStats.meanAbsDeviation}s</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
+    </>
   );
 }
