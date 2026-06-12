@@ -1,0 +1,153 @@
+/*
+ * GlassOrb.module.css — the larger, "alive" Sotto glass mark.
+ * Ported from SottoDesign "Sotto Orb.html". Scale is driven by the wrapper's
+ * font-size (set inline), so every offset/shadow is expressed in em and the orb
+ * stays crisp at any size. Animations are transform/opacity only and are disabled
+ * under prefers-reduced-motion.
+ */
+
+.wrap {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  line-height: 0;
+  animation: orbFloat 6s ease-in-out infinite;
+}
+
+/* outer bloom (on the wrapper so it isn't clipped by the orb's overflow) */
+.wrap::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(120, 120, 230, 0.5),
+    rgba(255, 143, 177, 0.22) 46%,
+    transparent 70%
+  );
+  filter: blur(0.07em);
+  animation: orbBreathe 6s ease-in-out infinite;
+}
+
+/* contact reflection beneath */
+.wrap::after {
+  content: '';
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  top: 100%;
+  height: 32%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, rgba(150, 150, 225, 0.3), transparent 72%);
+  transform: scaleY(-1);
+  filter: blur(0.042em);
+  opacity: 0.45;
+}
+
+.orb {
+  position: relative;
+  z-index: 1;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.25) 16%, transparent 38%),
+    radial-gradient(circle at 72% 76%, rgba(255, 143, 177, 0.95), transparent 56%),
+    radial-gradient(circle at 28% 72%, rgba(91, 141, 239, 1), transparent 60%),
+    linear-gradient(140deg, #6aa0ff, #ff8fb1);
+  box-shadow:
+    inset 0 0.018em 0.042em rgba(255, 255, 255, 0.85),
+    inset 0 -0.095em 0.155em rgba(40, 40, 96, 0.55),
+    inset 0 0 0 0.006em rgba(255, 255, 255, 0.22);
+}
+
+/* drifting specular highlight */
+.spec {
+  position: absolute;
+  left: 24%;
+  top: 16%;
+  width: 30%;
+  height: 20%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%);
+  filter: blur(0.006em);
+  transform-origin: center;
+  animation: orbSpec 7s ease-in-out infinite;
+}
+
+/* slow glass glare that sweeps across, then rests */
+.glare {
+  position: absolute;
+  top: -30%;
+  left: -60%;
+  width: 55%;
+  height: 160%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: rotate(18deg);
+  filter: blur(0.024em);
+  opacity: 0;
+  animation: orbGlare 6.5s ease-in-out infinite;
+}
+
+@keyframes orbFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.042em);
+  }
+}
+@keyframes orbBreathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+@keyframes orbSpec {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(0.042em, 0.03em) scale(1.08);
+    opacity: 1;
+  }
+}
+@keyframes orbGlare {
+  0% {
+    left: -60%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.6;
+  }
+  34% {
+    left: 120%;
+    opacity: 0;
+  }
+  100% {
+    left: 120%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrap,
+  .wrap::before,
+  .spec,
+  .glare {
+    animation: none;
+  }
+}

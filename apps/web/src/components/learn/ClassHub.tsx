@@ -40,7 +40,7 @@ export function ClassHub({ lesson, order, sections, scores, started, onBegin }: 
 
         <div className={styles.drawn}>
           <ClassGlyph name="spark" size={16} />
-          {totalSkills} skills, composed for you — then loosed into the day.
+          {totalSkills} skills, composed for you, then loosed into the day.
         </div>
 
         <div className={styles.hourCard}>
@@ -86,7 +86,7 @@ export function ClassHub({ lesson, order, sections, scores, started, onBegin }: 
 
         <div className={styles.practiceHead}>
           <span className={styles.phTitle}>The hour ahead</span>
-          <span className={styles.phSub}>four skills, in order</span>
+          <span className={styles.phSub}>{totalSkills} skills, in order</span>
         </div>
         <div className={styles.practiceGrid}>
           {sections.map((s) => {

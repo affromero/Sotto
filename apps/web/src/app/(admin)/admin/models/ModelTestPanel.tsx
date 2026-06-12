@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { TestableProvider } from './page';
+import type { TestableProvider } from '@/lib/admin/testable-providers';
 import styles from './ModelTestPanel.module.css';
 
 interface ModelTestPanelProps {

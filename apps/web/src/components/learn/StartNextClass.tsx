@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { GlassOrb } from '@/components/landing/GlassOrb';
 import styles from './StartNextClass.module.css';
 
 interface StartNextClassProps {
@@ -67,6 +68,20 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     );
   }
 
+  if (phase === 'generating') {
+    return (
+      <div
+        className={styles.composing}
+        role="status"
+        aria-live="polite"
+        aria-label="Composing your next class, please wait"
+      >
+        <GlassOrb size={56} />
+        <span className={styles.composingLabel}>Composing your class…</span>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.root}>
       {error && (
@@ -78,18 +93,9 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         type="button"
         className={styles.button}
         onClick={handleContinue}
-        disabled={phase === 'generating'}
-        aria-busy={phase === 'generating'}
-        aria-label={phase === 'generating' ? 'Generating next class, please wait' : 'Continue to next class'}
+        aria-label="Continue to next class"
       >
-        {phase === 'generating' ? (
-          <>
-            <span className={styles.spinner} aria-hidden="true" />
-            Generating…
-          </>
-        ) : (
-          'Continue'
-        )}
+        Continue
       </button>
     </div>
   );
