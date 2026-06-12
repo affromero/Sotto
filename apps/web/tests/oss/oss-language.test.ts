@@ -980,6 +980,9 @@ describe('open-source language-learning OSS surfaces', () => {
     );
     const onboardingSources = [
       readSource('src/app/welcome/steps/StepContext.tsx'),
+      // The "nothing leaves your machine" privacy promise is stated on the landing,
+      // which is part of the OSS onboarding/positioning surface this guardrail covers.
+      readSource('src/app/page.tsx'),
       sourceConnectorSource,
       sourceConnectorRouteSource,
       readFileSync(resolve(repoRoot, '.env.example'), 'utf8'),
