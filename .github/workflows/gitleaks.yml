@@ -13,6 +13,9 @@ on:
 
 permissions:
   contents: read
+  # gitleaks-action lists the PR's commits via the API to scan only the event's
+  # range; without pull-requests:read that call 403s and fails the job.
+  pull-requests: read
 
 jobs:
   scan:
