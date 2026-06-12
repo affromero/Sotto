@@ -9,21 +9,50 @@ import {
   TTS_PROVIDERS,
   STT_PROVIDERS,
   MODULES,
+  SOURCES,
   nextLevel,
   lessonTitle,
 } from '../data';
 import type { CefrLevel } from '../data';
-import type { AgentState, VoiceState, OnboardingConfig } from '../WelcomeFlow';
+import type { AgentState, ContextItem, VoiceState, OnboardingConfig } from '../WelcomeFlow';
 import { resolveAi, resolveTts, resolveStt, type KeyPost } from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.module.css';
+
+const MAX_ONBOARDING_NOTE_CHARS = 4000;
+
+function buildContextNote(sources: Set<string>, contextItems: ContextItem[]) {
+  const parts: string[] = [];
+  const selectedSources = SOURCES.filter((source) => sources.has(source.id));
+
+  if (selectedSources.length > 0) {
+    parts.push(
+      [
+        'Allowed context sources:',
+        ...selectedSources.map((source) => `- ${source.label}: ${source.meta}`),
+      ].join('\n')
+    );
+  }
+
+  if (contextItems.length > 0) {
+    parts.push(
+      [
+        'Direct context:',
+        ...contextItems.map((item) => `[${item.kind}] ${item.label}\n${item.value}`),
+      ].join('\n\n')
+    );
+  }
+
+  return parts.join('\n\n').trim().slice(0, MAX_ONBOARDING_NOTE_CHARS).trim();
+}
 
 interface Props {
   baseLang: string;
   language: string;
   level: CefrLevel | null;
   sources: Set<string>;
+  contextItems: ContextItem[];
   agent: AgentState;
   voice: VoiceState;
   config: OnboardingConfig;
@@ -36,6 +65,7 @@ export function StepReady({
   language,
   level,
   sources,
+  contextItems,
   agent,
   voice,
   config,
@@ -55,6 +85,10 @@ export function StepReady({
   const agentLabel = agent.method === 'cli' && prov.cli ? prov.cli.label : prov.name;
   const ttsName = (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
   const sttName = (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
+
+  function goHome() {
+    router.push('/');
+  }
 
   async function postKey(post: KeyPost): Promise<boolean> {
     try {
@@ -105,6 +139,7 @@ export function StepReady({
 
     // Everything else (course, preferences, owner infra) in one call.
     const infra = config.isOwner ? { ...ai.infra, ...tts.infra, ...stt.infra } : undefined;
+    const note = buildContextNote(sources, contextItems);
 
     try {
       const res = await fetch('/api/v1/onboarding/save', {
@@ -113,6 +148,7 @@ export function StepReady({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           course: { native: baseLang, target: language, ...(level && { level }) },
+          ...(note && { note }),
           preferred: {
             language,
             ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),
@@ -248,9 +284,11 @@ export function StepReady({
         <span className={t.spacer} />
         <button
           className={`${t.btn} ${t.btnPrimary}`}
-          disabled={loading || demoComplete}
-          onClick={finishOnboarding}
-          aria-label={config.selfHosted ? "Open today's session" : 'Finish demo'}
+          disabled={loading}
+          onClick={demoComplete ? goHome : finishOnboarding}
+          aria-label={
+            demoComplete ? 'Return home' : config.selfHosted ? "Open today's session" : 'Finish demo'
+          }
         >
           {loading ? (
             <>
@@ -258,7 +296,12 @@ export function StepReady({
               Setting up…
             </>
           ) : demoComplete ? (
-            'Demo complete'
+            <>
+              Back to home{' '}
+              <span className={t.btnArrow}>
+                <Glyph name="arrow" size={17} />
+              </span>
+            </>
           ) : (
             <>
               {config.selfHosted ? "Open today's session" : 'Finish demo'}{' '}

@@ -23,7 +23,7 @@ export function StepWelcome({ state, demoMode, setBaseLang, setLanguage, onNext 
         <span className={t.eyebrowIdx}>00 ·</span> Begin
       </div>
       <h1 className={t.title}>
-        A course composed <em>sotto voce</em>, in the tongue you choose.
+        A course shaped by <em>what you choose</em>.
       </h1>
       <p className={t.lede}>
         Sotto runs on your stack and teaches through the things you already care about. First — set

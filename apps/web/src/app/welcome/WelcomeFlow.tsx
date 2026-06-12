@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
@@ -29,6 +30,15 @@ export interface VoiceState {
   keys: Record<string, string>;
   /** Optional base URLs for keyless local providers (kokoro TTS, whisper STT). */
   baseUrls: Record<string, string>;
+}
+
+export type ContextItemKind = 'link' | 'text' | 'file';
+
+export interface ContextItem {
+  id: string;
+  kind: ContextItemKind;
+  label: string;
+  value: string;
 }
 
 export interface FlowState {
@@ -70,6 +80,7 @@ interface WelcomeSnapshot {
   agent: AgentState;
   voice: VoiceState;
   sources: Set<string>;
+  contextItems: ContextItem[];
   understood: Set<CefrLevel>;
 }
 
@@ -83,6 +94,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function isCefrLevel(value: unknown): value is CefrLevel {
   return typeof value === 'string' && LEVELS.includes(value as CefrLevel);
+}
+
+function isContextItemKind(value: unknown): value is ContextItemKind {
+  return value === 'link' || value === 'text' || value === 'file';
 }
 
 function parseAgent(value: unknown): AgentState {
@@ -125,6 +140,32 @@ function parseVoice(value: unknown): VoiceState {
   };
 }
 
+function parseContextItems(value: unknown): ContextItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item, index) => {
+    const record = asRecord(item);
+    if (!record || !isContextItemKind(record.kind) || typeof record.value !== 'string') {
+      return [];
+    }
+
+    const trimmed = record.value.trim();
+    if (!trimmed) return [];
+
+    return [
+      {
+        id: typeof record.id === 'string' && record.id ? record.id : `ctx-${record.kind}-${index}`,
+        kind: record.kind,
+        label:
+          typeof record.label === 'string' && record.label.trim()
+            ? record.label.trim()
+            : record.kind,
+        value: trimmed,
+      },
+    ];
+  });
+}
+
 function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
   try {
     const record = asRecord(JSON.parse(raw));
@@ -143,6 +184,7 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
       agent: parseAgent(record.agent),
       voice: parseVoice(record.voice),
       sources: new Set(sources),
+      contextItems: parseContextItems(record.contextItems),
       understood: new Set(understood),
     };
   } catch {
@@ -163,6 +205,7 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
         : { ...DEFAULT_AGENT },
     voice: { ...DEFAULT_VOICE },
     sources: new Set(clamped >= 3 ? ['repos', 'reading', 'notes', 'calendar'] : []),
+    contextItems: [],
     understood: new Set<CefrLevel>(clamped >= 4 ? ['A1', 'A2', 'B1'] : []),
   };
 }
@@ -174,6 +217,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
   const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
   const [voice, setVoice] = useState<VoiceState>({ ...DEFAULT_VOICE });
   const [sources, setSources] = useState<Set<string>>(new Set());
+  const [contextItems, setContextItems] = useState<ContextItem[]>([]);
   const [understood, setUnderstood] = useState<Set<CefrLevel>>(new Set());
   const [storageReady, setStorageReady] = useState(false);
   const [deepLinkMode, setDeepLinkMode] = useState(false);
@@ -216,6 +260,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
     setAgent(snapshot.agent);
     setVoice(snapshot.voice);
     setSources(snapshot.sources);
+    setContextItems(snapshot.contextItems);
     setUnderstood(snapshot.understood);
   }
 
@@ -270,6 +315,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
         agent,
         voice,
         sources: [...sources],
+        contextItems,
         understood: [...understood],
       })
     );
@@ -277,6 +323,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
     agent,
     baseLang,
     config.selfHosted,
+    contextItems,
     deepLinkMode,
     language,
     sources,
@@ -300,7 +347,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
               : step === 2
                 ? true
                 : step === 3
-                  ? sources.size > 0
+                  ? sources.size + contextItems.length > 0
                   : step === 4
                     ? !!level
                     : false;
@@ -317,7 +364,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [agent.status, go, language, level, sources.size, step]);
+  }, [agent.status, contextItems.length, go, language, level, sources.size, step]);
 
   function chooseBaseLang(code: string) {
     setBaseLang(code);
@@ -331,6 +378,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
     setAgent({ ...DEFAULT_AGENT });
     setVoice({ ...DEFAULT_VOICE });
     setSources(new Set());
+    setContextItems([]);
     setUnderstood(new Set());
     if (typeof window !== 'undefined' && config.selfHosted) {
       window.localStorage.removeItem(SAVE_KEY);
@@ -398,6 +446,8 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
         <StepContext
           sources={sources}
           toggle={toggleSource}
+          contextItems={contextItems}
+          setContextItems={setContextItems}
           demoMode={demoMode}
           onNext={() => go(4)}
           onBack={() => go(2)}
@@ -435,6 +485,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
           language={language}
           level={level}
           sources={sources}
+          contextItems={contextItems}
           agent={agent}
           voice={voice}
           config={config}
@@ -452,7 +503,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
       {/* Voice rail */}
       <aside className={t.voice}>
         <div className={t.voiceGlow} aria-hidden="true" />
-        <div className={t.brand}>
+        <Link href="/" className={t.brand} aria-label="Go to Sotto home">
           <div className={t.wordmark}>
             <Image
               src="/brand/sotto-mark.svg"
@@ -468,7 +519,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
           <div className={t.wordmarkSub}>
             {config.selfHosted ? 'v0 · self-hosted' : 'v0 · hosted demo'}
           </div>
-        </div>
+        </Link>
 
         <nav className={t.stepper} aria-label="Setup progress">
           {STEPS.map((s, i) => {
@@ -500,7 +551,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
         </nav>
 
         <div className={t.whisper} key={step}>
-          <div className={t.whisperTag}>sotto voce</div>
+          <div className={t.whisperTag}>private course</div>
           <p className={t.whisperText}>{WHISPERS[step]}</p>
         </div>
       </aside>

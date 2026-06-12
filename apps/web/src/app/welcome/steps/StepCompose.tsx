@@ -77,7 +77,7 @@ export function StepCompose({ level, voice, demoMode, onDone, onBack }: Props) {
           </>
         ) : (
           <>
-            Composing, <em>sotto voce</em>…
+            Composing <em>your course</em>...
           </>
         )}
       </h1>

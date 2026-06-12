@@ -8,8 +8,9 @@ import type { ImgHTMLAttributes } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WelcomeFlow } from '@/app/welcome/WelcomeFlow';
-import type { AgentState } from '@/app/welcome/WelcomeFlow';
+import type { AgentState, ContextItem } from '@/app/welcome/WelcomeFlow';
 import { StepAgent } from '@/app/welcome/steps/StepAgent';
+import { StepContext } from '@/app/welcome/steps/StepContext';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
 import { StepReady } from '@/app/welcome/steps/StepReady';
 import { StepVoice } from '@/app/welcome/steps/StepVoice';
@@ -193,6 +194,55 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByLabelText(/Deepgram API key/i)).not.toBeInTheDocument();
   });
 
+  it('adds direct links, notes, and uploaded files in the context step', async () => {
+    const user = userEvent.setup();
+    let contextItems: ContextItem[] = [];
+    const setContextItems = (
+      updater: ContextItem[] | ((prev: ContextItem[]) => ContextItem[])
+    ) => {
+      contextItems = typeof updater === 'function' ? updater(contextItems) : updater;
+    };
+    const renderStep = () => (
+      <StepContext
+        sources={new Set()}
+        toggle={vi.fn()}
+        contextItems={contextItems}
+        setContextItems={setContextItems}
+        demoMode={false}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    const { rerender } = render(renderStep());
+
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Add a link, note, or topic/i), 'example.com/paper');
+    await user.click(screen.getByRole('button', { name: /^Add$/i }));
+    rerender(renderStep());
+
+    expect(screen.getByText('example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
+
+    await user.type(
+      screen.getByLabelText(/Add a link, note, or topic/i),
+      'cooking, distributed systems, and opera'
+    );
+    await user.click(screen.getByRole('button', { name: /^Add$/i }));
+
+    const file = new File(['Italian notes from a design doc'], 'notes.md', {
+      type: 'text/markdown',
+    });
+    await user.upload(screen.getByLabelText(/Choose context files/i), file);
+    await waitFor(() => {
+      expect(contextItems.map((item) => item.kind)).toEqual(['link', 'text', 'file']);
+    });
+    rerender(renderStep());
+
+    expect(screen.getByText('notes.md')).toBeInTheDocument();
+  });
+
   it('finishes the hosted demo without saving or navigating into the app', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn();
@@ -205,6 +255,7 @@ describe('welcome hosted-demo mode', () => {
         language="it"
         level="A2"
         sources={new Set(['reading'])}
+        contextItems={[]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
         voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} }}
         config={{ selfHosted: false, isOwner: false }}
@@ -223,6 +274,12 @@ describe('welcome hosted-demo mode', () => {
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
+
+    const homeButton = screen.getByRole('button', { name: /return home/i });
+    expect(homeButton).toBeEnabled();
+
+    await user.click(homeButton);
+    expect(mockPush).toHaveBeenCalledWith('/');
   });
 
   it('finishes self-host setup by saving the course and entering /learn', async () => {
@@ -239,6 +296,14 @@ describe('welcome hosted-demo mode', () => {
         language="it"
         level="A2"
         sources={new Set(['reading', 'repos'])}
+        contextItems={[
+          {
+            id: 'ctx-link-1',
+            kind: 'link',
+            label: 'example.com',
+            value: 'https://example.com/paper',
+          },
+        ]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
         voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} }}
         config={{ selfHosted: true, isOwner: false }}
@@ -262,6 +327,9 @@ describe('welcome hosted-demo mode', () => {
       course: { native: 'en', target: 'it', level: 'A2' },
       preferred: { language: 'it' },
     });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain(
+      'https://example.com/paper'
+    );
     expect(mockPush).toHaveBeenCalledWith('/learn');
   });
 
@@ -274,6 +342,14 @@ describe('welcome hosted-demo mode', () => {
     expect(await screen.findByText(/Where do you/i)).toBeInTheDocument();
     expect(screen.getByText(/Estimated level/i).textContent).toContain('B1');
     expect(window.localStorage.getItem('sotto.onboarding.v1')).toBeNull();
+  });
+
+  it('links the sidebar logo back to home throughout the hosted demo', () => {
+    mockConfigFetch(false);
+
+    render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
+
+    expect(screen.getByRole('link', { name: /go to sotto home/i })).toHaveAttribute('href', '/');
   });
 
   it('does not persist hosted-demo progress while visitors move through welcome', async () => {

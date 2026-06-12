@@ -94,6 +94,18 @@ export function Glyph({ name, size = 20, stroke = 1.6 }: GlyphProps) {
           <path d="M12 3v6M12 15v6M3 12h6M15 12h6M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3" />
         </svg>
       );
+    case 'upload':
+      return (
+        <svg {...p}>
+          <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
+        </svg>
+      );
+    case 'x':
+      return (
+        <svg {...p}>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      );
     case 'repo':
       return (
         <svg {...p}>
