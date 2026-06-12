@@ -80,7 +80,6 @@ export default function EpisodeEditScreen() {
       await api.delete(`/episodes/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.removeQueries({ queryKey: ['episode', id] });
       Alert.alert('Deleted', 'Episode has been deleted.');
       router.replace('/(tabs)');
