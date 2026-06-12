@@ -5,6 +5,7 @@ import { StartNextClass } from '@/components/learn/StartNextClass';
 import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import { PedagogySelector } from '@/components/learn/PedagogySelector';
+import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -97,8 +98,8 @@ export default async function LearnPage() {
             </svg>
           </span>
           <p className={styles.emptyText}>
-            No active courses yet. Take a quick placement test and we&rsquo;ll start you at the right
-            level.
+            No active courses yet. Take a quick placement test and we&rsquo;ll start you at the
+            right level.
           </p>
           <Link href="/learn/placement" className={styles.ctaButton}>
             Take placement test
@@ -171,7 +172,10 @@ export default async function LearnPage() {
                   >
                     Exam
                   </Link>
-                  <StartNextClass courseId={course.id} activeClassId={course.activeClassId ?? null} />
+                  <StartNextClass
+                    courseId={course.id}
+                    activeClassId={course.activeClassId ?? null}
+                  />
                 </div>
                 <div className={styles.sourcedRow}>
                   <SourcedClassEntry
@@ -181,6 +185,9 @@ export default async function LearnPage() {
                 </div>
                 <div className={styles.sourcedRow}>
                   <PedagogySelector courseId={course.id} current={course.pedagogy} />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <CourseNotesPanel courseId={course.id} />
                 </div>
               </li>
             );

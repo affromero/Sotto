@@ -19,9 +19,12 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 import {
+  MAX_NOTE_LENGTH,
   getCourseNote,
   setCourseNote,
   formatNotesForPrompt,
+  mergeCourseNote,
+  normalizeCourseNote,
   sanitizeLearnerContext,
 } from '@/lib/course-notes';
 
@@ -43,7 +46,10 @@ describe('setCourseNote', () => {
   it('upserts a non-empty note', async () => {
     await setCourseNote('c1', 'focus on speaking');
     expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { courseId: 'c1' }, create: expect.objectContaining({ body: 'focus on speaking' }) }),
+      expect.objectContaining({
+        where: { courseId: 'c1' },
+        create: expect.objectContaining({ body: 'focus on speaking' }),
+      })
     );
     expect(mockDeleteMany).not.toHaveBeenCalled();
   });
@@ -52,6 +58,17 @@ describe('setCourseNote', () => {
     await setCourseNote('c1', '   ');
     expect(mockDeleteMany).toHaveBeenCalledWith({ where: { courseId: 'c1' } });
     expect(mockUpsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('normalizeCourseNote / mergeCourseNote', () => {
+  it('trims and caps course notes at the shared maximum', () => {
+    const long = `  ${'a'.repeat(MAX_NOTE_LENGTH + 50)}  `;
+    expect(normalizeCourseNote(long)).toHaveLength(MAX_NOTE_LENGTH);
+  });
+
+  it('appends uploaded note text after the existing note', () => {
+    expect(mergeCourseNote('chapter one', 'chapter two')).toBe('chapter one\n\nchapter two');
   });
 });
 
