@@ -236,7 +236,7 @@ export function StepContext({
               value={entry}
               onChange={(event) => setEntry(event.currentTarget.value)}
               placeholder={
-                'https://example.com/paper\nCooking verbs for Emilia-Romagna\nPodcast notes from last week'
+                'https://example.com/paper\nCooking verbs for Emilia-Romagna\nLecture notes from Monday'
               }
               rows={3}
             />

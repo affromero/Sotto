@@ -7,8 +7,7 @@ export interface ClassTopic {
   query: string;
 }
 
-// Shown when the learner has no stated interests yet — broadly intriguing,
-// curiosity-driven starters (mirrors the for-you generator's no-interest fallback).
+// Shown when the learner has no stated interests yet; curiosity-driven fallback topics.
 const FALLBACK_TOPICS: ClassTopic[] = [
   { label: 'Space exploration', query: 'space exploration' },
   { label: 'How memory works', query: 'how human memory works' },
