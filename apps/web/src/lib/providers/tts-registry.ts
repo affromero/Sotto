@@ -4,7 +4,17 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kokoro';
+export type TtsProviderId =
+  | 'elevenlabs'
+  | 'openai'
+  | 'cartesia'
+  | 'hume'
+  | 'fal'
+  | 'replicate'
+  | 'minimax'
+  | 'mistral'
+  | 'kokoro'
+  | 'local';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -408,6 +418,37 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     },
   },
 
+  // Generic local sidecar provider. This is the flexible no-code extension
+  // point for self-hosters who want to run any local TTS model. It uses the same
+  // small HTTP contract as services/local-tts, selected explicitly with
+  // TTS_PROVIDER=local and TTS_BASE_URL. Voice IDs come from TTS_VOICES or the
+  // sidecar's /voices endpoint; the sidecar may ignore unsupported optional
+  // fields such as model and language.
+  local: {
+    id: 'local',
+    displayName: 'Local TTS sidecar',
+    getApiKeyUrl: '',
+    supportsSfx: false,
+    supportsStreaming: false,
+    maxSegmentChars: 4096,
+    defaultModel: 'local',
+    models: [
+      { id: 'local', displayName: 'Local TTS model', tier: 'standard', supportedLanguages: LANG_ALL },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'standard',
+    platformCostPerKChar: 0,
+    modelsWithoutTextContext: ['local'],
+    languageDetection: 'optional_hint',
+    languageParam: 'language',
+    voicesAreCrossLingual: true,
+    auth: {
+      fields: [],
+      validate: async () => true,
+    },
+  },
+
 };
 
 export function getProviderMeta(id: TtsProviderId): TtsProviderMeta {
@@ -480,10 +521,10 @@ export interface TtsProviderClientMeta {
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
   return Object.values(TTS_PROVIDERS)
-    // kokoro is a keyless, server-configured local backend (no API-key fields) —
+    // Keyless, server-configured local backends have no API-key fields and are
     // never surfaced in BYOK client metadata, mirroring how the AI registry
     // excludes the keyless `local` and `claude-code` providers.
-    .filter((p) => p.id !== 'kokoro')
+    .filter((p) => p.id !== 'kokoro' && p.id !== 'local')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,

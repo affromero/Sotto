@@ -20,9 +20,9 @@ export async function GET() {
 const modelSchema = z.object({
   aiProvider: z.enum(aiProviderEnum).optional(),
   aiModel: z.string().min(1).optional(),
-  ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']).optional(),
+  ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro', 'local']).optional(),
   ttsModel: z.string().min(1).optional(),
-  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai']).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai', 'local']).optional(),
   sttModel: z.string().min(1).optional(),
 });
 

@@ -8,12 +8,12 @@
 
 ## 1. Role System
 
-| Role | Assignment | Access |
-|---|---|---|
-| `USER` | default on signup | learning dashboard, courses, classes, practice, exams, memory graph, settings, BYOK keys, device pairing |
+| Role      | Assignment                                    | Access                                                                                                     |
+| --------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `USER`    | default on signup                             | learning dashboard, courses, classes, practice, exams, memory graph, settings, BYOK keys, device pairing   |
 | `CREATOR` | legacy/operational role when manually granted | user access plus any expanded operational controls still wired in the app; not public creator distribution |
-| `ADMIN` | email allowlist or manual admin assignment | admin dashboards and operational controls |
-| `SYSTEM` | internal automation only | owns system operations; never assigned to a real login |
+| `ADMIN`   | email allowlist or manual admin assignment    | admin dashboards and operational controls                                                                  |
+| `SYSTEM`  | internal automation only                      | owns system operations; never assigned to a real login                                                     |
 
 The first account on a fresh self-hosted instance can act as the owner for household invite and setup flows where those surfaces are enabled. Roles are operational permissions only. The learning loop, BYOK/local setup, and privacy are available without commercial access controls.
 
@@ -66,15 +66,15 @@ Do not use this role to add public creator pages, public distribution, follows, 
 
 ## 4. Admin Dashboard
 
-| Page | Path | Purpose |
-|---|---|---|
-| Overview | `/admin` | users, jobs, health, BYOK adoption, and setup status |
-| Users | `/admin/users` | search users, update role, inspect setup readiness |
+| Page     | Path              | Purpose                                                                    |
+| -------- | ----------------- | -------------------------------------------------------------------------- |
+| Overview | `/admin`          | users, jobs, health, BYOK adoption, and setup status                       |
+| Users    | `/admin/users`    | search users, update role, inspect setup readiness                         |
 | Podcasts | `/admin/podcasts` | legacy audio-engine inspection for generated listening audio and ownership |
-| Config | `/admin/config` | provider defaults and operational limits |
-| Handles | `/admin/handles` | reserved handle management where still needed |
-| Inspire | `/admin/inspire` | private inspiration/source management where still enabled |
-| Ratings | `/admin/ratings` | quality/rating oversight |
+| Config   | `/admin/config`   | provider defaults and operational limits                                   |
+| Handles  | `/admin/handles`  | reserved handle management where still needed                              |
+| Inspire  | `/admin/inspire`  | private inspiration/source management where still enabled                  |
+| Ratings  | `/admin/ratings`  | quality/rating oversight                                                   |
 
 Admin pages must not bypass ownership checks for user-facing private resources. Admin inspection should be explicit and auditable.
 
@@ -99,19 +99,19 @@ Manual role changes happen in `/admin/users`.
 
 Dashboards should report setup as capabilities:
 
-| Capability | Example status |
-|---|---|
-| database | connected |
-| Redis | connected |
-| storage | local or hosted provider selected |
-| learning LLM/local agent | selected and validated |
-| TTS | selected and validated |
-| STT | selected and validated when speaking is used |
-| local TTS | Kokoro base URL configured when `TTS_PROVIDER=kokoro` |
-| local STT | Whisper-compatible base URL configured when `STT_PROVIDER=local` |
-| course setup | language pair, placement, current level |
-| memory graph | due counts and recent review activity |
-| household | owner, invite-only/open sign-up, invites where enabled |
+| Capability               | Example status                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| database                 | connected                                                                      |
+| Redis                    | connected                                                                      |
+| storage                  | local or hosted provider selected                                              |
+| learning LLM/local agent | selected and validated                                                         |
+| TTS                      | selected and validated                                                         |
+| STT                      | selected and validated when speaking is used                                   |
+| local TTS                | sidecar base URL configured when `TTS_PROVIDER=kokoro` or `TTS_PROVIDER=local` |
+| local STT                | Whisper-compatible base URL configured when `STT_PROVIDER=local`               |
+| course setup             | language pair, placement, current level                                        |
+| memory graph             | due counts and recent review activity                                          |
+| household                | owner, invite-only/open sign-up, invites where enabled                         |
 
 The UI should not silently treat another provider as ready just because another key exists.
 
@@ -128,6 +128,7 @@ Users can manage account display data in settings. Profile-style fields may stil
 The event pipeline and model-backed reporting store have been removed. Do not add
 route-level tracking, anonymous session analytics, or profile-backed admin
 dashboards.
+
 - conversion through onboarding
 - placement completion
 - course creation

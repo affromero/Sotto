@@ -4,7 +4,22 @@
  */
 
 interface TtsProviderLogoProps {
-  provider: 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kokoro' | 'anthropic' | 'google' | 'together' | 'deepgram' | 'assemblyai';
+  provider:
+    | 'elevenlabs'
+    | 'openai'
+    | 'cartesia'
+    | 'hume'
+    | 'fal'
+    | 'replicate'
+    | 'minimax'
+    | 'mistral'
+    | 'kokoro'
+    | 'local'
+    | 'anthropic'
+    | 'google'
+    | 'together'
+    | 'deepgram'
+    | 'assemblyai';
   size?: number;
   className?: string;
 }
@@ -78,7 +93,17 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#6366F1" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="11" fontWeight="700" fontFamily="sans-serif">fal</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="11"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            fal
+          </text>
         </svg>
       );
     case 'replicate':
@@ -92,14 +117,34 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#1A1A2E" />
-          <text x="12" y="16" textAnchor="middle" fill="#4FC3F7" fontSize="8" fontWeight="700" fontFamily="sans-serif">MM</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#4FC3F7"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            MM
+          </text>
         </svg>
       );
     case 'mistral':
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#FF7000" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">M</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="9"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            M
+          </text>
         </svg>
       );
     case 'anthropic':
@@ -116,14 +161,34 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#4285F4" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">G</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="9"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            G
+          </text>
         </svg>
       );
     case 'together':
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#0EA5E9" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">T</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="9"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            T
+          </text>
         </svg>
       );
     case 'deepgram':
@@ -137,14 +202,42 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#1651F5" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">AI</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="9"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            AI
+          </text>
         </svg>
       );
     case 'kokoro':
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="var(--color-accent)" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">K</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="9"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            K
+          </text>
+        </svg>
+      );
+    case 'local':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="var(--color-primary)" />
+          <path d="M7 7h10v10H7z" stroke="#fff" strokeWidth="1.5" />
+          <path d="M10 12h4M12 10v4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       );
     default:
@@ -162,6 +255,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   minimax: 'MiniMax',
   mistral: 'Mistral',
   kokoro: 'Kokoro',
+  local: 'Local TTS sidecar',
   anthropic: 'Anthropic',
   google: 'Google',
   together: 'Together AI',

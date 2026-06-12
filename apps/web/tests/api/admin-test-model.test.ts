@@ -5,7 +5,9 @@ import { NextRequest } from 'next/server';
 
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockGenerateResponse = vi.hoisted(() => vi.fn());
-const mockCreateAIProvider = vi.hoisted(() => vi.fn(() => ({ generateResponse: mockGenerateResponse, streamResponse: vi.fn() })));
+const mockCreateAIProvider = vi.hoisted(() =>
+  vi.fn(() => ({ generateResponse: mockGenerateResponse, streamResponse: vi.fn() }))
+);
 const mockGenerateSpeech = vi.hoisted(() => vi.fn());
 const mockCreateTtsProviderAsync = vi.hoisted(() =>
   vi.fn(async () => ({
@@ -43,12 +45,33 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/providers/tts-voices', () => ({
-  CARTESIA_VOICE_POOL: [{ id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' }],
+  CARTESIA_VOICE_POOL: [
+    { id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' },
+  ],
   HUME_VOICE_POOL: [{ id: 'ITO', name: 'Ito', gender: 'female', character: 'warm' }],
   FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
-  MINIMAX_VOICE_POOL: [{ id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' }],
-  MISTRAL_VOICE_POOL: [{ id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' }],
-  KOKORO_VOICE_POOL: [{ id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' }],
+  MINIMAX_VOICE_POOL: [
+    {
+      id: 'Deep_Voice_Man',
+      name: 'Deep Voice Man',
+      gender: 'male',
+      character: 'authoritative expert',
+    },
+  ],
+  MISTRAL_VOICE_POOL: [
+    {
+      id: 'casual_male',
+      name: 'Casual Male',
+      gender: 'male',
+      character: 'friendly conversationalist',
+    },
+  ],
+  KOKORO_VOICE_POOL: [
+    { id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' },
+  ],
+  LOCAL_TTS_VOICE_POOL: [
+    { id: 'default', name: 'Default', gender: 'female', character: 'warm narrator' },
+  ],
   getTestVoiceId: vi.fn((provider: string) => {
     const map: Record<string, string> = {
       elevenlabs: '21m00Tcm4TlvDq8ikWAM',
@@ -60,6 +83,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
       minimax: 'Deep_Voice_Man',
       mistral: 'casual_male',
       kokoro: 'af_heart',
+      local: 'default',
     };
     return map[provider] ?? 'alloy';
   }),
@@ -69,7 +93,18 @@ vi.mock('@/lib/providers/tts-voices', () => ({
 // Tests control keys via vi.stubEnv() in beforeEach.
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderIds: vi.fn(() => ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro']),
+  getProviderIds: vi.fn(() => [
+    'elevenlabs',
+    'openai',
+    'cartesia',
+    'hume',
+    'fal',
+    'replicate',
+    'minimax',
+    'mistral',
+    'kokoro',
+    'local',
+  ]),
   getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
 }));
 
@@ -88,12 +123,20 @@ vi.mock('@/lib/providers/fal-endpoints', () => ({
   getFalAvatarEndpoint: vi.fn(() => 'fal-ai/kling-video/ai-avatar/v2/pro'),
   LIP_SYNC_CONFIG: {
     'fal-veed-fabric-1.0': { maxAudioSeconds: 300, outputFormat: 'mp4' },
-    'fal-kling-avatar-v2-pro': { maxAudioSeconds: 60, outputFormat: 'mp4', defaultPrompt: 'A person speaking to camera' },
+    'fal-kling-avatar-v2-pro': {
+      maxAudioSeconds: 60,
+      outputFormat: 'mp4',
+      defaultPrompt: 'A person speaking to camera',
+    },
   },
 }));
 vi.mock('@/lib/providers/video-registry', () => ({
   getVideoProviderMeta: vi.fn((id: string) => {
-    if (id === 'minimax') return { platformKeyEnv: 'MINIMAX_API_KEY', auth: { validate: vi.fn().mockResolvedValue(true) } };
+    if (id === 'minimax')
+      return {
+        platformKeyEnv: 'MINIMAX_API_KEY',
+        auth: { validate: vi.fn().mockResolvedValue(true) },
+      };
     return { platformKeyEnv: 'FAL_KEY', auth: { validate: vi.fn().mockResolvedValue(true) } };
   }),
   videoModelRequiresFirstFrame: mockVideoModelRequiresFirstFrame,
@@ -107,7 +150,11 @@ vi.mock('@/lib/providers/avatar-registry', () => ({
 vi.mock('@/lib/providers/video/minimax.provider', () => ({
   MINIMAX_MODEL_MAP: {
     'minimax-hailuo02-768p': { apiModel: 'MiniMax-Hailuo-02', resolution: '768P' },
-    'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P', requiresFirstFrame: true },
+    'minimax-hailuo02-512p': {
+      apiModel: 'MiniMax-Hailuo-02',
+      resolution: '512P',
+      requiresFirstFrame: true,
+    },
   },
 }));
 vi.mock('@/lib/heygen', () => ({ listAvatars: mockListAvatars }));
@@ -157,7 +204,9 @@ describe('POST /api/v1/admin/test-model', () => {
 
   it('returns 403 when not admin', async () => {
     mockRequireAdmin.mockResolvedValue(null);
-    const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
+    const res = await POST(
+      createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
+    );
     const body = await res.json();
 
     expect(res.status).toBe(403);
@@ -167,7 +216,9 @@ describe('POST /api/v1/admin/test-model', () => {
   // ── Input validation ────────────────────────────────────────────────────────
 
   it('returns 400 for an invalid type', async () => {
-    const res = await POST(createRequest({ type: 'invalid', provider: 'anthropic', model: 'claude' }));
+    const res = await POST(
+      createRequest({ type: 'invalid', provider: 'anthropic', model: 'claude' })
+    );
     expect(res.status).toBe(400);
   });
 
@@ -192,7 +243,9 @@ describe('POST /api/v1/admin/test-model', () => {
         model: 'claude-haiku-4-5-20251001',
       });
 
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
+      const res = await POST(
+        createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200);
@@ -202,7 +255,12 @@ describe('POST /api/v1/admin/test-model', () => {
     });
 
     it('truncates AI response to 60 characters', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'A'.repeat(100), inputTokens: 5, outputTokens: 20, model: 'claude' });
+      mockGenerateResponse.mockResolvedValue({
+        content: 'A'.repeat(100),
+        inputTokens: 5,
+        outputTokens: 20,
+        model: 'claude',
+      });
 
       const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
       const body = await res.json();
@@ -212,7 +270,12 @@ describe('POST /api/v1/admin/test-model', () => {
     });
 
     it('passes the requested model to the AI provider', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'Hi', inputTokens: 1, outputTokens: 1, model: 'claude-opus-4-6' });
+      mockGenerateResponse.mockResolvedValue({
+        content: 'Hi',
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'claude-opus-4-6',
+      });
 
       await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-opus-4-6' }));
 
@@ -246,7 +309,9 @@ describe('POST /api/v1/admin/test-model', () => {
     it('classifies a 429 rate-limit error', async () => {
       mockGenerateResponse.mockRejectedValue(new Error('429 rate limit exceeded'));
 
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
+      const res = await POST(
+        createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -281,7 +346,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-key');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-mp3-bytes'));
 
-      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200);
@@ -292,7 +359,9 @@ describe('POST /api/v1/admin/test-model', () => {
 
     it('returns failure when the platform key is missing', async () => {
       // ELEVENLABS_API_KEY stubbed to '' in beforeEach
-      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200); // HTTP 200 — business-level failure in body
@@ -304,11 +373,23 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('CARTESIA_API_KEY', 'bad-key');
       mockGenerateSpeech.mockRejectedValue(new Error('403 forbidden'));
 
-      const res = await POST(createRequest({ type: 'tts', provider: 'cartesia', model: 'sonic-2' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'cartesia', model: 'sonic-2' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
       expect(body.error).toBe('Authentication failed — check API key');
+    });
+
+    it('treats local TTS as a keyless platform provider', async () => {
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-mp3-bytes'));
+
+      const res = await POST(createRequest({ type: 'tts', provider: 'local', model: 'local' }));
+      const body = await res.json();
+
+      expect(body.success).toBe(true);
+      expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('local', 'local', undefined, 'local');
     });
   });
 
@@ -321,7 +402,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: 'Hello world', segments: [], language: 'en' });
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200);
@@ -336,7 +419,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: '', segments: [], language: 'en' });
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(true);
@@ -345,7 +430,9 @@ describe('POST /api/v1/admin/test-model', () => {
 
     it('returns failure when the STT key is missing', async () => {
       // OPENAI_API_KEY is '' from beforeEach
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -369,11 +456,26 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockRejectedValue(new Error('fetch failed: ECONNREFUSED'));
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
       expect(body.error).toMatch(/^Network error:/);
+    });
+
+    it('routes local STT to the local placeholder key', async () => {
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
+      mockTranscribe.mockResolvedValue({ text: 'local transcript', segments: [], language: 'en' });
+
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'local', model: 'whisper-local' })
+      );
+      const body = await res.json();
+
+      expect(body.success).toBe(true);
+      expect(mockCreateSttProvider).toHaveBeenCalledWith('local', 'local', 'whisper-local');
     });
   });
 
@@ -401,11 +503,15 @@ describe('POST /api/v1/admin/test-model', () => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         // Queue submit
         if (urlStr.includes('queue.fal.run') && !urlStr.includes('/requests/')) {
-          return new Response(JSON.stringify({
-            request_id: 'req-123',
-            status_url: 'https://queue.fal.run/fal-ai/wan/v2.5/text-to-video/requests/req-123/status',
-            response_url: 'https://queue.fal.run/fal-ai/wan/v2.5/text-to-video/requests/req-123',
-          }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              request_id: 'req-123',
+              status_url:
+                'https://queue.fal.run/fal-ai/wan/v2.5/text-to-video/requests/req-123/status',
+              response_url: 'https://queue.fal.run/fal-ai/wan/v2.5/text-to-video/requests/req-123',
+            }),
+            { status: 200 }
+          );
         }
         // Poll status — return COMPLETED
         if (urlStr.includes('/status')) {
@@ -413,12 +519,16 @@ describe('POST /api/v1/admin/test-model', () => {
         }
         // Result fetch
         if (urlStr.includes('/requests/req-123') && !urlStr.includes('/status')) {
-          return new Response(JSON.stringify({ video: { url: 'https://fal.cdn/video.mp4' } }), { status: 200 });
+          return new Response(JSON.stringify({ video: { url: 'https://fal.cdn/video.mp4' } }), {
+            status: 200,
+          });
         }
         return new Response('not found', { status: 404 });
       });
 
-      const promise = POST(createRequest({ type: 'video', provider: 'fal', model: 'fal-wan2.5-480p' }));
+      const promise = POST(
+        createRequest({ type: 'video', provider: 'fal', model: 'fal-wan2.5-480p' })
+      );
       await vi.advanceTimersByTimeAsync(200_000);
       const res = await promise;
       const body = await res.json();
@@ -432,7 +542,9 @@ describe('POST /api/v1/admin/test-model', () => {
     it('returns failure when FAL_KEY is missing for video', async () => {
       mockGetFalVideoEndpoint.mockReturnValue('fal-ai/wan/v2.5/text-to-video');
 
-      const res = await POST(createRequest({ type: 'video', provider: 'fal', model: 'fal-wan2.5-480p' }));
+      const res = await POST(
+        createRequest({ type: 'video', provider: 'fal', model: 'fal-wan2.5-480p' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -447,30 +559,41 @@ describe('POST /api/v1/admin/test-model', () => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         // Submit
         if (urlStr.includes('video_generation') && !urlStr.includes('query')) {
-          return new Response(JSON.stringify({
-            task_id: 'task-456',
-            base_resp: { status_code: 0, status_msg: 'success' },
-          }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              task_id: 'task-456',
+              base_resp: { status_code: 0, status_msg: 'success' },
+            }),
+            { status: 200 }
+          );
         }
         // Poll status
         if (urlStr.includes('query/video_generation')) {
-          return new Response(JSON.stringify({
-            status: 'Success',
-            file_id: 'file-789',
-            base_resp: { status_code: 0, status_msg: 'success' },
-          }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              status: 'Success',
+              file_id: 'file-789',
+              base_resp: { status_code: 0, status_msg: 'success' },
+            }),
+            { status: 200 }
+          );
         }
         // File retrieve
         if (urlStr.includes('files/retrieve')) {
-          return new Response(JSON.stringify({
-            file: { download_url: 'https://minimax.cdn/video.mp4' },
-            base_resp: { status_code: 0, status_msg: 'success' },
-          }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              file: { download_url: 'https://minimax.cdn/video.mp4' },
+              base_resp: { status_code: 0, status_msg: 'success' },
+            }),
+            { status: 200 }
+          );
         }
         return new Response('not found', { status: 404 });
       });
 
-      const promise = POST(createRequest({ type: 'video', provider: 'minimax', model: 'minimax-hailuo02-768p' }));
+      const promise = POST(
+        createRequest({ type: 'video', provider: 'minimax', model: 'minimax-hailuo02-768p' })
+      );
       await vi.advanceTimersByTimeAsync(200_000);
       const res = await promise;
       const body = await res.json();
@@ -489,7 +612,9 @@ describe('POST /api/v1/admin/test-model', () => {
         return new Response(JSON.stringify({}), { status: 200 });
       });
 
-      const res = await POST(createRequest({ type: 'video', provider: 'fal', model: 'fal-unknown-model' }));
+      const res = await POST(
+        createRequest({ type: 'video', provider: 'fal', model: 'fal-unknown-model' })
+      );
       const body = await res.json();
 
       expect(body.response).toMatch(/API key valid/);
@@ -529,14 +654,19 @@ describe('POST /api/v1/admin/test-model', () => {
       fetchSpy.mockImplementation(async (url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         if (urlStr.includes('fal.run/fal-ai/flux/schnell')) {
-          return new Response(JSON.stringify({
-            images: [{ url: 'https://fal.cdn/portrait.png' }],
-          }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              images: [{ url: 'https://fal.cdn/portrait.png' }],
+            }),
+            { status: 200 }
+          );
         }
         return new Response('not found', { status: 404 });
       });
 
-      const res = await POST(createRequest({ type: 'avatar', provider: 'fal', model: 'fal-kling-avatar-v2-pro' }));
+      const res = await POST(
+        createRequest({ type: 'avatar', provider: 'fal', model: 'fal-kling-avatar-v2-pro' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(true);
@@ -555,14 +685,19 @@ describe('POST /api/v1/admin/test-model', () => {
       fetchSpy.mockImplementation(async (url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
         if (urlStr.includes('fal.run/fal-ai/flux/schnell')) {
-          return new Response(JSON.stringify({
-            images: [{ url: 'https://fal.cdn/portrait.png' }],
-          }), { status: 200 });
+          return new Response(
+            JSON.stringify({
+              images: [{ url: 'https://fal.cdn/portrait.png' }],
+            }),
+            { status: 200 }
+          );
         }
         return new Response('not found', { status: 404 });
       });
 
-      const res = await POST(createRequest({ type: 'avatar', provider: 'fal', model: 'fal-kling-avatar-v2-pro' }));
+      const res = await POST(
+        createRequest({ type: 'avatar', provider: 'fal', model: 'fal-kling-avatar-v2-pro' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(true);
@@ -570,7 +705,9 @@ describe('POST /api/v1/admin/test-model', () => {
     });
 
     it('returns failure when FAL_KEY is missing for avatar test', async () => {
-      const res = await POST(createRequest({ type: 'avatar', provider: 'fal', model: 'fal-kling-avatar-v2-pro' }));
+      const res = await POST(
+        createRequest({ type: 'avatar', provider: 'fal', model: 'fal-kling-avatar-v2-pro' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -582,7 +719,9 @@ describe('POST /api/v1/admin/test-model', () => {
       mockListAvatars.mockResolvedValue([{ id: '1' }, { id: '2' }]);
 
       // Mock getAvatarProviderMeta to return HEYGEN_API_KEY for heygen
-      const res = await POST(createRequest({ type: 'avatar', provider: 'heygen', model: 'heygen-default' }));
+      const res = await POST(
+        createRequest({ type: 'avatar', provider: 'heygen', model: 'heygen-default' })
+      );
       const body = await res.json();
 
       // HeyGen uses FAL_KEY in the mock but the important thing is listAvatars is called
@@ -597,9 +736,16 @@ describe('POST /api/v1/admin/test-model', () => {
     describe('AI BYOK', () => {
       it('calls generateResponse with apiKeyOverride from BYOK key', async () => {
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-anthropic-key', provider: 'anthropic' });
-        mockGenerateResponse.mockResolvedValue({ content: 'Hello', inputTokens: 5, outputTokens: 1, model: 'claude' });
+        mockGenerateResponse.mockResolvedValue({
+          content: 'Hello',
+          inputTokens: 5,
+          outputTokens: 1,
+          model: 'claude',
+        });
 
-        const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(true);
@@ -614,7 +760,9 @@ describe('POST /api/v1/admin/test-model', () => {
       it('returns failure when BYOK AI key is not found', async () => {
         mockGetAiKey.mockResolvedValue(null);
 
-        const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(false);
@@ -627,7 +775,14 @@ describe('POST /api/v1/admin/test-model', () => {
         mockGetByokKey.mockResolvedValue('byok-xi-key');
         mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
 
-        const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({
+            type: 'tts',
+            provider: 'elevenlabs',
+            model: 'eleven_v3',
+            keySource: 'byok',
+          })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(true);
@@ -640,11 +795,17 @@ describe('POST /api/v1/admin/test-model', () => {
         );
       });
 
-
       it('returns failure when BYOK TTS key is not found', async () => {
         mockGetByokKey.mockResolvedValue(null);
 
-        const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({
+            type: 'tts',
+            provider: 'elevenlabs',
+            model: 'eleven_v3',
+            keySource: 'byok',
+          })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(false);
@@ -659,10 +820,16 @@ describe('POST /api/v1/admin/test-model', () => {
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
-        await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' }));
+        await POST(
+          createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' })
+        );
 
         expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'openai');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith('openai', 'byok-openai-key', 'whisper-1');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith(
+          'openai',
+          'byok-openai-key',
+          'whisper-1'
+        );
       });
 
       it('uses TTS BYOK key for elevenlabs STT', async () => {
@@ -671,16 +838,29 @@ describe('POST /api/v1/admin/test-model', () => {
         mockGetByokKey.mockResolvedValue('byok-xi-stt-key');
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
-        await POST(createRequest({ type: 'stt', provider: 'elevenlabs', model: 'scribe_v1', keySource: 'byok' }));
+        await POST(
+          createRequest({
+            type: 'stt',
+            provider: 'elevenlabs',
+            model: 'scribe_v1',
+            keySource: 'byok',
+          })
+        );
 
         expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'elevenlabs');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'byok-xi-stt-key', 'scribe_v1');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith(
+          'elevenlabs',
+          'byok-xi-stt-key',
+          'scribe_v1'
+        );
       });
 
       it('returns failure when BYOK STT key is not found', async () => {
         mockGetAiKey.mockResolvedValue(null);
 
-        const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(false);
@@ -692,7 +872,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('ELEVENLABS_API_KEY', 'xi-platform-key');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
 
-      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(true);

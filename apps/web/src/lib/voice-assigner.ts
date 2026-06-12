@@ -16,6 +16,7 @@ import {
   MINIMAX_VOICE_POOL,
   MISTRAL_VOICE_POOL,
   KOKORO_VOICE_POOL,
+  getLocalTtsVoicePool,
 } from './providers/tts-voices';
 import type { TtsProviderId } from './providers/tts-registry';
 import { logger } from './logger';
@@ -140,6 +141,11 @@ function selectDeterministicVoiceIds(
 
     case 'kokoro': {
       const voices = selectVoiceSetFromPool(KOKORO_VOICE_POOL, podcastId, speakerCount, metadata);
+      return voices.map((v) => v.id);
+    }
+
+    case 'local': {
+      const voices = selectVoiceSetFromPool(getLocalTtsVoicePool(), podcastId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 

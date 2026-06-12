@@ -25,7 +25,14 @@ vi.mock('@/lib/auto-model-config', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   isValidModelId: vi.fn(() => true),
-  getAiProviderIds: vi.fn(() => ['anthropic', 'openai', 'claude-code', 'together', 'deepgram', 'assemblyai']),
+  getAiProviderIds: vi.fn(() => [
+    'anthropic',
+    'openai',
+    'claude-code',
+    'together',
+    'deepgram',
+    'assemblyai',
+  ]),
   getProviderForModel: vi.fn((id: string) => {
     if (id.startsWith('claude')) return 'anthropic';
     if (id.startsWith('gpt')) return 'openai';
@@ -188,6 +195,22 @@ describe('PATCH /api/v1/admin/auto-models', () => {
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
   });
 
+  it('accepts local speech providers in model config', async () => {
+    const body = {
+      model: {
+        ttsProvider: 'local',
+        ttsModel: 'local',
+        sttProvider: 'local',
+        sttModel: 'whisper-local',
+      },
+    };
+
+    const response = await PATCH(patchRequest(body));
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
+  });
+
   it('rejects invalid model block provider values', async () => {
     const response = await PATCH(patchRequest({ model: { aiProvider: 'invalid' } }));
 
@@ -196,7 +219,9 @@ describe('PATCH /api/v1/admin/auto-models', () => {
   });
 
   it('rejects mismatched AI provider/model pairs', async () => {
-    const response = await PATCH(patchRequest({ model: { aiProvider: 'anthropic', aiModel: 'gpt-5' } }));
+    const response = await PATCH(
+      patchRequest({ model: { aiProvider: 'anthropic', aiModel: 'gpt-5' } })
+    );
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({

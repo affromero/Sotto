@@ -68,6 +68,13 @@ describe('resolveTts', () => {
     expect(r.preferredTtsProvider).toBe('kokoro');
   });
 
+  it('maps local to the generic keyless sidecar provider', () => {
+    const r = resolveTts('local', '', 'http://localhost:8000');
+    expect(r.keyPost).toBeNull();
+    expect(r.infra).toEqual({ ttsProvider: 'local', ttsBaseUrl: 'http://localhost:8000' });
+    expect(r.preferredTtsProvider).toBe('local');
+  });
+
   it('routes a cloud TTS key to the BYOK store and sets it as the provider', () => {
     const r = resolveTts('elevenlabs', 'xi-key', '');
     expect(r.keyPost).toEqual({ endpoint: 'byok', provider: 'elevenlabs', apiKey: 'xi-key' });
