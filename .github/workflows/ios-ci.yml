@@ -37,12 +37,12 @@ jobs:
       EXPO_PUBLIC_API_URL: http://localhost:3000/api/v1
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -137,7 +137,7 @@ jobs:
       # --- Artifacts & cleanup ---
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maestro-results
           path: maestro-results.xml
@@ -145,7 +145,7 @@ jobs:
 
       - name: Upload Maestro screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maestro-screenshots
           path: ~/.maestro/tests/**/*.png

@@ -13,12 +13,12 @@ jobs:
     name: CI Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: actions/checkout@v6
+      - uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.SUBMODULE_SSH_KEY }}
       - run: git config --global url."git@github.com:".insteadOf "https://github.com/" && git submodule update --init --recursive
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
