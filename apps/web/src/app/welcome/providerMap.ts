@@ -41,6 +41,9 @@ export interface SttResolution {
   infra: { sttProvider?: string; sttBaseUrl?: string };
 }
 
+export const DEFAULT_LOCAL_TTS_BASE_URL = 'http://localhost:8000';
+export const DEFAULT_LOCAL_STT_BASE_URL = 'http://localhost:8001/v1';
+
 function clean(v: string | undefined | null): string {
   return (v ?? '').trim();
 }
@@ -55,7 +58,7 @@ export function resolveAi(
   provider: string,
   method: AiMethod,
   value: string,
-  model: string,
+  model: string
 ): AiResolution {
   const v = clean(value);
   const m = clean(model);
@@ -98,7 +101,7 @@ export function resolveAi(
  */
 export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsResolution {
   if (ttsId === 'kokoro' || ttsId === 'local') {
-    const u = clean(baseUrl);
+    const u = clean(baseUrl) || DEFAULT_LOCAL_TTS_BASE_URL;
     return {
       keyPost: null,
       preferredTtsProvider: ttsId,
@@ -120,11 +123,10 @@ export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsR
  * other cloud STT key lives in the AI-key store (matching resolveSttProvider).
  */
 export function resolveStt(sttId: string, apiKey: string, baseUrl: string): SttResolution {
-  const resolvedId =
-    sttId === 'whisper' ? 'local' : sttId === 'assembly' ? 'assemblyai' : sttId;
+  const resolvedId = sttId === 'whisper' ? 'local' : sttId === 'assembly' ? 'assemblyai' : sttId;
 
   if (resolvedId === 'local') {
-    const u = clean(baseUrl);
+    const u = clean(baseUrl) || DEFAULT_LOCAL_STT_BASE_URL;
     return { keyPost: null, infra: { sttProvider: 'local', ...(u && { sttBaseUrl: u }) } };
   }
 

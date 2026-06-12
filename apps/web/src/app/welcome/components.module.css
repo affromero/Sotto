@@ -701,6 +701,151 @@
   align-items: flex-start;
 }
 
+.localCheck {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--well);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.localCheckTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.localCheckCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.localCheckTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.localCheckHint {
+  color: var(--ink-mute);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.localCheckButton {
+  min-width: 72px;
+  min-height: 44px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.localCheckButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.localCheckButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.localCheckResult {
+  border-radius: var(--r);
+  padding: 9px 10px;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.localCheckResultOk {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.localCheckResultError {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.localCheckList {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.localCheckItem {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  padding: 9px 10px;
+}
+
+.localCheckItemHead {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.localCheckItemHead code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.localCheckItemDetail {
+  color: var(--ink-mute);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.localCheckItemOk .localCheckItemHead {
+  color: var(--accent);
+}
+
+.localCheckItemError {
+  border-color: var(--line-strong);
+}
+
+@media (max-width: 640px) {
+  .localCheckTop {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .localCheckButton {
+    width: 100%;
+  }
+}
+
 /* ---------- source list ---------- */
 .contextBar {
   margin-top: 26px;

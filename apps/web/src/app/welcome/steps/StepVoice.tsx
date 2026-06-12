@@ -1,7 +1,9 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { TTS_PROVIDERS, STT_PROVIDERS } from '../data';
 import type { VoiceState } from '../WelcomeFlow';
+import { DEFAULT_LOCAL_STT_BASE_URL, DEFAULT_LOCAL_TTS_BASE_URL } from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.module.css';
@@ -174,11 +176,109 @@ interface Props {
   onBack: () => void;
 }
 
+interface LocalSpeechCheckItem {
+  id: 'tts' | 'stt';
+  label: string;
+  url: string;
+  ok: boolean;
+  detail: string;
+}
+
+interface LocalSpeechCheckState {
+  status: 'idle' | 'checking' | 'ok' | 'error';
+  signature: string;
+  message: string;
+  checks: LocalSpeechCheckItem[];
+}
+
+function isLocalProvider(id: string, providers: typeof TTS_PROVIDERS) {
+  return providers.some((provider) => provider.id === id && provider.local);
+}
+
 export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) {
+  const [localCheck, setLocalCheck] = useState<LocalSpeechCheckState>({
+    status: 'idle',
+    signature: '',
+    message: '',
+    checks: [],
+  });
   const setKey = (id: string, val: string) =>
     setVoice((s) => ({ ...s, keys: { ...s.keys, [id]: val } }));
   const setBaseUrl = (id: string, val: string) =>
     setVoice((s) => ({ ...s, baseUrls: { ...s.baseUrls, [id]: val } }));
+  const ttsIsLocal = isLocalProvider(voice.tts, TTS_PROVIDERS);
+  const sttIsLocal = isLocalProvider(voice.stt, STT_PROVIDERS);
+  const needsLocalCheck = !demoMode && (ttsIsLocal || sttIsLocal);
+  const localCheckSignature = useMemo(
+    () =>
+      JSON.stringify({
+        tts: ttsIsLocal
+          ? {
+              provider: voice.tts,
+              baseUrl: voice.baseUrls[voice.tts]?.trim() || DEFAULT_LOCAL_TTS_BASE_URL,
+            }
+          : null,
+        stt: sttIsLocal
+          ? {
+              provider: voice.stt,
+              baseUrl: voice.baseUrls[voice.stt]?.trim() || DEFAULT_LOCAL_STT_BASE_URL,
+            }
+          : null,
+      }),
+    [sttIsLocal, ttsIsLocal, voice.baseUrls, voice.stt, voice.tts]
+  );
+  const localCheckFresh = localCheck.signature === localCheckSignature;
+  const localCheckStatus =
+    localCheck.status !== 'idle' && !localCheckFresh ? 'stale' : localCheck.status;
+  const canContinue = !needsLocalCheck || (localCheckStatus === 'ok' && localCheckFresh);
+
+  async function checkLocalSpeech() {
+    setLocalCheck({
+      status: 'checking',
+      signature: localCheckSignature,
+      message: 'Checking selected local endpoints.',
+      checks: [],
+    });
+
+    try {
+      const res = await fetch('/api/v1/onboarding/check-local-speech', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tts: { provider: voice.tts, baseUrl: voice.baseUrls[voice.tts] ?? '' },
+          stt: { provider: voice.stt, baseUrl: voice.baseUrls[voice.stt] ?? '' },
+        }),
+      });
+      if (!res.ok) {
+        setLocalCheck({
+          status: 'error',
+          signature: localCheckSignature,
+          message: 'Could not run the local endpoint check.',
+          checks: [],
+        });
+        return;
+      }
+
+      const data = (await res.json()) as { ok?: boolean; checks?: LocalSpeechCheckItem[] };
+      const checks = Array.isArray(data.checks) ? data.checks : [];
+      setLocalCheck({
+        status: data.ok ? 'ok' : 'error',
+        signature: localCheckSignature,
+        message: data.ok
+          ? 'Local speech endpoints are ready.'
+          : 'One or more local speech endpoints failed.',
+        checks,
+      });
+    } catch {
+      setLocalCheck({
+        status: 'error',
+        signature: localCheckSignature,
+        message: 'Could not reach Sotto to run the local endpoint check.',
+        checks: [],
+      });
+    }
+  }
 
   return (
     <div className={t.stepEnter}>
@@ -218,7 +318,7 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
         onKey={setKey}
         baseUrls={voice.baseUrls}
         onBaseUrl={setBaseUrl}
-        localPlaceholder="http://localhost:8000/v1"
+        localPlaceholder="http://localhost:8001/v1"
         demoMode={demoMode}
       />
 
@@ -229,12 +329,71 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
           : 'Keys are shared where it makes sense — enter ElevenLabs or OpenAI once and it powers both. Everything writes to your local config, nothing leaves your machine.'}
       </div>
 
+      {needsLocalCheck && (
+        <section className={c.localCheck} aria-live="polite">
+          <div className={c.localCheckTop}>
+            <div className={c.localCheckCopy}>
+              <span className={c.localCheckTitle}>
+                <Glyph name={localCheckStatus === 'ok' ? 'check' : 'link'} size={14} />
+                Local endpoint check
+              </span>
+              <span className={c.localCheckHint}>
+                Tests selected local speech servers from this Sotto instance before continuing.
+              </span>
+            </div>
+            <button
+              type="button"
+              className={c.localCheckButton}
+              onClick={checkLocalSpeech}
+              disabled={localCheckStatus === 'checking'}
+            >
+              {localCheckStatus === 'checking' ? 'Checking.' : 'Check'}
+            </button>
+          </div>
+
+          {localCheckStatus !== 'idle' && (
+            <div
+              className={`${c.localCheckResult} ${
+                localCheckStatus === 'ok' ? c.localCheckResultOk : c.localCheckResultError
+              }`}
+              role={
+                localCheckStatus === 'error' || localCheckStatus === 'stale' ? 'alert' : undefined
+              }
+            >
+              {localCheckStatus === 'stale'
+                ? 'Endpoint changed. Run the check again before continuing.'
+                : localCheck.message}
+            </div>
+          )}
+
+          {localCheck.checks.length > 0 && localCheckFresh && (
+            <ul className={c.localCheckList}>
+              {localCheck.checks.map((item) => (
+                <li
+                  key={item.id}
+                  className={`${c.localCheckItem} ${
+                    item.ok ? c.localCheckItemOk : c.localCheckItemError
+                  }`}
+                >
+                  <span className={c.localCheckItemHead}>
+                    <Glyph name={item.ok ? 'check' : 'x'} size={13} />
+                    <span>{item.label}</span>
+                    <code>{item.url}</code>
+                  </span>
+                  <span className={c.localCheckItemDetail}>{item.detail}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <div className={t.actions}>
         <button className={`${t.btn} ${t.btnBare}`} onClick={onBack}>
           ← Back
         </button>
         <span className={t.spacer} />
-        <button className={`${t.btn} ${t.btnPrimary}`} onClick={onNext}>
+        <button className={`${t.btn} ${t.btnPrimary}`} onClick={onNext} disabled={!canContinue}>
           Continue{' '}
           <span className={t.btnArrow}>
             <Glyph name="arrow" size={17} />
