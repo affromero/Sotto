@@ -5,7 +5,13 @@
  * openai or keyless claude-code, ElevenLabs STT key -> BYOK store).
  */
 import { describe, it, expect } from 'vitest';
-import { resolveAi, resolveTts, resolveStt } from '@/app/welcome/providerMap';
+import {
+  DEFAULT_LOCAL_STT_BASE_URL,
+  DEFAULT_LOCAL_TTS_BASE_URL,
+  resolveAi,
+  resolveTts,
+  resolveStt,
+} from '@/app/welcome/providerMap';
 
 describe('resolveAi', () => {
   it('maps claude + key to a BYOK anthropic key (AI-key store)', () => {
@@ -75,6 +81,11 @@ describe('resolveTts', () => {
     expect(r.preferredTtsProvider).toBe('local');
   });
 
+  it('uses the local TTS default when the welcome field is blank', () => {
+    const r = resolveTts('local', '', '');
+    expect(r.infra).toEqual({ ttsProvider: 'local', ttsBaseUrl: DEFAULT_LOCAL_TTS_BASE_URL });
+  });
+
   it('routes a cloud TTS key to the BYOK store and sets it as the provider', () => {
     const r = resolveTts('elevenlabs', 'xi-key', '');
     expect(r.keyPost).toEqual({ endpoint: 'byok', provider: 'elevenlabs', apiKey: 'xi-key' });
@@ -100,6 +111,11 @@ describe('resolveStt', () => {
     const r = resolveStt('local', '', 'http://localhost:8001/v1');
     expect(r.keyPost).toBeNull();
     expect(r.infra).toEqual({ sttProvider: 'local', sttBaseUrl: 'http://localhost:8001/v1' });
+  });
+
+  it('uses the local STT default when the welcome field is blank', () => {
+    const r = resolveStt('local', '', '');
+    expect(r.infra).toEqual({ sttProvider: 'local', sttBaseUrl: DEFAULT_LOCAL_STT_BASE_URL });
   });
 
   it('remaps the assembly label to the assemblyai provider (AI-key store)', () => {

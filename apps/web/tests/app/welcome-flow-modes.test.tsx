@@ -305,6 +305,69 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByLabelText(/Deepgram API key/i)).not.toBeInTheDocument();
   });
 
+  it('requires a green local endpoint check before continuing with local speech', async () => {
+    const user = userEvent.setup();
+    let voice = { tts: 'local', stt: 'local', keys: {}, baseUrls: {} };
+    const setVoice = vi.fn((updater: (prev: typeof voice) => typeof voice) => {
+      voice = updater(voice);
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        checks: [
+          {
+            id: 'tts',
+            label: 'Text to speech',
+            url: 'http://localhost:8000',
+            ok: true,
+            detail: 'Ready: /health, /voices, and /tts passed.',
+          },
+          {
+            id: 'stt',
+            label: 'Speech to text',
+            url: 'http://localhost:8001/v1',
+            ok: true,
+            detail: 'Ready: /audio/transcriptions accepted a test WAV.',
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const renderStep = () => (
+      <StepVoice
+        voice={voice}
+        demoMode={false}
+        setVoice={setVoice}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+    const { rerender } = render(renderStep());
+
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
+    expect(screen.getByPlaceholderText('http://localhost:8001/v1')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Check$/i }));
+
+    expect(await screen.findByText(/Local speech endpoints are ready/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/onboarding/check-local-speech',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+      })
+    );
+
+    await user.type(screen.getAllByLabelText(/Local sidecar endpoint URL/i)[0], '2');
+    rerender(renderStep());
+
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
+    expect(screen.getByText(/Endpoint changed/i)).toBeInTheDocument();
+  });
+
   it('adds direct links, notes, and uploaded files in the context step', async () => {
     const user = userEvent.setup();
     let contextItems: ContextItem[] = [];
