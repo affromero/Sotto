@@ -63,6 +63,7 @@ function VoicePicker({
                   {p.local && (
                     <span className={c.vcLocal}>
                       <Glyph name="shield" size={12} />
+                      local
                     </span>
                   )}
                   {set && (
