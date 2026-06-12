@@ -594,6 +594,197 @@
 }
 
 /* ---------- source list ---------- */
+.contextBar {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: stretch;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px;
+}
+
+.contextBar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.contextBarIcon {
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.contextInput {
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  padding: 0 4px;
+}
+
+.contextInput::placeholder {
+  color: var(--ink-mute);
+}
+
+.contextInput:focus {
+  outline: none;
+}
+
+.contextAdd,
+.contextUpload {
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.18s,
+    color 0.18s,
+    background 0.18s;
+}
+
+.contextAdd {
+  padding: 0 15px;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.contextAdd:disabled,
+.contextUpload:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.contextUpload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  color: var(--ink-soft);
+  background: var(--paper);
+}
+
+.contextUpload:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.contextItems {
+  margin-top: 10px;
+  display: grid;
+  gap: 7px;
+}
+
+.contextItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 9px 10px;
+}
+
+.contextKind {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 20px;
+  padding: 3px 7px;
+}
+
+.contextItemText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contextItemLabel {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contextItemPreview {
+  font-size: 12px;
+  color: var(--ink-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contextRemove {
+  width: 44px;
+  height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-mute);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.contextRemove:hover {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.contextNotice {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--ink-mute);
+}
+
+@media (max-width: 640px) {
+  .contextBar {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .contextAdd,
+  .contextUpload {
+    width: 100%;
+  }
+
+  .contextAdd {
+    grid-column: 1 / 2;
+  }
+
+  .contextUpload {
+    grid-column: 2 / 3;
+  }
+}
+
 .sourceList {
   margin-top: 26px;
   display: flex;

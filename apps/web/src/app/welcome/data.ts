@@ -81,6 +81,8 @@ export type GlyphName =
   | 'mic'
   | 'graph'
   | 'spark'
+  | 'upload'
+  | 'x'
   | 'repo'
   | 'lock'
   | 'shield'
@@ -626,14 +628,14 @@ export const COMPOSE_LOG: ComposeLogLine[] = [
   { t: 'plan', text: 'drafting {{LEVEL}} grammar gates (mastery-locked)' },
   { t: 'ok', text: 'grammar · 9 units · gate: ≥85% recall' },
   { t: 'plan', text: 'curating reading from your domains …' },
-  { t: 'ok', text: 'reading · "Sistemi distribuiti, spiegati piano"' },
+  { t: 'ok', text: 'reading · "Distributed systems, explained clearly"' },
   { t: 'plan', text: 'synthesizing listening lesson 01 (adaptive, your pace)' },
   { t: 'ok', text: 'listening · 6 min · {{TTS}} voice · jazz cold-open ☕' },
   { t: 'plan', text: 'scripting speaking drills · phoneme targets' },
   { t: 'ok', text: 'speaking · 12 prompts · {{STT}} phoneme scoring' },
   { t: 'plan', text: 'seeding vocabulary memory graph (yours, exportable)' },
   { t: 'ok', text: 'vocab · 48 nodes · spaced-repetition live' },
-  { t: 'done', text: 'course composed — sotto voce. buon viaggio.' },
+  { t: 'done', text: 'course composed - ready for the first lesson.' },
 ];
 
 export const MODULES: Module[] = [
@@ -662,7 +664,7 @@ export const WHISPERS: string[] = [
   "Tell me what you love — we'll learn the language for it.",
   "I'll meet you a half-step beyond where you stand.",
   'Every lesson, shaped to the things you care about.',
-  "Piano, piano. Softly, you'll be fluent.",
+  "Step by step, you'll build fluency.",
 ];
 
 export function iconFor(id: string): GlyphName {
