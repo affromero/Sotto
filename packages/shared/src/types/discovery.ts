@@ -30,22 +30,4 @@ export interface DiscoveryState {
   isComplete: boolean;
 }
 
-export interface TasteQuestion {
-  id: string;
-  text: string;
-  /** Clean topic statement derived from the question (e.g. "how X works" instead of "Would you listen to a episode about how X works?") */
-  topic: string;
-  tagSlugs: string[];
-  category: string;
-  /** Article URL from newsletter feeds (news questions only) */
-  sourceUrl?: string;
-  /** Source publication name, e.g. "Reuters", "NPR" (news questions only) */
-  sourceName?: string;
-}
 
-export interface TasteAnswer {
-  questionId: string;
-  question: string;
-  tagSlugs: string[];
-  response: 'yes' | 'no' | 'skip';
-}
