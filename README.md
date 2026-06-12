@@ -71,17 +71,17 @@ Every serious language app is closed, hosted, and subscription-funded. Your prog
 
 A complete [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across **five skills**, on a stack you control:
 
-| | |
-|---|---|
-| 🧩 **Grammar** | Multiple-choice drills with elaborative feedback from your connected LLM |
-| 📖 **Reading** | Graded passages with comprehension checks + vocabulary extraction |
+|                  |                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| 🧩 **Grammar**   | Multiple-choice drills with elaborative feedback from your connected LLM                    |
+| 📖 **Reading**   | Graded passages with comprehension checks + vocabulary extraction                           |
 | 🎧 **Listening** | An adaptive audio episode generated + narrated by your TTS, seeded with your due vocabulary |
-| 🎤 **Speaking** | Record → STT → pronunciation scoring with a rubric |
-| ✍️ **Writing** | Free-text tasks graded synchronously with inline AI corrections (old → new + why) |
+| 🎤 **Speaking**  | Record → STT → pronunciation scoring with a rubric                                          |
+| ✍️ **Writing**   | Free-text tasks graded synchronously with inline AI corrections (old → new + why)           |
 
 Plus the rest of the loop:
 
-- **Mastery-gated classes** — you can't advance until you pass; failed sections regenerate in a *similar-but-not-identical* form (retrieval practice / anti-copy).
+- **Mastery-gated classes** — you can't advance until you pass; failed sections regenerate in a _similar-but-not-identical_ form (retrieval practice / anti-copy).
 - **Ungated practice** — drill any single skill on your own time, spaced-repetition-driven, separate from the graded classes.
 - **Live conversation** — speak and hear the real-time translation (either direction) through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live); new words you hit feed straight into your memory graph. Runs on your own Google key (added in Settings), and stays hidden until you add one.
 - **Practice exams** — sit a full, multi-section mock exam modeled on the format of your target language's flagship ([Goethe-Zertifikat](https://www.goethe.de/en/spr/kup/prf.html) for German, [DELE](https://examenes.cervantes.es/) for Spanish, [Cambridge English](https://www.cambridgeenglish.org/) for English; a generic CEFR mock otherwise), at your level, with a mock band and section-by-section feedback. It is practice, never an official score, and never changes your level.
@@ -93,30 +93,30 @@ Plus the rest of the loop:
 
 ## How Sotto Compares
 
-The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is also open-source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), self-hostable, and BYO-LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking feedback, and a nearly identical stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured, [mastery-gated](https://en.wikipedia.org/wiki/Mastery_learning) [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across five *graded* skills (including writing with inline corrections and rubric-based pronunciation scoring), a **[keyless local-agent](#bring-your-own-claude--codex) path** (run it through your own Claude Code / Codex with no API key), a **[100%-offline path](#run-it-100-offline)** (local LLM + STT + TTS via Ollama / Whisper / Kokoro — no cloud key for *any* layer), an interactive memory-graph, and adaptive listening seeded by your due vocabulary.
+The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is also open-source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), self-hostable, and BYO-LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking feedback, and a nearly identical stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured, [mastery-gated](https://en.wikipedia.org/wiki/Mastery_learning) [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across five _graded_ skills (including writing with inline corrections and rubric-based pronunciation scoring), a **[keyless local-agent](#bring-your-own-claude--codex) path** (run it through your own Claude Code / Codex with no API key), a **[100%-offline path](#run-it-100-offline)** (local LLM + STT + TTS via Ollama / Whisper / Kokoro — no cloud key for _any_ layer), an interactive memory-graph, and adaptive listening seeded by your due vocabulary.
 
-| Capability | Sotto | [OpenLingo](https://github.com/pretzelai/openlingo) | [Duolingo](https://www.duolingo.com) | [Speak](https://www.speak.com) | [Praktika](https://praktika.ai) | [TalkPal](https://talkpal.ai) | [Pimsleur](https://www.pimsleur.com) |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Open source | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Self-hostable | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| BYOK / own API keys | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex), no key) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Runs 100% offline ([local LLM](#run-it-100-offline) + STT + TTS, no cloud key) | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Multi-user households on your server ([invite your family](#your-devices-and-household)) | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Data stays private (your infra) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| 5 *graded* skills (grammar / reading / listening / speaking / writing) | ✅ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ |
-| Mastery-gated progression | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
-| [Spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) (SM-2) | ✅ | ✅ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
-| Interactive memory graph | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Adaptive listening seeded by due vocab | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | 〰️ |
-| Classes from your own sources, with verified `[N]` citations | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Institutional-style practice exams (Goethe / DELE / Cambridge format) | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | ❌ |
-| Live spoken translation practice | ✅ | ❌ | ❌ | 〰️ | 〰️ | 〰️ | ❌ |
-| Rubric pronunciation scoring | ✅ | 〰️ | 〰️ | ✅ | ✅ | ✅ | ❌ |
-| No social layer / dark patterns | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Price | Self-host (pay providers directly) | Free (MIT) | Freemium + sub | Sub | Sub | Sub | Sub |
+| Capability                                                                                                                              |               Sotto                | [OpenLingo](https://github.com/pretzelai/openlingo) | [Duolingo](https://www.duolingo.com) | [Speak](https://www.speak.com) | [Praktika](https://praktika.ai) | [TalkPal](https://talkpal.ai) | [Pimsleur](https://www.pimsleur.com) |
+| --------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------: | :-------------------------------------------------: | :----------------------------------: | :----------------------------: | :-----------------------------: | :---------------------------: | :----------------------------------: |
+| Open source                                                                                                                             |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Self-hostable                                                                                                                           |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| BYOK / own API keys                                                                                                                     |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex), no key) |                 ✅                 |                         ❌                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Runs 100% offline ([local LLM](#run-it-100-offline) + STT + TTS, no cloud key)                                                          |                 ✅                 |                         〰️                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Multi-user households on your server ([invite your family](#your-devices-and-household))                                                |                 ✅                 |                         〰️                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Data stays private (your infra)                                                                                                         |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| 5 _graded_ skills (grammar / reading / listening / speaking / writing)                                                                  |                 ✅                 |                         〰️                          |                  〰️                  |               〰️               |               〰️                |              〰️               |                  〰️                  |
+| Mastery-gated progression                                                                                                               |                 ✅                 |                         ❌                          |                  〰️                  |               ❌               |               ❌                |              ❌               |                  〰️                  |
+| [Spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) (SM-2)                                                             |                 ✅                 |                         ✅                          |                  〰️                  |               ❌               |               ❌                |              ❌               |                  〰️                  |
+| Interactive memory graph                                                                                                                |                 ✅                 |                         ❌                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Adaptive listening seeded by due vocab                                                                                                  |                 ✅                 |                         〰️                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  〰️                  |
+| Classes from your own sources, with verified `[N]` citations                                                                            |                 ✅                 |                         ❌                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Institutional-style practice exams (Goethe / DELE / Cambridge format)                                                                   |                 ✅                 |                         ❌                          |                  〰️                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Live spoken translation practice                                                                                                        |                 ✅                 |                         ❌                          |                  ❌                  |               〰️               |               〰️                |              〰️               |                  ❌                  |
+| Rubric pronunciation scoring                                                                                                            |                 ✅                 |                         〰️                          |                  〰️                  |               ✅               |               ✅                |              ✅               |                  ❌                  |
+| No social layer / dark patterns                                                                                                         |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ✅                  |
+| Price                                                                                                                                   | Self-host (pay providers directly) |                     Free (MIT)                      |            Freemium + sub            |              Sub               |               Sub               |              Sub              |                 Sub                  |
 
-<sub>✅ yes · 〰️ partial · ❌ no. Values reflect each project's public repo/site (June 2026). OpenLingo: verified against [`pretzelai/openlingo`](https://github.com/pretzelai/openlingo) — it has STT speaking feedback (Whisper) and SM-2 SRS, but no rubric pronunciation score, mastery gates, or memory-graph. *Offline:* OpenLingo's BYO-LLM can point at a local model, but its speaking feedback uses cloud Whisper — so it earns 〰️; Sotto runs LLM **and** STT **and** TTS locally for a true no-cloud-key stack. The closed apps (Duolingo/Speak/Praktika/TalkPal/Pimsleur) are hosted-only and subscription-funded. Sotto values reflect the self-hosted OSS build; corrections welcome via PR.</sub>
+<sub>✅ yes · 〰️ partial · ❌ no. Values reflect each project's public repo/site (June 2026). OpenLingo: verified against [`pretzelai/openlingo`](https://github.com/pretzelai/openlingo) — it has STT speaking feedback (Whisper) and SM-2 SRS, but no rubric pronunciation score, mastery gates, or memory-graph. _Offline:_ OpenLingo's BYO-LLM can point at a local model, but its speaking feedback uses cloud Whisper — so it earns 〰️; Sotto runs LLM **and** STT **and** TTS locally for a true no-cloud-key stack. The closed apps (Duolingo/Speak/Praktika/TalkPal/Pimsleur) are hosted-only and subscription-funded. Sotto values reflect the self-hosted OSS build; corrections welcome via PR.</sub>
 
 ## The Learning Loop
 
@@ -204,7 +204,7 @@ Then open [localhost:3000](http://localhost:3000).
 
 ### Run it 100% offline
 
-No cloud key for *any* layer — the LLM, speech-to-text, and text-to-speech all run on your own hardware. One opt-in profile brings up [Ollama](https://ollama.com/) (LLM), [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (STT), and the bundled [Kokoro](https://github.com/hexgrad/kokoro) TTS sidecar:
+No cloud key for _any_ layer — the LLM, speech-to-text, and text-to-speech all run on your own hardware. One opt-in profile brings up [Ollama](https://ollama.com/) (LLM), [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (STT), and the bundled [Kokoro](https://github.com/hexgrad/kokoro) TTS sidecar:
 
 ```bash
 docker compose --profile local up -d        # ollama + whisper + kokoro
@@ -220,6 +220,8 @@ TTS_PROVIDER=kokoro  TTS_BASE_URL=http://localhost:8000
 ```
 
 Multilingual by design: **Qwen3 / Gemma 3** (100+ languages) for generation, **Whisper large-v3-turbo** (99+) for pronunciation, **Kokoro** (8 languages) for narration. A GPU helps the LLM but isn't required — Whisper and Kokoro are comfortable on CPU.
+
+Kokoro is the bundled TTS implementation. To bring your own local TTS model, keep the same `TTS_BASE_URL` pattern but set `TTS_PROVIDER=local`; your sidecar only needs `GET /health`, `GET /voices`, and `POST /tts`. See [docs/28-provider-extension-guide.md](docs/28-provider-extension-guide.md).
 
 <details>
 <summary>Bring your own agent / keys (.env.local)</summary>
@@ -250,8 +252,8 @@ OPENAI_API_KEY=sk-...
 
 The product is self-hosted: you run it, then reach it from anywhere. Apps are distributed from **[sotto.fm/download](https://sotto.fm/download)**.
 
-- **Desktop.** *Sotto Host* (a tiny [Tauri](https://tauri.app) launcher in `apps/desktop/`) runs the whole stack on your computer with no terminal. Open it, click **Start**, and it brings up the containers and opens the app.
-- **Mobile and iPad.** The [Expo](https://expo.dev) app connects to *your* server. The smooth path is **scan to connect**: on the server open **Settings → Devices**, scan the QR, and the device is paired (a one-time token mints a session, no password). iPad with Apple Pencil is first-class (PencilKit ink on worksheets).
+- **Desktop.** _Sotto Host_ (a tiny [Tauri](https://tauri.app) launcher in `apps/desktop/`) runs the whole stack on your computer with no terminal. Open it, click **Start**, and it brings up the containers and opens the app.
+- **Mobile and iPad.** The [Expo](https://expo.dev) app connects to _your_ server. The smooth path is **scan to connect**: on the server open **Settings → Devices**, scan the QR, and the device is paired (a one-time token mints a session, no password). iPad with Apple Pencil is first-class (PencilKit ink on worksheets).
 - **Web and PWA.** Installable from any browser. Add to home screen for full-screen, offline-capable access.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
@@ -302,13 +304,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## Related Projects
 
-| Project | Description |
-|---------|-------------|
-| [**Flight Finder**](https://github.com/affromero/flight-finder) | Track flight prices over time — self-hosted, BYO-LLM |
-| [**PriceToken**](https://github.com/affromero/pricetoken) | Real-time LLM pricing API, packages, and live dashboard |
-| [**gitpane**](https://github.com/affromero/gitpane) | Multi-repo Git workspace dashboard for the terminal |
-| [**kin3o**](https://github.com/affromero/kin3o) | AI-powered Lottie animation generator CLI |
-| [**Splattie**](https://github.com/affromero/splattie) | Interactive rigged 3D Gaussian assets from a single image |
+| Project                                                         | Description                                               |
+| --------------------------------------------------------------- | --------------------------------------------------------- |
+| [**Flight Finder**](https://github.com/affromero/flight-finder) | Track flight prices over time — self-hosted, BYO-LLM      |
+| [**PriceToken**](https://github.com/affromero/pricetoken)       | Real-time LLM pricing API, packages, and live dashboard   |
+| [**gitpane**](https://github.com/affromero/gitpane)             | Multi-repo Git workspace dashboard for the terminal       |
+| [**kin3o**](https://github.com/affromero/kin3o)                 | AI-powered Lottie animation generator CLI                 |
+| [**Splattie**](https://github.com/affromero/splattie)           | Interactive rigged 3D Gaussian assets from a single image |
 
 ## License
 

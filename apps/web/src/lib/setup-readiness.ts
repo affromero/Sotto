@@ -52,6 +52,7 @@ const AI_PLATFORM_KEYS: Record<string, string[]> = {
   openai: ['OPENAI_API_KEY'],
   google: ['GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY'],
   together: ['TOGETHER_API_KEY'],
+  local: ['AI_BASE_URL'],
 };
 
 const TTS_PLATFORM_KEYS: Record<string, string[]> = {
@@ -63,6 +64,8 @@ const TTS_PLATFORM_KEYS: Record<string, string[]> = {
   replicate: ['REPLICATE_API_TOKEN'],
   minimax: ['MINIMAX_API_KEY'],
   mistral: ['MISTRAL_API_KEY'],
+  kokoro: ['TTS_BASE_URL'],
+  local: ['TTS_BASE_URL'],
 };
 
 const STT_PLATFORM_KEYS: Record<string, string[]> = {
@@ -71,6 +74,7 @@ const STT_PLATFORM_KEYS: Record<string, string[]> = {
   together: ['TOGETHER_API_KEY'],
   deepgram: ['DEEPGRAM_API_KEY'],
   assemblyai: ['ASSEMBLYAI_API_KEY'],
+  local: ['STT_BASE_URL'],
 };
 
 const STT_AI_KEY_PROVIDERS = new Set(['openai', 'together', 'deepgram', 'assemblyai']);
@@ -129,6 +133,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   const selectedTtsProvider = input.selectedTtsProvider || env.TTS_PROVIDER || null;
   const selectedSttProvider = input.selectedSttProvider || env.STT_PROVIDER || null;
   const claudeCodeSelected = selectedAiProvider === 'claude-code';
+  const localAiSelected = selectedAiProvider === 'local';
+  const localTtsSelected = selectedTtsProvider === 'kokoro' || selectedTtsProvider === 'local';
+  const localSttSelected = selectedSttProvider === 'local';
   const aiReady =
     (claudeCodeSelected && input.claudeCodeAvailable === true) ||
     hasValidProvider(input.aiProviders, selectedAiProvider) ||
@@ -190,7 +197,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
           : 'Generation provider configured'
         : claudeCodeSelected
           ? "Install and authenticate the 'claude' CLI for Claude Code."
-          : 'Add an AI key or choose a local agent.',
+          : localAiSelected
+            ? 'Set AI_BASE_URL for the local OpenAI-compatible server.'
+            : 'Add an AI key or choose a local agent.',
     },
     {
       id: 'tts',
@@ -203,7 +212,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
         ? selectedTtsProvider
           ? `${selectedTtsProvider} selected`
           : 'Voice provider configured'
-        : 'Add a TTS provider key.',
+        : localTtsSelected
+          ? 'Set TTS_BASE_URL for the local TTS sidecar.'
+          : 'Add a TTS provider key.',
     },
     {
       id: 'agent-ingestion',
@@ -217,7 +228,8 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     {
       id: 'stt',
       label: 'Speech-to-text',
-      description: 'Optional transcription for speaking-practice scoring and audio imports without transcripts.',
+      description:
+        'Optional transcription for speaking-practice scoring and audio imports without transcripts.',
       status: sttReady ? 'ready' : selectedSttProvider ? 'action_required' : 'optional',
       actionLabel: 'Add optional transcription provider',
       actionHref: '/settings',
@@ -225,7 +237,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
         ? `${selectedSttProvider} selected`
         : selectedSttProvider
           ? sttProviderKnown
-            ? `Add the ${selectedSttProvider} STT key.`
+            ? localSttSelected
+              ? 'Set STT_BASE_URL for the local Whisper-compatible server.'
+              : `Add the ${selectedSttProvider} STT key.`
             : `Unknown STT provider: ${selectedSttProvider}`
           : 'Transcript ingestion works without STT. Add STT only for speaking-practice scoring or raw audio imports.',
       required: false,

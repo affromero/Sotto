@@ -9,11 +9,18 @@ service.
 Kokoro-82M is multilingual: English (US + UK), Spanish, French, Italian,
 Portuguese, Hindi, Japanese, and Chinese. It runs comfortably on CPU.
 
+This service is also the reference implementation of Sotto's generic local TTS
+sidecar shape. If you are wrapping a different local model, use
+`TTS_PROVIDER=local`, keep the same `/health`, `/voices`, and `/tts` endpoints,
+and configure your voice IDs with `TTS_VOICES` or `TTS_HOST_VOICE` /
+`TTS_EXPERT_VOICE`. See `docs/28-provider-extension-guide.md`.
+
 ## HTTP contract
 
 The Sotto `kokoro` provider (`apps/web/src/lib/providers/tts/kokoro.provider.ts`)
-talks to these endpoints. No authentication is performed — the server ignores any
-`Authorization` header.
+talks to these endpoints. The generic `local` provider uses the same endpoint
+shape and may also send an optional `model` field. No authentication is performed
+by this bundled service — it ignores any `Authorization` header.
 
 ### `POST /tts`
 
@@ -34,9 +41,7 @@ Response: raw `audio/wav` bytes (24 kHz, mono, 16-bit PCM).
 
 ```json
 {
-  "voices": [
-    { "id": "af_heart", "language": "en", "label": "Heart (US English, female)" }
-  ]
+  "voices": [{ "id": "af_heart", "language": "en", "label": "Heart (US English, female)" }]
 }
 ```
 
@@ -51,17 +56,17 @@ Response: raw `audio/wav` bytes (24 kHz, mono, 16-bit PCM).
 Voices follow Kokoro's `{lang}{gender}_{name}` convention. The first letter
 selects the pipeline language:
 
-| Prefix | Language            |
-| ------ | ------------------- |
-| `a`    | American English    |
-| `b`    | British English     |
-| `e`    | Spanish             |
-| `f`    | French              |
-| `i`    | Italian             |
-| `p`    | Brazilian Portuguese|
-| `h`    | Hindi               |
-| `j`    | Japanese            |
-| `z`    | Mandarin Chinese    |
+| Prefix | Language             |
+| ------ | -------------------- |
+| `a`    | American English     |
+| `b`    | British English      |
+| `e`    | Spanish              |
+| `f`    | French               |
+| `i`    | Italian              |
+| `p`    | Brazilian Portuguese |
+| `h`    | Hindi                |
+| `j`    | Japanese             |
+| `z`    | Mandarin Chinese     |
 
 ## Build & run
 
@@ -95,4 +100,13 @@ TTS_PROVIDER=kokoro
 TTS_BASE_URL=http://localhost:8000      # local dev outside Docker
 # TTS_BASE_URL=http://local-tts:8000    # inside Docker Compose (service name)
 # TTS_API_KEY=                          # optional — only if you front it with auth
+```
+
+For a custom local model, point Sotto at your own sidecar instead:
+
+```bash
+TTS_PROVIDER=local
+TTS_BASE_URL=http://localhost:8000
+TTS_MODEL=my-local-model                # optional
+TTS_VOICES=voice_a,voice_b              # optional, must match your sidecar
 ```

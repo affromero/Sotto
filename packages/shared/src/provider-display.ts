@@ -19,6 +19,7 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   minimax: { label: 'MiniMax', shortLabel: 'MiniMax' },
   mistral: { label: 'Mistral (Voxtral)', shortLabel: 'Mistral' },
   kokoro: { label: 'Kokoro (Local)', shortLabel: 'Kokoro' },
+  local: { label: 'Local TTS sidecar', shortLabel: 'Local' },
 };
 
 export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
@@ -27,6 +28,7 @@ export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   together: { label: 'Together AI Whisper', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
   assemblyai: { label: 'AssemblyAI', shortLabel: 'AssemblyAI' },
+  local: { label: 'Local Whisper', shortLabel: 'Local' },
 };
 
 export const LANGUAGE_DISPLAY: Record<string, string> = {
@@ -142,6 +144,7 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   'inworld-tts-1.5-max': 'Inworld 1.5 Max',
   'inworld-tts-1.5-mini': 'Inworld 1.5 Mini',
   kokoro: 'Kokoro 82M',
+  local: 'Local TTS',
 };
 
 export function getAiProviderLabel(id: string | null | undefined): string | null {

@@ -19,6 +19,7 @@ Docs are part of the product surface for the open source release. They must desc
 | `23-local-development.md` | Local OSS setup without Doppler |
 | `24-ios-testflight-appstore-guide.md` | iOS distribution guide |
 | `27-launch-readiness-status.md` | Launch readiness tracking |
+| `28-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
 
 ## Removed Pitch-Era Docs
 

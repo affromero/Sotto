@@ -5,7 +5,9 @@ import { NextRequest } from 'next/server';
 
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockGenerateResponse = vi.hoisted(() => vi.fn());
-const mockCreateAIProvider = vi.hoisted(() => vi.fn(() => ({ generateResponse: mockGenerateResponse, streamResponse: vi.fn() })));
+const mockCreateAIProvider = vi.hoisted(() =>
+  vi.fn(() => ({ generateResponse: mockGenerateResponse, streamResponse: vi.fn() }))
+);
 const mockGenerateSpeech = vi.hoisted(() => vi.fn());
 const mockCreateTtsProviderAsync = vi.hoisted(() =>
   vi.fn(async () => ({
@@ -34,12 +36,33 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/providers/tts-voices', () => ({
-  CARTESIA_VOICE_POOL: [{ id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' }],
+  CARTESIA_VOICE_POOL: [
+    { id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' },
+  ],
   HUME_VOICE_POOL: [{ id: 'ITO', name: 'Ito', gender: 'female', character: 'warm' }],
   FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
-  MINIMAX_VOICE_POOL: [{ id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' }],
-  MISTRAL_VOICE_POOL: [{ id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' }],
-  KOKORO_VOICE_POOL: [{ id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' }],
+  MINIMAX_VOICE_POOL: [
+    {
+      id: 'Deep_Voice_Man',
+      name: 'Deep Voice Man',
+      gender: 'male',
+      character: 'authoritative expert',
+    },
+  ],
+  MISTRAL_VOICE_POOL: [
+    {
+      id: 'casual_male',
+      name: 'Casual Male',
+      gender: 'male',
+      character: 'friendly conversationalist',
+    },
+  ],
+  KOKORO_VOICE_POOL: [
+    { id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' },
+  ],
+  LOCAL_TTS_VOICE_POOL: [
+    { id: 'default', name: 'Default', gender: 'female', character: 'warm narrator' },
+  ],
   getTestVoiceId: vi.fn((provider: string) => {
     const map: Record<string, string> = {
       elevenlabs: '21m00Tcm4TlvDq8ikWAM',
@@ -51,6 +74,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
       minimax: 'Deep_Voice_Man',
       mistral: 'casual_male',
       kokoro: 'af_heart',
+      local: 'default',
     };
     return map[provider] ?? 'alloy';
   }),
@@ -60,10 +84,20 @@ vi.mock('@/lib/providers/tts-voices', () => ({
 // Tests control keys via vi.stubEnv() in beforeEach.
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderIds: vi.fn(() => ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro']),
+  getProviderIds: vi.fn(() => [
+    'elevenlabs',
+    'openai',
+    'cartesia',
+    'hume',
+    'fal',
+    'replicate',
+    'minimax',
+    'mistral',
+    'kokoro',
+    'local',
+  ]),
   getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
 }));
-
 
 import { POST } from '@/app/api/v1/admin/test-model/route';
 
@@ -105,7 +139,9 @@ describe('POST /api/v1/admin/test-model', () => {
 
   it('returns 403 when not admin', async () => {
     mockRequireAdmin.mockResolvedValue(null);
-    const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
+    const res = await POST(
+      createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
+    );
     const body = await res.json();
 
     expect(res.status).toBe(403);
@@ -115,7 +151,9 @@ describe('POST /api/v1/admin/test-model', () => {
   // ── Input validation ────────────────────────────────────────────────────────
 
   it('returns 400 for an invalid type', async () => {
-    const res = await POST(createRequest({ type: 'invalid', provider: 'anthropic', model: 'claude' }));
+    const res = await POST(
+      createRequest({ type: 'invalid', provider: 'anthropic', model: 'claude' })
+    );
     expect(res.status).toBe(400);
   });
 
@@ -140,7 +178,9 @@ describe('POST /api/v1/admin/test-model', () => {
         model: 'claude-haiku-4-5-20251001',
       });
 
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
+      const res = await POST(
+        createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200);
@@ -150,7 +190,12 @@ describe('POST /api/v1/admin/test-model', () => {
     });
 
     it('truncates AI response to 60 characters', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'A'.repeat(100), inputTokens: 5, outputTokens: 20, model: 'claude' });
+      mockGenerateResponse.mockResolvedValue({
+        content: 'A'.repeat(100),
+        inputTokens: 5,
+        outputTokens: 20,
+        model: 'claude',
+      });
 
       const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
       const body = await res.json();
@@ -160,7 +205,12 @@ describe('POST /api/v1/admin/test-model', () => {
     });
 
     it('passes the requested model to the AI provider', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'Hi', inputTokens: 1, outputTokens: 1, model: 'claude-opus-4-6' });
+      mockGenerateResponse.mockResolvedValue({
+        content: 'Hi',
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'claude-opus-4-6',
+      });
 
       await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-opus-4-6' }));
 
@@ -194,7 +244,9 @@ describe('POST /api/v1/admin/test-model', () => {
     it('classifies a 429 rate-limit error', async () => {
       mockGenerateResponse.mockRejectedValue(new Error('429 rate limit exceeded'));
 
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
+      const res = await POST(
+        createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -229,7 +281,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-key');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-mp3-bytes'));
 
-      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200);
@@ -240,7 +294,9 @@ describe('POST /api/v1/admin/test-model', () => {
 
     it('returns failure when the platform key is missing', async () => {
       // ELEVENLABS_API_KEY stubbed to '' in beforeEach
-      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200); // HTTP 200 — business-level failure in body
@@ -252,11 +308,23 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('CARTESIA_API_KEY', 'bad-key');
       mockGenerateSpeech.mockRejectedValue(new Error('403 forbidden'));
 
-      const res = await POST(createRequest({ type: 'tts', provider: 'cartesia', model: 'sonic-2' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'cartesia', model: 'sonic-2' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
       expect(body.error).toBe('Authentication failed — check API key');
+    });
+
+    it('treats local TTS as a keyless platform provider', async () => {
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-mp3-bytes'));
+
+      const res = await POST(createRequest({ type: 'tts', provider: 'local', model: 'local' }));
+      const body = await res.json();
+
+      expect(body.success).toBe(true);
+      expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('local', 'local', undefined, 'local');
     });
   });
 
@@ -269,7 +337,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: 'Hello world', segments: [], language: 'en' });
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(res.status).toBe(200);
@@ -284,7 +354,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: '', segments: [], language: 'en' });
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(true);
@@ -293,7 +365,9 @@ describe('POST /api/v1/admin/test-model', () => {
 
     it('returns failure when the STT key is missing', async () => {
       // OPENAI_API_KEY is '' from beforeEach
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -317,11 +391,26 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockRejectedValue(new Error('fetch failed: ECONNREFUSED'));
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(false);
       expect(body.error).toMatch(/^Network error:/);
+    });
+
+    it('routes local STT to the local placeholder key', async () => {
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
+      mockTranscribe.mockResolvedValue({ text: 'local transcript', segments: [], language: 'en' });
+
+      const res = await POST(
+        createRequest({ type: 'stt', provider: 'local', model: 'whisper-local' })
+      );
+      const body = await res.json();
+
+      expect(body.success).toBe(true);
+      expect(mockCreateSttProvider).toHaveBeenCalledWith('local', 'local', 'whisper-local');
     });
   });
 
@@ -331,9 +420,16 @@ describe('POST /api/v1/admin/test-model', () => {
     describe('AI BYOK', () => {
       it('calls generateResponse with apiKeyOverride from BYOK key', async () => {
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-anthropic-key', provider: 'anthropic' });
-        mockGenerateResponse.mockResolvedValue({ content: 'Hello', inputTokens: 5, outputTokens: 1, model: 'claude' });
+        mockGenerateResponse.mockResolvedValue({
+          content: 'Hello',
+          inputTokens: 5,
+          outputTokens: 1,
+          model: 'claude',
+        });
 
-        const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(true);
@@ -348,7 +444,9 @@ describe('POST /api/v1/admin/test-model', () => {
       it('returns failure when BYOK AI key is not found', async () => {
         mockGetAiKey.mockResolvedValue(null);
 
-        const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(false);
@@ -361,7 +459,14 @@ describe('POST /api/v1/admin/test-model', () => {
         mockGetByokKey.mockResolvedValue('byok-xi-key');
         mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
 
-        const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({
+            type: 'tts',
+            provider: 'elevenlabs',
+            model: 'eleven_v3',
+            keySource: 'byok',
+          })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(true);
@@ -374,11 +479,17 @@ describe('POST /api/v1/admin/test-model', () => {
         );
       });
 
-
       it('returns failure when BYOK TTS key is not found', async () => {
         mockGetByokKey.mockResolvedValue(null);
 
-        const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({
+            type: 'tts',
+            provider: 'elevenlabs',
+            model: 'eleven_v3',
+            keySource: 'byok',
+          })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(false);
@@ -393,10 +504,16 @@ describe('POST /api/v1/admin/test-model', () => {
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
-        await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' }));
+        await POST(
+          createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' })
+        );
 
         expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'openai');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith('openai', 'byok-openai-key', 'whisper-1');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith(
+          'openai',
+          'byok-openai-key',
+          'whisper-1'
+        );
       });
 
       it('uses TTS BYOK key for elevenlabs STT', async () => {
@@ -405,16 +522,29 @@ describe('POST /api/v1/admin/test-model', () => {
         mockGetByokKey.mockResolvedValue('byok-xi-stt-key');
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
-        await POST(createRequest({ type: 'stt', provider: 'elevenlabs', model: 'scribe_v1', keySource: 'byok' }));
+        await POST(
+          createRequest({
+            type: 'stt',
+            provider: 'elevenlabs',
+            model: 'scribe_v1',
+            keySource: 'byok',
+          })
+        );
 
         expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'elevenlabs');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'byok-xi-stt-key', 'scribe_v1');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith(
+          'elevenlabs',
+          'byok-xi-stt-key',
+          'scribe_v1'
+        );
       });
 
       it('returns failure when BYOK STT key is not found', async () => {
         mockGetAiKey.mockResolvedValue(null);
 
-        const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' }));
+        const res = await POST(
+          createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' })
+        );
         const body = await res.json();
 
         expect(body.success).toBe(false);
@@ -426,7 +556,9 @@ describe('POST /api/v1/admin/test-model', () => {
       vi.stubEnv('ELEVENLABS_API_KEY', 'xi-platform-key');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
 
-      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const res = await POST(
+        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+      );
       const body = await res.json();
 
       expect(body.success).toBe(true);

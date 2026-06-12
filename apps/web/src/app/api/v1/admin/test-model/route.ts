@@ -37,6 +37,8 @@ function getSttPlatformKey(provider: string): string | undefined {
       return process.env.DEEPGRAM_API_KEY;
     case 'assemblyai':
       return process.env.ASSEMBLYAI_API_KEY;
+    case 'local':
+      return process.env.STT_API_KEY?.trim() || 'local';
     default:
       return undefined;
   }
@@ -246,7 +248,9 @@ export async function POST(request: NextRequest) {
       let sttKey: string | undefined;
 
       if (keySource === 'byok') {
-        if (provider === 'openai' || provider === 'together' || provider === 'deepgram' || provider === 'assemblyai') {
+        if (provider === 'local') {
+          sttKey = process.env.STT_API_KEY?.trim() || 'local';
+        } else if (provider === 'openai' || provider === 'together' || provider === 'deepgram' || provider === 'assemblyai') {
           const keyData = await getAiKey(adminId, provider as AiProviderId);
           if (!keyData) {
             return NextResponse.json({

@@ -90,6 +90,35 @@ describe('buildSetupReadiness', () => {
     expect(readiness.ready).toBe(true);
   });
 
+  it('marks local LLM, TTS, and STT ready from base URLs', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'local',
+      aiProviders: [],
+      ttsProviders: [],
+      sttProviders: [],
+      env: {
+        AI_PROVIDER: 'local',
+        AI_BASE_URL: 'http://localhost:11434/v1',
+        TTS_PROVIDER: 'local',
+        TTS_BASE_URL: 'http://localhost:8000',
+        STT_PROVIDER: 'local',
+        STT_BASE_URL: 'http://localhost:8001/v1',
+      },
+    });
+
+    expect(readiness.ready).toBe(true);
+    expect(readiness.nextAction).toBeNull();
+    expect(readiness.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'generation', status: 'ready', detail: 'local selected' }),
+        expect.objectContaining({ id: 'tts', status: 'ready', detail: 'local selected' }),
+        expect.objectContaining({ id: 'stt', status: 'ready', detail: 'local selected' }),
+      ])
+    );
+  });
+
   it('requires the Claude Code CLI when Claude Code is selected', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
@@ -174,6 +203,41 @@ describe('buildSetupReadiness', () => {
     expect(stt?.detail).toBe('Add the deepgram STT key.');
     expect(stt?.required).toBe(false);
     expect(readiness.nextAction).toBeNull();
+  });
+
+  it('asks for base URLs rather than keys when local providers are selected', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'local',
+      aiProviders: [],
+      ttsProviders: [],
+      sttProviders: [],
+      selectedAiProvider: 'local',
+      selectedTtsProvider: 'local',
+      selectedSttProvider: 'local',
+      env: {},
+    });
+
+    expect(readiness.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'generation',
+          status: 'action_required',
+          detail: 'Set AI_BASE_URL for the local OpenAI-compatible server.',
+        }),
+        expect.objectContaining({
+          id: 'tts',
+          status: 'action_required',
+          detail: 'Set TTS_BASE_URL for the local TTS sidecar.',
+        }),
+        expect.objectContaining({
+          id: 'stt',
+          status: 'action_required',
+          detail: 'Set STT_BASE_URL for the local Whisper-compatible server.',
+        }),
+      ])
+    );
   });
 
   it('maps STT readiness to the key store the resolver actually reads', () => {
