@@ -12,9 +12,32 @@ updates:
       default-days: 7
     open-pull-requests-limit: 10
     groups:
-      npm:
+      # Minor + patch bumps are batched into one low-risk PR that should stay
+      # green and be safe to merge on sight. Major bumps are deliberately left
+      # OUT of every group so Dependabot opens them as individual PRs — majors
+      # routinely need code migration and must be reviewed in isolation, never
+      # bundled (a single broken lockfile entry blocks the whole batch).
+      npm-minor-patch:
         patterns:
           - '*'
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Expo + React Native are a coupled native toolchain: the SDK, the React
+      # runtime it pins, and the native modules must move together via
+      # `npx expo install` / an Expo SDK upgrade — never piecemeal by
+      # Dependabot. Ignore their major (and RN's breaking minor) bumps so the
+      # mobile app upgrades as one deliberate step.
+      - dependency-name: 'expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'expo-*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-native'
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'react-native-*'
+        update-types: ['version-update:semver-major']
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
     directory: /
