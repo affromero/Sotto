@@ -199,6 +199,12 @@ describe('welcome hosted-demo mode', () => {
     );
 
     expect(screen.getAllByText(/no key or local endpoint is requested or saved/i)).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: /Local sidecar any Sotto-compatible TTS server/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Local sidecar any Sotto-compatible STT server/i })
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open elevenlabs api page/i })).toHaveAttribute(
       'href',
       'https://elevenlabs.io/app/settings/api-keys'

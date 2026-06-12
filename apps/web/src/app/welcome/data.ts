@@ -350,6 +350,14 @@ export const STT_PROVIDERS: VoiceProvider[] = [
     local: true,
   },
   {
+    id: 'local',
+    name: 'Local sidecar',
+    note: 'any Sotto-compatible STT server',
+    apiUrl: '/docs/28-provider-extension-guide.md',
+    apiLabel: 'Docs',
+    local: true,
+  },
+  {
     id: 'deepgram',
     name: 'Deepgram',
     note: 'word-level timing',
