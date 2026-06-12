@@ -41,6 +41,10 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sotto_test?schema=public
+      # Prisma's datasource declares directUrl = env("DIRECT_DATABASE_URL") (it
+      # bypasses pgbouncer in prod); schema push/generate fail with P1012 if it's
+      # unset. The test job points it at the same local Postgres as DATABASE_URL.
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sotto_test?schema=public
       REDIS_URL: redis://localhost:6379
       NEXTAUTH_SECRET: e2e-test-secret-minimum-32-characters-long
       AUTH_SECRET: e2e-test-secret-minimum-32-characters-long
@@ -54,12 +58,12 @@ jobs:
       AI_PROVIDER: anthropic
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
           submodules: recursive
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -81,7 +85,7 @@ jobs:
       - name: Run E2E tests
         run: npx playwright test --config e2e/playwright/playwright.config.ts --project=chromium
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
