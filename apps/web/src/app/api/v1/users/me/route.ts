@@ -89,7 +89,7 @@ export async function PATCH(request: NextRequest) {
     const validation = updateUserSchema.safeParse(body);
 
     if (!validation.success) {
-      return errorResponse(validation.error.errors[0].message, 400);
+      return errorResponse(validation.error.issues[0].message, 400);
     }
 
     const {

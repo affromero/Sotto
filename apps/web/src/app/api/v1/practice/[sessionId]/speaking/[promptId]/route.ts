@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const userId = authed.userId;
 
     const parsed = pollSchema.safeParse({ recordingId: request.nextUrl.searchParams.get('recordingId') });
-    if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+    if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
     if (!(await ownedSession(sessionId, userId))) return errorResponse('Practice session not found', 404);
 

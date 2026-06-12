@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!allowed) return errorResponse('Too many requests', 429);
 
   const parsed = changePasswordSchema.safeParse(await request.json());
-  if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+  if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
   try {
     await changeOwnPassword({ userId: session.user.id, ...parsed.data });

@@ -48,7 +48,7 @@ export async function PATCH(
     return NextResponse.json(updatedUser);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return errorResponse('Invalid request', 400, { details: error.errors });
+      return errorResponse('Invalid request', 400, { details: error.issues });
     }
 
     console.error('Error updating user role:', error);

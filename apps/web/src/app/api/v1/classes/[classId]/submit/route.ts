@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { classId } = await params;
 
     const parsed = submitSchema.safeParse(await request.json());
-    if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+    if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
     const result = await submitClass(classId, authed.userId, parsed.data.answers);
     if (!result) return errorResponse('Class not found', 404);

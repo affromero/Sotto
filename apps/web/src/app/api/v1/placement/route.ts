@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     const userId = authed.userId;
 
     const parsed = submitSchema.safeParse(await request.json());
-    if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+    if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
     const { native, target, answers } = parsed.data;
 
     const questions = await cache.get<PlacementQuestion[]>(cacheKey(userId, native, target));
