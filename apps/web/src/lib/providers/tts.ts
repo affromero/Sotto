@@ -102,6 +102,11 @@ async function importKokoro() {
   return KokoroProvider;
 }
 
+async function importLocalTts() {
+  const { LocalTtsProvider } = await import('./tts/local.provider');
+  return LocalTtsProvider;
+}
+
 // ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
@@ -184,6 +189,13 @@ export async function createTtsProviderAsync(
       // Keyless — the Kokoro sidecar needs no API key. It validates TTS_BASE_URL
       // and reachability internally and throws a clear error if unset.
       const Cls = await importKokoro();
+      return new Cls(apiKey, model);
+    }
+    case 'local': {
+      // Keyless generic sidecar — implement the Sotto local TTS HTTP contract
+      // and configure TTS_BASE_URL/TTS_VOICES. No app code is needed for a new
+      // local model behind this contract.
+      const Cls = await importLocalTts();
       return new Cls(apiKey, model);
     }
     default:
@@ -325,6 +337,12 @@ export async function resolveTtsProvider(context: {
     const provider = await createTtsProviderAsync('kokoro', undefined, undefined, resolvedModel);
     return { provider, source: 'platform', providerId: 'kokoro' };
   }
+  // Generic local TTS sidecar. Like kokoro, this is gated by TTS_BASE_URL and
+  // only resolved when explicitly requested with TTS_PROVIDER=local.
+  if (requestedProvider === 'local') {
+    const provider = await createTtsProviderAsync('local', undefined, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'local' };
+  }
 
   throw new Error(
     `No API key available for ${requestedProvider}. Please add a BYOK key in Settings.`
@@ -346,9 +364,13 @@ export function getConfiguredTtsProviderId(): TtsProviderId | null {
  */
 export async function canResolveTts(userId: string): Promise<boolean> {
   if (await hasByokKey(userId)) return true;
-  // Keyless local TTS (kokoro) counts only when explicitly configured AND given a
+  // Keyless local TTS sidecars count only when explicitly configured AND given a
   // reachable endpoint — never auto-selected by mere availability.
-  if (getConfiguredTtsProviderId() === 'kokoro' && infra('ttsBaseUrl', 'TTS_BASE_URL')) return true;
+  const configuredTtsProvider = getConfiguredTtsProviderId();
+  if (
+    (configuredTtsProvider === 'kokoro' || configuredTtsProvider === 'local') &&
+    infra('ttsBaseUrl', 'TTS_BASE_URL')
+  ) return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.CARTESIA_API_KEY) return true;

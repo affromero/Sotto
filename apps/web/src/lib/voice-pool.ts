@@ -179,7 +179,16 @@ const TONE_KEYWORDS: Record<
     penalty: ['playful', 'upbeat', 'energetic'],
   },
   comedic: {
-    preferred: ['witty', 'sharp', 'playful', 'energetic', 'engaging', 'upbeat', 'casual', 'curious'],
+    preferred: [
+      'witty',
+      'sharp',
+      'playful',
+      'energetic',
+      'engaging',
+      'upbeat',
+      'casual',
+      'curious',
+    ],
     penalty: ['calm', 'polished', 'distinguished'],
   },
   satirical: {
@@ -276,8 +285,7 @@ export function selectVoiceSet(
   const count = Math.max(1, Math.min(speakerCount, VOICE_POOL.length));
   const index = hashString(episodeId);
 
-  const hasMetadata =
-    metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
+  const hasMetadata = metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
 
   const pool = hasMetadata
     ? (() => {
@@ -292,9 +300,7 @@ export function selectVoiceSet(
 
   for (let i = 0; i < count; i++) {
     const wantGender = i % 2 === 0 ? 'female' : 'male';
-    const candidates = pool.filter(
-      (v) => !usedNames.has(v.name) && v.gender === wantGender
-    );
+    const candidates = pool.filter((v) => !usedNames.has(v.name) && v.gender === wantGender);
     const fallback = pool.filter((v) => !usedNames.has(v.name));
     const pickFrom = candidates.length > 0 ? candidates : fallback;
     if (pickFrom.length === 0) break;
@@ -321,8 +327,7 @@ export function selectVoicePair(
 } {
   const index = hashString(episodeId);
 
-  const hasMetadata =
-    metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
+  const hasMetadata = metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
 
   if (!hasMetadata) {
     const hostIndex = index % VOICE_POOL.length;
@@ -356,10 +361,7 @@ export function selectVoicePair(
 /**
  * Resolve a provider-specific voice ID from a voice pool entry.
  */
-export function resolveVoiceId(
-  entry: VoicePoolEntry,
-  provider: 'elevenlabs' | 'openai'
-): string {
+export function resolveVoiceId(entry: VoicePoolEntry, provider: 'elevenlabs' | 'openai'): string {
   return entry.ids[provider] ?? entry.ids.elevenlabs;
 }
 
@@ -367,9 +369,7 @@ export function resolveVoiceId(
  * Look up a voice pool entry by any provider ID.
  */
 export function findByVoiceId(voiceId: string): VoicePoolEntry | undefined {
-  return VOICE_POOL.find(
-    (v) => v.ids.elevenlabs === voiceId || v.ids.openai === voiceId
-  );
+  return VOICE_POOL.find((v) => v.ids.elevenlabs === voiceId || v.ids.openai === voiceId);
 }
 
 /**
@@ -381,9 +381,27 @@ export function findVoiceName(voiceId: string): string | undefined {
   if (main) return main.name;
 
   // Lazy import to avoid circular deps — these pools are static arrays
-   
-  const { CARTESIA_VOICE_POOL, HUME_VOICE_POOL, FAL_VOICE_POOL, INWORLD_VOICE_POOL, MINIMAX_VOICE_POOL, MISTRAL_VOICE_POOL, KOKORO_VOICE_POOL } = require('./providers/tts-voices') as typeof import('./providers/tts-voices');
-  const providerPools = [CARTESIA_VOICE_POOL, HUME_VOICE_POOL, FAL_VOICE_POOL, INWORLD_VOICE_POOL, MINIMAX_VOICE_POOL, MISTRAL_VOICE_POOL, KOKORO_VOICE_POOL];
+
+  const {
+    CARTESIA_VOICE_POOL,
+    HUME_VOICE_POOL,
+    FAL_VOICE_POOL,
+    INWORLD_VOICE_POOL,
+    MINIMAX_VOICE_POOL,
+    MISTRAL_VOICE_POOL,
+    KOKORO_VOICE_POOL,
+    getLocalTtsVoicePool,
+  } = require('./providers/tts-voices') as typeof import('./providers/tts-voices');
+  const providerPools = [
+    CARTESIA_VOICE_POOL,
+    HUME_VOICE_POOL,
+    FAL_VOICE_POOL,
+    INWORLD_VOICE_POOL,
+    MINIMAX_VOICE_POOL,
+    MISTRAL_VOICE_POOL,
+    KOKORO_VOICE_POOL,
+    getLocalTtsVoicePool(),
+  ];
   for (const pool of providerPools) {
     const match = pool.find((v: { id: string }) => v.id === voiceId);
     if (match) return match.name;
@@ -399,4 +417,3 @@ export function formatModelName(model: string): string {
   if (/^(tts|gpt|stt|speech)-/i.test(model)) return model.toUpperCase();
   return model.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
-

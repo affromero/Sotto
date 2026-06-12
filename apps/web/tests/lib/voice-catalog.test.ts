@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -23,6 +23,11 @@ describe('getVoiceCatalog', () => {
     vi.clearAllMocks();
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   describe('fixed-set providers', () => {
@@ -58,6 +63,18 @@ describe('getVoiceCatalog', () => {
       expect(catalog[0]).toMatchObject({ id: 'Deep_Voice_Man', name: 'Deep Voice Man' });
     });
 
+    it('returns configured local sidecar voices when no /voices endpoint is configured', async () => {
+      vi.stubEnv('TTS_BASE_URL', '');
+      vi.stubEnv('TTS_VOICES', 'voice_a,voice_b');
+
+      const catalog = await getVoiceCatalog('local');
+
+      expect(catalog).toEqual([
+        expect.objectContaining({ id: 'voice_a', name: 'Voice A' }),
+        expect.objectContaining({ id: 'voice_b', name: 'Voice B' }),
+      ]);
+      expect(mockCacheSet).toHaveBeenCalledWith('tts:voicecatalog:local', catalog, 86400);
+    });
   });
 
   describe('dynamic providers — Redis cache hit', () => {
@@ -188,6 +205,32 @@ describe('getVoiceCatalog', () => {
       expect(catalog[0]).toMatchObject({ name: 'Clyde' });
 
       vi.restoreAllMocks();
+    });
+
+    it('fetches local sidecar voices and sends optional auth', async () => {
+      vi.stubEnv('TTS_BASE_URL', 'http://localhost:8000');
+      vi.stubEnv('TTS_API_KEY', 'local-secret');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            voices: [
+              { id: 'speaker_a', label: 'Speaker A', gender: 'female', description: 'warm' },
+              { id: 'speaker_b', name: 'Speaker B', gender: 'male' },
+            ],
+          }),
+      } as Response);
+
+      const catalog = await getVoiceCatalog('local');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8000/voices', {
+        headers: { Authorization: 'Bearer local-secret' },
+      });
+      expect(catalog).toEqual([
+        { id: 'speaker_a', name: 'Speaker A', gender: 'female', description: 'warm' },
+        { id: 'speaker_b', name: 'Speaker B', gender: 'male', description: undefined },
+      ]);
+      expect(mockCacheSet).toHaveBeenCalledWith('tts:voicecatalog:local', catalog, 86400);
     });
   });
 });

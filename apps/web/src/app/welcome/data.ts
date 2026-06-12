@@ -330,6 +330,14 @@ export const TTS_PROVIDERS: VoiceProvider[] = [
     apiLabel: 'Docs',
     local: true,
   },
+  {
+    id: 'local',
+    name: 'Local sidecar',
+    note: 'any Sotto-compatible TTS server',
+    apiUrl: '/docs/28-provider-extension-guide.md',
+    apiLabel: 'Docs',
+    local: true,
+  },
 ];
 
 export const STT_PROVIDERS: VoiceProvider[] = [

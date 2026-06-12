@@ -1,10 +1,12 @@
-# services/local-tts — Local Kokoro TTS sidecar
+# services/local-tts — Bundled Kokoro TTS sidecar
 
 Keyless, self-hosted text-to-speech server wrapping the open-source
 [Kokoro-82M](https://github.com/hexgrad/kokoro) model in FastAPI. It is the TTS
 analog of the keyless local LLM (`AI_PROVIDER=local`) and local STT
 (`STT_PROVIDER=local`) backends: a self-hoster sets `TTS_PROVIDER=kokoro` and
 `TTS_BASE_URL`, and all lesson/speaking audio is generated with no cloud keys.
+For other local TTS models, keep the same sidecar HTTP shape and configure
+`TTS_PROVIDER=local`; do not pretend every local sidecar is Kokoro.
 
 ## Purpose
 
@@ -12,14 +14,16 @@ analog of the keyless local LLM (`AI_PROVIDER=local`) and local STT
   listening and speaking skills.
 - Paired with the Sotto `kokoro` provider in
   `apps/web/src/lib/providers/tts/kokoro.provider.ts`.
+- Reference shape for the generic Sotto `local` TTS provider in
+  `apps/web/src/lib/providers/tts/local.provider.ts`.
 
 ## HTTP contract
 
-| Method | Path      | Body / Query                                   | Response                                       |
-| ------ | --------- | ---------------------------------------------- | ---------------------------------------------- |
-| POST   | `/tts`    | `{ "text", "voice", "language"? }`             | `audio/wav` bytes (24 kHz, mono, 16-bit PCM)   |
-| GET    | `/voices` | —                                              | `{ "voices": [{ "id", "language", "label" }] }`|
-| GET    | `/health` | —                                              | `{ "status": "ok" }`                           |
+| Method | Path      | Body / Query                       | Response                                        |
+| ------ | --------- | ---------------------------------- | ----------------------------------------------- |
+| POST   | `/tts`    | `{ "text", "voice", "language"? }` | `audio/wav` bytes (24 kHz, mono, 16-bit PCM)    |
+| GET    | `/voices` | —                                  | `{ "voices": [{ "id", "language", "label" }] }` |
+| GET    | `/health` | —                                  | `{ "status": "ok" }`                            |
 
 No auth — the server ignores `Authorization`. Voice ids follow Kokoro's
 `{lang}{gender}_{name}` convention; the first letter selects the pipeline

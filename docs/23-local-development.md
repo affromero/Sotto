@@ -118,6 +118,27 @@ OPENAI_API_KEY="sk-..."
 
 Local agent CLIs must be installed and authenticated outside Sotto. Sotto should detect missing CLIs and report a setup error instead of choosing another provider.
 
+### 5.4 Totally Local Models
+
+Use the no-code local contracts when running your own models:
+
+```env
+AI_PROVIDER="local"
+AI_BASE_URL="http://localhost:11434/v1"
+AI_MODEL="qwen3"
+
+STT_PROVIDER="local"
+STT_BASE_URL="http://localhost:8001/v1"
+STT_MODEL="deepdml/faster-whisper-large-v3-turbo-ct2"
+
+TTS_PROVIDER="local"
+TTS_BASE_URL="http://localhost:8000"
+TTS_MODEL="my-local-tts-model"
+TTS_VOICES="default,alternate"
+```
+
+See `docs/28-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
+
 ---
 
 ## 6. What Works By Configuration Level

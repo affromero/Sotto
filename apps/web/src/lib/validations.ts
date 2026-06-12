@@ -22,6 +22,8 @@ const explicitTtsProviderSchema = z.enum([
   'replicate',
   'minimax',
   'mistral',
+  'kokoro',
+  'local',
 ]);
 
 const agentProviderSchema = z.enum(['claude-code', 'codex', 'openclaw', 'hermes', 'custom']);
@@ -143,7 +145,18 @@ export const voicePreviewSchema = z.object({
   voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
   provider: z
-    .enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro'])
+    .enum([
+      'elevenlabs',
+      'hume',
+      'cartesia',
+      'openai',
+      'fal',
+      'replicate',
+      'minimax',
+      'mistral',
+      'kokoro',
+      'local',
+    ])
     .refine((value) => value.length > 0),
 });
 
@@ -271,7 +284,7 @@ export const importEpisodeSchema = z.object({
   title: z.string().max(200).optional(),
   topic: z.string().max(5000).optional(),
   sourcePlatform: z.string().min(1).max(50),
-  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai']).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai', 'local']).optional(),
   sttModel: z.string().max(100).optional(),
 });
 
