@@ -41,3 +41,25 @@
   font-family: var(--sans);
   color: var(--ink);
 }
+
+/* dark mode — terminal palette, driven by the global ThemeProvider toggle */
+:global(html[data-theme='dark']) .surface {
+  --accent: #6a9bff;
+  --accent-fg: #0b0c09;
+  --accent-soft: color-mix(in oklab, #6a9bff 16%, transparent);
+  --accent-line: color-mix(in oklab, #6a9bff 42%, transparent);
+
+  --paper: #121310;
+  --paper-2: #1b1d17;
+  --well: #15170f;
+  --ink: #e9e3d3;
+  --ink-soft: #9d9684;
+  --ink-mute: #6e6857;
+  --line: rgba(233, 227, 211, 0.13);
+  --line-strong: rgba(233, 227, 211, 0.26);
+
+  --good: #2faa6b;
+  --bad: #d76a4a;
+  --good-soft: color-mix(in oklab, #2faa6b 16%, transparent);
+  --bad-soft: color-mix(in oklab, #d76a4a 16%, transparent);
+}
