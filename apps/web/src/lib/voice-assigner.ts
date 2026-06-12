@@ -1,5 +1,5 @@
 /**
- * Deterministic multi-voice assignment for podcasts.
+ * Deterministic multi-voice assignment for episodes.
  */
 
 import { prisma } from './prisma';
@@ -26,15 +26,15 @@ interface SpeakerInput {
 }
 
 /**
- * Assign distinct voices for each speaker in a podcast.
+ * Assign distinct voices for each speaker in a episode.
  *
- * For 2 or fewer speakers, or when all speakers already have PodcastVoice
+ * For 2 or fewer speakers, or when all speakers already have EpisodeVoice
  * entries, this is a no-op. Remaining speakers are assigned using stable
  * provider voice pools so self-hosted deployments do not need AI credentials
  * for voice casting.
  */
-export async function assignVoicesForPodcast(
-  podcastId: string,
+export async function assignVoicesForEpisode(
+  episodeId: string,
   speakers: SpeakerInput[],
   providerId: TtsProviderId,
   metadata?: VoiceMatchMetadata,
@@ -42,8 +42,8 @@ export async function assignVoicesForPodcast(
   if (speakers.length <= 1) return;
 
   // Check which speakers already have voice assignments
-  const existing = await prisma.podcastVoice.findMany({
-    where: { podcastId },
+  const existing = await prisma.episodeVoice.findMany({
+    where: { episodeId },
     select: { speaker: true },
   });
   const assignedSpeakers = new Set(existing.map((e) => e.speaker));
@@ -51,7 +51,7 @@ export async function assignVoicesForPodcast(
   const unassigned = speakers.filter((s) => !assignedSpeakers.has(s.name));
   if (unassigned.length === 0) return;
 
-  await assignDeterministicVoices(podcastId, unassigned, providerId, metadata);
+  await assignDeterministicVoices(episodeId, unassigned, providerId, metadata);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,22 +59,22 @@ export async function assignVoicesForPodcast(
 // ---------------------------------------------------------------------------
 
 async function assignDeterministicVoices(
-  podcastId: string,
+  episodeId: string,
   speakers: SpeakerInput[],
   providerId: TtsProviderId,
   metadata?: VoiceMatchMetadata,
 ): Promise<void> {
-  const voiceIds = selectDeterministicVoiceIds(podcastId, speakers.length, providerId, metadata);
+  const voiceIds = selectDeterministicVoiceIds(episodeId, speakers.length, providerId, metadata);
   if (voiceIds.length < speakers.length) {
     throw new Error(
       `Unable to assign ${speakers.length} voices for provider "${providerId}"; only ${voiceIds.length} voices are available.`
     );
   }
 
-  const entries: Array<{ podcastId: string; speaker: string; voiceId: string; provider: string }> = [];
+  const entries: Array<{ episodeId: string; speaker: string; voiceId: string; provider: string }> = [];
   for (let i = 0; i < speakers.length && i < voiceIds.length; i++) {
     entries.push({
-      podcastId,
+      episodeId,
       speaker: speakers[i].name,
       voiceId: voiceIds[i],
       provider: providerId,
@@ -82,64 +82,64 @@ async function assignDeterministicVoices(
   }
 
   if (entries.length > 0) {
-    await prisma.podcastVoice.createMany({
+    await prisma.episodeVoice.createMany({
       data: entries,
       skipDuplicates: true,
     });
   }
 
   logger.info('Deterministic voice assignment complete', {
-    podcastId,
+    episodeId,
     provider: providerId,
     assigned: String(entries.length),
   });
 }
 
 function selectDeterministicVoiceIds(
-  podcastId: string,
+  episodeId: string,
   speakerCount: number,
   providerId: TtsProviderId,
   metadata?: VoiceMatchMetadata,
 ): string[] {
   switch (providerId) {
     case 'elevenlabs': {
-      const entries = selectVoiceSet(podcastId, speakerCount, metadata);
+      const entries = selectVoiceSet(episodeId, speakerCount, metadata);
       return entries.map((e) => resolveVoiceId(e, 'elevenlabs'));
     }
 
     case 'openai': {
-      const entries = selectVoiceSet(podcastId, speakerCount, metadata);
+      const entries = selectVoiceSet(episodeId, speakerCount, metadata);
       return entries.map((e) => resolveVoiceId(e, 'openai'));
     }
 
     case 'cartesia': {
-      const voices = selectVoiceSetFromPool(CARTESIA_VOICE_POOL, podcastId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(CARTESIA_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 
     case 'hume': {
-      const voices = selectVoiceSetFromPool(HUME_VOICE_POOL, podcastId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(HUME_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 
     case 'fal':
     case 'replicate': {
-      const voices = selectVoiceSetFromPool(FAL_VOICE_POOL, podcastId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(FAL_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 
     case 'minimax': {
-      const voices = selectVoiceSetFromPool(MINIMAX_VOICE_POOL, podcastId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(MINIMAX_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 
     case 'mistral': {
-      const voices = selectVoiceSetFromPool(MISTRAL_VOICE_POOL, podcastId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(MISTRAL_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 
     case 'kokoro': {
-      const voices = selectVoiceSetFromPool(KOKORO_VOICE_POOL, podcastId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(KOKORO_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 

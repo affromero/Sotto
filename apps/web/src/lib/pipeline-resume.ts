@@ -1,6 +1,6 @@
 import { prismaUnfiltered as prisma } from './prisma';
 import { logger } from './logger';
-import { invalidatePodcastCache, publishPodcastStatus } from './redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from './redis';
 
 /**
  * Discriminated union of pipeline resume points.
@@ -23,32 +23,32 @@ interface MarkFailedOptions {
 }
 
 /**
- * Mark a podcast as FAILED, recording the status it was in when the failure occurred.
- * Idempotent: skips if the podcast is already FAILED.
+ * Mark a episode as FAILED, recording the status it was in when the failure occurred.
+ * Idempotent: skips if the episode is already FAILED.
  * Returns true if the status was actually changed, false if skipped.
  */
-export async function markPodcastFailed(
-  podcastId: string,
+export async function markEpisodeFailed(
+  episodeId: string,
   options?: string | MarkFailedOptions,
 ): Promise<boolean> {
   const opts: MarkFailedOptions =
     typeof options === 'string' ? { failureReason: options } : options ?? {};
 
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
+  const episode = await prisma.episode.findUnique({
+    where: { id: episodeId },
     select: { status: true },
   });
 
-  if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') {
+  if (!episode || episode.status === 'READY' || episode.status === 'FAILED' || episode.status === 'SCRIPT_READY') {
     return false;
   }
 
   // CAS status transition — prevents concurrent workers from double-marking
-  const cas = await prisma.podcast.updateMany({
-    where: { id: podcastId, status: podcast.status },
+  const cas = await prisma.episode.updateMany({
+    where: { id: episodeId, status: episode.status },
     data: {
       status: 'FAILED',
-      failedAtStatus: podcast.status,
+      failedAtStatus: episode.status,
       failureReason: opts.failureReason ?? null,
       technicalError: opts.technicalError ?? null,
       errorId: opts.errorId ?? null,
@@ -57,16 +57,16 @@ export async function markPodcastFailed(
   });
 
   if (cas.count === 0) {
-    logger.info('markPodcastFailed: status already changed, skipping', { podcastId });
+    logger.info('markEpisodeFailed: status already changed, skipping', { episodeId });
     return false;
   }
 
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'FAILED' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'FAILED' });
 
-  logger.info('Marked podcast as FAILED', {
-    podcastId,
-    failedAtStatus: podcast.status,
+  logger.info('Marked episode as FAILED', {
+    episodeId,
+    failedAtStatus: episode.status,
     failureReason: opts.failureReason,
   });
 
@@ -77,31 +77,31 @@ export async function markPodcastFailed(
  * Inspect existing data and determine where the pipeline should resume from.
  * Checks from the end of the pipeline backward to preserve the most work.
  */
-export async function determineResumePoint(podcastId: string): Promise<ResumePoint> {
-  await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+export async function determineResumePoint(episodeId: string): Promise<ResumePoint> {
+  await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: { id: true },
   });
 
   const [discovery, script, segments, dossier, outline] = await Promise.all([
     prisma.discovery.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { sourceContent: true },
     }),
     prisma.script.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { turns: true },
     }),
     prisma.segment.findMany({
-      where: { podcastId },
+      where: { episodeId },
       select: { id: true, audioUrl: true },
     }),
     prisma.researchDossier.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { id: true },
     }),
     prisma.creativeOutline.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { id: true },
     }),
   ]);

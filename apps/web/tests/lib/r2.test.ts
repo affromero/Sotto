@@ -14,7 +14,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   uploadFile,
   uploadStream,
-  uploadPodcastAudio,
+  uploadEpisodeAudio,
   uploadSegmentAudio,
   getPresignedUrl,
   downloadFile,
@@ -175,19 +175,19 @@ describe('r2.ts', () => {
     });
   });
 
-  describe('uploadPodcastAudio', () => {
-    it('uploads podcast audio with correct key format', async () => {
+  describe('uploadEpisodeAudio', () => {
+    it('uploads episode audio with correct key format', async () => {
       mockSend.mockResolvedValue({});
 
-      const podcastId = 'podcast-123';
+      const episodeId = 'episode-123';
       const audio = Buffer.from('audio data');
 
-      const result = await uploadPodcastAudio(podcastId, audio);
+      const result = await uploadEpisodeAudio(episodeId, audio);
 
-      expect(result).toBe('https://cdn.example.com/podcasts/podcast-123/audio.mp3');
+      expect(result).toBe('https://cdn.example.com/episodes/episode-123/audio.mp3');
       expect(PutObjectCommand).toHaveBeenCalledWith({
         Bucket: 'test-bucket',
-        Key: 'podcasts/podcast-123/audio.mp3',
+        Key: 'episodes/episode-123/audio.mp3',
         Body: audio,
         ContentType: 'audio/mpeg',
       });
@@ -199,40 +199,40 @@ describe('r2.ts', () => {
     it('uploads segment audio with correct key format', async () => {
       mockSend.mockResolvedValue({});
 
-      const podcastId = 'podcast-123';
+      const episodeId = 'episode-123';
       const segmentId = 'segment-456';
       const audio = Buffer.from('segment audio data');
 
-      const result = await uploadSegmentAudio(podcastId, segmentId, audio);
+      const result = await uploadSegmentAudio(episodeId, segmentId, audio);
 
-      expect(result).toBe('https://cdn.example.com/podcasts/podcast-123/segments/segment-456.mp3');
+      expect(result).toBe('https://cdn.example.com/episodes/episode-123/segments/segment-456.mp3');
       expect(PutObjectCommand).toHaveBeenCalledWith({
         Bucket: 'test-bucket',
-        Key: 'podcasts/podcast-123/segments/segment-456.mp3',
+        Key: 'episodes/episode-123/segments/segment-456.mp3',
         Body: audio,
         ContentType: 'audio/mpeg',
       });
     });
 
-    it('handles multiple segments for same podcast', async () => {
+    it('handles multiple segments for same episode', async () => {
       mockSend.mockResolvedValue({});
 
-      const podcastId = 'podcast-123';
+      const episodeId = 'episode-123';
 
-      await uploadSegmentAudio(podcastId, 'segment-1', Buffer.from('audio 1'));
-      await uploadSegmentAudio(podcastId, 'segment-2', Buffer.from('audio 2'));
+      await uploadSegmentAudio(episodeId, 'segment-1', Buffer.from('audio 1'));
+      await uploadSegmentAudio(episodeId, 'segment-2', Buffer.from('audio 2'));
 
       expect(mockSend).toHaveBeenCalledTimes(2);
       expect(PutObjectCommand).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
-          Key: 'podcasts/podcast-123/segments/segment-1.mp3',
+          Key: 'episodes/episode-123/segments/segment-1.mp3',
         })
       );
       expect(PutObjectCommand).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
-          Key: 'podcasts/podcast-123/segments/segment-2.mp3',
+          Key: 'episodes/episode-123/segments/segment-2.mp3',
         })
       );
     });
@@ -421,32 +421,32 @@ describe('r2.ts', () => {
 
     it('blocks deletion of segment audio files without force flag', async () => {
       await expect(
-        deleteFile('podcasts/abc123/segments/seg456.mp3')
+        deleteFile('episodes/abc123/segments/seg456.mp3')
       ).rejects.toThrow('Refusing to delete protected file');
     });
 
-    it('blocks deletion of podcast audio files without force flag', async () => {
+    it('blocks deletion of episode audio files without force flag', async () => {
       await expect(
-        deleteFile('podcasts/abc123/audio.mp3')
+        deleteFile('episodes/abc123/audio.mp3')
       ).rejects.toThrow('Refusing to delete protected file');
     });
 
     it('allows deletion of segment audio with force flag', async () => {
       mockSend.mockResolvedValue({});
 
-      await deleteFile('podcasts/abc123/segments/seg456.mp3', { force: true });
+      await deleteFile('episodes/abc123/segments/seg456.mp3', { force: true });
 
       expect(mockSend).toHaveBeenCalledTimes(1);
       expect(DeleteObjectCommand).toHaveBeenCalledWith({
         Bucket: 'test-bucket',
-        Key: 'podcasts/abc123/segments/seg456.mp3',
+        Key: 'episodes/abc123/segments/seg456.mp3',
       });
     });
 
     it('allows deletion of non-protected paths without force flag', async () => {
       mockSend.mockResolvedValue({});
 
-      await deleteFile('podcasts/abc123/visuals/vis789.png');
+      await deleteFile('episodes/abc123/visuals/vis789.png');
 
       expect(mockSend).toHaveBeenCalledTimes(1);
     });
@@ -455,32 +455,32 @@ describe('r2.ts', () => {
 
   describe('extractR2Key', () => {
     it('extracts key from public URL', () => {
-      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
-      expect(extractR2Key(url)).toBe('podcasts/abc/audio.mp3');
+      const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
+      expect(extractR2Key(url)).toBe('episodes/abc/audio.mp3');
     });
 
     it('passes through raw keys unchanged', () => {
-      const key = 'podcasts/abc/audio.mp3';
-      expect(extractR2Key(key)).toBe('podcasts/abc/audio.mp3');
+      const key = 'episodes/abc/audio.mp3';
+      expect(extractR2Key(key)).toBe('episodes/abc/audio.mp3');
     });
   });
 
   describe('resolveAudioUrl', () => {
     it('returns public URL as-is for PUBLIC visibility', async () => {
-      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
       const result = await resolveAudioUrl(url, 'PUBLIC');
       expect(result).toBe(url);
     });
 
     it('returns presigned URL for PRIVATE visibility', async () => {
       (getSignedUrl as Mock).mockResolvedValue(
-        'https://signed.example.com/podcasts/abc/audio.mp3?X-Amz-Signature=xyz'
+        'https://signed.example.com/episodes/abc/audio.mp3?X-Amz-Signature=xyz'
       );
 
-      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
       const result = await resolveAudioUrl(url, 'PRIVATE');
 
-      expect(result).toBe('https://signed.example.com/podcasts/abc/audio.mp3?X-Amz-Signature=xyz');
+      expect(result).toBe('https://signed.example.com/episodes/abc/audio.mp3?X-Amz-Signature=xyz');
       expect(getSignedUrl).toHaveBeenCalled();
     });
 
@@ -489,7 +489,7 @@ describe('r2.ts', () => {
         'https://signed.example.com/file.mp3?sig=abc'
       );
 
-      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
       const result = await resolveAudioUrl(url, 'UNLISTED');
 
       expect(result).toContain('sig=abc');
@@ -505,7 +505,7 @@ describe('r2.ts', () => {
     it('returns prefixes from CommonPrefixes', async () => {
       mockSend.mockResolvedValue({
         CommonPrefixes: [
-          { Prefix: 'podcasts/' },
+          { Prefix: 'episodes/' },
           { Prefix: 'avatars/' },
           { Prefix: 'recordings/' },
         ],
@@ -514,7 +514,7 @@ describe('r2.ts', () => {
       const result = await listPrefixes();
 
       expect(result).toEqual([
-        { prefix: 'podcasts/' },
+        { prefix: 'episodes/' },
         { prefix: 'avatars/' },
         { prefix: 'recordings/' },
       ]);
@@ -535,7 +535,7 @@ describe('r2.ts', () => {
     it('filters out entries without Prefix', async () => {
       mockSend.mockResolvedValue({
         CommonPrefixes: [
-          { Prefix: 'podcasts/' },
+          { Prefix: 'episodes/' },
           { Prefix: undefined },
           { Prefix: 'avatars/' },
         ],
@@ -544,7 +544,7 @@ describe('r2.ts', () => {
       const result = await listPrefixes();
 
       expect(result).toEqual([
-        { prefix: 'podcasts/' },
+        { prefix: 'episodes/' },
         { prefix: 'avatars/' },
       ]);
     });
@@ -624,21 +624,21 @@ describe('r2.ts', () => {
       const lastMod = new Date('2025-01-15T10:00:00Z');
       mockSend.mockResolvedValue({
         Contents: [
-          { Key: 'podcasts/abc/audio.mp3', Size: 1048576, LastModified: lastMod },
-          { Key: 'podcasts/abc/segments/s1.mp3', Size: 524288, LastModified: lastMod },
+          { Key: 'episodes/abc/audio.mp3', Size: 1048576, LastModified: lastMod },
+          { Key: 'episodes/abc/segments/s1.mp3', Size: 524288, LastModified: lastMod },
         ],
         IsTruncated: false,
       });
 
-      const result = await listObjectsDetailed('podcasts/abc/');
+      const result = await listObjectsDetailed('episodes/abc/');
 
       expect(result).toEqual([
-        { key: 'podcasts/abc/audio.mp3', sizeBytes: 1048576, lastModified: lastMod },
-        { key: 'podcasts/abc/segments/s1.mp3', sizeBytes: 524288, lastModified: lastMod },
+        { key: 'episodes/abc/audio.mp3', sizeBytes: 1048576, lastModified: lastMod },
+        { key: 'episodes/abc/segments/s1.mp3', sizeBytes: 524288, lastModified: lastMod },
       ]);
       expect(ListObjectsV2Command).toHaveBeenCalledWith({
         Bucket: 'test-bucket',
-        Prefix: 'podcasts/abc/',
+        Prefix: 'episodes/abc/',
         ContinuationToken: undefined,
       });
     });
@@ -646,16 +646,16 @@ describe('r2.ts', () => {
     it('handles pagination', async () => {
       mockSend
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'podcasts/a/audio.mp3', Size: 100, LastModified: undefined }],
+          Contents: [{ Key: 'episodes/a/audio.mp3', Size: 100, LastModified: undefined }],
           IsTruncated: true,
           NextContinuationToken: 'token-1',
         })
         .mockResolvedValueOnce({
-          Contents: [{ Key: 'podcasts/b/audio.mp3', Size: 200, LastModified: undefined }],
+          Contents: [{ Key: 'episodes/b/audio.mp3', Size: 200, LastModified: undefined }],
           IsTruncated: false,
         });
 
-      const result = await listObjectsDetailed('podcasts/');
+      const result = await listObjectsDetailed('episodes/');
 
       expect(result).toHaveLength(2);
       expect(mockSend).toHaveBeenCalledTimes(2);
@@ -671,11 +671,11 @@ describe('r2.ts', () => {
 
     it('defaults Size to 0 when missing', async () => {
       mockSend.mockResolvedValue({
-        Contents: [{ Key: 'podcasts/abc/audio.mp3' }],
+        Contents: [{ Key: 'episodes/abc/audio.mp3' }],
         IsTruncated: false,
       });
 
-      const result = await listObjectsDetailed('podcasts/abc/');
+      const result = await listObjectsDetailed('episodes/abc/');
 
       expect(result[0].sizeBytes).toBe(0);
     });

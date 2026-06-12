@@ -11,16 +11,16 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
 });
 const mockPrismaScriptUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ depth: 'standard' });
-const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({
+const mockPrismaEpisodeFindUnique = vi.fn().mockResolvedValue({
   topic: 'Quantum Computing',
   source: 'TWITTER',
   verificationMode: 'standard',
 });
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'TWITTER',
   ttsProvider: 'elevenlabs',
 });
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-001' });
 
 vi.mock('@/lib/prisma', () => {
@@ -34,10 +34,10 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaScriptUpdate(...args),
     },
-    podcast: {
-      findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    episode: {
+      findUnique: (...args: unknown[]) => mockPrismaEpisodeFindUnique(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
     },
     segment: {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
@@ -182,7 +182,7 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 }));
 
 vi.mock('@/lib/voice-assigner', () => ({
-  assignVoicesForPodcast: vi.fn().mockResolvedValue(undefined),
+  assignVoicesForEpisode: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/tts-tag-converter', () => ({
@@ -198,12 +198,12 @@ vi.mock('@/lib/discovery-figure-extractor', () => ({
 }));
 
 vi.mock('@/lib/pipeline-resume', () => ({
-  markPodcastFailed: vi.fn(),
+  markEpisodeFailed: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/script-verifier', () => ({
@@ -270,7 +270,7 @@ function createMockJob(data: ValidateReferencesPayload): Job<ValidateReferencesP
 }
 
 const defaultPayload: ValidateReferencesPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-001',
 };
 
@@ -302,7 +302,7 @@ describe('processReferenceValidation', () => {
       markdown: '# Transcript\n\n[1] Paper A',
     });
 
-    mockPrismaPodcastFindUnique.mockResolvedValue({
+    mockPrismaEpisodeFindUnique.mockResolvedValue({
       topic: 'Quantum Computing Basics',
       source: 'TWITTER',
       aiModel: null,
@@ -345,13 +345,13 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processReferenceValidation(job)).rejects.toThrow(
-        'Script not found for podcast podcast-001'
+        'Script not found for episode episode-001'
       );
     });
   });
 
   describe('AI routing', () => {
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockGetAiKey.mockResolvedValue(aiKey);
 
@@ -361,7 +361,7 @@ describe('processReferenceValidation', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockRunReferenceVerification).toHaveBeenCalledWith(
@@ -375,8 +375,8 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('uses the explicit podcast model owner and matching provider key', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+    it('uses the explicit episode model owner and matching provider key', async () => {
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         aiModel: 'gpt-5-mini',
@@ -392,7 +392,7 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
@@ -409,7 +409,7 @@ describe('processReferenceValidation', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         aiModel: 'gpt-5-mini',
@@ -440,7 +440,7 @@ describe('processReferenceValidation', () => {
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         aiModel: 'gpt-5-mini',
@@ -456,7 +456,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockRunReferenceVerification).toHaveBeenCalledWith(
@@ -482,7 +482,7 @@ describe('processReferenceValidation', () => {
     });
 
     it('allows local claude-code models without provider keys', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         aiModel: 'claude-code:sonnet',
@@ -511,7 +511,7 @@ describe('processReferenceValidation', () => {
 
     it('skips AI routing when no references require verification', async () => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         aiModel: null,
@@ -561,7 +561,7 @@ describe('processReferenceValidation', () => {
   describe('no references to validate (showcase mode — gate exempt)', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         verificationMode: 'showcase',
@@ -573,7 +573,7 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
-        'podcast-001',
+        'episode-001',
         expect.arrayContaining([
           expect.objectContaining({ speaker: 'HOST', text: 'Welcome to the show! [1]' }),
           expect.objectContaining({ speaker: 'EXPERT', text: 'Thanks for having me!' }),
@@ -990,7 +990,7 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
+        where: { episodeId: 'episode-001' },
         data: {
           turns: cleanedTurns,
           markdown: cleanedMarkdown,
@@ -1032,7 +1032,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockPrismaReferenceDeleteMany).toHaveBeenCalledWith({
         where: {
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           number: { in: expect.arrayContaining([1]) },
         },
       });
@@ -1063,7 +1063,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockPrismaReferenceDeleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ podcastId: 'podcast-001' }),
+          where: expect.objectContaining({ episodeId: 'episode-001' }),
         })
       );
     });
@@ -1073,8 +1073,8 @@ describe('processReferenceValidation', () => {
       const job = createMockJob({ ...defaultPayload, referenceRetryAttempt: 2 });
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'SCRIPT_READY', lowReferences: true }),
       });
     });
@@ -1108,19 +1108,19 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
-        'podcast-001',
+        'episode-001',
         expect.arrayContaining([
           expect.objectContaining({ speaker: 'HOST', text: 'Welcome to the show! [1]' }),
         ])
       );
     });
 
-    it('updates podcast status to GENERATING_AUDIO after queueing', async () => {
+    it('updates episode status to GENERATING_AUDIO after queueing', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'GENERATING_AUDIO' }),
       });
     });
@@ -1143,26 +1143,26 @@ describe('processReferenceValidation', () => {
     beforeEach(() => {
       // Set up for auto-approve path: TWITTER source, showcase (bypass gate for 0-refs tests)
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Quantum Computing Basics',
         source: 'TWITTER',
         verificationMode: 'showcase',
       });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'TWITTER',
         ttsProvider: 'elevenlabs',
       });
     });
 
     it('sets the unified auto TTS provider when missing (no-refs path)', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'podcast-001' },
+          where: { id: 'episode-001' },
           data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
         })
       );
@@ -1176,14 +1176,14 @@ describe('processReferenceValidation', () => {
     });
 
     it('continues no-refs auto-approval after filling a missing ttsProvider', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'podcast-001' },
+          where: { id: 'episode-001' },
           data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
         })
       );
@@ -1201,13 +1201,13 @@ describe('processReferenceValidation', () => {
         ),
         rejectedRefIds: new Set<string>(),
       });
-      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
         })
@@ -1224,8 +1224,8 @@ describe('processReferenceValidation', () => {
         ),
         rejectedRefIds: new Set<string>(),
       });
-      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'TWITTER',
         ttsProvider: 'elevenlabs',
       });
@@ -1246,15 +1246,15 @@ describe('processReferenceValidation', () => {
         ),
         rejectedRefIds: new Set<string>(),
       });
-      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'podcast-001' },
+          where: { id: 'episode-001' },
           data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
         })
       );
@@ -1268,7 +1268,7 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processReferenceValidation(job)).rejects.toThrow(
-        'Script not found for podcast podcast-001'
+        'Script not found for episode episode-001'
       );
     });
 
@@ -1311,8 +1311,8 @@ describe('processReferenceValidation', () => {
       const job = createMockJob({ ...defaultPayload, referenceRetryAttempt: 2 });
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'SCRIPT_READY', lowReferences: true }),
       });
       expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
@@ -1340,14 +1340,14 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).not.toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'SCRIPT_READY' } })
       );
     });
 
     it('uses eli5 thresholds for relaxed verificationMode', async () => {
       // relaxed → eli5 depth → requires 3. 3 refs, 0 removed → passes
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Fun Topic',
         source: 'TWITTER',
         verificationMode: 'relaxed',
@@ -1370,14 +1370,14 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).not.toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'SCRIPT_READY' } })
       );
     });
 
     it('skips gate for showcase verificationMode', async () => {
       // showcase + 0 remaining refs → should NOT pause
-      mockPrismaPodcastFindUnique.mockResolvedValue({
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
         topic: 'Showcase Topic',
         source: 'TWITTER',
         verificationMode: 'showcase',
@@ -1397,7 +1397,7 @@ describe('processReferenceValidation', () => {
 
       // Showcase should proceed to audio, not pause at SCRIPT_READY due to gate
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
-        'podcast-001',
+        'episode-001',
         expect.any(Array)
       );
     });
@@ -1409,8 +1409,8 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'SCRIPT_READY', lowReferences: true },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
@@ -1477,8 +1477,8 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       // Complete progress snapshot should show 3 verified (1 skipped + 2 new)
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({
           verificationProgress: expect.objectContaining({
             verified: 3,

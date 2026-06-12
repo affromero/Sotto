@@ -5,8 +5,8 @@ import type { DeepResearchPayload } from '@/lib/queue';
 const mockPrismaResearchDossierFindUnique = vi.fn();
 const mockPrismaResearchDossierCreate = vi.fn();
 const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn();
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
-const mockPrismaPodcastUpdate = vi.fn();
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn();
+const mockPrismaEpisodeUpdate = vi.fn();
 const mockPrismaUserFindUniqueOrThrow = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
@@ -18,9 +18,9 @@ vi.mock('@/lib/prisma', () => {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
     },
-    podcast: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    episode: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
     },
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
@@ -51,7 +51,7 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 const { mockBuildResearchDossier } = vi.hoisted(() => ({
   mockBuildResearchDossier: vi.fn().mockResolvedValue({
     mode: 'open-web',
-    userBrief: { topic: 'Private podcasts' },
+    userBrief: { topic: 'Private episodes' },
     sources: [],
     evidence: [],
     gaps: [],
@@ -75,8 +75,8 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockLogUsage = vi.fn();
@@ -102,7 +102,7 @@ function createMockJob(data: DeepResearchPayload): Job<DeepResearchPayload> {
 }
 
 const defaultPayload: DeepResearchPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-001',
   discoveryId: 'discovery-001',
 };
@@ -114,7 +114,7 @@ describe('processDeepResearch', () => {
     mockPrismaResearchDossierFindUnique.mockResolvedValue(null);
     mockPrismaResearchDossierCreate.mockResolvedValue({ id: 'dossier-001' });
     mockPrismaDiscoveryFindUniqueOrThrow.mockResolvedValue({
-      topic: 'Private podcasts',
+      topic: 'Private episodes',
       depth: 'standard',
       tone: 'casual',
       audience: 'general',
@@ -125,12 +125,12 @@ describe('processDeepResearch', () => {
       sourceUrl: null,
       messages: [{ role: 'user', content: 'Make a private briefing.' }],
     });
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
       source: 'WEB',
       aiProvider: null,
       aiModel: null,
     });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
     mockAddJob.mockResolvedValue({ id: 'planning-job-1' });
     mockLogUsage.mockResolvedValue(undefined);
@@ -141,7 +141,7 @@ describe('processDeepResearch', () => {
     });
     mockBuildResearchDossier.mockResolvedValue({
       mode: 'open-web',
-      userBrief: { topic: 'Private podcasts' },
+      userBrief: { topic: 'Private episodes' },
       sources: [],
       evidence: [],
       gaps: [],
@@ -154,7 +154,7 @@ describe('processDeepResearch', () => {
   });
 
   describe('AI routing', () => {
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockGetAiKey.mockResolvedValue(aiKey);
 
@@ -163,7 +163,7 @@ describe('processDeepResearch', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockBuildResearchDossier).toHaveBeenCalledWith(
@@ -175,8 +175,8 @@ describe('processDeepResearch', () => {
       );
     });
 
-    it('uses the explicit podcast model owner and matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    it('uses the explicit episode model owner and matching provider key', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiProvider: null,
         aiModel: 'gpt-5-mini',
@@ -187,7 +187,7 @@ describe('processDeepResearch', () => {
       await processDeepResearch(createMockJob(defaultPayload));
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
@@ -202,7 +202,7 @@ describe('processDeepResearch', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiProvider: null,
         aiModel: 'gpt-5-mini',
@@ -227,7 +227,7 @@ describe('processDeepResearch', () => {
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiProvider: null,
         aiModel: 'gpt-5-mini',
@@ -238,7 +238,7 @@ describe('processDeepResearch', () => {
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockBuildResearchDossier).toHaveBeenCalledWith(
@@ -260,7 +260,7 @@ describe('processDeepResearch', () => {
     });
 
     it('allows local claude-code models without provider keys', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiProvider: null,
         aiModel: 'claude-code:sonnet',
@@ -295,13 +295,13 @@ describe('processDeepResearch', () => {
         { name: 'creative-planning' },
         'creative_planning',
         {
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           userId: 'user-001',
           discoveryId: 'discovery-001',
           dossierId: 'dossier-001',
           useAdminCredits: undefined,
         },
-        { jobId: expect.stringMatching(/^plan-podcast-001-/) },
+        { jobId: expect.stringMatching(/^plan-episode-001-/) },
       );
     });
   });

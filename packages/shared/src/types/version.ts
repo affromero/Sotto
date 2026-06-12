@@ -1,4 +1,4 @@
-export interface PodcastVersionSummary {
+export interface EpisodeVersionSummary {
   id: string;
   version: number;
   audioUrl: string;
@@ -9,7 +9,7 @@ export interface PodcastVersionSummary {
   createdAt: string;
 }
 
-export interface PodcastVersionDetail extends PodcastVersionSummary {
+export interface EpisodeVersionDetail extends EpisodeVersionSummary {
   segments: Array<{
     segmentId: string;
     order: number;

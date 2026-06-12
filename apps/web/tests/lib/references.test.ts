@@ -31,7 +31,7 @@ describe('persistGeneratedReferences', () => {
   });
 
   it('maps all 8 GeneratedReference fields onto Reference rows', async () => {
-    await persistGeneratedReferences('podcast-1', [REF]);
+    await persistGeneratedReferences('episode-1', [REF]);
 
     expect(mockReferenceCreateMany).toHaveBeenCalledTimes(1);
     expect(mockReferenceCreateMany).toHaveBeenCalledWith(
@@ -39,7 +39,7 @@ describe('persistGeneratedReferences', () => {
         skipDuplicates: true,
         data: [
           {
-            podcastId: 'podcast-1',
+            episodeId: 'episode-1',
             number: 1,
             title: 'A Real Paper',
             authors: ['Ada Lovelace', 'Alan Turing'],
@@ -55,7 +55,7 @@ describe('persistGeneratedReferences', () => {
   });
 
   it('does not call createMany when there are no references', async () => {
-    await persistGeneratedReferences('podcast-1', []);
+    await persistGeneratedReferences('episode-1', []);
 
     expect(mockReferenceCreateMany).not.toHaveBeenCalled();
   });
@@ -72,7 +72,7 @@ describe('persistGeneratedReferences', () => {
       doi: null,
     };
 
-    await persistGeneratedReferences('podcast-1', [sparse]);
+    await persistGeneratedReferences('episode-1', [sparse]);
 
     expect(mockReferenceCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({

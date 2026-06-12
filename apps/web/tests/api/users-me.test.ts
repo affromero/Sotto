@@ -8,7 +8,7 @@ const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
 const mockUserInterestDeleteMany = vi.fn();
 const mockUserInterestCreateMany = vi.fn();
-const mockPodcastCount = vi.fn();
+const mockEpisodeCount = vi.fn();
 const mockFollowCount = vi.fn();
 
 const txClient = {
@@ -42,7 +42,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       update: (...args: unknown[]) => mockUserUpdate(...args),
     },
-    podcast: { count: (...args: unknown[]) => mockPodcastCount(...args) },
+    episode: { count: (...args: unknown[]) => mockEpisodeCount(...args) },
     follow: { count: (...args: unknown[]) => mockFollowCount(...args) },
     $transaction: (fn: (tx: typeof txClient) => Promise<unknown>) => fn(txClient),
   };
@@ -95,7 +95,7 @@ const mockUserMinimal = {
 describe('GET /api/v1/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPodcastCount.mockResolvedValue(0);
+    mockEpisodeCount.mockResolvedValue(0);
     mockFollowCount.mockResolvedValue(0);
   });
 

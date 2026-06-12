@@ -7,5 +7,5 @@ appId: fm.sotto.app
     id: 'login-sign-in-button'
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 10000

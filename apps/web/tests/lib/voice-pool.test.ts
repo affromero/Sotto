@@ -90,7 +90,7 @@ describe('scoreVoice', () => {
 
 describe('selectVoicePair backward compatibility', () => {
   it('returns same result without metadata as original hash-based logic', () => {
-    const testIds = ['podcast-abc-123', 'test-xyz-456', 'another-podcast-789'];
+    const testIds = ['episode-abc-123', 'test-xyz-456', 'another-episode-789'];
     for (const id of testIds) {
       const withoutMeta = selectVoicePair(id);
       const withEmptyMeta = selectVoicePair(id, {});
@@ -100,8 +100,8 @@ describe('selectVoicePair backward compatibility', () => {
   });
 
   it('returns same result with undefined metadata', () => {
-    const result1 = selectVoicePair('test-podcast-id');
-    const result2 = selectVoicePair('test-podcast-id', undefined);
+    const result1 = selectVoicePair('test-episode-id');
+    const result2 = selectVoicePair('test-episode-id', undefined);
     expect(result1.host.name).toBe(result2.host.name);
     expect(result1.expert.name).toBe(result2.expert.name);
   });
@@ -110,16 +110,16 @@ describe('selectVoicePair backward compatibility', () => {
 describe('selectVoicePair with metadata', () => {
   it('is deterministic (same inputs produce same output)', () => {
     const metadata: VoiceMatchMetadata = { tone: 'casual', audienceLevel: 'beginner' };
-    const result1 = selectVoicePair('test-podcast-id', metadata);
-    const result2 = selectVoicePair('test-podcast-id', metadata);
+    const result1 = selectVoicePair('test-episode-id', metadata);
+    const result2 = selectVoicePair('test-episode-id', metadata);
     expect(result1.host.name).toBe(result2.host.name);
     expect(result1.expert.name).toBe(result2.expert.name);
   });
 
   it('different metadata can produce different pairs', () => {
-    const podcastId = 'same-podcast-for-comparison';
-    const casual = selectVoicePair(podcastId, { tone: 'casual' });
-    const socratic = selectVoicePair(podcastId, { tone: 'socratic' });
+    const episodeId = 'same-episode-for-comparison';
+    const casual = selectVoicePair(episodeId, { tone: 'casual' });
+    const socratic = selectVoicePair(episodeId, { tone: 'socratic' });
     // The tiers are different so at least one voice should differ (host or expert)
     const samePair =
       casual.host.name === socratic.host.name && casual.expert.name === socratic.expert.name;
@@ -145,7 +145,7 @@ describe('selectVoicePair with metadata', () => {
 });
 
 describe('tier diversity', () => {
-  it('produces multiple distinct hosts across podcast IDs with same metadata', () => {
+  it('produces multiple distinct hosts across episode IDs with same metadata', () => {
     const metadata: VoiceMatchMetadata = { tone: 'casual' };
     const hosts = new Set<string>();
     for (let i = 0; i < 100; i++) {

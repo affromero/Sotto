@@ -78,10 +78,10 @@ export async function uploadStream(
 }
 
 /**
- * Upload podcast audio to R2
+ * Upload episode audio to R2
  */
-export async function uploadPodcastAudio(podcastId: string, audio: Buffer): Promise<string> {
-  const key = `podcasts/${podcastId}/audio.mp3`;
+export async function uploadEpisodeAudio(episodeId: string, audio: Buffer): Promise<string> {
+  const key = `episodes/${episodeId}/audio.mp3`;
   return uploadFile(key, audio, 'audio/mpeg');
 }
 
@@ -89,11 +89,11 @@ export async function uploadPodcastAudio(podcastId: string, audio: Buffer): Prom
  * Upload a segment audio file
  */
 export async function uploadSegmentAudio(
-  podcastId: string,
+  episodeId: string,
   segmentId: string,
   audio: Buffer
 ): Promise<string> {
-  const key = `podcasts/${podcastId}/segments/${segmentId}.mp3`;
+  const key = `episodes/${episodeId}/segments/${segmentId}.mp3`;
   return uploadFile(key, audio, 'audio/mpeg');
 }
 
@@ -123,7 +123,7 @@ export function extractR2Key(urlOrKey: string): string {
 }
 
 /**
- * Resolve an audio URL based on podcast visibility.
+ * Resolve an audio URL based on episode visibility.
  * PUBLIC → return the CDN URL as-is.
  * PRIVATE/UNLISTED → return a presigned URL (1hr TTL).
  * null → return null.
@@ -194,18 +194,18 @@ export async function downloadToFile(urlOrKey: string, destPath: string): Promis
 
 /**
  * Protected path patterns — these files must never be bulk-deleted.
- * Segment audio is needed by avatar generation, voice tracks, and future features.
- * Podcast audio is the final stitched output — irreplaceable without re-generation.
+ * Segment audio is needed by voice tracks, re-stitching, and future features.
+ * Episode audio is the final stitched output — irreplaceable without re-generation.
  */
 const PROTECTED_PATH_PATTERNS = [
-  /^podcasts\/[^/]+\/segments\/[^/]+\.mp3$/,  // segment audio
-  /^podcasts\/[^/]+\/audio\.mp3$/,             // final podcast audio
+  /^episodes\/[^/]+\/segments\/[^/]+\.mp3$/,  // segment audio
+  /^episodes\/[^/]+\/audio\.mp3$/,             // final episode audio
 ];
 
 /**
  * Delete a file from R2.
  *
- * Protected paths (segment audio, podcast audio) require `{ force: true }`.
+ * Protected paths (segment audio, episode audio) require `{ force: true }`.
  * This prevents accidental bulk deletion — the storage-cleanup incident of 2026-02.
  */
 export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): Promise<void> {
@@ -218,7 +218,7 @@ export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): 
   if (!opts?.force && PROTECTED_PATH_PATTERNS.some((p) => p.test(key))) {
     throw new Error(
       `Refusing to delete protected file: ${key}. ` +
-      'Segment and podcast audio files must not be deleted. ' +
+      'Segment and episode audio files must not be deleted. ' +
       'Pass { force: true } only if you are certain this is intentional.'
     );
   }

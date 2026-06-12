@@ -60,24 +60,24 @@ export function getPublicAppBaseUrl(env: AppUrlEnv = process.env): string {
   return appUrl;
 }
 
-/** Generate a podcast URL. */
-export function podcastUrl(
-  podcast: { id: string; slug?: string | null },
+/** Generate a episode URL. */
+export function episodeUrl(
+  episode: { id: string; slug?: string | null },
   handle?: string | null
 ): string {
-  if (podcast.slug && handle) {
-    return `/@${handle}/${podcast.slug}`;
+  if (episode.slug && handle) {
+    return `/@${handle}/${episode.slug}`;
   }
-  return `/podcast/${podcast.id}`;
+  return `/episode/${episode.id}`;
 }
 
 /**
- * Generate an absolute podcast URL.
+ * Generate an absolute episode URL.
  */
-export function absolutePodcastUrl(
-  podcast: { id: string; slug?: string | null },
+export function absoluteEpisodeUrl(
+  episode: { id: string; slug?: string | null },
   handle?: string | null,
   appUrl = getAppBaseUrl()
 ): string {
-  return `${appUrl}${podcastUrl(podcast, handle)}`;
+  return `${appUrl}${episodeUrl(episode, handle)}`;
 }

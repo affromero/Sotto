@@ -1,5 +1,5 @@
 /**
- * Creative Director — designs the narrative structure for a podcast episode.
+ * Creative Director — designs the narrative structure for a episode episode.
  *
  * Given a research dossier, selects a narrative framework, produces a
  * beat sheet with evidence assignments, tension curve, and speaker roles.

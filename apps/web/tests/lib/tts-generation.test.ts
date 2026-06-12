@@ -122,7 +122,7 @@ function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationP
     providerId: 'elevenlabs',
     source: 'platform',
     userId: 'user-1',
-    podcastId: 'podcast-1',
+    episodeId: 'episode-1',
     usageCategory: 'audio_generation',
     isAborted: vi.fn().mockResolvedValue(false),
     ...overrides,
@@ -257,7 +257,7 @@ describe('generateTtsAudio', () => {
     expect(mockLogUsage).toHaveBeenCalledWith(
       expect.objectContaining({
         category: 'audio_generation',
-        podcastId: 'podcast-1',
+        episodeId: 'episode-1',
         userId: 'user-1',
         metadata: expect.objectContaining({ segmentId: 'seg-1' }),
       })

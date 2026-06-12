@@ -9,14 +9,14 @@ tags: [library, critical]
     id: 'library-filter-ready'
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 3000
 
 - tapOn:
     id: 'library-filter-all'
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 5000
 
 # Private filter should render without leaving the library
@@ -25,16 +25,16 @@ tags: [library, critical]
 - tapOn:
     id: 'library-filter-all'
 
-# Scroll until seeded podcast is visible
+# Scroll until seeded episode is visible
 - scrollUntilVisible:
     element:
-      id: 'podcast-card-${E2E_PODCAST_ID}'
+      id: 'episode-card-${E2E_EPISODE_ID}'
     direction: DOWN
     timeout: 10000
 
-# Tap seeded podcast card to open player
+# Tap seeded episode card to open player
 - tapOn:
-    id: 'podcast-card-${E2E_PODCAST_ID}'
+    id: 'episode-card-${E2E_EPISODE_ID}'
 
 # Terminal assertion: player loaded
 - extendedWaitUntil:

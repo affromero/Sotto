@@ -1,7 +1,7 @@
 /**
  * components/learn/ListeningSection.tsx
  *
- * Listening section: expo-audio player for the podcast audio above the
+ * Listening section: expo-audio player for the episode audio above the
  * comprehension MC questions (reuses MCSection logic inline).
  * Gracefully handles null audioUrl with a plain note.
  */
@@ -13,10 +13,10 @@ import { ClassSectionData } from '../../lib/learn-api';
 import { MCSection } from './MCSection';
 
 // ---------------------------------------------------------------------------
-// Sub-component: podcast audio player
+// Sub-component: episode audio player
 // ---------------------------------------------------------------------------
 
-function PodcastPlayer({ audioUrl }: { audioUrl: string }) {
+function EpisodePlayer({ audioUrl }: { audioUrl: string }) {
   const player = useAudioPlayer(audioUrl);
   const status = useAudioPlayerStatus(player);
 
@@ -93,7 +93,7 @@ export function ListeningSection({
   submitted,
   result,
 }: ListeningSectionProps) {
-  const audioUrl = section.podcast?.audioUrl ?? null;
+  const audioUrl = section.episode?.audioUrl ?? null;
 
   return (
     <View style={styles.container}>
@@ -101,7 +101,7 @@ export function ListeningSection({
       <View style={styles.audioBlock}>
         <Text style={styles.audioLabel}>Lesson Audio</Text>
         {audioUrl ? (
-          <PodcastPlayer audioUrl={audioUrl} />
+          <EpisodePlayer audioUrl={audioUrl} />
         ) : (
           <View style={styles.noAudio}>
             <Text style={styles.noAudioText}>
@@ -109,9 +109,9 @@ export function ListeningSection({
             </Text>
           </View>
         )}
-        {section.podcast?.title && (
-          <Text style={styles.podcastTitle} numberOfLines={2}>
-            {section.podcast.title}
+        {section.episode?.title && (
+          <Text style={styles.episodeTitle} numberOfLines={2}>
+            {section.episode.title}
           </Text>
         )}
       </View>
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
   },
-  podcastTitle: {
+  episodeTitle: {
     fontFamily: typography.fontBody,
     fontSize: 14,
     color: colors.textSecondary,

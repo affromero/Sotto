@@ -73,11 +73,6 @@ services:
     networks: [sotto-network]
     restart: unless-stopped
 
-  remotion:
-    image: ghcr.io/affromero/sotto-remotion:latest
-    networks: [sotto-network]
-    restart: unless-stopped
-
 volumes:
   pgdata:
   redisdata:

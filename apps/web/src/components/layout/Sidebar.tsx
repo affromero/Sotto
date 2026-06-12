@@ -18,7 +18,7 @@ interface SidebarProps {
   currentPath: string;
   isOpen?: boolean;
   onClose?: () => void;
-  hasPodcasts?: boolean;
+  hasEpisodes?: boolean;
   hasActivePlayer?: boolean;
   user?: {
     name?: string | null;

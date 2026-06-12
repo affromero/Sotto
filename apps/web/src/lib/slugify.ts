@@ -36,17 +36,17 @@ export function slugify(title: string): string {
 }
 
 /**
- * Generate a unique podcast slug for a given user.
+ * Generate a unique episode slug for a given user.
  * Appends a numeric suffix (-2, -3, ...) if the base slug is already taken.
  */
-export async function generatePodcastSlug(
+export async function generateEpisodeSlug(
   title: string,
   userId: string,
-  prisma: { podcast: { findUnique: (args: { where: { userId_slug: { userId: string; slug: string } }; select: { id: true } }) => Promise<{ id: string } | null> } }
+  prisma: { episode: { findUnique: (args: { where: { userId_slug: { userId: string; slug: string } }; select: { id: true } }) => Promise<{ id: string } | null> } }
 ): Promise<string> {
   const base = slugify(title);
   // Try the base slug first
-  const existing = await prisma.podcast.findUnique({
+  const existing = await prisma.episode.findUnique({
     where: { userId_slug: { userId, slug: base } },
     select: { id: true },
   });
@@ -55,7 +55,7 @@ export async function generatePodcastSlug(
   // Append numeric suffix until unique
   for (let i = 2; i < 100; i++) {
     const candidate = `${base}-${i}`;
-    const taken = await prisma.podcast.findUnique({
+    const taken = await prisma.episode.findUnique({
       where: { userId_slug: { userId, slug: candidate } },
       select: { id: true },
     });

@@ -9,8 +9,8 @@ import {
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { markEpisodeFailed } from '@/lib/pipeline-resume';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { verifyScript, type ClaimAnalysis } from '@/lib/script-verifier';
 import {
   generateScriptWithFeedback,
@@ -23,7 +23,7 @@ import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
-import { assignVoicesForPodcast } from '@/lib/voice-assigner';
+import { assignVoicesForEpisode } from '@/lib/voice-assigner';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getGenerationFeatures } from '@/lib/generation-features';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
@@ -43,65 +43,52 @@ function getRepairMode(attempt: number): RepairMode {
 }
 
 export async function processScriptVerification(job: Job<VerifyScriptPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId, useAdminCredits } = job.data;
+  const { episodeId, userId, discoveryId, useAdminCredits } = job.data;
 
-  logger.info('Starting script verification', { podcastId });
+  logger.info('Starting script verification', { episodeId });
   await job.updateProgress(5);
 
   const genFeatures = getGenerationFeatures();
 
-  const [script, discovery, references, podcastRecord] = await Promise.all([
+  const [script, discovery, references, episodeRecord] = await Promise.all([
     prisma.script.findUniqueOrThrow({
-      where: { podcastId },
+      where: { episodeId },
     }),
     prisma.discovery.findUniqueOrThrow({
       where: { id: discoveryId },
     }),
     prisma.reference.findMany({
-      where: { podcastId },
+      where: { episodeId },
       orderBy: { number: 'asc' },
     }),
-    prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
-      select: { aiModel: true, verificationMode: true, language: true, source: true, zeroCostVideo: true },
+    prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
+      select: { aiModel: true, verificationMode: true, language: true, source: true },
     }),
   ]);
 
-  const verificationMode = podcastRecord.verificationMode;
+  const verificationMode = episodeRecord.verificationMode;
 
   let turns = script.turns as ScriptTurn[];
 
-  // Zero-cost mode: skip verification entirely — treat script as passed
-  if (podcastRecord.zeroCostVideo) {
-    logger.info('Zero-cost mode: skipping script verification', { podcastId });
-    await prisma.script.update({
-      where: { podcastId },
-      data: { verificationFeedback: 'Skipped (zero-cost mode)' },
-    });
-    // Route to audio — same as auto-approve path
-    await createSegmentsAndQueueAudio(podcastId, turns);
-    await job.updateProgress(100);
-    return;
-  }
-
-  const aiKey = useAdminCredits || podcastRecord.aiModel ? null : await getAiKey(userId);
-  if (!podcastRecord.aiModel && !aiKey) {
+  const aiKey = useAdminCredits || episodeRecord.aiModel ? null : await getAiKey(userId);
+  if (!episodeRecord.aiModel && !aiKey) {
     throw new Error('AI model is required for script verification when no AI key is configured.');
   }
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcastRecord.aiModel,
+    episodeAiModel: episodeRecord.aiModel,
     aiKey,
   });
 
   const verificationModel = model;
 
   const providerAiKey =
-    podcastRecord.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episodeRecord.aiModel && provider !== 'claude-code' && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (podcastRecord.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episodeRecord.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for script verification.`);
   }
 
@@ -152,12 +139,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     category: 'script_verification',
     inputTokens: verdict.inputTokens,
     outputTokens: verdict.outputTokens,
-    podcastId,
+    episodeId,
     userId,
   });
 
   logger.info('Script verification result', {
-    podcastId,
+    episodeId,
     passed: String(verdict.passed),
     score: String(verdict.score),
     attempt: String(attemptNumber),
@@ -178,24 +165,24 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   if (verdict.failureType === 'parse_error') {
     const previousWasParseError = script.verificationFeedback?.startsWith('PARSE_ERROR');
     if (!previousWasParseError) {
-      logger.warn('Parse error on verification — retrying without incrementing attempts', { podcastId });
+      logger.warn('Parse error on verification — retrying without incrementing attempts', { episodeId });
       await prisma.script.update({
-        where: { podcastId },
+        where: { episodeId },
         data: { verificationFeedback: verdict.feedback },
       });
       await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT,
-        { podcastId, userId, discoveryId, useAdminCredits },
-        { jobId: `verify-${podcastId}-parse-retry-${Date.now()}` });
+        { episodeId, userId, discoveryId, useAdminCredits },
+        { jobId: `verify-${episodeId}-parse-retry-${Date.now()}` });
       await job.updateProgress(100);
       return;
     }
     // Consecutive parse errors — fall through to normal failure path
-    logger.error('Consecutive parse errors on verification — treating as failure', { podcastId });
+    logger.error('Consecutive parse errors on verification — treating as failure', { episodeId });
   }
 
   if (verdict.passed) {
     await prisma.script.update({
-      where: { podcastId },
+      where: { episodeId },
       data: {
         verificationAttempts: attemptNumber,
         verificationClaims: Prisma.JsonNull,
@@ -205,7 +192,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     // Auto-adjust duration if script is too long/short (don't waste a verification attempt)
     if (verdict.durationFeedback) {
       logger.info('Script passed fact-check but needs duration adjustment', {
-        podcastId,
+        episodeId,
         durationFeedback: verdict.durationFeedback,
       });
 
@@ -229,7 +216,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         model,
         provider,
         webSearchEnabled: false,
-        targetLanguage: podcastRecord.language,
+        targetLanguage: episodeRecord.language,
         languageMode: null,
       });
 
@@ -239,13 +226,13 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         category: 'script_generation',
         inputTokens: adjusted.inputTokens,
         outputTokens: adjusted.outputTokens,
-        podcastId,
+        episodeId,
         userId,
       });
 
       // Save adjusted script
       await prisma.script.update({
-        where: { podcastId },
+        where: { episodeId },
         data: {
           turns: adjusted.turns,
           soundCues: adjusted.soundCues.length > 0 ? adjusted.soundCues : undefined,
@@ -256,10 +243,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
       // Update references if changed
       if (adjusted.references.length > 0) {
-        await prisma.reference.deleteMany({ where: { podcastId } });
+        await prisma.reference.deleteMany({ where: { episodeId } });
         await prisma.reference.createMany({
           data: adjusted.references.map((ref) => ({
-            podcastId,
+            episodeId,
             number: ref.number,
             title: ref.title,
             authors: ref.authors,
@@ -273,11 +260,11 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       }
 
       // Sync vocabulary entries with the adjusted script
-      await prisma.vocabularyEntry.deleteMany({ where: { podcastId } });
+      await prisma.vocabularyEntry.deleteMany({ where: { episodeId } });
       if (adjusted.vocabulary && adjusted.vocabulary.length > 0) {
         await prisma.vocabularyEntry.createMany({
           data: adjusted.vocabulary.map((v) => ({
-            podcastId,
+            episodeId,
             number: v.number,
             word: v.word,
             translation: v.translation,
@@ -292,98 +279,98 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       // Use adjusted turns for downstream routing
       turns = adjusted.turns;
 
-      logger.info('Script duration adjusted', { podcastId });
+      logger.info('Script duration adjusted', { episodeId });
     }
 
     if (references.length > 0 && verificationMode !== 'showcase') {
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      await prisma.episode.update({
+        where: { id: episodeId },
         data: { status: 'COMPILING' },
       });
-      await invalidatePodcastCache(podcastId);
-      await publishPodcastStatus(podcastId, { status: 'COMPILING' });
+      await invalidateEpisodeCache(episodeId);
+      await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
       await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
-        podcastId,
+        episodeId,
         userId,
         useAdminCredits,
-      }, { jobId: `validate-${podcastId}-${Date.now()}` });
+      }, { jobId: `validate-${episodeId}-${Date.now()}` });
 
-      logger.info('Script verified, routing to reference validation', { podcastId });
+      logger.info('Script verified, routing to reference validation', { episodeId });
     } else {
       // No references — check source to decide whether to pause for review
-      const podcast = await prisma.podcast.findUniqueOrThrow({
-        where: { id: podcastId },
+      const episode = await prisma.episode.findUniqueOrThrow({
+        where: { id: episodeId },
         select: { source: true },
       });
 
       // Free users auto-approve (no script review pause)
       const shouldAutoApprove = genFeatures.autoApproveScript ||
-        (podcast.source !== 'WEB' && podcast.source !== 'IMPORT');
+        (episode.source !== 'WEB' && episode.source !== 'IMPORT');
 
       if (!shouldAutoApprove) {
         // Pause for user review (Pro/BYOK users on WEB/IMPORT)
-        await prisma.podcast.update({
-          where: { id: podcastId },
+        await prisma.episode.update({
+          where: { id: episodeId },
           data: { status: 'SCRIPT_READY' },
         });
-        await invalidatePodcastCache(podcastId);
-        await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+        await invalidateEpisodeCache(episodeId);
+        await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
 
         await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
           userId,
           type: 'SCRIPT_READY',
           title: 'Script ready for review',
-          message: 'Your podcast script is ready. Review and approve it to start audio generation.',
-          data: { podcastId },
+          message: 'Your episode script is ready. Review and approve it to start audio generation.',
+          data: { episodeId },
         });
 
-        logger.info('Script verified (no refs), paused at SCRIPT_READY for review', { podcastId });
+        logger.info('Script verified (no refs), paused at SCRIPT_READY for review', { episodeId });
       } else {
         // Auto-approve for non-WEB/IMPORT sources (no user at browser).
-        const svExistingPodcast = await prisma.podcast.findUniqueOrThrow({
-          where: { id: podcastId },
+        const svExistingEpisode = await prisma.episode.findUniqueOrThrow({
+          where: { id: episodeId },
           select: { ttsProvider: true },
         });
-        if (!svExistingPodcast.ttsProvider) {
+        if (!svExistingEpisode.ttsProvider) {
           const selected = await getAutoModelConfig();
-          await prisma.podcast.update({
-            where: { id: podcastId },
+          await prisma.episode.update({
+            where: { id: episodeId },
             data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
           });
         }
 
-        // Assign voices for multi-speaker podcasts
-        const svPodcast = await prisma.podcast.findUniqueOrThrow({
-          where: { id: podcastId },
+        // Assign voices for multi-speaker episodes
+        const svEpisode = await prisma.episode.findUniqueOrThrow({
+          where: { id: episodeId },
           select: { ttsProvider: true },
         });
-        const svProvider = (svPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+        const svProvider = (svEpisode.ttsProvider ?? 'elevenlabs') as TtsProviderId;
         const svSpeakers = discovery.speakers as Array<{ name: string; description?: string }> | null;
         const speakerList = svSpeakers && svSpeakers.length > 0
           ? svSpeakers
           : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-        await assignVoicesForPodcast(podcastId, speakerList, svProvider);
+        await assignVoicesForEpisode(episodeId, speakerList, svProvider);
 
         // Convert TTS tags before creating segments
         const scriptTurns = turns as Array<{ speaker: string; text: string; direction?: string }>;
-        const convertedScriptTurns = svPodcast.ttsProvider
+        const convertedScriptTurns = svEpisode.ttsProvider
           ? await convertTurnsForProvider(scriptTurns, svProvider, { mode: 'disabled' })
           : scriptTurns;
-        await createSegmentsAndQueueAudio(podcastId, convertedScriptTurns);
+        await createSegmentsAndQueueAudio(episodeId, convertedScriptTurns);
 
-        await prisma.podcast.update({
-          where: { id: podcastId },
+        await prisma.episode.update({
+          where: { id: episodeId },
           data: { status: 'GENERATING_AUDIO' },
         });
-        await invalidatePodcastCache(podcastId);
-        await publishPodcastStatus(podcastId, { status: 'GENERATING_AUDIO' });
+        await invalidateEpisodeCache(episodeId);
+        await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });
 
-        logger.info('Script verified (no refs), auto-approved for audio generation', { podcastId });
+        logger.info('Script verified (no refs), auto-approved for audio generation', { episodeId });
       }
     }
 
-    await logPipelineStageComplete(podcastId, 'script-verification');
+    await logPipelineStageComplete(episodeId, 'script-verification');
     await job.updateProgress(100);
     return;
   }
@@ -392,17 +379,17 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   if (attemptNumber >= MAX_VERIFICATION_ATTEMPTS) {
     const isParseError = verdict.failureType === 'parse_error';
     const userMessage = isParseError
-      ? 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.'
+      ? 'We encountered a temporary processing issue while fact-checking your episode. Please try generating again.'
       : "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.";
 
-    await markPodcastFailed(podcastId, {
+    await markEpisodeFailed(episodeId, {
       failureReason: userMessage,
       technicalError: `Verification failed ${attemptNumber}/${MAX_VERIFICATION_ATTEMPTS}: ${verdict.feedback}`,
     });
 
     await prisma.pipelineEvent.create({
       data: {
-        podcastId,
+        episodeId,
         stage: 'script-verification',
         type: 'error',
         message: `Verification failed after ${attemptNumber} attempts. Score: ${verdict.score}. ${verdict.feedback}`,
@@ -415,12 +402,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         },
       },
     }).catch(err => logger.error('Failed to write PipelineEvent', {
-      podcastId,
+      episodeId,
       error: err instanceof Error ? err.message : String(err),
     }));
 
     await prisma.script.update({
-      where: { podcastId },
+      where: { episodeId },
       data: {
         verificationAttempts: attemptNumber,
         verificationFeedback: verdict.feedback,
@@ -430,14 +417,14 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
-      type: 'PODCAST_FAILED',
-      title: 'Podcast generation failed',
+      type: 'EPISODE_FAILED',
+      title: 'Episode generation failed',
       message: userMessage,
-      data: { podcastId },
+      data: { episodeId },
     });
 
     logger.error('Script verification failed after max attempts', {
-      podcastId,
+      episodeId,
       attempts: String(attemptNumber),
       score: String(verdict.score),
     });
@@ -450,7 +437,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   await job.updateProgress(60);
 
   await prisma.script.update({
-    where: { podcastId },
+    where: { episodeId },
     data: {
       verificationAttempts: attemptNumber,
       verificationFeedback: verdict.feedback,
@@ -459,7 +446,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   });
 
   logger.info('Regenerating script with feedback', {
-    podcastId,
+    episodeId,
     attempt: String(attemptNumber),
     feedback: verdict.feedback.substring(0, 200),
   });
@@ -482,7 +469,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   const useWebSearchForRevision = isLastRetry && fewUnresolved;
 
   logger.info('Revision strategy', {
-    podcastId,
+    episodeId,
     repairMode,
     attempt: String(attemptNumber),
     webSearch: String(useWebSearchForRevision),
@@ -513,7 +500,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     model,
     provider,
     webSearchEnabled: useWebSearchForRevision,
-    targetLanguage: podcastRecord.language,
+    targetLanguage: episodeRecord.language,
     languageMode: null,
   });
 
@@ -525,13 +512,13 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     category: 'script_generation',
     inputTokens: revised.inputTokens,
     outputTokens: revised.outputTokens,
-    podcastId,
+    episodeId,
     userId,
   });
 
   // Save revised script (increment version)
   await prisma.script.update({
-    where: { podcastId },
+    where: { episodeId },
     data: {
       turns: revised.turns,
       soundCues: revised.soundCues.length > 0 ? revised.soundCues : undefined,
@@ -543,10 +530,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   // Replace references: use new ones if available, otherwise keep old set
   // but filter out banned (unreliable) refs to break the loop trap.
   if (revised.references.length > 0) {
-    await prisma.reference.deleteMany({ where: { podcastId } });
+    await prisma.reference.deleteMany({ where: { episodeId } });
     await prisma.reference.createMany({
       data: revised.references.map((ref) => ({
-        podcastId,
+        episodeId,
         number: ref.number,
         title: ref.title,
         authors: ref.authors,
@@ -576,10 +563,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         number: renumberMap.get(ref.number) ?? ref.number,
       }));
 
-      await prisma.reference.deleteMany({ where: { podcastId } });
+      await prisma.reference.deleteMany({ where: { episodeId } });
       await prisma.reference.createMany({
         data: renumberedRefs.map((ref) => ({
-          podcastId,
+          episodeId,
           number: ref.number,
           title: ref.title,
           authors: ref.authors,
@@ -593,28 +580,28 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
       // Update saved turns with cleaned citations
       await prisma.script.update({
-        where: { podcastId },
+        where: { episodeId },
         data: { turns: cleanedTurns },
       });
 
       logger.info('Filtered banned refs and cleaned citations', {
-        podcastId,
+        episodeId,
         removed: String(bannedRefNumbers.size),
         remaining: String(cleanedRefs.length),
       });
     } else {
-      logger.warn('All refs banned and revision produced 0 — keeping previous set', { podcastId });
+      logger.warn('All refs banned and revision produced 0 — keeping previous set', { episodeId });
     }
   } else {
-    logger.warn('Revision produced 0 references, keeping previous set', { podcastId });
+    logger.warn('Revision produced 0 references, keeping previous set', { episodeId });
   }
 
   // Sync vocabulary entries with the revised script
-  await prisma.vocabularyEntry.deleteMany({ where: { podcastId } });
+  await prisma.vocabularyEntry.deleteMany({ where: { episodeId } });
   if (revised.vocabulary && revised.vocabulary.length > 0) {
     await prisma.vocabularyEntry.createMany({
       data: revised.vocabulary.map((v) => ({
-        podcastId,
+        episodeId,
         number: v.number,
         word: v.word,
         translation: v.translation,
@@ -630,14 +617,14 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   // Re-queue for another verification pass
   await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
-    podcastId,
+    episodeId,
     userId,
     discoveryId,
     useAdminCredits,
-  }, { jobId: `verify-${podcastId}-${attemptNumber + 1}-${Date.now()}` });
+  }, { jobId: `verify-${episodeId}-${attemptNumber + 1}-${Date.now()}` });
 
   logger.info('Script revised and re-queued for verification', {
-    podcastId,
+    episodeId,
     attempt: String(attemptNumber),
     newReferences: String(revised.references.length),
   });

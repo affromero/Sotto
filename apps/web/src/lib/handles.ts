@@ -26,7 +26,7 @@ const RESERVED_HANDLES = new Set([
   'login',
   'signup',
   'onboarding',
-  'podcast',
+  'episode',
   'profile',
   'team',
   'notifications',

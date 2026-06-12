@@ -1,4 +1,4 @@
-export interface Podcast {
+export interface Episode {
   id: string;
   title: string;
   topic: string;
@@ -18,7 +18,7 @@ export interface Podcast {
   tags?: Array<{ tag: { id: string; name: string; slug: string } }>;
 }
 
-export interface PodcastDetail extends Podcast {
+export interface EpisodeDetail extends Episode {
   segments?: Array<{
     id: string;
     speaker: string;
@@ -43,11 +43,11 @@ export interface UserProfile {
   email: string | null;
   handle: string | null;
   image: string | null;
-  podcastCount: number;
+  episodeCount: number;
   createdAt: string;
 }
 
-export interface CreatePodcastParams {
+export interface CreateEpisodeParams {
   title: string;
   topic: string;
   depth?: string;
@@ -86,7 +86,7 @@ export interface AgentIngestResult {
   idempotent?: boolean;
 }
 
-export interface UpdatePodcastParams {
+export interface UpdateEpisodeParams {
   title?: string;
   topic?: string;
   visibility?: string;

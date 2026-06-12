@@ -21,8 +21,8 @@ import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
 
 const NOTIFICATION_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  PODCAST_READY: 'headset',
-  PODCAST_FAILED: 'warning-outline',
+  EPISODE_READY: 'headset',
+  EPISODE_FAILED: 'warning-outline',
   INTERACTION_ANSWERED: 'chatbubble-outline',
   SYSTEM: 'information-circle-outline',
 };
@@ -117,8 +117,8 @@ export default function NotificationsScreen() {
       if (!notification.read) {
         markReadMutation.mutate(notification.id);
       }
-      if (notification.data?.podcastId) {
-        router.push(`/podcast/${notification.data.podcastId}`);
+      if (notification.data?.episodeId) {
+        router.push(`/episode/${notification.data.episodeId}`);
       }
     },
     [markReadMutation, router]

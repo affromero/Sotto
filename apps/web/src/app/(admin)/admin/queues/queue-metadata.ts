@@ -11,8 +11,7 @@ export type PipelineStage =
   | 'Content Pipeline'
   | 'Audio Pipeline'
   | 'Interactions'
-  | 'Platform Ops'
-  | 'Video Pipeline';
+  | 'Platform Ops';
 
 interface QueueMeta {
   description: string;
@@ -24,7 +23,6 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Audio Pipeline',
   'Interactions',
   'Platform Ops',
-  'Video Pipeline',
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
@@ -33,7 +31,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Content Pipeline',
   },
   'script-generation': {
-    description: 'Generates 2-voice conversational podcast scripts via LLM',
+    description: 'Generates 2-voice conversational episode scripts via LLM',
     stage: 'Content Pipeline',
   },
   'script-verification': {
@@ -84,41 +82,9 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Fetches AI model pricing from provider pages and updates snapshots',
     stage: 'Platform Ops',
   },
-  'visual-classification': {
-    description: 'Classifies podcast segments into visual types via Claude',
-    stage: 'Video Pipeline',
-  },
-  'visual-generation': {
-    description: 'Generates AI illustrations and fetches stock footage per segment',
-    stage: 'Video Pipeline',
-  },
-  'video-composition': {
-    description: 'Renders final MP4 video via Remotion sidecar',
-    stage: 'Video Pipeline',
-  },
-  'avatar-generation': {
-    description: 'Generates lip-synced avatar overlays via HeyGen',
-    stage: 'Video Pipeline',
-  },
-  'transition-generation': {
-    description: 'Generates AI video transitions between segment visuals',
-    stage: 'Video Pipeline',
-  },
-  'place-enrichment': {
-    description: 'Resolves place names to coordinates via gazetteers for map visuals',
-    stage: 'Video Pipeline',
-  },
-  'lip-sync-test': {
-    description: 'Tests lip-sync models with a short audio clip and avatar image via fal.ai',
-    stage: 'Video Pipeline',
-  },
   'waveform-generation': {
-    description: 'Generates waveform peaks JSON and spectrogram PNG from podcast audio',
+    description: 'Generates waveform peaks JSON and spectrogram PNG from episode audio',
     stage: 'Audio Pipeline',
-  },
-  'pipeline-classification': {
-    description: 'Classifies segment visuals via LLM and builds pipeline JSON for the video editor',
-    stage: 'Video Pipeline',
   },
   'tts-provider-monitor': {
     description: 'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',

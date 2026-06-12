@@ -8,12 +8,13 @@ import c from '../components.module.css';
 
 interface Props {
   agent: AgentState;
+  demoMode: boolean;
   setAgent: (updater: (prev: AgentState) => AgentState) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
+export function StepAgent({ agent, demoMode, setAgent, onNext, onBack }: Props) {
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
 
   function pick(id: string) {
@@ -24,7 +25,7 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
       method: p.cli ? 'cli' : p.kind === 'key' ? 'key' : 'url',
       value: '',
       model: '',
-      status: 'idle',
+      status: demoMode ? 'connected' : 'idle',
     }));
   }
 
@@ -36,11 +37,11 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
     setAgent((a) => ({ ...a, status: 'verifying' }));
     setTimeout(
       () => setAgent((a) => ({ ...a, status: 'connected' })),
-      agent.method === 'cli' ? 900 : 1300,
+      agent.method === 'cli' ? 900 : 1300
     );
   }
 
-  const inputMethod = prov && (agent.method === 'key' || agent.method === 'url');
+  const inputMethod = !demoMode && prov && (agent.method === 'key' || agent.method === 'url');
 
   return (
     <div className={t.stepEnter}>
@@ -48,12 +49,12 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
         <span className={t.eyebrowIdx}>01 ·</span> Bring your own agent
       </div>
       <h1 className={t.title}>
-        Connect the agent you <em>already use</em>.
+        Connect the agent that <em>already knows you</em>.
       </h1>
       <p className={t.lede}>
-        Sotto is infrastructure, not a model. Hook the Claude Code or Codex you already run,
-        point it at a local endpoint, or paste a key — the same agent you work with becomes
-        your tutor.
+        {demoMode
+          ? 'This hosted walkthrough simulates the connection. Choose an agent to see how Sotto turns your own stack into a tutor when you self-host it.'
+          : 'Sotto is infrastructure, not a model. Hook the Claude Code or Codex you already run, point it at a local endpoint, or paste a key — the same agent that knows your work becomes your tutor.'}
       </p>
 
       <div className={c.providerGrid}>
@@ -79,7 +80,14 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
 
       {prov && (
         <div className={c.connect} key={prov.id}>
-          {prov.cli && (
+          {demoMode && (
+            <div className={`${c.statusPill} ${c.statusPillConnected}`}>
+              <Glyph name="check" size={14} />
+              {prov.name} preview connected · ready to compose
+            </div>
+          )}
+
+          {!demoMode && prov.cli && (
             <div className={c.methodTabs}>
               <button
                 className={`${c.methodTab} ${agent.method === 'cli' ? c.methodTabOn : ''}`}
@@ -98,7 +106,7 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
             </div>
           )}
 
-          {agent.method === 'cli' && prov.cli && (
+          {!demoMode && agent.method === 'cli' && prov.cli && (
             <div className={c.cliDetect}>
               <span className={c.cliIco}>
                 <Glyph name="check" size={18} />
@@ -143,26 +151,10 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
                   {agent.status === 'connected' ? 'Connected' : 'Verify'}
                 </button>
               </div>
-
-              {agent.method === 'url' && (
-                <>
-                  <div className={c.fieldLabel}>Model</div>
-                  <div className={c.field}>
-                    <input
-                      className={c.fieldInput}
-                      type="text"
-                      placeholder="qwen3 · llama3.3 · gemma3"
-                      value={agent.model}
-                      onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
-                      aria-label="Local model name"
-                    />
-                  </div>
-                </>
-              )}
             </div>
           )}
 
-          {agent.status === 'verifying' && (
+          {!demoMode && agent.status === 'verifying' && (
             <div className={`${c.statusPill} ${c.statusPillVerifying}`}>
               <span className={c.spin} />
               {agent.method === 'cli'
@@ -170,7 +162,7 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
                 : `handshaking with ${prov.name}…`}
             </div>
           )}
-          {agent.status === 'connected' && (
+          {!demoMode && agent.status === 'connected' && (
             <div className={`${c.statusPill} ${c.statusPillConnected}`}>
               <Glyph name="check" size={14} />
               {agent.method === 'cli'
@@ -182,9 +174,11 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
 
           <div className={c.locknote}>
             <Glyph name="lock" size={15} />
-            {agent.method === 'cli'
-              ? "Sotto reuses your CLI's existing auth — nothing new to paste, nothing leaves your machine."
-              : "Your key stays in your environment. Sotto never proxies it through us — there is no us."}
+            {demoMode
+              ? 'Demo mode only simulates this connection; no key or endpoint is sent or stored.'
+              : agent.method === 'cli'
+                ? "Sotto reuses your CLI's existing auth — nothing new to paste, nothing leaves your machine."
+                : 'Your key stays in your environment. Sotto never proxies it through us — there is no us.'}
           </div>
         </div>
       )}

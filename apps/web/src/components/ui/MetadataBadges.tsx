@@ -1,22 +1,22 @@
 'use client';
 
-import { getPodcastBadges, type PodcastBadge } from '@sotto/shared';
-import type { PodcastSummary } from '@/types/podcast';
+import { getEpisodeBadges, type EpisodeBadge } from '@sotto/shared';
+import type { EpisodeSummary } from '@/types/episode';
 import styles from './MetadataBadges.module.css';
 
-type BadgeCategory = PodcastBadge['category'];
+type BadgeCategory = EpisodeBadge['category'];
 
 interface MetadataBadgesProps {
-  podcast: Pick<
-    PodcastSummary,
+  episode: Pick<
+    EpisodeSummary,
     'source' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
   >;
   categories?: BadgeCategory[];
   compact?: boolean;
 }
 
-export function MetadataBadges({ podcast, categories, compact }: MetadataBadgesProps) {
-  const allBadges = getPodcastBadges(podcast);
+export function MetadataBadges({ episode, categories, compact }: MetadataBadgesProps) {
+  const allBadges = getEpisodeBadges(episode);
   const badges = categories ? allBadges.filter((b) => categories.includes(b.category)) : allBadges;
 
   if (badges.length === 0) return null;

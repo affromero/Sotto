@@ -58,9 +58,9 @@ function createMockJob(data: SendNotificationPayload): Job<SendNotificationPaylo
 
 const defaultPayload: SendNotificationPayload = {
   userId: 'user-001',
-  type: 'PODCAST_READY',
-  title: 'Your podcast is ready!',
-  message: 'Your podcast "Quantum Physics 101" is ready to listen.',
+  type: 'EPISODE_READY',
+  title: 'Your episode is ready!',
+  message: 'Your episode "Quantum Physics 101" is ready to listen.',
 };
 
 // ---- Tests ----
@@ -70,8 +70,8 @@ describe('processNotification', () => {
     vi.clearAllMocks();
     mockPrismaNotificationCreate.mockResolvedValue({
       id: 'notif-001',
-      type: 'PODCAST_READY',
-      title: 'Your podcast is ready!',
+      type: 'EPISODE_READY',
+      title: 'Your episode is ready!',
       message: 'Ready.',
       data: null,
       read: false,
@@ -103,9 +103,9 @@ describe('processNotification', () => {
     });
 
     it.each([
-      { type: 'PODCAST_READY', title: 'Your podcast is ready!', message: 'Ready.' },
+      { type: 'EPISODE_READY', title: 'Your episode is ready!', message: 'Ready.' },
       { type: 'BRIEFING_READY', title: 'Briefing ready!', message: 'Ready.' },
-      { type: 'QUESTION_ON_YOUR_PODCAST', title: 'New question', message: 'Asked.' },
+      { type: 'QUESTION_ON_YOUR_EPISODE', title: 'New question', message: 'Asked.' },
     ] as const)('creates notification with $type type', async ({ type, title, message }) => {
       const job = createMockJob({ ...defaultPayload, type, title, message });
       await processNotification(job);
@@ -123,7 +123,7 @@ describe('processNotification', () => {
 
       expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ title: 'Your podcast is ready!' }),
+          data: expect.objectContaining({ title: 'Your episode is ready!' }),
         })
       );
     });
@@ -135,7 +135,7 @@ describe('processNotification', () => {
       expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            message: 'Your podcast "Quantum Physics 101" is ready to listen.',
+            message: 'Your episode "Quantum Physics 101" is ready to listen.',
           }),
         })
       );
@@ -144,14 +144,14 @@ describe('processNotification', () => {
     it('stores extra data when provided', async () => {
       const job = createMockJob({
         ...defaultPayload,
-        data: { podcastId: 'pod-123', url: '/podcast/pod-123' },
+        data: { episodeId: 'pod-123', url: '/episode/pod-123' },
       });
       await processNotification(job);
 
       expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            data: { podcastId: 'pod-123', url: '/podcast/pod-123' },
+            data: { episodeId: 'pod-123', url: '/episode/pod-123' },
           }),
         })
       );
@@ -160,9 +160,9 @@ describe('processNotification', () => {
     it('passes undefined for data when not provided', async () => {
       const payload: SendNotificationPayload = {
         userId: 'user-001',
-        type: 'PODCAST_READY',
+        type: 'EPISODE_READY',
         title: 'Ready',
-        message: 'Your podcast is ready.',
+        message: 'Your episode is ready.',
       };
       const job = createMockJob(payload);
       await processNotification(job);
@@ -186,8 +186,8 @@ describe('processNotification', () => {
         'user-001',
         expect.objectContaining({
           id: 'notif-001',
-          type: 'PODCAST_READY',
-          title: 'Your podcast is ready!',
+          type: 'EPISODE_READY',
+          title: 'Your episode is ready!',
         })
       );
     });
@@ -260,7 +260,7 @@ describe('processNotification', () => {
       await processNotification(job);
 
       expect(mockSendPushNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'Your podcast is ready!' })
+        expect.objectContaining({ title: 'Your episode is ready!' })
       );
     });
 
@@ -270,7 +270,7 @@ describe('processNotification', () => {
 
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: 'Your podcast "Quantum Physics 101" is ready to listen.',
+          body: 'Your episode "Quantum Physics 101" is ready to listen.',
         })
       );
     });
@@ -278,13 +278,13 @@ describe('processNotification', () => {
     it('includes data in push notification when provided', async () => {
       const job = createMockJob({
         ...defaultPayload,
-        data: { podcastId: 'pod-456' },
+        data: { episodeId: 'pod-456' },
       });
       await processNotification(job);
 
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { podcastId: 'pod-456' },
+          data: { episodeId: 'pod-456' },
         })
       );
     });
@@ -317,31 +317,31 @@ describe('processNotification', () => {
   });
 
   describe('complete notification payloads', () => {
-    it('correctly processes a full PODCAST_READY notification', async () => {
+    it('correctly processes a full EPISODE_READY notification', async () => {
       const job = createMockJob({
         userId: 'user-abc',
-        type: 'PODCAST_READY',
-        title: 'Your podcast is ready!',
+        type: 'EPISODE_READY',
+        title: 'Your episode is ready!',
         message: 'Listen to "AI in Healthcare" now.',
-        data: { podcastId: 'pod-health', url: '/podcast/pod-health' },
+        data: { episodeId: 'pod-health', url: '/episode/pod-health' },
       });
       await processNotification(job);
 
       expect(mockPrismaNotificationCreate).toHaveBeenCalledWith({
         data: {
           userId: 'user-abc',
-          type: 'PODCAST_READY',
-          title: 'Your podcast is ready!',
+          type: 'EPISODE_READY',
+          title: 'Your episode is ready!',
           message: 'Listen to "AI in Healthcare" now.',
-          data: { podcastId: 'pod-health', url: '/podcast/pod-health' },
+          data: { episodeId: 'pod-health', url: '/episode/pod-health' },
         },
       });
 
       expect(mockSendPushNotification).toHaveBeenCalledWith({
         userId: 'user-abc',
-        title: 'Your podcast is ready!',
+        title: 'Your episode is ready!',
         body: 'Listen to "AI in Healthcare" now.',
-        data: { podcastId: 'pod-health', url: '/podcast/pod-health' },
+        data: { episodeId: 'pod-health', url: '/episode/pod-health' },
       });
     });
 

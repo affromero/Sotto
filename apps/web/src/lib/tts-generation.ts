@@ -77,7 +77,7 @@ export interface TtsGenerationParams {
   previousText?: string;
   nextText?: string;
   direction?: string;
-  /** ISO 639-1 language code for the podcast (passed as hint to providers that accept it). */
+  /** ISO 639-1 language code for the episode (passed as hint to providers that accept it). */
   language?: string | null;
 
   /** Already-resolved provider instance. */
@@ -87,7 +87,7 @@ export interface TtsGenerationParams {
 
   /** User context for semaphore key, BYOK lookup, usage logging. */
   userId: string;
-  podcastId: string;
+  episodeId: string;
 
   requestedModel?: string | null;
 
@@ -136,7 +136,7 @@ export async function generateTtsAudio(
     providerId,
     source,
     userId,
-    podcastId,
+    episodeId,
     requestedModel: _requestedModel,
     usageCategory,
     extraMetadata,
@@ -169,7 +169,7 @@ export async function generateTtsAudio(
     providerId,
     source,
     voiceId,
-    podcastId,
+    episodeId,
     concurrencyLimit,
   });
 
@@ -182,7 +182,7 @@ export async function generateTtsAudio(
     await new Promise((resolve) => setTimeout(resolve, delay));
 
     if (await isAborted()) {
-      logger.info('Parent entity failed while waiting for semaphore, aborting', { podcastId });
+      logger.info('Parent entity failed while waiting for semaphore, aborting', { episodeId });
       return null;
     }
   }
@@ -200,7 +200,7 @@ export async function generateTtsAudio(
 
   if (chunks.length > 1) {
     logger.info('Text exceeds provider limit, splitting into chunks', {
-      podcastId,
+      episodeId,
       providerId,
       originalLength: ttsText.length,
       maxSegmentChars: meta.maxSegmentChars,
@@ -315,7 +315,7 @@ export async function generateTtsAudio(
       }
       logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', {
         providerId,
-        podcastId,
+        episodeId,
       });
     }
     throw err;
@@ -337,7 +337,7 @@ export async function generateTtsAudio(
     segmentDuration = await getAudioDuration(tmpPath);
   } catch (err) {
     logger.warn('FFprobe duration extraction failed, estimating from text length', {
-      podcastId,
+      episodeId,
       error: err instanceof Error ? err.message : String(err),
     });
     segmentDuration = estimateDurationFromText(text);
@@ -355,7 +355,7 @@ export async function generateTtsAudio(
     inputTokens: charCount,
     totalCost,
     durationMs,
-    podcastId,
+    episodeId,
     userId,
     metadata: { voiceId, speaker, source: effectiveSource, ...extraMetadata },
   });

@@ -336,7 +336,7 @@ async function main() {
     'login',
     'signup',
     'onboarding',
-    'podcast',
+    'episode',
     'profile',
     'team',
     'notifications',

@@ -37,23 +37,10 @@ interface AutoModelFormProps {
     includedModels: string[] | null;
     includedTtsModels: string[] | null;
     includedSttModels: string[] | null;
-    imageProvider: string;
-    imageModel: string;
-    includedImageModels: string[] | null;
-    videoProvider: string;
-    videoModel: string;
-    includedVideoModels: string[] | null;
-    avatarProvider: string;
-    avatarModel: string;
-    includedAvatarModels: string[] | null;
-    motionProvider: string;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
   sttProviders: ProviderOption[];
-  imageProviders: ProviderOption[];
-  videoProviders: ProviderOption[];
-  avatarProviders: ProviderOption[];
 }
 
 interface UnifiedStateConfig {
@@ -242,9 +229,6 @@ export function AutoModelForm({
   aiProviders,
   ttsProviders,
   sttProviders,
-  imageProviders,
-  videoProviders,
-  avatarProviders,
 }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -271,30 +255,8 @@ export function AutoModelForm({
     compositeIds: true,
   });
 
-  const imageState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.imageProvider, model: initialConfig.imageModel },
-    initialIncluded: initialConfig.includedImageModels,
-    providers: imageProviders,
-    compositeIds: false,
-  });
-
-  const videoState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.videoProvider, model: initialConfig.videoModel },
-    initialIncluded: initialConfig.includedVideoModels,
-    providers: videoProviders,
-    compositeIds: false,
-  });
-
-  const avatarState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.avatarProvider, model: initialConfig.avatarModel },
-    initialIncluded: initialConfig.includedAvatarModels,
-    providers: avatarProviders,
-    compositeIds: false,
-  });
-
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
-  const [motionProvider, setMotionProvider] = useState(initialConfig.motionProvider);
 
   const platformAiModels = aiProviders.find((provider) => provider.id === platformAiProvider)?.models ?? [];
 
@@ -327,16 +289,6 @@ export function AutoModelForm({
           includedModels: setToArray(aiState.included),
           includedTtsModels: setToArray(ttsState.included),
           includedSttModels: setToArray(sttState.included),
-          imageProvider: imageState.defaultSelection.provider,
-          imageModel: imageState.defaultSelection.model,
-          includedImageModels: setToArray(imageState.included),
-          videoProvider: videoState.defaultSelection.provider,
-          videoModel: videoState.defaultSelection.model,
-          includedVideoModels: setToArray(videoState.included),
-          avatarProvider: avatarState.defaultSelection.provider,
-          avatarModel: avatarState.defaultSelection.model,
-          includedAvatarModels: setToArray(avatarState.included),
-          motionProvider,
         }),
       });
 
@@ -373,43 +325,6 @@ export function AutoModelForm({
         description="Choose the default transcription model and the server-configured models available for imports."
         state={sttState}
       />
-
-      <UnifiedModelEditor
-        title="Image Models"
-        description="Choose the default image model and the server-configured models available for storyboards."
-        state={imageState}
-      />
-
-      <UnifiedModelEditor
-        title="Video Models"
-        description="Choose the default video model and the server-configured models available for text-to-video generation."
-        state={videoState}
-      />
-
-      <UnifiedModelEditor
-        title="Avatar Models"
-        description="Choose the default avatar engine and the server-configured models available for lip-sync overlays."
-        state={avatarState}
-      />
-
-      <fieldset className={styles.section}>
-        <legend className={styles.sectionTitle}>Motion Graphics</legend>
-        <p className={styles.platformDescription}>
-          Rendering engine for programmatic visual types such as charts, quotes, and timelines.
-        </p>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="motionProvider">Provider</label>
-          <select
-            id="motionProvider"
-            className={styles.select}
-            value={motionProvider}
-            onChange={(event) => setMotionProvider(event.target.value)}
-          >
-            <option value="remotion">Remotion (React)</option>
-            <option value="hera">Hera (AI Motion)</option>
-          </select>
-        </div>
-      </fieldset>
 
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Platform Operations</legend>

@@ -32,8 +32,8 @@ The repository ships the production services as three compose files:
 
 | File | Services | Lifecycle |
 | --- | --- | --- |
-| `docker-compose.infra.yml` | Postgres, PgBouncer, Redis, Pinchtab, Remotion | Long-lived, rarely restarted |
-| `docker-compose.app.yml` | Web app and maps app | Blue-green deployment slots |
+| `docker-compose.infra.yml` | Postgres, PgBouncer, Redis, Pinchtab | Long-lived, rarely restarted |
+| `docker-compose.app.yml` | Web app | Blue-green deployment slots |
 | `docker-compose.workers.yml` | BullMQ worker groups | Recreated after the new app slot passes health checks |
 
 `scripts/deploy.sh` coordinates those files. It loads `.env.production` by default, copies it to `.env` for Docker Compose, renders `Caddyfile` with the operator's domain, starts infra, builds the next app slot, runs Prisma, smoke-tests the new slot, restarts workers, and stops the old slot.
@@ -64,7 +64,6 @@ Point your own domain at the VPS:
 | `A` | `@` | `YOUR_SERVER_IPV4` |
 | `AAAA` | `@` | `YOUR_SERVER_IPV6` if enabled |
 | `CNAME` | `www` | your apex domain, if you want a www redirect |
-| `A` or `CNAME` | `maps` | your server or apex domain, if exposing the maps app |
 
 Use the exact public URL in both `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL`.
 
@@ -91,14 +90,13 @@ Minimum required production categories:
 | TTS | explicit `TTS_PROVIDER` and provider credentials |
 | BYOK | `BYOK_ENCRYPTION_KEY` |
 
-Optional Caddy hosts:
+Optional Caddy host for www redirect:
 
 ```bash
-SOTTO_MAPS_DOMAIN=maps.your-domain.example
 SOTTO_WWW_DOMAIN=www.your-domain.example
 ```
 
-Leave those unset if you do not want the optional Caddy blocks rendered.
+Leave that unset if you do not want the optional Caddy www-redirect block rendered.
 
 ## Caddy
 
@@ -143,12 +141,12 @@ STORAGE_PROVIDER=local
 LOCAL_STORAGE_DIR=./.sotto/storage
 ```
 
-For internet-facing deployments, prefer an S3-compatible bucket such as Cloudflare R2, MinIO, AWS S3, or another provider. Configure CORS for your exact `NEXT_PUBLIC_APP_URL`; do not use wildcard origins for private podcast audio.
+For internet-facing deployments, prefer an S3-compatible bucket such as Cloudflare R2, MinIO, AWS S3, or another provider. Configure CORS for your exact `NEXT_PUBLIC_APP_URL`; do not use wildcard origins for private episode audio.
 
 Private playback paths go through authenticated app routes or private RSS tokens:
 
 ```text
-/api/v1/podcasts/{podcastId}/stream
+/api/v1/episodes/{episodeId}/stream
 /api/v1/rss/private/{token}
 ```
 

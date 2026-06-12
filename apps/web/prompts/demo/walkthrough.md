@@ -39,14 +39,14 @@ Rules:
 - Use present tense, third person: "The user types a topic. The AI generates a two-voice script."
 - Keep sentences short. One idea per sentence. No conjunctions chaining 3+ clauses.
 
-Good: "A new podcast appears in the feed with cover art, title, and duration. Listeners can play it directly or fork it with their own angle."
-Bad: "Welcome — let's see how easy it is to create a podcast! I'll walk you through the amazing creation flow."
+Good: "A new episode appears in the feed with cover art, title, and duration. Listeners can play it directly or fork it with their own angle."
+Bad: "Welcome — let's see how easy it is to create a episode! I'll walk you through the amazing creation flow."
 
 ## Scene Structure
 
 Each scene is an object with:
 
-- `title` (string): Short scene name, e.g. "Create a podcast"
+- `title` (string): Short scene name, e.g. "Create a episode"
 - `narration` (string): What the narrator says during this scene. Follow the tone rules above strictly.
 - `actions` (array): Browser automation steps (see Action Types below)
 - `visualSuggestion` (object | null): Optional supplementary visual

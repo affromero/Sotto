@@ -8,7 +8,7 @@ import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/
 import { findActiveIndex, findActiveWordIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 import type { VocabularyEntryData } from '@/types/vocabulary';
 import styles from './Teleprompter.module.css';

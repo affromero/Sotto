@@ -25,9 +25,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@sotto/video': path.resolve(__dirname, '../../packages/video/src/index.ts'),
-      '@sotto/maps/server': path.resolve(__dirname, '../../packages/maps/src/server.ts'),
-      '@sotto/maps': path.resolve(__dirname, '../../packages/maps/src/index.ts'),
       // Stub optional dependencies that may not be installed
       'openai': path.resolve(__dirname, './tests/setup/openai-stub.ts'),
     },

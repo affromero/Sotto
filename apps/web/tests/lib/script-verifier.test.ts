@@ -1469,7 +1469,7 @@ describe('getMinSeriousRatio', () => {
 });
 
 describe('assessReferenceQuality with duration and tone', () => {
-  it('requires more refs for longer podcasts', () => {
+  it('requires more refs for longer episodes', () => {
     const refs = Array.from({ length: 5 }, (_, i) => makeRef(i + 1, 'PAPER'));
     const result = assessReferenceQuality(refs, 'standard', 15);
     expect(result.requiredCount).toBe(15);

@@ -57,7 +57,7 @@
 
 - [ ] **Budget vs actual** — Define monthly budgets per expense category, compare against actuals via Fava plugin or custom beanquery.
 
-- [ ] **Unit economics reconciliation** — Cross-reference imported `ApiUsageLog` costs against per-podcast estimates in `docs/11-unit-economics.md`.
+- [ ] **Unit economics reconciliation** — Cross-reference imported `ApiUsageLog` costs against per-episode estimates in `docs/11-unit-economics.md`.
 
 - [ ] **Tax accounts** — When relevant:
   - `Expenses:Tax:SalesTax` + `Liabilities:Tax:SalesTaxPayable`

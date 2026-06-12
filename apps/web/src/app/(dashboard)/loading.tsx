@@ -16,7 +16,7 @@ export default function DashboardLoading() {
         <div className={`${styles.bone} ${styles.statCard} ${styles.delay2}`} aria-hidden="true" />
       </div>
 
-      {/* My Podcasts section */}
+      {/* My Episodes section */}
       <div className={`${styles.bone} ${styles.sectionTitle} ${styles.delay2}`} aria-hidden="true" />
       <div className={styles.cardGrid}>
         {[0, 1, 2].map((i) => (

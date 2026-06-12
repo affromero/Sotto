@@ -10,8 +10,8 @@ vi.mock('@/components/player/PlaybackControls', () => ({
 
 describe('AudioPlayer', () => {
   const mockPlayer = {
-    podcastId: 'test-podcast-id',
-    podcastTitle: 'Test Podcast',
+    episodeId: 'test-episode-id',
+    episodeTitle: 'Test Episode',
     audioUrl: 'https://example.com/audio.mp3',
     isPlaying: false,
     currentTime: 30,
@@ -27,8 +27,8 @@ describe('AudioPlayer', () => {
     setPlaybackRate: vi.fn(),
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
-    loadPodcast: vi.fn(),
-    clearPodcast: vi.fn(),
+    loadEpisode: vi.fn(),
+    clearEpisode: vi.fn(),
   };
 
   beforeEach(() => {
@@ -41,16 +41,16 @@ describe('AudioPlayer', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders nothing when podcastId is null', () => {
+  it('renders nothing when episodeId is null', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
-      podcastId: null,
+      episodeId: null,
     });
     const { container } = render(<AudioPlayer />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders player when podcastId is present', () => {
+  it('renders player when episodeId is present', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<AudioPlayer />);
     expect(screen.getByRole('slider', { name: 'Playback progress' })).toBeInTheDocument();

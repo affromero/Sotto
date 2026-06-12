@@ -1,4 +1,4 @@
-// generation-messages.ts — Rotating sub-messages shown during podcast generation stages
+// generation-messages.ts — Rotating sub-messages shown during episode generation stages
 
 export interface StageMessage {
   text: string;

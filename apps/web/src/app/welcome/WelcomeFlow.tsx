@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
 import { Glyph } from './Glyph';
@@ -42,28 +42,145 @@ export interface OnboardingConfig {
   isOwner: boolean;
 }
 
-export function WelcomeFlow() {
+interface WelcomeFlowProps {
+  initialConfig?: OnboardingConfig;
+}
+
+const SAVE_KEY = 'sotto.onboarding.v1';
+
+const DEFAULT_AGENT: AgentState = {
+  provider: '',
+  method: null,
+  value: '',
+  model: '',
+  status: 'idle',
+};
+
+const DEFAULT_VOICE: VoiceState = {
+  tts: 'elevenlabs',
+  stt: 'whisper',
+  keys: {},
+  baseUrls: {},
+};
+
+interface WelcomeSnapshot {
+  step: number;
+  baseLang: string;
+  language: string;
+  agent: AgentState;
+  voice: VoiceState;
+  sources: Set<string>;
+  understood: Set<CefrLevel>;
+}
+
+function clampStep(n: number) {
+  return Math.max(0, Math.min(STEPS.length - 1, n));
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function isCefrLevel(value: unknown): value is CefrLevel {
+  return typeof value === 'string' && LEVELS.includes(value as CefrLevel);
+}
+
+function parseAgent(value: unknown): AgentState {
+  const record = asRecord(value);
+  if (!record) return { ...DEFAULT_AGENT };
+
+  return {
+    provider: typeof record.provider === 'string' ? record.provider : '',
+    method:
+      record.method === 'cli' || record.method === 'key' || record.method === 'url'
+        ? record.method
+        : null,
+    value: typeof record.value === 'string' ? record.value : '',
+    model: typeof record.model === 'string' ? record.model : '',
+    status:
+      record.status === 'idle' || record.status === 'verifying' || record.status === 'connected'
+        ? record.status
+        : 'idle',
+  };
+}
+
+function parseVoice(value: unknown): VoiceState {
+  const record = asRecord(value);
+  const keys = asRecord(record?.keys) ?? {};
+  const baseUrls = asRecord(record?.baseUrls) ?? {};
+
+  return {
+    tts: typeof record?.tts === 'string' ? record.tts : DEFAULT_VOICE.tts,
+    stt: typeof record?.stt === 'string' ? record.stt : DEFAULT_VOICE.stt,
+    keys: Object.fromEntries(
+      Object.entries(keys).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    ),
+    baseUrls: Object.fromEntries(
+      Object.entries(baseUrls).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    ),
+  };
+}
+
+function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
+  try {
+    const record = asRecord(JSON.parse(raw));
+    if (!record) return null;
+
+    const storedStep = typeof record.step === 'number' ? record.step : 0;
+    const sources = Array.isArray(record.sources) ? record.sources.filter(Boolean).map(String) : [];
+    const understood = Array.isArray(record.understood)
+      ? record.understood.filter(isCefrLevel)
+      : [];
+
+    return {
+      step: clampStep(storedStep),
+      baseLang: typeof record.baseLang === 'string' ? record.baseLang : 'en',
+      language: typeof record.language === 'string' ? record.language : '',
+      agent: parseAgent(record.agent),
+      voice: parseVoice(record.voice),
+      sources: new Set(sources),
+      understood: new Set(understood),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function designSnapshotForStep(step: number, languageParam: string | null): WelcomeSnapshot {
+  const clamped = clampStep(step);
+  const language = languageParam || (clamped >= 1 ? 'it' : '');
+  return {
+    step: clamped,
+    baseLang: 'en',
+    language,
+    agent:
+      clamped >= 1
+        ? { provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }
+        : { ...DEFAULT_AGENT },
+    voice: { ...DEFAULT_VOICE },
+    sources: new Set(clamped >= 3 ? ['repos', 'reading', 'notes', 'calendar'] : []),
+    understood: new Set<CefrLevel>(clamped >= 4 ? ['A1', 'A2', 'B1'] : []),
+  };
+}
+
+export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
   const [step, setStep] = useState(0);
   const [baseLang, setBaseLang] = useState('en');
   const [language, setLanguage] = useState('');
-  const [agent, setAgent] = useState<AgentState>({
-    provider: '',
-    method: null,
-    value: '',
-    model: '',
-    status: 'idle',
-  });
-  const [voice, setVoice] = useState<VoiceState>({
-    tts: 'elevenlabs',
-    stt: 'whisper',
-    keys: {},
-    baseUrls: {},
-  });
+  const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
+  const [voice, setVoice] = useState<VoiceState>({ ...DEFAULT_VOICE });
   const [sources, setSources] = useState<Set<string>>(new Set());
-  const [note, setNote] = useState('');
   const [understood, setUnderstood] = useState<Set<CefrLevel>>(new Set());
-  // Demo until proven self-hosted, so a misconfigured fetch never writes real data.
-  const [config, setConfig] = useState<OnboardingConfig>({ selfHosted: false, isOwner: false });
+  const [storageReady, setStorageReady] = useState(false);
+  const [deepLinkMode, setDeepLinkMode] = useState(false);
+  const hydratedRef = useRef(false);
+  const [config, setConfig] = useState<OnboardingConfig>(
+    initialConfig ?? { selfHosted: false, isOwner: false }
+  );
 
   useEffect(() => {
     let active = true;
@@ -88,18 +205,136 @@ export function WelcomeFlow() {
     return best;
   }, [understood]);
 
-  function go(n: number) {
-    setStep(Math.max(0, Math.min(STEPS.length - 1, n)));
+  const go = useCallback((n: number) => {
+    setStep(clampStep(n));
+  }, []);
+
+  function applySnapshot(snapshot: WelcomeSnapshot) {
+    setStep(snapshot.step);
+    setBaseLang(snapshot.baseLang);
+    setLanguage(snapshot.language);
+    setAgent(snapshot.agent);
+    setVoice(snapshot.voice);
+    setSources(snapshot.sources);
+    setUnderstood(snapshot.understood);
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || hydratedRef.current) return;
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled || hydratedRef.current) return;
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('step')) {
+        const requestedStep = Number.parseInt(params.get('step') ?? '0', 10);
+        applySnapshot(
+          designSnapshotForStep(
+            Number.isFinite(requestedStep) ? requestedStep : 0,
+            params.get('lang')
+          )
+        );
+        setDeepLinkMode(true);
+        setStorageReady(true);
+        hydratedRef.current = true;
+        return;
+      }
+
+      if (config.selfHosted) {
+        const raw = window.localStorage.getItem(SAVE_KEY);
+        const stored = raw ? parseStoredSnapshot(raw) : null;
+        if (stored) applySnapshot(stored);
+      }
+
+      setStorageReady(true);
+      hydratedRef.current = true;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config.selfHosted]);
+
+  useEffect(() => {
+    if (!storageReady || !config.selfHosted || deepLinkMode || typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        step,
+        baseLang,
+        language,
+        agent,
+        voice,
+        sources: [...sources],
+        understood: [...understood],
+      })
+    );
+  }, [
+    agent,
+    baseLang,
+    config.selfHosted,
+    deepLinkMode,
+    language,
+    sources,
+    step,
+    storageReady,
+    understood,
+    voice,
+  ]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = document.activeElement?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'Enter') {
+        const canAdvance =
+          step === 0
+            ? !!language
+            : step === 1
+              ? agent.status === 'connected'
+              : step === 2
+                ? true
+                : step === 3
+                  ? sources.size > 0
+                  : step === 4
+                    ? !!level
+                    : false;
+
+        if (canAdvance && step < 5) {
+          e.preventDefault();
+          go(step + 1);
+        }
+      } else if (e.key === 'Escape' && step > 0 && step <= 5) {
+        e.preventDefault();
+        go(step - 1);
+      }
+    }
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [agent.status, go, language, level, sources.size, step]);
+
+  function chooseBaseLang(code: string) {
+    setBaseLang(code);
+    setLanguage((prev) => (prev === code ? '' : prev));
   }
 
   function reset() {
     setStep(0);
     setLanguage('');
     setBaseLang('en');
-    setAgent({ provider: '', method: null, value: '', model: '', status: 'idle' });
-    setVoice({ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} });
+    setAgent({ ...DEFAULT_AGENT });
+    setVoice({ ...DEFAULT_VOICE });
     setSources(new Set());
     setUnderstood(new Set());
+    if (typeof window !== 'undefined' && config.selfHosted) {
+      window.localStorage.removeItem(SAVE_KEY);
+    }
   }
 
   function toggleSource(id: string) {
@@ -121,6 +356,7 @@ export function WelcomeFlow() {
   }
 
   const flowState: FlowState = { baseLang, language };
+  const demoMode = !config.selfHosted;
 
   let stepView: React.ReactNode;
   switch (step) {
@@ -128,7 +364,8 @@ export function WelcomeFlow() {
       stepView = (
         <StepWelcome
           state={flowState}
-          setBaseLang={setBaseLang}
+          demoMode={demoMode}
+          setBaseLang={chooseBaseLang}
           setLanguage={setLanguage}
           onNext={() => go(1)}
         />
@@ -138,6 +375,7 @@ export function WelcomeFlow() {
       stepView = (
         <StepAgent
           agent={agent}
+          demoMode={demoMode}
           setAgent={(updater) => setAgent((prev) => updater(prev))}
           onNext={() => go(2)}
           onBack={() => go(0)}
@@ -148,6 +386,7 @@ export function WelcomeFlow() {
       stepView = (
         <StepVoice
           voice={voice}
+          demoMode={demoMode}
           setVoice={(updater) => setVoice((prev) => updater(prev))}
           onNext={() => go(3)}
           onBack={() => go(1)}
@@ -159,8 +398,7 @@ export function WelcomeFlow() {
         <StepContext
           sources={sources}
           toggle={toggleSource}
-          note={note}
-          setNote={setNote}
+          demoMode={demoMode}
           onNext={() => go(4)}
           onBack={() => go(2)}
         />
@@ -181,7 +419,13 @@ export function WelcomeFlow() {
       break;
     case 5:
       stepView = (
-        <StepCompose level={level} voice={voice} onDone={() => go(6)} onBack={() => go(4)} />
+        <StepCompose
+          level={level}
+          voice={voice}
+          demoMode={demoMode}
+          onDone={() => go(6)}
+          onBack={() => go(4)}
+        />
       );
       break;
     case 6:
@@ -193,9 +437,9 @@ export function WelcomeFlow() {
           sources={sources}
           agent={agent}
           voice={voice}
-          note={note}
           config={config}
           onRestart={reset}
+          onJump={go}
         />
       );
       break;
@@ -207,23 +451,30 @@ export function WelcomeFlow() {
     <div className={t.root}>
       {/* Voice rail */}
       <aside className={t.voice}>
+        <div className={t.voiceGlow} aria-hidden="true" />
         <div className={t.brand}>
           <div className={t.wordmark}>
-            <Image src="/brand/sotto-mark.svg" alt="" width={30} height={30} className={t.wordmarkMark} priority unoptimized />
+            <Image
+              src="/brand/sotto-mark.svg"
+              alt=""
+              width={30}
+              height={30}
+              className={t.wordmarkMark}
+              priority
+              unoptimized
+            />
             sotto
           </div>
-          <div className={t.wordmarkSub}>v0 · self-hosted</div>
+          <div className={t.wordmarkSub}>
+            {config.selfHosted ? 'v0 · self-hosted' : 'v0 · hosted demo'}
+          </div>
         </div>
 
         <nav className={t.stepper} aria-label="Setup progress">
           {STEPS.map((s, i) => {
             const isActive = i === step;
             const isDone = i < step;
-            const stepClass = [
-              t.stepItem,
-              isDone ? t.done : '',
-              isActive ? t.active : '',
-            ]
+            const stepClass = [t.stepItem, isDone ? t.done : '', isActive ? t.active : '']
               .filter(Boolean)
               .join(' ');
             return (

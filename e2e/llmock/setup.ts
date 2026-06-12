@@ -27,13 +27,13 @@ readiness: 0.6
     }
   );
 
-  // Script generation — returns a two-voice podcast script
+  // Script generation — returns a two-voice episode script
   mock.on(
     {
       predicate: (req) => {
         const systemMsg = req.messages.find((m) => m.role === 'system');
         const systemText = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
-        return systemText.includes('podcast script') || systemText.includes('Script Generation');
+        return systemText.includes('episode script') || systemText.includes('Script Generation');
       },
     },
     {

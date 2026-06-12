@@ -29,7 +29,7 @@ export interface PracticeWritingItem {
 }
 
 export type PracticeStart =
-  | { status: 'ready'; sessionId: string; kind: string; items: PracticeMcItem[]; podcastId?: string }
+  | { status: 'ready'; sessionId: string; kind: string; items: PracticeMcItem[]; episodeId?: string }
   | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] }
   | { status: 'ready_writing'; sessionId: string; prompts: PracticeWritingItem[] };
 
@@ -45,9 +45,9 @@ interface PracticeRunnerProps {
 }
 
 
-// ---- Listening audio: poll the podcast until its audio is ready ----
+// ---- Listening audio: poll the episode until its audio is ready ----
 
-function ListeningAudio({ podcastId }: { podcastId: string }) {
+function ListeningAudio({ episodeId }: { episodeId: string }) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function ListeningAudio({ podcastId }: { podcastId: string }) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     async function poll() {
       try {
-        const res = await fetch(`/api/v1/podcasts/${podcastId}`);
+        const res = await fetch(`/api/v1/episodes/${episodeId}`);
         if (res.ok) {
           const data = (await res.json()) as { audioUrl?: string | null };
           if (active && data.audioUrl) {
@@ -73,7 +73,7 @@ function ListeningAudio({ podcastId }: { podcastId: string }) {
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [podcastId]);
+  }, [episodeId]);
 
   if (!audioUrl) {
     return (
@@ -138,9 +138,9 @@ function McRunner({ start, onDone }: { start: Extract<PracticeStart, { status: '
 
   return (
     <div className={styles.runner}>
-      {start.podcastId && (
+      {start.episodeId && (
         <div className={styles.audioBlock}>
-          <ListeningAudio podcastId={start.podcastId} />
+          <ListeningAudio episodeId={start.episodeId} />
         </div>
       )}
 

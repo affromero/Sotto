@@ -20,7 +20,7 @@ export interface VoicePoolEntry {
 }
 
 /**
- * Curated voice pool – 16 voices for podcast hosting and expert roles.
+ * Curated voice pool – 16 voices for episode hosting and expert roles.
  * OpenAI voice IDs map to the closest tonal match in OpenAI's TTS library.
  */
 export const VOICE_POOL: VoicePoolEntry[] = [
@@ -265,16 +265,16 @@ function hashString(s: string): number {
 }
 
 /**
- * Select N diverse voices for a podcast using a deterministic seed.
+ * Select N diverse voices for a episode using a deterministic seed.
  * Alternates genders and avoids duplicate voices.
  */
 export function selectVoiceSet(
-  podcastId: string,
+  episodeId: string,
   speakerCount: number,
   metadata?: VoiceMatchMetadata
 ): VoicePoolEntry[] {
   const count = Math.max(1, Math.min(speakerCount, VOICE_POOL.length));
-  const index = hashString(podcastId);
+  const index = hashString(episodeId);
 
   const hasMetadata =
     metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
@@ -307,19 +307,19 @@ export function selectVoiceSet(
 }
 
 /**
- * Select a diverse voice pair for a podcast using a deterministic seed.
+ * Select a diverse voice pair for a episode using a deterministic seed.
  * When metadata is provided, voices are scored and filtered to a "preferred tier"
  * (within 3 points of the best score) before hash-selecting within that tier.
  * Ensures the host and expert have different voices, preferring opposite genders.
  */
 export function selectVoicePair(
-  podcastId: string,
+  episodeId: string,
   metadata?: VoiceMatchMetadata
 ): {
   host: VoicePoolEntry;
   expert: VoicePoolEntry;
 } {
-  const index = hashString(podcastId);
+  const index = hashString(episodeId);
 
   const hasMetadata =
     metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);

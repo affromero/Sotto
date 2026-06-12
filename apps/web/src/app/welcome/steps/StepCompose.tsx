@@ -16,21 +16,20 @@ interface ResolvedLine {
 interface Props {
   level: CefrLevel | null;
   voice: VoiceState;
+  demoMode: boolean;
   onDone: () => void;
   onBack: () => void;
 }
 
-export function StepCompose({ level, voice, onDone, onBack }: Props) {
+export function StepCompose({ level, voice, demoMode, onDone, onBack }: Props) {
   const [lines, setLines] = useState<ResolvedLine[]>([]);
   const [liveCount, setLiveCount] = useState(0);
   const [finished, setFinished] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const lvl = level ?? 'A2';
-  const ttsName =
-    (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
-  const sttName =
-    (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
+  const ttsName = (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
+  const sttName = (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
 
   useEffect(() => {
     let i = 0;
@@ -52,9 +51,7 @@ export function StepCompose({ level, voice, onDone, onBack }: Props) {
         setLiveCount((v) => v + 1);
       }
       i++;
-      timers.push(
-        setTimeout(tick, item.t === 'done' ? 600 : 360 + Math.random() * 260),
-      );
+      timers.push(setTimeout(tick, item.t === 'done' ? 600 : 360 + Math.random() * 260));
     }
 
     timers.push(setTimeout(tick, 400));
@@ -85,8 +82,9 @@ export function StepCompose({ level, voice, onDone, onBack }: Props) {
         )}
       </h1>
       <p className={t.lede}>
-        Your agent is reading your context and writing a course only you could have. This runs
-        entirely on your infrastructure.
+        {demoMode
+          ? 'This preview simulates the composer so you can feel the course shape without creating a profile, saving keys, or connecting sources.'
+          : 'Your agent is reading your context and writing a course only you could have. This runs entirely on your infrastructure.'}
       </p>
 
       <div className={c.compose}>
@@ -113,9 +111,7 @@ export function StepCompose({ level, voice, onDone, onBack }: Props) {
                   .filter(Boolean)
                   .join(' ')}
               >
-                <span className={c.termPf}>
-                  {l.t === 'ok' ? '✓' : l.t === 'done' ? '★' : '›'}
-                </span>
+                <span className={c.termPf}>{l.t === 'ok' ? '✓' : l.t === 'done' ? '★' : '›'}</span>
                 <span>
                   {l.text}
                   {i === lines.length - 1 && !finished && (
@@ -129,10 +125,7 @@ export function StepCompose({ level, voice, onDone, onBack }: Props) {
 
         <div className={c.moduleStack}>
           {MODULES.map((m, i) => (
-            <div
-              key={m.id}
-              className={`${c.moduleCard} ${i < liveCount ? c.moduleCardLive : ''}`}
-            >
+            <div key={m.id} className={`${c.moduleCard} ${i < liveCount ? c.moduleCardLive : ''}`}>
               <span className={c.mico}>
                 <Glyph name={m.glyph} size={19} />
               </span>
@@ -153,12 +146,8 @@ export function StepCompose({ level, voice, onDone, onBack }: Props) {
           ← Back
         </button>
         <span className={t.spacer} />
-        <button
-          className={`${t.btn} ${t.btnPrimary}`}
-          disabled={!finished}
-          onClick={onDone}
-        >
-          Enter Sotto{' '}
+        <button className={`${t.btn} ${t.btnPrimary}`} disabled={!finished} onClick={onDone}>
+          {demoMode ? 'See course preview' : 'Enter Sotto'}{' '}
           <span className={t.btnArrow}>
             <Glyph name="arrow" size={17} />
           </span>

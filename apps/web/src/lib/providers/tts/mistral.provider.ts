@@ -80,8 +80,8 @@ export class MistralProvider implements TtsProvider {
     return Buffer.from(data.audio_data, 'base64');
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
-    const pair = selectVoicePairFromPool(MISTRAL_VOICE_POOL, podcastId ?? 'default', metadata);
+  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+    const pair = selectVoicePairFromPool(MISTRAL_VOICE_POOL, episodeId ?? 'default', metadata);
     const isHost = SPEAKER_VOICE_HOST_SET.has(speaker);
     return isHost ? pair.host.id : pair.expert.id;
   }

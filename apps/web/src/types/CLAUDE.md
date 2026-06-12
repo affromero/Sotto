@@ -6,7 +6,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 
 | File              | Contents                                                                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`, `versions`, `ttsProvider`), SegmentData, CreatePodcastRequest |
+| `episode.ts`      | EpisodeSummary, EpisodeDetail (includes `references`, `pdfUrl`, `versions`, `ttsProvider`), SegmentData, CreateEpisodeRequest |
 | `player.ts`       | PlayerState, PlayerControls                                                                                                                                       |
 | `interaction.ts`  | InteractionRequest, InteractionResponse, ResolutionChoice                                                                                                         |
 | `discovery.ts`    | DiscoveryMessage, DiscoveryMetadata, DiscoveryState                                                                                                               |
@@ -14,7 +14,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `reference.ts`    | ReferenceData (id, number, title, authors, year, url, type, publisher, doi)                                                                                       |
 | `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
 | `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
-| `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
+| `version.ts`      | EpisodeVersionData, EpisodeVersionSegmentData                                                                                                                     |
 | `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 
 ## Shared Package Re-export Pattern
@@ -30,7 +30,7 @@ This means `@/types/*` imports throughout the web app don't change.
 
 **Exceptions** — these files still import from `@prisma/client` directly:
 
-- `podcast.ts` — uses `PodcastStatus`, `PodcastVisibility`, `PodcastSource`, `Speaker`
+- `episode.ts` — uses `EpisodeStatus`, `EpisodeVisibility`, `EpisodeSource`, `Speaker`
 - `reference.ts` — uses `ReferenceType`, `VerificationStatus`
 - `next-auth.d.ts` — uses `UserRole` (NextAuth module augmentation)
 

@@ -61,28 +61,13 @@ vi.mock('@/lib/providers/stt-registry', () => ({
   },
 }));
 
-vi.mock('@/lib/providers/avatar-registry', () => ({
-  getAvatarProviderMeta: (id: string) => {
-    if (id === 'heygen') return { defaultModel: 'heygen-avatar-standard' };
-    if (id === 'runway') return { defaultModel: 'runway-characters' };
-    return { defaultModel: '' };
-  },
-  getAvatarModelProvider: (id: string) => {
-    if (id.startsWith('heygen')) return 'heygen';
-    if (id.startsWith('runway')) return 'runway';
-    return null;
-  },
-}));
-
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 import {
   getAutoModelConfig,
-  resolveIncludedImageModels,
   resolveIncludedModels,
-  resolveIncludedVideoModels,
   resolveSttIncludedModels,
   resolveTtsIncludedModels,
   setAutoModelConfig,
@@ -102,16 +87,6 @@ const row = {
   includedModels: null,
   includedTtsModels: null,
   includedSttModels: null,
-  imageProvider: 'fal',
-  imageModel: 'fal-flux-1-schnell',
-  includedImageModels: null,
-  videoProvider: 'fal',
-  videoModel: 'fal-wan2.5-480p',
-  includedVideoModels: null,
-  avatarProvider: 'heygen',
-  avatarModel: 'heygen-avatar-standard',
-  includedAvatarModels: null,
-  motionProvider: 'remotion',
   updatedAt: new Date(),
   updatedBy: null,
 };
@@ -132,16 +107,6 @@ const config: AutoModelConfigData = {
   includedModels: null,
   includedTtsModels: null,
   includedSttModels: null,
-  imageProvider: 'fal',
-  imageModel: 'fal-flux-1-schnell',
-  includedImageModels: null,
-  videoProvider: 'fal',
-  videoModel: 'fal-wan2.5-480p',
-  includedVideoModels: null,
-  avatarProvider: 'heygen',
-  avatarModel: 'heygen-avatar-standard',
-  includedAvatarModels: null,
-  motionProvider: 'remotion',
 };
 
 describe('getAutoModelConfig', () => {
@@ -161,8 +126,6 @@ describe('getAutoModelConfig', () => {
       includedModels: ['claude-sonnet-4-6', 'gpt-5'],
       includedTtsModels: ['openai:tts-1-hd'],
       includedSttModels: ['openai:whisper-1'],
-      includedImageModels: ['fal-flux-1-schnell'],
-      includedVideoModels: ['fal-wan2.5-480p'],
     });
 
     const result = await getAutoModelConfig();
@@ -170,8 +133,6 @@ describe('getAutoModelConfig', () => {
     expect(result.includedModels).toEqual(['claude-sonnet-4-6', 'gpt-5']);
     expect(result.includedTtsModels).toEqual(['openai:tts-1-hd']);
     expect(result.includedSttModels).toEqual(['openai:whisper-1']);
-    expect(result.includedImageModels).toEqual(['fal-flux-1-schnell']);
-    expect(result.includedVideoModels).toEqual(['fal-wan2.5-480p']);
   });
 
   it('creates the singleton with unified seed fields when missing', async () => {
@@ -217,29 +178,21 @@ describe('setAutoModelConfig', () => {
     });
   });
 
-  it('persists category defaults and included lists', async () => {
+  it('persists included lists for each model category', async () => {
     await setAutoModelConfig(
       {
-        imageProvider: 'fal',
-        imageModel: 'fal-flux-2-pro',
-        includedImageModels: ['fal-flux-2-pro'],
-        videoProvider: 'fal',
-        videoModel: 'fal-kling3-1080p',
-        includedVideoModels: ['fal-kling3-1080p'],
-        motionProvider: 'hera',
+        includedModels: ['claude-sonnet-4-6'],
+        includedTtsModels: ['openai:tts-1-hd'],
+        includedSttModels: ['openai:whisper-1'],
       },
       'admin-2',
     );
 
     const call = mockAutoModelConfigUpsert.mock.calls[0][0];
     expect(call.update).toMatchObject({
-      imageProvider: 'fal',
-      imageModel: 'fal-flux-2-pro',
-      includedImageModels: ['fal-flux-2-pro'],
-      videoProvider: 'fal',
-      videoModel: 'fal-kling3-1080p',
-      includedVideoModels: ['fal-kling3-1080p'],
-      motionProvider: 'hera',
+      includedModels: ['claude-sonnet-4-6'],
+      includedTtsModels: ['openai:tts-1-hd'],
+      includedSttModels: ['openai:whisper-1'],
     });
   });
 });
@@ -249,8 +202,6 @@ describe('included model resolvers', () => {
     expect(resolveIncludedModels(config)).toEqual(['claude-sonnet-4-6']);
     expect(resolveTtsIncludedModels(config)).toEqual(['openai:tts-1-hd']);
     expect(resolveSttIncludedModels(config)).toEqual(['openai:whisper-1']);
-    expect(resolveIncludedImageModels(config)).toEqual(['fal-flux-1-schnell']);
-    expect(resolveIncludedVideoModels(config)).toEqual(['fal-wan2.5-480p']);
   });
 
   it('return explicit unified lists when configured', () => {
@@ -260,12 +211,6 @@ describe('included model resolvers', () => {
     ]);
     expect(resolveSttIncludedModels({ ...config, includedSttModels: ['openai:gpt-4o-transcribe'] })).toEqual([
       'openai:gpt-4o-transcribe',
-    ]);
-    expect(resolveIncludedImageModels({ ...config, includedImageModels: ['fal-flux-2-pro'] })).toEqual([
-      'fal-flux-2-pro',
-    ]);
-    expect(resolveIncludedVideoModels({ ...config, includedVideoModels: ['fal-kling3-1080p'] })).toEqual([
-      'fal-kling3-1080p',
     ]);
   });
 });

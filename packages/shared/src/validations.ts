@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Shared validations used by both web and mobile clients
 
-export const createPodcastSchema = z.object({
+export const createEpisodeSchema = z.object({
   title: z.string().min(1).max(200),
   topic: z.string().min(1).max(5000),
   discoveryId: z.string().optional(),
@@ -66,5 +66,5 @@ export const handleSchema = z
 
 export const discoveryMessageSchema = z.object({
   content: z.string().min(1).max(5000),
-  podcastId: z.string().optional(),
+  episodeId: z.string().optional(),
 });

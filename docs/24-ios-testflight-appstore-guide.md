@@ -146,7 +146,7 @@ External testers = anyone you invite (up to 10,000). Requires **Beta App Review*
 2. Create group (e.g., "Beta Users")
 3. Select build → "Submit for Review"
 4. Fill in:
-   - **What to test**: describe key flows (create podcast, listen, ask questions)
+   - **What to test**: describe key flows (create episode, listen, ask questions)
    - **Contact info**: support email
    - **Sign-in credentials**: test account email/password if login is required
 5. Wait for approval (typically same day or next day)
@@ -178,7 +178,7 @@ Go to App Store Connect → My Apps → Sotto → App Store tab:
 
 **App Information**:
 - Name: `Sotto`
-- Subtitle: `Where Podcasts Get Social`
+- Subtitle: `Where Episodes Get Social`
 - Primary category: Education
 - Secondary category: News
 - Age rating: 12+ (AI-generated content)
@@ -187,7 +187,7 @@ Go to App Store Connect → My Apps → Sotto → App Store tab:
 
 **Version Information** (for each localization):
 - Description (see `docs/15-ios-app-strategy.md` for copy)
-- Keywords: `podcast, AI, learning, education, audio, interactive, voice`
+- Keywords: `episode, AI, learning, education, audio, interactive, voice`
 - Support URL: `https://your-domain.example/support`
 - Marketing URL: `https://your-domain.example`
 
@@ -201,12 +201,12 @@ Capture screenshots on simulators matching each size, or use a tool like [shots.
 **App Review Information**:
 - Contact: your name + email + phone
 - Demo account: provide test credentials if the app requires login
-- Notes: "This is an AI podcast app. All AI-generated content is labeled with an 'AI-Generated' badge."
+- Notes: "This is an AI episode app. All AI-generated content is labeled with an 'AI-Generated' badge."
 
 **Privacy**:
 - Privacy policy URL: `https://your-domain.example/privacy`
 - Privacy nutrition label:
-  - Data Linked to You: email, user content (podcasts), identifiers (push token)
+  - Data Linked to You: email, user content (episodes), identifiers (push token)
   - Data Not Linked to You: diagnostics
   - Data Used to Track You: none
 
@@ -265,7 +265,7 @@ eas update --branch preview --message "feat: add share button to player"
 | Build fails with "no provisioning profile" | Run `eas credentials` to regenerate |
 | TestFlight build stuck "Processing" | Wait up to 30 min; Apple processes the binary |
 | "Missing compliance" warning | Go to App Store Connect → TestFlight → click the build → fill export compliance (select "No" for encryption if you only use HTTPS) |
-| Rejection: "AI content not labeled" | Add "AI-Generated" badge on all podcast cards |
+| Rejection: "AI content not labeled" | Add "AI-Generated" badge on all episode cards |
 | Rejection: "missing privacy policy" | Publish at `your-domain.example/privacy` and link in App Store Connect |
 | Rejection: "app is a repackaged website" | Emphasize native features: background audio, push notifications, offline playback |
 | Push notifications not working on TestFlight | Ensure push notification key is configured: `eas credentials --platform ios` |
@@ -327,7 +327,7 @@ Or let EAS auto-increment in `eas.json`:
 - [ ] App Store screenshots captured (3 device sizes)
 - [ ] App description + keywords written
 - [ ] Privacy nutrition label filled out
-- [ ] "AI-Generated" badge visible on all podcast content
+- [ ] "AI-Generated" badge visible on all episode content
 - [ ] Background audio works when app is backgrounded
 - [ ] Push notifications register and deliver
 - [ ] Export compliance answered (TestFlight → build → "Missing Compliance")

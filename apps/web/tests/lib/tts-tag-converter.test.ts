@@ -91,7 +91,7 @@ describe('tts-tag-converter', () => {
       aiProvider: 'openai',
       aiModel: 'gpt-5-mini',
       apiKeyOverride: 'openai-key',
-      podcastId: 'pod-1',
+      episodeId: 'pod-1',
     });
 
     expect(mockCreateAIProvider).toHaveBeenCalledWith('openai');
@@ -111,7 +111,7 @@ describe('tts-tag-converter', () => {
         service: 'openai',
         category: 'tts-tag-conversion',
         model: 'gpt-5-mini',
-        podcastId: 'pod-1',
+        episodeId: 'pod-1',
       })
     );
   });

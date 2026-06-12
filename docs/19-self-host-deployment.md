@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18
 
-**Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private podcast storage, and no hosted Sotto services.
+**Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private episode storage, and no hosted Sotto services.
 
 ---
 
@@ -52,7 +52,6 @@ Create DNS records at your registrar:
 | `A` | `@` | `YOUR_SERVER_IPV4` |
 | `AAAA` | `@` | `YOUR_SERVER_IPV6` if used |
 | `CNAME` | `www` | `your-domain.example` if you want the www redirect |
-| `A` or `CNAME` | `maps` | your server or apex domain if exposing maps |
 
 Wait until this resolves from your local machine:
 
@@ -106,14 +105,13 @@ STORAGE_PROVIDER=local
 LOCAL_STORAGE_DIR=./.sotto/storage
 ```
 
-For optional Caddy blocks:
+For optional Caddy www-redirect:
 
 ```bash
 SOTTO_WWW_DOMAIN=www.your-domain.example
-SOTTO_MAPS_DOMAIN=maps.your-domain.example
 ```
 
-Leave optional domains unset if you do not want those hosts exposed.
+Leave that unset if you do not want the optional www-redirect Caddy block rendered.
 
 ## 5. Configure Caddy Import
 
@@ -199,7 +197,7 @@ For S3-compatible storage, restrict CORS to your exact public app URL:
 ]
 ```
 
-Do not use wildcard origins for private podcast audio.
+Do not use wildcard origins for private episode audio.
 
 ## 10. Backups
 

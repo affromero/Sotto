@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks (must be declared before any import that touches the modules) ----
 
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
-  id: 'podcast-001',
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
+  id: 'episode-001',
   title: 'Introduction to Quantum Computing',
   topic: 'Quantum Computing Basics',
   createdAt: new Date('2024-01-15T10:00:00Z'),
   user: { name: 'Alice Researcher' },
   segments: [
-    { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].', startTime: 0 },
+    { speaker: 'HOST', text: 'Welcome to our episode on quantum computing [1].', startTime: 0 },
     { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
   ],
   references: [
@@ -55,27 +55,27 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   ],
 });
 
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
-    podcast: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    episode: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockGeneratePodcastTranscript = vi.fn().mockReturnValue('# Fake Transcript\n\nContent here.');
+const mockGenerateEpisodeTranscript = vi.fn().mockReturnValue('# Fake Transcript\n\nContent here.');
 
 vi.mock('@/lib/pdf-generator', () => ({
-  generatePodcastTranscript: (...args: unknown[]) => mockGeneratePodcastTranscript(...args),
+  generateEpisodeTranscript: (...args: unknown[]) => mockGenerateEpisodeTranscript(...args),
 }));
 
 const mockUploadFile = vi
   .fn()
-  .mockResolvedValue('https://r2.example.com/podcasts/podcast-001/transcript.md');
+  .mockResolvedValue('https://r2.example.com/episodes/episode-001/transcript.md');
 
 vi.mock('@/lib/r2', () => ({
   uploadFile: (...args: unknown[]) => mockUploadFile(...args),
@@ -99,13 +99,13 @@ import type { Job } from 'bullmq';
 
 function createMockJob(data: Partial<GeneratePdfPayload>): Job<GeneratePdfPayload> {
   return {
-    data: { userId: 'user-1', podcastId: 'podcast-001', ...data } as GeneratePdfPayload,
+    data: { userId: 'user-1', episodeId: 'episode-001', ...data } as GeneratePdfPayload,
     updateProgress: vi.fn().mockResolvedValue(undefined),
   } as unknown as Job<GeneratePdfPayload>;
 }
 
 const defaultPayload: GeneratePdfPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-123',
 };
 
@@ -115,15 +115,15 @@ describe('processPdfGeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset default mock implementations
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-      id: 'podcast-001',
+    mockPrismaEpisodeUpdate.mockResolvedValue({});
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
+      id: 'episode-001',
       title: 'Introduction to Quantum Computing',
       topic: 'Quantum Computing Basics',
       createdAt: new Date('2024-01-15T10:00:00Z'),
       user: { name: 'Alice Researcher' },
       segments: [
-        { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].', startTime: 0 },
+        { speaker: 'HOST', text: 'Welcome to our episode on quantum computing [1].', startTime: 0 },
         { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
       ],
       references: [
@@ -142,24 +142,24 @@ describe('processPdfGeneration', () => {
         },
       ],
     });
-    mockGeneratePodcastTranscript.mockReturnValue('# Fake Transcript\n\nContent here.');
-    mockUploadFile.mockResolvedValue('https://r2.example.com/podcasts/podcast-001/transcript.md');
+    mockGenerateEpisodeTranscript.mockReturnValue('# Fake Transcript\n\nContent here.');
+    mockUploadFile.mockResolvedValue('https://r2.example.com/episodes/episode-001/transcript.md');
   });
 
-  describe('podcast lookup', () => {
-    it('handles missing podcast', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockRejectedValue(new Error('No Podcast found'));
+  describe('episode lookup', () => {
+    it('handles missing episode', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockRejectedValue(new Error('No Episode found'));
       const job = createMockJob(defaultPayload);
 
-      await expect(processPdfGeneration(job)).rejects.toThrow('No Podcast found');
+      await expect(processPdfGeneration(job)).rejects.toThrow('No Episode found');
     });
 
     it('includes startTime in segment select', async () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeFindUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         include: expect.objectContaining({
           segments: expect.objectContaining({
             select: { speaker: true, text: true, startTime: true },
@@ -170,17 +170,17 @@ describe('processPdfGeneration', () => {
   });
 
   describe('transcript generation', () => {
-    it('calls generatePodcastTranscript with complete podcast data', async () => {
+    it('calls generateEpisodeTranscript with complete episode data', async () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith({
+      expect(mockGenerateEpisodeTranscript).toHaveBeenCalledWith({
         title: 'Introduction to Quantum Computing',
         topic: 'Quantum Computing Basics',
         creatorName: 'Alice Researcher',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         segments: [
-          { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].', startTime: 0 },
+          { speaker: 'HOST', text: 'Welcome to our episode on quantum computing [1].', startTime: 0 },
           { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
         ],
         references: expect.arrayContaining([
@@ -201,9 +201,9 @@ describe('processPdfGeneration', () => {
     });
 
     it('uses Anonymous when user name is null', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        id: 'podcast-001',
-        title: 'Test Podcast',
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
+        id: 'episode-001',
+        title: 'Test Episode',
         topic: 'Test Topic',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         user: { name: null },
@@ -213,17 +213,17 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
+      expect(mockGenerateEpisodeTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           creatorName: 'Anonymous',
         })
       );
     });
 
-    it('handles podcasts with no segments', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        id: 'podcast-001',
-        title: 'Empty Podcast',
+    it('handles episodes with no segments', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
+        id: 'episode-001',
+        title: 'Empty Episode',
         topic: 'No Content',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         user: { name: 'Test User' },
@@ -233,17 +233,17 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
+      expect(mockGenerateEpisodeTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           segments: [],
         })
       );
     });
 
-    it('handles podcasts with no references', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        id: 'podcast-001',
-        title: 'No References Podcast',
+    it('handles episodes with no references', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
+        id: 'episode-001',
+        title: 'No References Episode',
         topic: 'Opinion Piece',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         user: { name: 'Test User' },
@@ -253,7 +253,7 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
+      expect(mockGenerateEpisodeTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           references: [],
         })
@@ -261,8 +261,8 @@ describe('processPdfGeneration', () => {
     });
 
     it('maps all reference fields including verificationDetails', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        id: 'podcast-001',
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
+        id: 'episode-001',
         title: 'Test',
         topic: 'Test',
         createdAt: new Date('2024-01-15T10:00:00Z'),
@@ -288,7 +288,7 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
+      expect(mockGenerateEpisodeTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           references: [
             {
@@ -314,23 +314,23 @@ describe('processPdfGeneration', () => {
   describe('R2 upload', () => {
     it('uploads markdown buffer to R2 with correct key and content type', async () => {
       const markdown = '# Test Transcript\n\nContent.';
-      mockGeneratePodcastTranscript.mockReturnValue(markdown);
+      mockGenerateEpisodeTranscript.mockReturnValue(markdown);
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'podcasts/podcast-001/transcript.md',
+        'episodes/episode-001/transcript.md',
         Buffer.from(markdown, 'utf-8'),
         'text/markdown'
       );
     });
 
-    it('constructs R2 key with podcastId', async () => {
-      const job = createMockJob({ podcastId: 'podcast-special-123', userId: 'user-123' });
+    it('constructs R2 key with episodeId', async () => {
+      const job = createMockJob({ episodeId: 'episode-special-123', userId: 'user-123' });
       await processPdfGeneration(job);
 
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'podcasts/podcast-special-123/transcript.md',
+        'episodes/episode-special-123/transcript.md',
         expect.any(Buffer),
         'text/markdown'
       );
@@ -345,14 +345,14 @@ describe('processPdfGeneration', () => {
   });
 
   describe('database updates', () => {
-    it('updates podcast with pdfUrl from R2', async () => {
-      mockUploadFile.mockResolvedValue('https://media.example.com/podcasts/001/transcript.md');
+    it('updates episode with pdfUrl from R2', async () => {
+      mockUploadFile.mockResolvedValue('https://media.example.com/episodes/001/transcript.md');
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        data: { pdfUrl: 'https://media.example.com/podcasts/001/transcript.md' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
+        data: { pdfUrl: 'https://media.example.com/episodes/001/transcript.md' },
       });
     });
 
@@ -361,14 +361,14 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { pdfUrl: 'https://custom-cdn.example.com/path/to/file.md' },
       });
     });
 
     it('handles database update failure', async () => {
-      mockPrismaPodcastUpdate.mockRejectedValue(new Error('Database connection lost'));
+      mockPrismaEpisodeUpdate.mockRejectedValue(new Error('Database connection lost'));
       const job = createMockJob(defaultPayload);
 
       await expect(processPdfGeneration(job)).rejects.toThrow('Database connection lost');
@@ -390,8 +390,8 @@ describe('processPdfGeneration', () => {
 
   describe('end-to-end flow', () => {
     it('executes the full pipeline successfully', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        id: 'podcast-e2e',
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
+        id: 'episode-e2e',
         title: 'End to End Test',
         topic: 'Testing',
         createdAt: new Date('2024-02-01T15:30:00Z'),
@@ -431,22 +431,22 @@ describe('processPdfGeneration', () => {
       });
 
       const markdown = '# End to End Test\n\nTranscript content.';
-      mockGeneratePodcastTranscript.mockReturnValue(markdown);
+      mockGenerateEpisodeTranscript.mockReturnValue(markdown);
       mockUploadFile.mockResolvedValue(
-        'https://r2.example.com/podcasts/podcast-e2e/transcript.md'
+        'https://r2.example.com/episodes/episode-e2e/transcript.md'
       );
 
-      const job = createMockJob({ podcastId: 'podcast-e2e', userId: 'user-123' });
+      const job = createMockJob({ episodeId: 'episode-e2e', userId: 'user-123' });
       await processPdfGeneration(job);
 
-      // Podcast loaded
-      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: 'podcast-e2e' },
+      // Episode loaded
+      expect(mockPrismaEpisodeFindUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'episode-e2e' },
         include: expect.any(Object),
       });
 
       // Transcript generated with correct data
-      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith({
+      expect(mockGenerateEpisodeTranscript).toHaveBeenCalledWith({
         title: 'End to End Test',
         topic: 'Testing',
         creatorName: 'E2E Tester',
@@ -463,15 +463,15 @@ describe('processPdfGeneration', () => {
 
       // Uploaded to R2 as markdown
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'podcasts/podcast-e2e/transcript.md',
+        'episodes/episode-e2e/transcript.md',
         Buffer.from(markdown, 'utf-8'),
         'text/markdown'
       );
 
-      // Podcast updated
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-e2e' },
-        data: { pdfUrl: 'https://r2.example.com/podcasts/podcast-e2e/transcript.md' },
+      // Episode updated
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-e2e' },
+        data: { pdfUrl: 'https://r2.example.com/episodes/episode-e2e/transcript.md' },
       });
 
       // Progress tracked
@@ -480,13 +480,13 @@ describe('processPdfGeneration', () => {
   });
 
   describe('error propagation', () => {
-    it('propagates errors from podcast lookup', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockRejectedValue(
-        new Error('Podcast not found: podcast-missing')
+    it('propagates errors from episode lookup', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockRejectedValue(
+        new Error('Episode not found: episode-missing')
       );
-      const job = createMockJob({ podcastId: 'podcast-missing', userId: 'user-123' });
+      const job = createMockJob({ episodeId: 'episode-missing', userId: 'user-123' });
 
-      await expect(processPdfGeneration(job)).rejects.toThrow('Podcast not found: podcast-missing');
+      await expect(processPdfGeneration(job)).rejects.toThrow('Episode not found: episode-missing');
     });
 
     it('propagates errors from uploadFile', async () => {
@@ -496,8 +496,8 @@ describe('processPdfGeneration', () => {
       await expect(processPdfGeneration(job)).rejects.toThrow('S3 403: access denied');
     });
 
-    it('propagates errors from podcast update', async () => {
-      mockPrismaPodcastUpdate.mockRejectedValue(
+    it('propagates errors from episode update', async () => {
+      mockPrismaEpisodeUpdate.mockRejectedValue(
         new Error('Unique constraint violation: pdfUrl already set')
       );
       const job = createMockJob(defaultPayload);
@@ -508,7 +508,7 @@ describe('processPdfGeneration', () => {
     });
 
     it('does not swallow unexpected errors', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockRejectedValue(new Error('Unexpected database error'));
+      mockPrismaEpisodeFindUniqueOrThrow.mockRejectedValue(new Error('Unexpected database error'));
       const job = createMockJob(defaultPayload);
 
       await expect(processPdfGeneration(job)).rejects.toThrow('Unexpected database error');

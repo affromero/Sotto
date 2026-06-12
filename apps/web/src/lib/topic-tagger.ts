@@ -1,6 +1,6 @@
 /**
  * Keyword-based topic tag matcher.
- * Maps podcast topics + focus areas to existing tag slugs from the seed data.
+ * Maps episode topics + focus areas to existing tag slugs from the seed data.
  * Pure keyword matching — no AI calls, deterministic, free.
  */
 
@@ -328,7 +328,7 @@ function keywordMatches(text: string, keyword: string): boolean {
 }
 
 /**
- * Match podcast topic + focus areas to tag slugs using keyword matching.
+ * Match episode topic + focus areas to tag slugs using keyword matching.
  * Returns tag slugs sorted by relevance (best match first), including parent categories.
  */
 export function matchTopicTags({ topic, focusAreas, maxTags = 5 }: MatchTopicTagsInput): string[] {

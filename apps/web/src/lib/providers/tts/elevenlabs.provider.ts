@@ -146,12 +146,12 @@ export class ElevenLabsProvider implements TtsProvider {
     return el.generateSoundEffect(params);
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
-    if (!podcastId) {
+    if (!episodeId) {
       return isHostVoice ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;
     }
-    const pair = selectVoicePair(podcastId, metadata);
+    const pair = selectVoicePair(episodeId, metadata);
     const entry = isHostVoice ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'elevenlabs');
   }

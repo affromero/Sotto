@@ -12,22 +12,22 @@ function formatTime(seconds: number): string {
 }
 
 interface AudioPlayerProps {
-  podcastId?: string;
+  episodeId?: string;
   audioUrl?: string;
-  podcastTitle?: string;
+  episodeTitle?: string;
 }
 
-export function AudioPlayer({ podcastId: initialPodcastId, audioUrl, podcastTitle }: AudioPlayerProps) {
+export function AudioPlayer({ episodeId: initialEpisodeId, audioUrl, episodeTitle }: AudioPlayerProps) {
   const player = usePlayer();
   const progressRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (initialPodcastId && audioUrl && loadedRef.current !== initialPodcastId) {
-      loadedRef.current = initialPodcastId;
-      player.loadPodcast(initialPodcastId, audioUrl, podcastTitle);
+    if (initialEpisodeId && audioUrl && loadedRef.current !== initialEpisodeId) {
+      loadedRef.current = initialEpisodeId;
+      player.loadEpisode(initialEpisodeId, audioUrl, episodeTitle);
     }
-  }, [initialPodcastId, audioUrl, podcastTitle]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialEpisodeId, audioUrl, episodeTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -39,7 +39,7 @@ export function AudioPlayer({ podcastId: initialPodcastId, audioUrl, podcastTitl
     [player]
   );
 
-  if (!player || !player.podcastId) return null;
+  if (!player || !player.episodeId) return null;
 
   const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
 

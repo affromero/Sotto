@@ -5,9 +5,6 @@ import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getPlatformTtsKey } from '@/lib/tts-generation';
-import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
-import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
-import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
 import { ModelTestPanel } from './ModelTestPanel';
 import styles from './page.module.css';
 
@@ -21,7 +18,7 @@ function isClaudeCliAvailable(): boolean {
 }
 
 export type TestableProvider = {
-  category: 'ai' | 'tts' | 'stt' | 'image' | 'video' | 'avatar';
+  category: 'ai' | 'tts' | 'stt';
   providerId: string;
   providerName: string;
   modelId: string;
@@ -56,24 +53,6 @@ function hasPlatformKey(category: TestableProvider['category'], providerId: stri
       default: return false;
     }
   }
-  if (category === 'image') {
-    return !!process.env.FAL_KEY;
-  }
-  if (category === 'video') {
-    switch (providerId) {
-      case 'fal': return !!process.env.FAL_KEY;
-      case 'minimax': return !!process.env.MINIMAX_API_KEY;
-      default: return false;
-    }
-  }
-  if (category === 'avatar') {
-    switch (providerId) {
-      case 'heygen': return !!process.env.HEYGEN_API_KEY;
-      case 'fal': return !!process.env.FAL_KEY;
-      case 'runway': return !!process.env.RUNWAY_API_KEY;
-      default: return false;
-    }
-  }
   return false;
 }
 
@@ -89,10 +68,6 @@ function hasByokKey(
     if (providerId === 'openai' || providerId === 'together' || providerId === 'deepgram' || providerId === 'assemblyai') return aiSet.has(providerId);
     if (providerId === 'elevenlabs') return ttsSet.has('elevenlabs');
   }
-  // Image, video, and avatar BYOK keys are stored in UserTtsKey.
-  if (category === 'image') return ttsSet.has('fal');
-  if (category === 'video') return ttsSet.has(providerId);
-  if (category === 'avatar') return ttsSet.has(providerId);
   return false;
 }
 
@@ -159,47 +134,6 @@ export default async function AdminModelsPage() {
     )
   );
 
-  const imageProviders = withKeyFlags(
-    getAllImageProviderMeta().flatMap((p) =>
-      p.models.map((m) => ({
-        category: 'image' as const,
-        providerId: p.id,
-        providerName: p.displayName,
-        modelId: m.id,
-        modelName: m.displayName,
-        tier: m.tier,
-      }))
-    )
-  );
-
-  const videoProviders = withKeyFlags(
-    getAllVideoProviderMeta().flatMap((p) =>
-      p.models.map((m) => ({
-        category: 'video' as const,
-        providerId: p.id,
-        providerName: p.displayName,
-        modelId: m.id,
-        modelName: m.displayName,
-        tier: m.tier,
-      }))
-    )
-  );
-
-  const avatarProviders = withKeyFlags(
-    getAllAvatarProviderMeta().flatMap((p) =>
-      p.models.map((m) => ({
-        category: 'avatar' as const,
-        providerId: p.id,
-        providerName: p.displayName,
-        modelId: m.id,
-        modelName: m.displayName,
-        tier: m.tier,
-        disabled: p.disabled,
-        disabledReason: p.disabledReason,
-      }))
-    )
-  );
-
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -213,9 +147,6 @@ export default async function AdminModelsPage() {
         aiProviders={aiProviders}
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
-        imageProviders={imageProviders}
-        videoProviders={videoProviders}
-        avatarProviders={avatarProviders}
       />
     </div>
   );

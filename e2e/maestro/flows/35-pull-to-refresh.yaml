@@ -9,7 +9,7 @@ tags:
 # Verify library is loaded
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 5000
 
 # Pull to refresh by swiping down
@@ -20,18 +20,18 @@ tags:
 # Wait for library to settle after refresh
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 10000
 - assertVisible:
-    id: 'library-podcast-list'
+    id: 'library-episode-list'
 
-# Verify podcast card still visible after refresh
+# Verify episode card still visible after refresh
 - scrollUntilVisible:
     element:
-      id: 'podcast-card-${E2E_PODCAST_ID}'
+      id: 'episode-card-${E2E_EPISODE_ID}'
     direction: DOWN
     timeout: 10000
 - assertVisible:
-    id: 'podcast-card-${E2E_PODCAST_ID}'
+    id: 'episode-card-${E2E_EPISODE_ID}'
 
 - takeScreenshot: library-refreshed

@@ -10,7 +10,7 @@ tags:
 # Library tab (already here after login)
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 5000
 
 # Search tab
@@ -48,10 +48,10 @@ tags:
     text: 'Profile'
 - extendedWaitUntil:
     visible:
-      id: 'profile-podcast-list'
+      id: 'profile-episode-list'
     timeout: 5000
 - assertVisible:
-    id: 'profile-podcast-list'
+    id: 'profile-episode-list'
 
 # Rapid cycle back through all tabs
 - tapOn:
@@ -67,7 +67,7 @@ tags:
     text: 'Library'
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 3000
 
 - takeScreenshot: tab-navigation-complete

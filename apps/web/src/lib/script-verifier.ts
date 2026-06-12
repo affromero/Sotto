@@ -275,9 +275,9 @@ function buildVerdict(
   if (maxDurationMinutes && (tooLong || tooShort)) {
     const bounds = wordCountBounds(maxDurationMinutes);
     if (tooLong) {
-      durationFeedback = `The script is ${totalWords} words, which exceeds the maximum of ${bounds.max} words for a ${maxDurationMinutes}-minute podcast. Reduce to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
+      durationFeedback = `The script is ${totalWords} words, which exceeds the maximum of ${bounds.max} words for a ${maxDurationMinutes}-minute episode. Reduce to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
     } else {
-      durationFeedback = `The script is ${totalWords} words, which is below the minimum of ${bounds.min} words for a ${maxDurationMinutes}-minute podcast. Expand to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
+      durationFeedback = `The script is ${totalWords} words, which is below the minimum of ${bounds.min} words for a ${maxDurationMinutes}-minute episode. Expand to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
     }
   }
 
@@ -417,7 +417,7 @@ function parseClaims(
 }
 
 /**
- * Verify a podcast script by extracting factual claims and evaluating sourcing.
+ * Verify a episode script by extracting factual claims and evaluating sourcing.
  * Acts as a "teacher" checking homework — every non-obvious claim needs adequate sourcing.
  *
  * When `previousClaims` is provided, unchanged turns are carried forward without
