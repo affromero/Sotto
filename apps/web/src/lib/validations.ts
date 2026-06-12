@@ -303,13 +303,6 @@ export const deleteAccountSchema = z.object({
 });
 
 /**
- * Referral attribution validation
- */
-export const referralSchema = z.object({
-  handle: z.string().min(3).max(30),
-});
-
-/**
  * Script regeneration with optional user feedback
  */
 export const regenerateWithFeedbackSchema = z

@@ -9,7 +9,6 @@ import {
   HelpCircle,
   FileText,
   Trash2,
-  Gift,
   Megaphone,
 } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
@@ -34,7 +33,6 @@ const typeIcons: Record<string, typeof Bell> = {
   PIPELINE_FAILURE: AlertTriangle,
 
   QUESTION_ON_YOUR_EPISODE: HelpCircle,
-  REFERRAL_SIGNUP: Gift,
 
   // Moderation
   CONTENT_REMOVED: Trash2,

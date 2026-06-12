@@ -48,14 +48,6 @@ interface SettingsFormProps {
   initialPreferredAiModel: string | null;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  referredUsers: Array<{
-    name: string | null;
-    handle: string | null;
-    image: string | null;
-    joinedAt: string;
-    verified: boolean;
-  }>;
-  appBaseUrl: string;
 }
 
 const providerLabels: Record<string, string> = {
@@ -82,8 +74,6 @@ export function SettingsForm({
   initialPreferredAiModel,
   initialEmailNotifications,
   initialPushNotifications,
-  referredUsers,
-  appBaseUrl,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [handle, setHandle] = useState(initialHandle);
@@ -688,66 +678,6 @@ export function SettingsForm({
           providerMeta={ttsProviderMeta}
         />
       </section>
-
-      {/* Referrals */}
-      {handle && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Referrals</h2>
-          <p className={styles.sectionDescription}>
-            Invite friends to self-host Sotto or join your instance.
-          </p>
-
-          <div className={styles.referralRow}>
-            <Input value={`${new URL(appBaseUrl).host}/ref/${handle}`} readOnly />
-            <Button
-              variant="secondary"
-              onClick={() => {
-                navigator.clipboard.writeText(`${appBaseUrl}/ref/${handle}`);
-              }}
-            >
-              Copy
-            </Button>
-          </div>
-
-          {referredUsers.length > 0 && (
-            <div className={styles.referralList}>
-              <h3 className={styles.referralListTitle}>
-                {referredUsers.length} {referredUsers.length === 1 ? 'person' : 'people'} joined via
-                your link
-              </h3>
-              <ul className={styles.referralUsers}>
-                {referredUsers.map((user) => (
-                  <li key={user.handle ?? user.joinedAt} className={styles.referralUser}>
-                    {user.image ? (
-                      <Image
-                        src={user.image}
-                        alt=""
-                        width={28}
-                        height={28}
-                        className={styles.referralAvatar}
-                      />
-                    ) : (
-                      <span className={styles.referralAvatarFallback}>
-                        {(user.name || user.handle || '?')[0].toUpperCase()}
-                      </span>
-                    )}
-                    <span className={styles.referralName}>{user.name || `@${user.handle}`}</span>
-                    <Badge variant={user.verified ? 'success' : 'default'}>
-                      {user.verified ? 'Verified' : 'Pending'}
-                    </Badge>
-                    <span className={styles.referralDate}>
-                      {new Date(user.joinedAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-      )}
 
       {/* Danger Zone */}
       <section className={`${styles.section} ${styles.dangerSection}`}>

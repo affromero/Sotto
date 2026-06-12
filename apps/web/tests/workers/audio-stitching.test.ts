@@ -110,10 +110,6 @@ vi.mock('@/lib/voice-pricing', () => ({
   captureEpisodePayments: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/referrals', () => ({
-  verifyReferral: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('@/lib/generation-limits', () => ({
   MAX_LESSON_DURATION_MINUTES: 30,
 }));

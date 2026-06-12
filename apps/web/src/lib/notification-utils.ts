@@ -50,10 +50,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'PIPELINE_FAILURE':
       return episodeId ? `/episode/${episodeId}` : '/admin';
 
-    // Referral
-    case 'REFERRAL_SIGNUP':
-      return '/settings';
-
     default:
       return null;
   }

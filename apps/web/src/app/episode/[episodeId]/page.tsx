@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { EpisodePlayerView } from './EpisodePlayerView';
-import { JoinCTA } from '@/components/referral/JoinCTA';
 import { getEpisodeForDetailPage } from '@/lib/episode-data';
 import { absoluteEpisodeUrl, getAppBaseUrl } from '@/lib/urls';
 import styles from './page.module.css';
@@ -165,9 +164,7 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
           isAdmin={isAdmin}
           isAuthenticated={!!userId}
         />
-        {!userId && episode.visibility === 'PUBLIC' && (
-          <JoinCTA creatorHandle={episode.user.handle} creatorName={episode.user.name} />
-        )}
+
       </div>
     </main>
   );

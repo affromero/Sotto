@@ -17,7 +17,6 @@ import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
-import { verifyReferral } from '@/lib/referrals';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -501,15 +500,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     } else {
       logger.info('Skipping duplicate notification (already exists)', { episodeId, notificationType });
     }
-
-    // 10a. Verify referral (grants referrer bonus if this is the user's first READY episode)
-    await verifyReferral(episode.userId).catch((err) => {
-      logger.warn('Failed to verify referral', {
-        userId: episode.userId,
-        episodeId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     // 10c. Auto-generate transcript
     await addJob(pdfGenerationQueue, JobType.GENERATE_PDF, {

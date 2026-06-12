@@ -92,12 +92,6 @@ model User {
   agentIngestions AgentIngestion[]
 
   warningCount Int @default(0)
-  // Referrals
-  referredById       String?
-  referredBy         User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals          User[]    @relation("Referrals")
-  referralVerified   Boolean   @default(false)
-  referralVerifiedAt DateTime?
 
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
@@ -114,7 +108,6 @@ model User {
 
   @@index([role])
   @@index([handle])
-  @@index([referredById])
 }
 
 model Account {
