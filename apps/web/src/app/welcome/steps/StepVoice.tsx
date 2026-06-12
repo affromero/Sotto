@@ -36,6 +36,7 @@ function VoicePicker({
   const sel = providers.find((p) => p.id === value) ?? providers[0];
   const k = keys[sel.id] ?? '';
   const bu = baseUrls[sel.id] ?? '';
+  const selectedLinkLabel = sel.apiLabel === 'API' ? 'Get key' : (sel.apiLabel ?? 'Get key');
 
   return (
     <div className={c.voiceBlock}>
@@ -46,37 +47,31 @@ function VoicePicker({
       <div className={c.voicePills}>
         {providers.map((p) => {
           const set = !p.local && (keys[p.id] ?? '').trim().length > 0;
+          const isSelected = value === p.id;
           return (
-            <span key={p.id} className={c.voiceChoice}>
-              <button
-                className={`${c.voiceChip} ${value === p.id ? c.voiceChipSel : ''}`}
-                onClick={() => onChange(p.id)}
-                aria-pressed={value === p.id}
-              >
-                {p.name}
-                {p.local && (
-                  <span className={c.vcLocal}>
-                    <Glyph name="shield" size={12} />
-                  </span>
-                )}
-                {set && (
-                  <span className={c.vcSet}>
-                    <Glyph name="check" size={12} />
-                  </span>
-                )}
-              </button>
-              {p.apiUrl ? (
-                <a
-                  className={c.voiceProviderLink}
-                  href={p.apiUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open ${p.name} ${p.apiLabel ?? 'API'} page`}
-                >
-                  {p.apiLabel ?? 'API'}
-                </a>
-              ) : null}
-            </span>
+            <button
+              key={p.id}
+              className={`${c.voiceChoice} ${isSelected ? c.voiceChoiceSel : ''}`}
+              onClick={() => onChange(p.id)}
+              aria-pressed={isSelected}
+            >
+              <span className={c.voiceChipText}>
+                <span className={c.voiceChipName}>
+                  {p.name}
+                  {p.local && (
+                    <span className={c.vcLocal}>
+                      <Glyph name="shield" size={12} />
+                    </span>
+                  )}
+                  {set && (
+                    <span className={c.vcSet}>
+                      <Glyph name="check" size={12} />
+                    </span>
+                  )}
+                </span>
+                <span className={c.voiceChipNote}>{p.note}</span>
+              </span>
+            </button>
           );
         })}
       </div>
@@ -86,6 +81,11 @@ function VoicePicker({
           <div className={c.voiceNote}>
             <Glyph name="lock" size={13} />
             Hosted demo preview · no key or local endpoint is requested or saved.
+            {sel.apiUrl ? (
+              <a className={c.voiceInlineLink} href={sel.apiUrl} target="_blank" rel="noreferrer">
+                {selectedLinkLabel}
+              </a>
+            ) : null}
           </div>
         </div>
       ) : sel.local ? (
@@ -106,6 +106,11 @@ function VoicePicker({
               onChange={(e) => onBaseUrl(sel.id, e.target.value)}
               aria-label={`${sel.name} endpoint URL (optional)`}
             />
+            {sel.apiUrl ? (
+              <a className={c.vkActionLink} href={sel.apiUrl} target="_blank" rel="noreferrer">
+                {selectedLinkLabel}
+              </a>
+            ) : null}
           </div>
           <div className={c.vkNote}>Optional · leave blank to use the default local endpoint.</div>
         </div>
@@ -123,6 +128,11 @@ function VoicePicker({
               onChange={(e) => onKey(sel.id, e.target.value)}
               aria-label={`${sel.name} API key`}
             />
+            {sel.apiUrl ? (
+              <a className={c.vkActionLink} href={sel.apiUrl} target="_blank" rel="noreferrer">
+                {selectedLinkLabel}
+              </a>
+            ) : null}
           </div>
           <div className={c.vkNote}>
             {k.trim()
