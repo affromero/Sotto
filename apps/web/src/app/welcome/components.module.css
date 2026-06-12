@@ -1207,68 +1207,55 @@
 }
 
 .placementMeaning {
-  margin-top: 18px;
-  border-left: 3px solid var(--accent);
-  padding: 12px 0 12px 14px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--well);
+  padding: 13px 15px;
   color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
-.placementMeaningHead {
+.placementMeaningTitle {
   display: flex;
-  align-items: baseline;
-  gap: 9px;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
   flex-wrap: wrap;
 }
 
-.placementMeaningLevel {
+.placementMeaningTitle strong {
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 600;
   color: var(--accent);
 }
 
-.placementMeaningTitle {
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 600;
-}
-
 .placementMeaningBody,
-.placementMeaningFoot {
-  margin: 7px 0 0;
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-.placementComforts {
-  display: grid;
-  gap: 5px;
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-}
-
-.placementComforts li {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
+.placementCourse {
+  margin: 8px 0 0;
   color: var(--ink-soft);
-  font-size: 12.5px;
-  line-height: 1.4;
 }
 
-.placementComforts li::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+.placementMeaningKicker {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
   flex: none;
 }
 
 .placementMeaningFoot {
+  margin: 8px 0 0;
   color: var(--ink-mute);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 /* ---------- compose hero ---------- */

@@ -104,7 +104,7 @@ describe('welcome hosted-demo mode', () => {
       screen.queryByRole('link', { name: /take the full placement test/i })
     ).not.toBeInTheDocument();
     expect(screen.getByText('Me llamo Luca.')).toBeInTheDocument();
-    expect(screen.getByText(/quick ladder, not a multiple-choice test/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tap the highest sentence you fully understand/i)).toBeInTheDocument();
   });
 
   it('explains the selected placement level so learners can skip the formal test', () => {
@@ -112,7 +112,7 @@ describe('welcome hosted-demo mode', () => {
       <StepPlacement
         baseLang="en"
         language="de"
-        understood={new Set(['C1', 'C2'])}
+        understood={new Set(['C2'])}
         toggleUnderstood={vi.fn()}
         level="C2"
         onNext={vi.fn()}
@@ -122,10 +122,74 @@ describe('welcome hosted-demo mode', () => {
 
     expect(screen.getByText(/Estimated level/i).textContent).toContain('top rung');
     expect(screen.getByText('Near-native range')).toBeInTheDocument();
+    expect(screen.getByText(/idiom and irony/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/register shifts, idioms, and compressed arguments/i)
+      screen.getByText(/Compose now; the adaptive test can verify this later/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/adaptive test can verify it later/i)).toBeInTheDocument();
+  });
+
+  it('localizes placement guidance to the learn-from language', () => {
+    render(
+      <StepPlacement
+        baseLang="es"
+        language="de"
+        understood={new Set(['B1'])}
+        toggleUnderstood={vi.fn()}
+        level="B1"
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Nivel estimado/i).textContent).toContain('B1');
+    expect(screen.getByText('Base independiente')).toBeInTheDocument();
+    expect(screen.getByText(/ideas principales en habla clara/i)).toBeInTheDocument();
+    expect(screen.getByText(/Enfoque del curso/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Often comfortable with/i)).not.toBeInTheDocument();
+  });
+
+  it('describes A1 as a true beginner path rather than existing comfort', () => {
+    render(
+      <StepPlacement
+        baseLang="en"
+        language="de"
+        understood={new Set(['A1'])}
+        toggleUnderstood={vi.fn()}
+        level="A1"
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Brand-new beginner')).toBeInTheDocument();
+    expect(screen.getByText(/This usually means/i)).toBeInTheDocument();
+    expect(screen.getByText(/first greetings/i)).toBeInTheDocument();
+    expect(screen.getByText(/Start from zero with pronunciation/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Often comfortable with/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the placement ladder to one selected rung', async () => {
+    const user = userEvent.setup();
+    mockConfigFetch(false);
+    window.history.pushState({}, '', '/welcome?step=4&lang=de');
+
+    render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
+
+    expect(await screen.findByText(/Where do you/i)).toBeInTheDocument();
+    const b1 = screen.getByRole('button', { name: /B1: Wenn ich Zeit hätte/i });
+    const b2 = screen.getByRole('button', { name: /B2: Trotz der Verspätung/i });
+    const c1 = screen.getByRole('button', { name: /C1: Er hätte uns rechtzeitig/i });
+
+    expect(b1).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(b2);
+    expect(b1).toHaveAttribute('aria-pressed', 'false');
+    expect(b2).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(c1);
+    expect(b2).toHaveAttribute('aria-pressed', 'false');
+    expect(c1).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Estimated level/i).textContent).toContain('C1');
   });
 
   it('shows the design agent choices without the removed Gemini card', () => {
