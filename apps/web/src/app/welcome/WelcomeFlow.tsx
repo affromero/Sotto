@@ -21,6 +21,8 @@ export interface AgentState {
   value: string;
   /** The model a local/custom OpenAI-compatible server serves (AI_MODEL). */
   model: string;
+  /** Optional Google/Gemini key that unlocks the Gemini Live translation mode. */
+  liveTranslationKey?: string;
   status: 'idle' | 'verifying' | 'connected';
 }
 
@@ -63,6 +65,7 @@ const DEFAULT_AGENT: AgentState = {
   method: null,
   value: '',
   model: '',
+  liveTranslationKey: '',
   status: 'idle',
 };
 
@@ -121,6 +124,8 @@ function parseAgent(value: unknown): AgentState {
         : null,
     value: typeof record.value === 'string' ? record.value : '',
     model: typeof record.model === 'string' ? record.model : '',
+    liveTranslationKey:
+      typeof record.liveTranslationKey === 'string' ? record.liveTranslationKey : '',
     status:
       record.status === 'idle' || record.status === 'verifying' || record.status === 'connected'
         ? record.status
@@ -210,7 +215,14 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
     language,
     agent:
       clamped >= 1
-        ? { provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }
+        ? {
+            provider: 'claude',
+            method: 'cli',
+            value: '',
+            model: '',
+            liveTranslationKey: '',
+            status: 'connected',
+          }
         : { ...DEFAULT_AGENT },
     voice: { ...DEFAULT_VOICE },
     sources: new Set(clamped >= 3 ? ['repos', 'reading', 'notes', 'calendar'] : []),

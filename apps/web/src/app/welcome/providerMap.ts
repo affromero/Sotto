@@ -95,6 +95,12 @@ export function resolveAi(
   return { keyPost: null, preferredAiProvider: null, preferredAiModel: null, infra: {} };
 }
 
+/** Optional Google key used only to unlock Gemini Live translation. */
+export function resolveLiveTranslateKey(apiKey: string): KeyPost | null {
+  const key = clean(apiKey);
+  return key ? { endpoint: 'ai-keys', provider: 'google', apiKey: key } : null;
+}
+
 /**
  * TTS → backend. The welcome TTS IDs already match TtsProviderId. Kokoro and
  * local are keyless local providers (infra + base URL); the rest take a BYOK key.

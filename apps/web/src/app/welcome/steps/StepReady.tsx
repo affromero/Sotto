@@ -15,7 +15,13 @@ import {
 } from '../data';
 import type { CefrLevel } from '../data';
 import type { AgentState, ContextItem, VoiceState, OnboardingConfig } from '../WelcomeFlow';
-import { resolveAi, resolveTts, resolveStt, type KeyPost } from '../providerMap';
+import {
+  resolveAi,
+  resolveLiveTranslateKey,
+  resolveTts,
+  resolveStt,
+  type KeyPost,
+} from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.module.css';
@@ -120,14 +126,19 @@ export function StepReady({
 
     // Translate the wizard's selections to real backend providers + infra.
     const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
+    const liveTranslateKey = resolveLiveTranslateKey(agent.liveTranslationKey ?? '');
     const tts = resolveTts(voice.tts, voice.keys[voice.tts] ?? '', voice.baseUrls[voice.tts] ?? '');
     const stt = resolveStt(voice.stt, voice.keys[voice.stt] ?? '', voice.baseUrls[voice.stt] ?? '');
 
     // BYOK keys → the validated settings routes. Surface failures (don't swallow)
     // but don't block onboarding — keys are editable later in Settings.
     const failures: string[] = [];
-    for (const post of [ai.keyPost, tts.keyPost, stt.keyPost]) {
+    const postedKeys = new Set<string>();
+    for (const post of [ai.keyPost, liveTranslateKey, tts.keyPost, stt.keyPost]) {
       if (!post) continue;
+      const postId = `${post.endpoint}:${post.provider}`;
+      if (postedKeys.has(postId)) continue;
+      postedKeys.add(postId);
       const ok = await postKey(post);
       if (!ok) failures.push(post.provider);
     }
@@ -287,7 +298,11 @@ export function StepReady({
           disabled={loading}
           onClick={demoComplete ? goHome : finishOnboarding}
           aria-label={
-            demoComplete ? 'Return home' : config.selfHosted ? "Open today's session" : 'Finish demo'
+            demoComplete
+              ? 'Return home'
+              : config.selfHosted
+                ? "Open today's session"
+                : 'Finish demo'
           }
         >
           {loading ? (
