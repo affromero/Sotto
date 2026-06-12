@@ -63,7 +63,6 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "resend": "^6.9.2",
-    "sherpa-onnx": "^1.12.25",
     "styled-jsx": "^5.1.6",
     "thesidedoor": "^0.1.0",
     "typescript": "^5.9.3",
