@@ -17,18 +17,36 @@ interface NavItem {
   href: string;
   label: string;
   glyph: GlyphName;
+  /** Extra path prefixes that should highlight this item (re-homed sub-tools). */
+  match: string[];
 }
 
 const NAV: NavItem[] = [
-  { href: '/admin', label: 'Overview', glyph: 'today' },
-  { href: '/admin/usage', label: 'Usage & cost', glyph: 'graph' },
-  { href: '/admin/providers', label: 'Providers & models', glyph: 'spark' },
-  { href: '/admin/users', label: 'Users & access', glyph: 'headset' },
-  { href: '/admin/system', label: 'System', glyph: 'gear' },
+  { href: '/admin', label: 'Overview', glyph: 'today', match: ['/admin'] },
+  { href: '/admin/usage', label: 'Usage & cost', glyph: 'graph', match: ['/admin/usage'] },
+  {
+    href: '/admin/providers',
+    label: 'Providers & models',
+    glyph: 'spark',
+    match: ['/admin/providers', '/admin/auto-models', '/admin/models'],
+  },
+  {
+    href: '/admin/users',
+    label: 'Users & access',
+    glyph: 'headset',
+    match: ['/admin/users', '/admin/handles'],
+  },
+  {
+    href: '/admin/system',
+    label: 'System',
+    glyph: 'gear',
+    match: ['/admin/system', '/admin/health', '/admin/queues', '/admin/episodes', '/admin/site-config'],
+  },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+function isActive(pathname: string, item: NavItem): boolean {
+  if (item.href === '/admin') return pathname === '/admin';
+  return item.match.some((m) => pathname.startsWith(m));
 }
 
 export function AdminShell({ children }: AdminShellProps) {
@@ -61,7 +79,7 @@ export function AdminShell({ children }: AdminShellProps) {
         </Link>
 
         {NAV.map((n) => {
-          const active = isActive(pathname, n.href);
+          const active = isActive(pathname, n);
           return (
             <Link
               key={n.href}
