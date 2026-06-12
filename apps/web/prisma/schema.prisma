@@ -616,7 +616,7 @@ model UserInterest {
   id        String   @id @default(cuid())
   userId    String
   tagId     String
-  source    String   @default("onboarding") // "onboarding" | "behavioral" | "manual"
+  source    String   @default("onboarding") // "onboarding" | "manual"
   weight    Float    @default(1.0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
