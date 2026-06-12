@@ -16,8 +16,6 @@ export const EPISODE_PUBLIC_SELECT = {
   visibility: true,
   language: true,
   currentVersion: true,
-  playCount: true,
-  saveCount: true,
   pdfUrl: true,
   lowReferences: true,
   sourcePlatform: true,
