@@ -96,6 +96,15 @@ function isCefrLevel(value: unknown): value is CefrLevel {
   return typeof value === 'string' && LEVELS.includes(value as CefrLevel);
 }
 
+function toSingleUnderstoodSet(levels: Iterable<CefrLevel>): Set<CefrLevel> {
+  const selected = new Set(levels);
+  let best: CefrLevel | null = null;
+  for (const level of LEVELS) {
+    if (selected.has(level)) best = level;
+  }
+  return best ? new Set([best]) : new Set();
+}
+
 function isContextItemKind(value: unknown): value is ContextItemKind {
   return value === 'link' || value === 'text' || value === 'file';
 }
@@ -185,7 +194,7 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
       voice: parseVoice(record.voice),
       sources: new Set(sources),
       contextItems: parseContextItems(record.contextItems),
-      understood: new Set(understood),
+      understood: toSingleUnderstoodSet(understood),
     };
   } catch {
     return null;
@@ -206,7 +215,7 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
     voice: { ...DEFAULT_VOICE },
     sources: new Set(clamped >= 3 ? ['repos', 'reading', 'notes', 'calendar'] : []),
     contextItems: [],
-    understood: new Set<CefrLevel>(clamped >= 4 ? ['A1', 'A2', 'B1'] : []),
+    understood: new Set<CefrLevel>(clamped >= 4 ? ['B1'] : []),
   };
 }
 
@@ -261,7 +270,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
     setVoice(snapshot.voice);
     setSources(snapshot.sources);
     setContextItems(snapshot.contextItems);
-    setUnderstood(snapshot.understood);
+    setUnderstood(toSingleUnderstoodSet(snapshot.understood));
   }
 
   useEffect(() => {
@@ -396,10 +405,8 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
 
   function toggleUnderstood(lvl: CefrLevel) {
     setUnderstood((prev) => {
-      const next = new Set(prev);
-      if (next.has(lvl)) next.delete(lvl);
-      else next.add(lvl);
-      return next;
+      if (prev.has(lvl)) return new Set();
+      return new Set([lvl]);
     });
   }
 

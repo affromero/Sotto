@@ -1,6 +1,12 @@
 'use client';
 
-import { LANGUAGES, PLACEMENT_BY_LANG, LEVELS, PLACEMENT_LEVEL_GUIDES } from '../data';
+import {
+  LANGUAGES,
+  PLACEMENT_BY_LANG,
+  LEVELS,
+  PLACEMENT_LEVEL_COPY,
+  PLACEMENT_LEVEL_GUIDES,
+} from '../data';
 import type { CefrLevel } from '../data';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
@@ -20,7 +26,6 @@ interface Props {
 export function StepPlacement({
   baseLang,
   language,
-  understood,
   toggleUnderstood,
   level,
   demoMode = false,
@@ -31,8 +36,11 @@ export function StepPlacement({
   const pct = level ? ((idx + 1) / LEVELS.length) * 100 : 0;
   const lang = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
   const items = PLACEMENT_BY_LANG[language] ?? PLACEMENT_BY_LANG['it'] ?? [];
-  const guide = level ? PLACEMENT_LEVEL_GUIDES[level] : null;
+  const copy = PLACEMENT_LEVEL_COPY[baseLang] ?? PLACEMENT_LEVEL_COPY.en;
+  const guides = PLACEMENT_LEVEL_GUIDES[baseLang] ?? PLACEMENT_LEVEL_GUIDES.en;
+  const guide = level ? guides[level] : null;
   const topLevel = level === LEVELS[LEVELS.length - 1];
+  const sourceRtl = baseLang === 'ar';
   const rtl = language === 'ar';
 
   return (
@@ -44,8 +52,8 @@ export function StepPlacement({
         Where do you <em>start</em> in {lang.native}?
       </h1>
       <p className={t.lede}>
-        This is a quick ladder, not a multiple-choice test. Tap every sentence you fully understand;
-        Sotto anchors your syllabus to the CEFR level just above your reach.
+        This is a quick placement ladder. Tap the highest sentence you fully understand; higher
+        rungs imply the earlier ones are in reach.
       </p>
       {demoMode && (
         <aside className={c.placementAside} aria-label="Placement test available">
@@ -59,7 +67,7 @@ export function StepPlacement({
 
       <div className={c.placementList}>
         {items.map((p) => {
-          const on = understood.has(p.level);
+          const on = level === p.level;
           const gloss = p.glosses?.[baseLang] ?? p.gloss;
           return (
             <button
@@ -100,34 +108,35 @@ export function StepPlacement({
             </span>
           ))}
         </div>
-        <div className={c.cefrRead}>
+        <div className={c.cefrRead} dir={sourceRtl ? 'rtl' : 'auto'}>
           {level ? (
             <>
-              Estimated level <b>{level}</b> — your course begins{' '}
-              {topLevel ? 'at the top rung.' : 'one rung higher.'}
+              {copy.estimatedLevel} <b>{level}</b> — {topLevel ? copy.beginsTop : copy.beginsNext}
             </>
           ) : (
             'Select what you understand to estimate your level.'
           )}
         </div>
         {guide && (
-          <section className={c.placementMeaning} aria-live="polite">
-            <div className={c.placementMeaningHead}>
-              <span className={c.placementMeaningLevel}>{level}</span>
-              <span className={c.placementMeaningTitle}>{guide.title}</span>
+          <section
+            className={c.placementMeaning}
+            aria-live="polite"
+            dir={sourceRtl ? 'rtl' : 'auto'}
+          >
+            <div className={c.placementMeaningTitle}>
+              <strong>{level}</strong>
+              <span aria-hidden="true">-</span>
+              <span>{guide.title}</span>
             </div>
-            <div className={c.placementMeaningBody}>
-              People around this level are often comfortable with:
-            </div>
-            <ul className={c.placementComforts}>
-              {guide.comfortable.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <p className={c.placementMeaningFoot}>
-              {guide.course} This estimate is enough to compose a course now; the adaptive test can
-              verify it later.
+            <p className={c.placementMeaningBody}>
+              <span className={c.placementMeaningKicker}>{copy.comfortableWith}:</span>{' '}
+              {guide.comfortable.join(' · ')}
             </p>
+            <p className={c.placementCourse}>
+              <span className={c.placementMeaningKicker}>{copy.courseFocus}:</span>{' '}
+              <span>{guide.course}</span>
+            </p>
+            <p className={c.placementMeaningFoot}>{copy.verifyLater}</p>
           </section>
         )}
       </div>
