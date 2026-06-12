@@ -491,6 +491,12 @@
   font-size: 14px;
   color: #fff;
   flex: none;
+  background: linear-gradient(150deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #80487f));
+}
+.uAv img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .uAv::after {
   content: '';
@@ -514,6 +520,14 @@
 .mono {
   font-family: var(--mono);
   font-size: 12.5px;
+}
+.dimCell {
+  color: var(--ink-soft);
+}
+
+/* vertical spacing between stacked sections */
+.section {
+  margin-top: 26px;
 }
 
 /* ---------------- status pill ---------------- */
@@ -828,6 +842,58 @@
 /* sub-tab strip above an embedded section */
 .subTabs {
   margin-bottom: 22px;
+}
+
+/* form controls (select, search, pagination) */
+.uselect {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--well);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.uselect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 10px 13px;
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+.pageInfo {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mute);
 }
 
 /* explanatory note block */
