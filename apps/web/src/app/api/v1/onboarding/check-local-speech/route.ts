@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) return errorResponse('Unauthorized', 401);
 
     const parsed = checkLocalSpeechSchema.safeParse(await request.json());
-    if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+    if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
     const checks: CheckResult[] = [];
     const { tts, stt } = parsed.data;

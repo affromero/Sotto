@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     const parsed = onboardingSaveSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return errorResponse(parsed.error.errors[0].message, 400);
+      return errorResponse(parsed.error.issues[0].message, 400);
     }
     const { course, note, preferred, infra } = parsed.data;
 

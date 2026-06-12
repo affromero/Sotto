@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const params = Object.fromEntries(request.nextUrl.searchParams);
     const validation = tasteQuizQuerySchema.safeParse(params);
     if (!validation.success) {
-      return errorResponse(validation.error.errors[0].message, 400);
+      return errorResponse(validation.error.issues[0].message, 400);
     }
 
     const { count } = validation.data;
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validation = tasteQuizAnswerSchema.safeParse(body);
     if (!validation.success) {
-      return errorResponse(validation.error.errors[0].message, 400);
+      return errorResponse(validation.error.issues[0].message, 400);
     }
 
     const { answers } = validation.data;

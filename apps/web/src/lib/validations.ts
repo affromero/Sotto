@@ -268,7 +268,7 @@ export const createDraftSchema = z.object({
 });
 
 export const updateDraftSchema = z.object({
-  draftData: z.record(z.unknown()).optional(),
+  draftData: z.record(z.string(), z.unknown()).optional(),
   metadata: draftMetadataSchema.optional(),
 });
 

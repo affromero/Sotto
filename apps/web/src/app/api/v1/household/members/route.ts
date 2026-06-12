@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   if (!adminId) return errorResponse('Forbidden', 403);
 
   const parsed = createMemberSchema.safeParse(await request.json());
-  if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+  if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
   try {
     const { id } = await createMember(parsed.data);
@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest) {
   if (!adminId) return errorResponse('Forbidden', 403);
 
   const parsed = updateMemberSchema.safeParse(await request.json());
-  if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
+  if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
   if (parsed.data.memberId === adminId) {
     return errorResponse('Use account settings to change your own profile', 400);
   }

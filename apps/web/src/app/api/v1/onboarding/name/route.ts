@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validation = nameSchema.safeParse(body);
     if (!validation.success) {
-      return errorResponse(validation.error.errors[0].message, 400);
+      return errorResponse(validation.error.issues[0].message, 400);
     }
 
     const { name } = validation.data;
