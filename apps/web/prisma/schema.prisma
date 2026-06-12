@@ -85,13 +85,8 @@ model User {
   interests              UserInterest[]
   hasCompletedOnboarding Boolean        @default(false)
 
-  // Taste quiz
-  tasteQuizAnswers TasteQuizAnswer[]
-
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
-
-  warningCount Int @default(0)
 
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
@@ -192,10 +187,6 @@ model Episode {
   // Versioning
   currentVersion Int @default(1)
 
-  // Counters (denormalized for performance)
-  playCount Int @default(0)
-  saveCount Int @default(0)
-
   // PDF export
   pdfUrl String?
 
@@ -222,8 +213,6 @@ model Episode {
   versions            EpisodeVersion[]
   voices              EpisodeVoice[]
   audioFingerprint    AudioFingerprint?
-  duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
-  duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   agentIngestion      AgentIngestion?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
@@ -237,7 +226,6 @@ model Episode {
   @@index([status])
   @@index([visibility])
   @@index([createdAt])
-  @@index([playCount])
   @@index([deletedAt])
 }
 
@@ -257,7 +245,6 @@ enum EpisodeStatus {
   FAILED
   IMPORTING
   TRANSCRIBING
-  DUPLICATE_REVIEW
 }
 
 model ResearchDossier {
@@ -622,23 +609,6 @@ model UserInterest {
   @@index([tagId])
 }
 
-// ============ TASTE QUIZ ============
-
-model TasteQuizAnswer {
-  id         String   @id @default(cuid())
-  userId     String
-  questionId String
-  question   String
-  tagSlugs   String[]
-  response   String // "yes" | "no" | "skip"
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, questionId])
-  @@index([userId])
-}
-
 // ============ NOTIFICATIONS ============
 
 model Notification {
@@ -664,11 +634,8 @@ enum NotificationType {
   KEY_INVALID
   QUESTION_ON_YOUR_EPISODE
   SCRIPT_READY
-  ACCOUNT_WARNING
-  CONTENT_REMOVED
   PLATFORM_ANNOUNCEMENT
   PIPELINE_FAILURE
-  REFERRAL_SIGNUP
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -1036,31 +1003,6 @@ model AudioFingerprint {
   episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
   @@index([duration])
-}
-
-enum DuplicateMatchStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model DuplicateMatch {
-  id               String               @id @default(cuid())
-  sourceEpisodeId  String
-  matchedEpisodeId String
-  similarity       Float
-  status           DuplicateMatchStatus @default(PENDING)
-  reviewedBy       String?
-  resolution       String?              @db.Text
-  reviewedAt       DateTime?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-
-  sourceEpisode  Episode @relation("DuplicateSource", fields: [sourceEpisodeId], references: [id], onDelete: Cascade)
-  matchedEpisode Episode @relation("DuplicateMatch", fields: [matchedEpisodeId], references: [id], onDelete: Cascade)
-
-  @@unique([sourceEpisodeId, matchedEpisodeId])
-  @@index([status])
 }
 
 // ============ MODEL PRICING SNAPSHOTS ============

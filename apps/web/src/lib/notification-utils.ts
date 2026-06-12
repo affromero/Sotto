@@ -41,11 +41,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'KEY_INVALID':
       return '/settings/api';
 
-    // Account moderation
-    case 'ACCOUNT_WARNING':
-    case 'CONTENT_REMOVED':
-      return '/settings';
-
     // Pipeline failure (admin)
     case 'PIPELINE_FAILURE':
       return episodeId ? `/episode/${episodeId}` : '/admin';

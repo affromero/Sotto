@@ -1,1 +1,1 @@
-export type { DiscoveryMessage, DiscoveryMetadata, DiscoveryState } from '@sotto/shared';
+export type { VerificationMode } from '@sotto/shared';

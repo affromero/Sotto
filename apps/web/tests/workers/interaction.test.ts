@@ -426,7 +426,7 @@ describe('processInteraction', () => {
       const callArgs = mockGenerateResponse.mock.calls[0];
       const systemPrompt = callArgs[0];
       expect(systemPrompt).toContain("Sotto's Q&A assistant");
-      expect(systemPrompt).toContain('episode context');
+      expect(systemPrompt).toContain('lesson context');
       expect(systemPrompt).toContain('under 200 words');
     });
 

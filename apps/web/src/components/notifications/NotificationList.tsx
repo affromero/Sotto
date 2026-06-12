@@ -5,10 +5,8 @@ import {
   Headphones,
   Bell,
   AlertTriangle,
-  AlertOctagon,
   HelpCircle,
   FileText,
-  Trash2,
   Megaphone,
 } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
@@ -33,10 +31,6 @@ const typeIcons: Record<string, typeof Bell> = {
   PIPELINE_FAILURE: AlertTriangle,
 
   QUESTION_ON_YOUR_EPISODE: HelpCircle,
-
-  // Moderation
-  CONTENT_REMOVED: Trash2,
-  ACCOUNT_WARNING: AlertOctagon,
 
   // System
   PLATFORM_ANNOUNCEMENT: Megaphone,

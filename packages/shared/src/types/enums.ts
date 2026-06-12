@@ -17,8 +17,7 @@ export type EpisodeStatus =
   | 'UPDATING'
   | 'FAILED'
   | 'IMPORTING'
-  | 'TRANSCRIBING'
-  | 'DUPLICATE_REVIEW';
+  | 'TRANSCRIBING';
 
 export type EpisodeVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
@@ -50,8 +49,6 @@ export type NotificationType =
   | 'KEY_INVALID'
   | 'QUESTION_ON_YOUR_EPISODE'
   | 'SCRIPT_READY'
-  | 'ACCOUNT_WARNING'
-  | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
   | 'PIPELINE_FAILURE';
 

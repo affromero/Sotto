@@ -1,16 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// Define mock fns at module scope so they're properly typed as Mock
 const mockSaveFindUnique = vi.fn();
 const mockSaveCreate = vi.fn();
 const mockSaveDelete = vi.fn();
 const mockEpisodeFindUnique = vi.fn();
-const mockEpisodeUpdate = vi.fn();
-const mockTransaction = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: vi.fn(),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -22,53 +20,20 @@ vi.mock('@/lib/prisma', () => {
     },
     episode: {
       findUnique: (...args: unknown[]) => mockEpisodeFindUnique(...args),
-      update: (...args: unknown[]) => mockEpisodeUpdate(...args),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
 import { POST, DELETE } from '@/app/api/v1/episodes/[episodeId]/save/route';
-import { auth } from '@/lib/auth';
 
-const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
-
-const mockPrisma = {
-  save: {
-    findUnique: mockSaveFindUnique,
-    create: mockSaveCreate,
-    delete: mockSaveDelete,
-  },
-  episode: {
-    findUnique: mockEpisodeFindUnique,
-    update: mockEpisodeUpdate,
-  },
-  $transaction: mockTransaction,
-};
-
-function createRequest(episodeId: string): NextRequest {
+function createRequest(episodeId: string, method = 'POST'): NextRequest {
   const url = new URL(`http://localhost:3000/api/v1/episodes/${episodeId}/save`);
-  return new NextRequest(url, { method: 'POST' });
+  return new NextRequest(url, { method });
 }
-
-const mockSession = {
-  user: {
-    id: 'user-123',
-    email: 'test@example.com',
-    name: 'Test User',
-  },
-  expires: new Date(Date.now() + 86400000).toISOString(),
-};
 
 const mockEpisode = {
   id: 'pod-1',
-  userId: 'user-456',
-  title: 'Test Episode',
-  topic: 'Test topic',
-  status: 'READY',
-  visibility: 'PUBLIC',
-  saveCount: 5,
 };
 
 const mockSave = {
@@ -84,20 +49,7 @@ describe('POST /api/v1/episodes/[episodeId]/save', () => {
   });
 
   it('returns 401 if user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest('pod-1');
-    const response = await POST(request, {
-      params: Promise.resolve({ episodeId: 'pod-1' }),
-    });
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 if session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {}, expires: '' });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest('pod-1');
     const response = await POST(request, {
@@ -110,8 +62,8 @@ describe('POST /api/v1/episodes/[episodeId]/save', () => {
   });
 
   it('returns 404 if episode does not exist', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.episode.findUnique.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockEpisodeFindUnique.mockResolvedValue(null);
 
     const request = createRequest('pod-nonexistent');
     const response = await POST(request, {
@@ -124,9 +76,9 @@ describe('POST /api/v1/episodes/[episodeId]/save', () => {
   });
 
   it('returns saved: true if already saved (idempotent)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.episode.findUnique.mockResolvedValue(mockEpisode);
-    mockPrisma.save.findUnique.mockResolvedValue(mockSave);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockEpisodeFindUnique.mockResolvedValue(mockEpisode);
+    mockSaveFindUnique.mockResolvedValue(mockSave);
 
     const request = createRequest('pod-1');
     const response = await POST(request, {
@@ -136,21 +88,14 @@ describe('POST /api/v1/episodes/[episodeId]/save', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ saved: true });
+    expect(mockSaveCreate).not.toHaveBeenCalled();
   });
 
-  it('creates save and increments saveCount in transaction when not already saved', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.episode.findUnique.mockResolvedValue(mockEpisode);
-    mockPrisma.save.findUnique.mockResolvedValue(null);
-
-    const mockTx = {
-      save: { create: vi.fn().mockResolvedValue(mockSave) },
-      episode: { update: vi.fn().mockResolvedValue({ ...mockEpisode, saveCount: 6 }) },
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback) => {
-      return callback(mockTx);
-    });
+  it('creates save when not already saved', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockEpisodeFindUnique.mockResolvedValue(mockEpisode);
+    mockSaveFindUnique.mockResolvedValue(null);
+    mockSaveCreate.mockResolvedValue(mockSave);
 
     const request = createRequest('pod-1');
     const response = await POST(request, {
@@ -160,32 +105,16 @@ describe('POST /api/v1/episodes/[episodeId]/save', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ saved: true });
+    expect(mockSaveCreate).toHaveBeenCalledWith({
+      data: { userId: 'user-123', episodeId: 'pod-1' },
+    });
   });
 
   it('handles different user saving different episode', async () => {
-    const differentSession = {
-      user: {
-        id: 'user-789',
-        email: 'other@example.com',
-        name: 'Other User',
-      },
-      expires: new Date(Date.now() + 86400000).toISOString(),
-    };
-
-    mockAuth.mockResolvedValue(differentSession);
-    mockPrisma.episode.findUnique.mockResolvedValue({ ...mockEpisode, id: 'pod-2' });
-    mockPrisma.save.findUnique.mockResolvedValue(null);
-
-    const mockTx = {
-      save: {
-        create: vi.fn().mockResolvedValue({ ...mockSave, userId: 'user-789', episodeId: 'pod-2' }),
-      },
-      episode: { update: vi.fn().mockResolvedValue({ ...mockEpisode, id: 'pod-2', saveCount: 1 }) },
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback) => {
-      return callback(mockTx);
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-789' });
+    mockEpisodeFindUnique.mockResolvedValue({ id: 'pod-2' });
+    mockSaveFindUnique.mockResolvedValue(null);
+    mockSaveCreate.mockResolvedValue({ ...mockSave, userId: 'user-789', episodeId: 'pod-2' });
 
     const request = createRequest('pod-2');
     const response = await POST(request, {
@@ -202,22 +131,9 @@ describe('DELETE /api/v1/episodes/[episodeId]/save', () => {
   });
 
   it('returns 401 if user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
-    const request = createRequest('pod-1');
-    const response = await DELETE(request, {
-      params: Promise.resolve({ episodeId: 'pod-1' }),
-    });
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 if session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {}, expires: '' });
-
-    const request = createRequest('pod-1');
+    const request = createRequest('pod-1', 'DELETE');
     const response = await DELETE(request, {
       params: Promise.resolve({ episodeId: 'pod-1' }),
     });
@@ -228,10 +144,10 @@ describe('DELETE /api/v1/episodes/[episodeId]/save', () => {
   });
 
   it('returns saved: false if save does not exist (idempotent)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.save.findUnique.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockSaveFindUnique.mockResolvedValue(null);
 
-    const request = createRequest('pod-1');
+    const request = createRequest('pod-1', 'DELETE');
     const response = await DELETE(request, {
       params: Promise.resolve({ episodeId: 'pod-1' }),
     });
@@ -239,22 +155,15 @@ describe('DELETE /api/v1/episodes/[episodeId]/save', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ saved: false });
+    expect(mockSaveDelete).not.toHaveBeenCalled();
   });
 
-  it('deletes save and decrements saveCount in transaction when save exists', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.save.findUnique.mockResolvedValue(mockSave);
+  it('deletes save when save exists', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockSaveFindUnique.mockResolvedValue(mockSave);
+    mockSaveDelete.mockResolvedValue(mockSave);
 
-    const mockTx = {
-      save: { delete: vi.fn().mockResolvedValue(mockSave) },
-      episode: { update: vi.fn().mockResolvedValue({ ...mockEpisode, saveCount: 4 }) },
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback) => {
-      return callback(mockTx);
-    });
-
-    const request = createRequest('pod-1');
+    const request = createRequest('pod-1', 'DELETE');
     const response = await DELETE(request, {
       params: Promise.resolve({ episodeId: 'pod-1' }),
     });
@@ -262,36 +171,21 @@ describe('DELETE /api/v1/episodes/[episodeId]/save', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ saved: false });
+    expect(mockSaveDelete).toHaveBeenCalledWith({
+      where: { userId_episodeId: { userId: 'user-123', episodeId: 'pod-1' } },
+    });
   });
 
   it('handles different user unsaving episode', async () => {
-    const differentSession = {
-      user: {
-        id: 'user-999',
-        email: 'another@example.com',
-        name: 'Another User',
-      },
-      expires: new Date(Date.now() + 86400000).toISOString(),
-    };
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-999' });
+    mockSaveFindUnique.mockResolvedValue({ ...mockSave, userId: 'user-999' });
+    mockSaveDelete.mockResolvedValue({ ...mockSave, userId: 'user-999' });
 
-    mockAuth.mockResolvedValue(differentSession);
-    mockPrisma.save.findUnique.mockResolvedValue({ ...mockSave, userId: 'user-999' });
-
-    const mockTx = {
-      save: { delete: vi.fn().mockResolvedValue({ ...mockSave, userId: 'user-999' }) },
-      episode: { update: vi.fn().mockResolvedValue({ ...mockEpisode, saveCount: 4 }) },
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback) => {
-      return callback(mockTx);
-    });
-
-    const request = createRequest('pod-1');
+    const request = createRequest('pod-1', 'DELETE');
     const response = await DELETE(request, {
       params: Promise.resolve({ episodeId: 'pod-1' }),
     });
 
     expect(response.status).toBe(200);
   });
-
 });

@@ -44,7 +44,6 @@ async function getEpisodes(search: string | undefined, status: string | undefine
         failureReason: true,
         technicalError: true,
         failedAt: true,
-        playCount: true,
         visibility: true,
         createdAt: true,
         user: {
@@ -123,7 +122,6 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
               <th>Title</th>
               <th>Creator</th>
               <th>Status</th>
-              <th>Plays</th>
               <th>Visibility</th>
               <th>Created</th>
               <th>Actions</th>
@@ -148,7 +146,6 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
                         {episode.status.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className={styles.numberCell}>{episode.playCount}</td>
                     <td>
                       <span className={`${styles.badge} ${styles[`badge${episode.visibility}`]}`}>
                         {episode.visibility}
@@ -169,7 +166,7 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
                   </tr>
                   {isFailed && (episode.failureReason || episode.technicalError) && (
                     <tr>
-                      <td colSpan={7} className={styles.errorDetailCell}>
+                      <td colSpan={6} className={styles.errorDetailCell}>
                         <div className={styles.errorDetail}>
                           {episode.failedAtStatus && (
                             <div>

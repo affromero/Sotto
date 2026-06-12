@@ -123,8 +123,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
     visibility,
     audioUrl: resolvedAudioUrl,
     duration: episode.duration,
-    playCount: episode.playCount,
-    saveCount: episode.saveCount,
     createdAt: episode.createdAt.toISOString(),
     source: episode.source,
     lowReferences: episode.lowReferences,

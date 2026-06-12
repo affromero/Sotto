@@ -50,12 +50,7 @@ export type {
   ClassDocumentPrompt,
 } from './types/class-document';
 
-export type {
-  DiscoveryMessage,
-  DiscoveryMetadata,
-  DiscoveryState,
-} from './types/discovery';
-
+export type { VerificationMode } from './types/discovery';
 
 export type { PlayerState, PlayerControls } from './types/player';
 
