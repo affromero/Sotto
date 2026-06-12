@@ -14,19 +14,19 @@ jobs:
     environment: production
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
 
       - run: npm ci
 
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -68,7 +68,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
