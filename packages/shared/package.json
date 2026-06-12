@@ -10,7 +10,7 @@
     "./*": "./src/*"
   },
   "dependencies": {
-    "pricetoken": "^0.13.8",
-    "zod": "^3.23.0"
+    "pricetoken": "^0.13.10",
+    "zod": "^4.4.3"
   }
 }

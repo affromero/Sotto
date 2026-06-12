@@ -59,22 +59,22 @@
     ]
   },
   "devDependencies": {
-    "@copilotkit/llmock": "^1.1.1",
-    "@playwright/test": "^1.58.2",
+    "@copilotkit/llmock": "^1.7.1",
+    "@playwright/test": "^1.60.0",
     "@types/geoip-lite": "^1.4.4",
-    "lint-staged": "^16.2.7",
-    "next-auth": "^5.0.0-beta.30",
-    "prettier": "^3.8.1",
-    "prisma": "^6.19.2",
-    "sort-package-json": "^3.6.1"
+    "lint-staged": "^17.0.7",
+    "next-auth": "^5.0.0-beta.31",
+    "prettier": "^3.8.3",
+    "prisma": "^7.8.0",
+    "sort-package-json": "^4.0.0"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
-    "geoip-lite": "^1.4.10",
-    "pricetoken": "^0.13.9"
+    "@prisma/client": "^7.8.0",
+    "geoip-lite": "^2.0.2",
+    "pricetoken": "^0.13.10"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.1.7"
+    "@next/swc-darwin-arm64": "^16.2.7"
   },
   "overrides": {
     "react-native-reanimated": "4.1.1",
