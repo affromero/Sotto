@@ -3,24 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import {
-  LayoutDashboard,
-  Users,
-  Radio,
-  AtSign,
-  Star,
-  FlaskConical,
-  Wand2,
-  HeartPulse,
-  ListTodo,
-  Clapperboard,
-  ArrowLeft,
-  Menu,
-  ChevronDown,
-  ToggleRight,
-} from 'lucide-react';
+import { Glyph, type GlyphName } from '@/components/Glyph';
+import { GlassBead } from '@/components/landing/GlassBead';
 import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
-import styles from './AdminShell.module.css';
+import { useTheme } from '@/components/providers/ThemeProvider';
+import styles from './adminTheme.module.css';
 
 interface AdminShellProps {
   children: React.ReactNode;
@@ -29,174 +16,95 @@ interface AdminShellProps {
 interface NavItem {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  glyph: GlyphName;
 }
 
-interface NavGroup {
-  label: string | null;
-  items: NavItem[];
-  defaultOpen?: boolean;
-}
-
-const navGroups: NavGroup[] = [
-  {
-    label: null,
-    items: [{ href: '/admin', label: 'Overview', icon: LayoutDashboard }],
-  },
-  {
-    label: 'Content',
-    defaultOpen: true,
-    items: [
-      { href: '/admin/users', label: 'Users', icon: Users },
-      { href: '/admin/episodes', label: 'Lessons', icon: Radio },
-    ],
-  },
-  {
-    label: 'Tools',
-    items: [
-      { href: '/admin/handles', label: 'Handles', icon: AtSign },
-      { href: '/admin/auto-models', label: 'Auto Models', icon: Wand2 },
-      { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
-      { href: '/admin/health', label: 'System Health', icon: HeartPulse },
-      { href: '/admin/queues', label: 'Queues', icon: ListTodo },
-      { href: '/admin/site-config', label: 'Site Config', icon: ToggleRight },
-      { href: '/admin/video-tests', label: 'Video Tests', icon: Clapperboard },
-    ],
-  },
-  {
-    label: 'AI / ML',
-    items: [
-      { href: '/admin/ratings', label: 'Quality Ratings', icon: Star },
-    ],
-  },
+const NAV: NavItem[] = [
+  { href: '/admin', label: 'Overview', glyph: 'today' },
+  { href: '/admin/usage', label: 'Usage & cost', glyph: 'graph' },
+  { href: '/admin/providers', label: 'Providers & models', glyph: 'spark' },
+  { href: '/admin/users', label: 'Users & access', glyph: 'headset' },
+  { href: '/admin/system', label: 'System', glyph: 'gear' },
 ];
 
-function getInitialExpanded(pathname: string): Record<string, boolean> {
-  const expanded: Record<string, boolean> = {};
-  for (const group of navGroups) {
-    if (!group.label) continue;
-    const containsActive = group.items.some(({ href }) => pathname === href);
-    expanded[group.label] = containsActive || !!group.defaultOpen;
-  }
-  return expanded;
+function isActive(pathname: string, href: string): boolean {
+  return href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
 }
 
 export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expanded, setExpanded] = useState(() => getInitialExpanded(pathname));
-
-  function toggleGroup(label: string) {
-    setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
-  }
+  const [open, setOpen] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
-    <div className={styles.layout}>
-      {sidebarOpen && (
-        <div className={styles.overlay} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      )}
+    <div className={styles.shell}>
+      <header className={styles.topBar}>
+        <button
+          type="button"
+          className={styles.menuButton}
+          onClick={() => setOpen(true)}
+          aria-label="Open admin navigation"
+        >
+          <Glyph name="map" size={20} />
+        </button>
+        <span className={styles.abWord}>sotto</span>
+        <span className={styles.abTag}>admin</span>
+      </header>
 
-      <aside
-        className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}
-        aria-label="Admin navigation"
-      >
-        <div className={styles.brand}>
-          <Link href="/dashboard" className={styles.logo}>
-            Sotto
+      {open && <div className={styles.overlay} onClick={() => setOpen(false)} aria-hidden="true" />}
+
+      <nav className={`${styles.adminNav} ${open ? styles.open : ''}`} aria-label="Admin navigation">
+        <Link href="/dashboard" className={styles.adminBrand} aria-label="Sotto admin home">
+          <GlassBead className={styles.brandBead} />
+          <span className={styles.abWord}>sotto</span>
+          <span className={styles.abTag}>admin</span>
+        </Link>
+
+        {NAV.map((n) => {
+          const active = isActive(pathname, n.href);
+          return (
+            <Link
+              key={n.href}
+              href={n.href}
+              className={`${styles.anavItem} ${active ? styles.on : ''}`}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => setOpen(false)}
+            >
+              <Glyph name={n.glyph} size={18} />
+              {n.label}
+            </Link>
+          );
+        })}
+
+        <div className={styles.anavFoot}>
+          <div className={styles.modeToggle} role="group" aria-label="Color mode">
+            <button
+              type="button"
+              className={resolvedTheme === 'light' ? styles.on : ''}
+              onClick={() => setTheme('light')}
+              aria-pressed={resolvedTheme === 'light'}
+            >
+              <Glyph name="sun" size={13} /> Light
+            </button>
+            <button
+              type="button"
+              className={resolvedTheme === 'dark' ? styles.on : ''}
+              onClick={() => setTheme('dark')}
+              aria-pressed={resolvedTheme === 'dark'}
+            >
+              <Glyph name="moon" size={13} /> Dark
+            </button>
+          </div>
+          <Link href="/dashboard" className={styles.anavBack} onClick={() => setOpen(false)}>
+            <Glyph name="back" size={13} /> Back to dashboard
           </Link>
-          <span className={styles.subtitle}>Admin</span>
+          <AccountSwitcher variant="admin" />
         </div>
+      </nav>
 
-        <nav className={styles.nav} aria-label="Admin sections">
-          {navGroups.map((group, gi) => {
-            if (!group.label) {
-              return group.items.map(({ href, label, icon: Icon }) => {
-                const isActive = pathname === href;
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
-                    aria-current={isActive ? 'page' : undefined}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <Icon className={styles.navIcon} aria-hidden="true" />
-                    {label}
-                  </Link>
-                );
-              });
-            }
-
-            const isOpen = expanded[group.label] ?? false;
-
-            return (
-              <div key={group.label} className={gi > 0 ? styles.navGroup : undefined}>
-                <button
-                  type="button"
-                  className={styles.navGroupLabel}
-                  onClick={() => toggleGroup(group.label!)}
-                  aria-expanded={isOpen}
-                >
-                  {group.label}
-                  <ChevronDown
-                    className={`${styles.navGroupChevron} ${isOpen ? styles.navGroupChevronOpen : ''}`}
-                    aria-hidden="true"
-                  />
-                </button>
-                {isOpen && (
-                  <div className={styles.navGroupItems}>
-                    {group.items.map(({ href, label, icon: Icon }) => {
-                      const isActive = pathname === href;
-                      return (
-                        <Link
-                          key={href}
-                          href={href}
-                          className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
-                          aria-current={isActive ? 'page' : undefined}
-                          onClick={() => setSidebarOpen(false)}
-                        >
-                          <Icon className={styles.navIcon} aria-hidden="true" />
-                          {label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className={styles.backLink}>
-          <Link
-            href="/dashboard"
-            className={styles.backLinkAnchor}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <ArrowLeft size={16} aria-hidden="true" />
-            Back to Dashboard
-          </Link>
-        </div>
-
-        <AccountSwitcher variant="admin" />
-      </aside>
-
-      <div className={styles.main}>
-        <header className={styles.topBar}>
-          <button
-            className={styles.menuButton}
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open admin navigation"
-            type="button"
-          >
-            <Menu size={24} aria-hidden="true" />
-          </button>
-          <span className={styles.logo}>Sotto</span>
-          <span className={styles.subtitle}>Admin</span>
-        </header>
-
-        <div className={styles.content}>{children}</div>
-      </div>
+      <main className={styles.adminMain}>
+        <div className={styles.adminInner}>{children}</div>
+      </main>
     </div>
   );
 }
