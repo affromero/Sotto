@@ -12,6 +12,7 @@ interface Props {
   understood: Set<CefrLevel>;
   toggleUnderstood: (lvl: CefrLevel) => void;
   level: CefrLevel | null;
+  demoMode?: boolean;
   onNext: () => void;
   onBack: () => void;
 }
@@ -22,6 +23,7 @@ export function StepPlacement({
   understood,
   toggleUnderstood,
   level,
+  demoMode = false,
   onNext,
   onBack,
 }: Props) {
@@ -43,6 +45,15 @@ export function StepPlacement({
         Tap every sentence you fully understand. Sotto anchors your syllabus to the CEFR level just
         above your reach — never busywork, never over your head.
       </p>
+      {demoMode && (
+        <aside className={c.placementAside} aria-label="Placement test available">
+          <span className={c.placementAsideKicker}>Full placement test</span>
+          <span>
+            Prefer a formal check? The app also has a short adaptive test that places learners before
+            their first course; this demo shows the same idea as a quick sentence ladder.
+          </span>
+        </aside>
+      )}
 
       <div className={c.placementList}>
         {items.map((p) => {

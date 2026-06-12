@@ -203,9 +203,9 @@ describe('welcome hosted-demo mode', () => {
       'href',
       'https://elevenlabs.io/app/settings/api-keys'
     );
-    expect(screen.getByRole('link', { name: /open whisper docs page/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /open deepgram api page/i })).toHaveAttribute(
       'href',
-      'https://github.com/openai/whisper'
+      'https://developers.deepgram.com/docs/create-additional-api-keys'
     );
     expect(screen.queryByText(/^rec$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/ElevenLabs API key/i)).not.toBeInTheDocument();
@@ -415,6 +415,9 @@ describe('welcome hosted-demo mode', () => {
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
     expect(await screen.findByText(/Where do you/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/placement test available/i)).toHaveTextContent(
+      /short adaptive test that places learners/i
+    );
     expect(screen.getByText(/Estimated level/i).textContent).toContain('B1');
     expect(window.localStorage.getItem('sotto.onboarding.v1')).toBeNull();
   });

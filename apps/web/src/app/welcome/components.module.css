@@ -1021,6 +1021,28 @@
   gap: 7px;
 }
 
+.placementAside {
+  margin-top: 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border-left: 3px solid var(--accent);
+  padding: 12px 0 12px 14px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.placementAsideKicker {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: var(--accent);
+}
+
 .plRow {
   display: flex;
   align-items: center;

@@ -462,6 +462,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
           understood={understood}
           toggleUnderstood={toggleUnderstood}
           level={level}
+          demoMode={demoMode}
           onNext={() => go(5)}
           onBack={() => go(3)}
         />
