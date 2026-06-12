@@ -26,12 +26,12 @@ import { logger } from '@/lib/logger';
 const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE', 'SOURCE_FIGURE']);
 
 async function generateAiImage(
-  podcastId: string,
+  episodeId: string,
   videoGenerationId: string,
   imagePrompt: string,
 ): Promise<{ buffer: Buffer; service: string; cost: number }> {
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: { userId: true },
   });
 
@@ -41,7 +41,7 @@ async function generateAiImage(
   });
 
   const { provider, source } = await resolveImageProvider({
-    userId: podcast.userId,
+    userId: episode.userId,
     requestedModel: videoGen?.imageModel,
   });
 
@@ -54,20 +54,20 @@ async function generateAiImage(
 }
 
 async function generateAiVideo(
-  podcastId: string,
+  episodeId: string,
   videoGenerationId: string,
   segmentVisualId: string,
   videoModel: string,
   videoPrompt: string,
   endStatePrompt?: string | null,
 ): Promise<{ buffer: Buffer; service: string; cost: number }> {
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: { userId: true },
   });
 
   const { provider: videoProvider, source: videoSource, providerId } = await resolveVideoProvider({
-    userId: podcast.userId,
+    userId: episode.userId,
     requestedModel: videoModel,
   });
 
@@ -90,16 +90,16 @@ async function generateAiVideo(
   // Always generate first-frame image for all video segments
   let imageCost = 0;
   logger.info('Generating first-frame image', { videoModel, segmentVisualId });
-  const firstFrameResult = await generateAiImage(podcastId, videoGenerationId, videoPrompt);
-  const firstFrameR2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-first-frame.png`;
+  const firstFrameResult = await generateAiImage(episodeId, videoGenerationId, videoPrompt);
+  const firstFrameR2Key = `episodes/${episodeId}/visuals/${segmentVisualId}-first-frame.png`;
   const firstFrameUrl = await uploadFile(firstFrameR2Key, firstFrameResult.buffer, 'image/png');
   imageCost += firstFrameResult.cost;
 
   // Always generate last-frame image (from endStatePrompt or fallback to videoPrompt)
   const lastFramePrompt = endStatePrompt ?? videoPrompt;
   logger.info('Generating last-frame image', { videoModel, segmentVisualId, hasEndStatePrompt: !!endStatePrompt });
-  const lastFrameResult = await generateAiImage(podcastId, videoGenerationId, lastFramePrompt);
-  const lastFrameR2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-last-frame.png`;
+  const lastFrameResult = await generateAiImage(episodeId, videoGenerationId, lastFramePrompt);
+  const lastFrameR2Key = `episodes/${episodeId}/visuals/${segmentVisualId}-last-frame.png`;
   const lastFrameUrl = await uploadFile(lastFrameR2Key, lastFrameResult.buffer, 'image/png');
   imageCost += lastFrameResult.cost;
 
@@ -164,7 +164,7 @@ async function generateAiVideo(
     // Extract last frame for next clip (skip for the final clip)
     if (!isLastClip) {
       const lastFrameBuffer = await extractLastFrame(clipBuffer);
-      const r2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-chain-${i}.png`;
+      const r2Key = `episodes/${episodeId}/visuals/${segmentVisualId}-chain-${i}.png`;
       chainImage = await uploadFile(r2Key, lastFrameBuffer, 'image/png');
     }
   }
@@ -175,7 +175,7 @@ async function generateAiVideo(
 }
 
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, segmentVisualId, visualType } = job.data;
+  const { episodeId, videoGenerationId, segmentVisualId, visualType } = job.data;
 
   // Apply user feedback to the prompt if present in metadata
   const userFeedback = (job.data.metadata as Record<string, unknown> | undefined)?.userFeedback as string | undefined;
@@ -190,7 +190,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
   });
   const zeroCostVideo = videoGen?.zeroCostVideo ?? false;
 
-  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType, hasFeedback: !!userFeedback, zeroCostVideo });
+  logger.info('Generating visual asset', { episodeId, segmentVisualId, visualType, hasFeedback: !!userFeedback, zeroCostVideo });
   await job.updateProgress(10);
 
   // Zero-cost guard: AI_ILLUSTRATION should never reach here, but defense-in-depth
@@ -208,7 +208,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         status: 'ready',
       },
     });
-    await checkAllReady(videoGenerationId, podcastId);
+    await checkAllReady(videoGenerationId, episodeId);
     await job.updateProgress(100);
     return;
   }
@@ -221,7 +221,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
 
   if (existing?.assetUrl) {
     logger.info('Visual asset already exists, skipping', { segmentVisualId });
-    await checkAllReady(videoGenerationId, podcastId);
+    await checkAllReady(videoGenerationId, episodeId);
     await job.updateProgress(100);
     return;
   }
@@ -249,14 +249,14 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     });
 
     if (visual?.visualMode === 'video' && visual.videoModel && !zeroCostVideo) {
-      const result = await generateAiVideo(podcastId, videoGenerationId, segmentVisualId, visual.videoModel, prompt, visual.endStatePrompt);
+      const result = await generateAiVideo(episodeId, videoGenerationId, segmentVisualId, visual.videoModel, prompt, visual.endStatePrompt);
       assetBuffer = result.buffer;
       assetType = 'video/mp4';
       assetExt = 'mp4';
       service = result.service;
       totalCost = result.cost;
     } else if (visualType === 'AI_ILLUSTRATION') {
-      const result = await generateAiImage(podcastId, videoGenerationId, prompt);
+      const result = await generateAiImage(episodeId, videoGenerationId, prompt);
       assetBuffer = result.buffer;
       assetType = 'image/png';
       assetExt = 'png';
@@ -283,13 +283,13 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
               status: 'ready',
             },
           });
-          await checkAllReady(videoGenerationId, podcastId);
+          await checkAllReady(videoGenerationId, episodeId);
           await job.updateProgress(100);
           return;
         }
         const placeName = metadata?.places?.[0]?.name ?? prompt;
         logger.info('No enriched place with coordinates, falling back to AI illustration', { segmentVisualId, placeName });
-        const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
+        const aiResult = await generateAiImage(episodeId, videoGenerationId, prompt);
         assetBuffer = aiResult.buffer;
         assetType = 'image/png';
         assetExt = 'png';
@@ -322,13 +322,13 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
               status: 'ready',
             },
           });
-          await checkAllReady(videoGenerationId, podcastId);
+          await checkAllReady(videoGenerationId, episodeId);
           await job.updateProgress(100);
           return;
         }
         // Fallback: generate AI illustration instead of showing a text card
         logger.info('No stock footage found, falling back to AI illustration', { segmentVisualId, prompt });
-        const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
+        const aiResult = await generateAiImage(episodeId, videoGenerationId, prompt);
         assetBuffer = aiResult.buffer;
         assetType = 'image/png';
         assetExt = 'png';
@@ -381,7 +381,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
               where: { id: segmentVisualId },
               data: { assetUrl: figureUrl, assetType: 'image/png', status: 'ready' },
             });
-            await checkAllReady(videoGenerationId, podcastId);
+            await checkAllReady(videoGenerationId, episodeId);
             await job.updateProgress(100);
             return;
           }
@@ -401,17 +401,17 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
             status: 'ready',
           },
         });
-        await checkAllReady(videoGenerationId, podcastId);
+        await checkAllReady(videoGenerationId, episodeId);
         await job.updateProgress(100);
         return;
       }
-      const fallbackPrompt = prompt || 'Editorial illustration for podcast segment';
+      const fallbackPrompt = prompt || 'Editorial illustration for episode segment';
       await prisma.segmentVisual.update({
         where: { id: segmentVisualId },
         data: { visualType: 'AI_ILLUSTRATION', status: 'pending' },
       });
       await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
-        podcastId,
+        episodeId,
         videoGenerationId,
         segmentVisualId,
         visualType: 'AI_ILLUSTRATION',
@@ -433,7 +433,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           where: { id: segmentVisualId },
           data: { status: 'ready', motionProvider: 'remotion' },
         });
-        await checkAllReady(videoGenerationId, podcastId);
+        await checkAllReady(videoGenerationId, episodeId);
         await job.updateProgress(100);
         return;
       }
@@ -456,7 +456,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         prompt: heraPrompt,
         durationSeconds: clampedDuration,
         referenceImageUrl: sv.firstFrameUrl ?? undefined,
-        podcastId,
+        episodeId,
       });
 
       if (!buffer) {
@@ -466,7 +466,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           where: { id: segmentVisualId },
           data: { status: 'ready', motionProvider: 'remotion' },
         });
-        await checkAllReady(videoGenerationId, podcastId);
+        await checkAllReady(videoGenerationId, episodeId);
         await job.updateProgress(100);
         return;
       }
@@ -483,7 +483,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         where: { id: segmentVisualId },
         data: { status: 'ready' },
       });
-      await checkAllReady(videoGenerationId, podcastId);
+      await checkAllReady(videoGenerationId, episodeId);
       await job.updateProgress(100);
       return;
     }
@@ -491,7 +491,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     await job.updateProgress(70);
 
     // Upload to R2
-    const r2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}.${assetExt}`;
+    const r2Key = `episodes/${episodeId}/visuals/${segmentVisualId}.${assetExt}`;
     const assetUrl = await uploadFile(r2Key, assetBuffer, assetType);
 
     // Update SegmentVisual
@@ -504,8 +504,8 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
 
     // Log cost
     if (totalCost > 0) {
-      const podcast = await prisma.podcast.findUnique({
-        where: { id: podcastId },
+      const episode = await prisma.episode.findUnique({
+        where: { id: episodeId },
         select: { userId: true },
       });
       logUsage({
@@ -513,8 +513,8 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         category: 'video_generation',
         totalCost,
         durationMs,
-        podcastId,
-        userId: podcast?.userId,
+        episodeId,
+        userId: episode?.userId,
         metadata: { stage: 'visual_generation', visualType },
       });
     }
@@ -535,7 +535,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         where: { id: segmentVisualId },
         data: { status: 'failed', failureReason: errMsg },
       });
-      await checkAllReady(videoGenerationId, podcastId);
+      await checkAllReady(videoGenerationId, episodeId);
       throw new UnrecoverableError(errMsg);
     }
 
@@ -551,7 +551,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           failureReason: errMsg,
         },
       });
-      await checkAllReady(videoGenerationId, podcastId);
+      await checkAllReady(videoGenerationId, episodeId);
     } else {
       // Non-terminal — reset to pending so checkAllReady doesn't prematurely fail
       await prisma.segmentVisual.update({
@@ -563,12 +563,12 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
   }
 
   // Check if all visuals for this generation are ready
-  await checkAllReady(videoGenerationId, podcastId);
+  await checkAllReady(videoGenerationId, episodeId);
   await job.updateProgress(100);
-  logger.info('Visual generation complete', { podcastId, segmentVisualId, visualType });
+  logger.info('Visual generation complete', { episodeId, segmentVisualId, visualType });
 }
 
-async function checkAllReady(videoGenerationId: string, podcastId: string): Promise<void> {
+async function checkAllReady(videoGenerationId: string, episodeId: string): Promise<void> {
   const pending = await prisma.segmentVisual.count({
     where: {
       videoGenerationId,
@@ -594,17 +594,17 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
       });
 
       // Send exactly one VIDEO_FAILED notification (checkAllReady fires once)
-      const podcast = await prisma.podcast.findUnique({
-        where: { id: podcastId },
+      const episode = await prisma.episode.findUnique({
+        where: { id: episodeId },
         select: { userId: true },
       });
-      if (podcast) {
+      if (episode) {
         await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-          userId: podcast.userId,
+          userId: episode.userId,
           type: 'VIDEO_FAILED',
           title: 'Video Generation Failed',
           message: `Video generation failed: ${failureReason}`,
-          data: { podcastId, videoGenerationId },
+          data: { episodeId, videoGenerationId },
         });
       }
       return;
@@ -620,8 +620,8 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
         where: { id: videoGenerationId },
         data: { status: 'GENERATING_TRANSITIONS' },
       });
-      const podcast = await prisma.podcast.findUniqueOrThrow({
-        where: { id: podcastId },
+      const episode = await prisma.episode.findUniqueOrThrow({
+        where: { id: episodeId },
         select: { userId: true },
       });
       const transitions = await prisma.segmentTransition.findMany({
@@ -629,10 +629,10 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
       });
       for (const t of transitions) {
         await addJob(transitionGenerationQueue, JobType.GENERATE_TRANSITION, {
-          podcastId,
+          episodeId,
           videoGenerationId,
           transitionId: t.id,
-          userId: podcast.userId,
+          userId: episode.userId,
         });
       }
       return;
@@ -653,7 +653,7 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
       });
       for (const overlay of overlays) {
         await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
-          podcastId,
+          episodeId,
           videoGenerationId,
           avatarOverlayId: overlay.id,
           speaker: overlay.speaker,
@@ -668,7 +668,7 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
 
     // All visuals ready — compose MP4 via Remotion sidecar
     await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-      podcastId,
+      episodeId,
       videoGenerationId,
     });
   }

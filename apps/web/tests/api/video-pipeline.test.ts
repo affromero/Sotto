@@ -11,11 +11,11 @@ const { mockGetAiKey, mockResolveAiModelAndProvider } = vi.hoisted(() => ({
   mockResolveAiModelAndProvider: vi.fn(),
 }));
 
-const mockPodcast = {
+const mockEpisode = {
   id: 'pod-1',
   userId: 'user-1',
   status: 'READY',
-  title: 'Test Podcast',
+  title: 'Test Episode',
   topic: 'Testing',
   segments: [
     { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello world', duration: 5 },
@@ -32,7 +32,7 @@ const mockVideoGenUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    podcast: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
+    episode: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
     user: { findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args) },
     userAiKey: { findMany: (...args: unknown[]) => mockUserAiKeyFindMany(...args) },
     videoGeneration: {
@@ -166,25 +166,25 @@ vi.mock('@/lib/api-response', () => ({
   },
 }));
 
-import { POST, GET, PATCH } from '@/app/api/v1/podcasts/[podcastId]/video/pipeline/route';
+import { POST, GET, PATCH } from '@/app/api/v1/episodes/[episodeId]/video/pipeline/route';
 
 function createRequest(method: string, body?: unknown, url?: string): NextRequest {
-  return new NextRequest(new URL(url ?? 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline'), {
+  return new NextRequest(new URL(url ?? 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline'), {
     method,
     body: body ? JSON.stringify(body) : undefined,
     headers: body ? { 'Content-Type': 'application/json' } : {},
   });
 }
 
-const routeParams = { params: Promise.resolve({ podcastId: 'pod-1' }) };
+const routeParams = { params: Promise.resolve({ episodeId: 'pod-1' }) };
 
-describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
+describe('POST /api/v1/episodes/[id]/video/pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
-    mockFindUnique.mockResolvedValue(mockPodcast);
+    mockFindUnique.mockResolvedValue(mockEpisode);
     mockUserFindUniqueOrThrow.mockResolvedValue({ preferredAiModel: null });
     mockUserAiKeyFindMany.mockResolvedValue([]);
     mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) => {
@@ -193,13 +193,13 @@ describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
       return { apiKey: 'anthropic-key', provider: 'anthropic' };
     });
     mockResolveAiModelAndProvider.mockImplementation(
-      async (opts: { podcastAiModel?: string | null; aiKey?: { provider: string } | null }) => {
-        if (opts.podcastAiModel) {
-          const provider = opts.podcastAiModel.startsWith('claude-code:')
+      async (opts: { episodeAiModel?: string | null; aiKey?: { provider: string } | null }) => {
+        if (opts.episodeAiModel) {
+          const provider = opts.episodeAiModel.startsWith('claude-code:')
             ? 'claude-code'
-            : MODEL_TO_PROVIDER[opts.podcastAiModel];
-          if (!provider) throw new Error(`Unknown AI model "${opts.podcastAiModel}".`);
-          return { model: opts.podcastAiModel, provider };
+            : MODEL_TO_PROVIDER[opts.episodeAiModel];
+          if (!provider) throw new Error(`Unknown AI model "${opts.episodeAiModel}".`);
+          return { model: opts.episodeAiModel, provider };
         }
 
         if (opts.aiKey) {
@@ -226,7 +226,7 @@ describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
       'classify_pipeline',
       expect.objectContaining({
         classificationId: body.classificationId,
-        podcastId: 'pod-1',
+        episodeId: 'pod-1',
         userId: 'user-1',
         aiProvider: 'anthropic',
         aiModel: 'claude-haiku-4-5-20251001',
@@ -235,7 +235,7 @@ describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
     );
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-      podcastAiModel: null,
+      episodeAiModel: null,
       aiKey: { apiKey: 'anthropic-key', provider: 'anthropic' },
     });
   });
@@ -310,7 +310,7 @@ describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(200);
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-      podcastAiModel: 'gpt-5-nano',
+      episodeAiModel: 'gpt-5-nano',
       aiKey: null,
     });
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
@@ -402,7 +402,7 @@ describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
   });
 });
 
-describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
+describe('GET /api/v1/episodes/[id]/video/pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
@@ -413,7 +413,7 @@ describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
   it('returns classifying when Redis key does not exist', async () => {
     mockCacheGet.mockResolvedValue(null);
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -425,7 +425,7 @@ describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
     const mockPipeline = { version: 3, segments: [], transitions: [], totalEstimatedCost: 0 };
     mockCacheGet.mockResolvedValue({ status: 'ready', pipeline: mockPipeline });
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -437,7 +437,7 @@ describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
   it('returns failed status from Redis', async () => {
     mockCacheGet.mockResolvedValue({ status: 'failed', error: 'LLM error', isLlmError: true, currentProvider: 'anthropic' });
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -450,7 +450,7 @@ describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
   it('requires auth', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(401);
@@ -459,7 +459,7 @@ describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
   it('returns none status when no classificationId and no draft exists', async () => {
     mockVideoGenFindFirst.mockResolvedValue(null);
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -469,23 +469,23 @@ describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
 
   it('rejects non-UUID classificationId', async () => {
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=not-a-uuid'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline?classificationId=not-a-uuid'),
       routeParams,
     );
     expect(res.status).toBe(400);
   });
 
-  it('requires podcast ownership', async () => {
+  it('requires episode ownership', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'other-user' });
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/episodes/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(403);
   });
 });
 
-describe('PATCH /api/v1/podcasts/[id]/video/pipeline', () => {
+describe('PATCH /api/v1/episodes/[id]/video/pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

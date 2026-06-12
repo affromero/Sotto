@@ -210,44 +210,44 @@ export async function checkRateLimit(
 }
 
 // ---------------------------------------------------------------------------
-// Podcast status cache + pub/sub
+// Episode status cache + pub/sub
 // ---------------------------------------------------------------------------
 
-const PODCAST_CACHE_PREFIX = 'podcast:public:';
-const PODCAST_CHANNEL_PREFIX = 'podcast:status:';
+const EPISODE_CACHE_PREFIX = 'episode:public:';
+const EPISODE_CHANNEL_PREFIX = 'episode:status:';
 
 const ACTIVE_STATUSES = new Set([
   'EXTRACTING', 'DISCOVERING', 'RESEARCHING', 'PLANNING',
   'SCRIPTING', 'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
 ]);
 
-export function getPodcastCacheTtl(status: string): number {
+export function getEpisodeCacheTtl(status: string): number {
   return ACTIVE_STATUSES.has(status) ? 2 : 30;
 }
 
-export async function invalidatePodcastCache(podcastId: string): Promise<void> {
-  await cache.delete(`${PODCAST_CACHE_PREFIX}${podcastId}`);
+export async function invalidateEpisodeCache(episodeId: string): Promise<void> {
+  await cache.delete(`${EPISODE_CACHE_PREFIX}${episodeId}`);
 }
 
-export async function publishPodcastStatus(
-  podcastId: string,
+export async function publishEpisodeStatus(
+  episodeId: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
   const client = getRedisClient();
-  await client.publish(`${PODCAST_CHANNEL_PREFIX}${podcastId}`, JSON.stringify(payload));
+  await client.publish(`${EPISODE_CHANNEL_PREFIX}${episodeId}`, JSON.stringify(payload));
 }
 
-export function createPodcastStatusSubscriber(podcastId: string) {
-  const client = createRedisConnection(`sse-pod-${podcastId.slice(0, 8)}`);
-  const channel = `${PODCAST_CHANNEL_PREFIX}${podcastId}`;
+export function createEpisodeStatusSubscriber(episodeId: string) {
+  const client = createRedisConnection(`sse-pod-${episodeId.slice(0, 8)}`);
+  const channel = `${EPISODE_CHANNEL_PREFIX}${episodeId}`;
 
   return {
     channel,
     client,
     subscribe(onMessage: (data: string) => void) {
       client.subscribe(channel).catch((err) => {
-        logger.error('Failed to subscribe to podcast status channel', {
-          podcastId,
+        logger.error('Failed to subscribe to episode status channel', {
+          episodeId,
           error: err instanceof Error ? err.message : String(err),
         });
       });

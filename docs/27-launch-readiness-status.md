@@ -49,7 +49,7 @@ This is the current safe operating mode.
 
 ### 6. Avatar route Redis connection leak
 
-`GET /api/v1/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
+`GET /api/v1/episodes/[episodeId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
 
 ## What Is Still Not Solved
 
@@ -75,7 +75,7 @@ The 30MB Essentials plan has a 30 connection limit. The core preset fits (18), b
 
 ### 2. Full-capacity launch readiness
 
-Sotto is currently stable only in reduced worker mode. This is enough for the core podcast pipeline, but not for every background feature.
+Sotto is currently stable only in reduced worker mode. This is enough for the core episode pipeline, but not for every background feature.
 
 Non-core queues should remain disabled until either:
 
@@ -110,7 +110,7 @@ Until Redis capacity is increased, launch with the reduced core worker set only.
 
 Safe-for-launch core flow:
 
-1. user creates podcast (status: EXTRACTING)
+1. user creates episode (status: EXTRACTING)
 2. content extraction runs
 3. script generation and verification run (≤3 loops)
 4. reference validation runs (if references exist)
@@ -144,7 +144,7 @@ Everything outside that path should be considered optional for day one.
 If Redis pressure returns:
 
 1. keep web up
-2. keep core podcast queues on
+2. keep core episode queues on
 3. disable non-core queues first
 4. check Redis connected client count
 5. check queue backlog for core queues
@@ -156,6 +156,6 @@ Sotto is in a much better place than before:
 
 - database and cache are now separated from the app server
 - deploy infrastructure is cleaner
-- the core podcast pipeline is currently stable in production
+- the core episode pipeline is currently stable in production
 
 But the system is not yet safe to run the full worker fleet on the current Redis Cloud limits. Launch is safest if we keep the reduced core worker configuration, raise Redis headroom, fix Redis eviction policy, and add monitoring before opening traffic.

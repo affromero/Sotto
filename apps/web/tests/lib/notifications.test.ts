@@ -30,10 +30,10 @@ describe('createNotification', () => {
     const mockNotification = {
       id: 'notif1',
       userId: 'user1',
-      type: 'PODCAST_READY',
-      title: 'Your podcast is ready',
-      message: 'Your podcast "Test" is ready to listen',
-      data: { podcastId: 'pod1' },
+      type: 'EPISODE_READY',
+      title: 'Your episode is ready',
+      message: 'Your episode "Test" is ready to listen',
+      data: { episodeId: 'pod1' },
       read: false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -43,10 +43,10 @@ describe('createNotification', () => {
 
     const result = await createNotification(
       'user1',
-      'PODCAST_READY',
-      'Your podcast is ready',
-      'Your podcast "Test" is ready to listen',
-      { podcastId: 'pod1' }
+      'EPISODE_READY',
+      'Your episode is ready',
+      'Your episode "Test" is ready to listen',
+      { episodeId: 'pod1' }
     );
 
     expect(result).toEqual(mockNotification);
@@ -74,9 +74,9 @@ describe('getUserNotifications', () => {
       {
         id: 'notif1',
         userId: 'user1',
-        type: 'PODCAST_READY',
-        title: 'Podcast ready',
-        message: 'Your podcast is ready',
+        type: 'EPISODE_READY',
+        title: 'Episode ready',
+        message: 'Your episode is ready',
         data: null,
         read: true,
         createdAt: new Date('2026-02-08T12:00:00Z'),
@@ -101,7 +101,7 @@ describe('markNotificationRead', () => {
     const mockNotification = {
       id: 'notif1',
       userId: 'user1',
-      type: 'PODCAST_READY',
+      type: 'EPISODE_READY',
       title: 'Test',
       message: 'Test',
       data: null,

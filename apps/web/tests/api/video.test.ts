@@ -7,7 +7,7 @@ const mockCheckVideoGenerationGate = vi.fn();
 const mockTryIncrementVideoGeneration = vi.fn();
 const mockAddJob = vi.fn();
 
-const mockPodcastFindUnique = vi.fn();
+const mockEpisodeFindUnique = vi.fn();
 const mockVideoGenFindFirst = vi.fn();
 const mockVideoGenCreate = vi.fn();
 const mockSegmentVisualCreateMany = vi.fn();
@@ -22,7 +22,7 @@ const mockTransaction = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    podcast: { findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args) },
+    episode: { findUnique: (...args: unknown[]) => mockEpisodeFindUnique(...args) },
     videoGeneration: {
       findFirst: (...args: unknown[]) => mockVideoGenFindFirst(...args),
       create: (...args: unknown[]) => mockVideoGenCreate(...args),
@@ -92,28 +92,28 @@ vi.mock('@/lib/api-response', () => ({
   },
 }));
 
-import { POST, PATCH } from '@/app/api/v1/podcasts/[podcastId]/video/route';
+import { POST, PATCH } from '@/app/api/v1/episodes/[episodeId]/video/route';
 
 function createRequest(body?: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/video'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/episodes/pod-1/video'), {
     method: 'POST',
     body: body ? JSON.stringify(body) : undefined,
     headers: body ? { 'Content-Type': 'application/json' } : {},
   });
 }
 
-const routeParams = { params: Promise.resolve({ podcastId: 'pod-1' }) };
+const routeParams = { params: Promise.resolve({ episodeId: 'pod-1' }) };
 
-describe('POST /api/v1/podcasts/[id]/video', () => {
+describe('POST /api/v1/episodes/[id]/video', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockTryIncrementVideoGeneration.mockResolvedValue(true);
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
+    mockEpisodeFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
     mockVideoGenFindFirst.mockResolvedValue(null);
-    mockVideoGenCreate.mockResolvedValue({ id: 'vg-1', podcastId: 'pod-1', status: 'PENDING' });
+    mockVideoGenCreate.mockResolvedValue({ id: 'vg-1', episodeId: 'pod-1', status: 'PENDING' });
     mockSegmentVisualCreateMany.mockResolvedValue({ count: 2 });
     mockSegmentVisualFindMany.mockResolvedValue([
       { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'test', metadata: null },
@@ -129,7 +129,7 @@ describe('POST /api/v1/podcasts/[id]/video', () => {
     expect(body.videoGenerationId).toBe('vg-1');
 
     expect(mockAddJob).toHaveBeenCalledWith('vis-class-queue', 'classify_visuals', expect.objectContaining({
-      podcastId: 'pod-1',
+      episodeId: 'pod-1',
       videoGenerationId: 'vg-1',
     }));
     expect(mockSegmentVisualCreateMany).not.toHaveBeenCalled();
@@ -252,19 +252,19 @@ describe('POST /api/v1/podcasts/[id]/video', () => {
 });
 
 function createPatchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/video'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/episodes/pod-1/video'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-describe('PATCH /api/v1/podcasts/[id]/video', () => {
+describe('PATCH /api/v1/episodes/[id]/video', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY', videoUrl: null });
     mockSegmentVisualFindMany.mockResolvedValue([
       { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'old prompt', metadata: null, assetUrl: 'https://r2.example.com/old.png' },
@@ -288,7 +288,7 @@ describe('PATCH /api/v1/podcasts/[id]/video', () => {
   });
 
   it('rejects non-owner requests', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
+    mockEpisodeFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
     const res = await PATCH(createPatchRequest({ segments: [{ segmentVisualId: 'sv-1' }] }), routeParams);
     expect(res.status).toBe(403);
   });

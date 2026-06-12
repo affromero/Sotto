@@ -17,7 +17,7 @@ const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn().mockResolvedValue({
 const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaScriptCreate = vi.fn().mockResolvedValue({
   id: 'script-001',
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
 });
 
 const mockPrismaReferenceCreateMany = vi.fn().mockResolvedValue({ count: 5 });
@@ -27,8 +27,8 @@ const mockPrismaSegmentCreate = vi.fn().mockImplementation((args) => ({
   ...args.data,
 }));
 
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ aiModel: null, verificationMode: 'standard' });
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({ aiModel: null, verificationMode: 'standard' });
 const mockPrismaTagFindMany = vi
   .fn()
   .mockResolvedValue([
@@ -36,7 +36,7 @@ const mockPrismaTagFindMany = vi
     { id: 'tag-prod', slug: 'prod-ai-generated' },
     { id: 'tag-explainer', slug: 'type-explainer' },
   ]);
-const mockPrismaPodcastTagUpsert = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeTagUpsert = vi.fn().mockResolvedValue({});
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
@@ -57,15 +57,15 @@ vi.mock('@/lib/prisma', () => {
     user: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({}),
     },
-    podcast: {
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
+    episode: {
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
     },
     tag: {
       findMany: (...args: unknown[]) => mockPrismaTagFindMany(...args),
     },
-    podcastTag: {
-      upsert: (...args: unknown[]) => mockPrismaPodcastTagUpsert(...args),
+    episodeTag: {
+      upsert: (...args: unknown[]) => mockPrismaEpisodeTagUpsert(...args),
     },
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
@@ -84,7 +84,7 @@ const mockGenerateScript = vi.fn().mockResolvedValue({
     { speaker: 'EXPERT', text: 'Thanks for having me!' },
   ],
   soundCues: [
-    { type: 'intro', prompt: 'warm podcast intro', durationSeconds: 3, insertAfterTurn: -1 },
+    { type: 'intro', prompt: 'warm episode intro', durationSeconds: 3, insertAfterTurn: -1 },
     { type: 'outro', prompt: 'gentle outro', durationSeconds: 4, insertAfterTurn: 1 },
   ],
   references: [],
@@ -159,8 +159,8 @@ vi.mock('@/lib/pipeline-events', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -193,7 +193,7 @@ function createMockJob(data: GenerateScriptPayload): Job<GenerateScriptPayload> 
 }
 
 const defaultPayload: GenerateScriptPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-001',
   discoveryId: 'discovery-001',
 };
@@ -224,7 +224,7 @@ describe('processScriptGeneration', () => {
         { speaker: 'EXPERT', text: 'Thanks for having me!' },
       ],
       soundCues: [
-        { type: 'intro', prompt: 'warm podcast intro', durationSeconds: 3, insertAfterTurn: -1 },
+        { type: 'intro', prompt: 'warm episode intro', durationSeconds: 3, insertAfterTurn: -1 },
         { type: 'outro', prompt: 'gentle outro', durationSeconds: 4, insertAfterTurn: 1 },
       ],
       references: [],
@@ -238,10 +238,10 @@ describe('processScriptGeneration', () => {
     mockPrismaScriptFindUnique.mockResolvedValue(null);
     mockPrismaScriptCreate.mockResolvedValue({
       id: 'script-001',
-      podcastId: 'podcast-001',
+      episodeId: 'episode-001',
     });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, verificationMode: 'standard' });
+    mockPrismaEpisodeUpdate.mockResolvedValue({});
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: null, verificationMode: 'standard' });
     mockPrismaSegmentCreate.mockImplementation((args) => ({
       id: `segment-${args.data.order}`,
       ...args.data,
@@ -266,18 +266,18 @@ describe('processScriptGeneration', () => {
 
       expect(mockGenerateScript).not.toHaveBeenCalled();
       expect(mockPrismaScriptCreate).not.toHaveBeenCalled();
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'COMPILING' },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
         {
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           userId: 'user-001',
         },
-        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+        { jobId: expect.stringMatching(/^compile-episode-001-/) }
       );
     });
 
@@ -302,7 +302,7 @@ describe('processScriptGeneration', () => {
   });
 
   describe('AI routing', () => {
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockGetAiKey.mockResolvedValue(aiKey);
 
@@ -311,7 +311,7 @@ describe('processScriptGeneration', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockGenerateScript).toHaveBeenCalledWith(
@@ -331,8 +331,8 @@ describe('processScriptGeneration', () => {
       );
     });
 
-    it('uses the explicit podcast model owner and matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    it('uses the explicit episode model owner and matching provider key', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'gpt-5-mini',
         verificationMode: 'standard',
         source: 'WEB',
@@ -347,7 +347,7 @@ describe('processScriptGeneration', () => {
       await processScriptGeneration(createMockJob(defaultPayload));
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
@@ -370,7 +370,7 @@ describe('processScriptGeneration', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'gpt-5-mini',
         verificationMode: 'standard',
         source: 'WEB',
@@ -389,7 +389,7 @@ describe('processScriptGeneration', () => {
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'gpt-5-mini',
         verificationMode: 'standard',
         source: 'WEB',
@@ -407,7 +407,7 @@ describe('processScriptGeneration', () => {
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGenerateScript).toHaveBeenCalledWith(
@@ -545,7 +545,7 @@ describe('processScriptGeneration', () => {
 
       expect(mockPrismaScriptCreate).toHaveBeenCalledWith({
         data: {
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           turns: [
             { speaker: 'HOST', text: 'First turn', direction: 'excited' },
             { speaker: 'EXPERT', text: 'Second turn' },
@@ -651,7 +651,7 @@ describe('processScriptGeneration', () => {
       expect(mockPrismaReferenceCreateMany).toHaveBeenCalledWith({
         data: [
           {
-            podcastId: 'podcast-001',
+            episodeId: 'episode-001',
             number: 1,
             title: 'Quantum Supremacy Using a Programmable Superconducting Processor',
             authors: ['John Martinis', 'Sergio Boixo'],
@@ -662,7 +662,7 @@ describe('processScriptGeneration', () => {
             doi: '10.1038/s41586-019-1666-5',
           },
           {
-            podcastId: 'podcast-001',
+            episodeId: 'episode-001',
             number: 2,
             title: 'Introduction to Quantum Computing',
             authors: ['Michael Nielsen', 'Isaac Chuang'],
@@ -722,7 +722,7 @@ describe('processScriptGeneration', () => {
       expect(mockPrismaReferenceCreateMany).toHaveBeenCalledWith({
         data: [
           {
-            podcastId: 'podcast-001',
+            episodeId: 'episode-001',
             number: 1,
             title: 'Web Article',
             authors: [],
@@ -738,7 +738,7 @@ describe('processScriptGeneration', () => {
   });
 
   describe('pipeline routing: always routes to compile', () => {
-    it('updates podcast status to COMPILING with references', async () => {
+    it('updates episode status to COMPILING with references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [{ speaker: 'HOST', text: 'With refs [1]' }],
         soundCues: [],
@@ -763,8 +763,8 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'COMPILING' }),
       });
     });
@@ -797,12 +797,12 @@ describe('processScriptGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
-        { podcastId: 'podcast-001', userId: 'user-001' },
-        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+        { episodeId: 'episode-001', userId: 'user-001' },
+        { jobId: expect.stringMatching(/^compile-episode-001-/) }
       );
     });
 
-    it('updates podcast status to COMPILING without references', async () => {
+    it('updates episode status to COMPILING without references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [
           { speaker: 'HOST', text: 'First turn' },
@@ -820,8 +820,8 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'COMPILING' }),
       });
     });
@@ -847,8 +847,8 @@ describe('processScriptGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
-        { podcastId: 'podcast-001', userId: 'user-001' },
-        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+        { episodeId: 'episode-001', userId: 'user-001' },
+        { jobId: expect.stringMatching(/^compile-episode-001-/) }
       );
     });
 
@@ -876,7 +876,7 @@ describe('processScriptGeneration', () => {
           category: 'script_generation',
           inputTokens: 2500,
           outputTokens: 1800,
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           userId: 'user-001',
         })
       );
@@ -949,7 +949,7 @@ describe('processScriptGeneration', () => {
     it('propagates errors from reference.createMany', async () => {
       mockPrismaScriptCreate.mockResolvedValueOnce({
         id: 'script-001',
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
       });
       mockGenerateScript.mockResolvedValue({
         turns: [{ speaker: 'HOST', text: 'Test' }],
@@ -977,24 +977,24 @@ describe('processScriptGeneration', () => {
       await expect(processScriptGeneration(job)).rejects.toThrow('Foreign key constraint failed');
     });
 
-    it('propagates errors from podcast.update', async () => {
+    it('propagates errors from episode.update', async () => {
       mockPrismaScriptCreate.mockResolvedValueOnce({
         id: 'script-001',
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
       });
-      mockPrismaPodcastUpdate.mockRejectedValue(new Error('Podcast update failed'));
+      mockPrismaEpisodeUpdate.mockRejectedValue(new Error('Episode update failed'));
       const job = createMockJob(defaultPayload);
 
-      await expect(processScriptGeneration(job)).rejects.toThrow('Podcast update failed');
+      await expect(processScriptGeneration(job)).rejects.toThrow('Episode update failed');
     });
 
     it('propagates errors from addJob', async () => {
       mockPrismaScriptCreate.mockResolvedValueOnce({
         id: 'script-001',
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
       });
       mockPrismaReferenceCreateMany.mockResolvedValueOnce({ count: 1 });
-      mockPrismaPodcastUpdate.mockResolvedValueOnce({});
+      mockPrismaEpisodeUpdate.mockResolvedValueOnce({});
       mockAddJob.mockRejectedValue(new Error('Queue connection failed'));
       mockGenerateScript.mockResolvedValue({
         turns: [{ speaker: 'HOST', text: 'Test' }],
@@ -1071,7 +1071,7 @@ describe('processScriptGeneration', () => {
       // Script saved
       expect(mockPrismaScriptCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           turns: expect.arrayContaining([
             expect.objectContaining({ speaker: 'HOST', text: 'Let me cite this [1]' }),
           ]),
@@ -1087,8 +1087,8 @@ describe('processScriptGeneration', () => {
       });
 
       // Status updated to COMPILING
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'COMPILING' }),
       });
 
@@ -1096,8 +1096,8 @@ describe('processScriptGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
-        expect.objectContaining({ podcastId: 'podcast-001' }),
-        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+        expect.objectContaining({ episodeId: 'episode-001' }),
+        { jobId: expect.stringMatching(/^compile-episode-001-/) }
       );
 
       // Usage logged
@@ -1147,13 +1147,13 @@ describe('processScriptGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
-        expect.objectContaining({ podcastId: 'podcast-001' }),
-        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+        expect.objectContaining({ episodeId: 'episode-001' }),
+        { jobId: expect.stringMatching(/^compile-episode-001-/) }
       );
 
       // Status updated to COMPILING
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'COMPILING' }),
       });
 
@@ -1167,7 +1167,7 @@ describe('processScriptGeneration', () => {
 
   describe('demo mode (showcase)', () => {
     it('passes mode: demo when verificationMode is showcase', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: null,
         verificationMode: 'showcase',
       });
@@ -1183,7 +1183,7 @@ describe('processScriptGeneration', () => {
     });
 
     it('passes mode: standard for non-showcase verificationMode', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: null,
         verificationMode: 'standard',
       });

@@ -13,18 +13,18 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
-import type { PodcastSummary } from '@sotto/shared';
+import type { EpisodeSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { globalStyles } from '../../lib/theme';
-import { PodcastCard } from '../../components/PodcastCard';
+import { EpisodeCard } from '../../components/EpisodeCard';
 import { SkeletonCard } from '../../components/SkeletonCard';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
 
 type LibraryFilter = 'all' | 'ready' | 'private';
 
-interface UserPodcastsResponse {
-  podcasts: PodcastSummary[];
+interface UserEpisodesResponse {
+  episodes: EpisodeSummary[];
 }
 
 const FILTER_OPTIONS: Array<{
@@ -41,54 +41,54 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<LibraryFilter>('all');
 
-  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery<UserPodcastsResponse>(
+  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery<UserEpisodesResponse>(
     {
-      queryKey: ['user', 'me', 'podcasts'],
+      queryKey: ['user', 'me', 'episodes'],
       queryFn: async () => {
-        const response = await api.get<UserPodcastsResponse>('/users/me/podcasts');
+        const response = await api.get<UserEpisodesResponse>('/users/me/episodes');
         return response.data;
       },
     }
   );
 
-  const podcasts = useMemo(() => {
-    const items = [...(data?.podcasts ?? [])].sort(
+  const episodes = useMemo(() => {
+    const items = [...(data?.episodes ?? [])].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
     switch (filter) {
       case 'ready':
-        return items.filter((podcast) => podcast.status === 'READY');
+        return items.filter((episode) => episode.status === 'READY');
       case 'private':
-        return items.filter((podcast) => podcast.visibility === 'PRIVATE');
+        return items.filter((episode) => episode.visibility === 'PRIVATE');
       default:
         return items;
     }
-  }, [data?.podcasts, filter]);
+  }, [data?.episodes, filter]);
 
   const stats = useMemo(() => {
-    const items = data?.podcasts ?? [];
+    const items = data?.episodes ?? [];
     return {
       total: items.length,
-      ready: items.filter((podcast) => podcast.status === 'READY').length,
-      private: items.filter((podcast) => podcast.visibility === 'PRIVATE').length,
+      ready: items.filter((episode) => episode.status === 'READY').length,
+      private: items.filter((episode) => episode.visibility === 'PRIVATE').length,
     };
-  }, [data?.podcasts]);
+  }, [data?.episodes]);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: PodcastSummary; index: number }) => (
+    ({ item, index }: { item: EpisodeSummary; index: number }) => (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(350)}>
-        <PodcastCard
-          podcast={item}
+        <EpisodeCard
+          episode={item}
           variant="feed"
-          onPress={() => router.push(`/podcast/${item.id}`)}
+          onPress={() => router.push(`/episode/${item.id}`)}
         />
       </Animated.View>
     ),
     [router]
   );
 
-  const keyExtractor = useCallback((item: PodcastSummary) => item.id, []);
+  const keyExtractor = useCallback((item: EpisodeSummary) => item.id, []);
 
   const listHeader = (
     <View style={styles.header}>
@@ -142,13 +142,13 @@ export default function LibraryScreen() {
   return (
     <View style={globalStyles.screenContainer}>
       <FlatList
-        testID="library-podcast-list"
-        data={podcasts}
+        testID="library-episode-list"
+        data={episodes}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         ListHeaderComponent={listHeader}
         contentContainerStyle={
-          podcasts.length === 0 ? styles.emptyListContainer : styles.listContent
+          episodes.length === 0 ? styles.emptyListContainer : styles.listContent
         }
         refreshControl={
           <RefreshControl

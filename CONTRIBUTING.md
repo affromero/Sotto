@@ -56,7 +56,7 @@ This runs lint, TypeScript type-checking, Vitest tests, and a production build. 
 
 1. Add the source and target language codes to the `SUPPORTED_LANGUAGES` constant in `packages/shared/src/provider-display.ts`.
 2. Add display names to the `LANGUAGE_DISPLAY` map in the same file.
-3. If the language requires a dedicated TTS voice profile, add an entry to `packages/shared/src/types/podcast.ts` (`VoiceProfile`).
+3. If the language requires a dedicated TTS voice profile, add an entry to `packages/shared/src/types/episode.ts` (`VoiceProfile`).
 4. Add a Prisma migration if any database enum needs updating, then run `npx prisma generate`.
 5. Add at least one Vitest test covering the new language code in `apps/web/src/`.
 

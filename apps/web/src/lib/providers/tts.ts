@@ -33,7 +33,7 @@ export interface SpeechParams {
   speaker?: string;
   /** Deterministic seed for reproducible output (ElevenLabs only, 0–4294967295) */
   seed?: number;
-  /** ISO 639-1 language code for the podcast (used as hint by providers that accept it). */
+  /** ISO 639-1 language code for the episode (used as hint by providers that accept it). */
   language?: string;
 }
 
@@ -46,7 +46,7 @@ export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
   generateSpeechWithTimestamps?(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, language?: string): string;
+  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, language?: string): string;
   getModelId(): string;
   /** Return the continuity ID from the last generateSpeech() call, if the provider supports it. */
   getLastContinuityId?(): string | null;
@@ -221,7 +221,7 @@ export interface ResolvedProvider {
  */
 export async function resolveTtsProvider(context: {
   userId: string;
-  podcastId: string;
+  episodeId: string;
   requestedProvider?: TtsProviderId | 'auto' | null;
   requestedModel?: string | null;
   /** Skip BYOK key lookup and go straight to platform keys. Used for fallback retries. */
@@ -236,7 +236,7 @@ export async function resolveTtsProvider(context: {
   }
 
   if (!language) {
-    logger.debug('No language provided, skipping language-aware provider selection', { podcastId: context.podcastId });
+    logger.debug('No language provided, skipping language-aware provider selection', { episodeId: context.episodeId });
   }
 
   // Helper: resolve a language-compatible model for a specific provider.

@@ -89,12 +89,12 @@ export class OpenAITtsProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
-    if (!podcastId) {
+    if (!episodeId) {
       return isHostVoice ? 'nova' : 'onyx';
     }
-    const pair = selectVoicePair(podcastId, metadata);
+    const pair = selectVoicePair(episodeId, metadata);
     const entry = isHostVoice ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'openai');
   }

@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 const execFileAsync = promisify(execFile);
 
 const SIMILARITY_THRESHOLD = 0.85;
-const DURATION_TOLERANCE = 0.15; // 15% — only compare podcasts within this duration range
+const DURATION_TOLERANCE = 0.15; // 15% — only compare episodes within this duration range
 
 interface FingerprintResult {
   fingerprint: number[];
@@ -59,18 +59,18 @@ function popcount32(n: number): number {
 }
 
 interface DuplicateCandidate {
-  podcastId: string;
+  episodeId: string;
   similarity: number;
 }
 
 /**
- * Find duplicate podcasts by comparing a fingerprint against all existing ones.
+ * Find duplicate episodes by comparing a fingerprint against all existing ones.
  * Pre-filters by duration (+/-15%) to reduce comparison count.
  */
 export async function findDuplicates(
   fingerprint: number[],
   duration: number,
-  excludePodcastId?: string,
+  excludeEpisodeId?: string,
 ): Promise<DuplicateCandidate[]> {
   const minDuration = Math.round(duration * (1 - DURATION_TOLERANCE));
   const maxDuration = Math.round(duration * (1 + DURATION_TOLERANCE));
@@ -78,9 +78,9 @@ export async function findDuplicates(
   const candidates = await prisma.audioFingerprint.findMany({
     where: {
       duration: { gte: minDuration, lte: maxDuration },
-      ...(excludePodcastId ? { podcastId: { not: excludePodcastId } } : {}),
+      ...(excludeEpisodeId ? { episodeId: { not: excludeEpisodeId } } : {}),
     },
-    select: { podcastId: true, fingerprint: true },
+    select: { episodeId: true, fingerprint: true },
   });
 
   const matches: DuplicateCandidate[] = [];
@@ -88,9 +88,9 @@ export async function findDuplicates(
   for (const candidate of candidates) {
     const similarity = compareFingerprints(fingerprint, candidate.fingerprint);
     if (similarity >= SIMILARITY_THRESHOLD) {
-      matches.push({ podcastId: candidate.podcastId, similarity });
+      matches.push({ episodeId: candidate.episodeId, similarity });
       logger.info('Duplicate candidate found', {
-        matchedPodcastId: candidate.podcastId,
+        matchedEpisodeId: candidate.episodeId,
         similarity: similarity.toFixed(4),
       });
     }

@@ -8,7 +8,7 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
     { speaker: 'EXPERT', text: 'Thanks for having me.' },
   ],
 });
-const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ language: null });
+const mockPrismaEpisodeFindUnique = vi.fn().mockResolvedValue({ language: null });
 const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ preferredLanguage: null });
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
@@ -20,8 +20,8 @@ vi.mock('@/lib/prisma', () => {
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
     },
-    podcast: {
-      findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
+    episode: {
+      findUnique: (...args: unknown[]) => mockPrismaEpisodeFindUnique(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
@@ -122,7 +122,7 @@ function createMockJob(data: ProcessInteractionPayload): Job<ProcessInteractionP
 }
 
 const defaultPayload: ProcessInteractionPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   interactionId: 'interaction-001',
   userId: 'user-001',
   question: 'Can you explain that in more detail?',
@@ -134,7 +134,7 @@ const defaultPayload: ProcessInteractionPayload = {
 describe('processInteraction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: null });
+    mockPrismaEpisodeFindUnique.mockResolvedValue({ language: null, aiModel: null });
     mockPrismaUserFindUnique.mockResolvedValue({ preferredLanguage: null });
     mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockPrismaScriptFindUnique.mockResolvedValue({
@@ -177,7 +177,7 @@ describe('processInteraction', () => {
   });
 
   describe('AI routing', () => {
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockGetAiKey.mockResolvedValue(aiKey);
 
@@ -186,7 +186,7 @@ describe('processInteraction', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
@@ -200,15 +200,15 @@ describe('processInteraction', () => {
       );
     });
 
-    it('uses the explicit podcast model owner and matching provider key', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: 'gpt-5-mini' });
+    it('uses the explicit episode model owner and matching provider key', async () => {
+      mockPrismaEpisodeFindUnique.mockResolvedValue({ language: null, aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
       mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
 
       await processInteraction(createMockJob(defaultPayload));
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
@@ -225,7 +225,7 @@ describe('processInteraction', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: 'gpt-5-mini' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({ language: null, aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
       mockGetAiKey.mockResolvedValue(null);
 
@@ -248,7 +248,7 @@ describe('processInteraction', () => {
     });
 
     it('allows local claude-code models without provider keys', async () => {
-      mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: 'claude-code:sonnet' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({ language: null, aiModel: 'claude-code:sonnet' });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'claude-code:sonnet',
         provider: 'claude-code',
@@ -276,11 +276,11 @@ describe('processInteraction', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processInteraction(job)).rejects.toThrow(
-        'Script not found for podcast podcast-001'
+        'Script not found for episode episode-001'
       );
     });
 
-    it('handles podcast with no turns gracefully', async () => {
+    it('handles episode with no turns gracefully', async () => {
       mockPrismaScriptFindUnique.mockResolvedValue({ turns: [] });
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
@@ -317,7 +317,7 @@ describe('processInteraction', () => {
       expect(mockGenerateResponse).toHaveBeenCalled();
       const callArgs = mockGenerateResponse.mock.calls[0];
       const messages = callArgs[1];
-      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain('Recent episode context:');
     });
 
     it('handles timestamp at segment boundary', async () => {
@@ -341,7 +341,7 @@ describe('processInteraction', () => {
 
       const callArgs = mockGenerateResponse.mock.calls[0];
       const messages = callArgs[1];
-      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain('Recent episode context:');
     });
 
     it('takes last 5 turns as recent context', async () => {
@@ -387,22 +387,22 @@ describe('processInteraction', () => {
       expect(content).toMatch(/EXPERT:/);
     });
 
-    it('handles early timestamp (beginning of podcast)', async () => {
+    it('handles early timestamp (beginning of episode)', async () => {
       const job = createMockJob({ ...defaultPayload, timestamp: 5 });
       await processInteraction(job);
 
       const callArgs = mockGenerateResponse.mock.calls[0];
       const messages = callArgs[1];
-      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain('Recent episode context:');
     });
 
-    it('handles very late timestamp (end of podcast)', async () => {
+    it('handles very late timestamp (end of episode)', async () => {
       const job = createMockJob({ ...defaultPayload, timestamp: 1200 });
       await processInteraction(job);
 
       const callArgs = mockGenerateResponse.mock.calls[0];
       const messages = callArgs[1];
-      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain('Recent episode context:');
     });
 
     it('constructs context message with user question', async () => {
@@ -426,7 +426,7 @@ describe('processInteraction', () => {
       const callArgs = mockGenerateResponse.mock.calls[0];
       const systemPrompt = callArgs[0];
       expect(systemPrompt).toContain("Sotto's Q&A assistant");
-      expect(systemPrompt).toContain('podcast context');
+      expect(systemPrompt).toContain('episode context');
       expect(systemPrompt).toContain('under 200 words');
     });
 
@@ -438,7 +438,7 @@ describe('processInteraction', () => {
       const messages = callArgs[1];
       expect(messages).toHaveLength(1);
       expect(messages[0].role).toBe('user');
-      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain('Recent episode context:');
       expect(messages[0].content).toContain("User's question:");
     });
 
@@ -517,7 +517,7 @@ describe('processInteraction', () => {
           category: 'interaction',
           inputTokens: 225,
           outputTokens: 90,
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           userId: 'user-001',
         })
       );
@@ -537,16 +537,16 @@ describe('processInteraction', () => {
       );
     });
 
-    it('logs correct podcastId from payload', async () => {
+    it('logs correct episodeId from payload', async () => {
       const job = createMockJob({
         ...defaultPayload,
-        podcastId: 'podcast-xyz-456',
+        episodeId: 'episode-xyz-456',
       });
       await processInteraction(job);
 
       expect(mockLogUsage).toHaveBeenCalledWith(
         expect.objectContaining({
-          podcastId: 'podcast-xyz-456',
+          episodeId: 'episode-xyz-456',
         })
       );
     });
@@ -571,7 +571,7 @@ describe('processInteraction', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processInteraction(job)).rejects.toThrow(
-        'Script not found for podcast podcast-001'
+        'Script not found for episode episode-001'
       );
     });
 
@@ -595,7 +595,7 @@ describe('processInteraction', () => {
   describe('edge cases', () => {
     it('handles single-turn script', async () => {
       mockPrismaScriptFindUnique.mockResolvedValue({
-        turns: [{ speaker: 'HOST', text: 'This is a very short podcast.' }],
+        turns: [{ speaker: 'HOST', text: 'This is a very short episode.' }],
       });
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
@@ -611,7 +611,7 @@ describe('processInteraction', () => {
       expect(mockGenerateResponse).toHaveBeenCalled();
       const callArgs = mockGenerateResponse.mock.calls[0];
       const messages = callArgs[1];
-      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain('Recent episode context:');
     });
 
     it('handles very long question text', async () => {
@@ -676,7 +676,7 @@ describe('processInteraction', () => {
       });
 
       const job = createMockJob({
-        podcastId: 'podcast-final',
+        episodeId: 'episode-final',
         interactionId: 'interaction-final',
         userId: 'user-final',
         question: 'What is AI?',
@@ -686,7 +686,7 @@ describe('processInteraction', () => {
       await processInteraction(job);
 
       expect(mockPrismaScriptFindUnique).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-final' },
+        where: { episodeId: 'episode-final' },
       });
 
       expect(mockGenerateResponse).toHaveBeenCalled();
@@ -706,7 +706,7 @@ describe('processInteraction', () => {
           category: 'interaction',
           inputTokens: 180,
           outputTokens: 65,
-          podcastId: 'podcast-final',
+          episodeId: 'episode-final',
           userId: 'user-final',
         })
       );

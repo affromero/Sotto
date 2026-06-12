@@ -352,7 +352,7 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
 }
 
 /**
- * Generate a 2-voice podcast script from discovery metadata.
+ * Generate a 2-voice episode script from discovery metadata.
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
  */

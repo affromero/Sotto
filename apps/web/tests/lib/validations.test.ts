@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   discoveryMessageSchema,
-  createPodcastSchema,
+  createEpisodeSchema,
   interactionSchema,
-  updatePodcastSchema,
+  updateEpisodeSchema,
   configureAvatarsSchema,
   updateAvatarPositionsSchema,
   regenerateWithFeedbackSchema,
@@ -15,22 +15,22 @@ describe('discoveryMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts content with optional podcastId', () => {
+  it('accepts content with optional episodeId', () => {
     const result = discoveryMessageSchema.safeParse({
       content: 'Tell me more',
-      podcastId: 'abc-123',
+      episodeId: 'abc-123',
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.podcastId).toBe('abc-123');
+      expect(result.data.episodeId).toBe('abc-123');
     }
   });
 
-  it('accepts content without podcastId', () => {
+  it('accepts content without episodeId', () => {
     const result = discoveryMessageSchema.safeParse({ content: 'Hello' });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.podcastId).toBeUndefined();
+      expect(result.data.episodeId).toBeUndefined();
     }
   });
 
@@ -65,9 +65,9 @@ describe('discoveryMessageSchema', () => {
   });
 });
 
-describe('createPodcastSchema', () => {
+describe('createEpisodeSchema', () => {
   it('accepts valid input', () => {
-    const result = createPodcastSchema.safeParse({
+    const result = createEpisodeSchema.safeParse({
       title: 'Quantum Physics 101',
       topic: 'An introduction to quantum mechanics for beginners',
       discoveryId: 'disc-123',
@@ -76,7 +76,7 @@ describe('createPodcastSchema', () => {
   });
 
   it('rejects empty title', () => {
-    const result = createPodcastSchema.safeParse({
+    const result = createEpisodeSchema.safeParse({
       title: '',
       topic: 'Some topic',
       discoveryId: 'disc-123',
@@ -85,7 +85,7 @@ describe('createPodcastSchema', () => {
   });
 
   it('rejects title exceeding 200 characters', () => {
-    const result = createPodcastSchema.safeParse({
+    const result = createEpisodeSchema.safeParse({
       title: 'a'.repeat(201),
       topic: 'Some topic',
       discoveryId: 'disc-123',
@@ -94,8 +94,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('rejects empty topic', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: '',
       discoveryId: 'disc-123',
     });
@@ -103,8 +103,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('rejects topic exceeding 5000 characters', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'a'.repeat(5001),
       discoveryId: 'disc-123',
     });
@@ -112,15 +112,15 @@ describe('createPodcastSchema', () => {
   });
 
   it('accepts missing discoveryId (optional for Twitter/API sources)', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
     });
     expect(result.success).toBe(true);
   });
 
   it('rejects missing title', () => {
-    const result = createPodcastSchema.safeParse({
+    const result = createEpisodeSchema.safeParse({
       topic: 'A topic',
       discoveryId: 'disc-123',
     });
@@ -128,7 +128,7 @@ describe('createPodcastSchema', () => {
   });
 
   it('accepts title at exactly 200 characters', () => {
-    const result = createPodcastSchema.safeParse({
+    const result = createEpisodeSchema.safeParse({
       title: 'a'.repeat(200),
       topic: 'A topic',
       discoveryId: 'disc-123',
@@ -137,8 +137,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('accepts durationTarget within valid range', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
       metadata: { topic: 'A topic', durationTarget: 20 },
     });
@@ -146,8 +146,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('accepts durationTarget at minimum boundary (1)', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
       metadata: { topic: 'A topic', durationTarget: 1 },
     });
@@ -155,8 +155,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('accepts durationTarget at maximum boundary (40)', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
       metadata: { topic: 'A topic', durationTarget: 40 },
     });
@@ -164,8 +164,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('rejects durationTarget below minimum (1)', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
       metadata: { topic: 'A topic', durationTarget: 0 },
     });
@@ -173,8 +173,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('rejects durationTarget above maximum', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
       metadata: { topic: 'A topic', durationTarget: 45 },
     });
@@ -182,8 +182,8 @@ describe('createPodcastSchema', () => {
   });
 
   it('accepts metadata without durationTarget (optional)', () => {
-    const result = createPodcastSchema.safeParse({
-      title: 'My Podcast',
+    const result = createEpisodeSchema.safeParse({
+      title: 'My Episode',
       topic: 'A topic',
       metadata: { topic: 'A topic' },
     });
@@ -255,24 +255,24 @@ describe('interactionSchema', () => {
   });
 });
 
-describe('updatePodcastSchema', () => {
+describe('updateEpisodeSchema', () => {
   it('accepts valid partial update with title only', () => {
-    const result = updatePodcastSchema.safeParse({ title: 'New Title' });
+    const result = updateEpisodeSchema.safeParse({ title: 'New Title' });
     expect(result.success).toBe(true);
   });
 
   it('accepts valid partial update with topic only', () => {
-    const result = updatePodcastSchema.safeParse({ topic: 'Updated topic' });
+    const result = updateEpisodeSchema.safeParse({ topic: 'Updated topic' });
     expect(result.success).toBe(true);
   });
 
   it('accepts valid partial update with visibility only', () => {
-    const result = updatePodcastSchema.safeParse({ visibility: 'PRIVATE' });
+    const result = updateEpisodeSchema.safeParse({ visibility: 'PRIVATE' });
     expect(result.success).toBe(true);
   });
 
   it('accepts all fields together', () => {
-    const result = updatePodcastSchema.safeParse({
+    const result = updateEpisodeSchema.safeParse({
       title: 'New Title',
       topic: 'New Topic',
       visibility: 'PUBLIC',
@@ -281,37 +281,37 @@ describe('updatePodcastSchema', () => {
   });
 
   it('accepts empty object (all fields optional)', () => {
-    const result = updatePodcastSchema.safeParse({});
+    const result = updateEpisodeSchema.safeParse({});
     expect(result.success).toBe(true);
   });
 
   it('accepts UNLISTED visibility', () => {
-    const result = updatePodcastSchema.safeParse({ visibility: 'UNLISTED' });
+    const result = updateEpisodeSchema.safeParse({ visibility: 'UNLISTED' });
     expect(result.success).toBe(true);
   });
 
   it('rejects invalid visibility value', () => {
-    const result = updatePodcastSchema.safeParse({ visibility: 'DRAFT' });
+    const result = updateEpisodeSchema.safeParse({ visibility: 'DRAFT' });
     expect(result.success).toBe(false);
   });
 
   it('rejects legacy remix fields', () => {
-    const result = updatePodcastSchema.safeParse({ remixNote: 'Different angle' });
+    const result = updateEpisodeSchema.safeParse({ remixNote: 'Different angle' });
     expect(result.success).toBe(false);
   });
 
   it('rejects empty title when provided', () => {
-    const result = updatePodcastSchema.safeParse({ title: '' });
+    const result = updateEpisodeSchema.safeParse({ title: '' });
     expect(result.success).toBe(false);
   });
 
   it('rejects title exceeding 200 characters', () => {
-    const result = updatePodcastSchema.safeParse({ title: 'a'.repeat(201) });
+    const result = updateEpisodeSchema.safeParse({ title: 'a'.repeat(201) });
     expect(result.success).toBe(false);
   });
 
   it('rejects empty topic when provided', () => {
-    const result = updatePodcastSchema.safeParse({ topic: '' });
+    const result = updateEpisodeSchema.safeParse({ topic: '' });
     expect(result.success).toBe(false);
   });
 });

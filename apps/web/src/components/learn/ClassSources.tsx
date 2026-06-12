@@ -2,7 +2,7 @@
 
 /**
  * ClassSources — the verified-sources panel for a sourced class. Renders the
- * class's references (surfaced from the LISTENING podcast) as a calm, numbered
+ * class's references (surfaced from the LISTENING episode) as a calm, numbered
  * list in the aula design system, each with a verification badge and an optional
  * content-domain tag. When the class was built from a real link, a "Built from …"
  * attribution links out to the source.

@@ -20,7 +20,7 @@ export function ReferencesTab({ references }: ReferencesTabProps) {
   if (references.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>No references for this podcast.</Text>
+        <Text style={styles.emptyText}>No references for this episode.</Text>
       </View>
     );
   }

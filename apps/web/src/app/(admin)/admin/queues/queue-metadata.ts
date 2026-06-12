@@ -33,7 +33,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Content Pipeline',
   },
   'script-generation': {
-    description: 'Generates 2-voice conversational podcast scripts via LLM',
+    description: 'Generates 2-voice conversational episode scripts via LLM',
     stage: 'Content Pipeline',
   },
   'script-verification': {
@@ -85,7 +85,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Platform Ops',
   },
   'visual-classification': {
-    description: 'Classifies podcast segments into visual types via Claude',
+    description: 'Classifies episode segments into visual types via Claude',
     stage: 'Video Pipeline',
   },
   'visual-generation': {
@@ -113,7 +113,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Video Pipeline',
   },
   'waveform-generation': {
-    description: 'Generates waveform peaks JSON and spectrogram PNG from podcast audio',
+    description: 'Generates waveform peaks JSON and spectrogram PNG from episode audio',
     stage: 'Audio Pipeline',
   },
   'pipeline-classification': {

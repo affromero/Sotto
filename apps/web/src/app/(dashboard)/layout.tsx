@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const userId = session.user.id as string;
-  const podcastCount = await prisma.podcast.count({
+  const episodeCount = await prisma.episode.count({
     where: { userId, deletedAt: null },
   });
 
@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         image: session.user.image ?? null,
         role: ((session.user as Record<string, unknown>).role as string) ?? 'USER',
       }}
-      hasPodcasts={podcastCount > 0}
+      hasEpisodes={episodeCount > 0}
     >
       {children}
       <InstallPrompt />

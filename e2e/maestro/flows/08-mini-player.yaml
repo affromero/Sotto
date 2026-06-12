@@ -4,14 +4,14 @@ tags: [player, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Scroll to and play seeded podcast
+# Scroll to and play seeded episode
 - scrollUntilVisible:
     element:
-      id: 'podcast-card-${E2E_PODCAST_ID}'
+      id: 'episode-card-${E2E_EPISODE_ID}'
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: 'podcast-card-${E2E_PODCAST_ID}'
+    id: 'episode-card-${E2E_EPISODE_ID}'
 - extendedWaitUntil:
     visible:
       id: 'player-play-pause'
@@ -23,7 +23,7 @@ tags: [player, smoke]
 - back
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 5000
 
 # MiniPlayer should be visible

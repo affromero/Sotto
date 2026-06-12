@@ -213,7 +213,7 @@ export default function ClassScreen() {
         {/* Sources (sourced classes) */}
         {(() => {
           const refs =
-            classData.sections.find((s) => s.podcast?.references?.length)?.podcast?.references ?? [];
+            classData.sections.find((s) => s.episode?.references?.length)?.episode?.references ?? [];
           if (refs.length === 0 && !classData.sourceUrl) return null;
           return (
             <View style={styles.sourcesBlock}>

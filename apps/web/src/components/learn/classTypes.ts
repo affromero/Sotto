@@ -43,7 +43,7 @@ export interface ClassQuestion {
 }
 
 /**
- * A class's verified source, surfaced from the LISTENING podcast's references.
+ * A class's verified source, surfaced from the LISTENING episode's references.
  * Narrower than {@link ReferenceData} — the class API omits `publisher`, `doi`,
  * `verificationDetails`, and a stable `id`. Use {@link classRefToReferenceData}
  * to adapt these for the shared citation/reference UI.
@@ -68,7 +68,7 @@ export interface ClassSpeakingPrompt {
   referenceTtsUrl?: string | null;
 }
 
-export interface ClassSectionPodcast {
+export interface ClassSectionEpisode {
   id: string;
   audioUrl: string | null;
   title: string;
@@ -83,7 +83,7 @@ export interface ClassSection {
   attempt: number;
   score: number | null;
   passed: boolean | null;
-  podcast: ClassSectionPodcast | null;
+  episode: ClassSectionEpisode | null;
   questions: ClassQuestion[];
   prompts: ClassSpeakingPrompt[];
   writingPrompts: WritingPromptData[];

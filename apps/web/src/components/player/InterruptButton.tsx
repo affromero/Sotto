@@ -23,7 +23,7 @@ export function InterruptButton({ onInterrupt }: InterruptButtonProps) {
     <button
       className={`${styles.button} ${isActive ? styles.active : ''}`}
       onClick={handleClick}
-      disabled={!player?.podcastId}
+      disabled={!player?.episodeId}
       aria-label="Ask a question"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

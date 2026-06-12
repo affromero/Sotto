@@ -7,73 +7,73 @@ import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { getGenerationFeatures } from '@/lib/generation-features';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId, useAdminCredits } = job.data;
+  const { episodeId, userId, discoveryId, useAdminCredits } = job.data;
 
-  logger.info('Generating script', { podcastId });
+  logger.info('Generating script', { episodeId });
   await job.updateProgress(10);
 
   // Idempotency: skip if script already exists
   const existingScript = await prisma.script.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { id: true },
   });
 
   if (existingScript) {
-    logger.info('Script already exists, skipping to compile', { podcastId });
+    logger.info('Script already exists, skipping to compile', { episodeId });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { status: 'COMPILING' },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'COMPILING' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
     await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-      podcastId,
+      episodeId,
       userId,
-    }, { jobId: `compile-${podcastId}-${Date.now()}` });
+    }, { jobId: `compile-${episodeId}-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
   }
 
-  const [podcast, discovery] = await Promise.all([
-    prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true, verificationMode: true, source: true, language: true } }),
+  const [episode, discovery] = await Promise.all([
+    prisma.episode.findUniqueOrThrow({ where: { id: episodeId }, select: { aiModel: true, verificationMode: true, source: true, language: true } }),
     prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
   const genFeatures = getGenerationFeatures();
 
-  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
-  if (!podcast.aiModel && !aiKey) {
+  const aiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
+  if (!episode.aiModel && !aiKey) {
     throw new Error('AI model is required for script generation when no AI key is configured.');
   }
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast.aiModel,
+    episodeAiModel: episode.aiModel,
     aiKey,
   });
 
   const providerAiKey =
-    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for script generation.`);
   }
 
   // Extract content from user-provided source URLs and append to discovery.sourceContent
   if (job.data.sourceUrls && job.data.sourceUrls.length > 0) {
     logger.info('Extracting content from user-provided source URLs', {
-      podcastId,
+      episodeId,
       urlCount: String(job.data.sourceUrls.length),
     });
     const results = await Promise.allSettled(
@@ -96,7 +96,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       });
       discovery.sourceContent = newContent;
       logger.info('Appended extracted source content', {
-        podcastId,
+        episodeId,
         extractedCount: String(extractedTexts.length),
       });
     }
@@ -153,8 +153,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         model,
         provider,
         webSearchEnabled: genFeatures.webSearchEnabled,
-        mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
-        targetLanguage: podcast.language,
+        mode: episode.verificationMode === 'showcase' ? 'demo' : 'standard',
+        targetLanguage: episode.language,
       });
 
   await job.updateProgress(50);
@@ -173,12 +173,12 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     const entryNumbers = new Set(result.vocabulary.map((v) => v.number));
     for (const num of markerNumbers) {
       if (!entryNumbers.has(num)) {
-        logger.warn('Vocabulary marker without matching entry', { podcastId, markerNumber: String(num) });
+        logger.warn('Vocabulary marker without matching entry', { episodeId, markerNumber: String(num) });
       }
     }
     for (const num of entryNumbers) {
       if (!markerNumbers.has(num)) {
-        logger.warn('Vocabulary entry without matching marker in script', { podcastId, entryNumber: String(num) });
+        logger.warn('Vocabulary entry without matching marker in script', { episodeId, entryNumber: String(num) });
       }
     }
   }
@@ -187,7 +187,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   await prisma.$transaction(async (tx) => {
     await tx.script.create({
       data: {
-        podcastId,
+        episodeId,
         turns: result.turns,
         soundCues: result.soundCues.length > 0 ? result.soundCues : undefined,
         markdown: result.markdown,
@@ -197,7 +197,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     if (result.references.length > 0) {
       await tx.reference.createMany({
         data: result.references.map((ref) => ({
-          podcastId,
+          episodeId,
           number: ref.number,
           title: ref.title,
           authors: ref.authors,
@@ -213,7 +213,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     if (result.vocabulary && result.vocabulary.length > 0) {
       await tx.vocabularyEntry.createMany({
         data: result.vocabulary.map((v) => ({
-          podcastId,
+          episodeId,
           number: v.number,
           word: v.word,
           translation: v.translation,
@@ -227,14 +227,14 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   });
 
   if (result.references.length > 0) {
-    logger.info('References saved', { podcastId, count: String(result.references.length) });
+    logger.info('References saved', { episodeId, count: String(result.references.length) });
   }
   if (result.vocabulary && result.vocabulary.length > 0) {
-    logger.info('Vocabulary entries saved', { podcastId, count: String(result.vocabulary.length) });
+    logger.info('Vocabulary entries saved', { episodeId, count: String(result.vocabulary.length) });
   }
 
   if (result.places.length > 0) {
-    logger.info('Places extracted from script', { podcastId, places: result.places.map((p) => p.name) });
+    logger.info('Places extracted from script', { episodeId, places: result.places.map((p) => p.name) });
   }
 
   // Collect all tag slugs upfront for a single batched lookup
@@ -299,10 +299,10 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     const tagId = tagsBySlug.get(slug);
     if (tagId) {
       tagUpserts.push(
-        prisma.podcastTag.upsert({
-          where: { podcastId_tagId: { podcastId, tagId } },
+        prisma.episodeTag.upsert({
+          where: { episodeId_tagId: { episodeId, tagId } },
           update: {},
-          create: { podcastId, tagId },
+          create: { episodeId, tagId },
         }),
       );
     }
@@ -310,25 +310,25 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   await Promise.all(tagUpserts);
 
   // Route to compile/QC step
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: {
       status: 'COMPILING',
       aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
       aiModel: model,
-      language: podcast.language ?? detectedLanguage ?? undefined,
+      language: episode.language ?? detectedLanguage ?? undefined,
     },
   });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'COMPILING' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
   await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-    podcastId,
+    episodeId,
     userId,
-  }, { jobId: `compile-${podcastId}-${Date.now()}` });
+  }, { jobId: `compile-${episodeId}-${Date.now()}` });
 
   logger.info('Script queued for compilation', {
-    podcastId,
+    episodeId,
     references: String(result.references.length),
   });
 
@@ -339,14 +339,14 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     category: 'script_generation',
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
-    podcastId,
+    episodeId,
     userId,
   });
 
-  await logPipelineStageComplete(podcastId, 'script-generation');
+  await logPipelineStageComplete(episodeId, 'script-generation');
   await job.updateProgress(100);
   logger.info('Script generation complete', {
-    podcastId,
+    episodeId,
     references: String(result.references.length),
   });
 }

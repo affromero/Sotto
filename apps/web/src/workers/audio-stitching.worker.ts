@@ -7,10 +7,10 @@ import {
   pdfGenerationQueue,
   waveformGenerationQueue,
 } from '@/lib/queue';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
+import { markEpisodeFailed } from '@/lib/pipeline-resume';
+import { downloadToFile, uploadEpisodeAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
 import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
@@ -153,10 +153,10 @@ const STOCK_SFX: Record<SoundCue['type'], string> = {
 };
 
 export async function processAudioStitching(job: Job<StitchAudioPayload>): Promise<void> {
-  const { podcastId, segmentIds, skipSfx } = job.data;
+  const { episodeId, segmentIds, skipSfx } = job.data;
   const tmpDir = path.join(os.tmpdir(), `sotto-stitch-${crypto.randomUUID()}`);
 
-  logger.info('Stitching audio', { podcastId, segmentCount: String(segmentIds.length) });
+  logger.info('Stitching audio', { episodeId, segmentCount: String(segmentIds.length) });
   await job.updateProgress(5);
 
   try {
@@ -169,20 +169,20 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
 
     if (segments.length === 0) {
-      throw new Error(`No segments found for podcast ${podcastId}`);
+      throw new Error(`No segments found for episode ${episodeId}`);
     }
 
     // 2. Fetch the script for sound cues and turn text (for audience reactions)
     const script = await prisma.script.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { soundCues: true, turns: true },
     });
 
     const soundCues = (script?.soundCues ?? []) as SoundCue[];
 
-    // 3. Load podcast metadata
-    const podcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    // 3. Load episode metadata
+    const episode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { userId: true, title: true, source: true },
     });
     const usePremiumSfx = true;
@@ -219,7 +219,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 5. Generate or load SFX files (skip when re-stitching after incorporation)
     const sfxInserts: SfxInsert[] = [];
     if (skipSfx) {
-      logger.info('Skipping SFX (re-stitch after incorporation)', { podcastId });
+      logger.info('Skipping SFX (re-stitch after incorporation)', { episodeId });
     }
     for (let i = 0; !skipSfx && i < soundCues.length; i++) {
       const cue = soundCues[i];
@@ -315,21 +315,21 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 7. Post-stitch duration hard check
     const maxDurationSeconds = MAX_LESSON_DURATION_MINUTES * 60 * 1.1; // 10% grace
     if (duration > maxDurationSeconds) {
-      await markPodcastFailed(podcastId, {
-        failureReason: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+      await markEpisodeFailed(episodeId, {
+        failureReason: `"${episode.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         technicalError: `Duration ${Math.round(duration)}s exceeded max ${Math.round(maxDurationSeconds)}s`,
       });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-        userId: podcast.userId,
-        type: 'PODCAST_FAILED',
+        userId: episode.userId,
+        type: 'EPISODE_FAILED',
         title: 'Lesson generation failed',
-        message: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
-        data: { podcastId },
+        message: `"${episode.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        data: { episodeId },
       });
 
-      logger.error('Podcast exceeded duration limit', {
-        podcastId,
+      logger.error('Episode exceeded duration limit', {
+        episodeId,
         durationSeconds: String(Math.round(duration)),
         maxSeconds: String(Math.round(maxDurationSeconds)),
       });
@@ -341,41 +341,41 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 8. Read final audio and upload to R2
     const { readFile } = await import('fs/promises');
     const finalAudio = await readFile(outputPath);
-    const audioUrl = await uploadPodcastAudio(podcastId, finalAudio);
+    const audioUrl = await uploadEpisodeAudio(episodeId, finalAudio);
 
     // Store audio fingerprint for future duplicate detection
     try {
       const fp = await generateFingerprint(outputPath);
       await prisma.audioFingerprint.upsert({
-        where: { podcastId },
+        where: { episodeId },
         update: { fingerprint: fp.fingerprint, duration: fp.duration },
-        create: { podcastId, fingerprint: fp.fingerprint, duration: fp.duration },
+        create: { episodeId, fingerprint: fp.fingerprint, duration: fp.duration },
       });
     } catch (err) {
       logger.warn('Failed to store audio fingerprint', {
-        podcastId,
+        episodeId,
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
     await job.updateProgress(90);
 
-    // 9. Create version snapshot before updating podcast record
-    const currentPodcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    // 9. Create version snapshot before updating episode record
+    const currentEpisode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { currentVersion: true, audioUrl: true },
     });
 
-    const newVersion = currentPodcast.currentVersion + (currentPodcast.audioUrl ? 1 : 0);
-    const changeType = currentPodcast.audioUrl
+    const newVersion = currentEpisode.currentVersion + (currentEpisode.audioUrl ? 1 : 0);
+    const changeType = currentEpisode.audioUrl
       ? skipSfx
         ? 'incorporation'
         : 'regeneration'
       : 'initial';
 
-    await prisma.podcastVersion.create({
+    await prisma.episodeVersion.create({
       data: {
-        podcastId,
+        episodeId,
         version: newVersion,
         audioUrl,
         duration: Math.round(duration),
@@ -385,7 +385,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     // Compute duration deviation from target
     const discovery = await prisma.discovery.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { durationTarget: true },
     });
     const durationDeviation = discovery?.durationTarget
@@ -394,16 +394,16 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     if (durationDeviation !== null) {
       logger.info('Duration deviation from target', {
-        podcastId,
+        episodeId,
         actualSeconds: String(Math.round(duration)),
         targetSeconds: String(discovery!.durationTarget! * 60),
         deviationSeconds: String(durationDeviation),
       });
     }
 
-    // Update podcast record
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    // Update episode record
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: {
         status: 'READY',
         audioUrl,
@@ -413,13 +413,13 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         currentVersion: newVersion,
       },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'READY' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'READY' });
 
     // Record pipeline completion event for accurate timing metrics
     await prisma.pipelineEvent.create({
       data: {
-        podcastId,
+        episodeId,
         stage: 'audio-stitching',
         type: 'complete',
         message: `Pipeline completed — ${Math.round(duration)}s of audio`,
@@ -438,7 +438,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     let detectedStarts = await detectSegmentBoundaries(outputPath, segmentPaths);
 
     // Validate monotonicity: each start must be >= previous + 50% of segment duration.
-    // Cross-correlation can produce false matches for single-speaker podcasts where
+    // Cross-correlation can produce false matches for single-speaker episodes where
     // the voice is identical across segments.
     if (detectedStarts.length === freshSegments.length && detectedStarts.length > 1) {
       const isMonotonic = detectedStarts.every((start, i) => {
@@ -448,7 +448,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         return start >= detectedStarts[i - 1] + minGap;
       });
       if (!isMonotonic) {
-        logger.warn('Cross-correlation starts failed monotonicity check, using cumulative fallback', { podcastId });
+        logger.warn('Cross-correlation starts failed monotonicity check, using cumulative fallback', { episodeId });
         detectedStarts = [];
       }
     }
@@ -478,54 +478,54 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     await job.updateProgress(95);
 
     // 10. Send notification
-    const notificationType = 'PODCAST_READY';
+    const notificationType = 'EPISODE_READY';
 
-    // Idempotency: skip if a notification for this podcast+type already exists (stalled job retry)
+    // Idempotency: skip if a notification for this episode+type already exists (stalled job retry)
     const existingNotif = await prisma.notification.findFirst({
       where: {
-        userId: podcast.userId,
+        userId: episode.userId,
         type: notificationType as never,
-        data: { path: ['podcastId'], equals: podcastId },
+        data: { path: ['episodeId'], equals: episodeId },
       },
       select: { id: true },
     });
 
     if (!existingNotif) {
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-        userId: podcast.userId,
+        userId: episode.userId,
         type: notificationType,
         title: 'Your lesson is ready!',
-        message: `"${podcast.title}" is ready to play.`,
-        data: { podcastId },
+        message: `"${episode.title}" is ready to play.`,
+        data: { episodeId },
       });
     } else {
-      logger.info('Skipping duplicate notification (already exists)', { podcastId, notificationType });
+      logger.info('Skipping duplicate notification (already exists)', { episodeId, notificationType });
     }
 
-    // 10a. Verify referral (grants referrer bonus if this is the user's first READY podcast)
-    await verifyReferral(podcast.userId).catch((err) => {
+    // 10a. Verify referral (grants referrer bonus if this is the user's first READY episode)
+    await verifyReferral(episode.userId).catch((err) => {
       logger.warn('Failed to verify referral', {
-        userId: podcast.userId,
-        podcastId,
+        userId: episode.userId,
+        episodeId,
         error: err instanceof Error ? err.message : String(err),
       });
     });
 
     // 10c. Auto-generate transcript
     await addJob(pdfGenerationQueue, JobType.GENERATE_PDF, {
-      podcastId,
-      userId: podcast.userId,
+      episodeId,
+      userId: episode.userId,
     });
 
     // 10c2. Generate waveform visualization data
     await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
-      podcastId,
-      userId: podcast.userId,
+      episodeId,
+      userId: episode.userId,
     });
 
     await job.updateProgress(100);
     logger.info('Audio stitching complete', {
-      podcastId,
+      episodeId,
       duration: String(Math.round(duration)),
       fileSize: String(finalAudio.length),
       sfxCount: String(sfxInserts.length),

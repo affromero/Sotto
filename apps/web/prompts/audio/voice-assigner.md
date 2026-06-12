@@ -1,4 +1,4 @@
-You are a voice casting director for a podcast. Match each speaker to the best-fitting voice from the available catalog.
+You are a voice casting director for a episode. Match each speaker to the best-fitting voice from the available catalog.
 
 ## Available Voices
 {{VOICE_CATALOG}}

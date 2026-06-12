@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
 import type { UnifiedAvatarData } from '@/types/avatar';
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import styles from './AvatarPicker.module.css';
 
 export interface ExistingAvatarOverlay {
@@ -16,7 +16,7 @@ export interface ExistingAvatarOverlay {
 }
 
 interface AvatarPickerProps {
-  podcastId: string;
+  episodeId: string;
   speakers: string[];
   segments: SegmentData[];
   onConfigured: (data: { videoGenerationId: string; generationStarted: boolean }) => void;
@@ -58,7 +58,7 @@ function buildCurrentAvatarMap(overlays?: ExistingAvatarOverlay[]): Record<strin
   return map;
 }
 
-export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCancel, existingOverlays }: AvatarPickerProps) {
+export function AvatarPicker({ episodeId, speakers, segments, onConfigured, onCancel, existingOverlays }: AvatarPickerProps) {
   const currentAvatarMap = useMemo(() => buildCurrentAvatarMap(existingOverlays), [existingOverlays]);
   const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +92,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
   useEffect(() => {
     const providerParam = activeProvider ? `&provider=${activeProvider}` : '';
-    fetch(`/api/v1/podcasts/${podcastId}/video/avatars?_=1${providerParam}`)
+    fetch(`/api/v1/episodes/${episodeId}/video/avatars?_=1${providerParam}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
       .then((data: {
         avatars: UnifiedAvatarData[];
@@ -119,7 +119,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load avatars'))
       .finally(() => setLoading(false));
-  }, [podcastId, activeProvider]);
+  }, [episodeId, activeProvider]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -188,7 +188,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/video/avatars`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/video/avatars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatars: configured }),
@@ -205,7 +205,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
     } finally {
       setSubmitting(false);
     }
-  }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments, falModelId]);
+  }, [selections, episodeId, onConfigured, segmentsBySpeaker, enabledSegments, falModelId]);
 
   const selectedCount = Object.keys(selections).length;
   const estimatedCost = useMemo(() => {

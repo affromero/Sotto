@@ -46,7 +46,7 @@ Sotto must keep these boundaries clear:
 - No follows, follower counts, likes, comments, forks, remix graph, leaderboards, community rank, or public activity ranking.
 - No implicit provider fallback chains. If the selected provider is missing credentials or capability, show a precise setup error.
 - No legacy social compatibility mode.
-- No podcast-platform, briefing, news-digest, or creator-network positioning as current behavior.
+- No episode-platform, briefing, news-digest, or creator-network positioning as current behavior.
 
 These boundaries make the open source release credible. Reviewers should be able to scan the README, schema, API routes, docs, and tests and see the same language-learning product.
 
@@ -182,7 +182,7 @@ The open source release is credible when:
 - A technical user can run the app locally from the README without Doppler.
 - A learner can take placement and start a course for a language pair.
 - A learner can complete or retry a mastery-gated class across the five skills.
-- Listening sections use the reused audio engine without presenting Sotto as a podcast platform.
+- Listening sections use the reused audio engine without presenting Sotto as a episode platform.
 - Speaking, writing, practice, exams, notes, and the memory graph are documented as current behavior where they exist.
 - BYOK and local-agent setup errors are explicit.
 - Social schema tables, social routes, social UI, billing gates, plans, tiers, and quota language are absent from the current product docs.

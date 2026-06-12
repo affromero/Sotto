@@ -118,7 +118,7 @@ describe('handles', () => {
     it('returns false for non-reserved handles', () => {
       expect(isHardcodedReserved('alice')).toBe(false);
       expect(isHardcodedReserved('bob_smith')).toBe(false);
-      expect(isHardcodedReserved('podcast_fan_42')).toBe(false);
+      expect(isHardcodedReserved('episode_fan_42')).toBe(false);
     });
   });
 

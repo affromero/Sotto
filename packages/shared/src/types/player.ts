@@ -1,6 +1,6 @@
 export interface PlayerState {
-  podcastId: string | null;
-  podcastTitle: string | null;
+  episodeId: string | null;
+  episodeTitle: string | null;
   audioUrl: string | null;
   isPlaying: boolean;
   currentTime: number;
@@ -19,6 +19,6 @@ export interface PlayerControls {
   setPlaybackRate: (rate: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
-  loadPodcast: (podcastId: string, audioUrl: string, podcastTitle?: string) => void;
-  clearPodcast: () => void;
+  loadEpisode: (episodeId: string, audioUrl: string, episodeTitle?: string) => void;
+  clearEpisode: () => void;
 }

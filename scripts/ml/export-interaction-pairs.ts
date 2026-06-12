@@ -5,7 +5,7 @@
  * along with the script context at that timestamp, for fine-tuning the Q&A model.
  *
  * Output: JSONL file with schema:
- *   { question, answer, timestamp, podcastTopic, scriptContext, segmentSpeaker, resolution, incorporated }
+ *   { question, answer, timestamp, episodeTopic, scriptContext, segmentSpeaker, resolution, incorporated }
  *
  * Usage: npx ts-node scripts/ml/export-interaction-pairs.ts > data/interaction-pairs.jsonl
  */
@@ -22,7 +22,7 @@ async function main() {
       status: { in: ['ANSWERED', 'RESOLVED', 'INCORPORATED'] },
     },
     include: {
-      podcast: {
+      episode: {
         select: {
           id: true,
           title: true,
@@ -40,7 +40,7 @@ async function main() {
   for (const interaction of interactions) {
     if (!interaction.answer) continue;
 
-    const segments = interaction.podcast.segments;
+    const segments = interaction.episode.segments;
     const timestamp = interaction.timestamp;
 
     // Find the segment playing at this timestamp
@@ -71,9 +71,9 @@ async function main() {
       question: interaction.question,
       answer: interaction.answer,
       timestamp: interaction.timestamp,
-      podcastId: interaction.podcastId,
-      podcastTitle: interaction.podcast.title,
-      podcastTopic: interaction.podcast.topic,
+      episodeId: interaction.episodeId,
+      episodeTitle: interaction.episode.title,
+      episodeTopic: interaction.episode.topic,
       scriptContext,
       currentSegmentSpeaker: currentSegment?.speaker || 'HOST',
       currentSegmentText: currentSegment?.text || '',

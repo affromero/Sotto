@@ -5,7 +5,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { writeScript } from '@/lib/script-writer';
 import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import type { Beat } from '@/lib/creative-director';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
@@ -15,38 +15,38 @@ import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 export async function processScriptWriting(job: Job<WriteScriptPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId, dossierId, outlineId, useAdminCredits } = job.data;
+  const { episodeId, userId, discoveryId, dossierId, outlineId, useAdminCredits } = job.data;
 
-  logger.info('Script writing starting', { podcastId });
+  logger.info('Script writing starting', { episodeId });
   await job.updateProgress(5);
 
   // Idempotency: skip if script already exists
   const existingScript = await prisma.script.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { id: true },
   });
 
   if (existingScript) {
-    logger.info('Script already exists, skipping to compile', { podcastId });
+    logger.info('Script already exists, skipping to compile', { episodeId });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { status: 'COMPILING' },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'COMPILING' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
     await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-      podcastId,
+      episodeId,
       userId,
-    }, { jobId: `compile-${podcastId}-${Date.now()}` });
+    }, { jobId: `compile-${episodeId}-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
   }
 
-  // Load dossier, outline, discovery, podcast
-  const [dossier, outline, discovery, podcast] = await Promise.all([
+  // Load dossier, outline, discovery, episode
+  const [dossier, outline, discovery, episode] = await Promise.all([
     prisma.researchDossier.findUniqueOrThrow({
       where: { id: dossierId },
       select: { sources: true, evidence: true },
@@ -62,34 +62,34 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
         audienceLevel: true, durationTarget: true, speakers: true,
       },
     }),
-    prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { aiModel: true },
     }),
   ]);
 
   await job.updateProgress(15);
 
-  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
-  if (!podcast.aiModel && !aiKey) {
+  const aiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
+  if (!episode.aiModel && !aiKey) {
     throw new Error('AI model is required for script writing when no AI key is configured.');
   }
 
   const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast.aiModel,
+    episodeAiModel: episode.aiModel,
     aiKey,
   });
 
   const providerAiKey =
-    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for script writing.`);
   }
 
   const speakers = (discovery.speakers as Array<{ name: string; description: string }>) || [
-    { name: 'Host', description: 'Curious and engaging podcast host' },
+    { name: 'Host', description: 'Curious and engaging episode host' },
     { name: 'Expert', description: 'Knowledgeable authority on the topic' },
   ];
 
@@ -122,7 +122,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   // Save script to DB
   await prisma.script.create({
     data: {
-      podcastId,
+      episodeId,
       turns: result.turns as unknown as Prisma.InputJsonValue,
       soundCues: result.soundCues as unknown as Prisma.InputJsonValue,
       markdown: result.markdown,
@@ -134,7 +134,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   if (result.references.length > 0) {
     await prisma.reference.createMany({
       data: result.references.map((ref, idx) => ({
-        podcastId,
+        episodeId,
         number: idx + 1,
         title: ref.title,
         authors: ref.authors || '',
@@ -149,7 +149,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
 
   await job.updateProgress(80);
 
-  // Auto-tag podcast
+  // Auto-tag episode
   const allTagSlugs = new Set<string>();
   const topicSlugs = matchTopicTags({
     topic: discovery.topic || '',
@@ -172,10 +172,10 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     const tagId = tagsBySlug.get(slug);
     if (tagId) {
       tagUpserts.push(
-        prisma.podcastTag.upsert({
-          where: { podcastId_tagId: { podcastId, tagId } },
+        prisma.episodeTag.upsert({
+          where: { episodeId_tagId: { episodeId, tagId } },
           update: {},
-          create: { podcastId, tagId },
+          create: { episodeId, tagId },
         }),
       );
     }
@@ -202,17 +202,17 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     category: 'script',
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
-    podcastId,
+    episodeId,
     userId,
   });
 
-  await logPipelineStageComplete(podcastId, 'script-writing',
+  await logPipelineStageComplete(episodeId, 'script-writing',
     `turns=${result.turns.length} refs=${result.references.length}`,
   );
 
   // Chain to compile/QC
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: {
       status: 'COMPILING',
       aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
@@ -220,16 +220,16 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
       language: detectedLanguage ?? undefined,
     },
   });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'COMPILING' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
   await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-    podcastId,
+    episodeId,
     userId,
-  }, { jobId: `compile-${podcastId}-${Date.now()}` });
+  }, { jobId: `compile-${episodeId}-${Date.now()}` });
 
   logger.info('Script writing complete, queued compilation', {
-    podcastId,
+    episodeId,
     turns: String(result.turns.length),
     references: String(result.references.length),
   });

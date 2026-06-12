@@ -3,7 +3,7 @@ interface Point {
   y: number;
 }
 
-interface PodcastGradient {
+interface EpisodeGradient {
   colors: [string, string];
   start: Point;
   end: Point;
@@ -38,7 +38,7 @@ function hashString(str: string): number {
   return Math.abs(hash);
 }
 
-export function getPodcastGradient(id: string): PodcastGradient {
+export function getEpisodeGradient(id: string): EpisodeGradient {
   const hash = hashString(id);
   const pair = WARM_PAIRS[hash % WARM_PAIRS.length];
   const angle = ANGLES[(hash >> 3) % ANGLES.length];

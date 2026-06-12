@@ -9,8 +9,8 @@ import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import styles from './PipelineEditor.module.css';
 
 interface PipelineEditorProps {
-  podcastId: string;
-  podcastTitle: string;
+  episodeId: string;
+  episodeTitle: string;
   pipeline: VideoPipeline;
   falModels: FalModelsResponse;
   onApprove: (pipeline: VideoPipeline) => void;

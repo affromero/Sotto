@@ -6,11 +6,11 @@ import { NotificationData } from '@/types/notification';
 const mockNotifications: NotificationData[] = [
   {
     id: 'notif-1',
-    type: 'PODCAST_READY',
-    title: 'Your podcast is ready',
-    message: 'Test Podcast is now available',
+    type: 'EPISODE_READY',
+    title: 'Your episode is ready',
+    message: 'Test Episode is now available',
     read: false,
-    data: { podcastId: 'podcast-1' },
+    data: { episodeId: 'episode-1' },
     createdAt: '2024-01-01T00:00:00Z',
   },
   {
@@ -19,7 +19,7 @@ const mockNotifications: NotificationData[] = [
     title: 'Briefing ready',
     message: 'Your daily briefing is ready',
     read: true,
-    data: { podcastId: 'podcast-briefing' },
+    data: { episodeId: 'episode-briefing' },
     createdAt: '2024-01-01T01:00:00Z',
   },
   {
@@ -28,7 +28,7 @@ const mockNotifications: NotificationData[] = [
     title: 'Script ready',
     message: 'AI Ethics is ready for review',
     read: false,
-    data: { podcastId: 'podcast-2' },
+    data: { episodeId: 'episode-2' },
     createdAt: '2024-01-01T02:00:00Z',
   },
 ];
@@ -412,7 +412,7 @@ describe('useNotifications', () => {
         await result.current.refresh();
         result.current.prepend({
           id: 'x',
-          type: 'PODCAST_READY',
+          type: 'EPISODE_READY',
           title: 't',
           message: 'm',
           read: false,

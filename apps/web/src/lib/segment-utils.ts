@@ -1,4 +1,4 @@
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { WordTiming } from '@sotto/shared';
 import type { VideoSegment } from '@sotto/video';
 

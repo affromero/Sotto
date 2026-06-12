@@ -68,7 +68,7 @@ export interface ClassSectionData {
   attempt: number;
   score: number | null;
   passed: boolean | null;
-  podcast: { id: string; audioUrl: string | null; title: string; references?: ClassReference[] } | null;
+  episode: { id: string; audioUrl: string | null; title: string; references?: ClassReference[] } | null;
   questions: ClassQuestion[];
   prompts: ClassPrompt[];
 }

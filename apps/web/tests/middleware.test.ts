@@ -164,7 +164,7 @@ describe('Middleware Security Tests', () => {
     });
 
     it('passes through API routes (own auth handling)', async () => {
-      const res = await middleware(createRequest('/api/v1/podcasts'));
+      const res = await middleware(createRequest('/api/v1/episodes'));
       // API routes without Authorization header still need to reach the API handler
       // They pass through because they're not in PROTECTED_ROUTES check (starts with /api/v1/)
       expect(isPassThrough(res)).toBe(true);

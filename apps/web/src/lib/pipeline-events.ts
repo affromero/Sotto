@@ -6,23 +6,23 @@ import { logger } from './logger';
  * logging failure never crashes a pipeline job.
  */
 export async function logPipelineStageComplete(
-  podcastId: string,
+  episodeId: string,
   stage: string,
   message?: string,
 ): Promise<void> {
   await prisma.pipelineEvent.create({
-    data: { podcastId, stage, type: 'complete', message: message ?? `${stage} completed` },
+    data: { episodeId, stage, type: 'complete', message: message ?? `${stage} completed` },
   }).catch((err) => {
     logger.warn('Failed to log pipeline stage completion', {
-      podcastId, stage, error: err instanceof Error ? err.message : String(err),
+      episodeId, stage, error: err instanceof Error ? err.message : String(err),
     });
   });
 }
 
 export interface RecentPipelineError {
   id: string;
-  podcastId: string;
-  podcastTitle: string;
+  episodeId: string;
+  episodeTitle: string;
   createdAt: Date;
   stage: string;
   type: string;
@@ -55,13 +55,13 @@ export async function getRecentPipelineErrors(
     take: limit,
     select: {
       id: true,
-      podcastId: true,
+      episodeId: true,
       createdAt: true,
       stage: true,
       type: true,
       message: true,
       metadata: true,
-      podcast: {
+      episode: {
         select: { title: true },
       },
     },
@@ -69,8 +69,8 @@ export async function getRecentPipelineErrors(
 
   return events.map((e) => ({
     id: e.id,
-    podcastId: e.podcastId,
-    podcastTitle: e.podcast.title,
+    episodeId: e.episodeId,
+    episodeTitle: e.episode.title,
     createdAt: e.createdAt,
     stage: e.stage,
     type: e.type,

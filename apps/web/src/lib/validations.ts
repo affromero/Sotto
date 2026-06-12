@@ -5,13 +5,13 @@ import { z } from 'zod';
  */
 export const discoveryMessageSchema = z.object({
   content: z.string().min(1).max(5000),
-  podcastId: z.string().optional(),
+  episodeId: z.string().optional(),
 });
 
 /**
- * Podcast creation validation — canonical schema lives in @sotto/shared
+ * Episode creation validation — canonical schema lives in @sotto/shared
  */
-export { createPodcastSchema } from '@sotto/shared';
+export { createEpisodeSchema } from '@sotto/shared';
 
 const explicitTtsProviderSchema = z.enum([
   'elevenlabs',
@@ -28,7 +28,7 @@ const agentProviderSchema = z.enum(['claude-code', 'codex', 'openclaw', 'hermes'
 
 /**
  * Private agent-output ingestion. This is intentionally separate from generic
- * podcast creation so local agents can post source material without exposing a
+ * episode creation so local agents can post source material without exposing a
  * social or public sharing surface.
  */
 export const agentIngestionSchema = z
@@ -87,9 +87,9 @@ export const interactionSchema = z.object({
 });
 
 /**
- * Podcast update validation
+ * Episode update validation
  */
-export const updatePodcastSchema = z
+export const updateEpisodeSchema = z
   .object({
     title: z.string().min(1).max(200).optional(),
     topic: z.string().min(1).max(5000).optional(),
@@ -265,9 +265,9 @@ export const appendDraftMessagesSchema = z.object({
 });
 
 /**
- * Import podcast validation
+ * Import episode validation
  */
-export const importPodcastSchema = z.object({
+export const importEpisodeSchema = z.object({
   title: z.string().max(200).optional(),
   topic: z.string().max(5000).optional(),
   sourcePlatform: z.string().min(1).max(50),

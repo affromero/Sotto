@@ -6,8 +6,8 @@ const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-new-001
 const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
   language: null,
   voices: [],
@@ -17,7 +17,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaVideoGenerationUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
-const mockPrismaPodcastVoiceUpsert = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeVoiceUpsert = vi.fn().mockResolvedValue({});
 
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
   const tx = {
@@ -32,9 +32,9 @@ const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<un
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
-    podcast: {
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
+    episode: {
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
     },
     segment: {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
@@ -50,8 +50,8 @@ vi.mock('@/lib/prisma', () => {
     videoGeneration: {
       updateMany: (...args: unknown[]) => mockPrismaVideoGenerationUpdateMany(...args),
     },
-    podcastVoice: {
-      upsert: (...args: unknown[]) => mockPrismaPodcastVoiceUpsert(...args),
+    episodeVoice: {
+      upsert: (...args: unknown[]) => mockPrismaEpisodeVoiceUpsert(...args),
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockPrismaTransaction(fn),
   };
@@ -109,8 +109,8 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockWriteFile = vi.fn().mockResolvedValue(undefined);
@@ -149,7 +149,7 @@ function createMockJob(data: RegenerateSegmentPayload): Job<RegenerateSegmentPay
 }
 
 const defaultPayload: RegenerateSegmentPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   interactionId: 'interaction-001',
   insertAfterOrder: 3,
   newText: 'Great question! Let me expand on that.',
@@ -186,7 +186,7 @@ describe('processSegmentRegeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: no custom voice IDs
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
       language: null,
       voices: [],
@@ -202,7 +202,7 @@ describe('processSegmentRegeneration', () => {
       { id: 'segment-003', order: 6 },
     ]);
     mockPrismaInteractionUpdate.mockResolvedValue({});
-    mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockStandardGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockUploadSegmentAudio.mockResolvedValue('https://r2.example.com/segments/segment-new-001.mp3');
@@ -214,13 +214,13 @@ describe('processSegmentRegeneration', () => {
   });
 
   describe('premium voice selection', () => {
-    it('calls provider getVoiceId with speaker and podcastId for voice diversity', async () => {
+    it('calls provider getVoiceId with speaker and episodeId for voice diversity', async () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
       expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
         'EXPERT',
-        'podcast-001',
+        'episode-001',
         undefined,
         undefined
       );
@@ -232,14 +232,14 @@ describe('processSegmentRegeneration', () => {
 
       expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
         'HOST',
-        'podcast-001',
+        'episode-001',
         undefined,
         undefined
       );
     });
 
     it('uses custom hostVoiceId when set and provider matches', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [{ speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' }],
@@ -256,7 +256,7 @@ describe('processSegmentRegeneration', () => {
     });
 
     it('uses custom expertVoiceId when set and provider matches', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [{ speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' }],
@@ -273,7 +273,7 @@ describe('processSegmentRegeneration', () => {
     });
 
     it('falls back to pool when stored voice has wrong provider', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [{ speaker: 'EXPERT', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' }],
@@ -292,7 +292,7 @@ describe('processSegmentRegeneration', () => {
     });
 
     it('uses the provider voice pool when stored voice has no provider', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [{ speaker: 'EXPERT', voiceId: 'old-voice-id', provider: null }],
@@ -309,16 +309,16 @@ describe('processSegmentRegeneration', () => {
       );
     });
 
-    it('persists resolved voice when no PodcastVoice row exists', async () => {
+    it('persists resolved voice when no EpisodeVoice row exists', async () => {
       mockProviderGetVoiceId.mockReturnValue('pool-voice-xyz');
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockPrismaPodcastVoiceUpsert).toHaveBeenCalledWith({
-        where: { podcastId_speaker: { podcastId: 'podcast-001', speaker: 'EXPERT' } },
+      expect(mockPrismaEpisodeVoiceUpsert).toHaveBeenCalledWith({
+        where: { episodeId_speaker: { episodeId: 'episode-001', speaker: 'EXPERT' } },
         update: { voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
         create: {
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           speaker: 'EXPERT',
           voiceId: 'pool-voice-xyz',
           provider: 'elevenlabs',
@@ -356,7 +356,7 @@ describe('processSegmentRegeneration', () => {
 
   describe('standard voice path', () => {
     beforeEach(() => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [],
@@ -382,7 +382,7 @@ describe('processSegmentRegeneration', () => {
 
       expect(mockStandardGetVoiceId).toHaveBeenCalledWith(
         'EXPERT',
-        'podcast-001',
+        'episode-001',
         undefined,
         undefined
       );
@@ -400,7 +400,7 @@ describe('processSegmentRegeneration', () => {
       await processSegmentRegeneration(job);
 
       expect(mockUploadSegmentAudio).toHaveBeenCalledWith(
-        'podcast-001',
+        'episode-001',
         expect.stringContaining('regen-'),
         audioBuffer
       );
@@ -515,29 +515,29 @@ describe('processSegmentRegeneration', () => {
       await processSegmentRegeneration(job);
 
       expect(mockPrismaVideoGenerationUpdateMany).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001', status: 'READY' },
+        where: { episodeId: 'episode-001', status: 'READY' },
         data: { status: 'STALE' },
       });
     });
   });
 
-  describe('podcast status update', () => {
-    it('updates podcast status to STITCHING after regeneration', async () => {
+  describe('episode status update', () => {
+    it('updates episode status to STITCHING after regeneration', async () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'STITCHING' },
       });
     });
 
-    it('uses the podcast ID from the payload', async () => {
-      const job = createMockJob({ ...defaultPayload, podcastId: 'podcast-xyz' });
+    it('uses the episode ID from the payload', async () => {
+      const job = createMockJob({ ...defaultPayload, episodeId: 'episode-xyz' });
       await processSegmentRegeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-xyz' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-xyz' },
         data: { status: 'STITCHING' },
       });
     });
@@ -556,7 +556,7 @@ describe('processSegmentRegeneration', () => {
       await processSegmentRegeneration(job);
 
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-stitching' }, 'stitch_audio', {
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
         segmentIds: ['segment-a', 'segment-b', 'segment-c'],
         skipSfx: true,
       });
@@ -615,7 +615,7 @@ describe('processSegmentRegeneration', () => {
         ]);
 
       const job = createMockJob({
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
         interactionId: 'interaction-001',
         insertAfterOrder: 0,
         newText: 'Let me explain that further.',
@@ -623,13 +623,13 @@ describe('processSegmentRegeneration', () => {
       });
       await processSegmentRegeneration(job);
 
-      // Podcast fetched
-      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalled();
+      // Episode fetched
+      expect(mockPrismaEpisodeFindUniqueOrThrow).toHaveBeenCalled();
 
       // Voice selected via provider
       expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
         'HOST',
-        'podcast-001',
+        'episode-001',
         undefined,
         undefined
       );
@@ -642,7 +642,7 @@ describe('processSegmentRegeneration', () => {
 
       // Uploaded to R2
       expect(mockUploadSegmentAudio).toHaveBeenCalledWith(
-        'podcast-001',
+        'episode-001',
         expect.stringContaining('regen-'),
         Buffer.from('host-audio')
       );
@@ -653,7 +653,7 @@ describe('processSegmentRegeneration', () => {
       // Segments shifted and new segment created
       expect(mockPrismaSegmentCreate).toHaveBeenCalledWith({
         data: {
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           speaker: 'HOST',
           text: 'Let me explain that further.',
           audioUrl: 'https://r2.example.com/host-audio.mp3',
@@ -675,15 +675,15 @@ describe('processSegmentRegeneration', () => {
         expect.objectContaining({ skipSfx: true })
       );
 
-      // Podcast status updated to STITCHING
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      // Episode status updated to STITCHING
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'STITCHING' },
       });
     });
 
     it('executes the full regeneration pipeline for EXPERT segment (standard voice)', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [],
@@ -708,7 +708,7 @@ describe('processSegmentRegeneration', () => {
         ]);
 
       const job = createMockJob({
-        podcastId: 'podcast-002',
+        episodeId: 'episode-002',
         interactionId: 'interaction-002',
         insertAfterOrder: 4,
         newText: 'That is a great observation.',
@@ -719,7 +719,7 @@ describe('processSegmentRegeneration', () => {
       // Voice selected for EXPERT via standard provider
       expect(mockStandardGetVoiceId).toHaveBeenCalledWith(
         'EXPERT',
-        'podcast-002',
+        'episode-002',
         undefined,
         undefined
       );
@@ -750,24 +750,24 @@ describe('processSegmentRegeneration', () => {
       // Re-stitch queued
       expect(mockAddJob).toHaveBeenCalled();
 
-      // Podcast status to STITCHING
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-002' },
+      // Episode status to STITCHING
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-002' },
         data: { status: 'STITCHING' },
       });
     });
   });
 
   describe('error propagation', () => {
-    it('propagates errors from podcast lookup', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockRejectedValue(new Error('Podcast not found'));
+    it('propagates errors from episode lookup', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockRejectedValue(new Error('Episode not found'));
       const job = createMockJob(defaultPayload);
 
-      await expect(processSegmentRegeneration(job)).rejects.toThrow('Podcast not found');
+      await expect(processSegmentRegeneration(job)).rejects.toThrow('Episode not found');
     });
 
     it('rejects segment regeneration when no TTS provider is persisted', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [],
@@ -778,7 +778,7 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processSegmentRegeneration(job)).rejects.toThrow(
-        'Podcast podcast-001 is missing a TTS provider'
+        'Episode episode-001 is missing a TTS provider'
       );
       expect(mockResolveTtsProvider).not.toHaveBeenCalled();
       expect(mockPremiumGenerateSpeech).not.toHaveBeenCalled();
@@ -796,7 +796,7 @@ describe('processSegmentRegeneration', () => {
     });
 
     it('propagates errors from standard generateSpeech', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
         voices: [],
@@ -832,11 +832,11 @@ describe('processSegmentRegeneration', () => {
       await expect(processSegmentRegeneration(job)).rejects.toThrow('Interaction does not exist');
     });
 
-    it('propagates errors from podcast update', async () => {
-      mockPrismaPodcastUpdate.mockRejectedValue(new Error('Podcast update failed'));
+    it('propagates errors from episode update', async () => {
+      mockPrismaEpisodeUpdate.mockRejectedValue(new Error('Episode update failed'));
       const job = createMockJob(defaultPayload);
 
-      await expect(processSegmentRegeneration(job)).rejects.toThrow('Podcast update failed');
+      await expect(processSegmentRegeneration(job)).rejects.toThrow('Episode update failed');
     });
 
     it('propagates errors from addJob', async () => {

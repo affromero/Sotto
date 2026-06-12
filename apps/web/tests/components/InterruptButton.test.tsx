@@ -8,8 +8,8 @@ vi.mock('@/components/providers/AudioPlayerProvider');
 
 describe('InterruptButton', () => {
   const mockPlayer = {
-    podcastId: 'test-podcast-id',
-    podcastTitle: 'Test Podcast',
+    episodeId: 'test-episode-id',
+    episodeTitle: 'Test Episode',
     audioUrl: 'https://example.com/audio.mp3',
     isPlaying: true,
     currentTime: 45,
@@ -25,8 +25,8 @@ describe('InterruptButton', () => {
     setPlaybackRate: vi.fn(),
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
-    loadPodcast: vi.fn(),
-    clearPodcast: vi.fn(),
+    loadEpisode: vi.fn(),
+    clearEpisode: vi.fn(),
   };
 
   beforeEach(() => {
@@ -47,17 +47,17 @@ describe('InterruptButton', () => {
     expect(screen.getByRole('button', { name: 'Ask a question' })).toBeInTheDocument();
   });
 
-  it('is disabled when podcastId is null', () => {
+  it('is disabled when episodeId is null', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
-      podcastId: null,
+      episodeId: null,
     });
     const onInterrupt = vi.fn();
     render(<InterruptButton onInterrupt={onInterrupt} />);
     expect(screen.getByRole('button', { name: 'Ask a question' })).toBeDisabled();
   });
 
-  it('is not disabled when podcastId is present', () => {
+  it('is not disabled when episodeId is present', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     const onInterrupt = vi.fn();
     render(<InterruptButton onInterrupt={onInterrupt} />);
@@ -110,7 +110,7 @@ describe('InterruptButton', () => {
     const onInterrupt = vi.fn();
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
-      podcastId: null,
+      episodeId: null,
     });
     render(<InterruptButton onInterrupt={onInterrupt} />);
     await user.click(screen.getByRole('button', { name: 'Ask a question' }));

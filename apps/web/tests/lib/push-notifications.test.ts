@@ -81,8 +81,8 @@ describe('push-notifications', () => {
       userId: 'user1',
       title: 'Test Notification',
       body: 'This is a test',
-      url: '/podcast/123',
-      data: { podcastId: '123' },
+      url: '/episode/123',
+      data: { episodeId: '123' },
     });
 
     expect(mockSendNotification).toHaveBeenCalledTimes(2);
@@ -90,7 +90,7 @@ describe('push-notifications', () => {
     expect(payload).toMatchObject({
       title: 'Test Notification',
       body: 'This is a test',
-      url: '/podcast/123',
+      url: '/episode/123',
     });
   });
 
@@ -153,18 +153,18 @@ describe('push-notifications', () => {
 
     await sendPushNotification({
       userId: 'user1',
-      title: 'Podcast Ready',
-      body: 'Your podcast is ready to listen',
-      url: '/podcast/abc',
-      data: { podcastId: 'abc', action: 'view' },
+      title: 'Episode Ready',
+      body: 'Your episode is ready to listen',
+      url: '/episode/abc',
+      data: { episodeId: 'abc', action: 'view' },
     });
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
     expect(payload).toMatchObject({
-      title: 'Podcast Ready',
-      body: 'Your podcast is ready to listen',
-      url: '/podcast/abc',
-      data: { podcastId: 'abc', action: 'view' },
+      title: 'Episode Ready',
+      body: 'Your episode is ready to listen',
+      url: '/episode/abc',
+      data: { episodeId: 'abc', action: 'view' },
     });
   });
 

@@ -46,24 +46,24 @@ describe('elevenlabs', () => {
 
   describe('voice selection', () => {
     it('selects a voice pair with different voices for host and expert', () => {
-      const result = selectVoicePair('podcast-123');
+      const result = selectVoicePair('episode-123');
 
       expect(result.host).toBeDefined();
       expect(result.expert).toBeDefined();
       expect(result.host.id).not.toBe(result.expert.id);
     });
 
-    it('returns consistent voice pair for the same podcast ID', () => {
-      const result1 = selectVoicePair('podcast-abc');
-      const result2 = selectVoicePair('podcast-abc');
+    it('returns consistent voice pair for the same episode ID', () => {
+      const result1 = selectVoicePair('episode-abc');
+      const result2 = selectVoicePair('episode-abc');
 
       expect(result1.host.id).toBe(result2.host.id);
       expect(result1.expert.id).toBe(result2.expert.id);
     });
 
-    it('returns different voice pairs for different podcast IDs', () => {
-      const result1 = selectVoicePair('podcast-001');
-      const result2 = selectVoicePair('podcast-002');
+    it('returns different voice pairs for different episode IDs', () => {
+      const result1 = selectVoicePair('episode-001');
+      const result2 = selectVoicePair('episode-002');
 
       // At least one voice should be different between the two pairs
       const isDifferent =
@@ -73,8 +73,8 @@ describe('elevenlabs', () => {
     });
 
     it('prefers different genders for host and expert when possible', () => {
-      // Test multiple podcast IDs to check gender diversity preference
-      const pairs = Array.from({ length: 10 }, (_, i) => selectVoicePair(`podcast-${i}`));
+      // Test multiple episode IDs to check gender diversity preference
+      const pairs = Array.from({ length: 10 }, (_, i) => selectVoicePair(`episode-${i}`));
 
       const differentGenderCount = pairs.filter(
         (pair) => pair.host.gender !== pair.expert.gender
@@ -86,25 +86,25 @@ describe('elevenlabs', () => {
   });
 
   describe('getVoiceId', () => {
-    it('returns host voice ID from voice pool when podcast ID is provided', () => {
-      const voiceId = getVoiceId('HOST', 'podcast-123');
+    it('returns host voice ID from voice pool when episode ID is provided', () => {
+      const voiceId = getVoiceId('HOST', 'episode-123');
       const profile = getVoiceProfile(voiceId);
 
       expect(voiceId).toBeDefined();
       expect(profile).toBeDefined();
     });
 
-    it('returns expert voice ID from voice pool when podcast ID is provided', () => {
-      const voiceId = getVoiceId('EXPERT', 'podcast-123');
+    it('returns expert voice ID from voice pool when episode ID is provided', () => {
+      const voiceId = getVoiceId('EXPERT', 'episode-123');
       const profile = getVoiceProfile(voiceId);
 
       expect(voiceId).toBeDefined();
       expect(profile).toBeDefined();
     });
 
-    it('returns different voice IDs for HOST and EXPERT with same podcast ID', () => {
-      const hostVoiceId = getVoiceId('HOST', 'podcast-abc');
-      const expertVoiceId = getVoiceId('EXPERT', 'podcast-abc');
+    it('returns different voice IDs for HOST and EXPERT with same episode ID', () => {
+      const hostVoiceId = getVoiceId('HOST', 'episode-abc');
+      const expertVoiceId = getVoiceId('EXPERT', 'episode-abc');
 
       expect(hostVoiceId).not.toBe(expertVoiceId);
     });
@@ -113,14 +113,14 @@ describe('elevenlabs', () => {
       process.env.ELEVENLABS_HOST_VOICE_ID = 'custom-host-id';
       process.env.ELEVENLABS_EXPERT_VOICE_ID = 'custom-expert-id';
 
-      const hostVoiceId = getVoiceId('HOST', 'podcast-123');
-      const expertVoiceId = getVoiceId('EXPERT', 'podcast-123');
+      const hostVoiceId = getVoiceId('HOST', 'episode-123');
+      const expertVoiceId = getVoiceId('EXPERT', 'episode-123');
 
       expect(hostVoiceId).toBe('custom-host-id');
       expect(expertVoiceId).toBe('custom-expert-id');
     });
 
-    it('returns fallback voices when no podcast ID is provided', () => {
+    it('returns fallback voices when no episode ID is provided', () => {
       const hostVoiceId = getVoiceId('HOST');
       const expertVoiceId = getVoiceId('EXPERT');
 
@@ -453,7 +453,7 @@ describe('elevenlabs', () => {
 
       const result = await designVoice({
         description: 'A warm, friendly female voice with a slight British accent',
-        sampleText: 'Hello, welcome to the podcast',
+        sampleText: 'Hello, welcome to the episode',
       });
 
       expect(mockFetch).toHaveBeenCalledWith(

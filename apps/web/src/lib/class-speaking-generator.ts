@@ -150,7 +150,7 @@ export async function composeSpeakingPrompts(
     try {
       const { provider } = await resolveTtsProvider({
         userId: p.userId,
-        podcastId: p.refId,
+        episodeId: p.refId,
         requestedProvider: requestedTtsProvider as Parameters<typeof resolveTtsProvider>[0]['requestedProvider'],
         language: p.targetLang,
       });

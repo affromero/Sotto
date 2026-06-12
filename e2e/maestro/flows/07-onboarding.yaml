@@ -36,8 +36,8 @@ tags: [onboarding, smoke]
 # Terminal assertion: landed on library
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 10000
 - assertVisible:
-    id: 'library-podcast-list'
+    id: 'library-episode-list'
 - takeScreenshot: post-onboarding

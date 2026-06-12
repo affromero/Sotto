@@ -81,12 +81,12 @@ export class MinimaxProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
-    if (!podcastId) {
+    if (!episodeId) {
       return isHostVoice ? MINIMAX_VOICE_POOL[0].id : MINIMAX_VOICE_POOL[1].id;
     }
-    const pair = selectVoicePairFromPool(MINIMAX_VOICE_POOL, podcastId, metadata);
+    const pair = selectVoicePairFromPool(MINIMAX_VOICE_POOL, episodeId, metadata);
     return isHostVoice ? pair.host.id : pair.expert.id;
   }
 

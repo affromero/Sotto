@@ -82,17 +82,17 @@ export class FalProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, language?: string): string {
+  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
 
     // When language is set, prefer voices native to that language
-    if (language && podcastId) {
+    if (language && episodeId) {
       const nativeVoices = FAL_VOICE_POOL.filter((v) => {
         const affinity = VOICE_LANGUAGE_AFFINITIES[v.id];
         return affinity?.nativeLanguages.includes(language);
       });
       if (nativeVoices.length >= 2) {
-        const pair = selectVoicePairFromPool(nativeVoices, podcastId, metadata);
+        const pair = selectVoicePairFromPool(nativeVoices, episodeId, metadata);
         return isHostVoice ? pair.host.id : pair.expert.id;
       }
       // Single native voice (ja → Ono_Anna, ko → Sohee) — use it for both slots
@@ -101,10 +101,10 @@ export class FalProvider implements TtsProvider {
       }
     }
 
-    if (!podcastId) {
+    if (!episodeId) {
       return isHostVoice ? FAL_VOICE_POOL[0].id : FAL_VOICE_POOL[1].id;
     }
-    const pair = selectVoicePairFromPool(FAL_VOICE_POOL, podcastId, metadata);
+    const pair = selectVoicePairFromPool(FAL_VOICE_POOL, episodeId, metadata);
     return isHostVoice ? pair.host.id : pair.expert.id;
   }
 

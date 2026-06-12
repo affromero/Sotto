@@ -5,7 +5,7 @@ import { FilmstripStrip } from './FilmstripStrip';
 import { SegmentDetailPanel } from './SegmentDetailPanel';
 import type { EditableSegmentVisual } from './visual-editor-constants';
 import type { SegmentVisualData } from '@/lib/segment-utils';
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { FalModelsResponse, PipelineTransition } from '@/types/pipeline';
 import type { VisualTypeString } from '@/lib/visual-classifier';
 import type { VisualMode } from '@/types/pipeline';
@@ -33,7 +33,7 @@ export interface VoiceInfo {
 }
 
 interface VideoEditorProps {
-  podcastId: string;
+  episodeId: string;
   segments: SegmentData[];
   segmentVisuals: SegmentVisualData[];
   falModels: FalModelsResponse;
@@ -86,7 +86,7 @@ function toPipelineTransition(t: TransitionData): PipelineTransition {
 }
 
 export function VideoEditor({
-  podcastId,
+  episodeId,
   segments,
   segmentVisuals,
   falModels,
@@ -128,7 +128,7 @@ export function VideoEditor({
     let cancelled = false;
     async function fetchTransitions() {
       try {
-        const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
+        const res = await fetch(`/api/v1/episodes/${episodeId}/video`);
         if (!res.ok || cancelled) return;
         const json = await res.json() as { transitions?: TransitionData[] };
         if (cancelled || !json.transitions) return;
@@ -139,7 +139,7 @@ export function VideoEditor({
     }
     void fetchTransitions();
     return () => { cancelled = true; };
-  }, [podcastId]);
+  }, [episodeId]);
 
   const originalMap = useMemo(() => {
     const map = new Map<string, EditableSegmentVisual>();
@@ -232,7 +232,7 @@ export function VideoEditor({
       }));
 
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/video`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ segments: changedSegments }),
@@ -248,7 +248,7 @@ export function VideoEditor({
     } catch {
       setSubmitting(false);
     }
-  }, [podcastId, editedSegments, onRegenerate]);
+  }, [episodeId, editedSegments, onRegenerate]);
 
   const handleRegenerate = useCallback(async () => {
     if (dirtyCount === 0) return;

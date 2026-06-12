@@ -109,7 +109,7 @@ export async function generateHeraMotionGraphic(params: {
   prompt: string;
   durationSeconds: number;
   referenceImageUrl?: string;
-  podcastId?: string;
+  episodeId?: string;
   userId?: string;
 }): Promise<Buffer | null> {
   if (!getApiKey()) {
@@ -152,7 +152,7 @@ export async function generateHeraMotionGraphic(params: {
         category: 'video_generation',
         totalCost: 0,
         durationMs: Date.now() - startTime,
-        podcastId: params.podcastId,
+        episodeId: params.episodeId,
         userId: params.userId,
         metadata: { stage: 'motion_graphic', durationSeconds: params.durationSeconds },
       });

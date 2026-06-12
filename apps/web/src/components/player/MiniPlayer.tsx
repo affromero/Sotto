@@ -6,7 +6,7 @@ import { WaveformBars } from '@/components/ui/WaveformBars';
 import styles from './MiniPlayer.module.css';
 
 interface MiniPlayerProps {
-  podcastTitle?: string;
+  episodeTitle?: string;
   onExpand?: () => void;
   onClose?: () => void;
 }
@@ -17,7 +17,7 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps) {
+export function MiniPlayer({ episodeTitle, onExpand, onClose }: MiniPlayerProps) {
   const player = usePlayer();
   const seekBarRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +36,7 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
     seekFromX(e.touches[0].clientX);
   }, [seekFromX]);
 
-  if (!player || !player.podcastId) return null;
+  if (!player || !player.episodeId) return null;
 
   const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
 
@@ -67,14 +67,14 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
               <WaveformBars className={styles.artworkWaveform} />
             ) : (
               <span className={styles.artworkLetter}>
-                {podcastTitle?.charAt(0).toUpperCase() || 'P'}
+                {episodeTitle?.charAt(0).toUpperCase() || 'P'}
               </span>
             )}
           </div>
         </button>
 
         <button className={styles.info} onClick={onExpand}>
-          <span className={styles.title}>{podcastTitle || 'Now Playing'}</span>
+          <span className={styles.title}>{episodeTitle || 'Now Playing'}</span>
           <span className={styles.time}>
             {formatTime(player.currentTime)} / {formatTime(player.duration)}
           </span>

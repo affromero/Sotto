@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { VideoEditor } from '@/components/player/VideoEditor';
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { FalModelsResponse } from '@/types/pipeline';
 
@@ -140,7 +140,7 @@ describe('VideoEditor', () => {
   it('selects first segment by default', () => {
     render(
       <VideoEditor
-        podcastId="pod-1"
+        episodeId="pod-1"
         segments={segments}
         segmentVisuals={segmentVisuals}
         falModels={falModels}
@@ -160,7 +160,7 @@ describe('VideoEditor', () => {
   it('clicking a block selects it and shows its detail panel', () => {
     render(
       <VideoEditor
-        podcastId="pod-1"
+        episodeId="pod-1"
         segments={segments}
         segmentVisuals={segmentVisuals}
         falModels={falModels}
@@ -185,7 +185,7 @@ describe('VideoEditor', () => {
 
     render(
       <VideoEditor
-        podcastId="pod-1"
+        episodeId="pod-1"
         segments={segments}
         segmentVisuals={segmentVisuals}
         falModels={falModels}
@@ -201,7 +201,7 @@ describe('VideoEditor', () => {
     });
 
     expect(vi.mocked(global.fetch)).toHaveBeenCalledWith(
-      '/api/v1/podcasts/pod-1/video',
+      '/api/v1/episodes/pod-1/video',
       expect.objectContaining({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

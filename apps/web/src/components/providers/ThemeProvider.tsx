@@ -26,7 +26,7 @@ function isLightOnlyRoute(pathname: string): boolean {
   return (
     pathname === '/' ||
     pathname.startsWith('/auth/') ||
-    (pathname.startsWith('/podcast/') && pathname.endsWith('/embed'))
+    (pathname.startsWith('/episode/') && pathname.endsWith('/embed'))
   );
 }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Composition, registerRoot } from 'remotion';
-import { PodcastVideo } from './compositions/PodcastVideo';
+import { EpisodeVideo } from './compositions/EpisodeVideo';
 import { LaunchVideo, computeTotalDurationFrames } from './compositions/LaunchVideo';
 import { SegmentStill } from './compositions/SegmentStill';
 import type { RenderInput, LaunchVideoInput, VideoSegment } from './types';
@@ -10,8 +10,8 @@ const RemotionRoot: React.FC = () => {
   return (
     <>
       <Composition
-        id="PodcastVideo"
-        component={PodcastVideo as React.FC}
+        id="EpisodeVideo"
+        component={EpisodeVideo as React.FC}
         durationInFrames={30 * 60}
         fps={DEFAULT_RENDER_CONFIG.fps}
         width={DEFAULT_RENDER_CONFIG.width}

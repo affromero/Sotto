@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /**
- * Backfill slugs for all existing podcasts that don't have one.
+ * Backfill slugs for all existing episodes that don't have one.
  *
  * Usage:
  *   npx tsx scripts/backfill-slugs.ts           # dry run (default)
@@ -27,24 +27,24 @@ function slugify(title: string): string {
 }
 
 async function main() {
-  const podcasts = await prisma.podcast.findMany({
+  const episodes = await prisma.episode.findMany({
     where: { slug: null },
     select: { id: true, title: true, userId: true },
     orderBy: { createdAt: 'asc' },
   });
 
-  console.log(`Found ${podcasts.length} podcasts without slugs (${apply ? 'APPLY' : 'DRY RUN'})`);
+  console.log(`Found ${episodes.length} episodes without slugs (${apply ? 'APPLY' : 'DRY RUN'})`);
 
   let updated = 0;
   let skipped = 0;
 
-  for (const podcast of podcasts) {
-    const base = slugify(podcast.title);
+  for (const episode of episodes) {
+    const base = slugify(episode.title);
     let slug = base;
 
     // Check for uniqueness per user
-    const existing = await prisma.podcast.findUnique({
-      where: { userId_slug: { userId: podcast.userId, slug } },
+    const existing = await prisma.episode.findUnique({
+      where: { userId_slug: { userId: episode.userId, slug } },
       select: { id: true },
     });
 
@@ -53,8 +53,8 @@ async function main() {
       let found = false;
       for (let i = 2; i < 100; i++) {
         const candidate = `${base}-${i}`;
-        const taken = await prisma.podcast.findUnique({
-          where: { userId_slug: { userId: podcast.userId, slug: candidate } },
+        const taken = await prisma.episode.findUnique({
+          where: { userId_slug: { userId: episode.userId, slug: candidate } },
           select: { id: true },
         });
         if (!taken) {
@@ -68,11 +68,11 @@ async function main() {
       }
     }
 
-    console.log(`  ${podcast.id} → "${slug}" (from "${podcast.title}")`);
+    console.log(`  ${episode.id} → "${slug}" (from "${episode.title}")`);
 
     if (apply) {
-      await prisma.podcast.update({
-        where: { id: podcast.id },
+      await prisma.episode.update({
+        where: { id: episode.id },
         data: { slug },
       });
       updated++;

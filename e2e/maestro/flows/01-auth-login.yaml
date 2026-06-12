@@ -10,6 +10,6 @@ tags: [auth, critical]
 - assertVisible:
     id: 'library-filter-all'
 - assertVisible:
-    id: 'library-podcast-list'
+    id: 'library-episode-list'
 - takeScreenshot: after-login
-- assertWithAI: 'A private podcast library with at least one podcast card is visible'
+- assertWithAI: 'A private episode library with at least one episode card is visible'

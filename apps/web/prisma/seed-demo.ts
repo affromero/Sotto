@@ -8,8 +8,8 @@ const prisma = new PrismaClient();
 const DEMO_LANGUAGE_IDS = {
   courseClassIntro: 'demo-de-a1-class-greetings',
   courseClassNumbers: 'demo-de-a1-class-numbers',
-  introPodcast: 'demo-de-a1-listening-greetings',
-  numbersPodcast: 'demo-de-a1-listening-market',
+  introEpisode: 'demo-de-a1-listening-greetings',
+  numbersEpisode: 'demo-de-a1-listening-market',
 } as const;
 
 type DemoSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING';
@@ -83,7 +83,7 @@ async function seedGermanCurriculum() {
   return { curriculum, introLesson, numbersLesson };
 }
 
-async function upsertClassPodcast(params: {
+async function upsertClassEpisode(params: {
   id: string;
   userId: string;
   title: string;
@@ -91,7 +91,7 @@ async function upsertClassPodcast(params: {
   segments: string[];
 }) {
   const duration = params.segments.length * 14;
-  const podcast = await prisma.podcast.upsert({
+  const episode = await prisma.episode.upsert({
     where: { id: params.id },
     create: {
       id: params.id,
@@ -118,11 +118,11 @@ async function upsertClassPodcast(params: {
     },
   });
 
-  await prisma.segment.deleteMany({ where: { podcastId: podcast.id } });
-  await prisma.reference.deleteMany({ where: { podcastId: podcast.id } });
+  await prisma.segment.deleteMany({ where: { episodeId: episode.id } });
+  await prisma.reference.deleteMany({ where: { episodeId: episode.id } });
   await prisma.segment.createMany({
     data: params.segments.map((text, index) => ({
-      podcastId: podcast.id,
+      episodeId: episode.id,
       speaker: index % 2 === 0 ? 'TEACHER' : 'LEARNER',
       text,
       order: index,
@@ -132,7 +132,7 @@ async function upsertClassPodcast(params: {
     })),
   });
 
-  return podcast;
+  return episode;
 }
 
 async function upsertSection(params: {
@@ -142,7 +142,7 @@ async function upsertSection(params: {
   status: 'READY' | 'PASSED';
   score?: number;
   passed?: boolean;
-  podcastId?: string | null;
+  episodeId?: string | null;
   spec: Prisma.InputJsonObject;
 }) {
   return prisma.classSection.upsert({
@@ -158,7 +158,7 @@ async function upsertSection(params: {
       score: params.score ?? null,
       passed: params.passed ?? null,
       passThreshold: 0.7,
-      podcastId: params.podcastId ?? null,
+      episodeId: params.episodeId ?? null,
       generatedAt: new Date('2026-05-20T12:00:00.000Z'),
     },
     update: {
@@ -171,7 +171,7 @@ async function upsertSection(params: {
       score: params.score ?? null,
       passed: params.passed ?? null,
       passThreshold: 0.7,
-      podcastId: params.podcastId ?? null,
+      episodeId: params.episodeId ?? null,
       generatedAt: new Date('2026-05-20T12:00:00.000Z'),
     },
   });
@@ -328,8 +328,8 @@ async function seedLanguageLearningDemo(userId: string) {
     },
   });
 
-  const introPodcast = await upsertClassPodcast({
-    id: DEMO_LANGUAGE_IDS.introPodcast,
+  const introEpisode = await upsertClassEpisode({
+    id: DEMO_LANGUAGE_IDS.introEpisode,
     userId,
     title: 'A1 German Listening: First Day in Berlin',
     topic: 'A slow A1 dialogue for greetings, introductions, and polite goodbyes in German.',
@@ -340,8 +340,8 @@ async function seedLanguageLearningDemo(userId: string) {
       'Natürlich. Willkommen in Berlin, Nico. Auf Wiedersehen!',
     ],
   });
-  const numbersPodcast = await upsertClassPodcast({
-    id: DEMO_LANGUAGE_IDS.numbersPodcast,
+  const numbersEpisode = await upsertClassEpisode({
+    id: DEMO_LANGUAGE_IDS.numbersEpisode,
     userId,
     title: 'A1 German Listening: Saturday at the Market',
     topic: 'A slow A1 dialogue for German numbers, prices, weekdays, and dates.',
@@ -464,7 +464,7 @@ async function seedLanguageLearningDemo(userId: string) {
       status: 'PASSED',
       score: 1,
       passed: true,
-      podcastId: introPodcast.id,
+      episodeId: introEpisode.id,
       spec: sectionSpecs.intro,
     }),
     speaking: await upsertSection({
@@ -498,7 +498,7 @@ async function seedLanguageLearningDemo(userId: string) {
       classId: numbersClass.id,
       skill: 'LISTENING',
       status: 'READY',
-      podcastId: numbersPodcast.id,
+      episodeId: numbersEpisode.id,
       spec: sectionSpecs.numbers,
     }),
     speaking: await upsertSection({
@@ -953,7 +953,7 @@ async function seedLanguageLearningDemo(userId: string) {
       targetVocabId: vocabByLemma.get('Guten Tag')!.id,
       grammarId: null,
       classId: null,
-      podcastId: null,
+      episodeId: null,
     },
   });
   await prisma.vocabEdge.upsert({
@@ -974,7 +974,7 @@ async function seedLanguageLearningDemo(userId: string) {
       targetVocabId: null,
       grammarId: grammarByKey.get('verb-heissen-present')!.id,
       classId: null,
-      podcastId: null,
+      episodeId: null,
     },
   });
   await prisma.vocabEdge.upsert({
@@ -995,7 +995,7 @@ async function seedLanguageLearningDemo(userId: string) {
       targetVocabId: null,
       grammarId: grammarByKey.get('cardinal-numbers')!.id,
       classId: null,
-      podcastId: null,
+      episodeId: null,
     },
   });
 
@@ -1110,8 +1110,8 @@ async function main() {
     if (tag) tagMap[slug] = tag.id;
   }
 
-  // ── 6. Podcasts ─────────────────────────────────────────────────
-  const podcastDefs = [
+  // ── 6. Episodes ─────────────────────────────────────────────────
+  const episodeDefs = [
     {
       title: 'The Hidden History of Cryptography',
       topic:
@@ -1168,7 +1168,7 @@ async function main() {
     },
   ];
 
-  // Segment templates — realistic two-voice podcast dialogue
+  // Segment templates — realistic two-voice episode dialogue
   const segmentSets: { speaker: string; text: string }[][] = [
     // Cryptography
     [
@@ -1403,7 +1403,7 @@ async function main() {
     ],
   ];
 
-  // Reference templates per podcast
+  // Reference templates per episode
   const referenceSets: {
     title: string;
     authors: string[];
@@ -1611,20 +1611,20 @@ async function main() {
     ],
   ];
 
-  const podcasts = [];
-  for (let i = 0; i < podcastDefs.length; i++) {
-    const def = podcastDefs[i];
+  const episodes = [];
+  for (let i = 0; i < episodeDefs.length; i++) {
+    const def = episodeDefs[i];
     const segments = segmentSets[i];
     const refs = referenceSets[i];
 
-    // Upsert podcast by checking if one with same title + userId exists
-    let podcast = await prisma.podcast.findFirst({
+    // Upsert episode by checking if one with same title + userId exists
+    let episode = await prisma.episode.findFirst({
       where: { title: def.title, userId: def.userId },
     });
 
-    if (podcast) {
-      podcast = await prisma.podcast.update({
-        where: { id: podcast.id },
+    if (episode) {
+      episode = await prisma.episode.update({
+        where: { id: episode.id },
         data: {
           topic: def.topic,
           status: 'READY',
@@ -1634,7 +1634,7 @@ async function main() {
         },
       });
     } else {
-      podcast = await prisma.podcast.create({
+      episode = await prisma.episode.create({
         data: {
           userId: def.userId,
           title: def.title,
@@ -1646,16 +1646,16 @@ async function main() {
         },
       });
     }
-    podcasts.push(podcast);
+    episodes.push(episode);
 
     // Delete existing segments + references (idempotent re-creation)
-    await prisma.segment.deleteMany({ where: { podcastId: podcast.id } });
-    await prisma.reference.deleteMany({ where: { podcastId: podcast.id } });
+    await prisma.segment.deleteMany({ where: { episodeId: episode.id } });
+    await prisma.reference.deleteMany({ where: { episodeId: episode.id } });
 
     // Create segments
     await prisma.segment.createMany({
       data: segments.map((seg, idx) => ({
-        podcastId: podcast!.id,
+        episodeId: episode!.id,
         speaker: seg.speaker,
         text: seg.text,
         order: idx,
@@ -1668,7 +1668,7 @@ async function main() {
     // Create references
     await prisma.reference.createMany({
       data: refs.map((ref, idx) => ({
-        podcastId: podcast!.id,
+        episodeId: episode!.id,
         number: idx + 1,
         title: ref.title,
         authors: ref.authors,
@@ -1683,21 +1683,21 @@ async function main() {
     for (const slug of def.tags) {
       const tagId = tagMap[slug];
       if (!tagId) continue;
-      await prisma.podcastTag.create({ data: { podcastId: podcast.id, tagId } }).catch(() => {}); // ignore if already exists
+      await prisma.episodeTag.create({ data: { episodeId: episode.id, tagId } }).catch(() => {}); // ignore if already exists
     }
   }
-  console.log(`  Created ${podcasts.length} podcasts with segments and references`);
+  console.log(`  Created ${episodes.length} episodes with segments and references`);
 
-  // ── 7. Interaction on the quantum computing podcast ─────────────
-  const quantumPodcast = podcasts[1];
-  if (quantumPodcast) {
+  // ── 7. Interaction on the quantum computing episode ─────────────
+  const quantumEpisode = episodes[1];
+  if (quantumEpisode) {
     const existing = await prisma.interaction.findFirst({
-      where: { podcastId: quantumPodcast.id, userId: demoUser.id },
+      where: { episodeId: quantumEpisode.id, userId: demoUser.id },
     });
     if (!existing) {
       await prisma.interaction.create({
         data: {
-          podcastId: quantumPodcast.id,
+          episodeId: quantumEpisode.id,
           userId: demoUser.id,
           status: 'RESOLVED',
           question:
@@ -1709,21 +1709,21 @@ async function main() {
           incorporated: false,
         },
       });
-      console.log('  Created interaction on quantum computing podcast');
+      console.log('  Created interaction on quantum computing episode');
     }
   }
 
-  // ── 8. Set audioUrl on Cryptography podcast ──────────────────
-  const cryptoPodcast = podcasts[0];
-  if (cryptoPodcast) {
-    await prisma.podcast.update({
-      where: { id: cryptoPodcast.id },
+  // ── 8. Set audioUrl on Cryptography episode ──────────────────
+  const cryptoEpisode = episodes[0];
+  if (cryptoEpisode) {
+    await prisma.episode.update({
+      where: { id: cryptoEpisode.id },
       data: { audioUrl: '/demo-audio.mp3' },
     });
-    console.log('  Set audioUrl on Cryptography podcast');
+    console.log('  Set audioUrl on Cryptography episode');
   }
 
-  // ── 9. SCRIPT_READY podcast — "The Psychology of Decision Making" ──
+  // ── 9. SCRIPT_READY episode — "The Psychology of Decision Making" ──
   const scriptReadyTurns = [
     {
       speaker: 'HOST',
@@ -1768,13 +1768,13 @@ async function main() {
     .map((t) => `**${t.speaker}:** ${t.text}`)
     .join('\n\n');
 
-  let scriptReadyPodcast = await prisma.podcast.findFirst({
+  let scriptReadyEpisode = await prisma.episode.findFirst({
     where: { title: 'The Psychology of Decision Making', userId: demoUser.id },
   });
 
-  if (scriptReadyPodcast) {
-    scriptReadyPodcast = await prisma.podcast.update({
-      where: { id: scriptReadyPodcast.id },
+  if (scriptReadyEpisode) {
+    scriptReadyEpisode = await prisma.episode.update({
+      where: { id: scriptReadyEpisode.id },
       data: {
         status: 'SCRIPT_READY',
         visibility: 'PUBLIC',
@@ -1783,7 +1783,7 @@ async function main() {
       },
     });
   } else {
-    scriptReadyPodcast = await prisma.podcast.create({
+    scriptReadyEpisode = await prisma.episode.create({
       data: {
         userId: demoUser.id,
         title: 'The Psychology of Decision Making',
@@ -1799,10 +1799,10 @@ async function main() {
 
   // Upsert Script record
   await prisma.script.upsert({
-    where: { podcastId: scriptReadyPodcast.id },
+    where: { episodeId: scriptReadyEpisode.id },
     update: { turns: scriptReadyTurns, markdown: scriptReadyMarkdown },
     create: {
-      podcastId: scriptReadyPodcast.id,
+      episodeId: scriptReadyEpisode.id,
       turns: scriptReadyTurns,
       markdown: scriptReadyMarkdown,
     },
@@ -1810,21 +1810,21 @@ async function main() {
 
   // Tag it
   if (tagMap['philosophy']) {
-    await prisma.podcastTag
+    await prisma.episodeTag
       .create({
-        data: { podcastId: scriptReadyPodcast.id, tagId: tagMap['philosophy'] },
+        data: { episodeId: scriptReadyEpisode.id, tagId: tagMap['philosophy'] },
       })
       .catch(() => {});
   }
   if (tagMap['science']) {
-    await prisma.podcastTag
+    await prisma.episodeTag
       .create({
-        data: { podcastId: scriptReadyPodcast.id, tagId: tagMap['science'] },
+        data: { episodeId: scriptReadyEpisode.id, tagId: tagMap['science'] },
       })
       .catch(() => {});
   }
 
-  console.log(`  Created SCRIPT_READY podcast: ${scriptReadyPodcast.id}`);
+  console.log(`  Created SCRIPT_READY episode: ${scriptReadyEpisode.id}`);
 
   // ── 10. Language-learning course showcase ──────────────────────
   const languageDemo = await seedLanguageLearningDemo(demoUser.id);
@@ -1835,7 +1835,7 @@ async function main() {
   console.log('\nDemo data seeded successfully!');
   console.log(`  Demo user:  ${demoUser.email} (${demoUser.id})`);
   console.log(`  Admin user: ${adminUser.email} (${adminUser.id})`);
-  console.log(`  Podcasts:   ${podcasts.length + 3} (including SCRIPT_READY and class audio)`);
+  console.log(`  Episodes:   ${episodes.length + 3} (including SCRIPT_READY and class audio)`);
   console.log(
     `  Course:     ${languageDemo.course.nativeLang}->${languageDemo.course.targetLang} ${languageDemo.course.currentLevel}`
   );

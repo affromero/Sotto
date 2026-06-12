@@ -14,7 +14,7 @@ tags: [notifications]
 
 # Verify notifications are visible
 - assertVisible:
-    text: "Your podcast is ready"
+    text: "Your episode is ready"
 
 # Mark all as read
 - tapOn:

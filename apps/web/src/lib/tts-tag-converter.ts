@@ -20,7 +20,7 @@ interface ScriptTurn {
 
 export interface TtsTagConversionOptions {
   mode?: 'disabled' | 'ai';
-  podcastId?: string;
+  episodeId?: string;
   aiProvider?: AiProviderId;
   aiModel?: string;
   apiKeyOverride?: string;
@@ -69,14 +69,14 @@ export async function convertTurnsForProvider(
       }
     );
 
-    if (options.podcastId) {
+    if (options.episodeId) {
       await logUsage({
         service: options.aiProvider,
         model: response.model,
         category: 'tts-tag-conversion',
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
-        podcastId: options.podcastId,
+        episodeId: options.episodeId,
       });
     }
 

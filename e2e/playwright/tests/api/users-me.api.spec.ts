@@ -26,11 +26,11 @@ test.describe('Users /me API routes', () => {
     expect([400, 409]).toContain(res.status());
   });
 
-  test('GET me/podcasts returns list', async ({ authedRequest }) => {
-    const res = await authedRequest.get('/api/v1/users/me/podcasts');
+  test('GET me/episodes returns list', async ({ authedRequest }) => {
+    const res = await authedRequest.get('/api/v1/users/me/episodes');
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body).toHaveProperty('podcasts');
+    expect(body).toHaveProperty('episodes');
   });
 
   test('GET me/export returns data', async ({ authedRequest }) => {

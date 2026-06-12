@@ -18,7 +18,7 @@ import { createRealtimeSession, pollSessionReady, consumeSession, deleteSession 
 const execFileAsync = promisify(execFile);
 
 const AUDIO_URL =
-  'https://pub-cdb1bb3318a3477c9f1a76249243a81c.r2.dev/podcasts/cmmndizqz000h06us1q6gljgf/avatars/HOST-audio.mp3';
+  'https://pub-cdb1bb3318a3477c9f1a76249243a81c.r2.dev/episodes/cmmndizqz000h06us1q6gljgf/avatars/HOST-audio.mp3';
 const AVATAR_ID = 'cat-character';
 const OUTPUT = '/tmp/test-runway-browser.webm';
 

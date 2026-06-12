@@ -39,7 +39,7 @@ interface ExamSection {
   weight: number;
   status: string;
   score: number | null;
-  podcast: { id: string; audioUrl: string | null; status: string } | null;
+  episode: { id: string; audioUrl: string | null; status: string } | null;
   questions: ExamQuestion[];
   speakingPrompts: SpeakingPrompt[];
   writingPrompts: WritingPrompt[];
@@ -64,8 +64,8 @@ function pct(n: number | null | undefined): string {
   return n == null ? '' : `${Math.round(n * 100)}%`;
 }
 
-// Listening audio: the podcast finishes generating asynchronously, so poll for it.
-function ListeningAudio({ podcastId, initialUrl }: { podcastId: string; initialUrl: string | null }) {
+// Listening audio: the episode finishes generating asynchronously, so poll for it.
+function ListeningAudio({ episodeId, initialUrl }: { episodeId: string; initialUrl: string | null }) {
   const [audioUrl, setAudioUrl] = useState<string | null>(initialUrl);
   useEffect(() => {
     if (audioUrl) return;
@@ -73,7 +73,7 @@ function ListeningAudio({ podcastId, initialUrl }: { podcastId: string; initialU
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const res = await fetch(`/api/v1/podcasts/${podcastId}`);
+        const res = await fetch(`/api/v1/episodes/${episodeId}`);
         if (res.ok) {
           const data = (await res.json()) as { audioUrl?: string | null };
           if (active && data.audioUrl) {
@@ -91,7 +91,7 @@ function ListeningAudio({ podcastId, initialUrl }: { podcastId: string; initialU
       active = false;
       clearTimeout(timer);
     };
-  }, [podcastId, audioUrl]);
+  }, [episodeId, audioUrl]);
 
   if (!audioUrl) {
     return (
@@ -184,8 +184,8 @@ export function ExamRunner({ exam: initialExam }: Props) {
               </p>
             )}
 
-            {section.format === 'listening' && section.podcast && (
-              <ListeningAudio podcastId={section.podcast.id} initialUrl={section.podcast.audioUrl} />
+            {section.format === 'listening' && section.episode && (
+              <ListeningAudio episodeId={section.episode.id} initialUrl={section.episode.audioUrl} />
             )}
 
             {section.format === 'speaking' ? (

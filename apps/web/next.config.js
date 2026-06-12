@@ -56,11 +56,11 @@ const nextConfig = {
     return [
       {
         source: '/@:handle/:slug/embed',
-        destination: '/podcast/by-slug/:handle/:slug/embed',
+        destination: '/episode/by-slug/:handle/:slug/embed',
       },
       {
         source: '/@:handle/:slug',
-        destination: '/podcast/by-slug/:handle/:slug',
+        destination: '/episode/by-slug/:handle/:slug',
       },
     ];
   },
@@ -143,7 +143,7 @@ const nextConfig = {
         ],
       },
       {
-        source: '/podcast/:podcastId/embed',
+        source: '/episode/:episodeId/embed',
         headers: [
           { key: 'Content-Security-Policy', value: embedCsp },
           { key: 'X-Content-Type-Options', value: 'nosniff' },

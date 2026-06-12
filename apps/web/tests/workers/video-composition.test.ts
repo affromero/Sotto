@@ -9,7 +9,7 @@ const {
   process.env.REMOTION_URL = 'http://remotion:3100';
   return {
   mockPrisma: {
-    podcast: { findUnique: vi.fn(), update: vi.fn() },
+    episode: { findUnique: vi.fn(), update: vi.fn() },
     videoGeneration: { update: vi.fn() },
     segment: { findMany: vi.fn() },
     segmentVisual: { findMany: vi.fn() },
@@ -54,13 +54,13 @@ afterEach(() => {
 });
 
 describe('video-composition worker', () => {
-  const baseData = { podcastId: 'pod-1', videoGenerationId: 'vg-1' };
+  const baseData = { episodeId: 'pod-1', videoGenerationId: 'vg-1' };
 
-  const podcast = {
+  const episode = {
     id: 'pod-1',
     audioUrl: 'https://cdn.example.com/audio.mp3',
     duration: 300,
-    title: 'Test Podcast',
+    title: 'Test Episode',
     userId: 'user-1',
   };
 
@@ -74,8 +74,8 @@ describe('video-composition worker', () => {
     { segmentId: 'seg-2', visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Stats' }, assetUrl: null, assetType: null, subOrder: 0, startOffset: 0, subDuration: 8 },
   ];
 
-  it('skips if podcast was deleted', async () => {
-    mockPrisma.podcast.findUnique.mockResolvedValue(null);
+  it('skips if episode was deleted', async () => {
+    mockPrisma.episode.findUnique.mockResolvedValue(null);
 
     await processVideoComposition(makeJob(baseData));
 
@@ -83,14 +83,14 @@ describe('video-composition worker', () => {
     expect(mockUploadFile).not.toHaveBeenCalled();
   });
 
-  it('throws if podcast has no audio URL', async () => {
-    mockPrisma.podcast.findUnique.mockResolvedValue({ ...podcast, audioUrl: null });
+  it('throws if episode has no audio URL', async () => {
+    mockPrisma.episode.findUnique.mockResolvedValue({ ...episode, audioUrl: null });
 
     await expect(processVideoComposition(makeJob(baseData))).rejects.toThrow('No audio URL available');
   });
 
   it('renders video end-to-end and uploads to R2', async () => {
-    mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
+    mockPrisma.episode.findUnique.mockResolvedValue(episode);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
     mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
@@ -122,7 +122,7 @@ describe('video-composition worker', () => {
     );
 
     expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/video.mp4',
+      'episodes/pod-1/video.mp4',
       expect.any(Buffer),
       'video/mp4',
     );
@@ -132,7 +132,7 @@ describe('video-composition worker', () => {
       data: expect.objectContaining({ status: 'READY', videoUrl: expect.any(String) }),
     });
 
-    expect(mockPrisma.podcast.update).toHaveBeenCalledWith({
+    expect(mockPrisma.episode.update).toHaveBeenCalledWith({
       where: { id: 'pod-1' },
       data: { videoUrl: expect.any(String) },
     });
@@ -145,7 +145,7 @@ describe('video-composition worker', () => {
   });
 
   it('throws on Remotion render failure', async () => {
-    mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
+    mockPrisma.episode.findUnique.mockResolvedValue(episode);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
     mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
@@ -167,7 +167,7 @@ describe('video-composition worker', () => {
   });
 
   it('includes segment timing in render payload', async () => {
-    mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
+    mockPrisma.episode.findUnique.mockResolvedValue(episode);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
     mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
@@ -198,7 +198,7 @@ describe('video-composition worker', () => {
   });
 
   it('throws on 429 from Remotion sidecar', async () => {
-    mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
+    mockPrisma.episode.findUnique.mockResolvedValue(episode);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
     mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 

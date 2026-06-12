@@ -1,7 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
-import type { PodcastVersionSummary } from '@sotto/shared';
+import type { EpisodeVersionSummary } from '@sotto/shared';
 import { BottomSheet } from './BottomSheet';
 import { timeAgo } from '../lib/formatters';
 import { formatTime } from '../lib/formatters';
@@ -9,7 +9,7 @@ import { formatTime } from '../lib/formatters';
 interface VersionHistoryProps {
   visible: boolean;
   onClose: () => void;
-  versions: PodcastVersionSummary[];
+  versions: EpisodeVersionSummary[];
   currentVersion: number;
 }
 

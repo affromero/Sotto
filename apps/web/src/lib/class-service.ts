@@ -264,7 +264,7 @@ export async function getClassForUser(classId: string, userId: string) {
             orderBy: { order: 'asc' },
             include: { responses: { where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 } },
           },
-          podcast: {
+          episode: {
             select: {
               id: true,
               audioUrl: true,

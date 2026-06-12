@@ -9,8 +9,8 @@ class MockElevenLabsProvider {
   async generateSoundEffect() {
     return Buffer.from('sfx');
   }
-  getVoiceId(speaker: string, podcastId?: string) {
-    if (!podcastId) {
+  getVoiceId(speaker: string, episodeId?: string) {
+    if (!episodeId) {
       return speaker === 'HOST' ? 'host-default' : 'expert-default';
     }
     return speaker === 'HOST' ? 'host-elevenlabs-id' : 'expert-elevenlabs-id';
@@ -195,8 +195,8 @@ describe('Provider Factories', () => {
 
     it('elevenlabs provider returns distinct voice IDs per speaker', () => {
       const provider = createTtsProvider('elevenlabs');
-      const hostVoice = provider.getVoiceId('HOST', 'podcast-1');
-      const expertVoice = provider.getVoiceId('EXPERT', 'podcast-1');
+      const hostVoice = provider.getVoiceId('HOST', 'episode-1');
+      const expertVoice = provider.getVoiceId('EXPERT', 'episode-1');
       expect(hostVoice).toBeTruthy();
       expect(expertVoice).toBeTruthy();
       expect(hostVoice).not.toBe(expertVoice);
@@ -207,7 +207,7 @@ describe('Provider Factories', () => {
   describe('resolveTtsProvider', () => {
     it('rejects missing provider instead of auto-selecting one', async () => {
       await expect(
-        resolveTtsProvider({ userId: 'user-1', podcastId: 'podcast-1' })
+        resolveTtsProvider({ userId: 'user-1', episodeId: 'episode-1' })
       ).rejects.toThrow('TTS provider is required');
     });
 
@@ -215,7 +215,7 @@ describe('Provider Factories', () => {
       await expect(
         resolveTtsProvider({
           userId: 'user-1',
-          podcastId: 'podcast-1',
+          episodeId: 'episode-1',
           requestedProvider: 'auto',
         })
       ).rejects.toThrow('TTS provider is required');

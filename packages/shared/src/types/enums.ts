@@ -2,7 +2,7 @@
 
 export type UserRole = 'USER' | 'ADMIN' | 'SYSTEM';
 
-export type PodcastStatus =
+export type EpisodeStatus =
   | 'PENDING'
   | 'DISCOVERING'
   | 'EXTRACTING'
@@ -20,9 +20,9 @@ export type PodcastStatus =
   | 'TRANSCRIBING'
   | 'DUPLICATE_REVIEW';
 
-export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+export type EpisodeVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
-export type PodcastSource =
+export type EpisodeSource =
   | 'WEB'
   | 'API'
   | 'AGENT'
@@ -45,10 +45,10 @@ export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'RE
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
 
 export type NotificationType =
-  | 'PODCAST_READY'
-  | 'PODCAST_FAILED'
+  | 'EPISODE_READY'
+  | 'EPISODE_FAILED'
   | 'KEY_INVALID'
-  | 'QUESTION_ON_YOUR_PODCAST'
+  | 'QUESTION_ON_YOUR_EPISODE'
   | 'SCRIPT_READY'
   | 'ACCOUNT_WARNING'
   | 'CONTENT_REMOVED'
@@ -116,7 +116,7 @@ export type EdgeType =
   | 'VOCAB_VOCAB'
   | 'VOCAB_GRAMMAR'
   | 'VOCAB_CLASS'
-  | 'VOCAB_PODCAST'
+  | 'VOCAB_EPISODE'
   | 'GRAMMAR_GRAMMAR';
 
 // Ungated single-skill practice. VOCAB is first-class (spaced-repetition recall)

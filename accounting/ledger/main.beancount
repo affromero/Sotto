@@ -2,7 +2,7 @@
 ; Sotto Financial Ledger
 ; ============================================================
 ;
-; Private podcast briefing platform
+; Private episode briefing platform
 ; https://your-domain.example
 ;
 ; Validate:  uv run bean-check ledger/main.beancount

@@ -43,20 +43,20 @@ function visualModeForType(visualType: VisualTypeString): VisualMode {
 }
 
 export async function processPipelineClassification(job: Job<ClassifyPipelinePayload>): Promise<void> {
-  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride } = job.data;
+  const { classificationId, episodeId, userId, aiProvider, aiModel, apiKeyOverride } = job.data;
   const redisKey = `${REDIS_KEY_PREFIX}${classificationId}`;
 
-  logger.info('Starting pipeline classification', { classificationId, podcastId });
+  logger.info('Starting pipeline classification', { classificationId, episodeId });
 
   try {
-    const [podcast, segmentTimings, discovery] = await Promise.all([
-      prisma.podcast.findUniqueOrThrow({
-        where: { id: podcastId },
+    const [episode, segmentTimings, discovery] = await Promise.all([
+      prisma.episode.findUniqueOrThrow({
+        where: { id: episodeId },
         select: { id: true, title: true, topic: true },
       }),
-      resolveSegmentTiming(podcastId),
+      resolveSegmentTiming(episodeId),
       prisma.discovery.findUnique({
-        where: { podcastId },
+        where: { episodeId },
         select: { sourceMetadata: true },
       }),
     ]);
@@ -85,7 +85,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
     await job.updateProgress(20);
 
     const [{ classifications, transitionRecommendations, inputTokens, outputTokens, model }, imageModels, videoModels, configuredVideo] = await Promise.all([
-      classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic, {
+      classifySegmentVisuals(segmentInputs, episode.title, episode.topic, {
         provider: aiProvider,
         model: aiModel,
         apiKeyOverride,
@@ -204,7 +204,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
 
     // Persist as DRAFT to DB so the storyboard survives across sessions
     const existingGen = await prisma.videoGeneration.findFirst({
-      where: { podcastId },
+      where: { episodeId },
       select: { id: true, status: true },
     });
     // Only save if no active generation exists (don't overwrite READY/GENERATING_*)
@@ -221,7 +221,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
       } else {
         await prisma.videoGeneration.create({
           data: {
-            podcastId,
+            episodeId,
             status: 'DRAFT',
             pipelineJson: pipeline as unknown as Prisma.InputJsonValue,
           },
@@ -236,7 +236,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
       category: 'video_generation',
       inputTokens,
       outputTokens,
-      podcastId,
+      episodeId,
       userId,
       metadata: { stage: 'pipeline-classification', segmentCount: classifications.length },
     });
@@ -244,14 +244,14 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
     await job.updateProgress(100);
     logger.info('Pipeline classification complete', {
       classificationId,
-      podcastId,
+      episodeId,
       segmentCount: String(segments.length),
       transitionCount: String(transitions.filter((t) => t.enabled).length),
       totalCost: String(pipeline.totalEstimatedCost),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error('Pipeline classification failed', { classificationId, podcastId, error: message });
+    logger.error('Pipeline classification failed', { classificationId, episodeId, error: message });
 
     const errorKind = classifyError(message);
     const isLlmError = USER_ACTIONABLE_ERROR_KINDS.has(errorKind);

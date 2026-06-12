@@ -32,7 +32,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('Memory')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
-    // Analytics is admin-only; the old podcast surfaces are gone.
+    // Analytics is admin-only; the old episode surfaces are gone.
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
     expect(screen.queryByText('Create')).not.toBeInTheDocument();
     expect(screen.queryByText('Voices')).not.toBeInTheDocument();

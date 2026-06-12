@@ -43,17 +43,17 @@ export async function clearInterceptor(page: Page, name: string): Promise<void> 
       break;
     case 'interact':
       // Interact uses two routes — unroute both patterns
-      await page.unroute('**/api/v1/podcasts/*/interact');
-      await page.unroute('**/api/v1/podcasts/*/interact/*');
+      await page.unroute('**/api/v1/episodes/*/interact');
+      await page.unroute('**/api/v1/episodes/*/interact/*');
       break;
     case 'fork':
-      await page.unroute('**/api/v1/podcasts/*/fork');
+      await page.unroute('**/api/v1/episodes/*/fork');
       break;
     case 'scriptApprove':
-      await page.unroute('**/api/v1/podcasts/*/script/approve');
+      await page.unroute('**/api/v1/episodes/*/script/approve');
       break;
     case 'avatar':
-      await page.unroute('**/api/v1/podcasts/*/avatar/session');
+      await page.unroute('**/api/v1/episodes/*/avatar/session');
       break;
     default:
       console.warn(`Unknown interceptor to clear: ${name}`);
@@ -91,13 +91,13 @@ async function interceptInteract(
   page: Page,
   options: Record<string, unknown>,
 ): Promise<void> {
-  const podcastId = options.podcastId as string;
+  const episodeId = options.episodeId as string;
   const interactionId = options.interactionId as string;
   const answer = options.answer as string;
   const answerDelay = (options.answerDelay as number) ?? 1500;
 
-  const postPattern = `**/api/v1/podcasts/${podcastId}/interact`;
-  const pollPattern = `**/api/v1/podcasts/${podcastId}/interact/${interactionId}`;
+  const postPattern = `**/api/v1/episodes/${episodeId}/interact`;
+  const pollPattern = `**/api/v1/episodes/${episodeId}/interact/${interactionId}`;
 
   await page.route(postPattern, async (route: Route) => {
     if (route.request().method() !== 'POST') {
@@ -109,7 +109,7 @@ async function interceptInteract(
       contentType: 'application/json',
       body: JSON.stringify({
         id: interactionId,
-        podcastId,
+        episodeId,
         question: 'mock question',
         timestamp: 60,
         status: 'PENDING',
@@ -144,10 +144,10 @@ async function interceptFork(
   page: Page,
   options: Record<string, unknown>,
 ): Promise<void> {
-  const podcastId = options.podcastId as string;
+  const episodeId = options.episodeId as string;
   const forkId = options.forkId as string;
 
-  await page.route(`**/api/v1/podcasts/${podcastId}/fork`, async (route: Route) => {
+  await page.route(`**/api/v1/episodes/${episodeId}/fork`, async (route: Route) => {
     await route.fulfill({
       status: 201,
       contentType: 'application/json',
@@ -160,10 +160,10 @@ async function interceptScriptApprove(
   page: Page,
   options: Record<string, unknown>,
 ): Promise<void> {
-  const podcastId = options.podcastId as string;
+  const episodeId = options.episodeId as string;
 
   await page.route(
-    `**/api/v1/podcasts/${podcastId}/script/approve`,
+    `**/api/v1/episodes/${episodeId}/script/approve`,
     async (route: Route) => {
       await route.fulfill({
         status: 200,
@@ -182,11 +182,11 @@ async function interceptAvatar(
   page: Page,
   options: Record<string, unknown>,
 ): Promise<void> {
-  const podcastId = options.podcastId as string;
+  const episodeId = options.episodeId as string;
   const videoUrl = options.videoUrl as string;
 
   await page.route(
-    `**/api/v1/podcasts/${podcastId}/avatar/session`,
+    `**/api/v1/episodes/${episodeId}/avatar/session`,
     async (route: Route) => {
       await route.fulfill({
         status: 200,

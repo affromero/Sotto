@@ -61,8 +61,8 @@ function renderEditor(segments: PipelineSegmentNode[], overrides: { onApprove?: 
 
   render(
     <PipelineEditor
-      podcastId="pod-1"
-      podcastTitle="Test"
+      episodeId="pod-1"
+      episodeTitle="Test"
       pipeline={pipeline}
       falModels={defaultModels}
       onApprove={onApprove}

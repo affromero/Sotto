@@ -22,7 +22,7 @@ interface VerifiedRef {
  * Each figure/table gets a sourceLabel with attribution to the reference.
  */
 export async function extractDiscoveryFigures(
-  podcastId: string,
+  episodeId: string,
   verifiedRefs: VerifiedRef[],
 ): Promise<void> {
   const refsWithUrls = verifiedRefs
@@ -74,7 +74,7 @@ export async function extractDiscoveryFigures(
 
   // Merge into Discovery.sourceMetadata
   const discovery = await prisma.discovery.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { sourceMetadata: true },
   });
 
@@ -87,14 +87,14 @@ export async function extractDiscoveryFigures(
   };
 
   await prisma.discovery.update({
-    where: { podcastId },
+    where: { episodeId },
     data: {
       sourceMetadata: JSON.parse(JSON.stringify(updatedMetadata)) as Prisma.InputJsonValue,
     },
   });
 
   logger.info('Discovery figures extracted from verified references', {
-    podcastId,
+    episodeId,
     figures: String(Math.min(allFigures.length, MAX_DISCOVERY_FIGURES)),
     tables: String(Math.min(allTables.length, MAX_DISCOVERY_TABLES)),
     refsProcessed: String(refsWithUrls.length),

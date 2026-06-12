@@ -421,14 +421,14 @@ describe('claude', () => {
         category: 'audio_generation',
         inputTokens: 500,
         totalCost: 0.085,
-        podcastId: 'podcast-123',
+        episodeId: 'episode-123',
       });
 
       expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           service: 'elevenlabs',
           totalCost: 0.085,
-          podcastId: 'podcast-123',
+          episodeId: 'episode-123',
         }),
       });
     });

@@ -10,17 +10,17 @@ interface UseSegmentVisualsResult {
   refresh: () => void;
 }
 
-export function useSegmentVisuals(podcastId: string | null): UseSegmentVisualsResult {
+export function useSegmentVisuals(episodeId: string | null): UseSegmentVisualsResult {
   const [visuals, setVisuals] = useState<SegmentVisualData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchVisuals = useCallback(async () => {
-    if (!podcastId) return;
+    if (!episodeId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
+      const res = await fetch(`/api/v1/episodes/${episodeId}/video`);
       if (!res.ok) {
         setIsLoading(false);
         return;
@@ -34,7 +34,7 @@ export function useSegmentVisuals(podcastId: string | null): UseSegmentVisualsRe
     } finally {
       setIsLoading(false);
     }
-  }, [podcastId]);
+  }, [episodeId]);
 
   useEffect(() => {
     fetchVisuals();

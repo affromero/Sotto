@@ -49,7 +49,7 @@ module.exports = ({ config }) => ({
             action: 'VIEW',
             autoVerify: true,
             data: [
-              { scheme: 'https', host: deploymentHost, pathPrefix: '/podcast' },
+              { scheme: 'https', host: deploymentHost, pathPrefix: '/episode' },
               { scheme: 'https', host: deploymentHost, pathPrefix: '/user' },
             ],
             category: ['BROWSABLE', 'DEFAULT'],

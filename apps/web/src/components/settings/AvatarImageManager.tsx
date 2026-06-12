@@ -203,7 +203,7 @@ export function AvatarImageManager() {
               <span className={styles.consentLabel}>
                 I confirm this is an image of myself. I have not uploaded someone else&apos;s
                 likeness without their written consent. I understand generated avatars may appear in
-                podcasts I share or export.
+                episodes I share or export.
               </span>
             </label>
           </div>

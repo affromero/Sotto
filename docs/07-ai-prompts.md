@@ -13,7 +13,7 @@ Sotto uses Anthropic Claude for 15+ distinct AI tasks across the pipeline. Each 
 | Prompt                    | File                                                   | Model             | Streaming | Purpose                                              |
 | ------------------------- | ------------------------------------------------------ | ----------------- | --------- | ---------------------------------------------------- |
 | Discovery Chat Agent      | `src/lib/discovery-agent.ts`                           | claude-sonnet-4-5 | Yes       | Conversational metadata extraction + web search      |
-| Script Generation         | `src/lib/script-generator.ts`                          | claude-sonnet-4-5 | No        | 2-voice podcast script from metadata                 |
+| Script Generation         | `src/lib/script-generator.ts`                          | claude-sonnet-4-5 | No        | 2-voice episode script from metadata                 |
 | Script Revision           | `src/lib/script-generator.ts`                          | claude-sonnet-4-5 | No        | Revise script based on verification feedback         |
 | Script Verification       | `src/lib/script-verifier.ts`                           | claude-sonnet-4-5 | No        | "Teacher" agent: fact-check claims, source citations |
 | Reference Validation      | `src/lib/reference-validator.ts`                       | claude-sonnet-4-5 | No        | AI layer of 4-layer citation verification            |
@@ -33,13 +33,13 @@ Content moderation (`src/workers/content-moderation.worker.ts`) uses the **OpenA
 
 **File:** `src/lib/discovery-agent.ts`
 
-**Purpose:** Conversational topic exploration. The agent guides users through a natural chat to understand what podcast they want, gathering structured metadata for script generation. The agent also suggests tappable chip options for quick responses on mobile.
+**Purpose:** Conversational topic exploration. The agent guides users through a natural chat to understand what episode they want, gathering structured metadata for script generation. The agent also suggests tappable chip options for quick responses on mobile.
 
 ### Full System Prompt
 
 ```
-You are Sotto's podcast discovery agent. Your job is to have a natural conversation
-to understand what the user wants to learn, then produce structured metadata for podcast generation.
+You are Sotto's episode discovery agent. Your job is to have a natural conversation
+to understand what the user wants to learn, then produce structured metadata for episode generation.
 
 You are warm, curious, and conversational — like a knowledgeable friend who's genuinely excited to help.
 
@@ -129,7 +129,7 @@ Parsed result:
 ```
 Perfect! Here's what I'll create for you:
 
-A standard-depth, casual podcast about quantum computing, focused on the intuition behind qubits and superposition, designed for someone with some physics background. About 10 minutes long.
+A standard-depth, casual episode about quantum computing, focused on the intuition behind qubits and superposition, designed for someone with some physics background. About 10 minutes long.
 
 Sound good?
 
@@ -180,12 +180,12 @@ export function parseMetadata(message: string): DiscoveryMetadata | null {
 
 **File:** `src/lib/script-generator.ts`
 
-**Purpose:** Generate an immersive, engaging 2-voice podcast script from the structured discovery metadata. The script includes delivery directions for TTS and sound effect cues for audio production.
+**Purpose:** Generate an immersive, engaging 2-voice episode script from the structured discovery metadata. The script includes delivery directions for TTS and sound effect cues for audio production.
 
 ### Full System Prompt
 
 ```
-You are a world-class podcast script writer for Sotto. Generate immersive, addictive 2-voice podcast scripts that listeners can't stop playing.
+You are a world-class episode script writer for Sotto. Generate immersive, addictive 2-voice episode scripts that listeners can't stop playing.
 
 ## Speakers:
 - HOST: Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects with short reactions.
@@ -210,7 +210,7 @@ You are a world-class podcast script writer for Sotto. Generate immersive, addic
 
 ## Sound Effect Cues:
 Include sound effect suggestions as [SFX: description] markers at natural transition points:
-- [SFX: warm podcast intro jingle, 3s] at the very start
+- [SFX: warm episode intro jingle, 3s] at the very start
 - [SFX: subtle transition whoosh, 1s] between major topic shifts
 - [SFX: gentle outro music, 4s] at the end
 - Use sparingly (3-5 per episode max) — they should enhance, not distract
@@ -223,9 +223,9 @@ Return a JSON object with two arrays:
     {"speaker": "EXPERT", "text": "...", "direction": "thoughtful"}
   ],
   "soundCues": [
-    {"type": "intro", "prompt": "warm upbeat podcast intro jingle with soft chimes", "durationSeconds": 3, "insertAfterTurn": -1},
+    {"type": "intro", "prompt": "warm upbeat episode intro jingle with soft chimes", "durationSeconds": 3, "insertAfterTurn": -1},
     {"type": "transition", "prompt": "subtle whoosh transition sound", "durationSeconds": 1, "insertAfterTurn": 8},
-    {"type": "outro", "prompt": "gentle melodic podcast outro with fade", "durationSeconds": 4, "insertAfterTurn": 20}
+    {"type": "outro", "prompt": "gentle melodic episode outro with fade", "durationSeconds": 4, "insertAfterTurn": 20}
   ]
 }
 
@@ -301,7 +301,7 @@ Source material is optional and only included when the user provided a URL or PD
   "soundCues": [
     {
       "type": "intro",
-      "prompt": "warm upbeat podcast intro jingle with soft chimes and gentle bass",
+      "prompt": "warm upbeat episode intro jingle with soft chimes and gentle bass",
       "durationSeconds": 3,
       "insertAfterTurn": -1
     },
@@ -313,7 +313,7 @@ Source material is optional and only included when the user provided a URL or PD
     },
     {
       "type": "outro",
-      "prompt": "gentle melodic podcast outro with piano fade",
+      "prompt": "gentle melodic episode outro with piano fade",
       "durationSeconds": 4,
       "insertAfterTurn": 20
     }
@@ -353,13 +353,13 @@ if (!parsed.soundCues || parsed.soundCues.length === 0) {
   parsed.soundCues = [
     {
       type: 'intro',
-      prompt: 'warm podcast intro jingle with soft chimes',
+      prompt: 'warm episode intro jingle with soft chimes',
       durationSeconds: 3,
       insertAfterTurn: -1,
     },
     {
       type: 'outro',
-      prompt: 'gentle melodic podcast outro with fade out',
+      prompt: 'gentle melodic episode outro with fade out',
       durationSeconds: 4,
       insertAfterTurn: parsed.turns.length - 1,
     },
@@ -373,27 +373,27 @@ if (!parsed.soundCues || parsed.soundCues.length === 0) {
 
 **File:** `src/workers/interaction.worker.ts`
 
-**Purpose:** Answer a user's question during podcast playback using the script context and the user's position in the podcast.
+**Purpose:** Answer a user's question during episode playback using the script context and the user's position in the episode.
 
 ### Full System Prompt
 
 ```
-You are Sotto's Q&A assistant. The user is listening to a podcast and paused to ask a question.
-Answer concisely and helpfully, using the podcast context. Keep answers under 200 words.
+You are Sotto's Q&A assistant. The user is listening to a episode and paused to ask a question.
+Answer concisely and helpfully, using the episode context. Keep answers under 200 words.
 Respond in {languageLabel}.
 
 [CONTENT_SAFETY_INSTRUCTIONS appended]
 [INPUT_SANITIZATION_INSTRUCTIONS appended]
 ```
 
-**Language support:** The response language is determined by priority: user's `preferredLanguage` > podcast's `language` > `'en'`. Uses `getLanguageLabel()` from `@sotto/shared` to get the display name.
+**Language support:** The response language is determined by priority: user's `preferredLanguage` > episode's `language` > `'en'`. Uses `getLanguageLabel()` from `@sotto/shared` to get the display name.
 
 **Content safety:** Both `CONTENT_SAFETY_INSTRUCTIONS` and `INPUT_SANITIZATION_INSTRUCTIONS` are appended. If a `ContentModerationError` is caught, the interaction is marked as answered with "Unable to answer — content policy violation."
 
 ### User Message Format
 
 ```
-Recent podcast context:
+Recent episode context:
 HOST: [text of recent turn 1]
 EXPERT: [text of recent turn 2]
 HOST: [text of recent turn 3]
@@ -405,7 +405,7 @@ User's question: [the question they asked]
 
 ### Design Rationale
 
-**Deliberately concise prompt:** Unlike the discovery and script prompts, the Q&A prompt is intentionally minimal. The user has paused their podcast to ask a quick question. They want a short, clear answer, not a lengthy explanation. The 200-word limit enforces this.
+**Deliberately concise prompt:** Unlike the discovery and script prompts, the Q&A prompt is intentionally minimal. The user has paused their episode to ask a quick question. They want a short, clear answer, not a lengthy explanation. The 200-word limit enforces this.
 
 **Context window:** The worker calculates which turns the user has heard based on the playback timestamp and provides the last 5 turns as context. This gives the model enough context to understand what was being discussed at the point the user paused, without overwhelming it with the entire script.
 
@@ -437,7 +437,7 @@ Plain text answer, no special formatting. For example:
 Great question! The "observer effect" in quantum mechanics doesn't mean a conscious observer is needed.
 It refers to the fact that measuring a quantum system requires interacting with it — usually by
 bouncing photons off it — which inevitably disturbs its state. It's more about the physical act
-of measurement than about human observation. The podcast was about to get into this distinction
+of measurement than about human observation. The episode was about to get into this distinction
 with the double-slit experiment example.
 ```
 
@@ -446,7 +446,7 @@ with the double-slit experiment example.
 After the interaction worker produces an answer, the user is presented with a resolution flow:
 
 1. "Was that clear?" (Yes / No)
-2. If Yes: "Want me to update the podcast with this explanation?" (Yes / No)
+2. If Yes: "Want me to update the episode with this explanation?" (Yes / No)
 3. If Yes: triggers the segment regeneration worker
 
 ---
@@ -455,22 +455,22 @@ After the interaction worker produces an answer, the user is presented with a re
 
 **File:** `src/workers/segment-regeneration.worker.ts`
 
-**Purpose:** Generate new script content to be inserted into an existing podcast, incorporating the answer to a user's question. The new content is then sent through TTS and stitched into the podcast audio.
+**Purpose:** Generate new script content to be inserted into an existing episode, incorporating the answer to a user's question. The new content is then sent through TTS and stitched into the episode audio.
 
 ### Context
 
-The segment regeneration worker does not use a separate Claude prompt. Instead, it receives pre-generated text (the answer from the interaction worker, adapted for the podcast format) and processes it through the audio pipeline:
+The segment regeneration worker does not use a separate Claude prompt. Instead, it receives pre-generated text (the answer from the interaction worker, adapted for the episode format) and processes it through the audio pipeline:
 
 1. Creates a new `Segment` record with the text and speaker assignment
 2. Generates TTS audio via ElevenLabs using the appropriate voice
 3. Uploads the audio to R2 storage
-4. Reorders all segments in the podcast to place the new content at the correct position
+4. Reorders all segments in the episode to place the new content at the correct position
 5. Marks the interaction as `INCORPORATED`
-6. Sets the podcast status back to `READY`
+6. Sets the episode status back to `READY`
 
 ### Text Preparation
 
-Before the segment regeneration worker runs, the Q&A answer is adapted from its raw form into podcast-script format. This adaptation happens in the API route that queues the regeneration job. The adapted text follows the same two-voice format:
+Before the segment regeneration worker runs, the Q&A answer is adapted from its raw form into episode-script format. This adaptation happens in the API route that queues the regeneration job. The adapted text follows the same two-voice format:
 
 ```
 HOST: That actually reminds me of a question someone asked — what about the observer effect? Does it really require a conscious observer?
@@ -485,7 +485,7 @@ The new segment is inserted at a fractional order position (`insertAfterOrder + 
 ```typescript
 const segment = await prisma.segment.create({
   data: {
-    podcastId,
+    episodeId,
     speaker,
     text: newText,
     order: insertAfterOrder + 0.5, // Temporary fractional position
@@ -497,7 +497,7 @@ After insertion, all segments are fetched in order and renumbered to clean integ
 
 ```typescript
 const allSegments = await prisma.segment.findMany({
-  where: { podcastId },
+  where: { episodeId },
   orderBy: { order: 'asc' },
 });
 
@@ -515,10 +515,10 @@ After segment insertion and reordering, the audio stitching worker re-runs to pr
 
 ```typescript
 export interface RegenerateSegmentPayload {
-  podcastId: string;
+  episodeId: string;
   interactionId: string;
   insertAfterOrder: number; // Position in segment sequence to insert after
-  newText: string; // The adapted podcast-format text
+  newText: string; // The adapted episode-format text
   speaker: string;
 }
 ```
@@ -531,7 +531,7 @@ The following principles guided the design of all Sotto prompts:
 
 ### 1. Role Clarity
 
-Each prompt starts with a clear role definition ("You are Sotto's podcast discovery agent", "You are a world-class podcast script writer"). This anchors the model's behavior and prevents drift toward generic assistant responses.
+Each prompt starts with a clear role definition ("You are Sotto's episode discovery agent", "You are a world-class episode script writer"). This anchors the model's behavior and prevents drift toward generic assistant responses.
 
 ### 2. Structured Output
 
@@ -543,11 +543,11 @@ Instead of saying "try to be concise," the prompts specify concrete constraints:
 
 ### 4. User Context
 
-The prompts remind the model about the user's context: "this is a mobile-first app used while commuting" (discovery), "the user paused their podcast" (Q&A). This context shapes the model's response length, tone, and assumptions about what the user needs.
+The prompts remind the model about the user's context: "this is a mobile-first app used while commuting" (discovery), "the user paused their episode" (Q&A). This context shapes the model's response length, tone, and assumptions about what the user needs.
 
 ### 5. Tone as a Parameter
 
-Tone is not hardcoded into the prompts. It is treated as a parameter (`casual`, `professional`, `socratic`, `storytelling`) that injects different instructions into the script generation prompt. This allows the same prompt infrastructure to produce dramatically different podcast styles.
+Tone is not hardcoded into the prompts. It is treated as a parameter (`casual`, `professional`, `socratic`, `storytelling`) that injects different instructions into the script generation prompt. This allows the same prompt infrastructure to produce dramatically different episode styles.
 
 ### 6. Graceful Degradation
 
@@ -561,7 +561,7 @@ All Claude API usage is logged for cost analysis:
 
 ```typescript
 export async function logApiUsage(params: {
-  podcastId?: string;
+  episodeId?: string;
   userId?: string;
   category: string;
   inputTokens: number;
@@ -587,9 +587,9 @@ export async function logApiUsage(params: {
 | ------------------------------------------ | ---------------- | ----------------- | -------- |
 | Discovery chat (per exchange)              | ~500             | ~200              | $0.0045  |
 | Discovery chat (full session, 5 exchanges) | ~2,500           | ~1,000            | $0.0225  |
-| Script generation (10 min podcast)         | ~1,500           | ~3,000            | $0.0495  |
-| Script generation (30 min podcast)         | ~2,000           | ~8,000            | $0.126   |
+| Script generation (10 min episode)         | ~1,500           | ~3,000            | $0.0495  |
+| Script generation (30 min episode)         | ~2,000           | ~8,000            | $0.126   |
 | Q&A interaction                            | ~800             | ~300              | $0.0069  |
 | Segment regeneration text prep             | ~600             | ~400              | $0.0078  |
 
-These costs are logged to the `ApiUsageLog` table and tracked per user, per podcast, and per operation category for unit economics analysis.
+These costs are logged to the `ApiUsageLog` table and tracked per user, per episode, and per operation category for unit economics analysis.

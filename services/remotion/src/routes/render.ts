@@ -11,7 +11,7 @@ import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus } from '@sotto/vi
 export const renderRouter = Router();
 
 /** Supported composition IDs — both use the same Remotion bundle. */
-type CompositionId = 'PodcastVideo' | 'LaunchVideo';
+type CompositionId = 'EpisodeVideo' | 'LaunchVideo';
 
 interface RenderJob {
   status: RenderStatusValue;
@@ -95,13 +95,13 @@ export function preWarmBundle(): void {
 // POST /render — start a new render
 renderRouter.post('/', (req, res) => {
   const { compositionId: rawCompositionId, ...body } = req.body;
-  const compositionId: CompositionId = rawCompositionId === 'LaunchVideo' ? 'LaunchVideo' : 'PodcastVideo';
+  const compositionId: CompositionId = rawCompositionId === 'LaunchVideo' ? 'LaunchVideo' : 'EpisodeVideo';
 
   // Validate based on composition type
-  if (compositionId === 'PodcastVideo') {
-    const podcastBody = body as Partial<RenderInput>;
-    if (!podcastBody.audioUrl || !podcastBody.segments?.length) {
-      res.status(400).json({ error: 'audioUrl and segments are required for PodcastVideo' });
+  if (compositionId === 'EpisodeVideo') {
+    const episodeBody = body as Partial<RenderInput>;
+    if (!episodeBody.audioUrl || !episodeBody.segments?.length) {
+      res.status(400).json({ error: 'audioUrl and segments are required for EpisodeVideo' });
       return;
     }
   } else if (compositionId === 'LaunchVideo') {
@@ -111,17 +111,17 @@ renderRouter.post('/', (req, res) => {
     }
   }
 
-  // Build input — for PodcastVideo, apply defaults; for LaunchVideo, pass through
+  // Build input — for EpisodeVideo, apply defaults; for LaunchVideo, pass through
   let input: Record<string, unknown>;
-  if (compositionId === 'PodcastVideo') {
-    const podcastBody = body as Partial<RenderInput>;
+  if (compositionId === 'EpisodeVideo') {
+    const episodeBody = body as Partial<RenderInput>;
     input = {
-      audioUrl: podcastBody.audioUrl,
-      segments: podcastBody.segments,
-      config: podcastBody.config ?? DEFAULT_RENDER_CONFIG,
-      branding: podcastBody.branding ?? DEFAULT_BRANDING,
-      transitions: podcastBody.transitions,
-      avatarOverlays: podcastBody.avatarOverlays,
+      audioUrl: episodeBody.audioUrl,
+      segments: episodeBody.segments,
+      config: episodeBody.config ?? DEFAULT_RENDER_CONFIG,
+      branding: episodeBody.branding ?? DEFAULT_BRANDING,
+      transitions: episodeBody.transitions,
+      avatarOverlays: episodeBody.avatarOverlays,
     };
   } else {
     input = {

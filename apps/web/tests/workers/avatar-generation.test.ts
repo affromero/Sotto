@@ -60,7 +60,7 @@ import { processAvatarGeneration } from '@/workers/avatar-generation.worker';
 
 const mockJob = {
   data: {
-    podcastId: 'pod_1',
+    episodeId: 'pod_1',
     videoGenerationId: 'vg_1',
     avatarOverlayId: 'ao_1',
     speaker: 'Host',
@@ -299,7 +299,7 @@ describe('provider dispatch', () => {
   it('dispatches to HeyGen when avatarProvider is heygen', async () => {
     const heygenJob = {
       data: {
-        podcastId: 'pod_1',
+        episodeId: 'pod_1',
         videoGenerationId: 'vg_1',
         avatarOverlayId: 'ao_1',
         speaker: 'Host',
@@ -319,7 +319,7 @@ describe('provider dispatch', () => {
 
     const runwayJob = {
       data: {
-        podcastId: 'pod_1',
+        episodeId: 'pod_1',
         videoGenerationId: 'vg_1',
         avatarOverlayId: 'ao_1',
         speaker: 'Host',

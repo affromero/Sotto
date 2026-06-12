@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 /**
- * GET /api/saved — User's saved (bookmarked) podcasts.
+ * GET /api/saved — User's saved (bookmarked) episodes.
  */
 export async function GET() {
   const session = await auth();
@@ -13,10 +13,10 @@ export async function GET() {
   }
 
   const saves = await prisma.save.findMany({
-    where: { userId: session.user.id, podcast: { deletedAt: null } },
+    where: { userId: session.user.id, episode: { deletedAt: null } },
     orderBy: { createdAt: 'desc' },
     include: {
-      podcast: {
+      episode: {
         select: {
           id: true,
           title: true,
@@ -37,13 +37,13 @@ export async function GET() {
     },
   });
 
-  const podcasts = saves.map((save) => ({
-    ...save.podcast,
-    createdAt: save.podcast.createdAt.toISOString(),
-    tags: save.podcast.tags.map(
+  const episodes = saves.map((save) => ({
+    ...save.episode,
+    createdAt: save.episode.createdAt.toISOString(),
+    tags: save.episode.tags.map(
       (pt: { tag: { id: string; name: string; slug: string } }) => pt.tag
     ),
   }));
 
-  return NextResponse.json({ podcasts });
+  return NextResponse.json({ episodes });
 }

@@ -6,13 +6,13 @@ import { addJob, JobType, audioGenerationQueue } from './queue';
  * Shared by script-verification (no-refs path), reference-validation, and script approve endpoint.
  */
 export async function createSegmentsAndQueueAudio(
-  podcastId: string,
+  episodeId: string,
   turns: Array<{ speaker: string; text: string; direction?: string }>
 ): Promise<void> {
   for (let i = 0; i < turns.length; i++) {
     const segment = await prisma.segment.create({
       data: {
-        podcastId,
+        episodeId,
         speaker: turns[i].speaker,
         text: turns[i].text,
         order: i,
@@ -23,13 +23,13 @@ export async function createSegmentsAndQueueAudio(
     const nextText = i < turns.length - 1 ? turns[i + 1].text.slice(0, 500) : undefined;
 
     await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, {
-      podcastId,
+      episodeId,
       segmentId: segment.id,
       speaker: turns[i].speaker,
       text: turns[i].text,
       previousText,
       nextText,
       direction: turns[i].direction,
-    }, { jobId: `audio-${podcastId}-${segment.id}` });
+    }, { jobId: `audio-${episodeId}-${segment.id}` });
   }
 }
