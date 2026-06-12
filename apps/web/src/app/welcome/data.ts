@@ -57,6 +57,12 @@ export interface PlacementSentence {
   glosses?: Record<string, string>;
 }
 
+export interface PlacementLevelGuide {
+  title: string;
+  comfortable: string[];
+  course: string;
+}
+
 export interface ComposeLogLine {
   t: 'ctx' | 'ok' | 'plan' | 'done';
   text: string;
@@ -70,6 +76,63 @@ export interface Module {
 }
 
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+export const PLACEMENT_LEVEL_GUIDES: Record<CefrLevel, PlacementLevelGuide> = {
+  A1: {
+    title: 'First foothold',
+    comfortable: [
+      'recognizing names, greetings, prices, and very familiar phrases',
+      'following slow, clear sentences with strong context',
+      'answering simple personal questions with prepared language',
+    ],
+    course: 'Your course keeps the language concrete and introduces structure explicitly.',
+  },
+  A2: {
+    title: 'Everyday basics',
+    comfortable: [
+      'handling routine situations like food, directions, schedules, and shopping',
+      'understanding short messages about immediate needs',
+      'joining simple exchanges when the topic stays familiar',
+    ],
+    course: 'Your course starts adding connected sentences and practical listening practice.',
+  },
+  B1: {
+    title: 'Independent foundation',
+    comfortable: [
+      'following the main point of clear speech on work, travel, and daily life',
+      'explaining plans, preferences, opinions, and simple reasons',
+      'reading short articles or stories when the topic is familiar',
+    ],
+    course: 'Your course can move into longer scenes, opinions, and supported native material.',
+  },
+  B2: {
+    title: 'Confident independence',
+    comfortable: [
+      'understanding the main ideas in complex texts and conversations',
+      'discussing abstract topics with enough detail to stay precise',
+      'catching tone and intent when the speaker is clear',
+    ],
+    course: 'Your course can use richer sources and focus on speed, nuance, and accuracy.',
+  },
+  C1: {
+    title: 'Advanced control',
+    comfortable: [
+      'following long arguments, lectures, interviews, and dense articles',
+      'reading between the lines when meaning is implied rather than stated',
+      'adjusting register for professional, academic, or social contexts',
+    ],
+    course: 'Your course can lean on authentic material and sharpen precision under pressure.',
+  },
+  C2: {
+    title: 'Near-native range',
+    comfortable: [
+      'handling almost any ordinary reading or listening without scaffolding',
+      'tracking irony, register shifts, idioms, and compressed arguments',
+      'refining style, tone, and exact word choice rather than basic comprehension',
+    ],
+    course: 'Your course starts at the top rung and focuses on polish, speed, and subtlety.',
+  },
+};
 
 export type GlyphName =
   | 'arrow'

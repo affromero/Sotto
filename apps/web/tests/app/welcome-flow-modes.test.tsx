@@ -104,6 +104,28 @@ describe('welcome hosted-demo mode', () => {
       screen.queryByRole('link', { name: /take the full placement test/i })
     ).not.toBeInTheDocument();
     expect(screen.getByText('Me llamo Luca.')).toBeInTheDocument();
+    expect(screen.getByText(/quick ladder, not a multiple-choice test/i)).toBeInTheDocument();
+  });
+
+  it('explains the selected placement level so learners can skip the formal test', () => {
+    render(
+      <StepPlacement
+        baseLang="en"
+        language="de"
+        understood={new Set(['C1', 'C2'])}
+        toggleUnderstood={vi.fn()}
+        level="C2"
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Estimated level/i).textContent).toContain('top rung');
+    expect(screen.getByText('Near-native range')).toBeInTheDocument();
+    expect(
+      screen.getByText(/register shifts, idioms, and compressed arguments/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/adaptive test can verify it later/i)).toBeInTheDocument();
   });
 
   it('shows the design agent choices without the removed Gemini card', () => {
@@ -199,11 +221,12 @@ describe('welcome hosted-demo mode', () => {
     );
 
     expect(screen.getAllByText(/no key or local endpoint is requested or saved/i)).toHaveLength(2);
+    expect(screen.getAllByText(/^local$/i)).toHaveLength(4);
     expect(
-      screen.getByRole('button', { name: /Local sidecar any Sotto-compatible TTS server/i })
+      screen.getByRole('button', { name: /Local sidecar.*any Sotto-compatible TTS server/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Local sidecar any Sotto-compatible STT server/i })
+      screen.getByRole('button', { name: /Local sidecar.*any Sotto-compatible STT server/i })
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open elevenlabs api page/i })).toHaveAttribute(
       'href',
@@ -221,9 +244,7 @@ describe('welcome hosted-demo mode', () => {
   it('adds direct links, notes, and uploaded files in the context step', async () => {
     const user = userEvent.setup();
     let contextItems: ContextItem[] = [];
-    const setContextItems = (
-      updater: ContextItem[] | ((prev: ContextItem[]) => ContextItem[])
-    ) => {
+    const setContextItems = (updater: ContextItem[] | ((prev: ContextItem[]) => ContextItem[])) => {
       contextItems = typeof updater === 'function' ? updater(contextItems) : updater;
     };
     const renderStep = () => (
@@ -405,12 +426,8 @@ describe('welcome hosted-demo mode', () => {
       course: { native: 'en', target: 'it', level: 'A2' },
       preferred: { language: 'it' },
     });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain(
-      'https://example.com/paper'
-    );
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain(
-      'Allowed context sources:'
-    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('https://example.com/paper');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('Allowed context sources:');
     expect(mockPush).toHaveBeenCalledWith('/learn');
   });
 

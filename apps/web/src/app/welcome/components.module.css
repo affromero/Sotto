@@ -536,6 +536,7 @@
 .voiceChipName {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 7px;
   color: var(--ink);
   font-size: 13.5px;
@@ -594,9 +595,25 @@
 }
 
 .vcLocal {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 1px 5px 1px 4px;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
   opacity: 0.85;
+}
+
+.vcLocal svg {
+  flex: none;
 }
 
 .voiceChoice:not(.voiceChoiceSel) .vcLocal {
@@ -1187,6 +1204,71 @@
   font-family: var(--sans);
   font-weight: 600;
   color: var(--accent);
+}
+
+.placementMeaning {
+  margin-top: 18px;
+  border-left: 3px solid var(--accent);
+  padding: 12px 0 12px 14px;
+  color: var(--ink-soft);
+}
+
+.placementMeaningHead {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.placementMeaningLevel {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.placementMeaningTitle {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.placementMeaningBody,
+.placementMeaningFoot {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.placementComforts {
+  display: grid;
+  gap: 5px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.placementComforts li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.placementComforts li::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+
+.placementMeaningFoot {
+  color: var(--ink-mute);
 }
 
 /* ---------- compose hero ---------- */

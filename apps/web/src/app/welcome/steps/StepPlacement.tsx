@@ -1,6 +1,6 @@
 'use client';
 
-import { LANGUAGES, PLACEMENT_BY_LANG, LEVELS } from '../data';
+import { LANGUAGES, PLACEMENT_BY_LANG, LEVELS, PLACEMENT_LEVEL_GUIDES } from '../data';
 import type { CefrLevel } from '../data';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
@@ -31,6 +31,8 @@ export function StepPlacement({
   const pct = level ? ((idx + 1) / LEVELS.length) * 100 : 0;
   const lang = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
   const items = PLACEMENT_BY_LANG[language] ?? PLACEMENT_BY_LANG['it'] ?? [];
+  const guide = level ? PLACEMENT_LEVEL_GUIDES[level] : null;
+  const topLevel = level === LEVELS[LEVELS.length - 1];
   const rtl = language === 'ar';
 
   return (
@@ -42,15 +44,15 @@ export function StepPlacement({
         Where do you <em>start</em> in {lang.native}?
       </h1>
       <p className={t.lede}>
-        Tap every sentence you fully understand. Sotto anchors your syllabus to the CEFR level just
-        above your reach — never busywork, never over your head.
+        This is a quick ladder, not a multiple-choice test. Tap every sentence you fully understand;
+        Sotto anchors your syllabus to the CEFR level just above your reach.
       </p>
       {demoMode && (
         <aside className={c.placementAside} aria-label="Placement test available">
           <span className={c.placementAsideKicker}>Full placement test</span>
           <span>
-            Prefer a formal check? The app also has a short adaptive test that places learners before
-            their first course; this demo shows the same idea as a quick sentence ladder.
+            Prefer a formal check? The app also has a short adaptive test that places learners
+            before their first course; this demo shows the same idea as a quick sentence ladder.
           </span>
         </aside>
       )}
@@ -101,12 +103,33 @@ export function StepPlacement({
         <div className={c.cefrRead}>
           {level ? (
             <>
-              Estimated level <b>{level}</b> — your course begins one rung higher.
+              Estimated level <b>{level}</b> — your course begins{' '}
+              {topLevel ? 'at the top rung.' : 'one rung higher.'}
             </>
           ) : (
             'Select what you understand to estimate your level.'
           )}
         </div>
+        {guide && (
+          <section className={c.placementMeaning} aria-live="polite">
+            <div className={c.placementMeaningHead}>
+              <span className={c.placementMeaningLevel}>{level}</span>
+              <span className={c.placementMeaningTitle}>{guide.title}</span>
+            </div>
+            <div className={c.placementMeaningBody}>
+              People around this level are often comfortable with:
+            </div>
+            <ul className={c.placementComforts}>
+              {guide.comfortable.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className={c.placementMeaningFoot}>
+              {guide.course} This estimate is enough to compose a course now; the adaptive test can
+              verify it later.
+            </p>
+          </section>
+        )}
       </div>
 
       <div className={t.actions}>
