@@ -108,3 +108,4 @@ config/admins.json
 .claude/worktrees/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+.env.mock.local
