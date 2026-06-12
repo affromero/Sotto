@@ -1,19 +1,21 @@
 import { getSiteConfig } from './site-config';
 import { hasConfiguredAdminEmails } from './admin-emails';
+import { isSelfHosted } from './self-hosted';
 
 /**
  * Whether the local profile sign-in is active: the Credentials provider and the
  * Netflix-style profile picker. Owner-set via SiteConfig.localAuth, where null
- * means "use the default". The default is on whenever no ADMIN_EMAILS are
- * configured, which covers both the self-hosted instance and the managed
- * showcase: the web experience is the local profile picker, not OAuth. A real
- * multi-tenant deployment opts into OAuth by configuring ADMIN_EMAILS (or by
- * setting SiteConfig.localAuth = false explicitly). An explicit true or false
- * always wins. This is an explicit setting, not an availability fallback: when it
- * returns false, Credentials must refuse to authorize and the picker must not
- * render.
+ * means "use the default". The managed showcase (`SELF_HOSTED=false`) never
+ * shows local profiles; visitors go straight through the public welcome demo.
+ * Self-hosted defaults to local auth when no ADMIN_EMAILS are configured. A real
+ * OAuth multi-tenant deployment opts out by configuring ADMIN_EMAILS or setting
+ * SiteConfig.localAuth = false explicitly. This is an explicit setting, not an
+ * availability fallback: when it returns false, Credentials must refuse to
+ * authorize and the picker must not render.
  */
 export async function isLocalAuthEnabled(): Promise<boolean> {
+  if (!isSelfHosted()) return false;
+
   const { localAuth } = await getSiteConfig();
   if (localAuth === true) return true;
   if (localAuth === false) return false;

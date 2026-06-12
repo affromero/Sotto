@@ -37,7 +37,10 @@
   border-radius: 20px;
   padding: 7px 14px;
   cursor: pointer;
-  transition: border-color 0.18s, color 0.18s, background 0.18s;
+  transition:
+    border-color 0.18s,
+    color 0.18s,
+    background 0.18s;
   min-height: 44px;
 }
 
@@ -79,7 +82,11 @@
   border-radius: var(--r);
   padding: 16px 16px 14px;
   cursor: pointer;
-  transition: transform 0.18s var(--ease), border-color 0.2s, background 0.2s, opacity 0.2s;
+  transition:
+    transform 0.18s var(--ease),
+    border-color 0.2s,
+    background 0.2s,
+    opacity 0.2s;
   overflow: hidden;
   min-height: 44px;
 }
@@ -143,7 +150,6 @@
   transform: none;
 }
 
-
 /* ---------- provider grid ---------- */
 .providerGrid {
   margin-top: 28px;
@@ -168,7 +174,10 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s var(--ease);
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.15s var(--ease);
   min-height: 44px;
 }
 
@@ -241,8 +250,14 @@
 }
 
 @keyframes stepIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* method tabs */
@@ -266,7 +281,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: border-color 0.18s, color 0.18s, background 0.18s;
+  transition:
+    border-color 0.18s,
+    color 0.18s,
+    background 0.18s;
   white-space: nowrap;
   min-height: 44px;
 }
@@ -400,7 +418,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .locknote {
@@ -454,7 +474,10 @@
   border-radius: 20px;
   padding: 9px 15px;
   cursor: pointer;
-  transition: border-color 0.18s, color 0.18s, background 0.18s;
+  transition:
+    border-color 0.18s,
+    color 0.18s,
+    background 0.18s;
   min-height: 44px;
 }
 
@@ -588,7 +611,9 @@
   border-radius: var(--r);
   padding: 14px 16px;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
   text-align: left;
   min-height: 44px;
 }
@@ -713,7 +738,10 @@
   padding: 14px 16px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s var(--ease);
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.15s var(--ease);
   min-height: 44px;
 }
 
@@ -773,24 +801,6 @@
   transform: none;
 }
 
-/* placement test link */
-.placementTestLink {
-  font-size: 13px;
-  color: var(--ink-mute);
-  margin-top: 10px;
-  display: block;
-  text-align: center;
-}
-
-.placementTestLink a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.placementTestLink a:hover {
-  text-decoration: underline;
-}
-
 /* CEFR slider */
 .cefr {
   margin-top: 30px;
@@ -810,7 +820,11 @@
   top: 0;
   bottom: 0;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 55%, var(--ink)));
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in oklab, var(--accent) 55%, var(--ink))
+  );
   transition: width 0.6s var(--ease);
 }
 
@@ -964,7 +978,9 @@
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
 
 .moduleStack {
@@ -984,7 +1000,11 @@
   padding: 13px 15px;
   opacity: 0.35;
   filter: grayscale(0.4);
-  transition: opacity 0.5s var(--ease), filter 0.5s var(--ease), border-color 0.4s, transform 0.4s var(--ease);
+  transition:
+    opacity 0.5s var(--ease),
+    filter 0.5s var(--ease),
+    border-color 0.4s,
+    transform 0.4s var(--ease);
   transform: translateY(6px);
 }
 
@@ -1132,6 +1152,36 @@
   margin-top: 4px;
 }
 
+/* clickable summary affordances — jump back to edit a choice */
+.courseJump {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.courseLang.courseJump {
+  transition: color 0.18s;
+}
+
+.courseLang.courseJump:hover {
+  color: var(--accent);
+}
+
+.courseBadge.courseJump {
+  border: 1px solid var(--accent-line);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s;
+}
+
+.courseBadge.courseJump:hover {
+  background: var(--accent-soft);
+}
+
 /* course stack footer */
 .courseStack {
   display: flex;
@@ -1163,6 +1213,19 @@
   flex: none;
 }
 
+.csJump {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.18s;
+}
+
+.csJump:hover,
+.csJump:hover svg {
+  color: var(--accent);
+}
+
 /* loading state button */
 .loadingSpinner {
   width: 14px;
@@ -1172,50 +1235,4 @@
   border-top-color: transparent;
   animation: spin 0.7s linear infinite;
   flex: none;
-}
-
-/* Learner note (StepContext "Tell it about you") */
-.noteBlock {
-  display: flex;
-  flex-direction: column;
-  margin-top: 18px;
-}
-
-.noteLabel {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-mute);
-  margin-bottom: 6px;
-}
-
-.noteOptional {
-  text-transform: none;
-  letter-spacing: 0;
-  opacity: 0.7;
-}
-
-.noteField {
-  width: 100%;
-  resize: vertical;
-  min-height: 88px;
-  font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r);
-  padding: 12px 14px;
-}
-
-.noteField::placeholder {
-  color: var(--ink-mute);
-}
-
-.noteField:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
 }

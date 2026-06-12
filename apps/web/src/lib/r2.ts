@@ -194,7 +194,7 @@ export async function downloadToFile(urlOrKey: string, destPath: string): Promis
 
 /**
  * Protected path patterns — these files must never be bulk-deleted.
- * Segment audio is needed by avatar generation, voice tracks, and future features.
+ * Segment audio is needed by voice tracks, re-stitching, and future features.
  * Episode audio is the final stitched output — irreplaceable without re-generation.
  */
 const PROTECTED_PATH_PATTERNS = [

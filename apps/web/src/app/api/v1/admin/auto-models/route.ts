@@ -39,20 +39,6 @@ const updateSchema = z.object({
   includedModels: includedModelsField,
   includedTtsModels: includedModelsField,
   includedSttModels: includedModelsField,
-  // Image
-  imageProvider: z.string().min(1).optional(),
-  imageModel: z.string().min(1).optional(),
-  includedImageModels: includedModelsField,
-  // Video
-  videoProvider: z.string().min(1).optional(),
-  videoModel: z.string().min(1).optional(),
-  includedVideoModels: includedModelsField,
-  // Avatar
-  avatarProvider: z.string().min(1).optional(),
-  avatarModel: z.string().min(1).optional(),
-  includedAvatarModels: includedModelsField,
-  // Motion
-  motionProvider: z.enum(['remotion', 'hera']).optional(),
 });
 
 export async function PATCH(request: NextRequest) {

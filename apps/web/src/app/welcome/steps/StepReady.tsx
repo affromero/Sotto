@@ -26,9 +26,9 @@ interface Props {
   sources: Set<string>;
   agent: AgentState;
   voice: VoiceState;
-  note: string;
   config: OnboardingConfig;
   onRestart: () => void;
+  onJump: (step: number) => void;
 }
 
 export function StepReady({
@@ -38,25 +38,23 @@ export function StepReady({
   sources,
   agent,
   voice,
-  note,
   config,
   onRestart,
+  onJump,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [demoComplete, setDemoComplete] = useState(false);
 
   const lang = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
   const base = BASE_LANGS.find((b) => b.code === baseLang) ?? BASE_LANGS[0];
   const lvl = level ?? 'A2';
   const prov = PROVIDERS.find((p) => p.id === agent.provider) ?? PROVIDERS[0];
-  const agentLabel =
-    agent.method === 'cli' && prov.cli ? prov.cli.label : prov.name;
-  const ttsName =
-    (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
-  const sttName =
-    (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
+  const agentLabel = agent.method === 'cli' && prov.cli ? prov.cli.label : prov.name;
+  const ttsName = (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
+  const sttName = (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
 
   async function postKey(post: KeyPost): Promise<boolean> {
     try {
@@ -76,10 +74,13 @@ export function StepReady({
     setLoading(true);
     setError(null);
     setWarnings([]);
+    setDemoComplete(false);
 
-    // Managed showcase (SELF_HOSTED=false): a non-persisting demo — just enter.
+    // Managed showcase (SELF_HOSTED=false): a non-persisting demo. Stop before
+    // the authenticated learning app; no profile, course, key, or setting is saved.
     if (!config.selfHosted) {
-      router.push('/learn');
+      setLoading(false);
+      setDemoComplete(true);
       return;
     }
 
@@ -102,10 +103,8 @@ export function StepReady({
       ]);
     }
 
-    // Everything else (course, note, preferences, owner infra) in one call.
-    const infra = config.isOwner
-      ? { ...ai.infra, ...tts.infra, ...stt.infra }
-      : undefined;
+    // Everything else (course, preferences, owner infra) in one call.
+    const infra = config.isOwner ? { ...ai.infra, ...tts.infra, ...stt.infra } : undefined;
 
     try {
       const res = await fetch('/api/v1/onboarding/save', {
@@ -114,7 +113,6 @@ export function StepReady({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           course: { native: baseLang, target: language, ...(level && { level }) },
-          ...(note.trim() && { note }),
           preferred: {
             language,
             ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),
@@ -148,22 +146,31 @@ export function StepReady({
         Welcome to your <em>{lang.native}</em>.
       </h1>
       <p className={t.lede}>
-        Mastery-gated, drawn from your world, running on your keys. Pick up where the agent left
-        off — it remembers everything, because the memory is yours.
+        {config.selfHosted
+          ? 'Mastery-gated, drawn from your world, running on your keys. Pick up where the agent left off — it remembers everything, because the memory is yours.'
+          : 'This is the hosted preview of a mastery-gated course drawn from mock context. No profile, source connection, key, or course record is created.'}
       </p>
 
       <div className={c.readyHero}>
         <div className={c.courseCard}>
           <div className={c.courseTop}>
-            <div>
-              <div className={c.courseLang}>
-                {lang.name} <span>· {lang.native}</span>
-              </div>
+            <button
+              className={`${c.courseLang} ${c.courseJump}`}
+              onClick={() => onJump(0)}
+              title="Change language"
+              type="button"
+            >
+              {lang.name} <span>· {lang.native}</span>
               <div className={c.courseFrom}>from {base.name}</div>
-            </div>
-            <div className={c.courseBadge}>
+            </button>
+            <button
+              className={`${c.courseBadge} ${c.courseJump}`}
+              onClick={() => onJump(4)}
+              title="Retake placement"
+              type="button"
+            >
               CEFR {lvl} → {nextLevel(lvl)}
-            </div>
+            </button>
           </div>
           <div className={c.courseMods}>
             {MODULES.map((m) => (
@@ -177,24 +184,39 @@ export function StepReady({
             <div className={c.flTag}>First up · drawn from your context</div>
             <div className={c.flTitle}>&ldquo;{lessonTitle(lang.code)}&rdquo;</div>
             <div className={c.flSub}>
-              {sources.size} context source{sources.size > 1 ? 's' : ''} woven in · grammar
-              gate unlocks at 85% recall
+              {sources.size} context source{sources.size > 1 ? 's' : ''} woven in · grammar gate
+              unlocks at 85% recall
             </div>
           </div>
           <div className={c.courseStack}>
-            <span className={c.csLabel}>Your stack</span>
-            <span className={c.csItem}>
+            <span className={c.csLabel}>{config.selfHosted ? 'Your stack' : 'Preview stack'}</span>
+            <button
+              className={`${c.csItem} ${c.csJump}`}
+              onClick={() => onJump(1)}
+              title="Change agent"
+              type="button"
+            >
               <Glyph name="plug" size={13} />
               {agentLabel}
-            </span>
-            <span className={c.csItem}>
+            </button>
+            <button
+              className={`${c.csItem} ${c.csJump}`}
+              onClick={() => onJump(2)}
+              title="Change voice"
+              type="button"
+            >
               <Glyph name="wave" size={13} />
               {ttsName}
-            </span>
-            <span className={c.csItem}>
+            </button>
+            <button
+              className={`${c.csItem} ${c.csJump}`}
+              onClick={() => onJump(2)}
+              title="Change voice"
+              type="button"
+            >
               <Glyph name="mic" size={13} />
               {sttName}
-            </span>
+            </button>
           </div>
         </div>
       </div>
@@ -211,6 +233,13 @@ export function StepReady({
           {error}
         </div>
       )}
+      {demoComplete && (
+        <div className={c.locknote} role="status">
+          <Glyph name="shield" size={15} />
+          Hosted demo complete. No profile was created, no credentials were requested, and nothing
+          was saved.
+        </div>
+      )}
 
       <div className={t.actions}>
         <button className={`${t.btn} ${t.btnBare}`} onClick={onRestart}>
@@ -219,18 +248,20 @@ export function StepReady({
         <span className={t.spacer} />
         <button
           className={`${t.btn} ${t.btnPrimary}`}
-          disabled={loading}
+          disabled={loading || demoComplete}
           onClick={finishOnboarding}
-          aria-label="Open today's session"
+          aria-label={config.selfHosted ? "Open today's session" : 'Finish demo'}
         >
           {loading ? (
             <>
               <span className={c.loadingSpinner} aria-hidden="true" />
               Setting up…
             </>
+          ) : demoComplete ? (
+            'Demo complete'
           ) : (
             <>
-              Open today&apos;s session{' '}
+              {config.selfHosted ? "Open today's session" : 'Finish demo'}{' '}
               <span className={t.btnArrow}>
                 <Glyph name="arrow" size={17} />
               </span>

@@ -21,35 +21,6 @@ enum UserRole {
   SYSTEM
 }
 
-// ============ VIDEO GENERATION ============
-
-enum VisualType {
-  DATA_CHART
-  QUOTE
-  COMPARISON
-  TIMELINE
-  DIAGRAM
-  STOCK_FOOTAGE
-  AI_ILLUSTRATION
-  TEXT_CARD
-  MAP_OVERLAY
-  DATA_TABLE
-  SOURCE_FIGURE
-}
-
-enum VideoStatus {
-  DRAFT
-  PENDING
-  CLASSIFYING
-  GENERATING_VISUALS
-  GENERATING_TRANSITIONS
-  GENERATING_AVATARS
-  COMPOSING
-  READY
-  FAILED
-  STALE
-}
-
 // ============ USERS & AUTH ============
 
 model User {
@@ -134,9 +105,6 @@ model User {
   // Invitation links created by admin
   invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
 
-  // Avatar images (lip-sync)
-  avatarImages AvatarImage[]
-
   // Language learning
   courses            Course[]
   classSubmissions   ClassSubmission[]
@@ -215,7 +183,6 @@ model Episode {
   aiProvider       String? // 'anthropic' | 'openai'
   aiModel          String? // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
   verificationMode String  @default("standard") // standard, relaxed, showcase
-  zeroCostVideo    Boolean @default(false) // skip AI illustrations + verification for $0 video
   aiAutoResolved   Boolean @default(false)
   ttsAutoResolved  Boolean @default(false)
   sttProvider      String? // required for imported audio without transcript; 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
@@ -239,9 +206,6 @@ model Episode {
   // PDF export
   pdfUrl String?
 
-  // Video generation
-  videoUrl String?
-
   // Waveform visualization
   waveformUrl    String?
   spectrogramUrl String?
@@ -264,7 +228,6 @@ model Episode {
   references          Reference[]
   versions            EpisodeVersion[]
   voices              EpisodeVoice[]
-  videoGenerations    VideoGeneration[]
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
@@ -490,9 +453,6 @@ model Segment {
   updatedAt DateTime @updatedAt
 
   episode            Episode             @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  segmentVisuals     SegmentVisual[]
-  transitionsFrom    SegmentTransition[] @relation("TransitionFrom")
-  transitionsTo      SegmentTransition[] @relation("TransitionTo")
 
   @@index([episodeId])
   @@index([order])
@@ -716,9 +676,6 @@ enum NotificationType {
   PLATFORM_ANNOUNCEMENT
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
-  VIDEO_READY
-  VIDEO_FAILED
-  AVATAR_FAILED
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -1040,20 +997,6 @@ model AutoModelConfig {
   includedModels      Json?
   includedTtsModels   Json?
   includedSttModels   Json?
-  // Image (still images for video visuals)
-  imageProvider       String   @default("fal")
-  imageModel          String   @default("fal-flux-1-schnell")
-  includedImageModels Json?
-  // Video (text-to-video)
-  videoProvider       String   @default("fal")
-  videoModel          String   @default("fal-wan2.5-480p")
-  includedVideoModels Json?
-  // Avatar (lip-sync avatar overlays)
-  avatarProvider      String   @default("heygen")
-  avatarModel         String   @default("heygen-avatar-standard")
-  includedAvatarModels Json?
-  // Motion (programmatic visual rendering)
-  motionProvider      String   @default("remotion")
   updatedAt           DateTime @updatedAt
   updatedBy           String?
 }
@@ -1142,159 +1085,6 @@ model ModelPricingSnapshot {
 
   @@index([modelId, createdAt])
   @@index([createdAt])
-}
-
-// ============ VIDEO GENERATION ============
-
-model VideoGeneration {
-  id             String      @id @default(cuid())
-  episodeId      String
-  status         VideoStatus @default(PENDING)
-  videoUrl       String?
-  duration       Int? // seconds
-  fileSize       Int? // bytes
-  width          Int         @default(1280)
-  height         Int         @default(720)
-  imageProvider  String? // null = auto (fal)
-  imageModel     String? // e.g. 'fal-flux-2-pro', 'fal-recraft-v3'
-  videoModel     String? // e.g. 'fal-veo3-1080p', 'fal-kling3-1080p'
-  pipelineJson   Json? // Approved pipeline editor state
-  avatarsVisible Boolean     @default(true)
-  zeroCostVideo  Boolean     @default(false) // no AI illustrations, free visuals only
-  failureReason  String?     @db.Text
-  technicalError String?     @db.Text
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  episode        Episode             @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  visuals        SegmentVisual[]
-  avatarOverlays AvatarOverlay[]
-  transitions    SegmentTransition[]
-
-  @@index([episodeId])
-}
-
-model SegmentTransition {
-  id                String  @id @default(cuid())
-  videoGenerationId String
-  fromSegmentId     String
-  toSegmentId       String
-  fromSegmentOrder  Int
-  toSegmentOrder    Int
-  transitionModel   String? // pricetoken model ID (FLF2V-capable video model)
-  prompt            String? @db.Text
-  assetUrl          String?
-  assetType         String? // 'video/mp4'
-  status            String  @default("pending") // pending | generating | ready | failed
-  failureReason     String? @db.Text
-  cost              Float?
-  recommended       Boolean @default(false)
-  enabled           Boolean @default(true)
-  durationSeconds   Float   @default(1)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
-  fromSegment     Segment         @relation("TransitionFrom", fields: [fromSegmentId], references: [id], onDelete: Cascade)
-  toSegment       Segment         @relation("TransitionTo", fields: [toSegmentId], references: [id], onDelete: Cascade)
-
-  @@unique([videoGenerationId, fromSegmentId, toSegmentId])
-  @@index([videoGenerationId])
-}
-
-model SegmentVisual {
-  id                String     @id @default(cuid())
-  videoGenerationId String
-  segmentId         String
-  order             Int
-  subOrder          Int        @default(0) // ordering within parent segment (0, 1, 2...)
-  startOffset       Float      @default(0) // seconds from parent segment start
-  subDuration       Float? // seconds; null = full segment duration
-  visualType        VisualType
-  prompt            String?    @db.Text
-  metadata          Json? // type-specific: chart data, quote text, timeline events, etc.
-  visualMode        String? // 'image' | 'video' | 'programmatic'
-  videoModel        String? // pricetoken model ID for video mode
-  endStatePrompt    String?    @db.Text
-  firstFrameUrl     String?
-  lastFrameUrl      String?
-  assetUrl          String? // R2 URL of generated image/video
-  assetType         String? // 'image/png' | 'video/mp4'
-  motionProvider    String? // 'remotion' | 'hera' — which motion provider rendered this visual
-  status            String     @default("pending") // pending | generating | ready | failed
-  failureReason     String?    @db.Text
-  previewUrl        String? // R2 URL of per-segment preview MP4
-  previewStatus     String? // pending | rendering | ready | failed
-  previewQuality    String? // 'preview' | 'full'
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-
-  videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
-  segment         Segment         @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-  @@index([videoGenerationId])
-  @@index([segmentId])
-  @@index([segmentId, subOrder])
-}
-
-model AvatarOverlay {
-  id                   String   @id @default(cuid())
-  videoGenerationId    String
-  speaker              String
-  avatarId             String
-  avatarName           String?
-  previewImageUrl      String?
-  heygenVideoId        String?
-  videoUrl             String?
-  concatAudioUrl       String?
-  status               String   @default("pending")
-  failureReason        String?  @db.Text
-  durationSeconds      Float?
-  avatarProvider       String?
-  avatarImageUrl       String?
-  avatarModelId        String?
-  falRequestId         String?
-  falChunkIndex        Int?
-  falTotalChunks       Int?
-  maskShape            String?
-  runwaySessionId      String?
-  runwayChunkIndex     Int?
-  runwayTotalChunks    Int?
-  chunkVideoUrl        String?
-  chunkDurationSeconds Float?
-  enabledSegmentIds    String[] @default([])
-  posX                 Float    @default(0.02)
-  posY                 Float    @default(0.55)
-  width                Float    @default(0.25)
-  height               Float    @default(0.35)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
-
-  @@unique([videoGenerationId, speaker])
-  @@index([videoGenerationId])
-}
-
-enum AvatarImageSource {
-  UPLOAD
-  GENERATED
-  DEFAULT
-}
-
-model AvatarImage {
-  id                    String            @id @default(cuid())
-  userId                String
-  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name                  String
-  imageUrl              String
-  sourceType            AvatarImageSource
-  prompt                String?           @db.Text
-  consentAcknowledgedAt DateTime?
-  createdAt             DateTime          @default(now())
-
-  @@unique([userId, name])
-  @@index([userId])
 }
 
 // ============ LANGUAGE LEARNING — CURRICULUM ============

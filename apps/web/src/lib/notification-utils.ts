@@ -3,13 +3,10 @@ import type { NotificationData } from '@/types/notification';
 const PIPELINE_SUCCESS_TYPES = new Set([
   'EPISODE_READY',
   'SCRIPT_READY',
-  'VIDEO_READY',
 ]);
 
 const PIPELINE_ERROR_TYPES = new Set([
   'EPISODE_FAILED',
-  'VIDEO_FAILED',
-  'AVATAR_FAILED',
   'KEY_INVALID',
   'PIPELINE_FAILURE',
 ]);
@@ -37,9 +34,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'EPISODE_READY':
     case 'EPISODE_FAILED':
     case 'SCRIPT_READY':
-    case 'VIDEO_READY':
-    case 'VIDEO_FAILED':
-    case 'AVATAR_FAILED':
     case 'QUESTION_ON_YOUR_EPISODE':
       return episodeId ? `/episode/${episodeId}` : null;
 

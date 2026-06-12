@@ -323,7 +323,6 @@ describe('processScriptVerification', () => {
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'gpt-5-mini',
@@ -354,7 +353,6 @@ describe('processScriptVerification', () => {
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'gpt-5-mini',
@@ -386,7 +384,6 @@ describe('processScriptVerification', () => {
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'gpt-5-mini',
@@ -415,7 +412,6 @@ describe('processScriptVerification', () => {
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
 
       const job = createMockJob({ ...defaultPayload, useAdminCredits: true });
@@ -433,7 +429,6 @@ describe('processScriptVerification', () => {
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'claude-code:sonnet',
@@ -453,24 +448,6 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('skips AI routing for zero-cost verification skips', async () => {
-      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
-        aiModel: null,
-        verificationMode: 'standard',
-        language: null,
-        source: 'WEB',
-        zeroCostVideo: true,
-      });
-      mockGetAiKey.mockResolvedValue(null);
-
-      const job = createMockJob(defaultPayload);
-      await processScriptVerification(job);
-
-      expect(mockGetAiKey).not.toHaveBeenCalled();
-      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
-      expect(mockVerifyScript).not.toHaveBeenCalled();
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-001', defaultScript.turns);
-    });
   });
 
   describe('model used for verification and regeneration', () => {

@@ -35,35 +35,6 @@ __SOTTO_APP_DOMAIN__ {
 	}
 }
 
-# BEGIN_OPTIONAL_MAPS
-__SOTTO_MAPS_DOMAIN__ {
-	reverse_proxy localhost:3002 localhost:3012 {
-		lb_policy first
-		health_uri /api/v1/health
-		health_interval 5s
-		health_timeout 3s
-		health_status 200
-	}
-
-	encode gzip zstd
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-		-Server
-	}
-
-	@static path /fonts/* /_next/static/* /favicon.ico
-	header @static Cache-Control "public, max-age=31536000, immutable"
-
-	log {
-		output file /var/log/caddy/maps-access.log {
-			roll_size 50MiB
-			roll_keep 5
-		}
-	}
-}
-# END_OPTIONAL_MAPS
-
 # BEGIN_OPTIONAL_WWW
 __SOTTO_WWW_DOMAIN__ {
 	# Telegram webhook — proxy directly when a deployment registers webhooks on the www host.

@@ -85,6 +85,7 @@ describe('POST /api/v1/onboarding/save', () => {
     const res = await POST(req(BASE));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ demo: true });
+    expect(mockAuth).not.toHaveBeenCalled();
     expect(mockCourseUpsert).not.toHaveBeenCalled();
     expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockSetSiteConfig).not.toHaveBeenCalled();
@@ -108,7 +109,7 @@ describe('POST /api/v1/onboarding/save', () => {
     // Note persisted + onboarding marked complete
     expect(mockSetCourseNote).toHaveBeenCalledWith('course1', BASE.note);
     const completed = mockUserUpdate.mock.calls.some(
-      (c) => c[0]?.data?.hasCompletedOnboarding === true,
+      (c) => c[0]?.data?.hasCompletedOnboarding === true
     );
     expect(completed).toBe(true);
   });
@@ -124,12 +125,12 @@ describe('POST /api/v1/onboarding/save', () => {
   it('persists server infra when the caller is the owner', async () => {
     mockRequireAdmin.mockResolvedValue('u1');
     const res = await POST(
-      req({ ...BASE, infra: { ttsProvider: 'kokoro', ttsBaseUrl: 'http://localhost:8000' } }),
+      req({ ...BASE, infra: { ttsProvider: 'kokoro', ttsBaseUrl: 'http://localhost:8000' } })
     );
     expect(res.status).toBe(200);
     expect(mockSetSiteConfig).toHaveBeenCalledWith(
       expect.objectContaining({ ttsProvider: 'kokoro', ttsBaseUrl: 'http://localhost:8000' }),
-      'u1',
+      'u1'
     );
     expect(mockInvalidate).toHaveBeenCalled();
   });

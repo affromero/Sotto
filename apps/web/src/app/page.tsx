@@ -8,6 +8,7 @@ import { ProductFrame } from '@/components/landing/ProductFrame';
 import { Glyph } from '@/app/welcome/Glyph';
 import type { GlyphName } from '@/app/welcome/data';
 import { getPublicGithubUrl } from '@/lib/public-links';
+import { isSelfHosted } from '@/lib/self-hosted';
 import styles from './page.module.css';
 
 const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
@@ -266,10 +267,7 @@ function ContextMock() {
     <div className={styles.mock}>
       <ul className={styles.mockSources}>
         {WALK_SOURCES.map((s) => (
-          <li
-            key={s.label}
-            className={`${styles.mockSource} ${s.on ? styles.mockSourceOn : ''}`}
-          >
+          <li key={s.label} className={`${styles.mockSource} ${s.on ? styles.mockSourceOn : ''}`}>
             <span className={styles.mockSourceText}>
               <span className={styles.mockSourceLabel}>{s.label}</span>
               <span className={styles.mockSourceMeta}>{s.meta}</span>
@@ -348,265 +346,263 @@ function WalkFrameMock({ frame }: { frame: WalkStep['frame'] }) {
 }
 
 export default function LandingPage() {
+  const demoMode = !isSelfHosted();
+
   return (
-    <div
-      className={styles.root}
-    >
+    <div className={styles.root}>
       <JsonLd />
-        <LandingHeader />
+      <LandingHeader demoMode={demoMode} />
 
-        <main className={styles.main}>
-          {/* ---- hero ---- */}
-          <section className={styles.hero} aria-labelledby="hero-title">
-            <p className={styles.eyebrow}>
-              <span className={styles.eyebrowDash} aria-hidden="true" />
-              Open-source · Self-hosted
-            </p>
-            <h1 id="hero-title" className={styles.heroTitle}>
-              Learn a language, <em>taught in your own context.</em>
-            </h1>
-            <p className={styles.lede}>{BRAND.subline}</p>
+      <main className={styles.main}>
+        {/* ---- hero ---- */}
+        <section className={styles.hero} aria-labelledby="hero-title">
+          <p className={styles.eyebrow}>
+            <span className={styles.eyebrowDash} aria-hidden="true" />
+            Open-source · Self-hosted
+          </p>
+          <h1 id="hero-title" className={styles.heroTitle}>
+            Learn a language, <em>taught in your own context.</em>
+          </h1>
+          <p className={styles.lede}>{BRAND.subline}</p>
 
-            <LandingCTA withGhost />
+          <LandingCTA withGhost demoMode={demoMode} />
 
-            <p className={styles.whisper}>
-              <span className={styles.whisperTag}>sotto voce</span>
-              Spoken softly, kept private. The agent that already knows you, now
-              teaching you to speak.
-            </p>
-          </section>
+          <p className={styles.whisper}>
+            <span className={styles.whisperTag}>sotto voce</span>
+            Spoken softly, kept private. The agent that already knows you, now teaching you to
+            speak.
+          </p>
+        </section>
 
-          {/* ---- how it works ---- */}
-          <section className={styles.section} aria-labelledby="how-title">
-            <header className={styles.sectionHead}>
-              <p className={styles.sectionLabel}>How it works</p>
-              <h2 id="how-title" className={styles.sectionTitle}>
-                Three steps, and the course is <em>yours</em>.
-              </h2>
-            </header>
+        {/* ---- how it works ---- */}
+        <section className={styles.section} aria-labelledby="how-title">
+          <header className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>How it works</p>
+            <h2 id="how-title" className={styles.sectionTitle}>
+              Three steps, and the course is <em>yours</em>.
+            </h2>
+          </header>
 
-            <ol className={styles.steps}>
-              {STEPS.map((step) => (
-                <li key={step.num} className={styles.step}>
-                  <div className={styles.stepIcon} aria-hidden="true">
-                    <Glyph name={step.icon} size={20} />
-                  </div>
-                  <div className={styles.stepBody}>
-                    <p className={styles.stepMeta}>
-                      <span className={styles.stepNum}>{step.num}</span>
-                      {step.label}
-                    </p>
-                    <h3 className={styles.stepTitle}>{step.title}</h3>
-                    <p className={styles.stepText}>{step.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
+          <ol className={styles.steps}>
+            {STEPS.map((step) => (
+              <li key={step.num} className={styles.step}>
+                <div className={styles.stepIcon} aria-hidden="true">
+                  <Glyph name={step.icon} size={20} />
+                </div>
+                <div className={styles.stepBody}>
+                  <p className={styles.stepMeta}>
+                    <span className={styles.stepNum}>{step.num}</span>
+                    {step.label}
+                  </p>
+                  <h3 className={styles.stepTitle}>{step.title}</h3>
+                  <p className={styles.stepText}>{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-          {/* ---- five skills + memory ---- */}
-          <section className={styles.section} aria-labelledby="skills-title">
-            <header className={styles.sectionHead}>
-              <p className={styles.sectionLabel}>Five skills · one memory</p>
-              <h2 id="skills-title" className={styles.sectionTitle}>
-                Every skill, drawn from <em>your world</em>.
-              </h2>
-              <p className={styles.sectionLede}>
-                Grammar, reading, listening, speaking, and writing, each gated by
-                demonstrated mastery, all feeding a vocabulary memory graph that is
-                entirely yours.
-              </p>
-            </header>
-
-            <ul className={styles.skillGrid}>
-              {SKILLS.map((skill) => (
-                <li key={skill.label} className={styles.skillCard}>
-                  <div className={styles.skillIcon} aria-hidden="true">
-                    <Glyph name={skill.icon} size={20} />
-                  </div>
-                  <p className={styles.skillLabel}>{skill.label}</p>
-                  <h3 className={styles.skillName}>{skill.name}</h3>
-                  <p className={styles.skillText}>{skill.body}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* ---- walkthrough ---- */}
-          <section className={styles.section} aria-labelledby="walk-title">
-            <header className={styles.sectionHead}>
-              <p className={styles.sectionLabel}>Step by step</p>
-              <h2 id="walk-title" className={styles.sectionTitle}>
-                From your agent to your first <em>class</em>.
-              </h2>
-              <p className={styles.sectionLede}>
-                Four steps, start to finish. Each one is the real screen you will
-                see, drawn in the same calm interface you learn in.
-              </p>
-            </header>
-
-            <ol className={styles.walk}>
-              {WALK_STEPS.map((step) => (
-                <li key={step.num} className={styles.walkStep}>
-                  <div className={styles.walkText}>
-                    <p className={styles.walkMeta}>
-                      <span className={styles.walkNum}>{step.num}</span>
-                      {step.label}
-                    </p>
-                    <h3 className={styles.walkTitle}>
-                      {step.title} <em>{step.titleAccent}</em>.
-                    </h3>
-                    <p className={styles.walkBody}>{step.body}</p>
-                  </div>
-                  <div className={styles.walkFrame}>
-                    <ProductFrame
-                      title={
-                        step.frame === 'placement'
-                          ? 'sotto.local / placement'
-                          : step.frame === 'skills'
-                            ? 'Sotto · Today'
-                            : 'sotto.local / welcome'
-                      }
-                      caption={step.caption}
-                      chrome={step.frame === 'skills' ? 'app' : 'browser'}
-                    >
-                      <WalkFrameMock frame={step.frame} />
-                    </ProductFrame>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          {/* ---- ownership ---- */}
-          <section className={styles.section} aria-labelledby="own-title">
-            <header className={styles.sectionHead}>
-              <p className={styles.sectionLabel}>Ownership</p>
-              <h2 id="own-title" className={styles.sectionTitle}>
-                Your keys, your data, <em>your stack</em>.
-              </h2>
-              <p className={styles.sectionLede}>
-                There is no social layer here. No feeds, no follows, no likes. Just
-                a learning stack you fully control.
-              </p>
-            </header>
-
-            <div className={styles.tenetGrid}>
-              {TENETS.map((tenet) => (
-                <article key={tenet.label} className={styles.tenet}>
-                  <div className={styles.tenetIcon} aria-hidden="true">
-                    <Glyph name={tenet.icon} size={20} />
-                  </div>
-                  <p className={styles.tenetLabel}>{tenet.label}</p>
-                  <h3 className={styles.tenetTitle}>{tenet.title}</h3>
-                  <p className={styles.tenetText}>{tenet.body}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          {/* ---- download ---- */}
-          <section className={styles.section} aria-labelledby="download-title">
-            <header className={styles.sectionHead}>
-              <p className={styles.eyebrow}>
-                <span className={styles.eyebrowDash} aria-hidden="true" />
-                Run it yourself
-              </p>
-              <h2 id="download-title" className={styles.sectionTitle}>
-                Get Sotto on <em>your own stack</em>.
-              </h2>
-              <p className={styles.sectionLede}>
-                Run the whole thing on your computer in one click, or host it on a
-                server for the household. Your courses, audio, and data stay where
-                you put them.
-              </p>
-            </header>
-
-            <div className={styles.downloadActions}>
-              <Link href="/download" className={styles.downloadPrimary}>
-                Download Sotto
-                <span className={styles.downloadArrow} aria-hidden="true">
-                  <Glyph name="arrow" size={17} />
-                </span>
-              </Link>
-              <a
-                href={GITHUB_URL}
-                className={styles.downloadGhost}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Host on a server
-              </a>
-            </div>
-
-            <ul className={styles.runChips}>
-              {RUN_CHIPS.map((chip) => (
-                <li key={chip.label} className={styles.runChip}>
-                  <div className={styles.runChipIcon} aria-hidden="true">
-                    <Glyph name={chip.icon} size={18} />
-                  </div>
-                  <p className={styles.runChipLabel}>{chip.label}</p>
-                  <h3 className={styles.runChipTitle}>{chip.title}</h3>
-                  <p className={styles.runChipText}>{chip.body}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* ---- footer CTA ---- */}
-          <section className={styles.convert} aria-labelledby="convert-title">
-            <p className={styles.eyebrow}>
-              <span className={styles.eyebrowDash} aria-hidden="true" />
-              {BRAND.cta}
-            </p>
-            <h2 id="convert-title" className={styles.convertTitle}>
-              Place. Practice. <em>Progress.</em>
+        {/* ---- five skills + memory ---- */}
+        <section className={styles.section} aria-labelledby="skills-title">
+          <header className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>Five skills · one memory</p>
+            <h2 id="skills-title" className={styles.sectionTitle}>
+              Every skill, drawn from <em>your world</em>.
             </h2>
             <p className={styles.sectionLede}>
-              Connect the agent you already own and take the first class today.
+              Grammar, reading, listening, speaking, and writing, each gated by demonstrated
+              mastery, all feeding a vocabulary memory graph that is entirely yours.
             </p>
+          </header>
 
-            <LandingCTA />
+          <ul className={styles.skillGrid}>
+            {SKILLS.map((skill) => (
+              <li key={skill.label} className={styles.skillCard}>
+                <div className={styles.skillIcon} aria-hidden="true">
+                  <Glyph name={skill.icon} size={20} />
+                </div>
+                <p className={styles.skillLabel}>{skill.label}</p>
+                <h3 className={styles.skillName}>{skill.name}</h3>
+                <p className={styles.skillText}>{skill.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-            <p className={styles.whisper}>
-              <span className={styles.whisperTag}>sotto voce</span>
-              {BRAND.origin}.
+        {/* ---- walkthrough ---- */}
+        <section className={styles.section} aria-labelledby="walk-title">
+          <header className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>Step by step</p>
+            <h2 id="walk-title" className={styles.sectionTitle}>
+              From your agent to your first <em>class</em>.
+            </h2>
+            <p className={styles.sectionLede}>
+              Four steps, start to finish. Each one is the real screen you will see, drawn in the
+              same calm interface you learn in.
             </p>
-          </section>
-        </main>
+          </header>
 
-        <footer className={styles.footer}>
-          <div className={styles.footerInner}>
-            <Link href="/" className={styles.footerWordmark} aria-label="Sotto home">
-              <GlassBead />
-              <span className={styles.footerWordmarkText}>sotto</span>
-            </Link>
-            <nav className={styles.footerLinks} aria-label="Footer">
-              <Link href="/about" className={styles.footerLink}>
-                About
-              </Link>
-              <a
-                href={GITHUB_URL}
-                className={styles.footerLink}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                GitHub
-              </a>
-              <a
-                href="https://www.gnu.org/licenses/agpl-3.0.html"
-                className={styles.footerLink}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                AGPL-3.0
-              </a>
-            </nav>
-            <p className={styles.footerNote}>
-              {BRAND.name}. {BRAND.pitchTagline}
+          <ol className={styles.walk}>
+            {WALK_STEPS.map((step) => (
+              <li key={step.num} className={styles.walkStep}>
+                <div className={styles.walkText}>
+                  <p className={styles.walkMeta}>
+                    <span className={styles.walkNum}>{step.num}</span>
+                    {step.label}
+                  </p>
+                  <h3 className={styles.walkTitle}>
+                    {step.title} <em>{step.titleAccent}</em>.
+                  </h3>
+                  <p className={styles.walkBody}>{step.body}</p>
+                </div>
+                <div className={styles.walkFrame}>
+                  <ProductFrame
+                    title={
+                      step.frame === 'placement'
+                        ? 'sotto.local / placement'
+                        : step.frame === 'skills'
+                          ? 'Sotto · Today'
+                          : 'sotto.local / welcome'
+                    }
+                    caption={step.caption}
+                    chrome={step.frame === 'skills' ? 'app' : 'browser'}
+                  >
+                    <WalkFrameMock frame={step.frame} />
+                  </ProductFrame>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* ---- ownership ---- */}
+        <section className={styles.section} aria-labelledby="own-title">
+          <header className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>Ownership</p>
+            <h2 id="own-title" className={styles.sectionTitle}>
+              Your keys, your data, <em>your stack</em>.
+            </h2>
+            <p className={styles.sectionLede}>
+              There is no social layer here. No feeds, no follows, no likes. Just a learning stack
+              you fully control.
             </p>
+          </header>
+
+          <div className={styles.tenetGrid}>
+            {TENETS.map((tenet) => (
+              <article key={tenet.label} className={styles.tenet}>
+                <div className={styles.tenetIcon} aria-hidden="true">
+                  <Glyph name={tenet.icon} size={20} />
+                </div>
+                <p className={styles.tenetLabel}>{tenet.label}</p>
+                <h3 className={styles.tenetTitle}>{tenet.title}</h3>
+                <p className={styles.tenetText}>{tenet.body}</p>
+              </article>
+            ))}
           </div>
-        </footer>
+        </section>
+
+        {/* ---- download ---- */}
+        <section className={styles.section} aria-labelledby="download-title">
+          <header className={styles.sectionHead}>
+            <p className={styles.eyebrow}>
+              <span className={styles.eyebrowDash} aria-hidden="true" />
+              Run it yourself
+            </p>
+            <h2 id="download-title" className={styles.sectionTitle}>
+              Get Sotto on <em>your own stack</em>.
+            </h2>
+            <p className={styles.sectionLede}>
+              Run the whole thing on your computer in one click, or host it on a server for the
+              household. Your courses, audio, and data stay where you put them.
+            </p>
+          </header>
+
+          <div className={styles.downloadActions}>
+            <Link href="/download" className={styles.downloadPrimary}>
+              Download Sotto
+              <span className={styles.downloadArrow} aria-hidden="true">
+                <Glyph name="arrow" size={17} />
+              </span>
+            </Link>
+            <a
+              href={GITHUB_URL}
+              className={styles.downloadGhost}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Host on a server
+            </a>
+          </div>
+
+          <ul className={styles.runChips}>
+            {RUN_CHIPS.map((chip) => (
+              <li key={chip.label} className={styles.runChip}>
+                <div className={styles.runChipIcon} aria-hidden="true">
+                  <Glyph name={chip.icon} size={18} />
+                </div>
+                <p className={styles.runChipLabel}>{chip.label}</p>
+                <h3 className={styles.runChipTitle}>{chip.title}</h3>
+                <p className={styles.runChipText}>{chip.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* ---- footer CTA ---- */}
+        <section className={styles.convert} aria-labelledby="convert-title">
+          <p className={styles.eyebrow}>
+            <span className={styles.eyebrowDash} aria-hidden="true" />
+            {BRAND.cta}
+          </p>
+          <h2 id="convert-title" className={styles.convertTitle}>
+            Place. Practice. <em>Progress.</em>
+          </h2>
+          <p className={styles.sectionLede}>
+            Connect the agent you already own and take the first class today.
+          </p>
+
+          <LandingCTA demoMode={demoMode} />
+
+          <p className={styles.whisper}>
+            <span className={styles.whisperTag}>sotto voce</span>
+            {BRAND.origin}.
+          </p>
+        </section>
+      </main>
+
+      <footer className={styles.footer}>
+        <div className={styles.footerInner}>
+          <Link href="/" className={styles.footerWordmark} aria-label="Sotto home">
+            <GlassBead />
+            <span className={styles.footerWordmarkText}>sotto</span>
+          </Link>
+          <nav className={styles.footerLinks} aria-label="Footer">
+            <Link href="/about" className={styles.footerLink}>
+              About
+            </Link>
+            <a
+              href={GITHUB_URL}
+              className={styles.footerLink}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+            </a>
+            <a
+              href="https://www.gnu.org/licenses/agpl-3.0.html"
+              className={styles.footerLink}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              AGPL-3.0
+            </a>
+          </nav>
+          <p className={styles.footerNote}>
+            {BRAND.name}. {BRAND.pitchTagline}
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

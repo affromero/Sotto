@@ -222,4 +222,4 @@ Then ensure the process can create the storage directory.
 
 ### Workers cannot reach services
 
-Local development outside Docker should use `localhost`. Full Docker deployments should use service names such as `postgres`, `redis`, and `remotion`.
+Local development outside Docker should use `localhost`. Full Docker deployments should use service names such as `postgres`, `redis`, and `local-tts`.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEpisodeStatus } from '@/lib/hooks/useEpisodeStatus';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,11 +13,7 @@ import {
   RefreshCw,
   Trash2,
   Shield,
-  Video,
-  Users,
-  X,
   MessageCircleQuestion,
-  Check,
   AlertTriangle,
 } from 'lucide-react';
 import { OwnerOnlyBadge } from '@/components/ui/OwnerOnlyBadge';
@@ -28,7 +24,6 @@ import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
 import { VocabularyList } from '@/components/player/VocabularyList';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
-import { Modal } from '@/components/ui/Modal';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { VersionHistory } from '@/components/player/VersionHistory';
@@ -41,35 +36,18 @@ import { ScriptEditor } from '@/components/create/ScriptEditor';
 import { InsufficientRefsBanner } from '@/components/create/InsufficientRefsBanner';
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
-import { VideoModelPicker } from '@/components/player/VideoModelPicker';
-import { VideoProgress } from '@/components/player/VideoProgress';
-import { VideoView } from '@/components/player/VideoView';
-import { PipelineEditor } from '@/components/player/PipelineEditor';
-import { VideoEditor } from '@/components/player/VideoEditor';
-import { AvatarPicker } from '@/components/player/AvatarPicker';
-import type { AvatarOverlayData } from '@/types/avatar';
-import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
 import type { EpisodeDetail } from '@/types/episode';
-import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
 import type { EpisodeStatus } from '@prisma/client';
-import type { SegmentVisualData } from '@/lib/segment-utils';
 import styles from './page.module.css';
-
-export interface VideoGenerationStatus {
-  available: boolean;
-  hasByokKey: boolean;
-}
 
 interface EpisodePlayerViewProps {
   episode: EpisodeDetail;
   isOwner: boolean;
   isAdmin?: boolean;
   isAuthenticated: boolean;
-  videoStatus?: VideoGenerationStatus;
-  avatarStatus?: VideoGenerationStatus;
 }
 
-type ViewMode = 'transcript' | 'teleprompter' | 'video';
+type ViewMode = 'transcript' | 'teleprompter';
 
 const statusVariants: Record<EpisodeStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
   {
@@ -142,8 +120,6 @@ export function EpisodePlayerView({
   isOwner,
   isAdmin,
   isAuthenticated,
-  videoStatus,
-  avatarStatus,
 }: EpisodePlayerViewProps) {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(0);
@@ -171,31 +147,6 @@ export function EpisodePlayerView({
   );
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
-  const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
-    episode.videoUrl ? 'ready' : 'idle'
-  );
-  const [segmentVisuals, setSegmentVisuals] = useState<SegmentVisualData[]>([]);
-  const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
-  const [videoError, setVideoError] = useState<{
-    message: string;
-    isLlmError?: boolean;
-    currentProvider?: string;
-  } | null>(null);
-  const [showModelPicker, setShowModelPicker] = useState(false);
-  const [videoLoading, setVideoLoading] = useState(false);
-  const [pipelineData, setPipelineData] = useState<VideoPipeline | null>(null);
-  const [showPipelineEditor, setShowPipelineEditor] = useState(false);
-  const [falModels, setFalModels] = useState<FalModelsResponse | null>(null);
-  const [pipelineLoading, setPipelineLoading] = useState(false);
-  const [classificationId, setClassificationId] = useState<string | null>(null);
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const [showVideoEditor, setShowVideoEditor] = useState(false);
-  const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
-  const [avatarsVisible, setAvatarsVisible] = useState(true);
-  const [avatarGenerating, setAvatarGenerating] = useState(false);
-  const [avatarDone, setAvatarDone] = useState(false);
-
-  const filteredAvatarOverlays = useMemo(() => avatarOverlays, [avatarOverlays]);
 
   // Fetch script turns for review when SCRIPT_READY or FAILED (for AudioConfigPanel speakers)
   const needsScript =
@@ -249,265 +200,6 @@ export function EpisodePlayerView({
       [router]
     ),
   });
-
-  // Check existing video generation status on mount
-  useEffect(() => {
-    if (liveStatus !== 'READY') return;
-    setVideoState('idle');
-    setSegmentVisuals([]);
-    setVideoGenerationId(null);
-    setVideoError(null);
-    fetch(`/api/v1/episodes/${episode.id}/video`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data?.status) return;
-        if (
-          (data.status === 'READY' ||
-            data.status === 'GENERATING_AVATARS' ||
-            data.status === 'STALE') &&
-          data.segmentVisuals?.length > 0
-        ) {
-          setVideoState('ready');
-          setSegmentVisuals(data.segmentVisuals);
-          if (data.avatarOverlays) {
-            setAvatarOverlays(data.avatarOverlays);
-            if (isOwner) {
-              const hasInProgress = data.avatarOverlays.some((o: AvatarOverlayData) =>
-                ['pending', 'concatenating', 'submitting', 'processing'].includes(o.status)
-              );
-              if (hasInProgress) setAvatarGenerating(true);
-            }
-          }
-          if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
-        } else if (isOwner && data.status === 'FAILED') {
-          setVideoState('failed');
-          setVideoError({ message: data.failureReason || 'Video generation failed.' });
-          if (data.segmentVisuals?.length > 0) {
-            setSegmentVisuals(data.segmentVisuals);
-          }
-        } else if (isOwner) {
-          setVideoState('generating');
-          setVideoGenerationId(data.videoGenerationId);
-        }
-      })
-      .catch(() => {});
-  }, [isOwner, liveStatus, episode.id]);
-
-  // Poll avatar overlay status while avatars are generating (independent of video state)
-  useEffect(() => {
-    if (!avatarGenerating) return;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/v1/episodes/${episode.id}/video`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.avatarOverlays) {
-          setAvatarOverlays(data.avatarOverlays);
-          const allDone = data.avatarOverlays.every(
-            (o: AvatarOverlayData) => o.status === 'ready' || o.status === 'failed'
-          );
-          if (allDone) {
-            setAvatarGenerating(false);
-            const anyReady = data.avatarOverlays.some(
-              (o: AvatarOverlayData) => o.status === 'ready'
-            );
-            if (anyReady) {
-              setAvatarDone(true);
-              setTimeout(() => setAvatarDone(false), 3000);
-            }
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
-  }, [avatarGenerating, episode.id]);
-
-  // Auto-select video tab when visuals become available; fall back to transcript when removed
-  useEffect(() => {
-    if (segmentVisuals.length > 0 && viewMode !== 'video') {
-      setViewMode('video');
-    } else if (segmentVisuals.length === 0 && viewMode === 'video') {
-      setViewMode('transcript');
-    }
-  }, [segmentVisuals.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleGenerateVideo = useCallback(
-    async (override?: { aiModel: string }, forceReclassify?: boolean) => {
-      // If we already have pipeline data in memory, just reopen the editor
-      if (pipelineData && !override && !forceReclassify) {
-        if (!falModels) {
-          const res = await fetch('/api/v1/fal-models');
-          if (res.ok) setFalModels(await res.json());
-        }
-        setShowPipelineEditor(true);
-        return;
-      }
-
-      setPipelineLoading(true);
-      setVideoError(null);
-      try {
-        // Check for a saved draft before triggering classification
-        if (!override && !forceReclassify) {
-          const [draftRes, modelsRes] = await Promise.all([
-            fetch(`/api/v1/episodes/${episode.id}/video/pipeline`),
-            !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
-          ]);
-          if (modelsRes?.ok) setFalModels(await modelsRes.json());
-          if (draftRes.ok) {
-            const draft = await draftRes.json();
-            if (draft.status === 'saved' && draft.pipeline) {
-              setPipelineData(draft.pipeline);
-              setShowPipelineEditor(true);
-              setPipelineLoading(false);
-              return;
-            }
-          }
-        }
-
-        // No saved draft — trigger classification
-        const pipelineBody = { ...override };
-        const hasBody = Object.keys(pipelineBody).length > 0;
-        const pipelineOpts: RequestInit = hasBody
-          ? {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(pipelineBody),
-            }
-          : { method: 'POST' };
-        const [pipelineRes, modelsRes] = await Promise.all([
-          fetch(`/api/v1/episodes/${episode.id}/video/pipeline`, pipelineOpts),
-          !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
-        ]);
-        if (modelsRes?.ok) setFalModels(await modelsRes.json());
-        if (!pipelineRes.ok) {
-          const err = await pipelineRes.json().catch(() => ({}));
-          setVideoError({
-            message: err.error || 'Failed to create pipeline.',
-            isLlmError: err.isLlmError,
-            currentProvider: err.currentProvider,
-          });
-          setPipelineLoading(false);
-          return;
-        }
-        const data = await pipelineRes.json();
-        // POST now returns { classificationId, status: 'classifying' } — start polling
-        setClassificationId(data.classificationId);
-      } catch {
-        setVideoError({ message: 'Failed to create pipeline.' });
-        setPipelineLoading(false);
-      }
-    },
-    [episode.id, pipelineData, falModels]
-  );
-
-  // Poll for pipeline classification result
-  useEffect(() => {
-    if (!classificationId || !pipelineLoading) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await fetch(
-          `/api/v1/episodes/${episode.id}/video/pipeline?classificationId=${classificationId}`
-        );
-        if (cancelled) return;
-        if (!res.ok) {
-          if (!cancelled) setTimeout(poll, 5000);
-          return;
-        }
-        const data = await res.json();
-        if (data.status === 'ready') {
-          setPipelineData(data.pipeline);
-          setShowPipelineEditor(true);
-          setPipelineLoading(false);
-          setClassificationId(null);
-          return;
-        }
-        if (data.status === 'failed') {
-          setVideoError({
-            message: data.error || 'Classification failed.',
-            isLlmError: data.isLlmError,
-            currentProvider: data.currentProvider,
-          });
-          setPipelineLoading(false);
-          setClassificationId(null);
-          return;
-        }
-        // Still classifying — poll again
-        if (!cancelled) setTimeout(poll, 3000);
-      } catch {
-        if (!cancelled) setTimeout(poll, 5000);
-      }
-    };
-    const timer = setTimeout(poll, 2000);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [classificationId, pipelineLoading, episode.id]);
-
-  const handlePipelineApprove = useCallback(
-    async (pipeline: VideoPipeline) => {
-      setShowPipelineEditor(false);
-      setVideoState('generating');
-      setVideoLoading(true);
-      try {
-        const res = await fetch(`/api/v1/episodes/${episode.id}/video`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pipeline }),
-        });
-        if (!res.ok) throw new Error('Failed to start video generation');
-        const data = await res.json();
-        setVideoGenerationId(data.videoGenerationId);
-      } catch (err) {
-        setVideoState('failed');
-        setVideoError({ message: err instanceof Error ? err.message : 'Generation failed' });
-      } finally {
-        setVideoLoading(false);
-      }
-    },
-    [episode.id]
-  );
-
-  const dismissVideoError = useCallback(() => {
-    setVideoState('idle');
-    setVideoError(null);
-  }, []);
-
-  const avatarPositionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleAvatarPositionChange = useCallback(
-    (speaker: string, pos: { posX: number; posY: number; width: number; height: number }) => {
-      // Update local state immediately
-      setAvatarOverlays((prev) => prev.map((o) => (o.speaker === speaker ? { ...o, ...pos } : o)));
-      // Debounce API call
-      if (avatarPositionTimerRef.current) clearTimeout(avatarPositionTimerRef.current);
-      avatarPositionTimerRef.current = setTimeout(() => {
-        fetch(`/api/v1/episodes/${episode.id}/video/avatars/positions`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ positions: [{ speaker, ...pos }] }),
-        }).catch(() => {});
-      }, 500);
-    },
-    [episode.id]
-  );
-
-  const handleMaskShapeChange = useCallback(
-    (speaker: string, shape: AvatarMaskShape) => {
-      setAvatarOverlays((prev) =>
-        prev.map((o) => (o.speaker === speaker ? { ...o, maskShape: shape } : o))
-      );
-      fetch(`/api/v1/episodes/${episode.id}/video/avatars/positions`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ positions: [{ speaker, maskShape: shape }] }),
-      }).catch(() => {});
-    },
-    [episode.id]
-  );
 
   const handleRetry = useCallback(async () => {
     setRetrying(true);
@@ -848,251 +540,6 @@ export function EpisodePlayerView({
           </div>
         )}
 
-        {/* Video Section */}
-        {isReady && isOwner && (
-          <section className={styles.videoSection} aria-label="Video">
-            <OwnerOnlyBadge />
-            {videoState === 'idle' && (
-              <>
-                <div className={styles.ownerToolbar}>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowModelPicker(true)}
-                    disabled={
-                      showModelPicker ||
-                      pipelineLoading ||
-                      videoLoading ||
-                      (!videoStatus?.available && !isAdmin)
-                    }
-                    aria-label="Generate Video"
-                    title="Generate a video from your lesson with AI visuals"
-                    type="button"
-                    data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
-                  >
-                    <Video size={14} />
-                    Video
-                  </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowAvatarPicker(true)}
-                    disabled
-                    aria-label="Add Avatars"
-                    title="Generate a video first to add avatars"
-                    type="button"
-                  >
-                    <Users size={14} />
-                    Avatars
-                  </button>
-                </div>
-                {showModelPicker && !videoError && (
-                  <VideoModelPicker
-                    onGenerate={(override) => {
-                      setShowModelPicker(false);
-                      handleGenerateVideo(override);
-                    }}
-                    onCancel={() => setShowModelPicker(false)}
-                    loading={pipelineLoading}
-                  />
-                )}
-                {videoError && (
-                  <div className={styles.videoErrorBlock}>
-                    <p className={styles.videoError}>{videoError.message}</p>
-                    {videoError.isLlmError && (
-                      <VideoModelPicker
-                        onGenerate={(override) => {
-                          setVideoError(null);
-                          handleGenerateVideo(override);
-                        }}
-                        onCancel={() => setVideoError(null)}
-                        loading={pipelineLoading}
-                      />
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-            {videoState === 'generating' && videoGenerationId && (
-              <VideoProgress
-                episodeId={episode.id}
-                videoGenerationId={videoGenerationId}
-                onComplete={(visuals) => {
-                  setVideoState('ready');
-                  setSegmentVisuals(visuals);
-                }}
-                onRequestEdit={async (visuals) => {
-                  setSegmentVisuals(visuals as SegmentVisualData[]);
-                  if (!falModels) {
-                    const res = await fetch('/api/v1/fal-models');
-                    if (res.ok) setFalModels(await res.json());
-                  }
-                  setVideoState('failed');
-                  setShowVideoEditor(true);
-                }}
-                onChangeAvatars={() => {
-                  setShowAvatarPicker(true);
-                }}
-                onDismiss={dismissVideoError}
-              />
-            )}
-            {videoState === 'ready' && (
-              <div className={styles.ownerToolbar}>
-                <button
-                  className={styles.toolbarBtn}
-                  onClick={async () => {
-                    if (!falModels) {
-                      const res = await fetch('/api/v1/fal-models');
-                      if (res.ok) setFalModels(await res.json());
-                    }
-                    setShowVideoEditor(true);
-                  }}
-                  aria-label="Edit Storyboard"
-                  title="Edit the video storyboard — change visuals, transitions, and timing"
-                  type="button"
-                >
-                  <Pencil size={14} />
-                  Storyboard
-                </button>
-                <button
-                  className={styles.toolbarBtn}
-                  onClick={() => setShowAvatarPicker(true)}
-                  disabled={!avatarGenerating && !avatarDone && !avatarStatus?.available}
-                  aria-label={
-                    avatarGenerating
-                      ? 'Generating avatars'
-                      : avatarDone
-                        ? 'Avatars ready'
-                        : avatarOverlays.length > 0
-                          ? 'Change Avatars'
-                          : 'Add Avatars'
-                  }
-                  title={
-                    avatarGenerating
-                      ? 'Generating avatars...'
-                      : avatarOverlays.length > 0
-                          ? 'Change the speaker avatars'
-                          : 'Add AI-generated speaker avatars'
-                  }
-                  type="button"
-                  data-loading={avatarGenerating ? 'true' : undefined}
-                  data-done={avatarDone ? 'true' : undefined}
-                >
-                  {avatarDone ? (
-                    <>
-                      <Check size={14} />
-                      Ready!
-                    </>
-                  ) : avatarGenerating ? (
-                    <>
-                      <RefreshCw size={14} />
-                      {(() => {
-                        const rw = avatarOverlays.find(
-                          (o) => o.avatarProvider === 'runway' && (o.runwayTotalChunks ?? 0) > 1
-                        );
-                        if (rw) return `Chunk ${rw.runwayChunkIndex ?? 0}/${rw.runwayTotalChunks}`;
-                        return `${avatarOverlays.filter((o) => o.status === 'ready').length}/${avatarOverlays.length}`;
-                      })()}
-                    </>
-                  ) : (
-                    <>
-                      <Users size={14} />
-                      Avatars
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-            {videoState === 'failed' && (
-              <>
-                <div className={styles.videoFailed}>
-                  <button
-                    className={styles.videoDismiss}
-                    onClick={dismissVideoError}
-                    type="button"
-                    aria-label="Dismiss error"
-                  >
-                    <X size={16} />
-                  </button>
-                  <p className={styles.videoError}>
-                    {videoError?.message || 'Video generation failed.'}
-                  </p>
-                </div>
-                <div className={styles.ownerToolbar}>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={async () => {
-                      const [falRes, visualRes] = await Promise.all([
-                        !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
-                        segmentVisuals.length === 0
-                          ? fetch(`/api/v1/episodes/${episode.id}/video`)
-                          : Promise.resolve(null),
-                      ]);
-                      if (falRes?.ok) setFalModels(await falRes.json());
-                      if (visualRes?.ok) {
-                        const d = (await visualRes.json()) as {
-                          segmentVisuals?: SegmentVisualData[];
-                        };
-                        if (d.segmentVisuals?.length) setSegmentVisuals(d.segmentVisuals);
-                      }
-                      setShowVideoEditor(true);
-                    }}
-                    aria-label="Edit Storyboard"
-                    title="Edit the video storyboard to fix the issue"
-                    type="button"
-                  >
-                    <Pencil size={14} />
-                    Storyboard
-                  </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    disabled={videoLoading}
-                    onClick={async () => {
-                      setVideoLoading(true);
-                      setVideoError(null);
-                      try {
-                        const res = await fetch(`/api/v1/episodes/${episode.id}/video`, {
-                          method: 'POST',
-                        });
-                        if (!res.ok) {
-                          const body = (await res.json().catch(() => ({}))) as { error?: string };
-                          setVideoError({ message: body.error || 'Retry failed.' });
-                          return;
-                        }
-                        const data = (await res.json()) as {
-                          videoGenerationId: string;
-                          status: string;
-                        };
-                        setVideoGenerationId(data.videoGenerationId);
-                        setVideoState('generating');
-                      } catch {
-                        setVideoError({ message: 'Network error — could not retry.' });
-                      } finally {
-                        setVideoLoading(false);
-                      }
-                    }}
-                    aria-label="Retry Video"
-                    title="Retry video generation"
-                    type="button"
-                  >
-                    <RefreshCw size={14} />
-                    Retry
-                  </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowAvatarPicker(true)}
-                    disabled
-                    aria-label="Avatars"
-                    title="Retry video generation first to add avatars"
-                    type="button"
-                  >
-                    <Users size={14} />
-                    Avatars
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
-        )}
-
         {/* Player — immediately after owner tools */}
         {isReady && episode.audioUrl && (
           <section
@@ -1221,23 +668,9 @@ export function EpisodePlayerView({
 
         {/* View Toggle + Transcript/Teleprompter */}
         {episode.segments.length > 0 && (
-          <details className={styles.detailsSection} open={segmentVisuals.length > 0 || undefined}>
+          <details className={styles.detailsSection}>
             <summary className={styles.detailsSummary}>
               <div className={styles.viewToggle} role="tablist" aria-label="Transcript view mode">
-                {segmentVisuals.length > 0 && (
-                  <button
-                    className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : styles.viewToggleBtnHighlight}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setViewMode('video');
-                    }}
-                    role="tab"
-                    aria-selected={viewMode === 'video'}
-                    type="button"
-                  >
-                    Video
-                  </button>
-                )}
                 <button
                   className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
                   onClick={(e) => {
@@ -1282,35 +715,13 @@ export function EpisodePlayerView({
                     currentTime={currentTime}
                     onSegmentClick={handleSegmentClick}
                   />
-                ) : segmentVisuals.length > 0 ? (
-                  <VideoView
-                    segments={episode.segments}
-                    segmentVisuals={segmentVisuals}
-                    references={episode.references}
-                    currentTime={currentTime}
-                    onSegmentClick={handleSegmentClick}
-                    title={episode.title}
-                    avatarOverlays={filteredAvatarOverlays}
-                    isOwner={isOwner}
-                    avatarsVisible={avatarsVisible}
-                    onAvatarsVisibleChange={async (visible) => {
-                      setAvatarsVisible(visible);
-                      await fetch(`/api/v1/episodes/${episode.id}/video`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ avatarsVisible: visible }),
-                      });
-                    }}
-                    onAvatarPositionChange={handleAvatarPositionChange}
-                    onMaskShapeChange={handleMaskShapeChange}
-                  />
                 ) : null}
               </section>
             </div>
           </details>
         )}
 
-        {/* References — after transcript/video */}
+        {/* References — after transcript */}
         {episode.references.length > 0 && (
           <section className={styles.referencesSection}>
             <ReferenceList references={episode.references} />
@@ -1378,98 +789,6 @@ export function EpisodePlayerView({
             <SottoBadge />
           </div>
         )}
-
-        {/* Avatar Picker Modal */}
-        <Modal
-          isOpen={showAvatarPicker}
-          onClose={() => setShowAvatarPicker(false)}
-          title="Speaker Avatars"
-          size="large"
-        >
-          <AvatarPicker
-            episodeId={episode.id}
-            speakers={[...new Set(episode.segments.map((s) => s.speaker))]}
-            segments={episode.segments}
-            existingOverlays={
-              avatarOverlays.length > 0
-                ? avatarOverlays.map((ov) => ({
-                    speaker: ov.speaker,
-                    avatarId: ov.avatarId,
-                    avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway' | 'fal',
-                    status: ov.status,
-                  }))
-                : undefined
-            }
-            onConfigured={({ generationStarted }) => {
-              setShowAvatarPicker(false);
-              if (generationStarted) {
-                setAvatarGenerating(true);
-              }
-            }}
-            onCancel={() => setShowAvatarPicker(false)}
-          />
-        </Modal>
-
-        {/* Pipeline Editor Modal (pre-generation storyboard) */}
-        <Modal
-          isOpen={showPipelineEditor && !!pipelineData && !!falModels}
-          onClose={() => {
-            setShowPipelineEditor(false);
-          }}
-          title="Video Storyboard"
-          size="large"
-        >
-          {pipelineData && falModels && (
-            <PipelineEditor
-              episodeId={episode.id}
-              episodeTitle={episode.title}
-              pipeline={pipelineData}
-              falModels={falModels}
-              onApprove={handlePipelineApprove}
-              onCancel={(edited) => {
-                setPipelineData(edited);
-                setShowPipelineEditor(false);
-                // Persist edits to DRAFT (fire-and-forget via PATCH)
-                fetch(`/api/v1/episodes/${episode.id}/video/pipeline`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(edited),
-                }).catch(() => {});
-              }}
-              onReclassify={() => {
-                setPipelineData(null);
-                setShowPipelineEditor(false);
-                handleGenerateVideo(undefined, true);
-              }}
-            />
-          )}
-        </Modal>
-
-        {/* Video Editor Modal (post-generation storyboard) */}
-        <Modal
-          isOpen={
-            showVideoEditor && (videoState === 'ready' || videoState === 'failed') && !!falModels
-          }
-          onClose={() => setShowVideoEditor(false)}
-          title="Edit Storyboard"
-          size="xlarge"
-        >
-          {falModels && (
-            <VideoEditor
-              episodeId={episode.id}
-              segments={episode.segments}
-              segmentVisuals={segmentVisuals}
-              falModels={falModels}
-              voices={[]}
-              onRegenerate={(genId) => {
-                setShowVideoEditor(false);
-                setVideoState('generating');
-                setVideoGenerationId(genId);
-              }}
-              onCancel={() => setShowVideoEditor(false)}
-            />
-          )}
-        </Modal>
 
       </div>
 

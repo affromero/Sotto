@@ -48,7 +48,6 @@ export interface EpisodeDetail extends EpisodeSummary {
   references: ReferenceData[];
   vocabularyEntries?: VocabularyEntryData[];
   pdfUrl: string | null;
-  videoUrl: string | null;
   isSaved: boolean;
 }
 

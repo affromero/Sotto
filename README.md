@@ -159,8 +159,6 @@ apps/web          Next.js 16 App Router — web UI, API routes, Prisma schema, V
 apps/mobile       Expo React Native — iPad-first UI with react-native-track-player
 packages/shared   Shared types, Zod schemas, brand copy
 packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex locally
-packages/maps     Language curriculum maps (private submodule, optional)
-services/remotion Remotion render sidecar (video worksheets)
 ```
 
 <details>
@@ -173,7 +171,7 @@ services/remotion Remotion render sidecar (video worksheets)
 - **Provider-resolved AI / TTS / STT** — explicit resolvers (`resolveLearningAi`, `resolveTtsProvider`, `resolveSttProvider`) pick the configured provider, never by key availability.
 - **Keyless local agent** — `AI_PROVIDER=claude-code` (or `codex`) routes every LLM call through your local CLI; no outbound API key required.
 - **[MCP](https://modelcontextprotocol.io/) server** (`packages/mcp`) — your local agent calls `ingest_agent_output` and other Sotto tools directly.
-- **Web + iPad** — [Next.js](https://nextjs.org/) + [React](https://react.dev/) on the web; [Expo](https://expo.dev/) React Native with [react-native-track-player](https://rntp.dev/) and [PencilKit](https://developer.apple.com/documentation/pencilkit) on iPad; [Remotion](https://www.remotion.dev/) + [FFmpeg](https://ffmpeg.org/) for video worksheets.
+- **Web + iPad** — [Next.js](https://nextjs.org/) + [React](https://react.dev/) on the web; [Expo](https://expo.dev/) React Native with [react-native-track-player](https://rntp.dev/) and [PencilKit](https://developer.apple.com/documentation/pencilkit) on iPad.
 
 </details>
 
@@ -202,7 +200,7 @@ npm run setup     # deps, .env.local (AUTH_SECRET + BYOK_ENCRYPTION_KEY), Postgr
 npm run dev
 ```
 
-Then open [localhost:3000](http://localhost:3000). The private `maps` submodule is optional — a no-op stub is dropped in when it's absent.
+Then open [localhost:3000](http://localhost:3000).
 
 ### Run it 100% offline
 

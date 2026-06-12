@@ -1,9 +1,8 @@
 # Publishes the open-source Sotto images to GHCR.
 #
-# Unlike deploy.yml (which builds on the server with the private maps submodule),
-# this builds a PUBLIC image: it initializes only the public verification-standard
-# submodule and drops in the @sotto/maps no-op stub, so no private code ships in
-# the published image. The curl|bash installer pulls these images.
+# Unlike deploy.yml (which builds on the server), this builds a PUBLIC image:
+# it initializes only the public verification-standard submodule.
+# The curl|bash installer pulls these images.
 name: Publish OSS image
 
 on:
@@ -29,12 +28,10 @@ jobs:
         with:
           submodules: false
 
-      # Public submodule only (no SSH key); the private maps package is replaced
-      # by a no-op stub so the build needs no private code.
-      - name: Init public submodule + stub maps
+      # Public submodule only (no SSH key needed).
+      - name: Init public submodule
         run: |
           git submodule update --init packages/verification-standard
-          node scripts/oss-maps-stub.mjs
 
       - uses: docker/setup-buildx-action@v3
 

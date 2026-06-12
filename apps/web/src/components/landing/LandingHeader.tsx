@@ -17,10 +17,11 @@ const NAV_LINKS = [
 
 /**
  * Top navigation for the landing page. Auth-aware: signed-in learners see a
- * "Dashboard" entry; signed-out visitors see "Sign in". Hydration-safe via
- * useHasMounted so the server render is stable.
+ * "Dashboard" entry; signed-out visitors see "Sign in". The public demo points
+ * to the welcome flow instead of auth. Hydration-safe via useHasMounted so the
+ * server render is stable.
  */
-export function LandingHeader() {
+export function LandingHeader({ demoMode = false }: { demoMode?: boolean }) {
   const { isAuthenticated } = useAuth();
   const mounted = useHasMounted();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -56,16 +57,15 @@ export function LandingHeader() {
               {link.label}
             </Link>
           ))}
-          <a
-            href={GITHUB_URL}
-            className={styles.link}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href={GITHUB_URL} className={styles.link} target="_blank" rel="noopener noreferrer">
             GitHub
           </a>
 
-          {signedIn ? (
+          {demoMode ? (
+            <Link href="/welcome" className={styles.navCta}>
+              Try demo
+            </Link>
+          ) : signedIn ? (
             <Link href="/dashboard" className={styles.navCta}>
               Dashboard
             </Link>
