@@ -847,10 +847,68 @@
 }
 
 /* ---------- source list ---------- */
-.contextBar {
+.contextDirect {
   margin-top: 26px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 16px;
+}
+
+.contextDirectHead {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+}
+
+.contextDirectLabel {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.contextDirectCopy {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.contextDirectCount {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.contextEntry {
+  margin-top: 14px;
+}
+
+.contextTextLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+
+.contextEntryGrid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
   align-items: stretch;
   background: var(--well);
@@ -859,7 +917,7 @@
   padding: 8px;
 }
 
-.contextBar:focus-within {
+.contextEntryGrid:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
@@ -876,10 +934,13 @@
   min-width: 0;
   font-family: var(--sans);
   font-size: 14px;
+  line-height: 1.45;
   color: var(--ink);
   background: transparent;
   border: 0;
-  padding: 0 4px;
+  padding: 8px 4px;
+  resize: vertical;
+  min-height: 78px;
 }
 
 .contextInput::placeholder {
@@ -910,6 +971,7 @@
   color: var(--accent-fg);
   background: var(--accent);
   border-color: var(--accent);
+  white-space: nowrap;
 }
 
 .contextAdd:disabled,
@@ -926,6 +988,20 @@
   padding: 0 13px;
   color: var(--ink-soft);
   background: var(--paper);
+}
+
+.contextUploadRow {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.contextUploadHint {
+  color: var(--ink-mute);
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 .contextUpload:hover:not(:disabled) {
@@ -1020,7 +1096,15 @@
 }
 
 @media (max-width: 640px) {
-  .contextBar {
+  .contextDirectHead {
+    grid-template-columns: 1fr;
+  }
+
+  .contextDirectCount {
+    width: fit-content;
+  }
+
+  .contextEntryGrid {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
@@ -1030,11 +1114,7 @@
   }
 
   .contextAdd {
-    grid-column: 1 / 2;
-  }
-
-  .contextUpload {
-    grid-column: 2 / 3;
+    grid-column: 1 / -1;
   }
 }
 
