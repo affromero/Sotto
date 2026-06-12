@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { shadowSm } from '../../lib/shadows';
-import type { PodcastSummary } from '@sotto/shared';
+import type { EpisodeSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { deleteToken } from '../../lib/auth';
 import { globalStyles } from '../../lib/theme';
@@ -28,11 +28,11 @@ interface UserProfile {
   name: string | null;
   handle: string | null;
   image: string | null;
-  podcastCount: number;
+  episodeCount: number;
 }
 
-interface UserPodcastsResponse {
-  podcasts: PodcastSummary[];
+interface UserEpisodesResponse {
+  episodes: EpisodeSummary[];
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -76,28 +76,28 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function MyPodcastItem({ podcast, onPress }: { podcast: PodcastSummary; onPress: () => void }) {
+function MyEpisodeItem({ episode, onPress }: { episode: EpisodeSummary; onPress: () => void }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.podcastItem, pressed && styles.podcastItemPressed]}
+      style={({ pressed }) => [styles.episodeItem, pressed && styles.episodeItemPressed]}
       onPress={onPress}
     >
-      <View style={styles.podcastItemContent}>
-        <View style={styles.podcastItemHeader}>
-          <Text style={styles.podcastItemTitle} numberOfLines={1}>
-            {podcast.title}
+      <View style={styles.episodeItemContent}>
+        <View style={styles.episodeItemHeader}>
+          <Text style={styles.episodeItemTitle} numberOfLines={1}>
+            {episode.title}
           </Text>
-          <StatusBadge status={podcast.status} />
+          <StatusBadge status={episode.status} />
         </View>
-        <Text style={styles.podcastItemTopic} numberOfLines={1}>
-          {podcast.topic}
+        <Text style={styles.episodeItemTopic} numberOfLines={1}>
+          {episode.topic}
         </Text>
-        <View style={styles.podcastItemMeta}>
-          <View style={styles.podcastItemStatRow}>
+        <View style={styles.episodeItemMeta}>
+          <View style={styles.episodeItemStatRow}>
             <Ionicons name="play" size={13} color={colors.textTertiary} />
-            <Text style={styles.podcastItemStat}>{formatCount(podcast.playCount)}</Text>
+            <Text style={styles.episodeItemStat}>{formatCount(episode.playCount)}</Text>
           </View>
-          <Text style={styles.podcastItemDuration}>{formatDuration(podcast.duration)}</Text>
+          <Text style={styles.episodeItemDuration}>{formatDuration(episode.duration)}</Text>
         </View>
       </View>
     </Pressable>
@@ -123,15 +123,15 @@ export default function ProfileScreen() {
   });
 
   const {
-    data: podcastsData,
-    isLoading: isPodcastsLoading,
-    isError: isPodcastsError,
-    refetch: refetchPodcasts,
+    data: episodesData,
+    isLoading: isEpisodesLoading,
+    isError: isEpisodesError,
+    refetch: refetchEpisodes,
     isRefetching,
-  } = useQuery<UserPodcastsResponse>({
-    queryKey: ['user', 'me', 'podcasts'],
+  } = useQuery<UserEpisodesResponse>({
+    queryKey: ['user', 'me', 'episodes'],
     queryFn: async () => {
-      const response = await api.get<UserPodcastsResponse>('/users/me/podcasts');
+      const response = await api.get<UserEpisodesResponse>('/users/me/episodes');
       return response.data;
     },
     enabled: !!profile,
@@ -158,20 +158,20 @@ export default function ProfileScreen() {
 
   const handleRefresh = useCallback(() => {
     refetchProfile();
-    refetchPodcasts();
-  }, [refetchProfile, refetchPodcasts]);
+    refetchEpisodes();
+  }, [refetchProfile, refetchEpisodes]);
 
-  const podcasts = podcastsData?.podcasts ?? [];
-  const isLoading = isProfileLoading || isPodcastsLoading;
+  const episodes = episodesData?.episodes ?? [];
+  const isLoading = isProfileLoading || isEpisodesLoading;
 
-  const renderPodcastItem = useCallback(
-    ({ item }: { item: PodcastSummary }) => (
-      <MyPodcastItem podcast={item} onPress={() => router.push(`/podcast/${item.id}`)} />
+  const renderEpisodeItem = useCallback(
+    ({ item }: { item: EpisodeSummary }) => (
+      <MyEpisodeItem episode={item} onPress={() => router.push(`/episode/${item.id}`)} />
     ),
     [router]
   );
 
-  const keyExtractor = useCallback((item: PodcastSummary) => item.id, []);
+  const keyExtractor = useCallback((item: EpisodeSummary) => item.id, []);
 
   const profileHeader = (
     <View style={styles.profileSection}>
@@ -192,7 +192,7 @@ export default function ProfileScreen() {
 
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{formatCount(profile?.podcastCount ?? 0)}</Text>
+          <Text style={styles.statNumber}>{formatCount(profile?.episodeCount ?? 0)}</Text>
           <Text style={styles.statLabel}>Lessons</Text>
         </View>
       </View>
@@ -207,9 +207,9 @@ export default function ProfileScreen() {
   return (
     <View style={globalStyles.screenContainer}>
       <FlatList
-        testID="profile-podcast-list"
-        data={podcasts}
-        renderItem={renderPodcastItem}
+        testID="profile-episode-list"
+        data={episodes}
+        renderItem={renderEpisodeItem}
         keyExtractor={keyExtractor}
         ListHeaderComponent={profileHeader}
         contentContainerStyle={styles.listContent}
@@ -233,9 +233,9 @@ export default function ProfileScreen() {
               }
               onRetry={() => refetchProfile()}
             />
-          ) : isPodcastsError ? (
+          ) : isEpisodesError ? (
             <EmptyState title="Error" subtitle="Failed to load your lessons" />
-          ) : isPodcastsLoading ? (
+          ) : isEpisodesLoading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
@@ -341,54 +341,54 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.textPrimary,
   },
-  podcastItem: {
+  episodeItem: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm + 2,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     ...shadowSm,
   },
-  podcastItemPressed: {
+  episodeItemPressed: {
     backgroundColor: colors.surfaceHover,
   },
-  podcastItemContent: {
+  episodeItemContent: {
     padding: spacing.md,
   },
-  podcastItemHeader: {
+  episodeItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
     gap: spacing.sm,
   },
-  podcastItemTitle: {
+  episodeItemTitle: {
     fontFamily: typography.fontHeading,
     fontSize: 17,
     color: colors.textPrimary,
     flex: 1,
   },
-  podcastItemTopic: {
+  episodeItemTopic: {
     fontFamily: typography.fontBody,
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
-  podcastItemMeta: {
+  episodeItemMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  podcastItemStatRow: {
+  episodeItemStatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  podcastItemStat: {
+  episodeItemStat: {
     fontFamily: typography.fontBody,
     fontSize: 13,
     color: colors.textTertiary,
   },
-  podcastItemDuration: {
+  episodeItemDuration: {
     fontFamily: typography.fontBody,
     fontSize: 13,
     color: colors.accent,

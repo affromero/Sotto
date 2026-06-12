@@ -1,5 +1,5 @@
 /**
- * Per-provider voice pools for podcast generation.
+ * Per-provider voice pools for episode generation.
  *
  * Each provider has a curated set of voices. The `selectVoicePairFromPool`
  * function uses the same deterministic hash as the ElevenLabs/OpenAI
@@ -118,7 +118,7 @@ export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
 // Verified against Mistral API 2026-03-29. Preset voices (user_id=null).
 // IDs are UUIDs from GET /v1/audio/voices. Limited female presets currently.
 export const MISTRAL_VOICE_POOL: ProviderVoice[] = [
-  // Paul — en_us male, diverse emotions for podcast variety
+  // Paul — en_us male, diverse emotions for episode variety
   { id: 'c69964a6-ab8b-4f8a-9465-ec0925096ec8', name: 'Paul (Neutral)', gender: 'male', character: 'polished professional' },
   { id: '98559b22-62b5-4a64-a7cd-fc78ca41faa8', name: 'Paul (Confident)', gender: 'male', character: 'authoritative expert' },
   { id: '01d985cd-5e0c-4457-bfd8-80ba31a5bc03', name: 'Paul (Cheerful)', gender: 'male', character: 'friendly conversationalist' },
@@ -227,13 +227,13 @@ function hashString(s: string): number {
  */
 export function selectVoiceSetFromPool(
   pool: ProviderVoice[],
-  podcastId: string,
+  episodeId: string,
   speakerCount: number,
   metadata?: VoiceMatchMetadata,
   _language?: string,
 ): ProviderVoice[] {
   const count = Math.max(1, Math.min(speakerCount, pool.length));
-  const index = hashString(podcastId);
+  const index = hashString(episodeId);
 
   const hasMetadata = metadata && metadata.tone;
 
@@ -272,11 +272,11 @@ export function selectVoiceSetFromPool(
  */
 export function selectVoicePairFromPool(
   pool: ProviderVoice[],
-  podcastId: string,
+  episodeId: string,
   metadata?: VoiceMatchMetadata,
   _language?: string,
 ): { host: ProviderVoice; expert: ProviderVoice } {
-  const index = hashString(podcastId);
+  const index = hashString(episodeId);
 
   const hasMetadata = metadata && metadata.tone;
 

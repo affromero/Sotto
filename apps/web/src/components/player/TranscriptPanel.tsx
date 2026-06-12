@@ -7,7 +7,7 @@ import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { AudioPlayerContext } from '@/components/providers/AudioPlayerProvider';
-import { SegmentData } from '@/types/podcast';
+import { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 import type { VocabularyEntryData } from '@/types/vocabulary';
 import styles from './TranscriptPanel.module.css';

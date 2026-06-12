@@ -11,14 +11,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Job } from 'bullmq';
 
-const mockPodcastFindUnique = vi.fn();
+const mockEpisodeFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockReferenceFindMany = vi.fn();
 const mockReferenceUpdate = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    podcast: { findUnique: (...a: unknown[]) => mockPodcastFindUnique(...a) },
+    episode: { findUnique: (...a: unknown[]) => mockEpisodeFindUnique(...a) },
     script: { findUnique: (...a: unknown[]) => mockScriptFindUnique(...a) },
     reference: {
       findMany: (...a: unknown[]) => mockReferenceFindMany(...a),
@@ -46,8 +46,8 @@ vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: 
 
 import { processVerifyClassReferences } from '@/workers/verify-class-references.worker';
 
-function makeJob(podcastId: string): Job<{ podcastId: string }> {
-  return { data: { podcastId } } as Job<{ podcastId: string }>;
+function makeJob(episodeId: string): Job<{ episodeId: string }> {
+  return { data: { episodeId } } as Job<{ episodeId: string }>;
 }
 
 const TURNS = [{ speaker: 'HOST', text: 'Hola [1] mundo [2].' }];
@@ -70,7 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
   mockReferenceUpdate.mockResolvedValue({});
-  mockPodcastFindUnique.mockResolvedValue({ userId: 'u1', topic: 'Science', title: 'Class' });
+  mockEpisodeFindUnique.mockResolvedValue({ userId: 'u1', topic: 'Science', title: 'Class' });
   mockScriptFindUnique.mockResolvedValue({ turns: TURNS });
 });
 
@@ -200,8 +200,8 @@ describe('processVerifyClassReferences', () => {
     expect(mockReferenceUpdate).not.toHaveBeenCalled();
   });
 
-  it('is a no-op when the podcast or script is missing', async () => {
-    mockPodcastFindUnique.mockResolvedValue(null);
+  it('is a no-op when the episode or script is missing', async () => {
+    mockEpisodeFindUnique.mockResolvedValue(null);
     mockReferenceFindMany.mockResolvedValue([ref('r1', 1)]);
 
     await processVerifyClassReferences(makeJob('p1'));

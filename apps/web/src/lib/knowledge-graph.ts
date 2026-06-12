@@ -128,7 +128,7 @@ export interface DueItems {
   grammar: Array<{ id: string; topicKey: string; title: string; mastery: number }>;
 }
 
-/** Due-or-weak items, used to seed adaptive class content + the listening podcast. */
+/** Due-or-weak items, used to seed adaptive class content + the listening episode. */
 export async function getDueItems(courseId: string, limit = 8): Promise<DueItems> {
   const now = new Date();
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };

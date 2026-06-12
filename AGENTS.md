@@ -4,9 +4,8 @@
 This is an npm workspaces monorepo. Key areas:
 - `apps/web/` Next.js web app (App Router), workers, Prisma, tests.
 - `apps/mobile/` Expo React Native app.
-- `apps/maps/` Next.js playground for `@sotto/maps`.
-- `packages/` shared libraries (`shared`, `maps`, `video`, `mcp`, `verification-standard`).
-- `services/` backend services (for example `remotion`).
+- `packages/` shared libraries (`shared`, `mcp`, `verification-standard`).
+- `services/` backend services (for example `local-tts`).
 - `e2e/` Playwright (web) and Maestro (mobile) tests.
 - `scripts/` dev/ops automation; `docs/` product/architecture docs; `extension/` browser extension; `accounting/` beancount ledger.
 

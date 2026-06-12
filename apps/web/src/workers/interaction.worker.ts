@@ -14,44 +14,44 @@ import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
 
 export async function processInteraction(job: Job<ProcessInteractionPayload>): Promise<void> {
-  const { podcastId, interactionId, userId, question, timestamp } = job.data;
+  const { episodeId, interactionId, userId, question, timestamp } = job.data;
 
-  logger.info('Processing interaction', { podcastId, interactionId });
+  logger.info('Processing interaction', { episodeId, interactionId });
   await job.updateProgress(10);
 
-  const [podcast, user] = await Promise.all([
-    prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true, aiModel: true } }),
+  const [episode, user] = await Promise.all([
+    prisma.episode.findUnique({ where: { id: episodeId }, select: { language: true, aiModel: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
   ]);
 
-  const aiKey = podcast?.aiModel ? null : await getAiKey(userId);
-  if (!podcast?.aiModel && !aiKey) {
+  const aiKey = episode?.aiModel ? null : await getAiKey(userId);
+  if (!episode?.aiModel && !aiKey) {
     throw new Error('AI model is required for interactions when no AI key is configured.');
   }
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast?.aiModel,
+    episodeAiModel: episode?.aiModel,
     aiKey,
   });
 
   const providerAiKey =
-    podcast?.aiModel && provider !== 'claude-code'
+    episode?.aiModel && provider !== 'claude-code'
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (podcast?.aiModel && provider !== 'claude-code' && !providerAiKey) {
+  if (episode?.aiModel && provider !== 'claude-code' && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for interactions.`);
   }
 
-  // Get podcast script context
-  const script = await prisma.script.findUnique({ where: { podcastId } });
-  if (!script) throw new Error(`Script not found for podcast ${podcastId}`);
+  // Get episode script context
+  const script = await prisma.script.findUnique({ where: { episodeId } });
+  if (!script) throw new Error(`Script not found for episode ${episodeId}`);
 
   const turns = script.turns as Array<{ speaker: string; text: string }>;
 
   // Find position in script using segment startTime + duration
   const segments = await prisma.segment.findMany({
-    where: { podcastId },
+    where: { episodeId },
     orderBy: { order: 'asc' },
     select: { order: true, startTime: true, duration: true },
   });
@@ -86,8 +86,8 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     .map((t) => `${t.speaker}: ${t.text}`)
     .join('\n');
 
-  // Language priority: user preference > podcast language > English
-  const responseLanguage = user?.preferredLanguage || podcast?.language || 'en';
+  // Language priority: user preference > episode language > English
+  const responseLanguage = user?.preferredLanguage || episode?.language || 'en';
   const languageLabel = getLanguageLabel(responseLanguage) || 'English';
 
   const systemPrompt = loadAndRender('interaction/qa-assistant.md', { LANGUAGE_LABEL: languageLabel }) + VOICE_REALISM_SHORT + CONTENT_SAFETY_INSTRUCTIONS + INPUT_SANITIZATION_INSTRUCTIONS;
@@ -98,7 +98,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     response = await ai.generateResponse(systemPrompt, [
       {
         role: 'user',
-        content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,
+        content: `Recent episode context:\n${recentContext}\n\nUser's question: ${question}`,
       },
     ], { apiKeyOverride: providerAiKey?.apiKey, model });
   } catch (err) {
@@ -147,10 +147,10 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     category: 'interaction',
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
-    podcastId,
+    episodeId,
     userId,
   });
 
   await job.updateProgress(100);
-  logger.info('Interaction processed', { podcastId, interactionId });
+  logger.info('Interaction processed', { episodeId, interactionId });
 }

@@ -24,13 +24,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       attempt: s.attempt,
       score: s.score,
       passed: s.passed,
-      podcast: s.podcast
+      episode: s.episode
         ? {
-            id: s.podcast.id,
-            audioUrl: s.podcast.audioUrl,
-            title: s.podcast.title,
+            id: s.episode.id,
+            audioUrl: s.episode.audioUrl,
+            title: s.episode.title,
             // Sourced-class sources: surfaced for the Sources panel + citation tooltips.
-            references: s.podcast.references,
+            references: s.episode.references,
           }
         : null,
       questions: s.questions.map((q) => ({

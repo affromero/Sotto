@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle, Plus, X } from 'lucide-react';
-import type { VerificationProgressSnapshot } from '@/types/podcast';
+import type { VerificationProgressSnapshot } from '@/types/episode';
 import styles from './InsufficientRefsBanner.module.css';
 
 interface InsufficientRefsBannerProps {
   refCount: number;
   requiredCount: number;
-  podcastId: string;
+  episodeId: string;
   onRegenerate: () => void;
   verificationProgress?: VerificationProgressSnapshot | null;
 }
@@ -27,7 +27,7 @@ function isValidUrl(value: string): boolean {
 export function InsufficientRefsBanner({
   refCount,
   requiredCount,
-  podcastId,
+  episodeId,
   onRegenerate,
   verificationProgress,
 }: InsufficientRefsBannerProps) {
@@ -57,7 +57,7 @@ export function InsufficientRefsBanner({
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/script/regenerate`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/script/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

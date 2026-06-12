@@ -4,12 +4,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockPrismaDiscoveryUpdate = vi.fn().mockResolvedValue({
   id: 'discovery-001',
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   sourceContent: '',
 });
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'WEB',
   aiModel: 'gpt-5-mini',
   user: {},
@@ -21,9 +21,9 @@ vi.mock('@/lib/prisma', () => {
       update: (...args: unknown[]) => mockPrismaDiscoveryUpdate(...args),
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
     },
-    podcast: {
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
+    episode: {
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -83,15 +83,15 @@ vi.mock('@/lib/topic-assessor', () => ({
 }));
 
 vi.mock('@/lib/pipeline-resume', () => ({
-  markPodcastFailed: vi.fn().mockResolvedValue(undefined),
+  markEpisodeFailed: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockInvalidatePodcastCache = vi.fn().mockResolvedValue(undefined);
-const mockPublishPodcastStatus = vi.fn().mockResolvedValue(undefined);
+const mockInvalidateEpisodeCache = vi.fn().mockResolvedValue(undefined);
+const mockPublishEpisodeStatus = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: (...args: unknown[]) => mockInvalidatePodcastCache(...args),
-  publishPodcastStatus: (...args: unknown[]) => mockPublishPodcastStatus(...args),
+  invalidateEpisodeCache: (...args: unknown[]) => mockInvalidateEpisodeCache(...args),
+  publishEpisodeStatus: (...args: unknown[]) => mockPublishEpisodeStatus(...args),
 }));
 
 const mockLogUsage = vi.fn().mockResolvedValue(undefined);
@@ -134,7 +134,7 @@ function createMockJob(data: ExtractContentPayload): Job<ExtractContentPayload> 
 }
 
 const defaultPayload: ExtractContentPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-001',
   sourceUrl: undefined,
   sourceText: undefined,
@@ -148,11 +148,11 @@ describe('processContentExtraction', () => {
     mockPrismaDiscoveryFindUnique.mockResolvedValue(null);
     mockPrismaDiscoveryUpdate.mockResolvedValue({
       id: 'discovery-001',
-      podcastId: 'podcast-001',
+      episodeId: 'episode-001',
       sourceContent: '# Extracted\n\nContent from URL',
     });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    mockPrismaEpisodeUpdate.mockResolvedValue({});
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
       source: 'WEB',
       aiModel: 'gpt-5-mini',
       user: {},
@@ -460,13 +460,13 @@ describe('processContentExtraction', () => {
       mockPrismaDiscoveryFindUnique
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
-          topic: 'Private podcast infrastructure',
+          topic: 'Private episode infrastructure',
           depth: 'standard',
           focusAreas: [],
         });
     });
 
-    it('uses the podcast model owner and matching provider key', async () => {
+    it('uses the episode model owner and matching provider key', async () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceText: 'Source material',
@@ -474,14 +474,14 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
-          topic: 'Private podcast infrastructure',
+          topic: 'Private episode infrastructure',
           apiKeyOverride: 'provider-key',
           model: 'gpt-5-mini',
           provider: 'openai',
@@ -491,7 +491,7 @@ describe('processContentExtraction', () => {
         expect.objectContaining({
           service: 'openai',
           category: 'topic_assessment',
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           userId: 'user-001',
         }),
       );
@@ -520,7 +520,7 @@ describe('processContentExtraction', () => {
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
@@ -532,9 +532,9 @@ describe('processContentExtraction', () => {
       );
     });
 
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: null,
         user: {},
@@ -553,7 +553,7 @@ describe('processContentExtraction', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
@@ -566,7 +566,7 @@ describe('processContentExtraction', () => {
     });
 
     it('rejects WEB feasibility checks without an explicit model or AI key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: null,
         user: {},
@@ -585,7 +585,7 @@ describe('processContentExtraction', () => {
     });
 
     it('routes explicit Claude Code models without fetching a provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: 'claude-code:opus',
         user: {},
@@ -612,28 +612,28 @@ describe('processContentExtraction', () => {
   });
 
   describe('database updates', () => {
-    it('updates podcast status to RESEARCHING', async () => {
+    it('updates episode status to RESEARCHING', async () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceText: 'Test content',
       });
       await processContentExtraction(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'RESEARCHING' },
       });
     });
 
-    it('invalidates podcast cache and publishes status after RESEARCHING transition', async () => {
+    it('invalidates episode cache and publishes status after RESEARCHING transition', async () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceText: 'Test content',
       });
       await processContentExtraction(job);
 
-      expect(mockInvalidatePodcastCache).toHaveBeenCalledWith('podcast-001');
-      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'RESEARCHING' });
+      expect(mockInvalidateEpisodeCache).toHaveBeenCalledWith('episode-001');
+      expect(mockPublishEpisodeStatus).toHaveBeenCalledWith('episode-001', { status: 'RESEARCHING' });
     });
   });
 
@@ -641,7 +641,7 @@ describe('processContentExtraction', () => {
     it('queues deep research job after extraction', async () => {
       mockPrismaDiscoveryUpdate.mockResolvedValue({
         id: 'discovery-abc',
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
         sourceContent: 'Test content',
       });
 
@@ -652,7 +652,7 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'deep-research' }, 'deep_research', {
-        podcastId: 'podcast-001',
+        episodeId: 'episode-001',
         userId: 'user-001',
         discoveryId: 'discovery-abc',
         useAdminCredits: undefined,
@@ -715,15 +715,15 @@ describe('processContentExtraction', () => {
 
       expect(mockExtractContent).not.toHaveBeenCalled();
       expect(mockPrismaDiscoveryUpdate).not.toHaveBeenCalled();
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'RESEARCHING' },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'deep-research' },
         'deep_research',
         expect.objectContaining({
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           discoveryId: 'discovery-existing',
         }),
         { jobId: expect.any(String) },
@@ -742,8 +742,8 @@ describe('processContentExtraction', () => {
       });
       await processContentExtraction(job);
 
-      expect(mockInvalidatePodcastCache).toHaveBeenCalledWith('podcast-001');
-      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'RESEARCHING' });
+      expect(mockInvalidateEpisodeCache).toHaveBeenCalledWith('episode-001');
+      expect(mockPublishEpisodeStatus).toHaveBeenCalledWith('episode-001', { status: 'RESEARCHING' });
     });
 
     it('proceeds normally when sourceContent is null', async () => {

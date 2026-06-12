@@ -11,6 +11,8 @@ const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
 interface LandingCTAProps {
   /** Whether to render the secondary ghost link. */
   withGhost?: boolean;
+  /** Public managed showcase: send visitors through the mock welcome flow. */
+  demoMode?: boolean;
 }
 
 const ArrowIcon = () => (
@@ -33,28 +35,30 @@ const ArrowIcon = () => (
 /**
  * Auth-aware call to action.
  *
+ * - Demo       → "Try the welcome flow" → /welcome
  * - Signed in  → "Continue your course" → /learn
  * - Signed out → "Start your course" → /auth/login (the profile picker)
  * - Secondary  → "View on GitHub" (the open-source repo)
  */
-export function LandingCTA({ withGhost = false }: LandingCTAProps) {
+export function LandingCTA({ withGhost = false, demoMode = false }: LandingCTAProps) {
   const { isAuthenticated } = useAuth();
   const mounted = useHasMounted();
   const signedIn = mounted && isAuthenticated;
+  const primaryHref = demoMode ? '/welcome' : signedIn ? '/learn' : '/auth/login';
+  const primaryLabel = demoMode
+    ? 'Try the welcome flow'
+    : signedIn
+      ? 'Continue your course'
+      : 'Start your course';
 
   return (
     <div className={styles.actions}>
-      <Link href={signedIn ? '/learn' : '/auth/login'} className={styles.btnPrimary}>
-        {signedIn ? 'Continue your course' : 'Start your course'}
+      <Link href={primaryHref} className={styles.btnPrimary}>
+        {primaryLabel}
         <ArrowIcon />
       </Link>
       {withGhost && (
-        <a
-          href={GITHUB_URL}
-          className={styles.btnGhost}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href={GITHUB_URL} className={styles.btnGhost} target="_blank" rel="noopener noreferrer">
           View on GitHub
         </a>
       )}

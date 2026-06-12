@@ -9,6 +9,8 @@ node_modules/
 
 # Next.js
 .next/
+# Alternate build dirs from NEXT_DIST_DIR (e.g. the SELF_HOSTED=false mock instance)
+.next-*/
 out/
 build/
 
@@ -106,3 +108,4 @@ config/admins.json
 .claude/worktrees/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+.env.mock.local

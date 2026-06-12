@@ -1,21 +1,21 @@
 appId: fm.sotto.app
-name: Save - Toggle Save on Podcast
+name: Save - Toggle Save on Episode
 tags: [player, save]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Scroll to seeded podcast in library
+# Scroll to seeded episode in library
 - extendedWaitUntil:
     visible:
-      id: 'library-podcast-list'
+      id: 'library-episode-list'
     timeout: 5000
 - scrollUntilVisible:
     element:
-      id: 'podcast-card-${E2E_PODCAST_ID}'
+      id: 'episode-card-${E2E_EPISODE_ID}'
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: 'podcast-card-${E2E_PODCAST_ID}'
+    id: 'episode-card-${E2E_EPISODE_ID}'
 - extendedWaitUntil:
     visible:
       id: 'player-save-button'

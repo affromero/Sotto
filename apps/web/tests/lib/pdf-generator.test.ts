@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { ReferenceData } from '@/types/reference';
-import { generatePodcastTranscript } from '@/lib/pdf-generator';
+import { generateEpisodeTranscript } from '@/lib/pdf-generator';
 
 describe('pdf-generator', () => {
   describe('basic transcript generation', () => {
     it('generates a markdown string with title and metadata', () => {
       const data = {
-        title: 'Test Podcast Title',
+        title: 'Test Episode Title',
         topic: 'Test Topic',
         creatorName: 'John Doe',
         createdAt: new Date('2026-02-09T10:00:00Z'),
@@ -14,10 +14,10 @@ describe('pdf-generator', () => {
         references: [],
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(typeof result).toBe('string');
-      expect(result).toContain('# Test Podcast Title');
+      expect(result).toContain('# Test Episode Title');
       expect(result).toContain('Test Topic');
       expect(result).toContain('By John Doe');
     });
@@ -35,7 +35,7 @@ describe('pdf-generator', () => {
         references: [],
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).toContain('[00:00] **HOST**');
       expect(result).toContain('Welcome to the show.');
@@ -55,7 +55,7 @@ describe('pdf-generator', () => {
         references: [],
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).toContain('[--:--] **HOST**');
     });
@@ -73,7 +73,7 @@ describe('pdf-generator', () => {
         references: [],
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).toContain('[00:05] **HOST**');
       expect(result).toContain('[10:42] **EXPERT**');
@@ -108,7 +108,7 @@ describe('pdf-generator', () => {
         references,
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).toContain('## References');
       expect(result).toContain('[1] *Introduction to Quantum Computing*');
@@ -146,7 +146,7 @@ describe('pdf-generator', () => {
         references,
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).toContain('[1] *Minimal Reference*');
       expect(result).not.toContain('DOI:');
@@ -193,7 +193,7 @@ describe('pdf-generator', () => {
         references,
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
       const firstIdx = result.indexOf('[1] *First Reference*');
       const thirdIdx = result.indexOf('[3] *Third Reference*');
 
@@ -212,7 +212,7 @@ describe('pdf-generator', () => {
         references: [],
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).not.toContain('## References');
     });
@@ -231,7 +231,7 @@ describe('pdf-generator', () => {
         references: [],
       };
 
-      const result = generatePodcastTranscript(data);
+      const result = generateEpisodeTranscript(data);
 
       expect(result).toContain('[1]');
       expect(result).toContain('[2, 3]');

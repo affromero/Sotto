@@ -33,7 +33,7 @@ export interface DiscoveryState {
 export interface TasteQuestion {
   id: string;
   text: string;
-  /** Clean topic statement derived from the question (e.g. "how X works" instead of "Would you listen to a podcast about how X works?") */
+  /** Clean topic statement derived from the question (e.g. "how X works" instead of "Would you listen to a episode about how X works?") */
   topic: string;
   tagSlugs: string[];
   category: string;

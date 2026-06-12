@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface CurrentPodcast {
+interface CurrentEpisode {
   id: string;
   title: string;
   creator: string;
@@ -8,13 +8,13 @@ interface CurrentPodcast {
 }
 
 interface PlayerStore {
-  currentPodcast: CurrentPodcast | null;
-  setCurrentPodcast: (podcast: CurrentPodcast) => void;
-  clearPodcast: () => void;
+  currentEpisode: CurrentEpisode | null;
+  setCurrentEpisode: (episode: CurrentEpisode) => void;
+  clearEpisode: () => void;
 }
 
 export const usePlayerStore = create<PlayerStore>((set) => ({
-  currentPodcast: null,
-  setCurrentPodcast: (podcast) => set({ currentPodcast: podcast }),
-  clearPodcast: () => set({ currentPodcast: null }),
+  currentEpisode: null,
+  setCurrentEpisode: (episode) => set({ currentEpisode: episode }),
+  clearEpisode: () => set({ currentEpisode: null }),
 }));

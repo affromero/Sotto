@@ -3,7 +3,7 @@
  *
  * These fragments teach the LLM to produce text that sounds like natural speech
  * rather than "written language read aloud." Based on research from LiveKit and
- * real podcast production techniques.
+ * real episode production techniques.
  *
  * Two variants:
  *   - VOICE_REALISM_INSTRUCTIONS: Full guidance for script generation (long-form dialogue)
@@ -13,7 +13,7 @@
 import { loadPrompt } from './prompt-loader';
 
 /**
- * Full voice realism instructions for podcast script generation.
+ * Full voice realism instructions for episode script generation.
  * Appended to all three generateScript* functions in script-generator.ts.
  *
  * Covers: disfluencies, observable speech behaviors, concrete before/after

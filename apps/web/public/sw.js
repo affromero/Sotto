@@ -1,6 +1,6 @@
 // Sotto Service Worker
 // Handles offline caching, push notifications, and background sync
-// for the Sotto interactive podcast platform.
+// for the Sotto interactive episode platform.
 
 const CACHE_VERSION = 'sotto-v1';
 const RUNTIME_CACHE = 'sotto-runtime-v1';

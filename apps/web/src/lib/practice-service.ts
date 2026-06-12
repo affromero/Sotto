@@ -53,7 +53,7 @@ export interface PracticeWritingItem {
 
 export type StartPracticeResult =
   | { status: 'unavailable'; reason: 'not_enough_vocab' | 'nothing_due' | 'no_content' }
-  | { status: 'ready'; sessionId: string; kind: PracticeKind; items: PracticeMcItemPublic[]; podcastId?: string }
+  | { status: 'ready'; sessionId: string; kind: PracticeKind; items: PracticeMcItemPublic[]; episodeId?: string }
   | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] }
   | { status: 'ready_writing'; sessionId: string; prompts: PracticeWritingItem[] };
 
@@ -270,7 +270,7 @@ async function startListening(
   seedToken: string,
   note: string,
 ): Promise<StartPracticeResult> {
-  const { podcastId, comprehensionQuestions } = await composeListeningContent({
+  const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: course.userId,
     courseId: course.id,
     level: course.currentLevel,
@@ -296,10 +296,10 @@ async function startListening(
       seed: seedToken,
       vocabLemmas: seed.targetVocab.map((v) => v.lemma),
       grammarKeys: [],
-      podcastId,
+      episodeId,
     },
   });
-  return { status: 'ready', sessionId: session.id, kind: 'LISTENING', items: items.map(toPublic), podcastId };
+  return { status: 'ready', sessionId: session.id, kind: 'LISTENING', items: items.map(toPublic), episodeId };
 }
 
 async function startSpeaking(

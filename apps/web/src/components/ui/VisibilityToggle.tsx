@@ -3,12 +3,12 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Globe, Link2, Lock } from 'lucide-react';
-import type { PodcastVisibility } from '@prisma/client';
+import type { EpisodeVisibility } from '@prisma/client';
 import styles from './VisibilityToggle.module.css';
 
-const ALL_VISIBILITIES: PodcastVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];
+const ALL_VISIBILITIES: EpisodeVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];
 
-const config: Record<PodcastVisibility, { icon: typeof Globe; label: string; className: string }> =
+const config: Record<EpisodeVisibility, { icon: typeof Globe; label: string; className: string }> =
   {
     PUBLIC: { icon: Globe, label: 'Public', className: styles.public },
     UNLISTED: { icon: Link2, label: 'Unlisted', className: styles.unlisted },
@@ -16,11 +16,11 @@ const config: Record<PodcastVisibility, { icon: typeof Globe; label: string; cla
   };
 
 interface VisibilityToggleProps {
-  podcastId: string;
-  visibility: PodcastVisibility;
+  episodeId: string;
+  visibility: EpisodeVisibility;
 }
 
-export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProps) {
+export function VisibilityToggle({ episodeId, visibility }: VisibilityToggleProps) {
   const router = useRouter();
   const [current, setCurrent] = useState(visibility);
   const [updating, setUpdating] = useState(false);
@@ -43,7 +43,7 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
       setErrorMessage(null);
 
       try {
-        const response = await fetch(`/api/v1/podcasts/${podcastId}`, {
+        const response = await fetch(`/api/v1/episodes/${episodeId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ visibility: next }),
@@ -65,7 +65,7 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
         setUpdating(false);
       }
     },
-    [current, updating, podcastId, router, cycle]
+    [current, updating, episodeId, router, cycle]
   );
 
   const { icon: Icon, label, className } = config[current];

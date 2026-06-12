@@ -1,5 +1,5 @@
 /**
- * Reference count and quality thresholds for podcast scripts.
+ * Reference count and quality thresholds for episode scripts.
  * Extracted from script-verifier.ts so they can be used by both
  * the compile/QC step and the legacy verification pipeline.
  */

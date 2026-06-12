@@ -99,7 +99,7 @@ const SAMPLE_CLASS_SPEAKING = {
   ],
 };
 
-// A class whose LISTENING section reuses a podcast (audio + comprehension MC).
+// A class whose LISTENING section reuses a episode (audio + comprehension MC).
 const SAMPLE_CLASS_LISTENING = {
   ...SAMPLE_CLASS_UNSUBMITTED,
   sections: [
@@ -110,7 +110,7 @@ const SAMPLE_CLASS_LISTENING = {
       attempt: 1,
       score: null,
       passed: null,
-      podcast: { id: 'pod-1', audioUrl: 'https://r2/listen.mp3', title: 'Listening' },
+      episode: { id: 'pod-1', audioUrl: 'https://r2/listen.mp3', title: 'Listening' },
       questions: [
         { id: 'l1', order: 1, question: 'What did they discuss?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 0, explanation: 'E' },
       ],
@@ -200,7 +200,7 @@ describe('GET /api/v1/classes/[classId]', () => {
     });
   });
 
-  it('returns the LISTENING podcast (audio url + title) for the player', async () => {
+  it('returns the LISTENING episode (audio url + title) for the player', async () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_LISTENING);
 
     const res = await GET(
@@ -210,7 +210,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.sections[0].podcast).toMatchObject({
+    expect(body.sections[0].episode).toMatchObject({
       id: 'pod-1',
       audioUrl: 'https://r2/listen.mp3',
       title: 'Listening',

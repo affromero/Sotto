@@ -111,10 +111,10 @@ describe('getModelMaxOutputTokens', () => {
 });
 
 describe('resolveAiModelAndProvider — explicit model routing', () => {
-  it('rejects an unknown podcast model before checking BYOK routing', async () => {
+  it('rejects an unknown episode model before checking BYOK routing', async () => {
     await expect(
       resolveAiModelAndProvider({
-        podcastAiModel: 'nonexistent-model-xyz',
+        episodeAiModel: 'nonexistent-model-xyz',
         aiKey: { provider: 'openai', apiKey: 'sk-test' },
       })
     ).rejects.toThrow(
@@ -122,19 +122,19 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
     );
   });
 
-  it('rejects an unknown podcast model before checking auto-model routing', async () => {
+  it('rejects an unknown episode model before checking auto-model routing', async () => {
     await expect(
       resolveAiModelAndProvider({
-        podcastAiModel: 'nonexistent-model-xyz',
+        episodeAiModel: 'nonexistent-model-xyz',
       })
     ).rejects.toThrow(
       'Unknown AI model "nonexistent-model-xyz". Choose a registered model before generation.'
     );
   });
 
-  it('returns known model with its provider when podcastAiModel is valid', async () => {
+  it('returns known model with its provider when episodeAiModel is valid', async () => {
     const result = await resolveAiModelAndProvider({
-      podcastAiModel: 'gpt-5-mini',
+      episodeAiModel: 'gpt-5-mini',
     });
 
     expect(result.provider).toBe('openai');
@@ -143,7 +143,7 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
 
   it('keeps claude-code composite models routed to local Claude Code', async () => {
     const result = await resolveAiModelAndProvider({
-      podcastAiModel: 'claude-code:sonnet',
+      episodeAiModel: 'claude-code:sonnet',
     });
 
     expect(result.provider).toBe('claude-code');
@@ -152,7 +152,7 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
 
   it('keeps local: prefixed models routed to the local provider without registry lookup', async () => {
     const result = await resolveAiModelAndProvider({
-      podcastAiModel: 'local:qwen3',
+      episodeAiModel: 'local:qwen3',
     });
 
     expect(result.provider).toBe('local');

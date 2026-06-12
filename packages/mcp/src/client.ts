@@ -1,11 +1,11 @@
 import type {
-  Podcast,
-  PodcastDetail,
+  Episode,
+  EpisodeDetail,
   UserProfile,
-  CreatePodcastParams,
+  CreateEpisodeParams,
   IngestAgentOutputParams,
   AgentIngestResult,
-  UpdatePodcastParams,
+  UpdateEpisodeParams,
 } from './types.js';
 
 export class ApiError extends Error {
@@ -52,7 +52,7 @@ export class SottoClient {
     return res.json() as Promise<T>;
   }
 
-  async createPodcast(params: CreatePodcastParams): Promise<{ id: string; status: string }> {
+  async createEpisode(params: CreateEpisodeParams): Promise<{ id: string; status: string }> {
     const focusAreas = params.focus_areas
       ? params.focus_areas
           .split(',')
@@ -60,7 +60,7 @@ export class SottoClient {
           .filter(Boolean)
       : undefined;
 
-    return this.request('/api/v1/podcasts', {
+    return this.request('/api/v1/episodes', {
       method: 'POST',
       body: JSON.stringify({
         title: params.title,
@@ -112,23 +112,23 @@ export class SottoClient {
     });
   }
 
-  async getPodcast(id: string): Promise<PodcastDetail> {
-    return this.request(`/api/v1/podcasts/${id}`);
+  async getEpisode(id: string): Promise<EpisodeDetail> {
+    return this.request(`/api/v1/episodes/${id}`);
   }
 
-  async listPodcasts(): Promise<Podcast[]> {
-    return this.request('/api/v1/podcasts');
+  async listEpisodes(): Promise<Episode[]> {
+    return this.request('/api/v1/episodes');
   }
 
-  async updatePodcast(id: string, params: UpdatePodcastParams): Promise<Podcast> {
-    return this.request(`/api/v1/podcasts/${id}`, {
+  async updateEpisode(id: string, params: UpdateEpisodeParams): Promise<Episode> {
+    return this.request(`/api/v1/episodes/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(params),
     });
   }
 
-  async deletePodcast(id: string): Promise<void> {
-    return this.request(`/api/v1/podcasts/${id}`, { method: 'DELETE' });
+  async deleteEpisode(id: string): Promise<void> {
+    return this.request(`/api/v1/episodes/${id}`, { method: 'DELETE' });
   }
 
   async getMe(): Promise<UserProfile> {

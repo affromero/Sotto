@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AppUrlConfigurationError,
-  absolutePodcastUrl,
+  absoluteEpisodeUrl,
   getAppBaseUrl,
   getPublicAppBaseUrl,
-  podcastUrl,
+  episodeUrl,
 } from '@/lib/urls';
 
 describe('url helpers', () => {
@@ -12,22 +12,22 @@ describe('url helpers', () => {
     vi.unstubAllEnvs();
   });
 
-  it('builds profile slug podcast paths when a slug and handle are available', () => {
-    expect(podcastUrl({ id: 'pod-1', slug: 'daily-brief' }, 'alice')).toBe('/@alice/daily-brief');
+  it('builds profile slug episode paths when a slug and handle are available', () => {
+    expect(episodeUrl({ id: 'pod-1', slug: 'daily-brief' }, 'alice')).toBe('/@alice/daily-brief');
   });
 
-  it('builds id podcast paths when a slug or handle is missing', () => {
-    expect(podcastUrl({ id: 'pod-1', slug: 'daily-brief' }, null)).toBe('/podcast/pod-1');
-    expect(podcastUrl({ id: 'pod-1', slug: null }, 'alice')).toBe('/podcast/pod-1');
+  it('builds id episode paths when a slug or handle is missing', () => {
+    expect(episodeUrl({ id: 'pod-1', slug: 'daily-brief' }, null)).toBe('/episode/pod-1');
+    expect(episodeUrl({ id: 'pod-1', slug: null }, 'alice')).toBe('/episode/pod-1');
   });
 
   it('uses NEXT_PUBLIC_APP_URL as the primary app base URL', () => {
     expect(
       getAppBaseUrl({
-        NEXT_PUBLIC_APP_URL: 'https://podcasts.example.com/',
+        NEXT_PUBLIC_APP_URL: 'https://episodes.example.com/',
         NEXTAUTH_URL: 'https://auth.example.com',
       })
-    ).toBe('https://podcasts.example.com');
+    ).toBe('https://episodes.example.com');
   });
 
   it('falls back to NEXTAUTH_URL when the public app URL is not configured', () => {
@@ -68,10 +68,10 @@ describe('url helpers', () => {
     ).toThrow('NEXT_PUBLIC_APP_URL or NEXTAUTH_URL must use https for public bot links.');
   });
 
-  it('builds absolute podcast URLs from explicit deployment configuration', () => {
+  it('builds absolute episode URLs from explicit deployment configuration', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com/');
 
-    expect(absolutePodcastUrl({ id: 'pod-1', slug: 'daily-brief' }, 'alice')).toBe(
+    expect(absoluteEpisodeUrl({ id: 'pod-1', slug: 'daily-brief' }, 'alice')).toBe(
       'https://selfhost.example.com/@alice/daily-brief'
     );
   });

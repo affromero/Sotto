@@ -1,5 +1,5 @@
 /**
- * Research Agent — builds a verified knowledge dossier for podcast generation.
+ * Research Agent — builds a verified knowledge dossier for episode generation.
  *
  * Three modes:
  *  - source-bound: extract facts from user-supplied URLs (no web research)

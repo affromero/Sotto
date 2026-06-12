@@ -114,7 +114,7 @@ export interface VoiceLanguageAffinity {
 /**
  * Maps Qwen3-TTS voice IDs to their native languages.
  * Used by Fal and Replicate qwen3-tts providers to prefer native-language
- * voices when a podcast language is known.
+ * voices when a episode language is known.
  */
 export const VOICE_LANGUAGE_AFFINITIES: Readonly<Record<string, VoiceLanguageAffinity>> = {
   Vivian:   { nativeLanguages: ['zh'] },

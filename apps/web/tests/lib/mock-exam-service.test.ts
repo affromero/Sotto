@@ -77,7 +77,7 @@ describe('createMockExam', () => {
       { question: 'Q', options: ['a', 'b'], correctIndex: 0, explanation: 'because' },
     ]);
     mockListening.mockResolvedValue({
-      podcastId: 'pod1',
+      episodeId: 'pod1',
       comprehensionQuestions: [{ question: 'L', options: ['a', 'b'], correctIndex: 1, explanation: 'why' }],
     });
     mockSpeaking.mockResolvedValue([

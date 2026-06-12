@@ -31,7 +31,7 @@ const MAX_SOURCE_CHARS = 12_000;
 /**
  * Turn a real source (URL → article/paper/video transcript) into a CEFR-leveled
  * passage in the target language, ready to drive a sourced class. Reuses the
- * podcast pipeline's content extractor and the learner's resolved AI. Throws
+ * episode pipeline's content extractor and the learner's resolved AI. Throws
  * `ClassSourceError` (not a generic Error) when the link can't be used, so the
  * caller can surface an actionable message instead of fabricating a "source".
  */

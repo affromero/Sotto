@@ -25,15 +25,15 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!isSelfHosted()) {
+      return NextResponse.json({ demo: true });
+    }
+
     const session = await auth();
     if (!session?.user?.id) {
       return errorResponse('Unauthorized', 401);
     }
     const userId = session.user.id;
-
-    if (!isSelfHosted()) {
-      return NextResponse.json({ demo: true });
-    }
 
     const parsed = onboardingSaveSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -84,7 +84,9 @@ export async function POST(request: NextRequest) {
           ...(preferred.language !== undefined && { preferredLanguage: preferred.language }),
           ...(preferred.aiProvider !== undefined && { preferredAiProvider: preferred.aiProvider }),
           ...(preferred.aiModel !== undefined && { preferredAiModel: preferred.aiModel }),
-          ...(preferred.ttsProvider !== undefined && { preferredTtsProvider: preferred.ttsProvider }),
+          ...(preferred.ttsProvider !== undefined && {
+            preferredTtsProvider: preferred.ttsProvider,
+          }),
           ...(preferred.ttsModel !== undefined && { preferredTtsModel: preferred.ttsModel }),
         },
       });

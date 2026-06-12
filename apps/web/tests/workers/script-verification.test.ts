@@ -8,8 +8,8 @@ const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn();
 const mockPrismaReferenceFindMany = vi.fn();
 const mockPrismaReferenceDeleteMany = vi.fn().mockResolvedValue({});
 const mockPrismaReferenceCreateMany = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn();
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
@@ -29,9 +29,9 @@ vi.mock('@/lib/prisma', () => {
     user: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({}),
     },
-    podcast: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    episode: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
     },
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
@@ -62,9 +62,9 @@ vi.mock('@/lib/segment-creator', () => ({
   createSegmentsAndQueueAudio: (...args: unknown[]) => mockCreateSegmentsAndQueueAudio(...args),
 }));
 
-const mockMarkPodcastFailed = vi.fn().mockResolvedValue(undefined);
+const mockMarkEpisodeFailed = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/pipeline-resume', () => ({
-  markPodcastFailed: (...args: unknown[]) => mockMarkPodcastFailed(...args),
+  markEpisodeFailed: (...args: unknown[]) => mockMarkEpisodeFailed(...args),
 }));
 
 const mockLogUsage = vi.fn();
@@ -131,7 +131,7 @@ vi.mock('@/lib/auto-model-config', () => ({
 }));
 
 vi.mock('@/lib/voice-assigner', () => ({
-  assignVoicesForPodcast: vi.fn().mockResolvedValue(undefined),
+  assignVoicesForEpisode: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/tts-tag-converter', () => ({
@@ -143,8 +143,8 @@ vi.mock('@/lib/pipeline-events', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -166,7 +166,7 @@ function createMockJob(data: VerifyScriptPayload): Job<VerifyScriptPayload> {
 }
 
 const defaultPayload: VerifyScriptPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-001',
   discoveryId: 'discovery-001',
 };
@@ -262,7 +262,7 @@ describe('processScriptVerification', () => {
     mockPrismaScriptFindUniqueOrThrow.mockResolvedValue(defaultScript);
     mockPrismaDiscoveryFindUniqueOrThrow.mockResolvedValue(defaultDiscovery);
     mockPrismaReferenceFindMany.mockResolvedValue(defaultReferences);
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockHasByokKey.mockResolvedValue(false);
     mockGetByokKey.mockResolvedValue(null);
@@ -283,20 +283,20 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('passes explicit podcastAiModel to resolveAiModelAndProvider', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', source: 'WEB' });
+    it('passes explicit episodeAiModel to resolveAiModelAndProvider', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', source: 'WEB' });
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith(
-        expect.objectContaining({ podcastAiModel: 'claude-haiku-4-5-20251001' })
+        expect.objectContaining({ episodeAiModel: 'claude-haiku-4-5-20251001' })
       );
     });
   });
 
   describe('AI routing', () => {
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockGetAiKey.mockResolvedValue(aiKey);
 
@@ -306,7 +306,7 @@ describe('processScriptVerification', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockVerifyScript).toHaveBeenCalledWith(
@@ -317,13 +317,12 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('uses the explicit podcast model owner and matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    it('uses the explicit episode model owner and matching provider key', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'gpt-5-mini',
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'gpt-5-mini',
@@ -335,7 +334,7 @@ describe('processScriptVerification', () => {
       await processScriptVerification(job);
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
@@ -349,12 +348,11 @@ describe('processScriptVerification', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'gpt-5-mini',
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'gpt-5-mini',
@@ -381,12 +379,11 @@ describe('processScriptVerification', () => {
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'gpt-5-mini',
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'gpt-5-mini',
@@ -398,7 +395,7 @@ describe('processScriptVerification', () => {
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockVerifyScript).toHaveBeenCalledWith(
@@ -410,12 +407,11 @@ describe('processScriptVerification', () => {
     });
 
     it('rejects admin-credit routes without an explicit model', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: null,
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
 
       const job = createMockJob({ ...defaultPayload, useAdminCredits: true });
@@ -428,12 +424,11 @@ describe('processScriptVerification', () => {
     });
 
     it('allows local claude-code models without provider keys', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         aiModel: 'claude-code:sonnet',
         verificationMode: 'standard',
         language: null,
         source: 'WEB',
-        zeroCostVideo: false,
       });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'claude-code:sonnet',
@@ -453,24 +448,6 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('skips AI routing for zero-cost verification skips', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        aiModel: null,
-        verificationMode: 'standard',
-        language: null,
-        source: 'WEB',
-        zeroCostVideo: true,
-      });
-      mockGetAiKey.mockResolvedValue(null);
-
-      const job = createMockJob(defaultPayload);
-      await processScriptVerification(job);
-
-      expect(mockGetAiKey).not.toHaveBeenCalled();
-      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
-      expect(mockVerifyScript).not.toHaveBeenCalled();
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('podcast-001', defaultScript.turns);
-    });
   });
 
   describe('model used for verification and regeneration', () => {
@@ -498,15 +475,15 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'COMPILING' },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'reference-validation' },
         'validate_references',
-        { podcastId: 'podcast-001', userId: 'user-001', useAdminCredits: undefined },
-        { jobId: expect.stringMatching(/^validate-podcast-001-/) }
+        { episodeId: 'episode-001', userId: 'user-001', useAdminCredits: undefined },
+        { jobId: expect.stringMatching(/^validate-episode-001-/) }
       );
     });
 
@@ -516,7 +493,7 @@ describe('processScriptVerification', () => {
 
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { podcastId: 'podcast-001' },
+          where: { episodeId: 'episode-001' },
           data: expect.objectContaining({ verificationAttempts: 1 }),
         })
       );
@@ -556,7 +533,7 @@ describe('processScriptVerification', () => {
 
   describe('verification pass — showcase mode skips reference validation', () => {
     beforeEach(() => {
-      mockPrismaPodcastFindUniqueOrThrow
+      mockPrismaEpisodeFindUniqueOrThrow
         .mockResolvedValueOnce({ aiModel: null, verificationMode: 'showcase' })
         .mockResolvedValueOnce({ source: 'WEB' });
     });
@@ -571,8 +548,8 @@ describe('processScriptVerification', () => {
         expect.anything(),
         expect.anything()
       );
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'SCRIPT_READY' },
       });
     });
@@ -592,7 +569,7 @@ describe('processScriptVerification', () => {
   describe('verification pass — with duration adjustment', () => {
     const durationVerdict = {
       ...passedVerdict,
-      durationFeedback: 'The script is 2000 words, which exceeds the maximum of 1575 words for a 10-minute podcast. Reduce to 1425–1575 words (1500 ideal).',
+      durationFeedback: 'The script is 2000 words, which exceeds the maximum of 1575 words for a 10-minute episode. Reduce to 1425–1575 words (1500 ideal).',
     };
 
     beforeEach(() => {
@@ -629,8 +606,8 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'COMPILING' },
       });
     });
@@ -651,7 +628,7 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+      expect(mockMarkEpisodeFailed).not.toHaveBeenCalled();
     });
 
     it('skips adjustment when durationFeedback is null', async () => {
@@ -666,7 +643,7 @@ describe('processScriptVerification', () => {
   describe('verification pass — no references, WEB source', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUniqueOrThrow
+      mockPrismaEpisodeFindUniqueOrThrow
         .mockResolvedValueOnce({ aiModel: null })
         .mockResolvedValueOnce({ source: 'WEB' });
     });
@@ -675,8 +652,8 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'SCRIPT_READY' },
       });
     });
@@ -703,7 +680,7 @@ describe('processScriptVerification', () => {
   describe('verification pass — no references, IMPORT source', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUniqueOrThrow
+      mockPrismaEpisodeFindUniqueOrThrow
         .mockResolvedValueOnce({ aiModel: null })
         .mockResolvedValueOnce({ source: 'IMPORT' });
     });
@@ -712,8 +689,8 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'SCRIPT_READY' },
       });
     });
@@ -729,7 +706,7 @@ describe('processScriptVerification', () => {
   describe('verification pass — no references, TWITTER source (auto-approve)', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUniqueOrThrow
+      mockPrismaEpisodeFindUniqueOrThrow
         .mockResolvedValueOnce({ aiModel: null })
         .mockResolvedValueOnce({ source: 'TWITTER' });
     });
@@ -739,7 +716,7 @@ describe('processScriptVerification', () => {
       await processScriptVerification(job);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
-        'podcast-001',
+        'episode-001',
         defaultScript.turns
       );
     });
@@ -748,8 +725,8 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: { status: 'GENERATING_AUDIO' },
       });
     });
@@ -768,7 +745,7 @@ describe('processScriptVerification', () => {
   describe('verification pass — no references, API source (auto-approve)', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
-      mockPrismaPodcastFindUniqueOrThrow
+      mockPrismaEpisodeFindUniqueOrThrow
         .mockResolvedValueOnce({ aiModel: null })
         .mockResolvedValueOnce({ source: 'API' });
     });
@@ -778,7 +755,7 @@ describe('processScriptVerification', () => {
       await processScriptVerification(job);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'GENERATING_AUDIO' } })
       );
     });
@@ -796,7 +773,7 @@ describe('processScriptVerification', () => {
 
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { podcastId: 'podcast-001' },
+          where: { episodeId: 'episode-001' },
           data: expect.objectContaining({
             verificationAttempts: 1,
             verificationFeedback: failedVerdict.feedback,
@@ -823,10 +800,10 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaReferenceDeleteMany).toHaveBeenCalledWith({ where: { podcastId: 'podcast-001' } });
+      expect(mockPrismaReferenceDeleteMany).toHaveBeenCalledWith({ where: { episodeId: 'episode-001' } });
       expect(mockPrismaReferenceCreateMany).toHaveBeenCalledWith({
         data: expect.arrayContaining([
-          expect.objectContaining({ podcastId: 'podcast-001', number: 1, title: 'Replacement Paper' }),
+          expect.objectContaining({ episodeId: 'episode-001', number: 1, title: 'Replacement Paper' }),
         ]),
       });
     });
@@ -855,7 +832,7 @@ describe('processScriptVerification', () => {
 
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { podcastId: 'podcast-001' },
+          where: { episodeId: 'episode-001' },
           data: expect.objectContaining({
             turns: [{ speaker: 'HOST', text: 'Revised.' }],
             version: { increment: 1 },
@@ -877,7 +854,7 @@ describe('processScriptVerification', () => {
 
       expect(mockPrismaReferenceCreateMany).toHaveBeenCalledWith({
         data: expect.arrayContaining([
-          expect.objectContaining({ podcastId: 'podcast-001', number: 1, title: 'New Paper' }),
+          expect.objectContaining({ episodeId: 'episode-001', number: 1, title: 'New Paper' }),
         ]),
       });
     });
@@ -896,16 +873,16 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'script-verification' },
         'verify_script',
-        { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
-        { jobId: expect.stringMatching(/^verify-podcast-001-2-\d+$/) }
+        { episodeId: 'episode-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
+        { jobId: expect.stringMatching(/^verify-episode-001-2-\d+$/) }
       );
     });
 
-    it('does not mark podcast failed', async () => {
+    it('does not mark episode failed', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+      expect(mockMarkEpisodeFailed).not.toHaveBeenCalled();
     });
 
     it('logs usage for both verification and regeneration', async () => {
@@ -927,11 +904,11 @@ describe('processScriptVerification', () => {
       mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({ ...defaultScript, verificationAttempts: 3 });
     });
 
-    it('marks podcast failed after 4 attempts', async () => {
+    it('marks episode failed after 4 attempts', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+      expect(mockMarkEpisodeFailed).toHaveBeenCalledWith('episode-001', {
         failureReason: "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
         technicalError: expect.stringContaining('Verification failed 4/4'),
       });
@@ -942,7 +919,7 @@ describe('processScriptVerification', () => {
       await processScriptVerification(job);
 
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
+        where: { episodeId: 'episode-001' },
         data: {
           verificationAttempts: 4,
           verificationFeedback: failedVerdict.feedback,
@@ -957,7 +934,7 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
-        expect.objectContaining({ userId: 'user-001', type: 'PODCAST_FAILED' })
+        expect.objectContaining({ userId: 'user-001', type: 'EPISODE_FAILED' })
       );
     });
 
@@ -967,7 +944,7 @@ describe('processScriptVerification', () => {
 
       expect(mockPrismaPipelineEventCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           stage: 'script-verification',
           type: 'error',
           message: expect.stringContaining('Verification failed after 4 attempts'),
@@ -1008,7 +985,7 @@ describe('processScriptVerification', () => {
           category: 'script_verification',
           inputTokens: passedVerdict.inputTokens,
           outputTokens: passedVerdict.outputTokens,
-          podcastId: 'podcast-001',
+          episodeId: 'episode-001',
           userId: 'user-001',
         })
       );
@@ -1080,8 +1057,8 @@ describe('processScriptVerification', () => {
       await expect(processScriptVerification(job)).rejects.toThrow('Rate limit exceeded');
     });
 
-    it('propagates errors from podcast update', async () => {
-      mockPrismaPodcastUpdate.mockRejectedValue(new Error('Database write failed'));
+    it('propagates errors from episode update', async () => {
+      mockPrismaEpisodeUpdate.mockRejectedValue(new Error('Database write failed'));
       const job = createMockJob(defaultPayload);
 
       await expect(processScriptVerification(job)).rejects.toThrow('Database write failed');
@@ -1103,7 +1080,7 @@ describe('processScriptVerification', () => {
       // Should NOT increment verificationAttempts — only save feedback
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { podcastId: 'podcast-001' },
+          where: { episodeId: 'episode-001' },
           data: { verificationFeedback: parseErrorVerdict.feedback },
         })
       );
@@ -1112,7 +1089,7 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'script-verification' },
         'verify_script',
-        { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
+        { episodeId: 'episode-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
         { jobId: expect.stringMatching(/parse-retry-\d+$/) }
       );
 
@@ -1147,8 +1124,8 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
-        failureReason: 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.',
+      expect(mockMarkEpisodeFailed).toHaveBeenCalledWith('episode-001', {
+        failureReason: 'We encountered a temporary processing issue while fact-checking your episode. Please try generating again.',
         technicalError: expect.stringContaining('Verification failed 4/4'),
       });
 
@@ -1156,7 +1133,7 @@ describe('processScriptVerification', () => {
         { name: 'notifications' },
         'send_notification',
         expect.objectContaining({
-          message: 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.',
+          message: 'We encountered a temporary processing issue while fact-checking your episode. Please try generating again.',
         })
       );
     });

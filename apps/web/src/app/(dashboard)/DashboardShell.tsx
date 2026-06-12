@@ -18,11 +18,11 @@ interface DashboardShellProps {
     image: string | null;
     role?: string;
   };
-  hasPodcasts?: boolean;
+  hasEpisodes?: boolean;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ user, hasPodcasts = false, children }: DashboardShellProps) {
+export function DashboardShell({ user, hasEpisodes = false, children }: DashboardShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pushDismissed, setPushDismissed] = useState(() => {
@@ -30,7 +30,7 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
     return localStorage.getItem('sotto:push-prompt-dismissed') === 'true';
   });
   const player = usePlayer();
-  const hasActivePlayer = !!player.podcastId;
+  const hasActivePlayer = !!player.episodeId;
   const { pushState, subscribe } = usePushSubscription();
 
   return (
@@ -39,7 +39,7 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
         currentPath={pathname}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        hasPodcasts={hasPodcasts}
+        hasEpisodes={hasEpisodes}
         hasActivePlayer={hasActivePlayer}
         user={user}
       />

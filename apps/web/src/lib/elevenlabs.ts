@@ -48,29 +48,29 @@ function toLegacy(entry: VoicePoolEntry): VoiceProfile {
 const VOICE_POOL: VoiceProfile[] = POOL.map(toLegacy);
 
 export function selectVoicePair(
-  podcastId: string,
+  episodeId: string,
   metadata?: VoiceMatchMetadata
 ): { host: VoiceProfile; expert: VoiceProfile } {
-  const pair = selectPair(podcastId, metadata);
+  const pair = selectPair(episodeId, metadata);
   return { host: toLegacy(pair.host), expert: toLegacy(pair.expert) };
 }
 
 /**
- * Get voice ID for a speaker role on a specific podcast.
+ * Get voice ID for a speaker role on a specific episode.
  * Falls back to env overrides if set, otherwise uses the voice pool.
  */
-export function getVoiceId(speaker: string, podcastId?: string): string {
+export function getVoiceId(speaker: string, episodeId?: string): string {
   const envHost = process.env.ELEVENLABS_HOST_VOICE_ID;
   const envExpert = process.env.ELEVENLABS_EXPERT_VOICE_ID;
   if (envHost && envExpert) {
     return speaker === 'HOST' ? envHost : envExpert;
   }
 
-  if (!podcastId) {
+  if (!episodeId) {
     return speaker === 'HOST' ? VOICE_POOL[0].id : VOICE_POOL[8].id;
   }
 
-  const pair = selectVoicePair(podcastId);
+  const pair = selectVoicePair(episodeId);
   return speaker === 'HOST' ? pair.host.id : pair.expert.id;
 }
 

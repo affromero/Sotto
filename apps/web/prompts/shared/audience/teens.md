@@ -1,1 +1,1 @@
-This podcast is for TEENAGERS aged 11-16. Use relatable references (social media, gaming, school life). Don't condescend — teens can handle complex topics but keep language accessible. Light humor works well. You can discuss challenging topics but frame them age-appropriately.
+This episode is for TEENAGERS aged 11-16. Use relatable references (social media, gaming, school life). Don't condescend — teens can handle complex topics but keep language accessible. Light humor works well. You can discuss challenging topics but frame them age-appropriately.

@@ -13,7 +13,7 @@
 | LLM or local agent | discovery, script generation, Q&A, source summarization |
 | TTS | segment audio generation |
 | STT | meeting and audio transcription |
-| Storage | podcast audio, segment audio, images, transcripts |
+| Storage | episode audio, segment audio, images, transcripts |
 
 Each capability should be selected explicitly. Missing capability errors should name the selected provider and the missing credential or setup step.
 

@@ -1,25 +1,12 @@
 import { ConnectionOptions, Queue, Worker, Job } from 'bullmq';
-import { createRedisConnection, getSharedQueueRedisClient, cache } from './redis';
+import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
-import { markPodcastFailed } from './pipeline-resume';
+import { markEpisodeFailed } from './pipeline-resume';
 import { classifyError, isKeyInvalidationError, userMessage } from './byok-errors';
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
-
-/** Cached admin user lookup — avoids hitting DB on every worker failure. */
-async function getCachedAdminUsers(): Promise<Array<{ id: string }>> {
-  const cacheKey = 'admin_users';
-  const cached = await cache.get<Array<{ id: string }>>(cacheKey);
-  if (cached) return cached;
-  const admins = await prisma.user.findMany({
-    where: { role: 'ADMIN' },
-    select: { id: true },
-  });
-  await cache.set(cacheKey, admins, 3600);
-  return admins;
-}
 
 /**
  * Job types for the Sotto queue system
@@ -41,17 +28,8 @@ export enum JobType {
   GENERATE_PDF = 'generate_pdf',
   VALIDATE_KEYS = 'validate_keys',
   FETCH_PRICING = 'fetch_pricing',
-  CLASSIFY_VISUALS = 'classify_visuals',
-  GENERATE_VISUAL = 'generate_visual',
-  GENERATE_TRANSITION = 'generate_transition',
-  COMPOSE_VIDEO = 'compose_video',
-  GENERATE_AVATAR = 'generate_avatar',
-  PLACE_ENRICHMENT = 'place_enrichment',
-  LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
-  CLASSIFY_PIPELINE = 'classify_pipeline',
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
-  RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
   SPEAKING_GRADING = 'speaking_grading',
   WORKSHEET_PDF = 'worksheet_pdf',
   VERIFY_CLASS_REFERENCES = 'verify_class_references',
@@ -61,7 +39,7 @@ export enum JobType {
  * Job payload types
  */
 export interface ExtractContentPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   sourceUrl?: string;
   sourceText?: string;
@@ -69,7 +47,7 @@ export interface ExtractContentPayload {
 }
 
 export interface GenerateScriptPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   discoveryId: string;
   sourceContent?: string;
@@ -90,7 +68,7 @@ export interface GenerateScriptPayload {
 }
 
 export interface GenerateAudioPayload {
-  podcastId: string;
+  episodeId: string;
   segmentId: string;
   speaker: string;
   text: string;
@@ -100,13 +78,13 @@ export interface GenerateAudioPayload {
 }
 
 export interface StitchAudioPayload {
-  podcastId: string;
+  episodeId: string;
   segmentIds: string[];
   skipSfx?: boolean;
 }
 
 export interface ProcessInteractionPayload {
-  podcastId: string;
+  episodeId: string;
   interactionId: string;
   userId: string;
   question: string;
@@ -114,7 +92,7 @@ export interface ProcessInteractionPayload {
 }
 
 export interface RegenerateSegmentPayload {
-  podcastId: string;
+  episodeId: string;
   interactionId: string;
   insertAfterOrder: number;
   newText: string;
@@ -130,7 +108,7 @@ export interface SendNotificationPayload {
 }
 
 export interface ValidateReferencesPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   useAdminCredits?: boolean;
   referenceRetryAttempt?: number; // 0-based, undefined = first pass
@@ -139,14 +117,14 @@ export interface ValidateReferencesPayload {
 }
 
 export interface DeepResearchPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   discoveryId: string;
   useAdminCredits?: boolean;
 }
 
 export interface CreativePlanningPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   discoveryId: string;
   dossierId: string;
@@ -154,7 +132,7 @@ export interface CreativePlanningPayload {
 }
 
 export interface WriteScriptPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   discoveryId: string;
   dossierId: string;
@@ -164,19 +142,19 @@ export interface WriteScriptPayload {
 }
 
 export interface CompileScriptPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
 }
 
 export interface VerifyScriptPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
   discoveryId: string;
   useAdminCredits?: boolean;
 }
 
 export interface GeneratePdfPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
 }
 
@@ -188,72 +166,9 @@ export interface FetchPricingPayload {}
 
 export interface MonitorTtsProvidersPayload {}
 
-export interface ClassifyVisualsPayload {
-  podcastId: string;
-  videoGenerationId: string;
-  userId: string;
-  zeroCostVideo?: boolean;
-}
-
-export interface GenerateVisualPayload {
-  podcastId: string;
-  videoGenerationId: string;
-  segmentVisualId: string;
-  visualType: string;
-  prompt: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface ComposeVideoPayload {
-  podcastId: string;
-  videoGenerationId: string;
-}
-
-export interface RenderSegmentPreviewPayload {
-  podcastId: string;
-  videoGenerationId: string;
-  segmentVisualId: string;
-  quality: 'preview' | 'full';
-}
-
-export interface PlaceEnrichmentPayload {
-  segmentVisualId: string;
-  podcastId: string;
-  videoGenerationId: string;
-  places: Array<{ name: string; yearHint?: number }>;
-}
-
-export interface GenerateAvatarPayload {
-  podcastId: string;
-  videoGenerationId: string;
-  avatarOverlayId: string;
-  speaker: string;
-  avatarId: string;
-  avatarProvider?: 'heygen' | 'runway' | 'fal' | 'replicate';
-  avatarImageUrl?: string;
-  avatarModelId?: string;
-  isPreset?: boolean;
-}
-
-export interface GenerateTransitionPayload {
-  podcastId: string;
-  videoGenerationId: string;
-  transitionId: string;
-  userId: string;
-}
-
 export interface GenerateWaveformPayload {
-  podcastId: string;
+  episodeId: string;
   userId: string;
-}
-
-export interface ClassifyPipelinePayload {
-  classificationId: string;
-  podcastId: string;
-  userId: string;
-  aiProvider: string;
-  aiModel: string;
-  apiKeyOverride?: string;
 }
 
 /**
@@ -290,15 +205,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'pdf-generation': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
-  'visual-classification': { attempts: 2 },
-  'visual-generation': { attempts: 3 },
-  'transition-generation': { attempts: 3 },
-  'video-composition': { attempts: 2 },
-  'avatar-generation': { attempts: 2 },
-  'place-enrichment': { attempts: 2 },
-  'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
-  'pipeline-classification': { attempts: 2, skipEvents: true },
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
@@ -368,17 +275,17 @@ async function handleWorkerFailure(
   const jobId = job?.id != null ? String(job.id) : undefined;
 
   try {
-    const podcastId = (job?.data as Record<string, unknown> | undefined)?.podcastId as
+    const episodeId = (job?.data as Record<string, unknown> | undefined)?.episodeId as
       | string
       | undefined;
-    if (!podcastId) {
+    if (!episodeId) {
       return;
     }
 
     await prisma.pipelineEvent
       .create({
         data: {
-          podcastId,
+          episodeId,
           stage: queueName,
           type:
             job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3)
@@ -403,8 +310,8 @@ async function handleWorkerFailure(
         })
       );
 
-    const podcast = await prisma.podcast.findUnique({
-      where: { id: podcastId },
+    const episode = await prisma.episode.findUnique({
+      where: { id: episodeId },
       select: {
         status: true,
         userId: true,
@@ -414,95 +321,31 @@ async function handleWorkerFailure(
         user: { select: { name: true, email: true } },
       },
     });
-    if (!podcast) {
+    if (!episode) {
       return;
     }
 
     const errorKind = classifyError(failedReason || '');
     const notifQueue = createQueue('notifications');
-    const ownerLabel = podcast.user?.name || podcast.user?.email || podcast.userId;
+    const ownerLabel = episode.user?.name || episode.user?.email || episode.userId;
 
     const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
     const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
-    const VIDEO_QUEUES = [
-      'visual-classification',
-      'visual-generation',
-      'transition-generation',
-      'video-composition',
-      'place-enrichment',
-    ];
-    if (VIDEO_QUEUES.includes(queueName)) {
-      const videoGenerationId = (job?.data as Record<string, unknown> | undefined)
-        ?.videoGenerationId as string | undefined;
-      if (!videoGenerationId) {
-        return;
-      }
-
-      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
-      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
-      if (!isTerminal) {
-        return;
-      }
-
-      // Don't update VideoGeneration or send notifications here.
-      // The worker's checkAllReady() handles aggregate state + notifications
-      // once ALL visuals are done — avoids duplicate notifications per failed job.
-      // PipelineEvent (logged above) still captures every individual failure.
-      return;
-    }
-
-    const AVATAR_QUEUES = ['avatar-generation'];
-    if (AVATAR_QUEUES.includes(queueName)) {
-      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
-      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
-      if (!isTerminal) {
-        return;
-      }
-
-      if (notifQueue) {
-        await notifQueue.add('send_notification', {
-          userId: podcast.userId,
-          type: 'AVATAR_FAILED',
-          title: 'Avatar Generation Failed',
-          message: `Avatar generation failed: ${failedReason || 'Unknown error'}`,
-          data: { podcastId },
-        });
-      }
-
-      const podcastLabel = podcast.title || podcastId;
-      const allAdmins = await getCachedAdminUsers();
-      const adminUsers = allAdmins.filter((a) => a.id !== podcast.userId);
-      for (const admin of adminUsers) {
-        if (notifQueue) {
-          notifQueue
-            .add('send_notification', {
-              userId: admin.id,
-              type: 'PIPELINE_FAILURE',
-              title: 'Avatar Pipeline Failure',
-              message: `[avatar-generation] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`,
-              data: { podcastId },
-            })
-            .catch(() => {});
-        }
-      }
-      return;
-    }
-
     if (queueName === 'interactions') {
       if (isKeyInvalidationError(errorKind)) {
         const aiKey = await prisma.userAiKey.findFirst({
-          where: { userId: podcast.userId, isValid: true },
+          where: { userId: episode.userId, isValid: true },
         });
         if (aiKey) {
-          await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+          await markAiKeyInvalid(episode.userId, aiKey.provider as AiProviderId);
           if (notifQueue) {
             await notifQueue.add('send_notification', {
-              userId: podcast.userId,
+              userId: episode.userId,
               type: 'KEY_INVALID',
               title: 'API Key Invalid',
               message: userMessage(errorKind, aiKey.provider),
-              data: { podcastId },
+              data: { episodeId },
             });
           }
         }
@@ -511,9 +354,9 @@ async function handleWorkerFailure(
     }
 
     if (
-      podcast.status === 'READY' ||
-      podcast.status === 'FAILED' ||
-      podcast.status === 'SCRIPT_READY'
+      episode.status === 'READY' ||
+      episode.status === 'FAILED' ||
+      episode.status === 'SCRIPT_READY'
     ) {
       return;
     }
@@ -541,33 +384,33 @@ async function handleWorkerFailure(
       // (updateMany WHERE isValid=true), so only the first worker sends the notification.
       let didInvalidateKey = false;
 
-      if (TTS_QUEUES.includes(queueName) && podcast.ttsProvider) {
+      if (TTS_QUEUES.includes(queueName) && episode.ttsProvider) {
         didInvalidateKey = await markTtsKeyInvalid(
-          podcast.userId,
-          podcast.ttsProvider as TtsProviderId
+          episode.userId,
+          episode.ttsProvider as TtsProviderId
         );
-        failureReason = userMessage(errorKind, podcast.ttsProvider);
-        await prisma.podcast.update({
-          where: { id: podcastId },
+        failureReason = userMessage(errorKind, episode.ttsProvider);
+        await prisma.episode.update({
+          where: { id: episodeId },
           data: { ttsProvider: null, ttsModel: null },
         });
       } else if (AI_QUEUES.includes(queueName)) {
         const aiKey = await prisma.userAiKey.findFirst({
-          where: { userId: podcast.userId, isValid: true },
+          where: { userId: episode.userId, isValid: true },
         });
         if (aiKey) {
-          didInvalidateKey = await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+          didInvalidateKey = await markAiKeyInvalid(episode.userId, aiKey.provider as AiProviderId);
           failureReason = userMessage(errorKind, aiKey.provider);
         }
       }
 
       if (didInvalidateKey && notifQueue) {
         await notifQueue.add('send_notification', {
-          userId: podcast.userId,
+          userId: episode.userId,
           type: 'KEY_INVALID',
           title: 'API Key Invalid',
           message: failureReason,
-          data: { podcastId },
+          data: { episodeId },
         });
       }
     }
@@ -576,33 +419,33 @@ async function handleWorkerFailure(
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('')}`;
 
-    const didTransition = await markPodcastFailed(podcastId, {
+    const didTransition = await markEpisodeFailed(episodeId, {
       failureReason,
       technicalError: failedReason || undefined,
       errorId,
     });
 
     if (!didTransition) {
-      logger.info('Podcast already failed, skipping duplicate notifications', { podcastId });
+      logger.info('Episode already failed, skipping duplicate notifications', { episodeId });
       return;
     }
 
     if (notifQueue) {
       await notifQueue.add('send_notification', {
-        userId: podcast.userId,
-        type: 'PODCAST_FAILED',
+        userId: episode.userId,
+        type: 'EPISODE_FAILED',
         title: 'Generation Failed',
         message: `${failureReason} (ref: ${errorId})`,
-        data: { podcastId },
+        data: { episodeId },
       });
     }
 
-    const podcastLabel = podcast.title || podcastId;
+    const episodeLabel = episode.title || episodeId;
     const adminUsers = await prisma.user.findMany({
-      where: { role: 'ADMIN', id: { not: podcast.userId } },
+      where: { role: 'ADMIN', id: { not: episode.userId } },
       select: { id: true },
     });
-    const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
+    const adminMessage = `[${queueName}] ${episodeLabel} (by ${ownerLabel}) — ${errorKind}`;
     for (const admin of adminUsers) {
       if (notifQueue) {
         notifQueue
@@ -611,7 +454,7 @@ async function handleWorkerFailure(
             type: 'PIPELINE_FAILURE',
             title: 'Pipeline Failure',
             message: adminMessage,
-            data: { podcastId },
+            data: { episodeId },
           })
           .catch((err: unknown) => {
             logger.warn('Failed to queue admin pipeline-failure notification', {
@@ -622,9 +465,9 @@ async function handleWorkerFailure(
       }
     }
 
-    logger.info('Marked podcast as FAILED after generation failure', {
-      userId: podcast.userId,
-      podcastId,
+    logger.info('Marked episode as FAILED after generation failure', {
+      userId: episode.userId,
+      episodeId,
       errorKind,
       failureReason,
     });
@@ -742,17 +585,6 @@ export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
-export const visualClassificationQueue = createQueueReference('visual-classification');
-export const visualGenerationQueue = createQueueReference('visual-generation');
-export const transitionGenerationQueue = createQueueReference('transition-generation');
-export const videoCompositionQueue = createQueueReference('video-composition');
-export const avatarGenerationQueue = createQueueReference('avatar-generation');
-export interface LipSyncTestPayload {
-  userId: string;
-  audioUrl: string;
-  avatarImageUrl: string;
-  avatarModelId: string;
-}
 
 export interface SpeakingGradingPayload {
   recordingId: string;
@@ -764,14 +596,10 @@ export interface WorksheetPdfPayload {
 }
 
 export interface VerifyClassReferencesPayload {
-  podcastId: string;
+  episodeId: string;
 }
-export const lipSyncTestQueue = createQueueReference('lip-sync-test');
-export const placeEnrichmentQueue = createQueueReference('place-enrichment');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
-export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
-export const segmentPreviewQueue = createQueueReference('segment-preview');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
 export const verifyClassReferencesQueue = createQueueReference('verify-class-references');

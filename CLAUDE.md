@@ -37,10 +37,8 @@ npm workspaces:
 - `@sotto/web` in `apps/web/`
 - `@sotto/mobile` in `apps/mobile/`
 - `@sotto/shared` in `packages/shared/`
-- `@sotto/maps` in `packages/maps/`
 - `@sotto/mcp` in `packages/mcp/`
 - `@sotto/verification-standard` in `packages/verification-standard/`
-- `@sotto/remotion-service` in `services/remotion/`
 
 Root `package.json` proxies the main web commands to `@sotto/web`. Each major directory has its own `CLAUDE.md`; follow the closest applicable file.
 
@@ -129,7 +127,7 @@ PENDING -> DISCOVERING -> EXTRACTING -> SCRIPTING -> VERIFYING_SCRIPT -> VALIDAT
 - Do not hardcode model names or provider IDs.
 - Do not create fallback chains that pick providers by key availability. Use explicit provider selection through `resolveSttProvider()`, `resolveTtsProvider()`, `resolveAutoModel()`, or the closest existing resolver.
 - Do not reuse the same two voices for every generated lesson unless the learner explicitly selected them.
-- Do not create admin endpoints or scripts that bulk-delete R2 files. Segment audio and podcast audio are protected in `deleteFile()`; never bypass that guard.
+- Do not create admin endpoints or scripts that bulk-delete R2 files. Segment audio and episode audio are protected in `deleteFile()`; never bypass that guard.
 - Do not require Doppler for local OSS workflows.
 
 ## Frontend Quality
@@ -172,11 +170,11 @@ Provider variables are optional until the selected workflow needs them. Common e
 ## Known Gotchas
 
 - Alpine + Chromium: pin Alpine version to match the Chromium version available in its repos. Alpine 3.22+ works with Chromium 136+.
-- Docker service names: workers reach sidecars via Docker service names such as `http://remotion:3100`; use `localhost` only for local dev outside Docker.
+- Docker service names: workers reach sidecars via Docker service names (e.g. `http://local-tts:8000`); use `localhost` only for local dev outside Docker.
 - Prisma in Docker: always run `npx prisma generate` inside the Docker build because the generated client is platform-specific.
 - Compose files stay at the repo root: the `docker-compose*.yml` files resolve `build.context: .`, `env_file: .env`, and `${VAR}` substitution from the project directory (their own location). Moving them to a subfolder breaks every invocation in `scripts/install.sh`, `scripts/deploy.sh`, `.github/workflows/logs.yml`, and the docs unless each adds `--project-directory`/`--env-file`, and `docker-compose.selfhost.yml` is downloaded standalone by the installer and must keep flat paths. None of this is CI-verifiable, so a wrong path silently breaks deploy or self-host install. Keep them at root.
 - Monorepo paths: avoid `__dirname`-relative paths across package boundaries. Use `process.cwd()` for cross-package references.
-- DB enum values are uppercase, for example `AI_ILLUSTRATION`, `STOCK_FOOTAGE`, and `TEXT_CARD`.
+- DB enum values are uppercase, for example `USER`, `ADMIN`, and `SYSTEM`.
 
 ## Reference
 

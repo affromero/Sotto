@@ -4,8 +4,8 @@ import { ExtractContentPayload, addJob, JobType, deepResearchQueue } from '@/lib
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { extractContent } from '@/lib/extractors';
 import { assessTopicFeasibility } from '@/lib/topic-assessor';
-import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { markEpisodeFailed } from '@/lib/pipeline-resume';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
@@ -14,33 +14,33 @@ import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { analyzeBias } from '@/lib/media-bias';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
-  const { podcastId, userId, sourceUrl, sourceText, useAdminCredits } = job.data;
+  const { episodeId, userId, sourceUrl, sourceText, useAdminCredits } = job.data;
 
-  logger.info('Extracting content', { podcastId });
+  logger.info('Extracting content', { episodeId });
   await job.updateProgress(10);
 
   // Idempotency: skip if content was already extracted
   const existingDiscovery = await prisma.discovery.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { id: true, sourceContent: true },
   });
 
   if (existingDiscovery?.sourceContent) {
-    logger.info('Content already extracted, skipping to deep research', { podcastId });
+    logger.info('Content already extracted, skipping to deep research', { episodeId });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { status: 'RESEARCHING' },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'RESEARCHING' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
 
     await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
-      podcastId,
+      episodeId,
       userId,
       discoveryId: existingDiscovery.id,
       useAdminCredits,
-    }, { jobId: `research-${podcastId}-${Date.now()}` });
+    }, { jobId: `research-${episodeId}-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
@@ -80,7 +80,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
   // Fetch topic/depth/focusAreas in one query for bias analysis + feasibility check
   const discoveryMeta = await prisma.discovery.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { topic: true, depth: true, focusAreas: true },
   });
 
@@ -99,7 +99,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
   // Store extracted content and metadata in discovery
   const discovery = await prisma.discovery.update({
-    where: { podcastId },
+    where: { episodeId },
     data: {
       sourceContent: content,
       ...(sourceMetadata && { sourceMetadata }),
@@ -108,35 +108,35 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
   await job.updateProgress(50);
 
-  // Pre-flight feasibility check — only for WEB-sourced podcasts (user is at browser).
+  // Pre-flight feasibility check — only for WEB-sourced episodes (user is at browser).
   // API sources have pre-validated topics and no interactive retry.
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: {
       source: true,
       aiModel: true,
     },
   });
 
-  if (podcast.source === 'WEB') {
+  if (episode.source === 'WEB') {
     if (discoveryMeta?.topic) {
-      logger.info('Running topic feasibility check', { podcastId });
+      logger.info('Running topic feasibility check', { episodeId });
 
-      const initialAiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
-      if (!podcast.aiModel && !initialAiKey) {
+      const initialAiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
+      if (!episode.aiModel && !initialAiKey) {
         throw new Error('AI model is required for topic feasibility assessment when no AI key is configured.');
       }
 
       const { model, provider } = await resolveAiModelAndProvider({
-        podcastAiModel: podcast.aiModel,
+        episodeAiModel: episode.aiModel,
         aiKey: initialAiKey,
       });
 
       const providerAiKey =
-        podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+        episode.aiModel && provider !== 'claude-code' && !useAdminCredits
           ? await getAiKey(userId, provider as AiProviderId)
           : initialAiKey;
-      if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+      if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
         throw new Error(`AI key for provider "${provider}" is required for topic feasibility assessment.`);
       }
 
@@ -155,13 +155,13 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
         category: 'topic_assessment',
         inputTokens: assessment.inputTokens,
         outputTokens: assessment.outputTokens,
-        podcastId,
+        episodeId,
         userId,
       });
 
       // Store assessment results in Discovery
       await prisma.discovery.update({
-        where: { podcastId },
+        where: { episodeId },
         data: {
           feasibilityVerdict: assessment.verdict,
           feasibilitySuggestion: assessment.suggestion,
@@ -172,13 +172,13 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
         const suggestion = assessment.suggestion
           ? ` Try: "${assessment.suggestion}"`
           : '';
-        await markPodcastFailed(podcastId, {
-          failureReason: `This topic can't produce a well-sourced podcast: ${assessment.reason}${suggestion}`,
+        await markEpisodeFailed(episodeId, {
+          failureReason: `This topic can't produce a well-sourced episode: ${assessment.reason}${suggestion}`,
           technicalError: `Topic assessment rejected: ${assessment.reason}`,
         });
 
         logger.info('Topic rejected by feasibility check', {
-          podcastId,
+          episodeId,
           reason: assessment.reason,
         });
         await job.updateProgress(100);
@@ -187,7 +187,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
       if (assessment.verdict === 'warn') {
         logger.info('Topic flagged with warning, continuing to script generation', {
-          podcastId,
+          episodeId,
           reason: assessment.reason,
         });
       }
@@ -196,23 +196,23 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
   await job.updateProgress(70);
 
-  // Update podcast status
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  // Update episode status
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: { status: 'RESEARCHING' },
   });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'RESEARCHING' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
 
   // Chain to deep research
   await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
-    podcastId,
+    episodeId,
     userId,
     discoveryId: discovery.id,
     useAdminCredits,
-  }, { jobId: `research-${podcastId}` });
+  }, { jobId: `research-${episodeId}` });
 
-  await logPipelineStageComplete(podcastId, 'content-extraction');
+  await logPipelineStageComplete(episodeId, 'content-extraction');
   await job.updateProgress(100);
-  logger.info('Content extraction complete', { podcastId });
+  logger.info('Content extraction complete', { episodeId });
 }

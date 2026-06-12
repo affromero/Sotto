@@ -11,12 +11,7 @@
 /** GPU/API-heavy workers that need beefy containers */
 export const HEAVY_WORKERS = new Set([
   'audio-generation',
-  'visual-generation',
-  'transition-generation',
-  'avatar-generation',
-  'video-composition',
   'audio-stitching',
-  'segment-preview',
 ]);
 
 /** Pipeline orchestration workers */
@@ -29,9 +24,6 @@ export const PIPELINE_WORKERS = new Set([
   'script-generation',
   'interactions',
   'segment-regeneration',
-  'visual-classification',
-  'place-enrichment',
-  'pipeline-classification',
   'speaking-grading',
   'worksheet-pdf',
   'verify-class-references',

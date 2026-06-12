@@ -41,7 +41,7 @@ tags: [create, critical]
             id: "script-approve-button"
           timeout: 30000
 - takeScreenshot: script-preview
-- assertWithAI: "A podcast script with speaker turns is displayed"
+- assertWithAI: "A episode script with speaker turns is displayed"
 
 # Step 4: Approve — Audio Generation
 - tapOn:

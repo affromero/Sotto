@@ -36,7 +36,7 @@ interface SelectionPopover {
 }
 
 interface ScriptEditorProps {
-  podcastId: string;
+  episodeId: string;
   onApprove: () => void;
   onRegenerate: () => void;
   getApproveBody?: () => Record<string, unknown>;
@@ -51,7 +51,7 @@ function nextTurnId(): string {
   return `turn-${++turnIdCounter}`;
 }
 
-export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBody }: ScriptEditorProps) {
+export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBody }: ScriptEditorProps) {
   const [turns, setTurns] = useState<TurnState[]>([]);
   const [references, setReferences] = useState<ReferenceData[]>([]);
   const [, setVersion] = useState(0);
@@ -87,7 +87,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     let mounted = true;
     async function fetchScript() {
       try {
-        const res = await fetch(`/api/v1/podcasts/${podcastId}/script`);
+        const res = await fetch(`/api/v1/episodes/${episodeId}/script`);
         if (!res.ok) throw new Error('Failed to load script');
         const data = await res.json();
         if (!mounted) return;
@@ -108,7 +108,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     }
     fetchScript();
     return () => { mounted = false; };
-  }, [podcastId]);
+  }, [episodeId]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -159,7 +159,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     if (saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/script`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/script`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +180,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     } finally {
       setSaving(false);
     }
-  }, [podcastId, turns, saving]);
+  }, [episodeId, turns, saving]);
 
   // Edit mode handlers
   const startEdit = useCallback((index: number) => {
@@ -286,7 +286,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     try {
       // Auto-save if dirty
       if (dirty) {
-        const res = await fetch(`/api/v1/podcasts/${podcastId}/script`, {
+        const res = await fetch(`/api/v1/episodes/${episodeId}/script`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -302,7 +302,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
       }
 
       const extraBody = getApproveBody ? getApproveBody() : {};
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/script/approve`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/script/approve`, {
         method: 'POST',
         ...(Object.keys(extraBody).length > 0
           ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extraBody) }
@@ -314,7 +314,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
       setError(err instanceof Error ? err.message : 'Failed to approve');
       setApproving(false);
     }
-  }, [dirty, turns, podcastId, onApprove, getApproveBody]);
+  }, [dirty, turns, episodeId, onApprove, getApproveBody]);
 
   // Regenerate (with optional feedback)
   const handleRegenerate = useCallback(async (withFeedback = false) => {
@@ -329,7 +329,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
       }
       const hasAnyFeedback = feedbackText || Object.keys(filteredComments).length > 0 || highlights.length > 0;
       const shouldSendBody = withFeedback && hasAnyFeedback;
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/script/regenerate`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/script/regenerate`, {
         method: 'POST',
         ...(shouldSendBody ? {
           headers: { 'Content-Type': 'application/json' },
@@ -346,7 +346,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
       setError(err instanceof Error ? err.message : 'Failed to regenerate');
       setRegenerating(false);
     }
-  }, [podcastId, onRegenerate, generalFeedback, turnComments, highlights]);
+  }, [episodeId, onRegenerate, generalFeedback, turnComments, highlights]);
 
   // Text selection for highlighting (desktop only)
   const handleTurnTextMouseUp = useCallback((index: number) => {

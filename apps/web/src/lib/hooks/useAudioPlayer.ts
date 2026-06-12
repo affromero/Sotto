@@ -6,8 +6,8 @@ import { PlayerState, PlayerControls } from '@/types/player';
 export function useAudioPlayer(): PlayerState & PlayerControls {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [state, setState] = useState<PlayerState>({
-    podcastId: null,
-    podcastTitle: null,
+    episodeId: null,
+    episodeTitle: null,
     audioUrl: null,
     isPlaying: false,
     currentTime: 0,
@@ -116,30 +116,30 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
   }, []);
 
-  const loadPodcast = useCallback(
-    (podcastId: string, audioUrl: string, podcastTitle?: string) => {
+  const loadEpisode = useCallback(
+    (episodeId: string, audioUrl: string, episodeTitle?: string) => {
       const audio = getAudio();
       if (!audio) return;
-      if (state.podcastId === podcastId && state.audioUrl === audioUrl) {
-        setState((s) => ({ ...s, podcastTitle: podcastTitle ?? s.podcastTitle }));
+      if (state.episodeId === episodeId && state.audioUrl === audioUrl) {
+        setState((s) => ({ ...s, episodeTitle: episodeTitle ?? s.episodeTitle }));
         return;
       }
       audio.src = audioUrl;
       audio.load();
       setState((s) => ({
         ...s,
-        podcastId,
-        podcastTitle: podcastTitle ?? null,
+        episodeId,
+        episodeTitle: episodeTitle ?? null,
         audioUrl,
         currentTime: 0,
         isPlaying: false,
       }));
-      updateMediaSession(podcastTitle ?? null, false);
+      updateMediaSession(episodeTitle ?? null, false);
     },
-    [state.podcastId, state.audioUrl, updateMediaSession]
+    [state.episodeId, state.audioUrl, updateMediaSession]
   );
 
-  const clearPodcast = useCallback(() => {
+  const clearEpisode = useCallback(() => {
     const audio = getAudio();
     if (audio) {
       audio.pause();
@@ -147,8 +147,8 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
       audio.load();
     }
     setState({
-      podcastId: null,
-      podcastTitle: null,
+      episodeId: null,
+      episodeTitle: null,
       audioUrl: null,
       isPlaying: false,
       currentTime: 0,
@@ -178,7 +178,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     setPlaybackRate,
     setVolume,
     toggleMute,
-    loadPodcast,
-    clearPodcast,
+    loadEpisode,
+    clearEpisode,
   };
 }

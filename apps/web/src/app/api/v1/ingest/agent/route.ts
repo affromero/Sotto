@@ -7,7 +7,7 @@ import { agentIngestionSchema } from '@/lib/validations';
 import { getJobPriority } from '@/lib/generation-features';
 import { isValidModelId } from '@/lib/providers/ai-registry';
 import {
-  createPrivateIngestionPodcast,
+  createPrivateIngestionEpisode,
   type PrivateIngestionTransaction,
 } from '@/lib/private-ingestion';
 import { errorResponse } from '@/lib/api-response';
@@ -78,7 +78,7 @@ async function findExistingIngestion(userId: string, idempotencyKey: string) {
       },
     },
     select: {
-      podcast: {
+      episode: {
         select: {
           id: true,
           status: true,
@@ -117,8 +117,8 @@ export async function POST(request: NextRequest) {
   if (existing) {
     return NextResponse.json(
       {
-        id: existing.podcast.id,
-        status: existing.podcast.status,
+        id: existing.episode.id,
+        status: existing.episode.status,
         source: 'AGENT',
         idempotent: true,
       },
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
   const topic = input.topic ?? input.title;
 
   try {
-    const created = await createPrivateIngestionPodcast({
+    const created = await createPrivateIngestionEpisode({
       userId: authResult.userId,
       title: input.title,
       topic,
@@ -168,11 +168,11 @@ export async function POST(request: NextRequest) {
       },
       jobPriority: getJobPriority(),
       jobIdPrefix: 'agent-ingest',
-      writeIngestionRecord: async (tx: PrivateIngestionTransaction, podcastId: string) => {
+      writeIngestionRecord: async (tx: PrivateIngestionTransaction, episodeId: string) => {
         await tx.agentIngestion.create({
           data: {
             userId: authResult.userId,
-            podcastId,
+            episodeId,
             idempotencyKey: input.idempotencyKey ?? null,
             provider: input.agent.provider,
             agentName: input.agent.name,
@@ -199,8 +199,8 @@ export async function POST(request: NextRequest) {
       if (duplicate) {
         return NextResponse.json(
           {
-            id: duplicate.podcast.id,
-            status: duplicate.podcast.status,
+            id: duplicate.episode.id,
+            status: duplicate.episode.status,
             source: 'AGENT',
             idempotent: true,
           },

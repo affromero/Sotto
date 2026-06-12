@@ -1,7 +1,7 @@
 {
   "name": "@sotto/mcp",
   "version": "0.1.0",
-  "description": "MCP server for creating and managing private Sotto podcasts",
+  "description": "MCP server for creating and managing private Sotto episodes",
   "type": "module",
   "bin": {
     "sotto-mcp": "./dist/index.js"
@@ -18,7 +18,7 @@
   "keywords": [
     "mcp",
     "sotto",
-    "podcast",
+    "episode",
     "ai"
   ],
   "license": "AGPL-3.0-only",

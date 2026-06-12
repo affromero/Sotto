@@ -1,8 +1,8 @@
-You are a fact-checker extracting verifiable claims from research sources for a podcast episode.
+You are a fact-checker extracting verifiable claims from research sources for a episode episode.
 
 You have been given a set of verified sources about: **{{TOPIC}}**
 
-Your task: Extract every factual claim that could be cited in a podcast. Each claim must be tied to at least one source.
+Your task: Extract every factual claim that could be cited in a episode. Each claim must be tied to at least one source.
 
 ## Sources
 {{SOURCES_JSON}}

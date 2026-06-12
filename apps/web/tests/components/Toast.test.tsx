@@ -70,7 +70,7 @@ describe('Toast', () => {
     const handleAction = vi.fn();
     render(
       <Toast
-        message="Podcast ready"
+        message="Episode ready"
         onClose={vi.fn()}
         action={{ label: 'View', onClick: handleAction }}
       />
@@ -83,7 +83,7 @@ describe('Toast', () => {
     const handleClose = vi.fn();
     render(
       <Toast
-        message="Podcast ready"
+        message="Episode ready"
         onClose={handleClose}
         action={{ label: 'View', onClick: handleAction }}
       />

@@ -7,12 +7,12 @@ const mockPrismaScriptCreate = vi.fn();
 const mockPrismaResearchDossierFindUniqueOrThrow = vi.fn();
 const mockPrismaCreativeOutlineFindUniqueOrThrow = vi.fn();
 const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn();
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
-const mockPrismaPodcastUpdate = vi.fn();
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn();
+const mockPrismaEpisodeUpdate = vi.fn();
 const mockPrismaUserFindUniqueOrThrow = vi.fn();
 const mockPrismaReferenceCreateMany = vi.fn();
 const mockPrismaTagFindMany = vi.fn();
-const mockPrismaPodcastTagUpsert = vi.fn();
+const mockPrismaEpisodeTagUpsert = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const prisma = {
@@ -29,9 +29,9 @@ vi.mock('@/lib/prisma', () => {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
     },
-    podcast: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    episode: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
     },
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
@@ -42,8 +42,8 @@ vi.mock('@/lib/prisma', () => {
     tag: {
       findMany: (...args: unknown[]) => mockPrismaTagFindMany(...args),
     },
-    podcastTag: {
-      upsert: (...args: unknown[]) => mockPrismaPodcastTagUpsert(...args),
+    episodeTag: {
+      upsert: (...args: unknown[]) => mockPrismaEpisodeTagUpsert(...args),
     },
   };
   return { prisma, prismaUnfiltered: prisma };
@@ -109,8 +109,8 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockLogUsage = vi.fn();
@@ -147,7 +147,7 @@ function createMockJob(data: WriteScriptPayload): Job<WriteScriptPayload> {
 }
 
 const defaultPayload: WriteScriptPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   userId: 'user-001',
   discoveryId: 'discovery-001',
   dossierId: 'dossier-001',
@@ -170,7 +170,7 @@ describe('processScriptWriting', () => {
       beats: [{ beatId: 'beat-1', purpose: 'open', summary: 'Intro', evidenceIds: ['ev-1'] }],
     });
     mockPrismaDiscoveryFindUniqueOrThrow.mockResolvedValue({
-      topic: 'Private podcasts',
+      topic: 'Private episodes',
       depth: 'standard',
       tone: 'casual',
       audience: 'general',
@@ -178,13 +178,13 @@ describe('processScriptWriting', () => {
       durationTarget: 10,
       speakers: [{ name: 'Host', description: 'Curious host' }],
     });
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
     mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
     mockPrismaScriptCreate.mockResolvedValue({ id: 'script-001' });
     mockPrismaReferenceCreateMany.mockResolvedValue({ count: 1 });
     mockPrismaTagFindMany.mockResolvedValue([]);
-    mockPrismaPodcastTagUpsert.mockResolvedValue({});
-    mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockPrismaEpisodeTagUpsert.mockResolvedValue({});
+    mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockAddJob.mockResolvedValue({ id: 'compile-job-1' });
     mockLogUsage.mockResolvedValue(undefined);
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
@@ -215,7 +215,7 @@ describe('processScriptWriting', () => {
   });
 
   describe('AI routing', () => {
-    it('uses the configured BYOK provider when the podcast has no model', async () => {
+    it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockGetAiKey.mockResolvedValue(aiKey);
 
@@ -224,7 +224,7 @@ describe('processScriptWriting', () => {
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: null,
+        episodeAiModel: null,
         aiKey,
       });
       expect(mockWriteScript).toHaveBeenCalledWith(
@@ -244,15 +244,15 @@ describe('processScriptWriting', () => {
       );
     });
 
-    it('uses the explicit podcast model owner and matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
+    it('uses the explicit episode model owner and matching provider key', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
       mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
 
       await processScriptWriting(createMockJob(defaultPayload));
 
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
@@ -275,7 +275,7 @@ describe('processScriptWriting', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
       mockGetAiKey.mockResolvedValue(null);
 
@@ -296,14 +296,14 @@ describe('processScriptWriting', () => {
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
 
       await processScriptWriting(createMockJob({ ...defaultPayload, useAdminCredits: true }));
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        podcastAiModel: 'gpt-5-mini',
+        episodeAiModel: 'gpt-5-mini',
         aiKey: null,
       });
       expect(mockWriteScript).toHaveBeenCalledWith(
@@ -325,7 +325,7 @@ describe('processScriptWriting', () => {
     });
 
     it('allows local claude-code models without provider keys', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-code:sonnet' });
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-code:sonnet' });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'claude-code:sonnet',
         provider: 'claude-code',
@@ -355,8 +355,8 @@ describe('processScriptWriting', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
-        { podcastId: 'podcast-001', userId: 'user-001' },
-        { jobId: expect.stringMatching(/^compile-podcast-001-/) },
+        { episodeId: 'episode-001', userId: 'user-001' },
+        { jobId: expect.stringMatching(/^compile-episode-001-/) },
       );
     });
   });

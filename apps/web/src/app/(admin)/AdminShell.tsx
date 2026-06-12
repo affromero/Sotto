@@ -48,7 +48,7 @@ const navGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { href: '/admin/users', label: 'Users', icon: Users },
-      { href: '/admin/podcasts', label: 'Lessons', icon: Radio },
+      { href: '/admin/episodes', label: 'Lessons', icon: Radio },
     ],
   },
   {

@@ -10,17 +10,17 @@ const mockGetModelRequiredPlan = vi.fn();
 const mockGetProviderForModel = vi.fn();
 const mockIsValidModelId = vi.fn();
 const mockAddJob = vi.fn();
-const mockGeneratePodcastSlug = vi.fn();
-const mockPodcastCreate = vi.fn();
-const mockPodcastUpdate = vi.fn();
+const mockGenerateEpisodeSlug = vi.fn();
+const mockEpisodeCreate = vi.fn();
+const mockEpisodeUpdate = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockAgentIngestionCreate = vi.fn();
 const mockAgentIngestionFindUnique = vi.fn();
 const mockTransaction = vi.fn();
 
 const txProxy = {
-  podcast: {
-    create: (...args: unknown[]) => mockPodcastCreate(...args),
+  episode: {
+    create: (...args: unknown[]) => mockEpisodeCreate(...args),
   },
   discovery: {
     create: (...args: unknown[]) => mockDiscoveryCreate(...args),
@@ -33,8 +33,8 @@ const txProxy = {
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: (...args: unknown[]) => mockTransaction(...args),
-    podcast: {
-      update: (...args: unknown[]) => mockPodcastUpdate(...args),
+    episode: {
+      update: (...args: unknown[]) => mockEpisodeUpdate(...args),
     },
     agentIngestion: {
       findUnique: (...args: unknown[]) => mockAgentIngestionFindUnique(...args),
@@ -72,7 +72,7 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 vi.mock('@/lib/slugify', () => ({
-  generatePodcastSlug: (...args: unknown[]) => mockGeneratePodcastSlug(...args),
+  generateEpisodeSlug: (...args: unknown[]) => mockGenerateEpisodeSlug(...args),
 }));
 
 import { POST } from '@/app/api/v1/ingest/agent/route';
@@ -122,11 +122,11 @@ describe('POST /api/v1/ingest/agent', () => {
     mockGetProviderForModel.mockReturnValue('claude-code');
     mockIsValidModelId.mockReturnValue(true);
     mockAgentIngestionFindUnique.mockResolvedValue(null);
-    mockPodcastCreate.mockResolvedValue({ id: 'pod-agent-1', status: 'EXTRACTING' });
+    mockEpisodeCreate.mockResolvedValue({ id: 'pod-agent-1', status: 'EXTRACTING' });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-agent-1' });
     mockAgentIngestionCreate.mockResolvedValue({ id: 'ingest-1' });
-    mockPodcastUpdate.mockResolvedValue({ id: 'pod-agent-1' });
-    mockGeneratePodcastSlug.mockResolvedValue('daily-engineering-notes');
+    mockEpisodeUpdate.mockResolvedValue({ id: 'pod-agent-1' });
+    mockGenerateEpisodeSlug.mockResolvedValue('daily-engineering-notes');
     mockAddJob.mockResolvedValue(undefined);
     mockTransaction.mockImplementation(async (callback: (tx: typeof txProxy) => unknown) =>
       callback(txProxy)
@@ -141,7 +141,7 @@ describe('POST /api/v1/ingest/agent', () => {
 
     expect(response.status).toBe(401);
     expect(body).toMatchObject({ error: 'Unauthorized' });
-    expect(mockPodcastCreate).not.toHaveBeenCalled();
+    expect(mockEpisodeCreate).not.toHaveBeenCalled();
   });
 
   it('requires an explicit TTS provider', async () => {
@@ -151,11 +151,11 @@ describe('POST /api/v1/ingest/agent', () => {
     const response = await POST(createRequest(payload));
 
     expect(response.status).toBe(400);
-    expect(mockPodcastCreate).not.toHaveBeenCalled();
+    expect(mockEpisodeCreate).not.toHaveBeenCalled();
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
-  it('creates a private AGENT podcast from an API-key request', async () => {
+  it('creates a private AGENT episode from an API-key request', async () => {
     const response = await POST(createRequest(validPayload, 'Bearer sk_sotto_test'));
     const body = await response.json();
 
@@ -166,7 +166,7 @@ describe('POST /api/v1/ingest/agent', () => {
       source: 'AGENT',
       discoveryId: 'disc-agent-1',
     });
-    expect(mockPodcastCreate).toHaveBeenCalledWith({
+    expect(mockEpisodeCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
         title: validPayload.title,
@@ -184,7 +184,7 @@ describe('POST /api/v1/ingest/agent', () => {
     expect(mockDiscoveryCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
-        podcastId: 'pod-agent-1',
+        episodeId: 'pod-agent-1',
         sourceUrl: validPayload.sourceUrl,
         sourceContent: expect.stringContaining(validPayload.content),
         sourceMetadata: expect.objectContaining({
@@ -201,7 +201,7 @@ describe('POST /api/v1/ingest/agent', () => {
     expect(mockAgentIngestionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
-        podcastId: 'pod-agent-1',
+        episodeId: 'pod-agent-1',
         idempotencyKey: 'claude-code:run-123',
         provider: 'claude-code',
         agentName: 'Claude Code',
@@ -213,7 +213,7 @@ describe('POST /api/v1/ingest/agent', () => {
       'content-extraction-queue',
       'EXTRACT_CONTENT',
       {
-        podcastId: 'pod-agent-1',
+        episodeId: 'pod-agent-1',
         userId: 'user-1',
         sourceText: expect.stringContaining(validPayload.content),
       },
@@ -221,9 +221,9 @@ describe('POST /api/v1/ingest/agent', () => {
     );
   });
 
-  it('returns the existing private podcast for a repeated idempotency key', async () => {
+  it('returns the existing private episode for a repeated idempotency key', async () => {
     mockAgentIngestionFindUnique.mockResolvedValue({
-      podcast: { id: 'pod-existing', status: 'READY' },
+      episode: { id: 'pod-existing', status: 'READY' },
     });
 
     const response = await POST(createRequest(validPayload));

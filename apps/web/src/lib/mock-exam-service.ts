@@ -128,7 +128,7 @@ async function buildExamSection(
         })),
       });
     } else if (section.format === 'listening') {
-      const { podcastId, comprehensionQuestions } = await composeListeningContent({
+      const { episodeId, comprehensionQuestions } = await composeListeningContent({
         userId: course.userId,
         courseId: course.id,
         level,
@@ -138,7 +138,7 @@ async function buildExamSection(
         mustIncludeVocab: spec.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
         note,
       });
-      await prisma.examSection.update({ where: { id: examSection.id }, data: { podcastId } });
+      await prisma.examSection.update({ where: { id: examSection.id }, data: { episodeId } });
       await prisma.examQuestion.createMany({
         data: comprehensionQuestions.slice(0, section.itemCount).map((q, i) => ({
           sectionId: examSection.id,
@@ -229,7 +229,7 @@ export interface ExamSectionPublic {
   weight: number;
   status: string;
   score: number | null;
-  podcast: { id: string; audioUrl: string | null; status: string } | null;
+  episode: { id: string; audioUrl: string | null; status: string } | null;
   questions: ExamQuestionPublic[];
   speakingPrompts: Array<{ id: string; order: number; targetPhrase: string; translation: string; referenceTtsUrl: string | null }>;
   writingPrompts: Array<{ id: string; order: number; task: string; guidance: string | null }>;
@@ -325,7 +325,7 @@ export async function getExamForUser(examId: string, userId: string): Promise<Ex
           questions: { orderBy: { order: 'asc' } },
           speakingPrompts: { orderBy: { order: 'asc' } },
           writingPrompts: { orderBy: { order: 'asc' } },
-          podcast: { select: { id: true, audioUrl: true, status: true } },
+          episode: { select: { id: true, audioUrl: true, status: true } },
         },
       },
       submission: { include: { sectionResults: true } },
@@ -352,8 +352,8 @@ export async function getExamForUser(examId: string, userId: string): Promise<Ex
       weight: s.weight,
       status: s.status,
       score: s.score,
-      podcast: s.podcast
-        ? { id: s.podcast.id, audioUrl: s.podcast.audioUrl, status: s.podcast.status }
+      episode: s.episode
+        ? { id: s.episode.id, audioUrl: s.episode.audioUrl, status: s.episode.status }
         : null,
       questions: s.questions.map((q) => ({
         id: q.id,

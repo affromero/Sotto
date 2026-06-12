@@ -31,14 +31,14 @@ beforeEach(() => {
 
 describe('useAudioPlayer', () => {
   describe('initial state', () => {
-    it('has null podcastId', () => {
+    it('has null episodeId', () => {
       const { result } = renderHook(() => useAudioPlayer());
-      expect(result.current.podcastId).toBeNull();
+      expect(result.current.episodeId).toBeNull();
     });
 
-    it('has null podcastTitle', () => {
+    it('has null episodeTitle', () => {
       const { result } = renderHook(() => useAudioPlayer());
-      expect(result.current.podcastTitle).toBeNull();
+      expect(result.current.episodeTitle).toBeNull();
     });
 
     it('has null audioUrl', () => {
@@ -228,27 +228,27 @@ describe('useAudioPlayer', () => {
     });
   });
 
-  describe('loadPodcast', () => {
-    it('sets podcastId', () => {
+  describe('loadEpisode', () => {
+    it('sets episodeId', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3');
       });
-      expect(result.current.podcastId).toBe('podcast-1');
+      expect(result.current.episodeId).toBe('episode-1');
     });
 
-    it('sets podcastTitle when provided', () => {
+    it('sets episodeTitle when provided', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'My Podcast');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3', 'My Episode');
       });
-      expect(result.current.podcastTitle).toBe('My Podcast');
+      expect(result.current.episodeTitle).toBe('My Episode');
     });
 
     it('sets audioUrl', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3');
       });
       expect(result.current.audioUrl).toBe('https://example.com/audio.mp3');
     });
@@ -259,7 +259,7 @@ describe('useAudioPlayer', () => {
         result.current.seek(45);
       });
       act(() => {
-        result.current.loadPodcast('podcast-2', 'https://example.com/audio2.mp3');
+        result.current.loadEpisode('episode-2', 'https://example.com/audio2.mp3');
       });
       expect(result.current.currentTime).toBe(0);
     });
@@ -270,41 +270,41 @@ describe('useAudioPlayer', () => {
         result.current.play();
       });
       act(() => {
-        result.current.loadPodcast('podcast-3', 'https://example.com/audio3.mp3');
+        result.current.loadEpisode('episode-3', 'https://example.com/audio3.mp3');
       });
       expect(result.current.isPlaying).toBe(false);
     });
 
-    it('skips reload when same podcastId is loaded', () => {
+    it('skips reload when same episodeId is loaded', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'Title 1');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3', 'Title 1');
       });
       act(() => {
         result.current.seek(30);
       });
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'Title 1 Updated');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3', 'Title 1 Updated');
       });
       expect(result.current.currentTime).toBe(30);
-      expect(result.current.podcastTitle).toBe('Title 1 Updated');
+      expect(result.current.episodeTitle).toBe('Title 1 Updated');
     });
   });
 
-  describe('clearPodcast', () => {
+  describe('clearEpisode', () => {
     it('resets all state to initial values', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'Test');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3', 'Test');
       });
       act(() => {
         result.current.play();
       });
       act(() => {
-        result.current.clearPodcast();
+        result.current.clearEpisode();
       });
-      expect(result.current.podcastId).toBeNull();
-      expect(result.current.podcastTitle).toBeNull();
+      expect(result.current.episodeId).toBeNull();
+      expect(result.current.episodeTitle).toBeNull();
       expect(result.current.audioUrl).toBeNull();
       expect(result.current.isPlaying).toBe(false);
       expect(result.current.currentTime).toBe(0);
@@ -313,10 +313,10 @@ describe('useAudioPlayer', () => {
     it('pauses audio before clearing', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
-        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3');
+        result.current.loadEpisode('episode-1', 'https://example.com/audio.mp3');
       });
       act(() => {
-        result.current.clearPodcast();
+        result.current.clearEpisode();
       });
       expect(mockPause).toHaveBeenCalled();
     });

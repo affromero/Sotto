@@ -6,7 +6,7 @@ interface TranscriptSegment {
   startTime: number | null;
 }
 
-interface PodcastTranscriptData {
+interface EpisodeTranscriptData {
   title: string;
   topic: string;
   creatorName: string;
@@ -26,9 +26,9 @@ function formatTimestamp(seconds: number | null): string {
 }
 
 /**
- * Generate a markdown transcript for a podcast with timestamps and references.
+ * Generate a markdown transcript for a episode with timestamps and references.
  */
-export function generatePodcastTranscript(data: PodcastTranscriptData): string {
+export function generateEpisodeTranscript(data: EpisodeTranscriptData): string {
   const dateStr = data.createdAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',

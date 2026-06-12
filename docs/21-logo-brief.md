@@ -358,7 +358,7 @@ The logo should be distinctly Sotto, not reminiscent of these existing brands:
 | **Praktika**                      | Avatar/tutor character system               | Sotto should not imply a social avatar network or animated persona    |
 | **TalkPal**                       | Chat/speech companion branding              | Avoid generic AI-chat language symbols                                |
 | **Pimsleur**                      | Audio-course branding                       | Sotto's listening is adaptive and part of a broader learning system   |
-| **Spotify / Apple Podcasts**      | Curved broadcast or radio-wave marks        | Sotto is not a streaming or podcast platform                          |
+| **Spotify / Apple Episodes**      | Curved broadcast or radio-wave marks        | Sotto is not a streaming or episode platform                          |
 
 **General language-learning logo cliches to avoid**:
 
@@ -561,7 +561,7 @@ When reviewing logo concepts, score each on these dimensions:
 | Criterion            | Weight | Description                                                                                |
 | -------------------- | ------ | ------------------------------------------------------------------------------------------ |
 | **Brand alignment**  | 25%    | Does it feel warm, intimate, intelligent, and calm?                                        |
-| **Distinctiveness**  | 20%    | Is it clearly different from Duolingo, OpenLingo, Speak, Praktika, TalkPal, Pimsleur, and podcast/audio marks? |
+| **Distinctiveness**  | 20%    | Is it clearly different from Duolingo, OpenLingo, Speak, Praktika, TalkPal, Pimsleur, and episode/audio marks? |
 | **Scalability**      | 20%    | Does it work at 24px (favicon) and 400px (hero) equally well?                              |
 | **Memorability**     | 15%    | After seeing it once, could someone describe it from memory?                               |
 | **Versatility**      | 10%    | Does it work in full color, single color, reversed, on dark and light backgrounds?         |

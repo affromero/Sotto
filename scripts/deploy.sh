@@ -76,8 +76,6 @@ remove_optional_block() {
 
 remove_optional_markers() {
   awk '
-    $0 == "# BEGIN_OPTIONAL_MAPS" { next }
-    $0 == "# END_OPTIONAL_MAPS" { next }
     $0 == "# BEGIN_OPTIONAL_WWW" { next }
     $0 == "# END_OPTIONAL_WWW" { next }
     { print }
@@ -86,18 +84,13 @@ remove_optional_markers() {
 
 render_caddy_config() {
   local app_host="$1"
-  local maps_host="$2"
-  local www_host="$3"
+  local www_host="$2"
 
   local rendered
   rendered="$(<"$CADDY_TEMPLATE")"
   rendered="${rendered//__SOTTO_APP_DOMAIN__/$app_host}"
 
-  if [ -n "$maps_host" ]; then
-    rendered="${rendered//__SOTTO_MAPS_DOMAIN__/$maps_host}"
-  else
-    rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_MAPS" "# END_OPTIONAL_MAPS")"
-  fi
+  rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_MAPS" "# END_OPTIONAL_MAPS")"
 
   if [ -n "$www_host" ]; then
     rendered="${rendered//__SOTTO_WWW_DOMAIN__/$www_host}"
@@ -119,24 +112,21 @@ fi
 if [ "$ACTIVE_SLOT" = "blue" ]; then
   NEW_SLOT="green"
   NEW_WEB_PORT=3010
-  NEW_MAPS_PORT=3012
   OLD_SLOT="blue"
 elif [ "$ACTIVE_SLOT" = "green" ]; then
   NEW_SLOT="blue"
   NEW_WEB_PORT=3000
-  NEW_MAPS_PORT=3002
   OLD_SLOT="green"
 else
   # First deploy — start with blue
   NEW_SLOT="blue"
   NEW_WEB_PORT=3000
-  NEW_MAPS_PORT=3002
   OLD_SLOT="none"
 fi
 
 echo "=== Blue-green deploy ==="
 echo "Active slot: $ACTIVE_SLOT"
-echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT, maps=$NEW_MAPS_PORT)"
+echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT)"
 
 # --- Pull code ---
 
@@ -164,20 +154,13 @@ set +a
 require_env NEXT_PUBLIC_APP_URL
 
 APP_DOMAIN="$(app_host_from_url "$NEXT_PUBLIC_APP_URL")"
-MAPS_DOMAIN="${SOTTO_MAPS_DOMAIN:-}"
 WWW_DOMAIN="${SOTTO_WWW_DOMAIN:-}"
 CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"
 
-validate_caddy_host SOTTO_MAPS_DOMAIN "$MAPS_DOMAIN"
 validate_caddy_host SOTTO_WWW_DOMAIN "$WWW_DOMAIN"
 
 echo "Loaded env file: $ENV_FILE"
 echo "App domain:      $APP_DOMAIN"
-if [ -n "$MAPS_DOMAIN" ]; then
-  echo "Maps domain:     $MAPS_DOMAIN"
-else
-  echo "Maps domain:     disabled"
-fi
 if [ -n "$WWW_DOMAIN" ]; then
   echo "WWW domain:      $WWW_DOMAIN"
 else
@@ -189,7 +172,7 @@ fi
 echo ""
 echo "=== Syncing Caddy config ==="
 TMP_CADDY="$(mktemp)"
-render_caddy_config "$APP_DOMAIN" "$MAPS_DOMAIN" "$WWW_DOMAIN" > "$TMP_CADDY"
+render_caddy_config "$APP_DOMAIN" "$WWW_DOMAIN" > "$TMP_CADDY"
 sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
 rm -f "$TMP_CADDY"
 sudo caddy validate --config /etc/caddy/Caddyfile
@@ -240,18 +223,6 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# --- Rebuild remotion if source changed ---
-
-echo ""
-REMOTION_CHANGED=$(git diff --name-only "${PREV_SHA}..HEAD" -- packages/video/ services/remotion/ 2>/dev/null | head -1)
-if [ -n "$REMOTION_CHANGED" ]; then
-  echo "=== Rebuilding remotion (source changed) ==="
-  docker compose -f "$COMPOSE_INFRA" build remotion
-  docker compose -f "$COMPOSE_INFRA" up -d --no-deps remotion
-else
-  echo "=== Remotion unchanged, skipping rebuild ==="
-fi
-
 # --- Pre-build cleanup (prevent disk exhaustion) ---
 
 echo ""
@@ -266,7 +237,6 @@ echo "=== Building $NEW_SLOT slot ==="
 export COMMIT_SHA
 COMMIT_SHA=$(git rev-parse --short HEAD)
 export WEB_PORT=$NEW_WEB_PORT
-export MAPS_PORT=$NEW_MAPS_PORT
 docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build
 
 # --- Database migrations ---
@@ -320,14 +290,6 @@ if [ "$HEALTH_OK" = false ]; then
   exit 1
 fi
 
-# Also check maps if it has a health endpoint
-MAPS_HEALTH=$(curl -sf "http://127.0.0.1:${NEW_MAPS_PORT}/api/v1/health" 2>/dev/null || echo "")
-if [ -n "$MAPS_HEALTH" ]; then
-  echo "Maps health check passed"
-else
-  echo "Maps health check skipped (no response — may not have /api/v1/health)"
-fi
-
 # --- Post-deploy smoke check ---
 
 echo ""
@@ -354,10 +316,8 @@ if [ "$OLD_SLOT" != "none" ]; then
   # Determine old slot ports for env
   if [ "$OLD_SLOT" = "blue" ]; then
     export WEB_PORT=3000
-    export MAPS_PORT=3002
   else
     export WEB_PORT=3010
-    export MAPS_PORT=3012
   fi
 
   docker compose -f "$COMPOSE_APP" -p "sotto-${OLD_SLOT}" down --timeout 10
@@ -380,4 +340,3 @@ echo "=== Deploy complete ==="
 echo "Slot: $NEW_SLOT"
 echo "Version: $COMMIT_SHA"
 echo "Web: http://127.0.0.1:${NEW_WEB_PORT}"
-echo "Maps: http://127.0.0.1:${NEW_MAPS_PORT}"

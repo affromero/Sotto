@@ -53,7 +53,7 @@ app/
 ├── auth/login.tsx         # Login (dev: email, prod: OAuth)
 ├── settings.tsx           # Settings hub — BYOK keys, logout
 ├── settings/api-keys.tsx  # BYOK key management
-├── podcast/[id].tsx       # Full-screen player
+├── episode/[id].tsx       # Full-screen player
 └── learn/
     ├── placement.tsx      # Placement test (PlacementQuiz component)
     ├── memory.tsx         # Memory graph (MemoryGraphWebView)
@@ -81,7 +81,7 @@ app/
 |------|---------|
 | `Avatar.tsx` | Image with fallback initial circle |
 | `EmptyState.tsx` / `ErrorState.tsx` | Empty + error patterns |
-| `PodcastCard.tsx` | `variant="feed"` (full) / `variant="compact"` (row) |
+| `EpisodeCard.tsx` | `variant="feed"` (full) / `variant="compact"` (row) |
 | `BottomSheet.tsx` | Bottom sheet container |
 | `learn/PlacementQuiz.tsx` | Multi-step placement test UI — fetches questions, submits answers |
 | `learn/MCSection.tsx` | Multiple-choice section renderer for grammar/reading/listening |
@@ -117,7 +117,7 @@ npm run mobile:android:build:production  # Play Store AAB (EAS)
 
 - Import types from `@sotto/shared` — never duplicate definitions
 - Use `lib/theme.ts` for design tokens, `lib/formatters.ts` for display formatting
-- Use shared components (`Avatar`, `EmptyState`, `ErrorState`, `PodcastCard`)
+- Use shared components (`Avatar`, `EmptyState`, `ErrorState`, `EpisodeCard`)
 - Use `StyleSheet.create()` for all styles
 - Define styles in a `styles` const at bottom of file
 - Use `lib/api.ts` for API calls (auth token attached automatically)

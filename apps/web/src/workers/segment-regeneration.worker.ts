@@ -8,7 +8,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { estimateDurationFromText } from '@/lib/duration';
 import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { logger } from '@/lib/logger';
@@ -20,14 +20,14 @@ import { writeFile, rm } from 'fs/promises';
 export async function processSegmentRegeneration(
   job: Job<RegenerateSegmentPayload>
 ): Promise<void> {
-  const { podcastId, interactionId, insertAfterOrder, newText, speaker } = job.data;
+  const { episodeId, interactionId, insertAfterOrder, newText, speaker } = job.data;
 
-  logger.info('Regenerating segment', { podcastId, interactionId });
+  logger.info('Regenerating segment', { episodeId, interactionId });
   await job.updateProgress(10);
 
-  // Fetch podcast to determine voice configuration
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  // Fetch episode to determine voice configuration
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: {
       userId: true,
       language: true,
@@ -39,7 +39,7 @@ export async function processSegmentRegeneration(
 
   // Fetch discovery metadata for topic-aware voice selection
   const discovery = await prisma.discovery.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { tone: true, audienceLevel: true, audience: true },
   });
 
@@ -52,37 +52,37 @@ export async function processSegmentRegeneration(
     : undefined;
 
   // Resolve provider using multi-provider system (matches audio-generation worker)
-  if (!podcast.ttsProvider) {
+  if (!episode.ttsProvider) {
     throw new Error(
-      `Podcast ${podcastId} is missing a TTS provider. Select a provider before regenerating audio.`
+      `Episode ${episodeId} is missing a TTS provider. Select a provider before regenerating audio.`
     );
   }
 
   const { provider, source, providerId } = await resolveTtsProvider({
-    userId: podcast.userId,
-    podcastId,
-    requestedProvider: podcast.ttsProvider as TtsProviderId,
-    requestedModel: podcast.ttsModel,
-    language: podcast.language,
+    userId: episode.userId,
+    episodeId,
+    requestedProvider: episode.ttsProvider as TtsProviderId,
+    requestedModel: episode.ttsModel,
+    language: episode.language,
   });
 
-  const podcastVoice = podcast.voices.find((v) => v.speaker === speaker);
+  const episodeVoice = episode.voices.find((v) => v.speaker === speaker);
   const voiceId =
-    podcastVoice?.voiceId && podcastVoice.provider === providerId
-      ? podcastVoice.voiceId
-      : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
+    episodeVoice?.voiceId && episodeVoice.provider === providerId
+      ? episodeVoice.voiceId
+      : provider.getVoiceId(speaker, episodeId, voiceMetadata, episode.language ?? undefined);
 
   // Persist resolved voice for retry consistency and analytics
-  if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
+  if (!episodeVoice || episodeVoice.provider !== providerId || episodeVoice.voiceId !== voiceId) {
     try {
-      await prisma.podcastVoice.upsert({
-        where: { podcastId_speaker: { podcastId, speaker } },
+      await prisma.episodeVoice.upsert({
+        where: { episodeId_speaker: { episodeId, speaker } },
         update: { voiceId, provider: providerId },
-        create: { podcastId, speaker, voiceId, provider: providerId },
+        create: { episodeId, speaker, voiceId, provider: providerId },
       });
     } catch (err) {
       logger.warn('Failed to persist voice assignment', {
-        podcastId,
+        episodeId,
         speaker,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -94,14 +94,14 @@ export async function processSegmentRegeneration(
     providerId,
     source,
     voiceId,
-    podcastId,
+    episodeId,
   });
 
   const ttsText = cleanTextForTts(newText);
   const audioBuffer = await provider.generateSpeech({
     text: ttsText,
     voiceId,
-    language: podcast.language ?? undefined,
+    language: episode.language ?? undefined,
   });
 
   const charCount = ttsText.length;
@@ -111,15 +111,15 @@ export async function processSegmentRegeneration(
     category: 'segment_regeneration',
     inputTokens: charCount,
     totalCost: (charCount / 1000) * ttsMeta.platformCostPerKChar,
-    podcastId,
-    userId: podcast.userId,
+    episodeId,
+    userId: episode.userId,
     metadata: { voiceId, speaker },
   });
 
   await job.updateProgress(40);
 
   // Upload to R2
-  const audioUrl = await uploadSegmentAudio(podcastId, `regen-${crypto.randomUUID()}`, audioBuffer);
+  const audioUrl = await uploadSegmentAudio(episodeId, `regen-${crypto.randomUUID()}`, audioBuffer);
 
   // Measure actual audio duration via FFprobe
   let segmentDuration: number;
@@ -143,7 +143,7 @@ export async function processSegmentRegeneration(
     // Shift all segments with order > insertAfterOrder up by 1
     // Update in descending order to avoid unique constraint violations
     const toShift = await tx.segment.findMany({
-      where: { podcastId, order: { gt: insertAfterOrder } },
+      where: { episodeId, order: { gt: insertAfterOrder } },
       orderBy: { order: 'desc' },
       select: { id: true, order: true },
     });
@@ -158,7 +158,7 @@ export async function processSegmentRegeneration(
     // Create the new segment at the correct position
     return tx.segment.create({
       data: {
-        podcastId,
+        episodeId,
         speaker,
         text: newText,
         audioUrl,
@@ -176,36 +176,30 @@ export async function processSegmentRegeneration(
     data: { status: 'INCORPORATED', incorporated: true },
   });
 
-  // Mark READY video generation as stale — segment timeline has shifted
-  await prisma.videoGeneration.updateMany({
-    where: { podcastId, status: 'READY' },
-    data: { status: 'STALE' },
-  });
-
   // Queue re-stitch with skipSfx (SFX positions are invalid after inserting a segment)
   const allSegments = await prisma.segment.findMany({
-    where: { podcastId },
+    where: { episodeId },
     orderBy: { order: 'asc' },
     select: { id: true },
   });
 
   await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
-    podcastId,
+    episodeId,
     segmentIds: allSegments.map((s) => s.id),
     skipSfx: true,
   });
 
   // Set status to STITCHING (the stitching worker will set READY when done)
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: { status: 'STITCHING' },
   });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'STITCHING' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'STITCHING' });
 
   await job.updateProgress(100);
   logger.info('Segment regeneration complete, queued re-stitch', {
-    podcastId,
+    episodeId,
     segmentId: newSegment.id,
     interactionId,
   });

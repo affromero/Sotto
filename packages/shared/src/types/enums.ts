@@ -2,7 +2,7 @@
 
 export type UserRole = 'USER' | 'ADMIN' | 'SYSTEM';
 
-export type PodcastStatus =
+export type EpisodeStatus =
   | 'PENDING'
   | 'DISCOVERING'
   | 'EXTRACTING'
@@ -20,9 +20,9 @@ export type PodcastStatus =
   | 'TRANSCRIBING'
   | 'DUPLICATE_REVIEW';
 
-export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+export type EpisodeVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
-export type PodcastSource =
+export type EpisodeSource =
   | 'WEB'
   | 'API'
   | 'AGENT'
@@ -45,47 +45,20 @@ export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'RE
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
 
 export type NotificationType =
-  | 'PODCAST_READY'
-  | 'PODCAST_FAILED'
+  | 'EPISODE_READY'
+  | 'EPISODE_FAILED'
   | 'KEY_INVALID'
-  | 'QUESTION_ON_YOUR_PODCAST'
+  | 'QUESTION_ON_YOUR_EPISODE'
   | 'SCRIPT_READY'
   | 'ACCOUNT_WARNING'
   | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
-  | 'VIDEO_READY'
-  | 'VIDEO_FAILED'
-  | 'AVATAR_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
 export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'ARCHIVED';
-
-export type VisualType =
-  | 'DATA_CHART'
-  | 'QUOTE'
-  | 'COMPARISON'
-  | 'TIMELINE'
-  | 'DIAGRAM'
-  | 'STOCK_FOOTAGE'
-  | 'AI_ILLUSTRATION'
-  | 'TEXT_CARD'
-  | 'MAP_OVERLAY'
-  | 'DATA_TABLE'
-  | 'SOURCE_FIGURE';
-
-export type VideoStatus =
-  | 'DRAFT'
-  | 'PENDING'
-  | 'CLASSIFYING'
-  | 'GENERATING_VISUALS'
-  | 'GENERATING_TRANSITIONS'
-  | 'GENERATING_AVATARS'
-  | 'COMPOSING'
-  | 'READY'
-  | 'FAILED';
 
 // Language learning
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
@@ -116,7 +89,7 @@ export type EdgeType =
   | 'VOCAB_VOCAB'
   | 'VOCAB_GRAMMAR'
   | 'VOCAB_CLASS'
-  | 'VOCAB_PODCAST'
+  | 'VOCAB_EPISODE'
   | 'GRAMMAR_GRAMMAR';
 
 // Ungated single-skill practice. VOCAB is first-class (spaced-repetition recall)

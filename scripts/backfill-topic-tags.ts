@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 /**
- * Backfill topic tags for existing podcasts.
+ * Backfill topic tags for existing episodes.
  *
- * Reads each podcast's Discovery topic + focusAreas (or podcast.topic for imports),
- * runs keyword matching against the tag pool, and upserts PodcastTag records.
+ * Reads each episode's Discovery topic + focusAreas (or episode.topic for imports),
+ * runs keyword matching against the tag pool, and upserts EpisodeTag records.
  *
  * Usage:
  *   npx tsx scripts/backfill-topic-tags.ts           # dry run (default)
@@ -178,7 +178,7 @@ async function main() {
       console.log('DRY RUN — no changes will be written. Pass --apply to write.\n');
     }
 
-    const podcasts = await prisma.podcast.findMany({
+    const episodes = await prisma.episode.findMany({
       select: {
         id: true,
         title: true,
@@ -188,14 +188,14 @@ async function main() {
       },
     });
 
-    console.log(`Found ${podcasts.length} podcasts to process.\n`);
+    console.log(`Found ${episodes.length} episodes to process.\n`);
 
     let totalTagsAdded = 0;
-    let podcastsTagged = 0;
+    let episodesTagged = 0;
 
-    for (const podcast of podcasts) {
-      const topic = podcast.discovery?.topic || podcast.topic || podcast.suggestedTopic || '';
-      const focusAreas = (podcast.discovery?.focusAreas as string[]) ?? [];
+    for (const episode of episodes) {
+      const topic = episode.discovery?.topic || episode.topic || episode.suggestedTopic || '';
+      const focusAreas = (episode.discovery?.focusAreas as string[]) ?? [];
       const slugs = matchTopicTags(topic, focusAreas);
 
       if (slugs.length === 0) continue;
@@ -207,18 +207,18 @@ async function main() {
 
       if (tags.length === 0) continue;
 
-      podcastsTagged++;
-      console.log(`${podcast.title || podcast.id}`);
+      episodesTagged++;
+      console.log(`${episode.title || episode.id}`);
       console.log(`  topic: "${topic}"`);
       if (focusAreas.length > 0) console.log(`  focusAreas: ${JSON.stringify(focusAreas)}`);
       console.log(`  tags: ${tags.map((t) => t.slug).join(', ')}`);
 
       if (!dryRun) {
         for (const tag of tags) {
-          await prisma.podcastTag.upsert({
-            where: { podcastId_tagId: { podcastId: podcast.id, tagId: tag.id } },
+          await prisma.episodeTag.upsert({
+            where: { episodeId_tagId: { episodeId: episode.id, tagId: tag.id } },
             update: {},
-            create: { podcastId: podcast.id, tagId: tag.id },
+            create: { episodeId: episode.id, tagId: tag.id },
           });
         }
       }
@@ -227,7 +227,7 @@ async function main() {
     }
 
     console.log(
-      `\n${dryRun ? 'Would tag' : 'Tagged'} ${podcastsTagged} podcasts with ${totalTagsAdded} topic tags.`
+      `\n${dryRun ? 'Would tag' : 'Tagged'} ${episodesTagged} episodes with ${totalTagsAdded} topic tags.`
     );
   } finally {
     await prisma.$disconnect();

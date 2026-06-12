@@ -62,7 +62,7 @@ Every serious language app is closed, hosted, and subscription-funded. Your prog
 
 1. **Taught in your own context.** Connect your own Claude Code or Codex and grant the context you choose — your notes, goals, the things you're working on. Sotto draws lessons, readings, and listening from that, instead of generic content.
 2. **You own the learning stack.** Self-host it on your machine or a VPS, with your keys, your database, and your files. There's no Sotto account holding your progress hostage.
-3. **Pedagogy over gamification.** Mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect) (the testing effect). The adaptive listening podcast is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's *i+1*). The memory graph is [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) on the [SM-2](https://super-memory.com/english/ol/sm2.htm) algorithm. No streaks-as-[dark-pattern](https://en.wikipedia.org/wiki/Dark_pattern), no leaderboards — **there is no social layer at all.**
+3. **Pedagogy over gamification.** Mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect) (the testing effect). The adaptive listening episode is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's *i+1*). The memory graph is [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) on the [SM-2](https://super-memory.com/english/ol/sm2.htm) algorithm. No streaks-as-[dark-pattern](https://en.wikipedia.org/wiki/Dark_pattern), no leaderboards — **there is no social layer at all.**
 4. **Bring your own everything.** LLM, TTS, STT — explicit provider selection, BYOK, or a keyless local agent. You pay your providers directly; nothing is billed through the self-hosted build.
 
 </details>
@@ -85,7 +85,7 @@ Plus the rest of the loop:
 - **Ungated practice** — drill any single skill on your own time, spaced-repetition-driven, separate from the graded classes.
 - **Live conversation** — speak and hear the real-time translation (either direction) through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live); new words you hit feed straight into your memory graph. Runs on your own Google key (added in Settings), and stays hidden until you add one.
 - **Practice exams** — sit a full, multi-section mock exam modeled on the format of your target language's flagship ([Goethe-Zertifikat](https://www.goethe.de/en/spr/kup/prf.html) for German, [DELE](https://examenes.cervantes.es/) for Spanish, [Cambridge English](https://www.cambridgeenglish.org/) for English; a generic CEFR mock otherwise), at your level, with a mock band and section-by-section feedback. It is practice, never an official score, and never changes your level.
-- **Personal memory graph** — a per-course, [Obsidian](https://obsidian.md/)-style vocabulary/grammar graph with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition that drives review, seeds the listening podcast, and renders as an interactive [Cytoscape](https://js.cytoscape.org/) visualization.
+- **Personal memory graph** — a per-course, [Obsidian](https://obsidian.md/)-style vocabulary/grammar graph with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition that drives review, seeds the listening episode, and renders as an interactive [Cytoscape](https://js.cytoscape.org/) visualization.
 - **Notes that personalize everything** — tell Sotto your goals and background once; it threads through placement, classes, and practice.
 - **Any language pair** — German/English/Spanish ship as hand-authored reference curricula; any other native→target pair is composed by your connected agent on demand.
 - **Worksheets** — a print-optimized worksheet + server-side PDF, with iPad PencilKit annotation.
@@ -135,6 +135,23 @@ flowchart LR
 
 Everything a learner does — classes and practice alike — feeds one course-scoped memory graph. Due and weak items resurface in the next class's adaptive content and in practice.
 
+## Concepts
+
+A quick map of the nouns you'll meet in the app and the code:
+
+| Term | What it is |
+|------|-----------|
+| **Course** | Your enrollment in one language pair at a CEFR level (say, German-from-English at B1). You can hold several at once; everything below is scoped to a course. |
+| **Class** | A mastery-gated unit of study, roughly an hour's work, built from the five skill **sections**. You can't advance until you pass, and a failed section regenerates in a similar-but-not-identical form. |
+| **Section** | One skill inside a class: grammar, reading, listening, speaking, or writing. The listening section plays an Episode; the rest are drills, passages, recordings, or writing tasks. |
+| **Episode** | The generated, narrated **audio** a listening section plays: a short script written for your level, seeded with your due vocabulary, and voiced by your TTS. It is just the audio unit (the same engine powers any audio Sotto makes). It is not a podcast: nothing is public, there is no feed, and it stays private to you. |
+| **Lesson** | A node in the fixed CEFR **curriculum** that sets what a class is about (its grammar points, vocabulary themes, can-do goal). Hand-authored for German/English/Spanish; composed by your agent for any other pair. |
+| **Practice** | Ungated, single-skill drilling on your own time, driven by spaced repetition. Separate from the graded classes, and it never gates progress. |
+| **Exam** | A full, multi-section **mock exam** modeled on a flagship's format (Goethe / DELE / Cambridge, or a generic CEFR mock). Practice only: a mock band plus feedback, never an official score, and it never changes your level. |
+| **Memory graph** | Your per-course vocabulary and grammar with SM-2 spaced repetition. It decides what's due, seeds the next listening Episode, and renders as an interactive graph. |
+
+> The audio entity is called **Episode** rather than Lesson or Class because those two words were already taken: `Lesson` is the curriculum node and `Class` is the gated unit. Episode keeps the model unambiguous.
+
 ## Architecture
 
 ```
@@ -142,8 +159,6 @@ apps/web          Next.js 16 App Router — web UI, API routes, Prisma schema, V
 apps/mobile       Expo React Native — iPad-first UI with react-native-track-player
 packages/shared   Shared types, Zod schemas, brand copy
 packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex locally
-packages/maps     Language curriculum maps (private submodule, optional)
-services/remotion Remotion render sidecar (video worksheets)
 ```
 
 <details>
@@ -156,7 +171,7 @@ services/remotion Remotion render sidecar (video worksheets)
 - **Provider-resolved AI / TTS / STT** — explicit resolvers (`resolveLearningAi`, `resolveTtsProvider`, `resolveSttProvider`) pick the configured provider, never by key availability.
 - **Keyless local agent** — `AI_PROVIDER=claude-code` (or `codex`) routes every LLM call through your local CLI; no outbound API key required.
 - **[MCP](https://modelcontextprotocol.io/) server** (`packages/mcp`) — your local agent calls `ingest_agent_output` and other Sotto tools directly.
-- **Web + iPad** — [Next.js](https://nextjs.org/) + [React](https://react.dev/) on the web; [Expo](https://expo.dev/) React Native with [react-native-track-player](https://rntp.dev/) and [PencilKit](https://developer.apple.com/documentation/pencilkit) on iPad; [Remotion](https://www.remotion.dev/) + [FFmpeg](https://ffmpeg.org/) for video worksheets.
+- **Web + iPad** — [Next.js](https://nextjs.org/) + [React](https://react.dev/) on the web; [Expo](https://expo.dev/) React Native with [react-native-track-player](https://rntp.dev/) and [PencilKit](https://developer.apple.com/documentation/pencilkit) on iPad.
 
 </details>
 
@@ -185,7 +200,7 @@ npm run setup     # deps, .env.local (AUTH_SECRET + BYOK_ENCRYPTION_KEY), Postgr
 npm run dev
 ```
 
-Then open [localhost:3000](http://localhost:3000). The private `maps` submodule is optional — a no-op stub is dropped in when it's absent.
+Then open [localhost:3000](http://localhost:3000).
 
 ### Run it 100% offline
 

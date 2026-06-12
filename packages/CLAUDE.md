@@ -6,7 +6,7 @@ Shared code consumed by both `apps/web/` and `apps/mobile/`.
 
 ### What belongs here
 
-- **Types** — Prisma-free interfaces and string union enums (e.g., `PodcastStatus`, `Speaker`)
+- **Types** — Prisma-free interfaces and string union enums (e.g., `EpisodeStatus`, `Speaker`)
 - **Validations** — Zod schemas used for client-side validation on both platforms
 - **Design tokens** — Colors, spacing, typography constants from the "Warm Intimacy" design system
 - **Content badges** — `content-badge.ts` — badge logic for content type, AI/TTS provider, and language

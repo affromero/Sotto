@@ -14,7 +14,7 @@ export async function GET() {
   const [
     user,
     interests,
-    podcasts,
+    episodes,
     scripts,
     discoveries,
     discoveryMessages,
@@ -41,7 +41,7 @@ export async function GET() {
       where: { userId },
       select: { tagId: true, source: true, weight: true, createdAt: true },
     }),
-    prisma.podcast.findMany({
+    prisma.episode.findMany({
       where: { userId },
       select: {
         id: true,
@@ -56,18 +56,18 @@ export async function GET() {
       },
     }),
     prisma.script.findMany({
-      where: { podcast: { userId } },
+      where: { episode: { userId } },
       select: {
-        podcastId: true,
+        episodeId: true,
         turns: true,
         version: true,
         createdAt: true,
       },
     }),
     prisma.discovery.findMany({
-      where: { podcast: { userId } },
+      where: { episode: { userId } },
       select: {
-        podcastId: true,
+        episodeId: true,
         topic: true,
         depth: true,
         audienceLevel: true,
@@ -81,7 +81,7 @@ export async function GET() {
       },
     }),
     prisma.discoveryMessage.findMany({
-      where: { discovery: { podcast: { userId } } },
+      where: { discovery: { episode: { userId } } },
       select: {
         discoveryId: true,
         role: true,
@@ -93,7 +93,7 @@ export async function GET() {
     prisma.interaction.findMany({
       where: { userId },
       select: {
-        podcastId: true,
+        episodeId: true,
         question: true,
         timestamp: true,
         answer: true,
@@ -105,7 +105,7 @@ export async function GET() {
     }),
     prisma.save.findMany({
       where: { userId },
-      select: { podcastId: true, createdAt: true },
+      select: { episodeId: true, createdAt: true },
     }),
     prisma.feedback.findMany({
       where: { userId },
@@ -138,7 +138,7 @@ export async function GET() {
     exportedAt: new Date().toISOString(),
     user,
     interests,
-    podcasts,
+    episodes,
     scripts,
     discoveries,
     discoveryMessages,

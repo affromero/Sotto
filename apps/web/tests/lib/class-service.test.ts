@@ -65,7 +65,7 @@ vi.mock('@/lib/knowledge-graph', () => ({
 }));
 
 vi.mock('@/lib/class-listening-generator', () => ({
-  generateClassListening: vi.fn().mockResolvedValue({ sectionId: 'section-listening', podcastId: 'podcast-listening' }),
+  generateClassListening: vi.fn().mockResolvedValue({ sectionId: 'section-listening', episodeId: 'episode-listening' }),
 }));
 
 vi.mock('@/lib/class-speaking-generator', () => ({

@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks ----
 
-const mockPodcastFindUnique = vi.fn();
-const mockPodcastFindUniqueOrThrow = vi.fn();
-const mockPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPodcastUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+const mockEpisodeFindUnique = vi.fn();
+const mockEpisodeFindUniqueOrThrow = vi.fn();
+const mockEpisodeUpdate = vi.fn().mockResolvedValue({});
+const mockEpisodeUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockDiscoveryFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockReferenceFindMany = vi.fn();
@@ -15,11 +15,11 @@ const mockCreativeOutlineFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
-    podcast: {
-      findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
-      findUniqueOrThrow: (...args: unknown[]) => mockPodcastFindUniqueOrThrow(...args),
-      update: (...args: unknown[]) => mockPodcastUpdate(...args),
-      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
+    episode: {
+      findUnique: (...args: unknown[]) => mockEpisodeFindUnique(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockEpisodeFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockEpisodeUpdate(...args),
+      updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args),
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockDiscoveryFindUnique(...args),
@@ -53,27 +53,27 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ---- Import under test ----
-import { markPodcastFailed, determineResumePoint } from '@/lib/pipeline-resume';
+import { markEpisodeFailed, determineResumePoint } from '@/lib/pipeline-resume';
 
 // ---- Tests ----
 
-describe('markPodcastFailed', () => {
+describe('markEpisodeFailed', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('records failedAtStatus and sets status to FAILED via CAS', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
 
-    await markPodcastFailed('podcast-001');
+    await markEpisodeFailed('episode-001');
 
-    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'podcast-001', status: 'GENERATING_AUDIO' },
+    expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'episode-001', status: 'GENERATING_AUDIO' },
       data: {
         status: 'FAILED',
         failedAtStatus: 'GENERATING_AUDIO',
@@ -85,58 +85,58 @@ describe('markPodcastFailed', () => {
     });
   });
 
-  it('skips if podcast is already FAILED (idempotent)', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'FAILED' });
+  it('skips if episode is already FAILED (idempotent)', async () => {
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'FAILED' });
 
-    await markPodcastFailed('podcast-001');
+    await markEpisodeFailed('episode-001');
 
-    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
+    expect(mockEpisodeUpdateMany).not.toHaveBeenCalled();
   });
 
-  it('skips if podcast is READY', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'READY' });
+  it('skips if episode is READY', async () => {
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'READY' });
 
-    await markPodcastFailed('podcast-001');
+    await markEpisodeFailed('episode-001');
 
-    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
+    expect(mockEpisodeUpdateMany).not.toHaveBeenCalled();
   });
 
-  it('skips if podcast is SCRIPT_READY', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'SCRIPT_READY' });
+  it('skips if episode is SCRIPT_READY', async () => {
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'SCRIPT_READY' });
 
-    await markPodcastFailed('podcast-001');
+    await markEpisodeFailed('episode-001');
 
-    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
+    expect(mockEpisodeUpdateMany).not.toHaveBeenCalled();
   });
 
-  it('skips if podcast not found', async () => {
-    mockPodcastFindUnique.mockResolvedValue(null);
+  it('skips if episode not found', async () => {
+    mockEpisodeFindUnique.mockResolvedValue(null);
 
-    await markPodcastFailed('nonexistent');
+    await markEpisodeFailed('nonexistent');
 
-    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
+    expect(mockEpisodeUpdateMany).not.toHaveBeenCalled();
   });
 
   it('returns false when CAS loses (status changed between read and write)', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
-    mockPodcastUpdateMany.mockResolvedValue({ count: 0 });
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockEpisodeUpdateMany.mockResolvedValue({ count: 0 });
 
-    const result = await markPodcastFailed('podcast-001');
+    const result = await markEpisodeFailed('episode-001');
 
     expect(result).toBe(false);
-    expect(mockPodcastUpdateMany).toHaveBeenCalled();
+    expect(mockEpisodeUpdateMany).toHaveBeenCalled();
   });
 
   it('persists errorId when provided', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
 
-    await markPodcastFailed('podcast-003', {
+    await markEpisodeFailed('episode-003', {
       failureReason: 'TTS provider error',
       errorId: 'err_abc123def456',
     });
 
-    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'podcast-003', status: 'GENERATING_AUDIO' },
+    expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'episode-003', status: 'GENERATING_AUDIO' },
       data: {
         status: 'FAILED',
         failedAtStatus: 'GENERATING_AUDIO',
@@ -149,12 +149,12 @@ describe('markPodcastFailed', () => {
   });
 
   it('sets errorId to null when not provided', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'SCRIPTING' });
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'SCRIPTING' });
 
-    await markPodcastFailed('podcast-004', { failureReason: 'Script error' });
+    await markEpisodeFailed('episode-004', { failureReason: 'Script error' });
 
-    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'podcast-004', status: 'SCRIPTING' },
+    expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'episode-004', status: 'SCRIPTING' },
       data: expect.objectContaining({
         errorId: null,
       }),
@@ -162,12 +162,12 @@ describe('markPodcastFailed', () => {
   });
 
   it('records STITCHING as failedAtStatus when failing during stitching', async () => {
-    mockPodcastFindUnique.mockResolvedValue({ status: 'STITCHING' });
+    mockEpisodeFindUnique.mockResolvedValue({ status: 'STITCHING' });
 
-    await markPodcastFailed('podcast-002');
+    await markEpisodeFailed('episode-002');
 
-    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'podcast-002', status: 'STITCHING' },
+    expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'episode-002', status: 'STITCHING' },
       data: {
         status: 'FAILED',
         failedAtStatus: 'STITCHING',
@@ -184,7 +184,7 @@ describe('determineResumePoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Defaults: nothing exists
-    mockPodcastFindUniqueOrThrow.mockResolvedValue({
+    mockEpisodeFindUniqueOrThrow.mockResolvedValue({
       source: 'WEB',
       failedAtStatus: null,
     });
@@ -203,7 +203,7 @@ describe('determineResumePoint', () => {
       { id: 'seg-3', audioUrl: 'https://cdn.example.com/seg3.mp3' },
     ]);
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({
       step: 'STITCH_AUDIO',
@@ -225,7 +225,7 @@ describe('determineResumePoint', () => {
       { id: 'seg-3', audioUrl: null },
     ]);
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({
       step: 'GENERATE_AUDIO',
@@ -247,7 +247,7 @@ describe('determineResumePoint', () => {
       { id: 'seg-3', audioUrl: null },
     ]);
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'SCRIPT_READY' });
   });
@@ -257,7 +257,7 @@ describe('determineResumePoint', () => {
       turns: [{ speaker: 'HOST', text: 'Hello' }],
     });
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'COMPILE_SCRIPT' });
   });
@@ -265,7 +265,7 @@ describe('determineResumePoint', () => {
   it('returns WRITE_SCRIPT when creative outline exists but no script', async () => {
     mockCreativeOutlineFindUnique.mockResolvedValue({ id: 'outline-001' });
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'WRITE_SCRIPT' });
   });
@@ -273,7 +273,7 @@ describe('determineResumePoint', () => {
   it('returns CREATIVE_PLANNING when research dossier exists but no outline', async () => {
     mockResearchDossierFindUnique.mockResolvedValue({ id: 'dossier-001' });
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'CREATIVE_PLANNING' });
   });
@@ -283,13 +283,13 @@ describe('determineResumePoint', () => {
       sourceContent: 'Extracted article content...',
     });
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'DEEP_RESEARCH' });
   });
 
   it('returns EXTRACT_CONTENT when nothing exists', async () => {
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'EXTRACT_CONTENT' });
   });
@@ -297,7 +297,7 @@ describe('determineResumePoint', () => {
   it('returns EXTRACT_CONTENT when discovery has no sourceContent', async () => {
     mockDiscoveryFindUnique.mockResolvedValue({ sourceContent: null });
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'EXTRACT_CONTENT' });
   });
@@ -305,7 +305,7 @@ describe('determineResumePoint', () => {
   it('returns EXTRACT_CONTENT when discovery has empty sourceContent', async () => {
     mockDiscoveryFindUnique.mockResolvedValue({ sourceContent: '' });
 
-    const result = await determineResumePoint('podcast-001');
+    const result = await determineResumePoint('episode-001');
 
     expect(result).toEqual({ step: 'EXTRACT_CONTENT' });
   });

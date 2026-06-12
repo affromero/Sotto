@@ -1,19 +1,19 @@
 import { Job } from 'bullmq';
 import { GeneratePdfPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generatePodcastTranscript } from '@/lib/pdf-generator';
+import { generateEpisodeTranscript } from '@/lib/pdf-generator';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 
 export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promise<void> {
-  const { podcastId } = job.data;
+  const { episodeId } = job.data;
 
-  logger.info('Generating transcript', { podcastId });
+  logger.info('Generating transcript', { episodeId });
   await job.updateProgress(10);
 
-  // Load podcast with segments and references
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  // Load episode with segments and references
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     include: {
       user: { select: { name: true } },
       segments: { orderBy: { order: 'asc' }, select: { speaker: true, text: true, startTime: true } },
@@ -24,13 +24,13 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
   await job.updateProgress(30);
 
   // Generate markdown transcript
-  const markdown = generatePodcastTranscript({
-    title: podcast.title,
-    topic: podcast.topic,
-    creatorName: podcast.user.name || 'Anonymous',
-    createdAt: podcast.createdAt,
-    segments: podcast.segments,
-    references: podcast.references.map((ref) => ({
+  const markdown = generateEpisodeTranscript({
+    title: episode.title,
+    topic: episode.topic,
+    creatorName: episode.user.name || 'Anonymous',
+    createdAt: episode.createdAt,
+    segments: episode.segments,
+    references: episode.references.map((ref) => ({
       id: ref.id,
       number: ref.number,
       title: ref.title,
@@ -49,18 +49,18 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
   await job.updateProgress(70);
 
   // Upload to R2
-  const key = `podcasts/${podcastId}/transcript.md`;
+  const key = `episodes/${episodeId}/transcript.md`;
   const buffer = Buffer.from(markdown, 'utf-8');
   const pdfUrl = await uploadFile(key, buffer, 'text/markdown');
 
   await job.updateProgress(90);
 
-  // Update podcast record
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  // Update episode record
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: { pdfUrl },
   });
 
   await job.updateProgress(100);
-  logger.info('Transcript generation complete', { podcastId, pdfUrl });
+  logger.info('Transcript generation complete', { episodeId, pdfUrl });
 }

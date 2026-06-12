@@ -4,14 +4,14 @@ tags: [error]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Scroll to seeded FAILED-status podcast
+# Scroll to seeded FAILED-status episode
 - scrollUntilVisible:
     element:
-      id: "podcast-card-${E2E_FAILED_PODCAST_ID}"
+      id: "episode-card-${E2E_FAILED_EPISODE_ID}"
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: "podcast-card-${E2E_FAILED_PODCAST_ID}"
+    id: "episode-card-${E2E_FAILED_EPISODE_ID}"
 
 # Verify error UI and retry button
 - extendedWaitUntil:

@@ -5,16 +5,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({ soundCues: [] });
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
-  title: 'Test Podcast',
+  title: 'Test Episode',
   source: 'WEB',
   currentVersion: 0,
   audioUrl: null,
 });
-const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue(null);
-const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeFindUnique = vi.fn().mockResolvedValue(null);
+const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeVersionCreate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
@@ -29,13 +29,13 @@ vi.mock('@/lib/prisma', () => {
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
     },
-    podcast: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
-      findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
-      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    episode: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
+      findUnique: (...args: unknown[]) => mockPrismaEpisodeFindUnique(...args),
+      update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
     },
-    podcastVersion: {
-      create: (...args: unknown[]) => mockPrismaPodcastVersionCreate(...args),
+    episodeVersion: {
+      create: (...args: unknown[]) => mockPrismaEpisodeVersionCreate(...args),
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
@@ -65,11 +65,11 @@ vi.mock('@/lib/audio-stitcher', () => ({
 }));
 
 const mockDownloadToFile = vi.fn().mockResolvedValue(undefined);
-const mockUploadPodcastAudio = vi.fn().mockResolvedValue('https://r2.example.com/final.mp3');
+const mockUploadEpisodeAudio = vi.fn().mockResolvedValue('https://r2.example.com/final.mp3');
 
 vi.mock('@/lib/r2', () => ({
   downloadToFile: (...args: unknown[]) => mockDownloadToFile(...args),
-  uploadPodcastAudio: (...args: unknown[]) => mockUploadPodcastAudio(...args),
+  uploadEpisodeAudio: (...args: unknown[]) => mockUploadEpisodeAudio(...args),
   deleteFile: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -98,8 +98,8 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
-  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+  invalidateEpisodeCache: vi.fn().mockResolvedValue(undefined),
+  publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/audio-fingerprint', () => ({
@@ -107,7 +107,7 @@ vi.mock('@/lib/audio-fingerprint', () => ({
 }));
 
 vi.mock('@/lib/voice-pricing', () => ({
-  capturePodcastPayments: vi.fn().mockResolvedValue(undefined),
+  captureEpisodePayments: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/referrals', () => ({
@@ -118,10 +118,10 @@ vi.mock('@/lib/generation-limits', () => ({
   MAX_LESSON_DURATION_MINUTES: 30,
 }));
 
-const mockMarkPodcastFailed = vi.fn().mockResolvedValue(undefined);
+const mockMarkEpisodeFailed = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/pipeline-resume', () => ({
-  markPodcastFailed: (...args: unknown[]) => mockMarkPodcastFailed(...args),
+  markEpisodeFailed: (...args: unknown[]) => mockMarkEpisodeFailed(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -170,7 +170,7 @@ function createMockJob(data: StitchAudioPayload): Job<StitchAudioPayload> {
 }
 
 const defaultPayload: StitchAudioPayload = {
-  podcastId: 'podcast-001',
+  episodeId: 'episode-001',
   segmentIds: ['seg-1', 'seg-2', 'seg-3'],
 };
 
@@ -197,10 +197,10 @@ describe('processAudioStitching', () => {
       { id: 'seg-3', duration: 100 },
     ]);
 
-    // Default podcast data
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    // Default episode data
+    mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
-      title: 'Test Podcast',
+      title: 'Test Episode',
       source: 'WEB',
       currentVersion: 0,
       audioUrl: null,
@@ -215,7 +215,7 @@ describe('processAudioStitching', () => {
     // Default file operations
     mockDownloadToFile.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue(Buffer.from('final-audio-data'));
-    mockUploadPodcastAudio.mockResolvedValue('https://r2.example.com/final.mp3');
+    mockUploadEpisodeAudio.mockResolvedValue('https://r2.example.com/final.mp3');
   });
 
   describe('segment fetching', () => {
@@ -224,7 +224,7 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow(
-        'No segments found for podcast podcast-001'
+        'No segments found for episode episode-001'
       );
     });
 
@@ -401,8 +401,8 @@ describe('processAudioStitching', () => {
       await processAudioStitching(job);
 
       expect(mockStitchWithEffects).toHaveBeenCalled();
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'READY' }),
       });
     });
@@ -449,59 +449,59 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockUploadPodcastAudio).toHaveBeenCalledWith(
-        'podcast-001',
+      expect(mockUploadEpisodeAudio).toHaveBeenCalledWith(
+        'episode-001',
         Buffer.from('final-audio-bytes')
       );
     });
   });
 
-  describe('podcast status update', () => {
-    it('updates podcast status to READY', async () => {
+  describe('episode status update', () => {
+    it('updates episode status to READY', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({
           status: 'READY',
         }),
       });
     });
 
-    it('updates podcast with audioUrl from R2', async () => {
-      mockUploadPodcastAudio.mockResolvedValue('https://media.example.com/final.mp3');
+    it('updates episode with audioUrl from R2', async () => {
+      mockUploadEpisodeAudio.mockResolvedValue('https://media.example.com/final.mp3');
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({
           audioUrl: 'https://media.example.com/final.mp3',
         }),
       });
     });
 
-    it('updates podcast with duration from stitcher', async () => {
+    it('updates episode with duration from stitcher', async () => {
       mockStitchWithEffects.mockResolvedValue({ duration: 250.75 });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({
           duration: 251, // rounded
         }),
       });
     });
 
-    it('updates podcast with file size', async () => {
+    it('updates episode with file size', async () => {
       mockReadFile.mockResolvedValue(Buffer.alloc(1024 * 512)); // 512 KB
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({
           fileSize: 1024 * 512,
         }),
@@ -577,15 +577,15 @@ describe('processAudioStitching', () => {
 
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'notifications' }, 'send_notification', {
         userId: 'user-1',
-        type: 'PODCAST_READY',
+        type: 'EPISODE_READY',
         title: 'Your lesson is ready!',
-        message: '"Test Podcast" is ready to play.',
-        data: { podcastId: 'podcast-001' },
+        message: '"Test Episode" is ready to play.',
+        data: { episodeId: 'episode-001' },
       });
     });
 
-    it('includes podcast title in notification message', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+    it('includes episode title in notification message', async () => {
+      mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-2',
         title: 'Quantum Computing Explained',
         source: 'WEB',
@@ -613,7 +613,7 @@ describe('processAudioStitching', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'waveform-generation' },
         'generate_waveform',
-        { podcastId: 'podcast-001', userId: 'user-1' }
+        { episodeId: 'episode-001', userId: 'user-1' }
       );
     });
   });
@@ -655,25 +655,25 @@ describe('processAudioStitching', () => {
   });
 
   describe('duration limit failure', () => {
-    it('sends PODCAST_FAILED notification when duration exceeds limit', async () => {
+    it('sends EPISODE_FAILED notification when duration exceeds limit', async () => {
       // LIMITS.maxDurationMinutes is 30, so max with 10% grace = 1980s
       mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', expect.objectContaining({
+      expect(mockMarkEpisodeFailed).toHaveBeenCalledWith('episode-001', expect.objectContaining({
         technicalError: expect.stringContaining('exceeded max'),
       }));
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
-        expect.objectContaining({ type: 'PODCAST_FAILED', title: 'Lesson generation failed' })
+        expect.objectContaining({ type: 'EPISODE_FAILED', title: 'Lesson generation failed' })
       );
     });
   });
 
   describe('error handling', () => {
-    it('re-throws error without marking podcast failed (centralized handler does that)', async () => {
+    it('re-throws error without marking episode failed (centralized handler does that)', async () => {
       mockStitchWithEffects.mockReset().mockRejectedValue(new Error('FFmpeg error'));
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
@@ -684,8 +684,8 @@ describe('processAudioStitching', () => {
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
 
-      // markPodcastFailed is NOT called in the catch block — centralized handler handles it
-      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+      // markEpisodeFailed is NOT called in the catch block — centralized handler handles it
+      expect(mockMarkEpisodeFailed).not.toHaveBeenCalled();
     });
 
     it('propagates error from downloadToFile', async () => {
@@ -695,8 +695,8 @@ describe('processAudioStitching', () => {
       await expect(processAudioStitching(job)).rejects.toThrow('R2 download failed');
     });
 
-    it('propagates error from uploadPodcastAudio', async () => {
-      mockUploadPodcastAudio.mockReset().mockRejectedValue(new Error('R2 upload failed'));
+    it('propagates error from uploadEpisodeAudio', async () => {
+      mockUploadEpisodeAudio.mockReset().mockRejectedValue(new Error('R2 upload failed'));
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
@@ -710,11 +710,11 @@ describe('processAudioStitching', () => {
   });
 
   describe('end-to-end flow', () => {
-    it('executes full pipeline for basic podcast (no SFX)', async () => {
+    it('executes full pipeline for basic episode (no SFX)', async () => {
       // Reset mocks and set up fresh data
       mockStitchWithEffects.mockReset().mockResolvedValue({ duration: 305.5 });
       mockReadFile.mockReset().mockResolvedValue(Buffer.alloc(1024 * 256));
-      mockUploadPodcastAudio.mockReset().mockResolvedValue('https://media.example.com/final.mp3');
+      mockUploadEpisodeAudio.mockReset().mockResolvedValue('https://media.example.com/final.mp3');
       mockPrismaSegmentFindMany
         .mockReset()
         .mockResolvedValueOnce([
@@ -734,8 +734,8 @@ describe('processAudioStitching', () => {
       // Segments fetched and ordered
       expect(mockPrismaSegmentFindMany).toHaveBeenCalled();
 
-      // Podcast config fetched
-      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalled();
+      // Episode config fetched
+      expect(mockPrismaEpisodeFindUniqueOrThrow).toHaveBeenCalled();
 
       // Script fetched for sound cues
       expect(mockPrismaScriptFindUnique).toHaveBeenCalled();
@@ -747,11 +747,11 @@ describe('processAudioStitching', () => {
       expect(mockStitchWithEffects).toHaveBeenCalled();
 
       // Final audio uploaded to R2
-      expect(mockUploadPodcastAudio).toHaveBeenCalledWith('podcast-001', expect.any(Buffer));
+      expect(mockUploadEpisodeAudio).toHaveBeenCalledWith('episode-001', expect.any(Buffer));
 
-      // Podcast updated to READY
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      // Episode updated to READY
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: {
           status: 'READY',
           audioUrl: 'https://media.example.com/final.mp3',
@@ -779,7 +779,7 @@ describe('processAudioStitching', () => {
       expect(job.updateProgress).toHaveBeenCalledWith(100);
     });
 
-    it('executes full pipeline for podcast with SFX', async () => {
+    it('executes full pipeline for episode with SFX', async () => {
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           { type: 'intro', prompt: 'Warm piano intro', durationSeconds: 3, insertAfterTurn: 0 },
@@ -804,9 +804,9 @@ describe('processAudioStitching', () => {
       const stitchCall = mockStitchWithEffects.mock.calls[0][0];
       expect(stitchCall.sfxInserts).toHaveLength(2);
 
-      // Podcast completed successfully
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      // Episode completed successfully
+      expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-001' },
         data: expect.objectContaining({ status: 'READY' }),
       });
     });

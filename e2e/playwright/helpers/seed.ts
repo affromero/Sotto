@@ -41,13 +41,13 @@ export async function seedTestUser() {
     },
   });
 
-  // Seed a ready podcast for player tests
-  const testPodcast = await prisma.podcast.upsert({
-    where: { id: 'e2e-podcast' },
+  // Seed a ready episode for player tests
+  const testEpisode = await prisma.episode.upsert({
+    where: { id: 'e2e-episode' },
     update: {},
     create: {
-      id: 'e2e-podcast',
-      title: 'E2E Test Podcast',
+      id: 'e2e-episode',
+      title: 'E2E Test Episode',
       topic: 'Testing',
       status: 'READY',
       audioUrl: 'https://media.example.com/e2e/test-audio.mp3',
@@ -70,13 +70,13 @@ export async function seedTestUser() {
     },
   });
 
-  // Other user's podcast for ownership-boundary tests
-  const otherPodcast = await prisma.podcast.upsert({
-    where: { id: 'e2e-other-podcast' },
+  // Other user's episode for ownership-boundary tests
+  const otherEpisode = await prisma.episode.upsert({
+    where: { id: 'e2e-other-episode' },
     update: {},
     create: {
-      id: 'e2e-other-podcast',
-      title: 'E2E Other Podcast',
+      id: 'e2e-other-episode',
+      title: 'E2E Other Episode',
       topic: 'Independent ownership content',
       status: 'READY',
       audioUrl: 'https://media.example.com/e2e/test-audio-other.mp3',
@@ -86,13 +86,13 @@ export async function seedTestUser() {
     },
   });
 
-  // SCRIPT_READY podcast for script approve/regenerate tests
-  const scriptReadyPodcast = await prisma.podcast.upsert({
+  // SCRIPT_READY episode for script approve/regenerate tests
+  const scriptReadyEpisode = await prisma.episode.upsert({
     where: { id: 'e2e-script-ready' },
     update: { status: 'SCRIPT_READY' },
     create: {
       id: 'e2e-script-ready',
-      title: 'E2E Script Ready Podcast',
+      title: 'E2E Script Ready Episode',
       topic: 'Script workflow testing',
       status: 'SCRIPT_READY',
       visibility: 'PRIVATE',
@@ -100,45 +100,45 @@ export async function seedTestUser() {
     },
   });
 
-  // Script for testPodcast
+  // Script for testEpisode
   const scriptTurns = [
-    { speaker: 'HOST', text: 'Welcome to our test podcast about testing.' },
+    { speaker: 'HOST', text: 'Welcome to our test episode about testing.' },
     { speaker: 'EXPERT', text: 'Thanks for having me. Testing is crucial for quality software.' },
   ];
   await prisma.script.upsert({
-    where: { podcastId: testPodcast.id },
+    where: { episodeId: testEpisode.id },
     update: {},
     create: {
-      podcastId: testPodcast.id,
+      episodeId: testEpisode.id,
       turns: scriptTurns,
       markdown: scriptTurns.map((t) => `**${t.speaker}**: ${t.text}`).join('\n\n'),
       version: 1,
     },
   });
 
-  // Script for scriptReadyPodcast
+  // Script for scriptReadyEpisode
   const scriptReadyTurns = [
     { speaker: 'HOST', text: 'This script is ready for approval.' },
     { speaker: 'EXPERT', text: 'The verification process has completed successfully.' },
   ];
   await prisma.script.upsert({
-    where: { podcastId: scriptReadyPodcast.id },
+    where: { episodeId: scriptReadyEpisode.id },
     update: {},
     create: {
-      podcastId: scriptReadyPodcast.id,
+      episodeId: scriptReadyEpisode.id,
       turns: scriptReadyTurns,
       markdown: scriptReadyTurns.map((t) => `**${t.speaker}**: ${t.text}`).join('\n\n'),
       version: 1,
     },
   });
 
-  // Interaction (ANSWERED, PUBLIC) on testPodcast
+  // Interaction (ANSWERED, PUBLIC) on testEpisode
   const interaction = await prisma.interaction.upsert({
     where: { id: 'e2e-interaction' },
     update: {},
     create: {
       id: 'e2e-interaction',
-      podcastId: testPodcast.id,
+      episodeId: testEpisode.id,
       userId: user.id,
       status: 'ANSWERED',
       question: 'What makes testing so important?',
@@ -148,13 +148,13 @@ export async function seedTestUser() {
     },
   });
 
-  // Save (user → otherPodcast)
+  // Save (user → otherEpisode)
   await prisma.save.upsert({
-    where: { userId_podcastId: { userId: user.id, podcastId: otherPodcast.id } },
+    where: { userId_episodeId: { userId: user.id, episodeId: otherEpisode.id } },
     update: {},
     create: {
       userId: user.id,
-      podcastId: otherPodcast.id,
+      episodeId: otherEpisode.id,
     },
   });
 
@@ -178,10 +178,10 @@ export async function seedTestUser() {
       create: {
         id: 'e2e-notif-ready',
         userId: user.id,
-        type: 'PODCAST_READY',
-        title: 'Your podcast is ready',
-        message: 'Your podcast "E2E Test Podcast" is ready to listen.',
-        data: { podcastId: testPodcast.id },
+        type: 'EPISODE_READY',
+        title: 'Your episode is ready',
+        message: 'Your episode "E2E Test Episode" is ready to listen.',
+        data: { episodeId: testEpisode.id },
         read: false,
       },
     }),
@@ -214,13 +214,13 @@ export async function seedTestUser() {
     });
   }
 
-  // FAILED podcast for error-state E2E tests
-  const failedPodcast = await prisma.podcast.upsert({
-    where: { id: 'e2e-failed-podcast' },
+  // FAILED episode for error-state E2E tests
+  const failedEpisode = await prisma.episode.upsert({
+    where: { id: 'e2e-failed-episode' },
     update: { status: 'FAILED' },
     create: {
-      id: 'e2e-failed-podcast',
-      title: 'E2E Failed Podcast',
+      id: 'e2e-failed-episode',
+      title: 'E2E Failed Episode',
       topic: 'Generation failure testing',
       status: 'FAILED',
       visibility: 'PUBLIC',
@@ -241,13 +241,13 @@ export async function seedTestUser() {
     },
   });
 
-  // Draft podcast
-  const draft = await prisma.podcast.upsert({
+  // Draft episode
+  const draft = await prisma.episode.upsert({
     where: { id: 'e2e-draft' },
     update: {},
     create: {
       id: 'e2e-draft',
-      title: 'Draft Podcast',
+      title: 'Draft Episode',
       topic: 'Saved draft topic',
       status: 'PENDING',
       visibility: 'PRIVATE',
@@ -282,13 +282,13 @@ export async function seedTestUser() {
     user,
     otherUser,
     sessionToken,
-    testPodcast,
-    otherPodcast,
-    scriptReadyPodcast,
+    testEpisode,
+    otherEpisode,
+    scriptReadyEpisode,
     interaction,
     subTag,
     notifications,
-    failedPodcast,
+    failedEpisode,
     emptyUser,
     draft,
     freshInviteCode,

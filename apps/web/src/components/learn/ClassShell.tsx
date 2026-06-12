@@ -73,11 +73,11 @@ export function ClassShell({ classId }: ClassShellProps) {
   const sections = useMemo(() => (cls ? orderSections(cls.sections) : []), [cls]);
   const gate = cls ? Math.round(cls.passThreshold * 100) : 70;
 
-  // The class's verified sources live on the LISTENING podcast (sourced classes).
+  // The class's verified sources live on the LISTENING episode (sourced classes).
   // Collected once for the Sources panel + READING citation resolution.
   const classReferences = useMemo<ClassReference[]>(() => {
-    const podcast = sections.find((s) => (s.podcast?.references?.length ?? 0) > 0)?.podcast;
-    return podcast?.references ?? [];
+    const episode = sections.find((s) => (s.episode?.references?.length ?? 0) > 0)?.episode;
+    return episode?.references ?? [];
   }, [sections]);
 
   const passageReferences = useMemo(
@@ -319,7 +319,7 @@ export function ClassShell({ classId }: ClassShellProps) {
         stage = (
           <ListeningSection
             key={seg.id}
-            podcast={seg.podcast}
+            episode={seg.episode}
             questions={seg.questions}
             gate={gate}
             nextName={nextName}

@@ -41,12 +41,11 @@
 
   /* shell layout — fixed viewport height so the rail fills and each column
      scrolls internally. height: 100% collapses to content height when the parent
-     chain is not a definite-height element, which leaves dead space below. The
-     rail is capped at 340px instead of 38% so it stays a sidebar, not a half. */
+     chain is not a definite-height element, which leaves dead space below. */
   height: 100vh;
   height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(280px, 340px) 1fr;
+  grid-template-columns: minmax(320px, 38%) 1fr;
   background: var(--paper);
   overflow: hidden;
   position: relative;
@@ -84,11 +83,28 @@
   flex-direction: column;
   gap: 28px;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  isolation: isolate;
+}
+
+.voice > .brand,
+.voice > .stepper,
+.voice > .whisper {
+  position: relative;
+  z-index: 1;
 }
 
 /* atmospheric accent glow */
-.voice::after {
+.voiceGlow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.voiceGlow::after {
   content: '';
   position: absolute;
   width: 420px;
@@ -98,7 +114,6 @@
   background: radial-gradient(circle, var(--accent), transparent 68%);
   opacity: 0.26;
   filter: blur(8px);
-  pointer-events: none;
 }
 
 @media (max-width: 880px) {
@@ -106,7 +121,7 @@
     padding: 22px 26px;
     gap: 16px;
   }
-  .voice::after {
+  .voiceGlow::after {
     width: 240px;
     height: 240px;
   }
@@ -340,7 +355,11 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  transition: transform 0.15s var(--ease), background 0.2s, border-color 0.2s, opacity 0.2s;
+  transition:
+    transform 0.15s var(--ease),
+    background 0.2s,
+    border-color 0.2s,
+    opacity 0.2s;
   min-height: 44px;
   min-width: 44px;
 }
