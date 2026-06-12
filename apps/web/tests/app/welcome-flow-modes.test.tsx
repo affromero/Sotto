@@ -192,7 +192,7 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByText(/Estimated level/i).textContent).toContain('C1');
   });
 
-  it('shows the design agent choices without the removed Gemini card', () => {
+  it('shows the design agent choices and a separate Google live key prompt', () => {
     render(
       <StepAgent
         agent={{ provider: '', method: null, value: '', model: '', status: 'idle' }}
@@ -216,7 +216,14 @@ describe('welcome hosted-demo mode', () => {
       'https://platform.openai.com/api-keys'
     );
     expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
-    expect(screen.queryByText('Gemini')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gemini/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Google API key for Live/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Google Gemini API key for live conversation/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /open google ai studio api key page/i })
+    ).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   });
 
   it('keeps welcome course copy away from podcast and video framing', () => {
@@ -559,6 +566,57 @@ describe('welcome hosted-demo mode', () => {
     });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('https://example.com/paper');
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('Allowed context sources:');
+    expect(mockPush).toHaveBeenCalledWith('/learn');
+  });
+
+  it('saves an optional Google live conversation key during self-host setup', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ demo: false, courseId: 'course_1' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <StepReady
+        baseLang="en"
+        language="it"
+        level="A2"
+        sources={new Set(['reading'])}
+        contextItems={[]}
+        agent={{
+          provider: 'claude',
+          method: 'cli',
+          value: '',
+          model: '',
+          liveTranslationKey: 'AIza-live',
+          status: 'connected',
+        }}
+        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} }}
+        config={{ selfHosted: true, isOwner: false }}
+        onRestart={vi.fn()}
+        onJump={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /open today's session/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/settings/ai-keys',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'google', apiKey: 'AIza-live' }),
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/onboarding/save',
+      expect.objectContaining({ method: 'POST', credentials: 'include' })
+    );
     expect(mockPush).toHaveBeenCalledWith('/learn');
   });
 

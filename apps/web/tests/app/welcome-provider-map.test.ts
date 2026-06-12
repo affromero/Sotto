@@ -9,6 +9,7 @@ import {
   DEFAULT_LOCAL_STT_BASE_URL,
   DEFAULT_LOCAL_TTS_BASE_URL,
   resolveAi,
+  resolveLiveTranslateKey,
   resolveTts,
   resolveStt,
 } from '@/app/welcome/providerMap';
@@ -63,6 +64,20 @@ describe('resolveAi', () => {
     expect(r.keyPost).toBeNull();
     expect(r.infra).toEqual({});
     expect(r.preferredAiProvider).toBeNull();
+  });
+});
+
+describe('resolveLiveTranslateKey', () => {
+  it('routes the optional live conversation key to the Google AI-key store', () => {
+    expect(resolveLiveTranslateKey(' AIza-live ')).toEqual({
+      endpoint: 'ai-keys',
+      provider: 'google',
+      apiKey: 'AIza-live',
+    });
+  });
+
+  it('does not post an empty optional live conversation key', () => {
+    expect(resolveLiveTranslateKey('  ')).toBeNull();
   });
 });
 

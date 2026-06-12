@@ -16,15 +16,17 @@ interface Props {
 
 export function StepAgent({ agent, demoMode, setAgent, onNext, onBack }: Props) {
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
+  const liveTranslationKey = agent.liveTranslationKey ?? '';
 
   function pick(id: string) {
     const p = PROVIDERS.find((x) => x.id === id);
     if (!p) return;
-    setAgent(() => ({
+    setAgent((prev) => ({
       provider: id,
       method: p.cli ? 'cli' : p.kind === 'key' ? 'key' : 'url',
       value: '',
       model: '',
+      liveTranslationKey: prev.liveTranslationKey ?? '',
       status: demoMode ? 'connected' : 'idle',
     }));
   }
@@ -192,6 +194,38 @@ export function StepAgent({ agent, demoMode, setAgent, onNext, onBack }: Props) 
               : agent.method === 'cli'
                 ? "Sotto reuses your CLI's existing auth — nothing new to paste, nothing leaves your machine."
                 : 'Your key stays in your environment. Sotto never proxies it through us — there is no us.'}
+          </div>
+        </div>
+      )}
+
+      {!demoMode && (
+        <div className={c.connect}>
+          <div>
+            <div className={c.fieldLabel}>Google API key for Live</div>
+            <div className={c.field}>
+              <input
+                className={c.fieldInput}
+                type="password"
+                placeholder="AIza-..."
+                value={liveTranslationKey}
+                onChange={(e) => setAgent((a) => ({ ...a, liveTranslationKey: e.target.value }))}
+                aria-label="Google Gemini API key for live conversation"
+              />
+              <a
+                className={c.providerLink}
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open Google AI Studio API key page"
+              >
+                Get key
+              </a>
+            </div>
+          </div>
+          <div className={c.locknote}>
+            <Glyph name="lock" size={15} />
+            Optional. Saves a Google key for live spoken translation; your course agent choice stays
+            separate.
           </div>
         </div>
       )}
