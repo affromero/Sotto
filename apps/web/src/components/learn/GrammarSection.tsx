@@ -169,7 +169,11 @@ export function GrammarSection({
               <div className={`${styles.drillWhy} ${curCorrect ? styles.drillWhyOk : styles.drillWhyNo}`}>
                 <div className={styles.whyHead}>
                   <ClassGlyph name={curCorrect ? 'check' : 'x'} size={13} />
-                  {curCorrect ? 'Right' : 'Not quite'}
+                  {curCorrect
+                    ? 'Right'
+                    : cur.correctIndex !== undefined
+                      ? `Not quite. It's “${cur.options[cur.correctIndex]}”`
+                      : 'Not quite'}
                 </div>
                 <p>{cur.explanation}</p>
               </div>
