@@ -1,5 +1,5 @@
 // Generates the LISTENING section of a class:
-// 1. Creates a CLASS podcast seeded with due vocabulary.
+// 1. Creates a CLASS episode seeded with due vocabulary.
 // 2. Generates a short conversational script via generateScript().
 // 3. Persists Script + VocabularyEntry rows (mirrors script-generation worker).
 // 4. Queues audio generation via createSegmentsAndQueueAudio().
@@ -39,7 +39,7 @@ export interface ClassListeningParams {
 
 export interface ClassListeningResult {
   sectionId: string;
-  podcastId: string;
+  episodeId: string;
 }
 
 export interface ListeningComprehensionQuestion {
@@ -49,7 +49,7 @@ export interface ListeningComprehensionQuestion {
   explanation: string;
 }
 
-// Content-only listening generation: builds the CLASS podcast (script → audio)
+// Content-only listening generation: builds the CLASS episode (script → audio)
 // and the comprehension questions, feeds generated vocab into the memory graph,
 // and returns both. The caller decides where to persist the questions (a class
 // section, or a practice session). No ClassSection/LessonQuestion rows here.
@@ -75,7 +75,7 @@ export interface ListeningContentParams {
 }
 
 export interface ListeningContent {
-  podcastId: string;
+  episodeId: string;
   comprehensionQuestions: ListeningComprehensionQuestion[];
 }
 
@@ -83,10 +83,10 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveLearningAi(p.userId);
 
-  // Step 2: create a CLASS podcast. When the instance pins an explicit TTS
+  // Step 2: create a CLASS episode. When the instance pins an explicit TTS
   // provider (TTS_PROVIDER, e.g. the keyless local kokoro sidecar), seed it on
-  // the podcast so the audio-generation worker renders listening audio with it.
-  const podcast = await prisma.podcast.create({
+  // the episode so the audio-generation worker renders listening audio with it.
+  const episode = await prisma.episode.create({
     data: {
       userId: p.userId,
       title: `Listening: ${p.objective}`,
@@ -98,7 +98,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       ttsProvider: getConfiguredTtsProviderId() ?? undefined,
     },
   });
-  const podcastId = podcast.id;
+  const episodeId = episode.id;
 
   try {
     // Step 3: generate the script
@@ -127,7 +127,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
     await prisma.$transaction(async (tx) => {
       await tx.script.create({
         data: {
-          podcastId,
+          episodeId,
           turns: result.turns,
           soundCues: result.soundCues.length > 0 ? result.soundCues : undefined,
           markdown: result.markdown,
@@ -137,7 +137,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       if (result.vocabulary && result.vocabulary.length > 0) {
         await tx.vocabularyEntry.createMany({
           data: result.vocabulary.map((v) => ({
-            podcastId,
+            episodeId,
             number: v.number,
             word: v.word,
             translation: v.translation,
@@ -154,13 +154,13 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
     // NOT enqueue the reference-validation worker: for non-WEB/IMPORT sources it
     // re-runs createSegmentsAndQueueAudio (segment-creator is not idempotent),
     // which would double-create segments + double-queue audio.
-    await persistGeneratedReferences(podcastId, result.references);
+    await persistGeneratedReferences(episodeId, result.references);
     if (result.references.length > 0) {
-      await addJob(verifyClassReferencesQueue, JobType.VERIFY_CLASS_REFERENCES, { podcastId });
+      await addJob(verifyClassReferencesQueue, JobType.VERIFY_CLASS_REFERENCES, { episodeId });
     }
 
     // Step 5: queue audio generation segments
-    await createSegmentsAndQueueAudio(podcastId, result.turns);
+    await createSegmentsAndQueueAudio(episodeId, result.turns);
 
     // Step 6: log usage
     logUsage({
@@ -170,7 +170,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       userId: p.userId,
-      podcastId,
+      episodeId,
     });
 
     // Step 7: upsert generated vocab into the learner's knowledge graph
@@ -217,7 +217,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       inputTokens: quizResponse.inputTokens,
       outputTokens: quizResponse.outputTokens,
       userId: p.userId,
-      podcastId,
+      episodeId,
     });
 
     // Step 10: parse quiz JSON
@@ -252,10 +252,10 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       throw new Error('Listening quiz generation produced no usable questions.');
     }
 
-    return { podcastId, comprehensionQuestions: questions };
+    return { episodeId, comprehensionQuestions: questions };
   } catch (err) {
-    // Best-effort cleanup: mark the podcast failed so it doesn't linger as PENDING.
-    await prisma.podcast.update({ where: { id: podcastId }, data: { status: 'FAILED' } }).catch(() => {});
+    // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
+    await prisma.episode.update({ where: { id: episodeId }, data: { status: 'FAILED' } }).catch(() => {});
     throw err;
   }
 }
@@ -263,7 +263,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
 // Generate the LISTENING section of a class: compose the content, then persist
 // the gated ClassSection + LessonQuestion rows.
 export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
-  const { podcastId, comprehensionQuestions } = await composeListeningContent({
+  const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: p.userId,
     courseId: p.courseId,
     level: p.level,
@@ -287,7 +287,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
         seed: `${p.classId}-LISTENING-1`,
         spec: { objective: p.objective },
         status: 'READY',
-        podcastId,
+        episodeId,
         generatedAt: new Date(),
       },
     });
@@ -306,15 +306,15 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
 
     logger.info('Listening section generated', {
       classId: p.classId,
-      podcastId,
+      episodeId,
       sectionId: section.id,
       questionCount: String(comprehensionQuestions.length),
     });
 
-    return { sectionId: section.id, podcastId };
+    return { sectionId: section.id, episodeId };
   } catch (err) {
-    // Best-effort cleanup: mark the podcast failed so it doesn't linger as PENDING.
-    await prisma.podcast.update({ where: { id: podcastId }, data: { status: 'FAILED' } }).catch(() => {});
+    // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
+    await prisma.episode.update({ where: { id: episodeId }, data: { status: 'FAILED' } }).catch(() => {});
     throw err;
   }
 }

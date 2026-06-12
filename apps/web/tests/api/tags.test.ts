@@ -32,8 +32,8 @@ describe('GET /api/v1/tags', () => {
 
   it('returns a list of tags with correct shape', async () => {
     mockPrisma.tag.findMany.mockResolvedValue([
-      { id: 'tag-1', name: 'Science', slug: 'science', _count: { podcasts: 15 } },
-      { id: 'tag-2', name: 'Technology', slug: 'technology', _count: { podcasts: 10 } },
+      { id: 'tag-1', name: 'Science', slug: 'science', _count: { episodes: 15 } },
+      { id: 'tag-2', name: 'Technology', slug: 'technology', _count: { episodes: 10 } },
     ] as never);
 
     const request = createRequest();
@@ -48,14 +48,14 @@ describe('GET /api/v1/tags', () => {
       id: 'tag-1',
       name: 'Science',
       slug: 'science',
-      podcastCount: 15,
+      episodeCount: 15,
     });
 
     expect(body[1]).toEqual({
       id: 'tag-2',
       name: 'Technology',
       slug: 'technology',
-      podcastCount: 10,
+      episodeCount: 10,
     });
   });
 
@@ -70,39 +70,39 @@ describe('GET /api/v1/tags', () => {
     expect(body).toEqual([]);
   });
 
-  it('maps _count.podcasts to podcastCount in response', async () => {
+  it('maps _count.episodes to episodeCount in response', async () => {
     mockPrisma.tag.findMany.mockResolvedValue([
-      { id: 'tag-1', name: 'Art', slug: 'art', _count: { podcasts: 0 } },
-      { id: 'tag-2', name: 'Music', slug: 'music', _count: { podcasts: 42 } },
+      { id: 'tag-1', name: 'Art', slug: 'art', _count: { episodes: 0 } },
+      { id: 'tag-2', name: 'Music', slug: 'music', _count: { episodes: 42 } },
     ] as never);
 
     const request = createRequest();
     const response = await GET(request);
     const body = await response.json();
 
-    expect(body[0].podcastCount).toBe(0);
-    expect(body[1].podcastCount).toBe(42);
+    expect(body[0].episodeCount).toBe(0);
+    expect(body[1].episodeCount).toBe(42);
 
-    // Verify _count is not in the response (it's mapped to podcastCount)
+    // Verify _count is not in the response (it's mapped to episodeCount)
     expect(body[0]).not.toHaveProperty('_count');
     expect(body[1]).not.toHaveProperty('_count');
   });
 
-  // Verifies the response preserves the order returned by the database query (ordered by podcast count desc)
-  it('returns tags ordered by podcast count descending', async () => {
+  // Verifies the response preserves the order returned by the database query (ordered by episode count desc)
+  it('returns tags ordered by episode count descending', async () => {
     mockPrisma.tag.findMany.mockResolvedValue([
-      { id: 'tag-1', name: 'Science', slug: 'science', _count: { podcasts: 50 } },
-      { id: 'tag-2', name: 'Technology', slug: 'technology', _count: { podcasts: 30 } },
-      { id: 'tag-3', name: 'History', slug: 'history', _count: { podcasts: 10 } },
+      { id: 'tag-1', name: 'Science', slug: 'science', _count: { episodes: 50 } },
+      { id: 'tag-2', name: 'Technology', slug: 'technology', _count: { episodes: 30 } },
+      { id: 'tag-3', name: 'History', slug: 'history', _count: { episodes: 10 } },
     ] as never);
 
     const request = createRequest();
     const response = await GET(request);
     const body = await response.json();
 
-    expect(body[0].podcastCount).toBe(50);
-    expect(body[1].podcastCount).toBe(30);
-    expect(body[2].podcastCount).toBe(10);
+    expect(body[0].episodeCount).toBe(50);
+    expect(body[1].episodeCount).toBe(30);
+    expect(body[2].episodeCount).toBe(10);
   });
 
 });

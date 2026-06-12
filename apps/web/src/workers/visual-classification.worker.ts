@@ -25,9 +25,9 @@ const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, userId, zeroCostVideo: zeroCostFromPayload } = job.data;
+  const { episodeId, videoGenerationId, userId, zeroCostVideo: zeroCostFromPayload } = job.data;
 
-  logger.info('Starting visual classification', { podcastId, videoGenerationId });
+  logger.info('Starting visual classification', { episodeId, videoGenerationId });
   await job.updateProgress(10);
 
   // Update status
@@ -37,10 +37,10 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
   });
 
   try {
-    // Fetch podcast metadata + resolve AI model + segment timing + source data
-    const [podcast, segmentTimings, discovery] = await Promise.all([
-      prisma.podcast.findUniqueOrThrow({
-        where: { id: podcastId },
+    // Fetch episode metadata + resolve AI model + segment timing + source data
+    const [episode, segmentTimings, discovery] = await Promise.all([
+      prisma.episode.findUniqueOrThrow({
+        where: { id: episodeId },
         select: {
           aiModel: true,
           title: true,
@@ -51,9 +51,9 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
           },
         },
       }),
-      resolveSegmentTiming(podcastId),
+      resolveSegmentTiming(episodeId),
       prisma.discovery.findUnique({
-        where: { podcastId },
+        where: { episodeId },
         select: { sourceMetadata: true },
       }),
     ]);
@@ -64,26 +64,26 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     });
     const zeroCostVideo = videoGenRecord?.zeroCostVideo ?? zeroCostFromPayload ?? false;
 
-    const aiKey = podcast.aiModel ? null : await getAiKey(userId);
-    if (!podcast.aiModel && !aiKey) {
+    const aiKey = episode.aiModel ? null : await getAiKey(userId);
+    if (!episode.aiModel && !aiKey) {
       throw new Error('AI model is required for visual classification when no AI key is configured.');
     }
 
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
-      podcastAiModel: podcast.aiModel,
+      episodeAiModel: episode.aiModel,
       aiKey,
     });
 
     const providerAiKey =
-      podcast.aiModel && aiProvider !== 'claude-code'
+      episode.aiModel && aiProvider !== 'claude-code'
         ? await getAiKey(userId, aiProvider as AiProviderId)
         : aiKey;
-    if (podcast.aiModel && aiProvider !== 'claude-code' && !providerAiKey) {
+    if (episode.aiModel && aiProvider !== 'claude-code' && !providerAiKey) {
       throw new Error(`AI key for provider "${aiProvider}" is required for visual classification.`);
     }
 
     if (segmentTimings.length === 0) {
-      throw new Error('No segments found for podcast');
+      throw new Error('No segments found for episode');
     }
 
     const motionProvider = await resolveMotionProvider();
@@ -115,8 +115,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
 
     const { classifications, transitionRecommendations, inputTokens, outputTokens, model } = await classifySegmentVisuals(
       segmentInputs,
-      podcast.title,
-      podcast.topic,
+      episode.title,
+      episode.topic,
       { provider: aiProvider, model: aiModel, apiKeyOverride: providerAiKey?.apiKey, structuredData, zeroCostVideo },
     );
 
@@ -172,7 +172,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       });
 
       if (programmaticVisuals.length > 0) {
-        const segmentMap = new Map(podcast.segments.map((s) => [s.id, s]));
+        const segmentMap = new Map(episode.segments.map((s) => [s.id, s]));
 
         // Process in batches to avoid overwhelming the sidecar
         for (let i = 0; i < programmaticVisuals.length; i += STILL_CONCURRENCY) {
@@ -203,8 +203,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
               ]);
 
               const [firstFrameUrl, lastFrameUrl] = await Promise.all([
-                uploadFile(`podcasts/${podcastId}/visuals/${visual.id}-first-frame.png`, firstBuf, 'image/png'),
-                uploadFile(`podcasts/${podcastId}/visuals/${visual.id}-last-frame.png`, lastBuf, 'image/png'),
+                uploadFile(`episodes/${episodeId}/visuals/${visual.id}-first-frame.png`, firstBuf, 'image/png'),
+                uploadFile(`episodes/${episodeId}/visuals/${visual.id}-last-frame.png`, lastBuf, 'image/png'),
               ]);
 
               await prisma.segmentVisual.update({
@@ -271,14 +271,14 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
           const meta = (visual.metadata as Record<string, unknown>) ?? {};
           const places = (meta.places as Array<{ name: string; yearHint?: number }>) ?? [];
           await addJob(placeEnrichmentQueue, JobType.PLACE_ENRICHMENT, {
-            podcastId,
+            episodeId,
             videoGenerationId,
             segmentVisualId: visual.id,
             places,
           });
         } else {
           await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
-            podcastId,
+            episodeId,
             videoGenerationId,
             segmentVisualId: visual.id,
             visualType: visual.visualType,
@@ -290,7 +290,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     } else {
       // All sub-visuals are programmatic (Remotion) — skip straight to composition
       await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-        podcastId,
+        episodeId,
         videoGenerationId,
       });
     }
@@ -302,14 +302,14 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       category: 'video_generation',
       inputTokens,
       outputTokens,
-      podcastId,
+      episodeId,
       userId,
       metadata: { stage: 'classification', segmentCount: classifications.length },
     });
 
     await job.updateProgress(100);
     logger.info('Visual classification complete', {
-      podcastId,
+      episodeId,
       videoGenerationId,
       totalSegments: String(classifications.length),
       pendingVisuals: String(pendingCount),
@@ -317,7 +317,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error('Visual classification failed', { podcastId, videoGenerationId, error: message });
+    logger.error('Visual classification failed', { episodeId, videoGenerationId, error: message });
 
     await prisma.videoGeneration.update({
       where: { id: videoGenerationId },

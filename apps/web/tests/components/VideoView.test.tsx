@@ -10,7 +10,7 @@ beforeAll(() => {
     disconnect() {}
   } as unknown as typeof ResizeObserver;
 });
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 
@@ -28,14 +28,14 @@ vi.mock('@/components/providers/AudioPlayerProvider', () => ({
     audioUrl: null,
     volume: 1,
     playbackRate: 1,
-    podcastId: null,
+    episodeId: null,
     play: vi.fn(),
     pause: vi.fn(),
     seek: vi.fn(),
     skip: vi.fn(),
     setVolume: vi.fn(),
     setPlaybackRate: vi.fn(),
-    loadPodcast: vi.fn(),
+    loadEpisode: vi.fn(),
   }),
 }));
 

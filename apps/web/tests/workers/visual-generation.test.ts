@@ -13,7 +13,7 @@ const {
   mockPrisma: {
     segmentVisual: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn(), findMany: vi.fn() },
     segment: { findUnique: vi.fn() },
-    podcast: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
+    episode: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
     videoGeneration: { findUnique: vi.fn(), update: vi.fn() },
     avatarOverlay: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
     segmentTransition: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
@@ -84,7 +84,7 @@ beforeEach(() => {
 
 describe('visual-generation worker', () => {
   const baseData = {
-    podcastId: 'pod-1',
+    episodeId: 'pod-1',
     videoGenerationId: 'vg-1',
     segmentVisualId: 'sv-1',
     visualType: 'AI_ILLUSTRATION',
@@ -111,8 +111,8 @@ describe('visual-generation worker', () => {
     mockPrisma.segmentVisual.findUnique
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique
       .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
       .mockResolvedValueOnce({ imageModel: 'fal-flux-1-schnell' });       // generateAiImage
@@ -140,7 +140,7 @@ describe('visual-generation worker', () => {
       height: 720,
     });
     expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/visuals/sv-1.png',
+      'episodes/pod-1/visuals/sv-1.png',
       expect.any(Buffer),
       'image/png',
     );
@@ -155,8 +155,8 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockSearchStockVideo.mockResolvedValue(null);
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique
       .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
       .mockResolvedValueOnce({ imageModel: 'fal-flux-1-schnell' });       // generateAiImage
@@ -191,7 +191,7 @@ describe('visual-generation worker', () => {
     });
     // Should upload the generated image
     expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/visuals/sv-1.png',
+      'episodes/pod-1/visuals/sv-1.png',
       expect.any(Buffer),
       'image/png',
     );
@@ -234,7 +234,7 @@ describe('visual-generation worker', () => {
       'vintage',
     );
     expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/visuals/sv-1.png',
+      'episodes/pod-1/visuals/sv-1.png',
       expect.any(Buffer),
       'image/png',
     );
@@ -244,8 +244,8 @@ describe('visual-generation worker', () => {
     mockPrisma.segmentVisual.findUnique
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique
       .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
       .mockResolvedValueOnce({ imageModel: 'flux-schnell' });             // generateAiImage
@@ -290,8 +290,8 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce({ visualMode: 'video', videoModel: 'minimax-hailuo02-512p', endStatePrompt: 'scene ends' }) // mode check
       .mockResolvedValueOnce({ segmentId: 'seg-1', subDuration: null });                                                    // duration lookup
     mockPrisma.segment.findUnique.mockResolvedValue({ duration: 8 });
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique
       .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
       .mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });           // generateAiImage (called multiple times for video)
@@ -344,12 +344,12 @@ describe('visual-generation worker', () => {
     });
     // Should upload both frames to R2
     expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/visuals/sv-1-first-frame.png',
+      'episodes/pod-1/visuals/sv-1-first-frame.png',
       expect.any(Buffer),
       'image/png',
     );
     expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/visuals/sv-1-last-frame.png',
+      'episodes/pod-1/visuals/sv-1-last-frame.png',
       expect.any(Buffer),
       'image/png',
     );
@@ -371,8 +371,8 @@ describe('visual-generation worker', () => {
     mockPrisma.segmentVisual.findUnique
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique
       .mockResolvedValueOnce({ zeroCostVideo: false })
       .mockResolvedValueOnce({ imageModel: null });
@@ -395,7 +395,7 @@ describe('visual-generation worker', () => {
     expect(mockAddJob).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'video-composition' }),
       'compose_video',
-      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
+      expect.objectContaining({ episodeId: 'pod-1', videoGenerationId: 'vg-1' }),
     );
   });
 
@@ -415,8 +415,8 @@ describe('visual-generation worker', () => {
       { order: 2, videoModel: null, failureReason: 'timeout' },
     ]);
 
-    // Podcast lookup for notification
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    // Episode lookup for notification
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
 
     await processVisualGeneration(makeJob(baseData));
 
@@ -440,8 +440,8 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
 
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique
       .mockResolvedValueOnce({ zeroCostVideo: false })
       .mockResolvedValueOnce({ imageModel: null });
@@ -473,7 +473,7 @@ describe('visual-generation worker', () => {
 
     // One pending avatar overlay
     mockPrisma.avatarOverlay.count.mockResolvedValueOnce(1);
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.avatarOverlay.findMany.mockResolvedValueOnce([
       {
         id: 'ao-1',

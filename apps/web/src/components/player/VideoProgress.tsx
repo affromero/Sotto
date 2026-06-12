@@ -47,7 +47,7 @@ interface VideoStatusResponse {
 }
 
 interface VideoProgressProps {
-  podcastId: string;
+  episodeId: string;
   videoGenerationId: string;
   onComplete: (visuals: SegmentVisual[]) => void;
   onFailed?: (reason: string) => void;
@@ -175,7 +175,7 @@ function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
   );
 }
 
-export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit, onChangeAvatars, onDismiss }: VideoProgressProps) {
+export function VideoProgress({ episodeId, videoGenerationId, onComplete, onFailed, onRequestEdit, onChangeAvatars, onDismiss }: VideoProgressProps) {
   const [data, setData] = useState<VideoStatusResponse | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -191,7 +191,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
 
   const poll = useCallback(async () => {
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
+      const res = await fetch(`/api/v1/episodes/${episodeId}/video`);
       if (!res.ok) { schedulePoll(5000); return; }
       const json = await res.json() as VideoStatusResponse;
       if (!json.status) { schedulePoll(5000); return; }
@@ -219,7 +219,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
     } catch {
       schedulePoll(5000);
     }
-  }, [podcastId, onComplete, onFailed, schedulePoll]);
+  }, [episodeId, onComplete, onFailed, schedulePoll]);
 
   useEffect(() => {
     pollRef.current = poll;
@@ -255,7 +255,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
     setRetrying(true);
     setRetryError(null);
     try {
-      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`, {
+      const res = await fetch(`/api/v1/episodes/${episodeId}/video`, {
         method: 'POST',
       });
       if (!res.ok) {

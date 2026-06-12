@@ -14,7 +14,7 @@ vi.mock('@/lib/logger', () => ({
 import { classifySegmentVisuals, type SegmentInput } from '@/lib/visual-classifier';
 
 const SEGMENTS: SegmentInput[] = [
-  { segmentId: 'seg-1', order: 0, speaker: 'Host', text: 'Welcome to our podcast about AI.', duration: 5 },
+  { segmentId: 'seg-1', order: 0, speaker: 'Host', text: 'Welcome to our episode about AI.', duration: 5 },
   { segmentId: 'seg-2', order: 1, speaker: 'Expert', text: 'In 2023, AI saw a 300% increase in adoption.', duration: 8 },
   { segmentId: 'seg-3', order: 2, speaker: 'Host', text: 'As Einstein once said, imagination is more important than knowledge.', duration: 6 },
 ];
@@ -97,7 +97,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic', AI_RUNTIME);
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Episode', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     // Each legacy item should be wrapped as a single sub-visual
@@ -148,7 +148,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic', AI_RUNTIME);
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Episode', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications[1].subVisuals[0].visualType).toBe('TEXT_CARD');
@@ -164,7 +164,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic', AI_RUNTIME);
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Episode', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications.every((c) => c.subVisuals[0].visualType === 'TEXT_CARD')).toBe(true);

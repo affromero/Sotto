@@ -2,8 +2,8 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { z } from 'zod';
 import { SottoClient, ApiError } from './client.js';
 import {
-  formatPodcastDetail,
-  formatPodcastList,
+  formatEpisodeDetail,
+  formatEpisodeList,
   formatProfile,
   formatCreated,
   formatAgentIngested,
@@ -24,11 +24,11 @@ export function createServer(client: SottoClient): McpServer {
   // --- Tools ---
 
   server.tool(
-    'create_podcast',
-    'Create an AI podcast from a topic. Returns the podcast ID and kicks off the generation pipeline.',
+    'create_episode',
+    'Create an AI episode from a topic. Returns the episode ID and kicks off the generation pipeline.',
     {
-      title: z.string().describe('Podcast title'),
-      topic: z.string().describe('What the podcast should be about'),
+      title: z.string().describe('Episode title'),
+      topic: z.string().describe('What the episode should be about'),
       depth: z
         .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
         .optional()
@@ -55,7 +55,7 @@ export function createServer(client: SottoClient): McpServer {
     },
     async (params) => {
       try {
-        const result = await client.createPodcast(params);
+        const result = await client.createEpisode(params);
         return { content: [{ type: 'text', text: formatCreated(result) }] };
       } catch (err) {
         return errorResult(err);
@@ -65,9 +65,9 @@ export function createServer(client: SottoClient): McpServer {
 
   server.tool(
     'ingest_agent_output',
-    'Create a private Sotto podcast from output produced by a local agent run.',
+    'Create a private Sotto episode from output produced by a local agent run.',
     {
-      title: z.string().describe('Podcast title'),
+      title: z.string().describe('Episode title'),
       content: z.string().describe('Raw agent output, transcript, notes, or report to turn into audio'),
       tts_provider: z
         .enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral'])
@@ -76,7 +76,7 @@ export function createServer(client: SottoClient): McpServer {
       idempotency_key: z
         .string()
         .optional()
-        .describe('Stable run key so retries do not create duplicate podcasts'),
+        .describe('Stable run key so retries do not create duplicate episodes'),
       source_url: z.string().optional().describe('Optional URL for the source run or report'),
       duration_minutes: z.number().min(1).max(40).optional().describe('Target duration in minutes'),
       depth: z
@@ -113,15 +113,15 @@ export function createServer(client: SottoClient): McpServer {
   );
 
   server.tool(
-    'get_podcast',
-    'Get podcast details including status, segments, and Q&A interactions.',
+    'get_episode',
+    'Get episode details including status, segments, and Q&A interactions.',
     {
-      podcast_id: z.string().describe('The podcast ID'),
+      episode_id: z.string().describe('The episode ID'),
     },
-    async ({ podcast_id }) => {
+    async ({ episode_id }) => {
       try {
-        const podcast = await client.getPodcast(podcast_id);
-        return { content: [{ type: 'text', text: formatPodcastDetail(podcast) }] };
+        const episode = await client.getEpisode(episode_id);
+        return { content: [{ type: 'text', text: formatEpisodeDetail(episode) }] };
       } catch (err) {
         return errorResult(err);
       }
@@ -129,13 +129,13 @@ export function createServer(client: SottoClient): McpServer {
   );
 
   server.tool(
-    'list_podcasts',
-    'List all your podcasts, ordered by most recent first.',
+    'list_episodes',
+    'List all your episodes, ordered by most recent first.',
     {},
     async () => {
       try {
-        const podcasts = await client.listPodcasts();
-        return { content: [{ type: 'text', text: formatPodcastList(podcasts) }] };
+        const episodes = await client.listEpisodes();
+        return { content: [{ type: 'text', text: formatEpisodeList(episodes) }] };
       } catch (err) {
         return errorResult(err);
       }
@@ -143,10 +143,10 @@ export function createServer(client: SottoClient): McpServer {
   );
 
   server.tool(
-    'update_podcast',
-    "Update a podcast's title, topic, or visibility.",
+    'update_episode',
+    "Update a episode's title, topic, or visibility.",
     {
-      podcast_id: z.string().describe('The podcast ID'),
+      episode_id: z.string().describe('The episode ID'),
       title: z.string().optional().describe('New title'),
       topic: z.string().optional().describe('New topic description'),
       visibility: z
@@ -154,10 +154,10 @@ export function createServer(client: SottoClient): McpServer {
         .optional()
         .describe('Visibility setting'),
     },
-    async ({ podcast_id, ...params }) => {
+    async ({ episode_id, ...params }) => {
       try {
-        const updated = await client.updatePodcast(podcast_id, params);
-        return { content: [{ type: 'text', text: formatPodcastDetail(updated) }] };
+        const updated = await client.updateEpisode(episode_id, params);
+        return { content: [{ type: 'text', text: formatEpisodeDetail(updated) }] };
       } catch (err) {
         return errorResult(err);
       }
@@ -165,14 +165,14 @@ export function createServer(client: SottoClient): McpServer {
   );
 
   server.tool(
-    'delete_podcast',
-    'Delete a podcast you own. This is irreversible.',
+    'delete_episode',
+    'Delete a episode you own. This is irreversible.',
     {
-      podcast_id: z.string().describe('The podcast ID to delete'),
+      episode_id: z.string().describe('The episode ID to delete'),
     },
-    async ({ podcast_id }) => {
+    async ({ episode_id }) => {
       try {
-        await client.deletePodcast(podcast_id);
+        await client.deleteEpisode(episode_id);
         return { content: [{ type: 'text', text: formatDeleted() }] };
       } catch (err) {
         return errorResult(err);
@@ -180,7 +180,7 @@ export function createServer(client: SottoClient): McpServer {
     }
   );
 
-  server.tool('get_me', 'Get your Sotto profile and private podcast count.', {}, async () => {
+  server.tool('get_me', 'Get your Sotto profile and private episode count.', {}, async () => {
     try {
       const profile = await client.getMe();
       return { content: [{ type: 'text', text: formatProfile(profile) }] };
@@ -192,14 +192,14 @@ export function createServer(client: SottoClient): McpServer {
   // --- Resources ---
 
   server.resource(
-    'podcast',
-    new ResourceTemplate('sotto://podcasts/{id}', {
+    'episode',
+    new ResourceTemplate('sotto://episodes/{id}', {
       list: async () => {
         try {
-          const podcasts = await client.listPodcasts();
+          const episodes = await client.listEpisodes();
           return {
-            resources: podcasts.map((p) => ({
-              uri: `sotto://podcasts/${p.id}`,
+            resources: episodes.map((p) => ({
+              uri: `sotto://episodes/${p.id}`,
               name: p.title,
               description: `${p.status} — ${p.topic}`,
               mimeType: 'application/json',
@@ -211,13 +211,13 @@ export function createServer(client: SottoClient): McpServer {
       },
     }),
     async (uri, { id }) => {
-      const podcast = await client.getPodcast(id as string);
+      const episode = await client.getEpisode(id as string);
       return {
         contents: [
           {
             uri: uri.href,
             mimeType: 'application/json',
-            text: JSON.stringify(podcast, null, 2),
+            text: JSON.stringify(episode, null, 2),
           },
         ],
       };

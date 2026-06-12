@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Hoisted mock handles (vi.hoisted so they are available before vi.mock calls) ----
 
 const {
-  mockPodcastCreate,
-  mockPodcastUpdate,
+  mockEpisodeCreate,
+  mockEpisodeUpdate,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,
@@ -12,8 +12,8 @@ const {
   mockLessonQuestionCreateMany,
   mockTransaction,
 } = vi.hoisted(() => {
-  const podcastCreate = vi.fn();
-  const podcastUpdate = vi.fn();
+  const episodeCreate = vi.fn();
+  const episodeUpdate = vi.fn();
   const scriptCreate = vi.fn();
   const vocabEntryCreateMany = vi.fn();
   const learnerVocabUpsert = vi.fn();
@@ -22,8 +22,8 @@ const {
   const transaction = vi.fn();
 
   return {
-    mockPodcastCreate: podcastCreate,
-    mockPodcastUpdate: podcastUpdate,
+    mockEpisodeCreate: episodeCreate,
+    mockEpisodeUpdate: episodeUpdate,
     mockScriptCreate: scriptCreate,
     mockVocabEntryCreateMany: vocabEntryCreateMany,
     mockLearnerVocabUpsert: learnerVocabUpsert,
@@ -53,9 +53,9 @@ const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    podcast: {
-      create: (...args: unknown[]) => mockPodcastCreate(...args),
-      update: (...args: unknown[]) => mockPodcastUpdate(...args),
+    episode: {
+      create: (...args: unknown[]) => mockEpisodeCreate(...args),
+      update: (...args: unknown[]) => mockEpisodeUpdate(...args),
     },
     script: {
       create: (...args: unknown[]) => mockScriptCreate(...args),
@@ -132,7 +132,7 @@ import type { ClassListeningParams, ListeningContentParams } from '@/lib/class-l
 // ---- Fixtures ----
 
 const SAMPLE_TURNS = [
-  { speaker: 'HOST', text: 'Hola, bienvenidos al podcast.' },
+  { speaker: 'HOST', text: 'Hola, bienvenidos al episode.' },
   { speaker: 'EXPERT', text: 'Hoy hablamos sobre saludos.' },
 ];
 
@@ -163,7 +163,7 @@ const SAMPLE_SCRIPT_RESULT = {
   references: [],
   vocabulary: SAMPLE_VOCABULARY,
   places: [],
-  markdown: '## Podcast\n\nHola, bienvenidos.',
+  markdown: '## Episode\n\nHola, bienvenidos.',
   inputTokens: 100,
   outputTokens: 200,
   model: 'm',
@@ -213,8 +213,8 @@ const PARAMS: ClassListeningParams = {
 function setupHappyPath() {
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
   mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
-  mockPodcastCreate.mockResolvedValue({ id: 'podcast-1' });
-  mockPodcastUpdate.mockResolvedValue({});
+  mockEpisodeCreate.mockResolvedValue({ id: 'episode-1' });
+  mockEpisodeUpdate.mockResolvedValue({});
   mockGenerateScript.mockResolvedValue(SAMPLE_SCRIPT_RESULT);
 
   // $transaction receives a callback; execute it with a tx proxy that delegates to the mocks
@@ -251,20 +251,20 @@ describe('generateClassListening', () => {
   });
 
   describe('happy path', () => {
-    it('returns { sectionId, podcastId } on success', async () => {
+    it('returns { sectionId, episodeId } on success', async () => {
       setupHappyPath();
 
       const result = await generateClassListening(PARAMS);
 
-      expect(result).toEqual({ sectionId: 'section-1', podcastId: 'podcast-1' });
+      expect(result).toEqual({ sectionId: 'section-1', episodeId: 'episode-1' });
     });
 
-    it('creates a CLASS-source PRIVATE podcast for the user', async () => {
+    it('creates a CLASS-source PRIVATE episode for the user', async () => {
       setupHappyPath();
 
       await generateClassListening(PARAMS);
 
-      expect(mockPodcastCreate).toHaveBeenCalledWith(
+      expect(mockEpisodeCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             userId: 'u1',
@@ -277,13 +277,13 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('seeds the CLASS podcast with the configured local TTS provider (TTS_PROVIDER=kokoro)', async () => {
+    it('seeds the CLASS episode with the configured local TTS provider (TTS_PROVIDER=kokoro)', async () => {
       setupHappyPath();
       mockGetConfiguredTtsProviderId.mockReturnValue('kokoro');
 
       await generateClassListening(PARAMS);
 
-      expect(mockPodcastCreate).toHaveBeenCalledWith(
+      expect(mockEpisodeCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ ttsProvider: 'kokoro' }),
         }),
@@ -314,7 +314,7 @@ describe('generateClassListening', () => {
       expect(mockScriptCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            podcastId: 'podcast-1',
+            episodeId: 'episode-1',
             turns: SAMPLE_TURNS,
             markdown: SAMPLE_SCRIPT_RESULT.markdown,
           }),
@@ -323,19 +323,19 @@ describe('generateClassListening', () => {
       expect(mockVocabEntryCreateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.arrayContaining([
-            expect.objectContaining({ podcastId: 'podcast-1', word: 'hola', translation: 'hello' }),
-            expect.objectContaining({ podcastId: 'podcast-1', word: 'gracias', translation: 'thank you' }),
+            expect.objectContaining({ episodeId: 'episode-1', word: 'hola', translation: 'hello' }),
+            expect.objectContaining({ episodeId: 'episode-1', word: 'gracias', translation: 'thank you' }),
           ]),
         }),
       );
     });
 
-    it('calls createSegmentsAndQueueAudio with podcastId and the turns', async () => {
+    it('calls createSegmentsAndQueueAudio with episodeId and the turns', async () => {
       setupHappyPath();
 
       await generateClassListening(PARAMS);
 
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('podcast-1', SAMPLE_TURNS);
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-1', SAMPLE_TURNS);
     });
 
     it('upserts each generated vocabulary word into learnerVocab', async () => {
@@ -360,7 +360,7 @@ describe('generateClassListening', () => {
       }
     });
 
-    it('creates a LISTENING ClassSection with the podcastId and status READY', async () => {
+    it('creates a LISTENING ClassSection with the episodeId and status READY', async () => {
       setupHappyPath();
 
       await generateClassListening(PARAMS);
@@ -371,7 +371,7 @@ describe('generateClassListening', () => {
             classId: 'class-1',
             skill: 'LISTENING',
             status: 'READY',
-            podcastId: 'podcast-1',
+            episodeId: 'episode-1',
           }),
         }),
       );
@@ -404,10 +404,10 @@ describe('generateClassListening', () => {
 
       expect(mockLogUsage).toHaveBeenCalledTimes(2);
       expect(mockLogUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'class-listening-script', userId: 'u1', podcastId: 'podcast-1' }),
+        expect.objectContaining({ category: 'class-listening-script', userId: 'u1', episodeId: 'episode-1' }),
       );
       expect(mockLogUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'class-listening-quiz', userId: 'u1', podcastId: 'podcast-1' }),
+        expect.objectContaining({ category: 'class-listening-quiz', userId: 'u1', episodeId: 'episode-1' }),
       );
     });
   });
@@ -431,16 +431,16 @@ describe('generateClassListening', () => {
       await expect(generateClassListening(PARAMS)).rejects.toThrow(/No default AI model/);
     });
 
-    it('marks podcast FAILED and re-throws when generateScript throws', async () => {
+    it('marks episode FAILED and re-throws when generateScript throws', async () => {
       mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
       mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
-      mockPodcastCreate.mockResolvedValue({ id: 'podcast-1' });
-      mockPodcastUpdate.mockResolvedValue({});
+      mockEpisodeCreate.mockResolvedValue({ id: 'episode-1' });
+      mockEpisodeUpdate.mockResolvedValue({});
       mockGenerateScript.mockRejectedValue(new Error('AI timeout'));
 
       await expect(generateClassListening(PARAMS)).rejects.toThrow('AI timeout');
-      expect(mockPodcastUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'podcast-1' }, data: { status: 'FAILED' } }),
+      expect(mockEpisodeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'episode-1' }, data: { status: 'FAILED' } }),
       );
     });
 
@@ -454,8 +454,8 @@ describe('generateClassListening', () => {
       });
 
       await expect(generateClassListening(PARAMS)).rejects.toThrow(/malformed output/);
-      // Podcast should be marked FAILED on error
-      expect(mockPodcastUpdate).toHaveBeenCalledWith(
+      // Episode should be marked FAILED on error
+      expect(mockEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'FAILED' } }),
       );
     });
@@ -524,12 +524,12 @@ describe('composeListeningContent', () => {
     mustIncludeVocab: [{ word: 'hola', translation: 'hello' }],
   };
 
-  it('returns the podcast id + comprehension questions without persisting a class section', async () => {
+  it('returns the episode id + comprehension questions without persisting a class section', async () => {
     setupHappyPath();
 
     const content = await composeListeningContent(CONTENT_PARAMS);
 
-    expect(content.podcastId).toBe('podcast-1');
+    expect(content.episodeId).toBe('episode-1');
     expect(content.comprehensionQuestions.length).toBeGreaterThan(0);
     expect(content.comprehensionQuestions[0]).toMatchObject({
       question: expect.any(String),
@@ -564,7 +564,7 @@ describe('composeListeningContent', () => {
       );
       // Empty references → persistGeneratedReferences is a no-op caller-side and
       // the verify-class-references job is never enqueued.
-      expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('podcast-1', []);
+      expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('episode-1', []);
       expect(mockAddJob).not.toHaveBeenCalled();
     });
   });
@@ -611,11 +611,11 @@ describe('composeListeningContent', () => {
 
       await composeListeningContent(SOURCED_PARAMS);
 
-      expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('podcast-1', SOURCED_REFERENCES);
+      expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('episode-1', SOURCED_REFERENCES);
       expect(mockAddJob).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'verify-class-references' }),
         'verify_class_references',
-        { podcastId: 'podcast-1' },
+        { episodeId: 'episode-1' },
       );
     });
 
@@ -640,7 +640,7 @@ describe('composeListeningContent', () => {
       await composeListeningContent(SOURCED_PARAMS);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('podcast-1', SAMPLE_TURNS);
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-1', SAMPLE_TURNS);
     });
   });
 });

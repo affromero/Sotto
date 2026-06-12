@@ -5,7 +5,7 @@ import { Check, AlertCircle, Pause, ShieldCheck } from 'lucide-react';
 import { useRotatingMessage } from '@/lib/hooks/useRotatingMessage';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { getVerificationStandardUrl } from '@/lib/public-links';
-import type { VerificationProgressSnapshot } from '@/types/podcast';
+import type { VerificationProgressSnapshot } from '@/types/episode';
 import styles from './GenerationProgress.module.css';
 
 const COMPILE_STAGES = new Set(['COMPILING']);

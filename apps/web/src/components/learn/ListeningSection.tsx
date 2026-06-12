@@ -3,17 +3,17 @@
 /**
  * ListeningSection — the audio player + comprehension module from the design
  * bundle (`class-listening.jsx`), wired to a real <audio> element fed by the
- * section's `podcast.audioUrl`. Waveform bars are driven from `timeupdate`
+ * section's `episode.audioUrl`. Waveform bars are driven from `timeupdate`
  * progress (a fixed pseudo-amplitude envelope — we have no precomputed peaks).
  *
- * Adaptation: our class `podcast` carries no transcript array, so the design's
+ * Adaptation: our class `episode` carries no transcript array, so the design's
  * transcript toggle is omitted; the player + MCQ are the live surface.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, MasteryMeter } from './ClassWidgets';
-import { fmtClock, type ClassQuestion, type ClassSectionPodcast } from './classTypes';
+import { fmtClock, type ClassQuestion, type ClassSectionEpisode } from './classTypes';
 import styles from './ListeningSection.module.css';
 
 const BAR_COUNT = 56;
@@ -33,7 +33,7 @@ function genWave(n: number, seed = 13): number[] {
 }
 
 interface ListeningSectionProps {
-  podcast: ClassSectionPodcast | null;
+  episode: ClassSectionEpisode | null;
   questions: ClassQuestion[];
   gate: number; // 0..100
   nextName: string | null;
@@ -43,7 +43,7 @@ interface ListeningSectionProps {
 }
 
 export function ListeningSection({
-  podcast,
+  episode,
   questions,
   gate,
   nextName,
@@ -98,7 +98,7 @@ export function ListeningSection({
   }
 
   const playedTo = duration > 0 ? elapsed / duration : 0;
-  const hasAudio = !!podcast?.audioUrl;
+  const hasAudio = !!episode?.audioUrl;
 
   return (
     <div className={styles.root}>
@@ -115,7 +115,7 @@ export function ListeningSection({
         <div className={styles.player}>
           <div className={styles.playerTop}>
             <div className={styles.playerMeta}>
-              <div className={styles.playerTitle}>{podcast?.title ?? 'Lesson audio'}</div>
+              <div className={styles.playerTitle}>{episode?.title ?? 'Lesson audio'}</div>
               <div className={styles.playerGloss}>
                 {hasAudio ? 'adaptive speed' : 'audio still generating'}
               </div>
@@ -159,10 +159,10 @@ export function ListeningSection({
             </div>
           </div>
 
-          {hasAudio && podcast?.audioUrl && (
+          {hasAudio && episode?.audioUrl && (
             <audio
               ref={audioRef}
-              src={podcast.audioUrl}
+              src={episode.audioUrl}
               preload="metadata"
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}

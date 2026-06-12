@@ -129,7 +129,7 @@ PENDING -> DISCOVERING -> EXTRACTING -> SCRIPTING -> VERIFYING_SCRIPT -> VALIDAT
 - Do not hardcode model names or provider IDs.
 - Do not create fallback chains that pick providers by key availability. Use explicit provider selection through `resolveSttProvider()`, `resolveTtsProvider()`, `resolveAutoModel()`, or the closest existing resolver.
 - Do not reuse the same two voices for every generated lesson unless the learner explicitly selected them.
-- Do not create admin endpoints or scripts that bulk-delete R2 files. Segment audio and podcast audio are protected in `deleteFile()`; never bypass that guard.
+- Do not create admin endpoints or scripts that bulk-delete R2 files. Segment audio and episode audio are protected in `deleteFile()`; never bypass that guard.
 - Do not require Doppler for local OSS workflows.
 
 ## Frontend Quality

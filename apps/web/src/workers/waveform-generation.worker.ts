@@ -10,32 +10,32 @@ import { readFile } from 'fs/promises';
 import { tmpdir } from 'os';
 
 export async function processWaveformGeneration(job: Job<GenerateWaveformPayload>): Promise<void> {
-  const { podcastId } = job.data;
+  const { episodeId } = job.data;
 
-  logger.info('Generating waveform data', { podcastId });
+  logger.info('Generating waveform data', { episodeId });
   await job.updateProgress(10);
 
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: { audioUrl: true },
   });
 
-  if (!podcast.audioUrl) {
-    throw new Error(`Podcast ${podcastId} has no audioUrl`);
+  if (!episode.audioUrl) {
+    throw new Error(`Episode ${episodeId} has no audioUrl`);
   }
 
   const tmpDir = await mkdtemp(join(tmpdir(), 'waveform-'));
 
   try {
     const audioPath = join(tmpDir, 'audio.mp3');
-    await downloadToFile(podcast.audioUrl, audioPath);
+    await downloadToFile(episode.audioUrl, audioPath);
     await job.updateProgress(30);
 
     // Extract waveform peaks
     const peaks = await extractWaveformPeaks(audioPath);
     const peaksJson = Buffer.from(JSON.stringify(peaks), 'utf-8');
     const waveformUrl = await uploadFile(
-      `podcasts/${podcastId}/waveform.json`,
+      `episodes/${episodeId}/waveform.json`,
       peaksJson,
       'application/json',
     );
@@ -48,22 +48,22 @@ export async function processWaveformGeneration(job: Job<GenerateWaveformPayload
       await generateSpectrogram(audioPath, spectrogramPath);
       const spectrogramBuffer = await readFile(spectrogramPath);
       spectrogramUrl = await uploadFile(
-        `podcasts/${podcastId}/spectrogram.png`,
+        `episodes/${episodeId}/spectrogram.png`,
         spectrogramBuffer,
         'image/png',
       );
     } catch (err) {
       // Spectrogram is optional — showspectrumpic may not be available
       logger.warn('Spectrogram generation failed, skipping', {
-        podcastId,
+        episodeId,
         error: err instanceof Error ? err.message : String(err),
       });
     }
     await job.updateProgress(80);
 
-    // Update podcast record
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    // Update episode record
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: {
         waveformUrl,
         ...(spectrogramUrl ? { spectrogramUrl } : {}),
@@ -71,7 +71,7 @@ export async function processWaveformGeneration(job: Job<GenerateWaveformPayload
     });
 
     await job.updateProgress(100);
-    logger.info('Waveform generation complete', { podcastId, waveformUrl, spectrogramUrl });
+    logger.info('Waveform generation complete', { episodeId, waveformUrl, spectrogramUrl });
   } finally {
     await rm(tmpDir, { recursive: true }).catch(() => {});
   }

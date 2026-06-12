@@ -1,6 +1,6 @@
-// Verify-only worker for sourced-class podcasts.
+// Verify-only worker for sourced-class episodes.
 //
-// ⚠️ A class podcast ALREADY created its segments and queued audio in
+// ⚠️ A class episode ALREADY created its segments and queued audio in
 // `composeListeningContent` (via `createSegmentsAndQueueAudio`). The normal
 // `reference-validation` worker is NOT idempotent for that step: for any
 // non-WEB/IMPORT source it auto-approves and calls `createSegmentsAndQueueAudio`
@@ -21,24 +21,24 @@ import { logger } from '@/lib/logger';
 export async function processVerifyClassReferences(
   job: Job<VerifyClassReferencesPayload>,
 ): Promise<void> {
-  const { podcastId } = job.data;
+  const { episodeId } = job.data;
 
-  const [podcast, script, references] = await Promise.all([
-    prisma.podcast.findUnique({
-      where: { id: podcastId },
+  const [episode, script, references] = await Promise.all([
+    prisma.episode.findUnique({
+      where: { id: episodeId },
       select: { userId: true, topic: true, title: true },
     }),
     prisma.script.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { turns: true },
     }),
-    prisma.reference.findMany({ where: { podcastId } }),
+    prisma.reference.findMany({ where: { episodeId } }),
   ]);
 
-  if (!podcast || !script || references.length === 0) {
+  if (!episode || !script || references.length === 0) {
     logger.info('Skipping class reference verification — missing data or no references', {
-      podcastId,
-      hasPodcast: String(!!podcast),
+      episodeId,
+      hasEpisode: String(!!episode),
       hasScript: String(!!script),
       refCount: String(references.length),
     });
@@ -46,9 +46,9 @@ export async function processVerifyClassReferences(
   }
 
   try {
-    // Use the LEARNER's resolved AI (BYOK or local agent) — NOT the podcast
+    // Use the LEARNER's resolved AI (BYOK or local agent) — NOT the episode
     // pipeline resolver, which is keyed on cloud BYOK + admin credits.
-    const ai = await resolveLearningAi(podcast.userId);
+    const ai = await resolveLearningAi(episode.userId);
 
     const refInputs: ReferenceInput[] = references.map((r) => ({
       id: r.id,
@@ -62,7 +62,7 @@ export async function processVerifyClassReferences(
     }));
 
     const turns = script.turns as Array<{ speaker: string; text: string }>;
-    const topic = podcast.topic || podcast.title || '';
+    const topic = episode.topic || episode.title || '';
 
     const { results, rejectedRefIds } = await runReferenceVerification(
       refInputs,
@@ -146,14 +146,14 @@ export async function processVerifyClassReferences(
     await Promise.all(updates.filter(Boolean));
 
     logger.info('Class reference verification complete', {
-      podcastId,
+      episodeId,
       total: String(references.length),
       rejected: String(rejectedRefIds.size),
     });
   } catch (err) {
     // Verification is best-effort — a failure must NOT throw the class.
     logger.warn('Class reference verification failed; references left as-is', {
-      podcastId,
+      episodeId,
       error: err instanceof Error ? err.message : String(err),
     });
   }

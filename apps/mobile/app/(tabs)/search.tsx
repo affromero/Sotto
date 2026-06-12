@@ -12,16 +12,16 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
-import type { PodcastSummary } from '@sotto/shared';
+import type { EpisodeSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { globalStyles } from '../../lib/theme';
-import { PodcastCard } from '../../components/PodcastCard';
+import { EpisodeCard } from '../../components/EpisodeCard';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
 import { BottomSheet } from '../../components/BottomSheet';
 
-interface UserPodcastsResponse {
-  podcasts: PodcastSummary[];
+interface UserEpisodesResponse {
+  episodes: EpisodeSummary[];
 }
 
 export default function SearchScreen() {
@@ -32,37 +32,37 @@ export default function SearchScreen() {
 
   const debouncedQuery = query.trim().toLowerCase();
 
-  const { data, isLoading, isError, refetch } = useQuery<UserPodcastsResponse>({
-    queryKey: ['user', 'me', 'podcasts'],
+  const { data, isLoading, isError, refetch } = useQuery<UserEpisodesResponse>({
+    queryKey: ['user', 'me', 'episodes'],
     queryFn: async () => {
-      const response = await api.get<UserPodcastsResponse>('/users/me/podcasts');
+      const response = await api.get<UserEpisodesResponse>('/users/me/episodes');
       return response.data;
     },
   });
 
   const tags = useMemo(() => {
     const bySlug = new Map<string, { id: string; name: string; slug: string }>();
-    for (const podcast of data?.podcasts ?? []) {
-      for (const tag of podcast.tags ?? []) {
+    for (const episode of data?.episodes ?? []) {
+      for (const tag of episode.tags ?? []) {
         bySlug.set(tag.slug, tag);
       }
     }
     return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [data?.podcasts]);
+  }, [data?.episodes]);
 
-  const podcasts = useMemo(() => {
+  const episodes = useMemo(() => {
     if (debouncedQuery.length < 2) return [];
 
-    return (data?.podcasts ?? []).filter((podcast) => {
+    return (data?.episodes ?? []).filter((episode) => {
       const matchesText =
-        podcast.title.toLowerCase().includes(debouncedQuery) ||
-        podcast.topic.toLowerCase().includes(debouncedQuery);
+        episode.title.toLowerCase().includes(debouncedQuery) ||
+        episode.topic.toLowerCase().includes(debouncedQuery);
       const matchesTags =
         selectedTags.length === 0 ||
-        selectedTags.every((slug) => podcast.tags?.some((tag) => tag.slug === slug));
+        selectedTags.every((slug) => episode.tags?.some((tag) => tag.slug === slug));
       return matchesText && matchesTags;
     });
-  }, [data?.podcasts, debouncedQuery, selectedTags]);
+  }, [data?.episodes, debouncedQuery, selectedTags]);
 
   const toggleTag = useCallback((slug: string) => {
     setSelectedTags((prev) =>
@@ -120,16 +120,16 @@ export default function SearchScreen() {
       ) : (
         <FlatList
           testID="search-results-list"
-          data={podcasts}
+          data={episodes}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <PodcastCard
-              podcast={item}
+            <EpisodeCard
+              episode={item}
               variant="feed"
-              onPress={() => router.push(`/podcast/${item.id}`)}
+              onPress={() => router.push(`/episode/${item.id}`)}
             />
           )}
-          contentContainerStyle={podcasts.length === 0 ? styles.emptyContainer : styles.listContent}
+          contentContainerStyle={episodes.length === 0 ? styles.emptyContainer : styles.listContent}
           ListEmptyComponent={
             <EmptyState
               title="No results"

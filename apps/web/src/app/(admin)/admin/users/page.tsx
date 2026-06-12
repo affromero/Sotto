@@ -38,7 +38,7 @@ async function getUsers(search: string | undefined, page: number) {
         createdAt: true,
         _count: {
           select: {
-            podcasts: true,
+            episodes: true,
             userAiKeys: { where: { isValid: true } },
             userTtsKeys: { where: { isValid: true } },
           },
@@ -103,7 +103,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               <th>User</th>
               <th>Email</th>
               <th>Role</th>
-              <th>Podcasts</th>
+              <th>Episodes</th>
               <th>Joined</th>
             </tr>
           </thead>
@@ -139,7 +139,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                       isOwnUser={user.id === currentUserId}
                     />
                   </td>
-                  <td className={styles.numberCell}>{user._count.podcasts}</td>
+                  <td className={styles.numberCell}>{user._count.episodes}</td>
                   <td className={styles.dateCell}>
                     {new Date(user.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',

@@ -48,7 +48,7 @@
 
 ### Changed
 - Showcase carousel descriptions explain source context (how each visual was generated from the source)
-- Showcase header uses set name dynamically ("From a podcast about Fusion Energy")
+- Showcase header uses set name dynamically ("From a episode about Fusion Energy")
 - New showcase sets are automatically active (deactivates previous)
 - Consolidated `var(--space-N)` to semantic spacing tokens
 
@@ -59,12 +59,12 @@
 - PDF figure extraction via pdfjs-dist with embedded image capture
 - `SOURCE_FIGURE` visual type: renders actual source figures in video with attribution overlay
 - Per-section video preview: users can preview individual segments before final render
-- Preview API (`POST/GET /api/v1/podcasts/[id]/video/preview`) with Zod validation and ownership auth
+- Preview API (`POST/GET /api/v1/episodes/[id]/video/preview`) with Zod validation and ownership auth
 - Segment preview worker renders per-segment MP4 via sidecar `/clip` with audio
 - Per-segment feedback and selective regeneration via PATCH endpoint
 - FFmpeg concat optimization: skip full Remotion re-render when all segments have full-quality previews
 - Discovery-sourced figure extraction from verified reference URLs with attribution
-- Per-podcast cost breakdown (text/audio/video/avatar) on player page and billing page
+- Per-episode cost breakdown (text/audio/video/avatar) on player page and billing page
 - Admin per-user cost oversight dashboard
 - Storage inspector with 4-bucket cost breakdown
 - Hume Octave v2 as default TTS model
@@ -111,11 +111,11 @@
 
 ### Added
 - Consent-based avatar image system — verified users upload their own portrait with explicit consent acknowledgment, admin kill switches for uploads and AI generation, shareable toggle per image, and avatar image sharing between users (request/approve/deny/revoke flow)
-- Identity chapter on landing page — "Your Face. Your Voice. Your Podcast." section highlighting verified voice cloning + avatar images with pipeline loop visualization (Chat → Script → Your Voice → Your Face → Publish)
+- Identity chapter on landing page — "Your Face. Your Voice. Your Episode." section highlighting verified voice cloning + avatar images with pipeline loop visualization (Chat → Script → Your Voice → Your Face → Publish)
 - Admin avatar controls in plan features panel — toggles for user uploads and AI generation, both with admin bypass
 
 ### Fixed
-- Avatar generation no longer restricted by podcast duration limit
+- Avatar generation no longer restricted by episode duration limit
 
 ### Changed
 - Avatar AI generation restricted to admin-only (was available to all users)
@@ -144,19 +144,19 @@
 ## [0.25.0] - 2026-03-16
 
 ### Added
-- Orphan pipeline reaper — draft-cleanup worker detects podcasts stuck in active pipeline states for >2 hours and marks them FAILED with user-friendly retry message
+- Orphan pipeline reaper — draft-cleanup worker detects episodes stuck in active pipeline states for >2 hours and marks them FAILED with user-friendly retry message
 - Per-user monthly budget enforcement — `spentMonthCents` / `budgetMonthCents` fields on User model, inline spend tracking in usage-logger, generation gate blocks when budget exceeded with automatic monthly reset
 
 ### Fixed
-- Double-stitch race condition — audio-generation worker now uses CAS (compare-and-swap) `updateMany` and stable BullMQ jobIds (`stitch-{podcastId}`) so concurrent segment completions can't create duplicate PodcastVersion records
+- Double-stitch race condition — audio-generation worker now uses CAS (compare-and-swap) `updateMany` and stable BullMQ jobIds (`stitch-{episodeId}`) so concurrent segment completions can't create duplicate EpisodeVersion records
 - TOCTOU on `/generate` endpoint — all status transitions (fresh start, resume, import) use CAS `updateMany` to prevent concurrent requests from double-queuing pipeline jobs
-- `markPodcastFailed` race — uses CAS on current status so concurrent workers can't double-mark a podcast as FAILED
+- `markEpisodeFailed` race — uses CAS on current status so concurrent workers can't double-mark a episode as FAILED
 - Stable jobIds across entire pipeline (`extract-`, `script-`, `verify-`, `validate-`, `audio-`, `stitch-`, `import-`) replacing `Date.now()`-based IDs, enabling BullMQ deduplication
 
 ## [0.23.2] - 2026-03-15
 
 ### Fixed
-- Video pipeline editor timeout on large podcasts — moved LLM classification to async BullMQ worker with Redis result store, replacing synchronous API call that was killed by Cloudflare's 100s origin timeout
+- Video pipeline editor timeout on large episodes — moved LLM classification to async BullMQ worker with Redis result store, replacing synchronous API call that was killed by Cloudflare's 100s origin timeout
 - Redis eviction policy corrected from `volatile-lru` to `noeviction` to prevent BullMQ job loss under memory pressure
 
 ## [0.23.0] - 2026-03-15
@@ -167,13 +167,13 @@
 - Hera added to landing page Video provider marquee
 
 ### Fixed
-- Landing player now resolves voice names from PodcastVoice records instead of showing speaker roles
+- Landing player now resolves voice names from EpisodeVoice records instead of showing speaker roles
 
 ## [0.22.0] - 2026-03-15
 
 ### Added
 - Cross-page view transitions via Next.js experimental API — TopBar and MiniPlayer persist across route changes
-- Trending podcast carousel with auto-advance (6s), scroll-snap, dot indicators, keyboard navigation, and full ARIA support
+- Trending episode carousel with auto-advance (6s), scroll-snap, dot indicators, keyboard navigation, and full ARIA support
 - Ambient player glow on MiniPlayer that activates during playback
 - Interactive transcript hover: speaker-colored left border, timestamp tooltip via CSS `::after`
 - Infinite scroll on feed — replaces Load More button with IntersectionObserver sentinel
@@ -189,8 +189,8 @@
 ### Changed
 - Global reduced-motion safety net: all animations, transitions, and scroll behavior disabled for motion-sensitive users
 - Feed tab switching now animates content on panel mount
-- Podcast page action buttons (Like/Save/Fork) have press feedback and pop animation on active state
-- Podcast status sections (processing/failed/script-ready) animate in instead of appearing instantly
+- Episode page action buttons (Like/Save/Fork) have press feedback and pop animation on active state
+- Episode status sections (processing/failed/script-ready) animate in instead of appearing instantly
 - Progressive enhancement: `@supports (animation-timeline: view())` for scroll-driven animations in Chromium, falls back to IntersectionObserver in Firefox/Safari
 
 ## [0.21.10] - 2026-03-15
@@ -221,7 +221,7 @@
 
 ### Fixed
 - Landing page now re-renders immediately after admin saves or resets showcase config (added `revalidatePath('/')` to all admin showcase API routes)
-- Landing page falls back to hardcoded content when showcase podcast is missing discovery chat or script data, preventing half-populated chapters
+- Landing page falls back to hardcoded content when showcase episode is missing discovery chat or script data, preventing half-populated chapters
 - Resolved all pre-existing test failures across web and mobile test suites
 
 ### Added
@@ -232,12 +232,12 @@
 ## [0.21.4] - 2026-03-15
 
 ### Added
-- Interactive landing page showcase — all chapter content (chat, script, audio, video, bot mocks) driven from a single admin-configurable podcast
+- Interactive landing page showcase — all chapter content (chat, script, audio, video, bot mocks) driven from a single admin-configurable episode
 - ScriptEditorMock component with real citation hover tooltips via CitationMarker
 - AudioClipPlayer with HTML5 audio playback, progress bar, and voice track switcher (swap TTS provider/model on the spot)
 - VideoClipPlayer for ShowcaseChapter video clip playback
-- Admin panel at /admin/landing — podcast picker, script/audio/video clip range controls, bot overrides
-- Bootstrap Showcase button — creates a CRISPR podcast as @sotto and kicks off the generation pipeline
+- Admin panel at /admin/landing — episode picker, script/audio/video clip range controls, bot overrides
+- Bootstrap Showcase button — creates a CRISPR episode as @sotto and kicks off the generation pipeline
 - Reset to Defaults button — instantly reverts landing page to hardcoded content
 - LandingShowcase singleton Prisma model for admin config
 
@@ -249,7 +249,7 @@
 ## [0.21.3] - 2026-03-14
 
 ### Added
-- Quiz stats badge on podcast page showing completion rate and score
+- Quiz stats badge on episode page showing completion rate and score
 - Daily Briefings and Comprehension Quizzes sections on landing page
 
 ## [0.21.2] - 2026-03-14
@@ -257,7 +257,7 @@
 ### Added
 - Daily briefings: schema, scheduler, config, prompt, settings UI, API endpoints, and BRIEFING_READY notification (Phases 1-6)
 - Post-listen quizzes: schema, quiz generation worker, pipeline triggers, API routes, and PostListenQuiz UI component (Phases 1-3)
-- "Limited Sources" badge on feed cards and podcast detail page for podcasts with insufficient verified references
+- "Limited Sources" badge on feed cards and episode detail page for episodes with insufficient verified references
 - Minimum reference count gate in reference-validation worker — enforces per-depth minimums (10 deep_dive, 5 standard, 3 eli5)
 
 ### Changed
@@ -265,12 +265,12 @@
 - Notification data includes `insufficientRefs`, `verified`, and `required` counts for frontend display
 
 ### Fixed
-- Podcasts with zero verified references no longer silently reach READY status
+- Episodes with zero verified references no longer silently reach READY status
 
 ## [0.21.1] - 2026-03-14
 
 ### Added
-- Content-aware video scene splitting — monologue podcasts now produce one sub-visual per distinct idea with no upper cap, instead of being capped at 2-4
+- Content-aware video scene splitting — monologue episodes now produce one sub-visual per distinct idea with no upper cap, instead of being capped at 2-4
 
 ### Fixed
 - ElevenLabs eleven_v3 rejecting `previous_request_ids` — skip all continuity params for that model

@@ -10,7 +10,7 @@ const {
 } = vi.hoisted(() => ({
   mockPrisma: {
     videoGeneration: { update: vi.fn(), findUnique: vi.fn() },
-    podcast: { findUniqueOrThrow: vi.fn() },
+    episode: { findUniqueOrThrow: vi.fn() },
     segment: { findMany: vi.fn() },
     segmentVisual: { createMany: vi.fn(), findMany: vi.fn(), count: vi.fn(), update: vi.fn() },
     segmentTransition: { createMany: vi.fn() },
@@ -67,15 +67,15 @@ beforeEach(() => {
 });
 
 describe('visual-classification worker', () => {
-  const baseData = { podcastId: 'pod-1', videoGenerationId: 'vg-1', userId: 'user-1' };
+  const baseData = { episodeId: 'pod-1', videoGenerationId: 'vg-1', userId: 'user-1' };
 
-  function seedClassifiablePodcast(aiModel: string | null = null) {
+  function seedClassifiableEpisode(aiModel: string | null = null) {
     const segments = [
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
     ];
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({
       aiModel,
-      title: 'Test Podcast',
+      title: 'Test Episode',
       topic: 'Test topic',
       segments,
     });
@@ -103,9 +103,9 @@ describe('visual-classification worker', () => {
     });
   }
 
-  it('uses the configured BYOK provider when the podcast has no model', async () => {
+  it('uses the configured BYOK provider when the episode has no model', async () => {
     const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
-    seedClassifiablePodcast(null);
+    seedClassifiableEpisode(null);
     mockGetAiKey.mockResolvedValue(aiKey);
 
     await processVisualClassification(makeJob(baseData));
@@ -113,12 +113,12 @@ describe('visual-classification worker', () => {
     expect(mockGetAiKey).toHaveBeenCalledTimes(1);
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
     expect(mockResolveAiModel).toHaveBeenCalledWith({
-      podcastAiModel: null,
+      episodeAiModel: null,
       aiKey,
     });
     expect(mockClassify).toHaveBeenCalledWith(
       expect.any(Array),
-      'Test Podcast',
+      'Test Episode',
       'Test topic',
       expect.objectContaining({
         provider: 'anthropic',
@@ -128,22 +128,22 @@ describe('visual-classification worker', () => {
     );
   });
 
-  it('uses the explicit podcast model owner and matching provider key', async () => {
-    seedClassifiablePodcast('gpt-5-mini');
+  it('uses the explicit episode model owner and matching provider key', async () => {
+    seedClassifiableEpisode('gpt-5-mini');
     mockResolveAiModel.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
     mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
 
     await processVisualClassification(makeJob(baseData));
 
     expect(mockResolveAiModel).toHaveBeenCalledWith({
-      podcastAiModel: 'gpt-5-mini',
+      episodeAiModel: 'gpt-5-mini',
       aiKey: null,
     });
     expect(mockGetAiKey).toHaveBeenCalledTimes(1);
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
     expect(mockClassify).toHaveBeenCalledWith(
       expect.any(Array),
-      'Test Podcast',
+      'Test Episode',
       'Test topic',
       expect.objectContaining({
         provider: 'openai',
@@ -154,7 +154,7 @@ describe('visual-classification worker', () => {
   });
 
   it('rejects explicit non-local models without a matching provider key', async () => {
-    seedClassifiablePodcast('gpt-5-mini');
+    seedClassifiableEpisode('gpt-5-mini');
     mockResolveAiModel.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
     mockGetAiKey.mockResolvedValue(null);
 
@@ -173,7 +173,7 @@ describe('visual-classification worker', () => {
   });
 
   it('rejects missing model and missing BYOK key before classification', async () => {
-    seedClassifiablePodcast(null);
+    seedClassifiableEpisode(null);
     mockGetAiKey.mockResolvedValue(null);
 
     await expect(processVisualClassification(makeJob(baseData))).rejects.toThrow(
@@ -184,7 +184,7 @@ describe('visual-classification worker', () => {
   });
 
   it('allows local claude-code models without provider keys', async () => {
-    seedClassifiablePodcast('claude-code:sonnet');
+    seedClassifiableEpisode('claude-code:sonnet');
     mockResolveAiModel.mockResolvedValue({
       model: 'claude-code:sonnet',
       provider: 'claude-code',
@@ -196,7 +196,7 @@ describe('visual-classification worker', () => {
     expect(mockGetAiKey).not.toHaveBeenCalled();
     expect(mockClassify).toHaveBeenCalledWith(
       expect.any(Array),
-      'Test Podcast',
+      'Test Episode',
       'Test topic',
       expect.objectContaining({
         provider: 'claude-code',
@@ -212,8 +212,8 @@ describe('visual-classification worker', () => {
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
       { id: 'seg-2', order: 1, speaker: 'Expert', text: 'Data shows...', startTime: 5, duration: 8 },
     ];
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
-      title: 'Test Podcast',
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({
+      title: 'Test Episode',
       topic: 'Test topic',
       segments,
     });
@@ -265,8 +265,8 @@ describe('visual-classification worker', () => {
     const segments = [
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'The Silk Road stretched from Xi\'an to Constantinople...', startTime: 0, duration: 30 },
     ];
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
-      title: 'Geography Podcast',
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({
+      title: 'Geography Episode',
       topic: 'World places',
       segments,
     });
@@ -310,7 +310,7 @@ describe('visual-classification worker', () => {
     const segments = [
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'Rome was founded...', startTime: 0, duration: 5 },
     ];
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({
       title: 'Ancient Rome',
       topic: 'History',
       segments,
@@ -355,7 +355,7 @@ describe('visual-classification worker', () => {
       expect.objectContaining({ name: 'place-enrichment' }),
       'place_enrichment',
       expect.objectContaining({
-        podcastId: 'pod-1',
+        episodeId: 'pod-1',
         videoGenerationId: 'vg-1',
         segmentVisualId: 'sv-1',
         places: [{ name: 'Rome', yearHint: -753 }],
@@ -368,7 +368,7 @@ describe('visual-classification worker', () => {
     const segments = [
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'Here are the rankings...', startTime: 0, duration: 10 },
     ];
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({
       title: 'Rankings',
       topic: 'Data',
       segments,
@@ -407,7 +407,7 @@ describe('visual-classification worker', () => {
     expect(mockAddJob).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'video-composition' }),
       'compose_video',
-      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
+      expect.objectContaining({ episodeId: 'pod-1', videoGenerationId: 'vg-1' }),
     );
   });
 
@@ -415,7 +415,7 @@ describe('visual-classification worker', () => {
     const segments = [
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
     ];
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+    mockPrisma.episode.findUniqueOrThrow.mockResolvedValue({
       title: 'Test',
       topic: 'Test',
       segments,
@@ -441,7 +441,7 @@ describe('visual-classification worker', () => {
     expect(mockAddJob).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'video-composition' }),
       'compose_video',
-      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
+      expect.objectContaining({ episodeId: 'pod-1', videoGenerationId: 'vg-1' }),
     );
   });
 });

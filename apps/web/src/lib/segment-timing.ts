@@ -13,9 +13,9 @@ export interface SegmentTiming {
 /**
  * Resolve segment timing for video generation.
  */
-export async function resolveSegmentTiming(podcastId: string): Promise<SegmentTiming[]> {
+export async function resolveSegmentTiming(episodeId: string): Promise<SegmentTiming[]> {
   const segments = await prisma.segment.findMany({
-    where: { podcastId },
+    where: { episodeId },
     orderBy: { order: 'asc' },
     select: { id: true, order: true, speaker: true, text: true, duration: true, startTime: true },
   });

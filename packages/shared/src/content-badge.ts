@@ -1,4 +1,4 @@
-import type { PodcastSummary } from './types/podcast';
+import type { EpisodeSummary } from './types/episode';
 import {
   AI_PROVIDER_DISPLAY,
   AI_MODEL_SHORT_DISPLAY,
@@ -9,41 +9,39 @@ import {
 
 const SOURCE_PLATFORM_LABELS: Record<string, string> = {
   notebooklm: 'NotebookLM',
-  spotify: 'Spotify',
-  apple_podcasts: 'Apple Podcasts',
   youtube: 'YouTube',
   other: 'Other',
 };
 
 export function getContentBadgeLabel(
-  podcast: Pick<PodcastSummary, 'source' | 'sourcePlatform'>
+  episode: Pick<EpisodeSummary, 'source' | 'sourcePlatform'>
 ): string {
-  if (podcast.source === 'IMPORT') {
-    return podcast.sourcePlatform
-      ? SOURCE_PLATFORM_LABELS[podcast.sourcePlatform] ?? 'Imported'
+  if (episode.source === 'IMPORT') {
+    return episode.sourcePlatform
+      ? SOURCE_PLATFORM_LABELS[episode.sourcePlatform] ?? 'Imported'
       : 'Imported';
   }
   return 'AI-Generated';
 }
 
-export interface PodcastBadge {
+export interface EpisodeBadge {
   category: 'content' | 'ai' | 'tts' | 'language';
   label: string;
   icon?: string;
   variant: 'default' | 'info' | 'success' | 'accent';
 }
 
-export function getPodcastBadges(
-  podcast: Pick<
-    PodcastSummary,
+export function getEpisodeBadges(
+  episode: Pick<
+    EpisodeSummary,
     'source' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
   >
-): PodcastBadge[] {
-  const badges: PodcastBadge[] = [];
+): EpisodeBadge[] {
+  const badges: EpisodeBadge[] = [];
 
   // 1. Content type badge
-  const contentLabel = getContentBadgeLabel(podcast);
-  const isImport = podcast.source === 'IMPORT';
+  const contentLabel = getContentBadgeLabel(episode);
+  const isImport = episode.source === 'IMPORT';
   badges.push({
     category: 'content',
     label: contentLabel,
@@ -52,11 +50,11 @@ export function getPodcastBadges(
 
   // 2. AI badge — "Provider · Model" format
   if (!isImport) {
-    const providerShort = podcast.aiProvider
-      ? AI_PROVIDER_DISPLAY[podcast.aiProvider]?.shortLabel
+    const providerShort = episode.aiProvider
+      ? AI_PROVIDER_DISPLAY[episode.aiProvider]?.shortLabel
       : null;
-    const modelShort = podcast.aiModel
-      ? AI_MODEL_SHORT_DISPLAY[podcast.aiModel]
+    const modelShort = episode.aiModel
+      ? AI_MODEL_SHORT_DISPLAY[episode.aiModel]
       : null;
 
     let aiLabel: string | null = null;
@@ -72,7 +70,7 @@ export function getPodcastBadges(
       badges.push({
         category: 'ai',
         label: aiLabel,
-        icon: podcast.aiProvider ?? undefined,
+        icon: episode.aiProvider ?? undefined,
         variant: 'accent',
       });
     }
@@ -80,8 +78,8 @@ export function getPodcastBadges(
 
   // 3. TTS badge — "Provider · Model" format
   if (!isImport) {
-    const ttsProviderShort = getTtsProviderLabel(podcast.ttsProvider);
-    const ttsModelShort = getTtsModelLabel(podcast.ttsModel);
+    const ttsProviderShort = getTtsProviderLabel(episode.ttsProvider);
+    const ttsModelShort = getTtsModelLabel(episode.ttsModel);
 
     let ttsLabel: string | null = null;
     if (ttsProviderShort && ttsModelShort) {
@@ -94,14 +92,14 @@ export function getPodcastBadges(
       badges.push({
         category: 'tts',
         label: ttsLabel,
-        icon: podcast.ttsProvider ?? undefined,
+        icon: episode.ttsProvider ?? undefined,
         variant: 'default',
       });
     }
   }
 
   // 4. Language badge — always, when set
-  const langLabel = getLanguageLabel(podcast.language);
+  const langLabel = getLanguageLabel(episode.language);
   if (langLabel) {
     badges.push({
       category: 'language',

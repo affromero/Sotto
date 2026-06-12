@@ -1,5 +1,5 @@
 /**
- * Centralized duration constants and helpers for podcast generation.
+ * Centralized duration constants and helpers for episode generation.
  *
  * All word-count ↔ duration calculations go through here so the script
  * generator, verifier, and workers stay in sync.

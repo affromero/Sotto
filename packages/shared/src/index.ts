@@ -3,9 +3,9 @@
 // Enums (string unions, Prisma-free)
 export type {
   UserRole,
-  PodcastStatus,
-  PodcastVisibility,
-  PodcastSource,
+  EpisodeStatus,
+  EpisodeVisibility,
+  EpisodeSource,
   Speaker,
   InteractionStatus,
   ReferenceType,
@@ -28,18 +28,18 @@ export type {
 
 // Types
 export type {
-  PodcastSummary,
-  PodcastDetail,
+  EpisodeSummary,
+  EpisodeDetail,
   SegmentData,
   WordTiming,
   InteractionSummary,
-  CreatePodcastRequest,
-  GeneratePodcastRequest,
+  CreateEpisodeRequest,
+  GenerateEpisodeRequest,
   AiModelOption,
   TtsOption,
   ScriptTurn,
   VoiceProfile,
-} from './types/podcast';
+} from './types/episode';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';
 
@@ -69,12 +69,12 @@ export type {
 
 export type { NotificationData, PushSubscriptionData } from './types/notification';
 
-export type { PodcastVersionSummary, PodcastVersionDetail } from './types/version';
+export type { EpisodeVersionSummary, EpisodeVersionDetail } from './types/version';
 
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
 
-export { getContentBadgeLabel, getPodcastBadges } from './content-badge';
-export type { PodcastBadge } from './content-badge';
+export { getContentBadgeLabel, getEpisodeBadges } from './content-badge';
+export type { EpisodeBadge } from './content-badge';
 
 export {
   AI_PROVIDER_DISPLAY,
@@ -105,7 +105,7 @@ export type { StageMessage, StageMessagePool } from './generation-messages';
 
 // Validations (shared Zod schemas)
 export {
-  createPodcastSchema,
+  createEpisodeSchema,
   interactionSchema,
   updateProfileSchema,
   paginationSchema,

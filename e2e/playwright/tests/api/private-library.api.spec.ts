@@ -5,6 +5,6 @@ test.describe('Private library API routes', () => {
     const res = await authedRequest.get('/api/v1/saved');
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body).toHaveProperty('podcasts');
+    expect(body).toHaveProperty('episodes');
   });
 });

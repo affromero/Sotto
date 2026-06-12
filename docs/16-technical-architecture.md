@@ -77,11 +77,11 @@ The active data model is learner and course oriented. Important groups:
 | Practice | `PracticeSession`, `PracticeKind`, `PracticeStatus` |
 | Mock exams | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution` |
 | Memory graph | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType` |
-| Reused audio engine | `Podcast`, `PodcastSegment`, `PodcastVersion`, interaction/reference models used by listening audio |
+| Reused audio engine | `Episode`, `EpisodeSegment`, `EpisodeVersion`, interaction/reference models used by listening audio |
 | Provider config | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings |
 | Operations | queue/job metadata, reports, audit/admin records, usage and cost records |
 
-`Podcast` remains because the listening skill reuses the existing audio engine for script generation, verification, TTS, stitching, playback, and references. It is an implementation detail for listening sections, listening practice, and exam listening, not a current podcast-platform product.
+`Episode` remains because the listening skill reuses the existing audio engine for script generation, verification, TTS, stitching, playback, and references. It is an implementation detail for listening sections, listening practice, and exam listening, not a current episode-platform product.
 
 Removed social primitives must stay removed:
 
@@ -91,7 +91,7 @@ Removed social primitives must stay removed:
 - `CollectionFollow`
 - `Activity`
 - `InteractionVote`
-- podcast fork lineage fields
+- episode fork lineage fields
 - public engagement counters for likes, comments, forks, and followers
 
 Billing, plan, tier, quota, and paid feature-gate models must not control access to the learning loop.
@@ -289,7 +289,7 @@ The current learning API surface is under `/api/v1`:
 | `/api/v1/live-translate/token` | Mint a BYOK Google Live token without exposing the key |
 | `/api/v1/live-translate/session` | Store live conversation transcript and extract vocabulary |
 
-Existing `/api/v1/podcasts/*` routes may still be used by the reused audio engine and player components. They should not be documented as the primary product surface.
+Existing `/api/v1/episodes/*` routes may still be used by the reused audio engine and player components. They should not be documented as the primary product surface.
 
 ---
 
@@ -307,7 +307,7 @@ Storage rules:
 
 - Workers must respect `STORAGE_PROVIDER`.
 - Local storage must support the full listening audio, worksheet, recording, and export paths.
-- No cleanup script may bulk-delete protected podcast or segment audio by pattern.
+- No cleanup script may bulk-delete protected episode or segment audio by pattern.
 - Deletion paths must go through existing storage guards.
 
 ---
@@ -382,4 +382,4 @@ The architecture is considered aligned when:
 - Local setup works without Doppler.
 - Placement, courses, classes, practice, exams, memory, speaking, writing, and listening are documented against current routes and schema.
 - Provider setup errors are explicit.
-- Listening audio works through the reused audio pipeline without positioning Sotto as a podcast platform.
+- Listening audio works through the reused audio pipeline without positioning Sotto as a episode platform.

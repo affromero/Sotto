@@ -11,7 +11,7 @@ import { PlaceResolver, findHistoricalMaps } from '@sotto/maps/server';
 import { logger } from '@/lib/logger';
 
 export async function processPlaceEnrichment(job: Job<PlaceEnrichmentPayload>): Promise<void> {
-  const { segmentVisualId, podcastId, videoGenerationId, places } = job.data;
+  const { segmentVisualId, episodeId, videoGenerationId, places } = job.data;
 
   logger.info('Starting place enrichment', { segmentVisualId, placeCount: String(places.length) });
 
@@ -90,7 +90,7 @@ export async function processPlaceEnrichment(job: Job<PlaceEnrichmentPayload>): 
 
   // Queue visual-generation to produce the map image (or AI illustration fallback)
   await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
-    podcastId,
+    episodeId,
     videoGenerationId,
     segmentVisualId,
     visualType: visual.visualType,

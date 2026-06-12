@@ -16,7 +16,7 @@ export async function logUsage(params: {
   inputTokens?: number;
   outputTokens?: number;
   totalCost?: number;
-  podcastId?: string;
+  episodeId?: string;
   userId?: string;
   durationMs?: number;
   metadata?: Record<string, unknown>;
@@ -38,7 +38,7 @@ export async function logUsage(params: {
           outputTokens: params.outputTokens ?? null,
           totalCost: totalCost ?? 0,
           durationMs: params.durationMs ?? null,
-          podcastId: params.podcastId ?? null,
+          episodeId: params.episodeId ?? null,
           userId: params.userId ?? null,
           metadata: params.metadata ?? {},
         },

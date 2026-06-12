@@ -2,7 +2,7 @@ appId: fm.sotto.app
 name: Error - Empty Library State
 tags: [error]
 ---
-# Login as user with no podcasts
+# Login as user with no episodes
 - extendedWaitUntil:
     visible:
       id: 'login-email-input'

@@ -12,12 +12,12 @@ import { concatenateSpeakerAudio } from '@/lib/avatar-audio-concat';
  * Fetch segments for avatar audio concatenation.
  */
 async function fetchAvatarSegments(opts: {
-  podcastId: string;
+  episodeId: string;
   speaker: string;
   enabledSegmentIds: string[];
 }): Promise<Array<{ id: string; order: number; audioUrl: string | null }>> {
   const segments = await prisma.segment.findMany({
-    where: { podcastId: opts.podcastId, speaker: opts.speaker },
+    where: { episodeId: opts.episodeId, speaker: opts.speaker },
     orderBy: { order: 'asc' },
     select: { id: true, order: true, audioUrl: true },
   });
@@ -49,9 +49,9 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
 // ── HeyGen path (existing logic, extracted verbatim) ──
 
 async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId } = job.data;
+  const { episodeId, videoGenerationId, avatarOverlayId, speaker, avatarId } = job.data;
 
-  logger.info('Starting HeyGen avatar generation', { podcastId, speaker, avatarId });
+  logger.info('Starting HeyGen avatar generation', { episodeId, speaker, avatarId });
 
   const overlay = await prisma.avatarOverlay.findUnique({
     where: { id: avatarOverlayId },
@@ -64,7 +64,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
   if (overlay.videoUrl) {
     logger.info('Avatar overlay already has video, skipping', { avatarOverlayId });
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
     return;
   }
 
@@ -100,7 +100,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       await job.updateProgress(10);
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
+        episodeId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -118,7 +118,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       await job.updateProgress(25);
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
+      const concatAudioKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -183,7 +183,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
     await job.updateProgress(90);
 
     const webmBuffer = await readFile(transparentPath);
-    const webmKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
+    const webmKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
     const videoUrl = await uploadFile(webmKey, webmBuffer, 'video/webm');
 
     await prisma.avatarOverlay.update({
@@ -195,17 +195,17 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       service: 'heygen',
       category: 'avatar_generation',
       totalCost: (durationSeconds / 60) * 0.10,
-      podcastId,
+      episodeId,
       durationMs: Math.round(durationSeconds * 1000),
       metadata: { speaker, avatarId, durationSeconds },
     });
 
     await job.updateProgress(95);
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     await job.updateProgress(100);
-    logger.info('HeyGen avatar generation complete', { podcastId, speaker, avatarOverlayId });
+    logger.info('HeyGen avatar generation complete', { episodeId, speaker, avatarOverlayId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma.avatarOverlay.update({
@@ -213,7 +213,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       data: { status: 'failed', failureReason: message },
     });
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     if (isNonRetryableHeyGenError(err)) {
       logger.error('Non-retryable HeyGen error, stopping retries', { message, avatarOverlayId });
@@ -229,9 +229,9 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 // ── Fal lip-sync path (VEED Fabric / Kling Avatar) ──
 
 async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarImageUrl, avatarModelId } = job.data;
+  const { episodeId, videoGenerationId, avatarOverlayId, speaker, avatarImageUrl, avatarModelId } = job.data;
 
-  logger.info('Starting Fal lip-sync avatar generation', { podcastId, speaker, avatarModelId });
+  logger.info('Starting Fal lip-sync avatar generation', { episodeId, speaker, avatarModelId });
 
   const overlay = await prisma.avatarOverlay.findUnique({
     where: { id: avatarOverlayId },
@@ -244,7 +244,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
 
   if (overlay.videoUrl) {
     logger.info('Avatar overlay already has video, skipping', { avatarOverlayId });
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
     return;
   }
 
@@ -282,7 +282,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       });
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
+        episodeId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -298,7 +298,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       durationSeconds = concatResult.durationSeconds;
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
+      const concatAudioKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -317,7 +317,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       execSync(`ffmpeg -i "${join(tmpDir, `${speaker}-concat.mp3`)}" -t ${testMaxSeconds} -y "${trimmedPath}" 2>/dev/null`);
       // Re-upload trimmed audio
       const trimmedBuffer = await readFile(trimmedPath);
-      const trimmedKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio-test.mp3`;
+      const trimmedKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio-test.mp3`;
       concatAudioUrl = await uploadFile(trimmedKey, trimmedBuffer, 'audio/mpeg');
       durationSeconds = testMaxSeconds;
       logger.info('Trimmed audio for test', { avatarOverlayId, testMaxSeconds });
@@ -358,7 +358,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       const videoRes = await fetch(result.videoUrl);
       if (!videoRes.ok) throw new Error(`Failed to download fal lip-sync video: ${videoRes.status}`);
       const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-      const videoKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
+      const videoKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, videoBuffer, 'video/mp4');
 
       await prisma.avatarOverlay.update({
@@ -396,7 +396,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
 
         // Upload chunk audio to R2 for fal to access
         const chunkAudioBuffer = await readFile(chunk.inputPath);
-        const chunkAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-audio-${i}.mp3`;
+        const chunkAudioKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-audio-${i}.mp3`;
         const chunkAudioUrl = await uploadFile(chunkAudioKey, chunkAudioBuffer, 'audio/mpeg');
 
         const { statusUrl, resultUrl } = await submitFalLipSync({
@@ -435,7 +435,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       await job.updateProgress(85);
 
       const finalBuffer = await readFile(finalVideoPath);
-      const videoKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
+      const videoKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, finalBuffer, 'video/mp4');
 
       await prisma.avatarOverlay.update({
@@ -448,17 +448,17 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       service: 'fal',
       category: 'avatar_generation',
       totalCost: (durationSeconds / 60) * (LIP_SYNC_CONFIG[modelId]?.maxAudioSeconds === 60 ? 0.168 : 4.80),
-      podcastId,
+      episodeId,
       durationMs: Math.round(durationSeconds * 1000),
       metadata: { speaker, modelId, durationSeconds },
     });
 
     await job.updateProgress(95);
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     await job.updateProgress(100);
-    logger.info('Fal lip-sync avatar generation complete', { podcastId, speaker, avatarOverlayId });
+    logger.info('Fal lip-sync avatar generation complete', { episodeId, speaker, avatarOverlayId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma.avatarOverlay.update({
@@ -466,7 +466,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       data: { status: 'failed', failureReason: message },
     });
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     throw err;
   } finally {
@@ -477,9 +477,9 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
 // ── Replicate lip-sync path (Wav2Lip / SadTalker / VEED Fabric) ──
 
 async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarImageUrl, avatarModelId } = job.data;
+  const { episodeId, videoGenerationId, avatarOverlayId, speaker, avatarImageUrl, avatarModelId } = job.data;
 
-  logger.info('Starting Replicate lip-sync avatar generation', { podcastId, speaker, avatarModelId });
+  logger.info('Starting Replicate lip-sync avatar generation', { episodeId, speaker, avatarModelId });
 
   const overlay = await prisma.avatarOverlay.findUnique({
     where: { id: avatarOverlayId },
@@ -492,7 +492,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
 
   if (overlay.videoUrl) {
     logger.info('Avatar overlay already has video, skipping', { avatarOverlayId });
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
     return;
   }
 
@@ -530,7 +530,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       });
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
+        episodeId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -546,7 +546,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       durationSeconds = concatResult.durationSeconds;
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
+      const concatAudioKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -587,7 +587,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       const videoRes = await fetch(result.videoUrl);
       if (!videoRes.ok) throw new Error(`Failed to download Replicate lip-sync video: ${videoRes.status}`);
       const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-      const videoKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
+      const videoKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, videoBuffer, 'video/mp4');
 
       await prisma.avatarOverlay.update({
@@ -625,7 +625,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
 
         // Upload chunk audio to R2 for Replicate to access
         const chunkAudioBuffer = await readFile(chunk.inputPath);
-        const chunkAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-audio-${i}.mp3`;
+        const chunkAudioKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-audio-${i}.mp3`;
         const chunkAudioUrl = await uploadFile(chunkAudioKey, chunkAudioBuffer, 'audio/mpeg');
 
         const { predictionId } = await submitReplicateLipSync({
@@ -662,7 +662,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       await job.updateProgress(85);
 
       const finalBuffer = await readFile(finalVideoPath);
-      const videoKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
+      const videoKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, finalBuffer, 'video/mp4');
 
       await prisma.avatarOverlay.update({
@@ -675,17 +675,17 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       service: 'replicate',
       category: 'avatar_generation',
       totalCost: (durationSeconds / 60) * (lipSyncConfig?.maxAudioSeconds === 60 ? 1.0 : 4.80),
-      podcastId,
+      episodeId,
       durationMs: Math.round(durationSeconds * 1000),
       metadata: { speaker, modelId, durationSeconds },
     });
 
     await job.updateProgress(95);
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     await job.updateProgress(100);
-    logger.info('Replicate lip-sync avatar generation complete', { podcastId, speaker, avatarOverlayId });
+    logger.info('Replicate lip-sync avatar generation complete', { episodeId, speaker, avatarOverlayId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma.avatarOverlay.update({
@@ -693,7 +693,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
       data: { status: 'failed', failureReason: message },
     });
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     throw err;
   } finally {
@@ -704,9 +704,9 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
 // ── Runway path (realtime sessions via Playwright) ──
 
 async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, isPreset } = job.data;
+  const { episodeId, videoGenerationId, avatarOverlayId, speaker, avatarId, isPreset } = job.data;
 
-  logger.info('Starting Runway avatar generation', { podcastId, speaker, avatarId });
+  logger.info('Starting Runway avatar generation', { episodeId, speaker, avatarId });
 
   const overlay = await prisma.avatarOverlay.findUnique({
     where: { id: avatarOverlayId },
@@ -719,7 +719,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
   if (overlay.videoUrl) {
     logger.info('Avatar overlay already has video, skipping', { avatarOverlayId });
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
     return;
   }
 
@@ -751,7 +751,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       });
 
       const segments = await fetchAvatarSegments({
-        podcastId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
+        episodeId, speaker, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
       const segmentsWithAudio = segments.filter((s) => s.audioUrl);
@@ -767,7 +767,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       durationSeconds = concatResult.durationSeconds;
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
+      const concatAudioKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -843,7 +843,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
         // Upload chunk to R2 for progressive playback
         const chunkBuffer = await readFile(chunk.outputPath);
-        const chunkR2Key = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-${i}.webm`;
+        const chunkR2Key = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-${i}.webm`;
         const chunkR2Url = await uploadFile(chunkR2Key, chunkBuffer, 'video/webm');
         const cumulativeDuration = chunks.slice(0, i + 1).reduce((sum, c) => sum + c.durationSeconds, 0);
 
@@ -875,7 +875,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
     // Upload to R2 (no chromakey — Runway has scene background)
     const webmBuffer = await readFile(finalVideoPath);
-    const webmKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
+    const webmKey = `episodes/${episodeId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
     const videoUrl = await uploadFile(webmKey, webmBuffer, 'video/webm');
 
     // Chunk files kept in R2 — no deletion
@@ -890,17 +890,17 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       service: 'runway',
       category: 'avatar_generation',
       totalCost: (durationSeconds / 60) * 0.10,
-      podcastId,
+      episodeId,
       durationMs: Math.round(durationSeconds * 1000),
       metadata: { speaker, avatarId, durationSeconds, chunks: chunks.length },
     });
 
     await job.updateProgress(95);
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     await job.updateProgress(100);
-    logger.info('Runway avatar generation complete', { podcastId, speaker, avatarOverlayId });
+    logger.info('Runway avatar generation complete', { episodeId, speaker, avatarOverlayId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma.avatarOverlay.update({
@@ -908,7 +908,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       data: { status: 'failed', failureReason: message },
     });
 
-    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    await checkAllAvatarsReady(videoGenerationId, episodeId);
 
     if (isNonRetryableRunwayError(err)) {
       logger.error('Non-retryable Runway error, stopping retries', { message, avatarOverlayId });
@@ -923,7 +923,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
 // ── Shared ──
 
-async function checkAllAvatarsReady(videoGenerationId: string, _podcastId: string): Promise<void> {
+async function checkAllAvatarsReady(videoGenerationId: string, _episodeId: string): Promise<void> {
   const pending = await prisma.avatarOverlay.count({
     where: {
       videoGenerationId,

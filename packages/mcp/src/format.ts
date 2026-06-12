@@ -1,7 +1,7 @@
 import type {
   AgentIngestResult,
-  Podcast,
-  PodcastDetail,
+  Episode,
+  EpisodeDetail,
   UserProfile,
 } from './types.js';
 
@@ -12,12 +12,12 @@ function formatDuration(seconds: number | null): string {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
-function formatTags(podcast: Podcast): string {
-  if (!podcast.tags || podcast.tags.length === 0) return '';
-  return podcast.tags.map((t) => t.tag.name).join(', ');
+function formatTags(episode: Episode): string {
+  if (!episode.tags || episode.tags.length === 0) return '';
+  return episode.tags.map((t) => t.tag.name).join(', ');
 }
 
-export function formatPodcastSummary(p: Podcast): string {
+export function formatEpisodeSummary(p: Episode): string {
   const lines = [
     `**${p.title}**`,
     `ID: ${p.id}`,
@@ -32,8 +32,8 @@ export function formatPodcastSummary(p: Podcast): string {
   return lines.join('\n');
 }
 
-export function formatPodcastDetail(p: PodcastDetail): string {
-  const lines = [formatPodcastSummary(p)];
+export function formatEpisodeDetail(p: EpisodeDetail): string {
+  const lines = [formatEpisodeSummary(p)];
 
   if (p.topic) {
     lines.push('', `Topic: ${p.topic}`);
@@ -57,30 +57,30 @@ export function formatPodcastDetail(p: PodcastDetail): string {
   return lines.join('\n');
 }
 
-export function formatPodcastList(podcasts: Podcast[]): string {
-  if (podcasts.length === 0) return 'No podcasts found.';
-  return podcasts.map((p, i) => `${i + 1}. ${formatPodcastSummary(p)}`).join('\n\n');
+export function formatEpisodeList(episodes: Episode[]): string {
+  if (episodes.length === 0) return 'No episodes found.';
+  return episodes.map((p, i) => `${i + 1}. ${formatEpisodeSummary(p)}`).join('\n\n');
 }
 
 export function formatProfile(u: UserProfile): string {
   const lines = [
     `**${u.name || 'Anonymous'}**`,
     u.handle ? `@${u.handle}` : null,
-    `Podcasts: ${u.podcastCount}`,
+    `Episodes: ${u.episodeCount}`,
     `Member since: ${u.createdAt}`,
   ];
   return lines.filter(Boolean).join('\n');
 }
 
 export function formatCreated(result: { id: string; status?: string }): string {
-  return `Podcast created!\nID: ${result.id}\nStatus: ${result.status || 'EXTRACTING'}\n\nThe podcast is now being generated. Use get_podcast to check progress.`;
+  return `Episode created!\nID: ${result.id}\nStatus: ${result.status || 'EXTRACTING'}\n\nThe episode is now being generated. Use get_episode to check progress.`;
 }
 
 export function formatAgentIngested(result: AgentIngestResult): string {
   const action = result.idempotent ? 'Agent output already ingested.' : 'Agent output ingested.';
-  return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private podcast is now in your library pipeline. Use get_podcast to check progress.`;
+  return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private episode is now in your library pipeline. Use get_episode to check progress.`;
 }
 
 export function formatDeleted(): string {
-  return 'Podcast deleted successfully.';
+  return 'Episode deleted successfully.';
 }

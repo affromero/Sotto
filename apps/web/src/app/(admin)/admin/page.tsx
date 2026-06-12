@@ -4,10 +4,10 @@ import styles from './page.module.css';
 
 async function getDurationAccuracyStats() {
   const [tracked, withinTarget, deviationStats] = await Promise.all([
-    prisma.podcast.count({
+    prisma.episode.count({
       where: { durationDeviation: { not: null }, status: 'READY' },
     }),
-    prisma.podcast.count({
+    prisma.episode.count({
       where: {
         durationDeviation: {
           gte: -DURATION_TOLERANCE_SECONDS,
@@ -20,7 +20,7 @@ async function getDurationAccuracyStats() {
       SELECT
         AVG(ABS("durationDeviation"))::float AS mean_abs,
         AVG("durationDeviation")::float AS avg_dev
-      FROM "Podcast"
+      FROM "Episode"
       WHERE "durationDeviation" IS NOT NULL
         AND "status" = 'READY'
         AND "deletedAt" IS NULL
@@ -45,9 +45,9 @@ async function getOverviewStats() {
 
   const [
     totalUsers,
-    totalPodcasts,
-    readyPodcasts,
-    failedPodcasts,
+    totalEpisodes,
+    readyEpisodes,
+    failedEpisodes,
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
@@ -58,9 +58,9 @@ async function getOverviewStats() {
     byokUsersRow,
   ] = await Promise.all([
     prisma.user.count(),
-    prisma.podcast.count(),
-    prisma.podcast.count({ where: { status: 'READY' } }),
-    prisma.podcast.count({ where: { status: 'FAILED' } }),
+    prisma.episode.count(),
+    prisma.episode.count({ where: { status: 'READY' } }),
+    prisma.episode.count({ where: { status: 'FAILED' } }),
     prisma.user.count({
       where: { createdAt: { gte: today } },
     }),
@@ -70,7 +70,7 @@ async function getOverviewStats() {
     prisma.user.count({
       where: { createdAt: { gte: monthAgo } },
     }),
-    prisma.podcast.aggregate({
+    prisma.episode.aggregate({
       _sum: { playCount: true },
     }),
     // API costs (30d)
@@ -79,10 +79,10 @@ async function getOverviewStats() {
       _sum: { totalCost: true },
     }),
     // Pipeline (30d)
-    prisma.podcast.count({
+    prisma.episode.count({
       where: { createdAt: { gte: monthAgo }, source: { not: 'IMPORT' } },
     }),
-    prisma.podcast.count({
+    prisma.episode.count({
       where: { createdAt: { gte: monthAgo }, status: 'FAILED', source: { not: 'IMPORT' } },
     }),
     // BYOK users
@@ -96,9 +96,9 @@ async function getOverviewStats() {
 
   return {
     totalUsers,
-    totalPodcasts,
-    readyPodcasts,
-    failedPodcasts,
+    totalEpisodes,
+    readyEpisodes,
+    failedEpisodes,
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
@@ -137,21 +137,21 @@ export default async function AdminOverviewPage() {
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Total Lessons</span>
           </div>
-          <div className={styles.cardValue}>{stats.totalPodcasts.toLocaleString()}</div>
+          <div className={styles.cardValue}>{stats.totalEpisodes.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Ready Lessons</span>
           </div>
-          <div className={styles.cardValue}>{stats.readyPodcasts.toLocaleString()}</div>
+          <div className={styles.cardValue}>{stats.readyEpisodes.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <span className={styles.cardLabel}>Failed Lessons</span>
           </div>
-          <div className={styles.cardValue}>{stats.failedPodcasts.toLocaleString()}</div>
+          <div className={styles.cardValue}>{stats.failedEpisodes.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>

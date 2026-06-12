@@ -15,8 +15,8 @@ export function GlobalMiniPlayer() {
   const router = useRouter();
   const player = usePlayer();
 
-  const isPodcastRoute = pathname.startsWith('/podcast/') || pathname.startsWith('/@');
-  const isVisible = !isPodcastRoute && !!player.podcastId;
+  const isEpisodeRoute = pathname.startsWith('/episode/') || pathname.startsWith('/@');
+  const isVisible = !isEpisodeRoute && !!player.episodeId;
 
   useEffect(() => {
     if (isVisible) {
@@ -31,9 +31,9 @@ export function GlobalMiniPlayer() {
 
   return (
     <MiniPlayer
-      podcastTitle={player.podcastTitle ?? undefined}
-      onExpand={() => router.push(`/podcast/${player.podcastId}`)}
-      onClose={() => player.clearPodcast()}
+      episodeTitle={player.episodeTitle ?? undefined}
+      onExpand={() => router.push(`/episode/${player.episodeId}`)}
+      onClose={() => player.clearEpisode()}
     />
   );
 }

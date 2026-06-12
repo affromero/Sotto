@@ -1,5 +1,5 @@
 // Sotto Database Schema
-// Interactive Podcast Platform
+// Interactive Episode Platform
 
 generator client {
   provider        = "prisma-client-js"
@@ -88,7 +88,7 @@ model User {
   // Relations
   accounts            Account[]
   sessions            Session[]
-  podcasts            Podcast[]
+  episodes            Episode[]
   discoveries         Discovery[]
   discoveryChatErrors DiscoveryChatError[]
   interactions        Interaction[]
@@ -185,15 +185,15 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ============ PODCASTS ============
+// ============ EPISODES ============
 
-model Podcast {
+model Episode {
   id             String        @id @default(cuid())
   userId         String
   title          String
   slug           String?
   topic          String        @db.Text
-  status         PodcastStatus @default(PENDING)
+  status         EpisodeStatus @default(PENDING)
   failedAtStatus String?
   failureReason  String?       @db.Text
   technicalError String?       @db.Text
@@ -223,10 +223,10 @@ model Podcast {
   language         String? // ISO 639-1, e.g. 'en', 'es', 'ja'
 
   // Source tracking
-  source        PodcastSource @default(WEB)
+  source        EpisodeSource @default(WEB)
 
   // Visibility
-  visibility PodcastVisibility @default(PRIVATE)
+  visibility EpisodeVisibility @default(PRIVATE)
   isDelisted Boolean           @default(false)
 
   // Versioning
@@ -249,7 +249,7 @@ model Podcast {
   // Content/verification flags
   lowReferences        Boolean @default(false)
   verificationProgress Json? // transient progress during reference validation
-  sourcePlatform       String? // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
+  sourcePlatform       String? // e.g. "notebooklm", "spotify", "apple_episodes", "youtube"
 
   // Relations
   user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -258,12 +258,12 @@ model Podcast {
   segments            Segment[]
   interactions        Interaction[]
   saves               Save[]
-  tags                PodcastTag[]
+  tags                EpisodeTag[]
   jobs                Job[]
   pipelineEvents      PipelineEvent[]
   references          Reference[]
-  versions            PodcastVersion[]
-  voices              PodcastVoice[]
+  versions            EpisodeVersion[]
+  voices              EpisodeVoice[]
   videoGenerations    VideoGeneration[]
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
@@ -285,7 +285,7 @@ model Podcast {
   @@index([deletedAt])
 }
 
-enum PodcastStatus {
+enum EpisodeStatus {
   PENDING
   DISCOVERING
   EXTRACTING
@@ -306,7 +306,7 @@ enum PodcastStatus {
 
 model ResearchDossier {
   id        String   @id @default(cuid())
-  podcastId String   @unique
+  episodeId String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -322,12 +322,12 @@ model ResearchDossier {
   totalOutputTokens Int     @default(0)
   model             String?
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 }
 
 model CreativeOutline {
   id        String   @id @default(cuid())
-  podcastId String   @unique
+  episodeId String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -346,16 +346,16 @@ model CreativeOutline {
   outputTokens Int     @default(0)
   model        String?
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 }
 
-enum PodcastVisibility {
+enum EpisodeVisibility {
   PUBLIC
   UNLISTED
   PRIVATE
 }
 
-enum PodcastSource {
+enum EpisodeSource {
   WEB
   API
   AGENT
@@ -368,7 +368,7 @@ enum PodcastSource {
 
 model Discovery {
   id        String   @id @default(cuid())
-  podcastId String   @unique
+  episodeId String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -392,7 +392,7 @@ model Discovery {
   feasibilitySuggestion String? @db.Text
 
   // Relations
-  podcast  Podcast            @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode  Episode            @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   messages DiscoveryMessage[]
   user     User               @relation(fields: [userId], references: [id])
   userId   String
@@ -403,7 +403,7 @@ model Discovery {
 model AgentIngestion {
   id             String   @id @default(cuid())
   userId         String
-  podcastId      String   @unique
+  episodeId      String   @unique
   idempotencyKey String?
   provider       String
   agentName      String
@@ -414,7 +414,7 @@ model AgentIngestion {
   updatedAt      DateTime @updatedAt
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
@@ -453,7 +453,7 @@ model DiscoveryChatError {
 
 model Script {
   id                   String   @id @default(cuid())
-  podcastId            String   @unique
+  episodeId            String   @unique
   turns                Json // [{speaker: "HOST"|"EXPERT", text: "..."}]
   soundCues            Json? // [{type, prompt, durationSeconds, insertAfterTurn}]
   markdown             String   @db.Text
@@ -465,14 +465,14 @@ model Script {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 }
 
 // ============ AUDIO SEGMENTS ============
 
 model Segment {
   id          String  @id @default(cuid())
-  podcastId   String
+  episodeId   String
   speaker     String
   text        String  @db.Text
   audioUrl    String?
@@ -489,27 +489,27 @@ model Segment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode            Episode             @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   segmentVisuals     SegmentVisual[]
   transitionsFrom    SegmentTransition[] @relation("TransitionFrom")
   transitionsTo      SegmentTransition[] @relation("TransitionTo")
 
-  @@index([podcastId])
+  @@index([episodeId])
   @@index([order])
 }
 
-// ============ PODCAST VOICE ASSIGNMENTS ============
+// ============ EPISODE VOICE ASSIGNMENTS ============
 
-model PodcastVoice {
+model EpisodeVoice {
   id        String  @id @default(cuid())
-  podcastId String
+  episodeId String
   speaker   String // "Host", "Expert", "Skeptic", etc.
   voiceId   String? // TTS voice ID (pool or clone)
   provider  String? // TTS provider that assigned the voiceId
-  podcast   Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode   Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
-  @@unique([podcastId, speaker])
-  @@index([podcastId])
+  @@unique([episodeId, speaker])
+  @@index([episodeId])
 }
 
 // ============ USER VOICE PREFERENCES ============
@@ -526,11 +526,11 @@ model UserVoicePreference {
   @@index([userId])
 }
 
-// ============ PODCAST VERSIONS ============
+// ============ EPISODE VERSIONS ============
 
-model PodcastVersion {
+model EpisodeVersion {
   id            String   @id @default(cuid())
-  podcastId     String
+  episodeId     String
   version       Int
   audioUrl      String
   duration      Int?
@@ -539,15 +539,15 @@ model PodcastVersion {
   interactionId String?
   createdAt     DateTime @default(now())
 
-  podcast     Podcast                 @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode     Episode                 @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   interaction Interaction?            @relation(fields: [interactionId], references: [id])
-  segments    PodcastVersionSegment[]
+  segments    EpisodeVersionSegment[]
 
-  @@unique([podcastId, version])
-  @@index([podcastId])
+  @@unique([episodeId, version])
+  @@index([episodeId])
 }
 
-model PodcastVersionSegment {
+model EpisodeVersionSegment {
   id         String  @id @default(cuid())
   versionId  String
   segmentId  String
@@ -555,7 +555,7 @@ model PodcastVersionSegment {
   startTime  Float?
   ttsVoiceId String? // Snapshot of segment's TTS voice ID at version time
 
-  version PodcastVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  version EpisodeVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   @@index([versionId])
 }
@@ -564,7 +564,7 @@ model PodcastVersionSegment {
 
 model Interaction {
   id        String            @id @default(cuid())
-  podcastId String
+  episodeId String
   userId    String
   status    InteractionStatus @default(PENDING)
 
@@ -577,7 +577,7 @@ model Interaction {
 
   // Resolution
   resolved     Boolean  @default(false)
-  incorporated Boolean  @default(false) // baked into podcast
+  incorporated Boolean  @default(false) // baked into episode
   helpful      Boolean? // null = no feedback, true/false = user response
   segmentOrder Int? // computed by worker: which segment the question maps to
 
@@ -587,11 +587,11 @@ model Interaction {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast  Podcast          @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode  Episode          @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions PodcastVersion[]
+  versions EpisodeVersion[]
 
-  @@index([podcastId])
+  @@index([episodeId])
   @@index([userId])
   @@index([status])
 }
@@ -610,14 +610,14 @@ enum InteractionStatus {
 model Save {
   id        String   @id @default(cuid())
   userId    String
-  podcastId String
+  episodeId String
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, podcastId])
-  @@index([podcastId])
+  @@unique([userId, episodeId])
+  @@index([episodeId])
 }
 
 // ============ TAGS ============
@@ -631,22 +631,22 @@ model Tag {
   parent   Tag?  @relation("TagHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children Tag[] @relation("TagHierarchy")
 
-  podcasts      PodcastTag[]
+  episodes      EpisodeTag[]
   userInterests UserInterest[]
 
   @@index([slug])
   @@index([parentId])
 }
 
-model PodcastTag {
+model EpisodeTag {
   id        String @id @default(cuid())
-  podcastId String
+  episodeId String
   tagId     String
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  @@unique([podcastId, tagId])
+  @@unique([episodeId, tagId])
   @@index([tagId])
 }
 
@@ -706,10 +706,10 @@ model Notification {
 }
 
 enum NotificationType {
-  PODCAST_READY
-  PODCAST_FAILED
+  EPISODE_READY
+  EPISODE_FAILED
   KEY_INVALID
-  QUESTION_ON_YOUR_PODCAST
+  QUESTION_ON_YOUR_EPISODE
   SCRIPT_READY
   ACCOUNT_WARNING
   CONTENT_REMOVED
@@ -754,7 +754,7 @@ model ExpoPushToken {
 
 model Job {
   id        String   @id @default(cuid())
-  podcastId String?
+  episodeId String?
   type      String
   payload   Json
   status    String // pending, processing, complete, failed
@@ -764,10 +764,10 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
   @@index([type, status])
-  @@index([podcastId])
+  @@index([episodeId])
   @@index([status])
   @@index([createdAt])
 }
@@ -776,16 +776,16 @@ model Job {
 
 model PipelineEvent {
   id        String   @id @default(cuid())
-  podcastId String
+  episodeId String
   createdAt DateTime @default(now())
   stage     String // queue name: 'audio-generation', 'script-verification', etc.
   type      String // 'error' | 'warning' | 'retry' | 'complete'
   message   String   @db.Text
   metadata  Json? // { segmentId?, jobId?, attemptNumber?, errorKind? }
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
-  @@index([podcastId, createdAt])
+  @@index([episodeId, createdAt])
   @@index([type, createdAt])
 }
 
@@ -795,7 +795,7 @@ model ApiUsageLog {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  podcastId String?
+  episodeId String?
   userId    String?
   service   String // anthropic, openai, elevenlabs, etc.
   modelId   String? // e.g. 'claude-sonnet-4-5-20250929', 'whisper-1', 'eleven_v3'
@@ -813,7 +813,7 @@ model ApiUsageLog {
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([podcastId])
+  @@index([episodeId])
   @@index([userId])
   @@index([createdAt])
   @@index([service])
@@ -918,7 +918,7 @@ model PairingToken {
 
 model Reference {
   id        String        @id @default(cuid())
-  podcastId String
+  episodeId String
   number    Int
   title     String        @db.Text
   authors   String[]
@@ -935,15 +935,15 @@ model Reference {
   originalTitle       String?            @db.Text
   contentDomain       String? // 'ACADEMIC' | 'NEWS' | 'GOVERNMENT' | 'EDUCATIONAL' | 'GENERAL'
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
-  @@unique([podcastId, number])
-  @@index([podcastId])
+  @@unique([episodeId, number])
+  @@index([episodeId])
 }
 
 model VocabularyEntry {
   id              String   @id @default(cuid())
-  podcastId       String
+  episodeId       String
   number          Int // [V1], [V2] marker index, 1-based
   word            String // target language word/phrase
   translation     String // native language translation
@@ -953,10 +953,10 @@ model VocabularyEntry {
   difficulty      String? // beginner, intermediate, advanced
   createdAt       DateTime @default(now())
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
-  @@unique([podcastId, number])
-  @@index([podcastId])
+  @@unique([episodeId, number])
+  @@index([episodeId])
 }
 
 enum ReferenceType {
@@ -1092,12 +1092,12 @@ model SiteConfig {
 
 model AudioFingerprint {
   id          String   @id @default(cuid())
-  podcastId   String   @unique
+  episodeId   String   @unique
   fingerprint Int[]
   duration    Int // seconds
   createdAt   DateTime @default(now())
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
   @@index([duration])
 }
@@ -1110,8 +1110,8 @@ enum DuplicateMatchStatus {
 
 model DuplicateMatch {
   id               String               @id @default(cuid())
-  sourcePodcastId  String
-  matchedPodcastId String
+  sourceEpisodeId  String
+  matchedEpisodeId String
   similarity       Float
   status           DuplicateMatchStatus @default(PENDING)
   reviewedBy       String?
@@ -1120,10 +1120,10 @@ model DuplicateMatch {
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
-  sourcePodcast  Podcast @relation("DuplicateSource", fields: [sourcePodcastId], references: [id], onDelete: Cascade)
-  matchedPodcast Podcast @relation("DuplicateMatch", fields: [matchedPodcastId], references: [id], onDelete: Cascade)
+  sourceEpisode  Episode @relation("DuplicateSource", fields: [sourceEpisodeId], references: [id], onDelete: Cascade)
+  matchedEpisode Episode @relation("DuplicateMatch", fields: [matchedEpisodeId], references: [id], onDelete: Cascade)
 
-  @@unique([sourcePodcastId, matchedPodcastId])
+  @@unique([sourceEpisodeId, matchedEpisodeId])
   @@index([status])
 }
 
@@ -1148,7 +1148,7 @@ model ModelPricingSnapshot {
 
 model VideoGeneration {
   id             String      @id @default(cuid())
-  podcastId      String
+  episodeId      String
   status         VideoStatus @default(PENDING)
   videoUrl       String?
   duration       Int? // seconds
@@ -1166,12 +1166,12 @@ model VideoGeneration {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  podcast        Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  episode        Episode             @relation(fields: [episodeId], references: [id], onDelete: Cascade)
   visuals        SegmentVisual[]
   avatarOverlays AvatarOverlay[]
   transitions    SegmentTransition[]
 
-  @@index([podcastId])
+  @@index([episodeId])
 }
 
 model SegmentTransition {
@@ -1518,13 +1518,13 @@ model ClassSection {
   score         Float?
   passed        Boolean?
   passThreshold Float         @default(0.7)
-  podcastId     String?       @unique // LISTENING section -> reuse Podcast; @unique because one section per podcast
+  episodeId     String?       @unique // LISTENING section -> reuse Episode; @unique because one section per episode
   generatedAt   DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   class         CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
-  podcast       Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  episode       Episode?         @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   questions     LessonQuestion[]
   prompts       SpeakingPrompt[]
   writingPrompts WritingPrompt[]
@@ -1533,7 +1533,7 @@ model ClassSection {
 }
 
 // MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
-// post-listen quiz question shape, but supports retries and has no podcast.
+// post-listen quiz question shape, but supports retries and has no episode.
 model LessonQuestion {
   id           String   @id @default(cuid())
   sectionId    String
@@ -1746,7 +1746,7 @@ model MockExam {
   @@index([courseId])
 }
 
-// One part of a mock exam (e.g. "Leseverstehen Teil 1"). LISTENING reuses Podcast;
+// One part of a mock exam (e.g. "Leseverstehen Teil 1"). LISTENING reuses Episode;
 // speaking/writing reuse SpeakingPrompt/WritingPrompt via their examSectionId FK.
 model ExamSection {
   id        String        @id @default(cuid())
@@ -1757,13 +1757,13 @@ model ExamSection {
   format    String // 'mc' | 'listening' | 'speaking' | 'writing'
   weight    Float         @default(0) // share of the overall band; sums to ~1 per exam
   status    SectionStatus @default(PENDING)
-  podcastId String?       @unique // LISTENING section -> reuse Podcast
+  episodeId String?       @unique // LISTENING section -> reuse Episode
   score     Float?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   exam            MockExam         @relation(fields: [examId], references: [id], onDelete: Cascade)
-  podcast         Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  episode         Episode?         @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   questions       ExamQuestion[]
   speakingPrompts SpeakingPrompt[]
   writingPrompts  WritingPrompt[]
@@ -1825,7 +1825,7 @@ enum EdgeType {
   VOCAB_VOCAB // collocation / morphological relation
   VOCAB_GRAMMAR // word exemplifies a grammar topic
   VOCAB_CLASS // word introduced / practiced in a class
-  VOCAB_PODCAST // word appeared in a listening podcast
+  VOCAB_EPISODE // word appeared in a listening episode
   GRAMMAR_GRAMMAR // prerequisite chain
 }
 
@@ -1894,7 +1894,7 @@ model VocabEdge {
   targetVocabId String?
   grammarId     String?
   classId       String?
-  podcastId     String?
+  episodeId     String?
   createdAt     DateTime @default(now())
 
   course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -1919,12 +1919,12 @@ model PracticeSession {
   score        Float? // 0..1, set on submit
   vocabLemmas  String[]       @default([]) // lemmas this session reviews (SRS targets)
   grammarKeys  String[]       @default([]) // grammar topicKeys this session reviews
-  podcastId    String?        @unique // LISTENING practice audio (one podcast per session)
+  episodeId    String?        @unique // LISTENING practice audio (one episode per session)
   startedAt    DateTime       @default(now())
   completedAt  DateTime?
 
   course           Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  podcast          Podcast?            @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  episode          Episode?            @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   prompts          SpeakingPrompt[]
   recordings       SpeakingRecording[]
   writingPrompts   WritingPrompt[]

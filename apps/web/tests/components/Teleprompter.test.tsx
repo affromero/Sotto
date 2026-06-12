@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Teleprompter } from '@/components/player/Teleprompter';
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 
 // jsdom doesn't implement scrollIntoView

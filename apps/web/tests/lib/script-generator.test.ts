@@ -40,7 +40,7 @@ describe('generateScript', () => {
           { speaker: 'EXPERT', text: 'Thanks for having me!' },
         ],
         soundCues: [
-          { type: 'intro', prompt: 'warm podcast intro', durationSeconds: 3, insertAfterTurn: -1 },
+          { type: 'intro', prompt: 'warm episode intro', durationSeconds: 3, insertAfterTurn: -1 },
         ],
         references: [],
       };
@@ -284,7 +284,7 @@ describe('generateScript', () => {
   });
 
   describe('language learning instructions', () => {
-    it('injects the target-language and vocabulary instructions into the system prompt for a learning podcast', async () => {
+    it('injects the target-language and vocabulary instructions into the system prompt for a learning episode', async () => {
       mockGenerateResponse.mockResolvedValue({
         content: JSON.stringify({
           turns: [{ speaker: 'HOST', text: '[V1:Guten Morgen]!' }, { speaker: 'EXPERT', text: 'Ja.' }],
@@ -317,7 +317,7 @@ describe('generateScript', () => {
       expect(systemPrompt).toContain('sprechen');
     });
 
-    it('omits language instructions for a standard English podcast', async () => {
+    it('omits language instructions for a standard English episode', async () => {
       mockGenerateResponse.mockResolvedValue({
         content: JSON.stringify({
           turns: [{ speaker: 'HOST', text: 'Hello.' }, { speaker: 'EXPERT', text: 'Hi.' }],

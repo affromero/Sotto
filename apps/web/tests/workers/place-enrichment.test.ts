@@ -57,7 +57,7 @@ beforeEach(() => {
 describe('place-enrichment worker', () => {
   const baseData = {
     segmentVisualId: 'sv-1',
-    podcastId: 'pod-1',
+    episodeId: 'pod-1',
     videoGenerationId: 'vg-1',
     places: [{ name: 'Constantinople', yearHint: 1200 }],
   };
@@ -127,7 +127,7 @@ describe('place-enrichment worker', () => {
       expect.objectContaining({ name: 'visual-generation' }),
       'generate_visual',
       expect.objectContaining({
-        podcastId: 'pod-1',
+        episodeId: 'pod-1',
         videoGenerationId: 'vg-1',
         segmentVisualId: 'sv-1',
         visualType: 'MAP_OVERLAY',

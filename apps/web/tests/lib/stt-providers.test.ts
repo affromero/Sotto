@@ -274,17 +274,17 @@ describe('AI Registry — new STT-only providers', () => {
   });
 });
 
-describe('importPodcastSchema — STT providers', () => {
+describe('importEpisodeSchema — STT providers', () => {
   // Inline import to avoid pulling in all validations deps
-  let importPodcastSchema: typeof import('@/lib/validations').importPodcastSchema;
+  let importEpisodeSchema: typeof import('@/lib/validations').importEpisodeSchema;
 
   beforeEach(async () => {
     const mod = await import('@/lib/validations');
-    importPodcastSchema = mod.importPodcastSchema;
+    importEpisodeSchema = mod.importEpisodeSchema;
   });
 
   it('accepts openai as sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
       sttProvider: 'openai',
     });
@@ -292,7 +292,7 @@ describe('importPodcastSchema — STT providers', () => {
   });
 
   it('accepts elevenlabs as sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
       sttProvider: 'elevenlabs',
     });
@@ -300,7 +300,7 @@ describe('importPodcastSchema — STT providers', () => {
   });
 
   it('rejects invalid sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
       sttProvider: 'invalid-provider',
     });
@@ -308,7 +308,7 @@ describe('importPodcastSchema — STT providers', () => {
   });
 
   it('accepts together as sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
       sttProvider: 'together',
     });
@@ -316,7 +316,7 @@ describe('importPodcastSchema — STT providers', () => {
   });
 
   it('accepts deepgram as sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
       sttProvider: 'deepgram',
     });
@@ -324,7 +324,7 @@ describe('importPodcastSchema — STT providers', () => {
   });
 
   it('accepts assemblyai as sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
       sttProvider: 'assemblyai',
     });
@@ -332,7 +332,7 @@ describe('importPodcastSchema — STT providers', () => {
   });
 
   it('accepts omitted sttProvider', () => {
-    const result = importPodcastSchema.safeParse({
+    const result = importEpisodeSchema.safeParse({
       sourcePlatform: 'youtube',
     });
     expect(result.success).toBe(true);

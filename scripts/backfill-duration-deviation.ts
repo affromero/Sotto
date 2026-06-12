@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 /**
- * Backfill durationDeviation for existing READY podcasts.
+ * Backfill durationDeviation for existing READY episodes.
  *
- * Computes deviation = podcast.duration - discovery.durationTarget * 60
- * for every READY podcast that has a duration but no durationDeviation yet.
+ * Computes deviation = episode.duration - discovery.durationTarget * 60
+ * for every READY episode that has a duration but no durationDeviation yet.
  *
  * Usage:
  *   npx tsx scripts/backfill-duration-deviation.ts           # dry run (default)
@@ -21,7 +21,7 @@ async function main() {
       console.log('DRY RUN — no changes will be written. Pass --apply to write.\n');
     }
 
-    const podcasts = await prisma.podcast.findMany({
+    const episodes = await prisma.episode.findMany({
       where: {
         status: 'READY',
         duration: { not: null },
@@ -36,26 +36,26 @@ async function main() {
       },
     });
 
-    console.log(`Found ${podcasts.length} READY podcasts without durationDeviation.\n`);
+    console.log(`Found ${episodes.length} READY episodes without durationDeviation.\n`);
 
     let updated = 0;
     let skippedNoTarget = 0;
 
-    for (const podcast of podcasts) {
-      const target = podcast.discovery?.durationTarget;
+    for (const episode of episodes) {
+      const target = episode.discovery?.durationTarget;
       if (!target) {
         skippedNoTarget++;
         continue;
       }
 
-      const deviation = podcast.duration! - target * 60;
+      const deviation = episode.duration! - target * 60;
       console.log(
-        `${podcast.title || podcast.id}: ${podcast.duration}s actual, ${target * 60}s target → ${deviation > 0 ? '+' : ''}${deviation}s deviation`
+        `${episode.title || episode.id}: ${episode.duration}s actual, ${target * 60}s target → ${deviation > 0 ? '+' : ''}${deviation}s deviation`
       );
 
       if (!dryRun) {
-        await prisma.podcast.update({
-          where: { id: podcast.id },
+        await prisma.episode.update({
+          where: { id: episode.id },
           data: { durationDeviation: deviation },
         });
       }
@@ -64,7 +64,7 @@ async function main() {
     }
 
     console.log(
-      `\n${dryRun ? 'Would update' : 'Updated'} ${updated} podcasts. Skipped ${skippedNoTarget} (no duration target).`
+      `\n${dryRun ? 'Would update' : 'Updated'} ${updated} episodes. Skipped ${skippedNoTarget} (no duration target).`
     );
   } finally {
     await prisma.$disconnect();

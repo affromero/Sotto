@@ -1,5 +1,5 @@
 /**
- * Script Writer — writes podcast dialogue grounded in a research dossier and creative outline.
+ * Script Writer — writes episode dialogue grounded in a research dossier and creative outline.
  *
  * The writer receives pre-verified evidence and a beat sheet. It cites using
  * [[ev_ID]] placeholders which the compile step resolves to [N] footnotes.

@@ -5,7 +5,7 @@ import { logger } from './logger';
 /**
  * Attribute a referral: link the new user to their referrer.
  * Does NOT verify or notify — that happens when the referred user
- * creates their first podcast (see verifyReferral).
+ * creates their first episode (see verifyReferral).
  *
  * Returns true if attribution succeeded, false if skipped.
  */
@@ -39,11 +39,11 @@ export async function attributeReferral(
 }
 
 /**
- * Verify a referral: called when a referred user's first podcast reaches READY.
+ * Verify a referral: called when a referred user's first episode reaches READY.
  * Marks the referral as verified and notifies the referrer.
  *
  * Returns true if verification succeeded, false if skipped (no referrer,
- * already verified, or not actually their first podcast).
+ * already verified, or not actually their first episode).
  */
 export async function verifyReferral(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -59,8 +59,8 @@ export async function verifyReferral(userId: string): Promise<boolean> {
   if (!user?.referredById) return false;
   if (user.referralVerified) return false;
 
-  // Confirm this is truly their first READY podcast
-  const readyCount = await prisma.podcast.count({
+  // Confirm this is truly their first READY episode
+  const readyCount = await prisma.episode.count({
     where: { userId, status: 'READY' },
   });
   if (readyCount !== 1) return false;

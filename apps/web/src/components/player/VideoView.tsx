@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { Maximize2, Minimize2, Minus, Plus, Subtitles, Play as PlayIcon, Pause, RotateCcw, RotateCw } from 'lucide-react';
 import { Player, type PlayerRef } from '@remotion/player';
-import { PodcastVisuals } from '@sotto/video';
+import { EpisodeVisuals } from '@sotto/video';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
 import type { VisualsInput } from '@sotto/video';
 import { parseTextWithCitations } from '@/lib/citation-parser';
@@ -14,7 +14,7 @@ import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AvatarOverlay, AVATAR_MASK_SHAPES } from '@/components/player/AvatarOverlay';
 import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
 import type { AvatarOverlayData } from '@/types/avatar';
-import type { SegmentData } from '@/types/podcast';
+import type { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 import styles from './VideoView.module.css';
 
@@ -239,7 +239,7 @@ export function VideoView({
         </button>
         <Player
           ref={playerRef}
-          component={PodcastVisuals as React.FC}
+          component={EpisodeVisuals as React.FC}
           inputProps={inputProps}
           durationInFrames={totalFrames}
           compositionWidth={DEFAULT_RENDER_CONFIG.width}

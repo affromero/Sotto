@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
-import { SegmentData } from '@/types/podcast';
+import { SegmentData } from '@/types/episode';
 
 vi.mock('@/lib/citation-parser', () => ({
   parseTextWithCitations: (text: string) => text,
@@ -22,7 +22,7 @@ describe('TranscriptPanel', () => {
     {
       id: 'segment-1',
       speaker: 'HOST' as const,
-      text: 'Welcome to the podcast about quantum physics.',
+      text: 'Welcome to the episode about quantum physics.',
       audioUrl: 'https://example.com/audio1.mp3',
       order: 0,
       startTime: 0,
@@ -59,7 +59,7 @@ describe('TranscriptPanel', () => {
 
   it('renders all segments', () => {
     render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
-    expect(screen.getByText('Welcome to the podcast about quantum physics.')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to the episode about quantum physics.')).toBeInTheDocument();
     expect(
       screen.getByText('Thank you for having me. Let me explain quantum entanglement.')
     ).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe('TranscriptPanel', () => {
     render(
       <TranscriptPanel segments={mockSegments} currentTime={0} onSegmentClick={onSegmentClick} />
     );
-    await user.click(screen.getByText('Welcome to the podcast about quantum physics.'));
+    await user.click(screen.getByText('Welcome to the episode about quantum physics.'));
     expect(onSegmentClick).toHaveBeenCalledWith(0);
   });
 
@@ -101,7 +101,7 @@ describe('TranscriptPanel', () => {
         onSegmentClick={onSegmentClick}
       />
     );
-    await user.click(screen.getByText('Welcome to the podcast about quantum physics.'));
+    await user.click(screen.getByText('Welcome to the episode about quantum physics.'));
     expect(onSegmentClick).not.toHaveBeenCalled();
   });
 
@@ -109,7 +109,7 @@ describe('TranscriptPanel', () => {
     const { container } = render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
     const buttons = container.querySelectorAll('[role="button"]');
     const segmentTexts = Array.from(buttons).map((el) => el.textContent);
-    expect(segmentTexts[0]).toContain('Welcome to the podcast about quantum physics.');
+    expect(segmentTexts[0]).toContain('Welcome to the episode about quantum physics.');
     expect(segmentTexts[1]).toContain('Thank you for having me. Let me explain quantum entanglement.');
     expect(segmentTexts[2]).toContain('That sounds fascinating. Can you elaborate?');
   });
@@ -246,7 +246,7 @@ describe('TranscriptPanel', () => {
       });
 
       // Click a segment to reengage
-      fireEvent.click(screen.getByText('Welcome to the podcast about quantum physics.'));
+      fireEvent.click(screen.getByText('Welcome to the episode about quantum physics.'));
 
       (HTMLElement.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
       rerender(<TranscriptPanel segments={mockSegments} currentTime={6} />);

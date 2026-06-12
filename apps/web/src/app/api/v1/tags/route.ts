@@ -10,11 +10,11 @@ export async function GET(_request: NextRequest) {
       name: true,
       slug: true,
       _count: {
-        select: { podcasts: { where: { podcast: { deletedAt: null } } } },
+        select: { episodes: { where: { episode: { deletedAt: null } } } },
       },
     },
     orderBy: {
-      podcasts: { _count: 'desc' },
+      episodes: { _count: 'desc' },
     },
   });
 
@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest) {
     id: tag.id,
     name: tag.name,
     slug: tag.slug,
-    podcastCount: tag._count.podcasts,
+    episodeCount: tag._count.episodes,
   }));
 
   return NextResponse.json(result);

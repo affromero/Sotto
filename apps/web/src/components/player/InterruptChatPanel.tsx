@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { ResolutionPrompt } from '@/components/chat/ResolutionPrompt';
-import type { InteractionSummary } from '@/types/podcast';
+import type { InteractionSummary } from '@/types/episode';
 import styles from './InterruptChatPanel.module.css';
 
 interface InterruptChatPanelProps {
-  podcastId: string;
+  episodeId: string;
   isOwner: boolean;
-  podcastSource: string;
+  episodeSource: string;
   currentTime: number;
   existingInteractions: InteractionSummary[];
   onClose: () => void;
@@ -27,9 +27,9 @@ type PanelState =
   | 'incorporated';
 
 export function InterruptChatPanel({
-  podcastId,
+  episodeId,
   isOwner,
-  podcastSource,
+  episodeSource,
   currentTime,
   existingInteractions,
   onClose,
@@ -56,7 +56,7 @@ export function InterruptChatPanel({
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/podcasts/${podcastId}/interact`, {
+      const response = await fetch(`/api/v1/episodes/${episodeId}/interact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question.trim(), timestamp: currentTime }),
@@ -75,7 +75,7 @@ export function InterruptChatPanel({
       pollRef.current = setInterval(async () => {
         if (document.visibilityState === 'hidden') return;
         try {
-          const pollRes = await fetch(`/api/v1/podcasts/${podcastId}/interact/${data.id}`);
+          const pollRes = await fetch(`/api/v1/episodes/${episodeId}/interact/${data.id}`);
           if (!pollRes.ok) return;
           const pollData = await pollRes.json();
 
@@ -106,7 +106,7 @@ export function InterruptChatPanel({
       setError(err instanceof Error ? err.message : 'An error occurred');
       setState('idle');
     }
-  }, [question, podcastId, currentTime, state, onQuestionAnswered]);
+  }, [question, episodeId, currentTime, state, onQuestionAnswered]);
 
   const handleResolve = useCallback(
     async (helpful: boolean, incorporate: boolean) => {
@@ -115,7 +115,7 @@ export function InterruptChatPanel({
       // First resolve with helpful feedback
       setState('resolving');
       try {
-        await fetch(`/api/v1/podcasts/${podcastId}/interact/${activeInteractionId}/resolve`, {
+        await fetch(`/api/v1/episodes/${episodeId}/interact/${activeInteractionId}/resolve`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ helpful }),
@@ -124,7 +124,7 @@ export function InterruptChatPanel({
         if (incorporate && isOwner) {
           setState('incorporating');
           const incRes = await fetch(
-            `/api/v1/podcasts/${podcastId}/interact/${activeInteractionId}/incorporate`,
+            `/api/v1/episodes/${episodeId}/interact/${activeInteractionId}/incorporate`,
             { method: 'POST' }
           );
           if (incRes.ok) {
@@ -147,7 +147,7 @@ export function InterruptChatPanel({
         setActiveInteractionId(null);
       }, 2000);
     },
-    [activeInteractionId, podcastId, isOwner]
+    [activeInteractionId, episodeId, isOwner]
   );
 
   return (
@@ -236,7 +236,7 @@ export function InterruptChatPanel({
           <p className={styles.answerText}>{answer}</p>
           <ResolutionPrompt
             onResolve={(helpful, incorporate) => handleResolve(helpful, incorporate)}
-            canIncorporate={isOwner && podcastSource !== 'IMPORT'}
+            canIncorporate={isOwner && episodeSource !== 'IMPORT'}
           />
         </div>
       )}

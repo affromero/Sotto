@@ -8,7 +8,7 @@ import {
 } from '@/lib/queue';
 import { Prisma } from '@prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { type ReferenceInput } from '@/lib/reference-validator';
 import { runReferenceVerification, buildReferenceRetryFeedback, mergeVerifiedReferences } from '@/lib/reference-verification';
 import { generateScriptWithFeedback } from '@/lib/script-generator';
@@ -23,7 +23,7 @@ import { getMinReferenceCount } from '@/lib/script-verifier';
 import { getAiKey } from '@/lib/byok';
 import { getGenerationFeatures } from '@/lib/generation-features';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { assignVoicesForPodcast } from '@/lib/voice-assigner';
+import { assignVoicesForEpisode } from '@/lib/voice-assigner';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
@@ -37,49 +37,49 @@ const MAX_REF_RETRY_ATTEMPTS: Record<string, number> = {
   eli5: 1,
 };
 
-async function pauseForTtsProviderSelection(podcastId: string, userId: string): Promise<void> {
-  await prisma.podcast.update({
-    where: { id: podcastId },
+async function pauseForTtsProviderSelection(episodeId: string, userId: string): Promise<void> {
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
   });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
 
   await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
     userId,
     type: 'SCRIPT_READY',
     title: 'Choose a voice provider',
     message: 'Your script is ready. Choose a TTS provider to start audio generation.',
-    data: { podcastId, missingTtsProvider: true },
+    data: { episodeId, missingTtsProvider: true },
   });
 
-  logger.warn('Reference validation paused before audio: missing TTS provider', { podcastId, userId });
+  logger.warn('Reference validation paused before audio: missing TTS provider', { episodeId, userId });
 }
 
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
 ): Promise<void> {
-  const { podcastId, userId, useAdminCredits, referenceRetryAttempt, previousVerifiedCount, previouslyVerifiedRefIds } = job.data;
+  const { episodeId, userId, useAdminCredits, referenceRetryAttempt, previousVerifiedCount, previouslyVerifiedRefIds } = job.data;
   const attempt = referenceRetryAttempt ?? 0;
 
-  logger.info('Starting reference validation', { podcastId, attempt: String(attempt) });
+  logger.info('Starting reference validation', { episodeId, attempt: String(attempt) });
   await job.updateProgress(5);
 
   // Load references and script
-  const [references, script, podcast, discovery] = await Promise.all([
+  const [references, script, episode, discovery] = await Promise.all([
     prisma.reference.findMany({
-      where: { podcastId },
+      where: { episodeId },
       orderBy: { number: 'asc' },
     }),
     prisma.script.findUnique({
-      where: { podcastId },
+      where: { episodeId },
     }),
-    prisma.podcast.findUnique({
-      where: { id: podcastId },
+    prisma.episode.findUnique({
+      where: { id: episodeId },
       select: { topic: true, aiModel: true, source: true, verificationMode: true },
     }),
     prisma.discovery.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: {
         depth: true,
         topic: true,
@@ -96,94 +96,94 @@ export async function processReferenceValidation(
   ]);
 
   if (!script) {
-    throw new Error(`Script not found for podcast ${podcastId}`);
+    throw new Error(`Script not found for episode ${episodeId}`);
   }
 
-  // Compute minimum reference requirement for this podcast
+  // Compute minimum reference requirement for this episode
   const depth = discovery?.depth || 'standard';
-  const isShowcase = podcast?.verificationMode === 'showcase';
-  const effectiveDepth = podcast?.verificationMode === 'relaxed' ? 'eli5' : depth;
+  const isShowcase = episode?.verificationMode === 'showcase';
+  const effectiveDepth = episode?.verificationMode === 'relaxed' ? 'eli5' : depth;
   const requiredRefCount = getMinReferenceCount(effectiveDepth, discovery?.durationTarget ?? 10);
 
   if (references.length === 0) {
     // Gate: pause as draft if references are required but none exist
     if (!isShowcase && requiredRefCount > 0) {
       logger.warn('No references found — pausing at SCRIPT_READY for user action', {
-        podcastId,
+        episodeId,
         required: String(requiredRefCount),
         depth,
       });
 
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      await prisma.episode.update({
+        where: { id: episodeId },
         data: { status: 'SCRIPT_READY', lowReferences: true },
       });
-      await invalidatePodcastCache(podcastId);
-      await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+      await invalidateEpisodeCache(episodeId);
+      await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId,
         type: 'SCRIPT_READY',
         title: 'Script needs references',
-        message: 'Your podcast doesn\'t have enough verified references. Add source URLs, explore a different angle, or delete it.',
-        data: { podcastId, insufficientRefs: true, verified: 0, required: requiredRefCount },
+        message: 'Your episode doesn\'t have enough verified references. Add source URLs, explore a different angle, or delete it.',
+        data: { episodeId, insufficientRefs: true, verified: 0, required: requiredRefCount },
       });
       return;
     }
 
-    logger.info('No references to validate, proceeding to audio generation', { podcastId });
-    const earlyExistingPodcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    logger.info('No references to validate, proceeding to audio generation', { episodeId });
+    const earlyExistingEpisode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { ttsProvider: true },
     });
-    if (!earlyExistingPodcast.ttsProvider) {
+    if (!earlyExistingEpisode.ttsProvider) {
       const selected = await getAutoModelConfig();
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      await prisma.episode.update({
+        where: { id: episodeId },
         data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
       });
     }
 
-    // Assign voices for multi-speaker podcasts
+    // Assign voices for multi-speaker episodes
     const earlyTurns = script.turns as Array<{ speaker: string; text: string }>;
-    const earlyPodcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    const earlyEpisode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { ttsProvider: true },
     });
-    if (!earlyPodcast.ttsProvider) {
-      await pauseForTtsProviderSelection(podcastId, userId);
+    if (!earlyEpisode.ttsProvider) {
+      await pauseForTtsProviderSelection(episodeId, userId);
       await job.updateProgress(100);
       return;
     }
 
-    const earlyProvider = earlyPodcast.ttsProvider as TtsProviderId;
+    const earlyProvider = earlyEpisode.ttsProvider as TtsProviderId;
     const earlySpeakers = [...new Set(earlyTurns.map((t) => t.speaker))].map((name) => ({ name }));
-    await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider);
+    await assignVoicesForEpisode(episodeId, earlySpeakers, earlyProvider);
 
     // Convert TTS tags before creating segments
     const convertedEarlyTurns = await convertTurnsForProvider(earlyTurns, earlyProvider, { mode: 'disabled' });
-    await createSegmentsAndQueueAudio(podcastId, convertedEarlyTurns);
+    await createSegmentsAndQueueAudio(episodeId, convertedEarlyTurns);
     await job.updateProgress(100);
     return;
   }
 
-  const aiKey = useAdminCredits || podcast?.aiModel ? null : await getAiKey(userId);
-  if (!podcast?.aiModel && !aiKey) {
+  const aiKey = useAdminCredits || episode?.aiModel ? null : await getAiKey(userId);
+  if (!episode?.aiModel && !aiKey) {
     throw new Error('AI model is required for reference validation when no AI key is configured.');
   }
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast?.aiModel,
+    episodeAiModel: episode?.aiModel,
     aiKey,
   });
   const verificationModel = model;
 
   const providerAiKey =
-    podcast?.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode?.aiModel && provider !== 'claude-code' && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (podcast?.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode?.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for reference validation.`);
   }
 
@@ -205,7 +205,7 @@ export async function processReferenceValidation(
 
   if (skippedVerifiedCount > 0) {
     logger.info('Skipping re-verification for previously verified refs', {
-      podcastId,
+      episodeId,
       skipped: String(skippedVerifiedCount),
       verifying: String(refsToVerify.length),
     });
@@ -214,8 +214,8 @@ export async function processReferenceValidation(
   const scriptTurns = script.turns as Array<{ speaker: string; text: string; direction?: string }>;
 
   // Write initial progress snapshot
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: {
       verificationProgress: {
         total: refInputs.length,
@@ -237,7 +237,7 @@ export async function processReferenceValidation(
   const { results: verificationResults, rejectedRefIds, claimContexts } = await runReferenceVerification(
     refsToVerify,
     scriptTurns,
-    podcast?.topic || '',
+    episode?.topic || '',
     providerAiKey?.apiKey,
     verificationModel,
     provider,
@@ -340,7 +340,7 @@ export async function processReferenceValidation(
     (ref) => ref.url && !rejectedRefIds.has(ref.id) && verificationResults.get(ref.id)?.verdict.status !== 'REMOVED'
   );
   if (verifiedRefs.length > 0) {
-    await extractDiscoveryFigures(podcastId, verifiedRefs);
+    await extractDiscoveryFigures(episodeId, verifiedRefs);
   }
 
   // Clean script if any references were removed
@@ -356,14 +356,14 @@ export async function processReferenceValidation(
 
     // Update script
     await prisma.script.update({
-      where: { podcastId },
+      where: { episodeId },
       data: { turns, markdown },
     });
 
     // Delete removed references FIRST (before renumbering to avoid unique constraint conflicts)
     await prisma.reference.deleteMany({
       where: {
-        podcastId,
+        episodeId,
         number: { in: [...removedNumbers] },
       },
     });
@@ -382,7 +382,7 @@ export async function processReferenceValidation(
     }
 
     logger.info('Script cleaned and references renumbered', {
-      podcastId,
+      episodeId,
       removed: String(removedNumbers.size),
       renumbered: String(renumberMap.size),
     });
@@ -404,7 +404,7 @@ export async function processReferenceValidation(
     if (attempt < maxRetries && !goingBackward) {
       // --- RETRY PATH: regenerate script with feedback ---
       logger.info('References below minimum — retrying with feedback', {
-        podcastId,
+        episodeId,
         attempt: String(attempt),
         maxRetries: String(maxRetries),
         verified: String(verifiedCount),
@@ -412,8 +412,8 @@ export async function processReferenceValidation(
       });
 
       // Write progress snapshot (replacing phase)
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      await prisma.episode.update({
+        where: { id: episodeId },
         data: {
           verificationProgress: {
             total: references.length,
@@ -449,15 +449,15 @@ export async function processReferenceValidation(
       });
 
       // Load the current (possibly cleaned) script for regeneration
-      const currentScript = await prisma.script.findUnique({ where: { podcastId } });
+      const currentScript = await prisma.script.findUnique({ where: { episodeId } });
       const currentRefs = await prisma.reference.findMany({
-        where: { podcastId },
+        where: { episodeId },
         orderBy: { number: 'asc' },
       });
 
       if (currentScript && discovery) {
         const regenResult = await generateScriptWithFeedback({
-          topic: discovery.topic || podcast?.topic || '',
+          topic: discovery.topic || episode?.topic || '',
           depth: discovery.depth || 'standard',
           audienceLevel: discovery.audienceLevel || 'intermediate',
           audience: discovery.audience || undefined,
@@ -513,7 +513,7 @@ export async function processReferenceValidation(
 
         // Save regenerated script
         await prisma.script.update({
-          where: { podcastId },
+          where: { episodeId },
           data: {
             turns: regenResult.turns,
             markdown: regenResult.markdown,
@@ -521,11 +521,11 @@ export async function processReferenceValidation(
         });
 
         // Replace all references with merged set
-        await prisma.reference.deleteMany({ where: { podcastId } });
+        await prisma.reference.deleteMany({ where: { episodeId } });
         if (merged.length > 0) {
           await prisma.reference.createMany({
             data: merged.map((r) => ({
-              podcastId,
+              episodeId,
               number: r.number,
               title: r.title,
               authors: r.authors,
@@ -541,7 +541,7 @@ export async function processReferenceValidation(
 
         // Log pipeline event
         await logPipelineStageComplete(
-          podcastId,
+          episodeId,
           'reference-validation-retry',
           `Attempt ${attempt + 1}: ${verifiedCount} verified, regenerated ${merged.length} refs`
         );
@@ -555,7 +555,7 @@ export async function processReferenceValidation(
 
         // Re-queue for next validation pass
         await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
-          podcastId,
+          episodeId,
           userId,
           useAdminCredits,
           referenceRetryAttempt: attempt + 1,
@@ -569,7 +569,7 @@ export async function processReferenceValidation(
     // --- EXHAUSTED RETRIES (or going backward) — fall through to banner ---
     if (goingBackward) {
       logger.warn('Reference retry going backward — stopping', {
-        podcastId,
+        episodeId,
         attempt: String(attempt),
         currentVerified: String(verifiedCount),
         previousVerified: String(previousVerifiedCount),
@@ -577,7 +577,7 @@ export async function processReferenceValidation(
     }
 
     logger.warn('References below minimum after validation — pausing at SCRIPT_READY', {
-      podcastId,
+      episodeId,
       remaining: String(remainingRefCount),
       required: String(requiredRefCount),
       depth,
@@ -604,8 +604,8 @@ export async function processReferenceValidation(
       (r) => r.verdict.status === 'REPLACED'
     ).length;
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: {
         status: 'SCRIPT_READY',
         lowReferences: true,
@@ -628,22 +628,22 @@ export async function processReferenceValidation(
         },
       },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
       type: 'SCRIPT_READY',
       title: 'Script needs more references',
       message: `Only ${remainingRefCount} of ${requiredRefCount} required references could be verified. Add source URLs, explore a different angle, or delete it.`,
-      data: { podcastId, insufficientRefs: true, verified: remainingRefCount, required: requiredRefCount },
+      data: { episodeId, insufficientRefs: true, verified: remainingRefCount, required: requiredRefCount },
     });
     return;
   }
 
   // Write complete progress snapshot
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: {
       verificationProgress: {
         total: references.length,
@@ -665,70 +665,70 @@ export async function processReferenceValidation(
   const genFeatures = getGenerationFeatures();
 
   // Non-WEB/IMPORT sources always auto-approve; for WEB/IMPORT, check tier
-  const isWebOrImport = podcast?.source === 'WEB' || podcast?.source === 'IMPORT';
+  const isWebOrImport = episode?.source === 'WEB' || episode?.source === 'IMPORT';
   const shouldAutoApprove = genFeatures.autoApproveScript || !isWebOrImport;
 
   if (!shouldAutoApprove) {
     // Pause for user review (Pro users get script review)
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
       type: 'SCRIPT_READY',
       title: 'Script ready for review',
-      message: 'Your podcast script is ready. Review and approve it to start audio generation.',
-      data: { podcastId },
+      message: 'Your episode script is ready. Review and approve it to start audio generation.',
+      data: { episodeId },
     });
 
-    logger.info('References validated, paused at SCRIPT_READY for review', { podcastId });
+    logger.info('References validated, paused at SCRIPT_READY for review', { episodeId });
   } else {
     // Auto-approve for non-WEB/IMPORT sources.
-    const existingPodcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    const existingEpisode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { ttsProvider: true },
     });
-    if (!existingPodcast.ttsProvider) {
+    if (!existingEpisode.ttsProvider) {
       const selected = await getAutoModelConfig();
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      await prisma.episode.update({
+        where: { id: episodeId },
         data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
       });
     }
 
-    // Assign voices for multi-speaker podcasts
-    const latePodcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    // Assign voices for multi-speaker episodes
+    const lateEpisode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { ttsProvider: true },
     });
-    if (!latePodcast.ttsProvider) {
-      await pauseForTtsProviderSelection(podcastId, userId);
+    if (!lateEpisode.ttsProvider) {
+      await pauseForTtsProviderSelection(episodeId, userId);
       return;
     }
 
-    const lateProvider = latePodcast.ttsProvider as TtsProviderId;
+    const lateProvider = lateEpisode.ttsProvider as TtsProviderId;
     const lateSpeakers = [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider);
+    await assignVoicesForEpisode(episodeId, lateSpeakers, lateProvider);
 
     // Convert TTS tags before creating segments
     const convertedTurns = await convertTurnsForProvider(turns, lateProvider, { mode: 'disabled' });
-    await createSegmentsAndQueueAudio(podcastId, convertedTurns);
+    await createSegmentsAndQueueAudio(episodeId, convertedTurns);
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { status: 'GENERATING_AUDIO', verificationProgress: Prisma.DbNull },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'GENERATING_AUDIO' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });
 
-    logger.info('References validated, auto-approved for audio generation', { podcastId });
+    logger.info('References validated, auto-approved for audio generation', { episodeId });
   }
 
-  await logPipelineStageComplete(podcastId, 'reference-validation');
+  await logPipelineStageComplete(episodeId, 'reference-validation');
   await job.updateProgress(100);
 
   const replacedCount = [...verificationResults.values()].filter(
@@ -737,7 +737,7 @@ export async function processReferenceValidation(
   const removedCount = removedNumbers.size;
 
   logger.info('Reference validation complete', {
-    podcastId,
+    episodeId,
     verified: String(verifiedCount),
     replaced: String(replacedCount),
     removed: String(removedCount),

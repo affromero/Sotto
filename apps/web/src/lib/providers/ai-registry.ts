@@ -432,33 +432,33 @@ export function isValidModelId(modelId: string): boolean {
  * Resolve the AI model and its owning provider, keeping them in sync.
  *
  * Priority:
- * 1. podcast.aiModel (user's explicit choice) → look up provider from registry. Throws if unknown.
+ * 1. episode.aiModel (user's explicit choice) → look up provider from registry. Throws if unknown.
  * 2. BYOK key → provider default model
  *
  * Returns both `model` and `provider` so callers never mismatch them.
  */
 export async function resolveAiModelAndProvider(opts: {
-  podcastAiModel?: string | null;
+  episodeAiModel?: string | null;
   aiKey?: { provider: string; apiKey: string } | null;
 }): Promise<{ model: string; provider: string }> {
-  // 1. Podcast-level model override — only use if the model is in the registry
-  if (opts.podcastAiModel) {
-    if (opts.podcastAiModel.startsWith('claude-code:')) {
-      return { model: opts.podcastAiModel, provider: 'claude-code' };
+  // 1. Episode-level model override — only use if the model is in the registry
+  if (opts.episodeAiModel) {
+    if (opts.episodeAiModel.startsWith('claude-code:')) {
+      return { model: opts.episodeAiModel, provider: 'claude-code' };
     }
 
     // Local OpenAI-compatible model (e.g. "local:qwen3") — routed by prefix, not
     // the registry, since the served model name is host-defined.
-    if (opts.podcastAiModel.startsWith('local:')) {
-      return { model: opts.podcastAiModel, provider: 'local' };
+    if (opts.episodeAiModel.startsWith('local:')) {
+      return { model: opts.episodeAiModel, provider: 'local' };
     }
 
-    const owner = getProviderForModel(opts.podcastAiModel);
+    const owner = getProviderForModel(opts.episodeAiModel);
     if (owner) {
-      return { model: opts.podcastAiModel, provider: owner };
+      return { model: opts.episodeAiModel, provider: owner };
     }
     throw new Error(
-      `Unknown AI model "${opts.podcastAiModel}". Choose a registered model before generation.`
+      `Unknown AI model "${opts.episodeAiModel}". Choose a registered model before generation.`
     );
   }
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18
 
-**Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private podcast storage, and no hosted Sotto services.
+**Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private episode storage, and no hosted Sotto services.
 
 ---
 
@@ -199,7 +199,7 @@ For S3-compatible storage, restrict CORS to your exact public app URL:
 ]
 ```
 
-Do not use wildcard origins for private podcast audio.
+Do not use wildcard origins for private episode audio.
 
 ## 10. Backups
 

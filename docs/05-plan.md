@@ -2,7 +2,7 @@
 
 > **Date**: 2026-05-15
 >
-> **Summary**: This is the active implementation plan for Sotto as a free, open-source, self-hostable language-learning platform. The current build centers on BYOK/local-agent setup, placement, mastery-gated CEFR courses, grammar/reading/listening/speaking/writing classes, ungated practice, mock exams, memory graph review, and the reused audio engine for adaptive listening. Old private-podcast, briefing, news, bot, billing, and social-roadmap items are removed from the current product plan.
+> **Summary**: This is the active implementation plan for Sotto as a free, open-source, self-hostable language-learning platform. The current build centers on BYOK/local-agent setup, placement, mastery-gated CEFR courses, grammar/reading/listening/speaking/writing classes, ungated practice, mock exams, memory graph review, and the reused audio engine for adaptive listening. Old private-episode, briefing, news, bot, billing, and social-roadmap items are removed from the current product plan.
 
 ---
 
@@ -44,7 +44,7 @@ Completed in the language-learning pivot:
 - Courses are native-language to target-language enrollments with CEFR level state.
 - Mastery-gated `CourseClass` generation exists across grammar, reading, listening, speaking, and writing.
 - Failed sections can regenerate in a similar-but-not-identical form.
-- The listening skill reuses the audio-generation engine and `Podcast` implementation details.
+- The listening skill reuses the audio-generation engine and `Episode` implementation details.
 - Speaking recordings flow through STT and pronunciation feedback.
 - Writing responses are graded with inline corrections and feedback.
 - Ungated `PracticeSession` exists for skill-specific review, including vocabulary.
@@ -63,7 +63,7 @@ Completed in the language-learning pivot:
 
 Removed from the old project plan:
 
-- Private podcast platform positioning.
+- Private episode platform positioning.
 - Private RSS as the main product delivery primitive.
 - Meeting recap ingestion as a current roadmap item.
 - Scheduled news briefings as a current roadmap item.
@@ -197,7 +197,7 @@ Errors should name the missing capability and link to the exact settings section
 
 ### 6.1 Manual Topic Or URL
 
-Current behavior: reframed as sourced classes, not podcast creation.
+Current behavior: reframed as sourced classes, not episode creation.
 
 A learner can generate a class from a real article, paper, video link, or interest topic where the code path supports it. The class should be leveled to the learner's CEFR state, cite verified sources where available, and feed the same grammar, reading, listening, speaking, writing, and memory graph loop.
 
@@ -225,7 +225,7 @@ Meeting recap episodes, meeting roll-ups, and meeting-to-daily-briefing flows be
 
 Removed from the active plan.
 
-Scheduled news podcasts and world briefings belonged to the old private audio briefing strategy. They should not appear in current docs, tests, or pitch copy as Sotto behavior.
+Scheduled news episodes and world briefings belonged to the old private audio briefing strategy. They should not appear in current docs, tests, or pitch copy as Sotto behavior.
 
 ### 6.5 Generic Webhook
 
@@ -284,7 +284,7 @@ Current delivery surfaces:
 - worksheet pages and iPad PencilKit ink where enabled.
 - mobile/iPad routes backed by the same `/api/v1` learning APIs.
 
-Legacy audio routes can remain for the reused listening engine. Do not present RSS, public creator routes, or podcast feeds as the main product delivery layer.
+Legacy audio routes can remain for the reused listening engine. Do not present RSS, public creator routes, or episode feeds as the main product delivery layer.
 
 ### 7.4 Storage
 
@@ -311,7 +311,7 @@ Every stage should add guardrails:
 - Worker tests for listening audio generation and speaking grading where those paths change.
 - Component tests for first-run onboarding and learning dashboard changes.
 - E2E smoke test for local onboarding when provider calls are mocked.
-- OSS guard tests that fail if removed social, billing, plan, tier, quota, news, briefing, public-discovery, or podcast-platform product docs return.
+- OSS guard tests that fail if removed social, billing, plan, tier, quota, news, briefing, public-discovery, or episode-platform product docs return.
 
 Before every commit:
 
@@ -351,7 +351,7 @@ Known non-fatal build warnings should be documented only when they are unrelated
 ### Stage 4 - Agent Ingestion
 
 - Keep agent ingestion private and learning-scoped.
-- Do not route agent output into briefing or podcast-product surfaces.
+- Do not route agent output into briefing or episode-product surfaces.
 - Add queue integration only when the learning workflow needs async processing.
 - Add tests for auth, idempotency, and private course/memory effects.
 - Commit once CI passes.
@@ -368,7 +368,7 @@ Removed from the active plan.
 
 Removed from the active plan.
 
-- Do not build scheduled news podcasts.
+- Do not build scheduled news episodes.
 - Do not document world briefings as current behavior.
 - Revisit only with a new language-learning requirement, schema, and tests.
 
@@ -409,6 +409,6 @@ Reframed as sourced-class and context operations.
 - Memory graph works end to end.
 - At least one BYOK provider path works end to end.
 - At least one local-agent path works end to end.
-- No stale social-network, billing, plan, tier, quota, briefing, news, bot-workflow, or podcast-platform docs are included in the release packet.
+- No stale social-network, billing, plan, tier, quota, briefing, news, bot-workflow, or episode-platform docs are included in the release packet.
 - SECURITY.md or equivalent reporting guidance exists.
 - Self-hosted language clearly keeps Sotto billing out of feature access.

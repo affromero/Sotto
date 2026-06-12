@@ -30,7 +30,7 @@ function baseExam(overrides: Partial<ExamData> = {}): ExamData {
         weight: 1,
         status: 'READY',
         score: null,
-        podcast: null,
+        episode: null,
         questions: [
           { id: 'q1', order: 1, question: 'Was bedeutet Haus?', options: ['house', 'tree'], passageRef: null, passageText: null },
         ],

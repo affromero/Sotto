@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /**
- * Backfill TTS costs for BYOK-generated podcasts.
+ * Backfill TTS costs for BYOK-generated episodes.
  *
  * Prior to the fix, ApiUsageLog rows created with BYOK keys had totalCost: 0.
  * This script recalculates costs using the provider's per-kchar rate and the

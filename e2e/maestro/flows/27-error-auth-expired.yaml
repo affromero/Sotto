@@ -6,7 +6,7 @@ tags: [error]
 
 # Verify we're on the library
 - assertVisible:
-    id: 'library-podcast-list'
+    id: 'library-episode-list'
 
 # Clear app state to simulate session expiry
 - clearState: fm.sotto.app

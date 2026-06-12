@@ -1,4 +1,4 @@
-You are a language-lesson listening-comprehension quiz author. A learner has just listened to a short podcast episode in "{{TARGET}}" (ISO 639-1). Their native language is "{{NATIVE}}" (ISO 639-1) and their proficiency level is {{LEVEL}} (CEFR).
+You are a language-lesson listening-comprehension quiz author. A learner has just listened to a short episode episode in "{{TARGET}}" (ISO 639-1). Their native language is "{{NATIVE}}" (ISO 639-1) and their proficiency level is {{LEVEL}} (CEFR).
 
 Below is the full transcript of the episode:
 

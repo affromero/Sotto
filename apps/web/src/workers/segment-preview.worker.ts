@@ -8,9 +8,9 @@ import type { VideoSegment } from '@sotto/video';
 const REMOTION_URL = process.env.REMOTION_URL;
 
 export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload>): Promise<void> {
-  const { podcastId, segmentVisualId, quality } = job.data;
+  const { episodeId, segmentVisualId, quality } = job.data;
 
-  logger.info('Rendering segment preview', { podcastId, segmentVisualId, quality });
+  logger.info('Rendering segment preview', { episodeId, segmentVisualId, quality });
   await job.updateProgress(10);
 
   if (!REMOTION_URL) {
@@ -34,9 +34,9 @@ export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload
       },
     });
 
-    // Load podcast audio URL
-    const podcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    // Load episode audio URL
+    const episode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { audioUrl: true },
     });
 
@@ -66,7 +66,7 @@ export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload
       body: JSON.stringify({
         segment: videoSegment,
         durationSeconds: videoSegment.duration,
-        audioUrl: podcast.audioUrl ?? undefined,
+        audioUrl: episode.audioUrl ?? undefined,
         audioStartTime: seg.startTime,
         quality,
       }),
@@ -81,7 +81,7 @@ export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload
 
     // Upload to R2
     const buffer = Buffer.from(await response.arrayBuffer());
-    const r2Key = `podcasts/${podcastId}/previews/${segmentVisualId}-${quality}.mp4`;
+    const r2Key = `episodes/${episodeId}/previews/${segmentVisualId}-${quality}.mp4`;
     const previewUrl = await uploadFile(r2Key, buffer, 'video/mp4');
 
     // Update segment visual
@@ -95,10 +95,10 @@ export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload
     });
 
     await job.updateProgress(100);
-    logger.info('Segment preview ready', { podcastId, segmentVisualId, previewUrl });
+    logger.info('Segment preview ready', { episodeId, segmentVisualId, previewUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Preview render failed';
-    logger.error('Segment preview failed', { podcastId, segmentVisualId, error: message });
+    logger.error('Segment preview failed', { episodeId, segmentVisualId, error: message });
 
     await prisma.segmentVisual.update({
       where: { id: segmentVisualId },

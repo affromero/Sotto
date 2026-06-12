@@ -7,23 +7,23 @@ import type { TtsProvider } from '@/lib/providers/tts';
 import { uploadSegmentAudio } from '@/lib/r2';
 import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { generateTtsAudio, getPlatformTtsKey } from '@/lib/tts-generation';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
-  const { podcastId, segmentId, speaker, text, previousText, nextText, direction } = job.data;
+  const { episodeId, segmentId, speaker, text, previousText, nextText, direction } = job.data;
 
-  logger.info('Generating audio for segment', { podcastId, segmentId, speaker });
+  logger.info('Generating audio for segment', { episodeId, segmentId, speaker });
   await job.updateProgress(10);
 
-  // Fail-fast: skip if podcast already failed (another segment errored first)
-  const podcastStatus = await prisma.podcast.findUnique({
-    where: { id: podcastId },
+  // Fail-fast: skip if episode already failed (another segment errored first)
+  const episodeStatus = await prisma.episode.findUnique({
+    where: { id: episodeId },
     select: { status: true },
   });
 
-  if (podcastStatus?.status === 'FAILED') {
-    logger.info('Podcast already failed, skipping segment', { podcastId, segmentId });
+  if (episodeStatus?.status === 'FAILED') {
+    logger.info('Episode already failed, skipping segment', { episodeId, segmentId });
     await job.updateProgress(100);
     return;
   }
@@ -35,16 +35,16 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   });
 
   if (existingSegment?.audioUrl) {
-    logger.info('Segment already has audio, skipping TTS', { podcastId, segmentId });
+    logger.info('Segment already has audio, skipping TTS', { episodeId, segmentId });
 
     // Still check if all segments are done — may need to trigger stitching
     const pendingSegments = await prisma.segment.count({
-      where: { podcastId, audioUrl: null },
+      where: { episodeId, audioUrl: null },
     });
 
     if (pendingSegments === 0) {
       const segments = await prisma.segment.findMany({
-        where: { podcastId },
+        where: { episodeId },
         orderBy: { order: 'asc' },
         select: { id: true },
       });
@@ -54,22 +54,22 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         audioStitchingQueue,
         JobType.STITCH_AUDIO,
         {
-          podcastId,
+          episodeId,
           segmentIds: segments.map((s) => s.id),
         },
-        { jobId: `stitch-${podcastId}-${Date.now()}` }
+        { jobId: `stitch-${episodeId}-${Date.now()}` }
       );
 
       // CAS status transition — only one worker wins
-      const cas = await prisma.podcast.updateMany({
-        where: { id: podcastId, status: 'GENERATING_AUDIO' },
+      const cas = await prisma.episode.updateMany({
+        where: { id: episodeId, status: 'GENERATING_AUDIO' },
         data: { status: 'STITCHING' },
       });
       if (cas.count > 0) {
-        await invalidatePodcastCache(podcastId);
-        await publishPodcastStatus(podcastId, { status: 'STITCHING' });
+        await invalidateEpisodeCache(episodeId);
+        await publishEpisodeStatus(episodeId, { status: 'STITCHING' });
       } else {
-        logger.info('Another worker already transitioned to STITCHING', { podcastId });
+        logger.info('Another worker already transitioned to STITCHING', { episodeId });
       }
     }
 
@@ -77,9 +77,9 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     return;
   }
 
-  // Fetch podcast to determine voice configuration
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
+  // Fetch episode to determine voice configuration
+  const episode = await prisma.episode.findUniqueOrThrow({
+    where: { id: episodeId },
     select: {
       userId: true,
       language: true,
@@ -91,7 +91,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
 
   // Fetch discovery metadata for topic-aware voice selection
   const discovery = await prisma.discovery.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { tone: true, audienceLevel: true, audience: true },
   });
 
@@ -106,7 +106,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   // When discovery doesn't have a tone, infer from script delivery directions
   if (!voiceMetadata?.tone) {
     const script = await prisma.script.findUnique({
-      where: { podcastId },
+      where: { episodeId },
       select: { turns: true },
     });
     if (script?.turns) {
@@ -149,36 +149,36 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
 
     voiceId =
       existingSegment.ttsVoiceId ??
-      provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
+      provider.getVoiceId(speaker, episodeId, voiceMetadata, episode.language ?? undefined);
 
     // Persist resolved voice for consistency
     try {
-      await prisma.podcastVoice.upsert({
-        where: { podcastId_speaker: { podcastId, speaker } },
+      await prisma.episodeVoice.upsert({
+        where: { episodeId_speaker: { episodeId, speaker } },
         update: { voiceId, provider: providerId },
-        create: { podcastId, speaker, voiceId, provider: providerId },
+        create: { episodeId, speaker, voiceId, provider: providerId },
       });
     } catch (err) {
       logger.warn('Failed to persist voice assignment', {
-        podcastId,
+        episodeId,
         speaker,
         error: err instanceof Error ? err.message : String(err),
       });
     }
   } else {
-    // ---- Standard flow: resolve provider at podcast level ----
-    if (!podcast.ttsProvider) {
+    // ---- Standard flow: resolve provider at episode level ----
+    if (!episode.ttsProvider) {
       throw new Error(
-        `Podcast ${podcastId} is missing a TTS provider. Select a provider before generating audio.`
+        `Episode ${episodeId} is missing a TTS provider. Select a provider before generating audio.`
       );
     }
 
     const resolved = await resolveTtsProvider({
-      userId: podcast.userId,
-      podcastId,
-      requestedProvider: podcast.ttsProvider as TtsProviderId,
-      requestedModel: podcast.ttsModel,
-      language: podcast.language,
+      userId: episode.userId,
+      episodeId,
+      requestedProvider: episode.ttsProvider as TtsProviderId,
+      requestedModel: episode.ttsModel,
+      language: episode.language,
     });
     provider = resolved.provider;
     providerId = resolved.providerId;
@@ -187,38 +187,38 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     const ttsModelId = provider.getModelId();
 
     // Write back resolved provider and model if not already set
-    if (!podcast.ttsProvider || !podcast.ttsModel) {
-      await prisma.podcast
+    if (!episode.ttsProvider || !episode.ttsModel) {
+      await prisma.episode
         .update({
-          where: { id: podcastId },
+          where: { id: episodeId },
           data: { ttsProvider: providerId, ttsModel: ttsModelId },
         })
         .catch((err) => {
-          logger.warn('Failed to write back TTS provider to podcast', {
-            podcastId,
+          logger.warn('Failed to write back TTS provider to episode', {
+            episodeId,
             error: err instanceof Error ? err.message : String(err),
           });
         });
     }
 
     // Use custom voice ID if set and provider matches, otherwise let the provider pick from its pool
-    const podcastVoice = podcast.voices.find((v) => v.speaker === speaker);
+    const episodeVoice = episode.voices.find((v) => v.speaker === speaker);
     voiceId =
-      podcastVoice?.voiceId && podcastVoice.provider === providerId
-        ? podcastVoice.voiceId
-        : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
+      episodeVoice?.voiceId && episodeVoice.provider === providerId
+        ? episodeVoice.voiceId
+        : provider.getVoiceId(speaker, episodeId, voiceMetadata, episode.language ?? undefined);
 
     // Persist resolved voice for retry consistency and analytics
-    if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
+    if (!episodeVoice || episodeVoice.provider !== providerId || episodeVoice.voiceId !== voiceId) {
       try {
-        await prisma.podcastVoice.upsert({
-          where: { podcastId_speaker: { podcastId, speaker } },
+        await prisma.episodeVoice.upsert({
+          where: { episodeId_speaker: { episodeId, speaker } },
           update: { voiceId, provider: providerId },
-          create: { podcastId, speaker, voiceId, provider: providerId },
+          create: { episodeId, speaker, voiceId, provider: providerId },
         });
       } catch (err) {
         logger.warn('Failed to persist voice assignment', {
-          podcastId,
+          episodeId,
           speaker,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -234,17 +234,17 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     previousText,
     nextText,
     direction,
-    language: podcast.language,
+    language: episode.language,
     provider,
     providerId,
     source,
-    userId: podcast.userId,
-    podcastId,
-    requestedModel: podcast.ttsModel,
+    userId: episode.userId,
+    episodeId,
+    requestedModel: episode.ttsModel,
     usageCategory: 'audio_generation',
     isAborted: async () => {
-      const check = await prisma.podcast.findUnique({
-        where: { id: podcastId },
+      const check = await prisma.episode.findUnique({
+        where: { id: episodeId },
         select: { status: true },
       });
       return check?.status === 'FAILED';
@@ -252,7 +252,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   });
 
   if (!result) {
-    logger.info('Podcast failed while waiting for semaphore, skipping', { podcastId, segmentId });
+    logger.info('Episode failed while waiting for semaphore, skipping', { episodeId, segmentId });
     await job.updateProgress(100);
     return;
   }
@@ -260,7 +260,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   await job.updateProgress(60);
 
   // Upload to R2
-  const audioUrl = await uploadSegmentAudio(podcastId, segmentId, result.audioBuffer);
+  const audioUrl = await uploadSegmentAudio(episodeId, segmentId, result.audioBuffer);
 
   // Update segment with audio URL, duration, and word timings
   await prisma.segment.update({
@@ -274,15 +274,15 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
 
   await job.updateProgress(90);
 
-  // Check if all segments for this podcast are done
+  // Check if all segments for this episode are done
   const pendingSegments = await prisma.segment.count({
-    where: { podcastId, audioUrl: null },
+    where: { episodeId, audioUrl: null },
   });
 
   if (pendingSegments === 0) {
     // All segments generated — queue stitching
     const segments = await prisma.segment.findMany({
-      where: { podcastId },
+      where: { episodeId },
       orderBy: { order: 'asc' },
       select: { id: true },
     });
@@ -292,28 +292,28 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       audioStitchingQueue,
       JobType.STITCH_AUDIO,
       {
-        podcastId,
+        episodeId,
         segmentIds: segments.map((s) => s.id),
       },
-      { jobId: `stitch-${podcastId}-${Date.now()}` }
+      { jobId: `stitch-${episodeId}-${Date.now()}` }
     );
 
     // CAS status transition — only one worker wins
-    const cas = await prisma.podcast.updateMany({
-      where: { id: podcastId, status: 'GENERATING_AUDIO' },
+    const cas = await prisma.episode.updateMany({
+      where: { id: episodeId, status: 'GENERATING_AUDIO' },
       data: { status: 'STITCHING' },
     });
     if (cas.count > 0) {
-      await invalidatePodcastCache(podcastId);
-      await publishPodcastStatus(podcastId, { status: 'STITCHING' });
+      await invalidateEpisodeCache(episodeId);
+      await publishEpisodeStatus(episodeId, { status: 'STITCHING' });
     } else {
-      logger.info('Another worker already transitioned to STITCHING', { podcastId });
+      logger.info('Another worker already transitioned to STITCHING', { episodeId });
     }
   }
 
   await job.updateProgress(100);
   logger.info('Audio generation complete for segment', {
-    podcastId,
+    episodeId,
     segmentId,
     service: result.service,
   });

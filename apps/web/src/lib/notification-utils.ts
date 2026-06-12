@@ -1,13 +1,13 @@
 import type { NotificationData } from '@/types/notification';
 
 const PIPELINE_SUCCESS_TYPES = new Set([
-  'PODCAST_READY',
+  'EPISODE_READY',
   'SCRIPT_READY',
   'VIDEO_READY',
 ]);
 
 const PIPELINE_ERROR_TYPES = new Set([
-  'PODCAST_FAILED',
+  'EPISODE_FAILED',
   'VIDEO_FAILED',
   'AVATAR_FAILED',
   'KEY_INVALID',
@@ -31,17 +31,17 @@ export function isPipelineNotification(type: string): boolean {
  * Returns null if no meaningful navigation target exists.
  */
 export function getNotificationUrl(notification: NotificationData): string | null {
-  const podcastId = notification.data?.podcastId;
+  const episodeId = notification.data?.episodeId;
   switch (notification.type) {
-    // Podcast-centric
-    case 'PODCAST_READY':
-    case 'PODCAST_FAILED':
+    // Episode-centric
+    case 'EPISODE_READY':
+    case 'EPISODE_FAILED':
     case 'SCRIPT_READY':
     case 'VIDEO_READY':
     case 'VIDEO_FAILED':
     case 'AVATAR_FAILED':
-    case 'QUESTION_ON_YOUR_PODCAST':
-      return podcastId ? `/podcast/${podcastId}` : null;
+    case 'QUESTION_ON_YOUR_EPISODE':
+      return episodeId ? `/episode/${episodeId}` : null;
 
     // Settings / BYOK
     case 'KEY_INVALID':
@@ -54,7 +54,7 @@ export function getNotificationUrl(notification: NotificationData): string | nul
 
     // Pipeline failure (admin)
     case 'PIPELINE_FAILURE':
-      return podcastId ? `/podcast/${podcastId}` : '/admin';
+      return episodeId ? `/episode/${episodeId}` : '/admin';
 
     // Referral
     case 'REFERRAL_SIGNUP':

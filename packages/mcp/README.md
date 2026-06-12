@@ -1,6 +1,6 @@
 # @sotto/mcp
 
-MCP server for Sotto. Create and manage private AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
+MCP server for Sotto. Create and manage private AI episodes from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
 
 ## Setup
 
@@ -89,17 +89,17 @@ Point at your local dev server:
 
 | Tool                        | Description                                             |
 | --------------------------- | ------------------------------------------------------- |
-| `create_podcast`            | Create an AI podcast from a topic                       |
-| `ingest_agent_output`       | Create a private podcast from local agent output        |
-| `get_podcast`               | Get podcast details + generation status                 |
-| `list_podcasts`             | List your podcasts                                      |
-| `update_podcast`            | Update title, topic, or visibility                      |
-| `delete_podcast`            | Delete a podcast                                        |
+| `create_episode`            | Create an AI episode from a topic                       |
+| `ingest_agent_output`       | Create a private episode from local agent output        |
+| `get_episode`               | Get episode details + generation status                 |
+| `list_episodes`             | List your episodes                                      |
+| `update_episode`            | Update title, topic, or visibility                      |
+| `delete_episode`            | Delete a episode                                        |
 | `get_me`                    | Get your Sotto profile                                  |
 
 ### Local Agent Ingestion
 
-Use `ingest_agent_output` when Claude Code, Codex, OpenClaw, Hermes, or another local agent has produced a report you want in your private podcast feed. The tool requires an explicit `tts_provider` and never publishes the result publicly.
+Use `ingest_agent_output` when Claude Code, Codex, OpenClaw, Hermes, or another local agent has produced a report you want in your private episode feed. The tool requires an explicit `tts_provider` and never publishes the result publicly.
 
 Minimal fields:
 
@@ -124,7 +124,7 @@ The web app exposes `/api/v1/source-connectors/readiness` so self-hosted install
 
 | Resource | URI                     | Description                              |
 | -------- | ----------------------- | ---------------------------------------- |
-| Podcast  | `sotto://podcasts/{id}` | Podcast detail (with list for discovery) |
+| Episode  | `sotto://episodes/{id}` | Episode detail (with list for discovery) |
 | Profile  | `sotto://me`            | Your profile                             |
 
 ## Development

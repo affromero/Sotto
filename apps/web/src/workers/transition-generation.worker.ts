@@ -13,7 +13,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 
 export async function processTransitionGeneration(job: Job<GenerateTransitionPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, transitionId, userId } = job.data;
+  const { episodeId, videoGenerationId, transitionId, userId } = job.data;
 
   logger.info('Starting transition generation', { transitionId, videoGenerationId });
   await job.updateProgress(10);
@@ -25,7 +25,7 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
   // Idempotency: already generated
   if (transition.assetUrl) {
     logger.info('Transition already generated, skipping', { transitionId });
-    await checkAllTransitionsReady(videoGenerationId, podcastId);
+    await checkAllTransitionsReady(videoGenerationId, episodeId);
     return;
   }
 
@@ -78,7 +78,7 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
         where: { id: transitionId },
         data: { status: 'ready' },
       });
-      await checkAllTransitionsReady(videoGenerationId, podcastId);
+      await checkAllTransitionsReady(videoGenerationId, episodeId);
       return;
     }
 
@@ -109,7 +109,7 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
     await job.updateProgress(80);
 
     // Upload to R2
-    const r2Key = `podcasts/${podcastId}/transitions/${transitionId}.mp4`;
+    const r2Key = `episodes/${episodeId}/transitions/${transitionId}.mp4`;
     const assetUrl = await uploadFile(r2Key, buffer, 'video/mp4');
 
     // Calculate cost
@@ -133,7 +133,7 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
       category: 'video_generation',
       inputTokens: 0,
       outputTokens: 0,
-      podcastId,
+      episodeId,
       userId,
       metadata: { stage: 'transition', transitionId, duration },
     });
@@ -152,10 +152,10 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
     throw err;
   }
 
-  await checkAllTransitionsReady(videoGenerationId, podcastId);
+  await checkAllTransitionsReady(videoGenerationId, episodeId);
 }
 
-async function checkAllTransitionsReady(videoGenerationId: string, podcastId: string): Promise<void> {
+async function checkAllTransitionsReady(videoGenerationId: string, episodeId: string): Promise<void> {
   const pending = await prisma.segmentTransition.count({
     where: {
       videoGenerationId,
@@ -197,7 +197,7 @@ async function checkAllTransitionsReady(videoGenerationId: string, podcastId: st
 
   // All transitions (and avatars) ready — compose MP4
   await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-    podcastId,
+    episodeId,
     videoGenerationId,
   });
 }

@@ -93,11 +93,11 @@
 }
 
 /* Stat card accent colors */
-.statPodcasts {
+.statEpisodes {
   border-left-color: var(--color-primary);
 }
 
-.statPodcasts:hover {
+.statEpisodes:hover {
   box-shadow: 0 8px 24px rgba(63, 79, 176, 0.12);
 }
 
@@ -143,9 +143,9 @@
   text-decoration: underline;
 }
 
-/* Podcasts Section */
+/* Episodes Section */
 
-.podcastsSection {
+.episodesSection {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
@@ -222,14 +222,14 @@
   box-shadow: 0 4px 16px rgba(63, 79, 176, 0.25);
 }
 
-/* Podcast Grid — mini gradient cards */
+/* Episode Grid — mini gradient cards */
 
 .cardWrapper {
   position: relative;
   isolation: isolate;
 }
 
-.podcastGrid {
+.episodeGrid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--spacing-md);
@@ -390,7 +390,7 @@
     padding: var(--spacing-2xl) var(--spacing-xl);
   }
 
-  .podcastGrid {
+  .episodeGrid {
     grid-template-columns: repeat(2, 1fr);
   }
 }

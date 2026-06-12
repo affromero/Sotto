@@ -11,7 +11,7 @@
   },
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts PodcastVideo",
+    "render": "remotion render src/index.ts EpisodeVideo",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

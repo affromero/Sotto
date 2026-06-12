@@ -60,10 +60,10 @@ const mockSession = {
 const mockNotification1 = {
   id: 'notif-1',
   userId: 'user-1',
-  type: 'PODCAST_READY',
-  title: 'Podcast ready',
-  message: 'Your podcast "Quantum Physics 101" is ready to listen',
-  data: { podcastId: 'pod-1' },
+  type: 'EPISODE_READY',
+  title: 'Episode ready',
+  message: 'Your episode "Quantum Physics 101" is ready to listen',
+  data: { episodeId: 'pod-1' },
   read: false,
   createdAt: new Date('2025-01-15T10:00:00Z'),
 };
@@ -74,7 +74,7 @@ const mockNotification2 = {
   type: 'BRIEFING_READY',
   title: 'Briefing ready',
   message: 'Your daily briefing is ready',
-  data: { podcastId: 'pod-briefing' },
+  data: { episodeId: 'pod-briefing' },
   read: true,
   createdAt: new Date('2025-01-14T10:00:00Z'),
 };
@@ -85,7 +85,7 @@ const mockNotification3 = {
   type: 'SCRIPT_READY',
   title: 'Script ready',
   message: 'Your script is ready for review',
-  data: { podcastId: 'pod-2' },
+  data: { episodeId: 'pod-2' },
   read: false,
   createdAt: new Date('2025-01-13T10:00:00Z'),
 };
@@ -138,10 +138,10 @@ describe('GET /api/v1/notifications', () => {
 
     const notif = body.notifications[0];
     expect(notif.id).toBe('notif-1');
-    expect(notif.type).toBe('PODCAST_READY');
-    expect(notif.title).toBe('Podcast ready');
-    expect(notif.message).toBe('Your podcast "Quantum Physics 101" is ready to listen');
-    expect(notif.data).toEqual({ podcastId: 'pod-1' });
+    expect(notif.type).toBe('EPISODE_READY');
+    expect(notif.title).toBe('Episode ready');
+    expect(notif.message).toBe('Your episode "Quantum Physics 101" is ready to listen');
+    expect(notif.data).toEqual({ episodeId: 'pod-1' });
     expect(notif.read).toBe(false);
   });
 

@@ -39,10 +39,10 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = basePrisma;
 /** Raw Prisma client — no soft-delete filtering. Use in workers, pipeline code, and admin. */
 export const prismaUnfiltered = basePrisma;
 
-/** Prisma client with automatic soft-delete filtering on the Podcast model. */
+/** Prisma client with automatic soft-delete filtering on the Episode model. */
 export const prisma = basePrisma.$extends({
   query: {
-    podcast: {
+    episode: {
       async findMany({ args, query }) {
         args.where = { ...args.where, deletedAt: null };
         return query(args);
@@ -56,8 +56,8 @@ export const prisma = basePrisma.$extends({
         return query(args);
       },
       async groupBy({ args, query }) {
-        (args as { where?: Prisma.PodcastWhereInput }).where = {
-          ...(args as { where?: Prisma.PodcastWhereInput }).where,
+        (args as { where?: Prisma.EpisodeWhereInput }).where = {
+          ...(args as { where?: Prisma.EpisodeWhereInput }).where,
           deletedAt: null,
         };
         return query(args);
@@ -89,7 +89,7 @@ export const prisma = basePrisma.$extends({
           args.select = { ...originalSelect, deletedAt: true };
           const result = await query(args) as Record<string, unknown>;
           if (result.deletedAt != null) {
-            throw new Prisma.PrismaClientKnownRequestError('No Podcast found', {
+            throw new Prisma.PrismaClientKnownRequestError('No Episode found', {
               code: 'P2025',
               clientVersion: Prisma.prismaVersion.client,
             });
@@ -99,7 +99,7 @@ export const prisma = basePrisma.$extends({
         }
         const result = await query(args) as Record<string, unknown>;
         if (result.deletedAt != null) {
-          throw new Prisma.PrismaClientKnownRequestError('No Podcast found', {
+          throw new Prisma.PrismaClientKnownRequestError('No Episode found', {
             code: 'P2025',
             clientVersion: Prisma.prismaVersion.client,
           });

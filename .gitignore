@@ -9,6 +9,8 @@ node_modules/
 
 # Next.js
 .next/
+# Alternate build dirs from NEXT_DIST_DIR (e.g. the SELF_HOSTED=false mock instance)
+.next-*/
 out/
 build/
 

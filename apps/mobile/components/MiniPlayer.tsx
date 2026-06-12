@@ -17,22 +17,22 @@ export function MiniPlayer() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const currentPodcast = usePlayerStore((s) => s.currentPodcast);
+  const currentEpisode = usePlayerStore((s) => s.currentEpisode);
   const { position, duration } = useProgress(1000);
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
 
-  // Hide on podcast detail (already has full player) and auth screens
-  if (!currentPodcast) return null;
-  if (pathname.startsWith('/podcast/') || pathname.startsWith('/auth/')) return null;
+  // Hide on episode detail (already has full player) and auth screens
+  if (!currentEpisode) return null;
+  if (pathname.startsWith('/episode/') || pathname.startsWith('/auth/')) return null;
 
   const progressRatio = duration > 0 ? position / duration : 0;
 
   return (
     <Pressable
       style={[styles.container, { bottom: insets.bottom + TAB_BAR_HEIGHT + spacing.sm }]}
-      onPress={() => router.push(`/podcast/${currentPodcast.id}`)}
-      accessibilityLabel={`Now playing: ${currentPodcast.title}`}
+      onPress={() => router.push(`/episode/${currentEpisode.id}`)}
+      accessibilityLabel={`Now playing: ${currentEpisode.title}`}
       accessibilityRole="button"
       testID="mini-player"
     >
@@ -49,10 +49,10 @@ export function MiniPlayer() {
       <View style={styles.content}>
         <View style={styles.info}>
           <Text style={styles.title} numberOfLines={1}>
-            {currentPodcast.title}
+            {currentEpisode.title}
           </Text>
           <Text style={styles.creator} numberOfLines={1}>
-            {currentPodcast.creator}
+            {currentEpisode.creator}
           </Text>
         </View>
 

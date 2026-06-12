@@ -27,24 +27,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   try {
-    const podcasts = await prisma.podcast.findMany({
+    const episodes = await prisma.episode.findMany({
       where: { visibility: 'PUBLIC', status: 'READY' },
       select: { id: true, slug: true, updatedAt: true, user: { select: { handle: true } } },
       orderBy: { updatedAt: 'desc' },
       take: 5000,
     });
 
-    const podcastPages = podcasts.map((p) => ({
+    const episodePages = episodes.map((p) => ({
       url:
         p.slug && p.user.handle
           ? `${baseUrl}/@${p.user.handle}/${p.slug}`
-          : `${baseUrl}/podcast/${p.id}`,
+          : `${baseUrl}/episode/${p.id}`,
       lastModified: p.updatedAt,
       changeFrequency: 'monthly' as const,
       priority: 0.6,
     }));
 
-    return [...staticPages, ...podcastPages];
+    return [...staticPages, ...episodePages];
   } catch (error) {
     console.error('[sitemap] DB query failed, returning static pages only:', error);
     return staticPages;

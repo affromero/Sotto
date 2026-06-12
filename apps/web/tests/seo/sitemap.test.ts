@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockPodcastFindMany = vi.fn();
+const mockEpisodeFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    podcast: {
-      findMany: (...args: unknown[]) => mockPodcastFindMany(...args),
+    episode: {
+      findMany: (...args: unknown[]) => mockEpisodeFindMany(...args),
     },
   },
 }));
@@ -16,7 +16,7 @@ describe('sitemap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
-    mockPodcastFindMany.mockResolvedValue([
+    mockEpisodeFindMany.mockResolvedValue([
       {
         id: 'pod-1',
         slug: 'daily-brief',
@@ -42,7 +42,7 @@ describe('sitemap', () => {
 
     expect(urls).toContain('https://selfhost.example.com');
     expect(urls).toContain('https://selfhost.example.com/@alice/daily-brief');
-    expect(urls).toContain('https://selfhost.example.com/podcast/pod-2');
+    expect(urls).toContain('https://selfhost.example.com/episode/pod-2');
     expect(urls.some((url) => url.startsWith('https://sotto.fm'))).toBe(false);
   });
 });

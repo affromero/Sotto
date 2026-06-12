@@ -16,23 +16,23 @@ const POLL_INTERVAL_MS = 5000;
 const RENDER_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 export async function processVideoComposition(job: Job<ComposeVideoPayload>): Promise<void> {
-  const { podcastId, videoGenerationId } = job.data;
+  const { episodeId, videoGenerationId } = job.data;
 
-  logger.info('Starting video composition', { podcastId, videoGenerationId });
+  logger.info('Starting video composition', { episodeId, videoGenerationId });
   await job.updateProgress(10);
 
-  // Check podcast still exists
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
+  // Check episode still exists
+  const episode = await prisma.episode.findUnique({
+    where: { id: episodeId },
     select: { id: true, audioUrl: true, duration: true, title: true, userId: true },
   });
 
-  if (!podcast) {
-    logger.warn('Podcast deleted during video generation', { podcastId });
+  if (!episode) {
+    logger.warn('Episode deleted during video generation', { episodeId });
     return;
   }
 
-  if (!podcast.audioUrl) {
+  if (!episode.audioUrl) {
     throw new Error('No audio URL available');
   }
 
@@ -44,7 +44,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
     });
 
     // Fetch segment timing + visuals
-    const segmentTimings = await resolveSegmentTiming(podcastId);
+    const segmentTimings = await resolveSegmentTiming(episodeId);
     const segmentVisualsBySegment = new Map<string, Array<{
       visualType: string; prompt: string | null; metadata: unknown;
       assetUrl: string | null; assetType: string | null;
@@ -152,34 +152,34 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       allPreviewVisuals.every((v) => v.previewStatus === 'ready' && v.previewQuality === 'full' && v.previewUrl);
 
     if (allHaveFullPreviews && transitionInputs.length === 0) {
-      logger.info('All segments have full-quality previews, using FFmpeg concat', { podcastId, segments: String(allPreviewVisuals.length) });
+      logger.info('All segments have full-quality previews, using FFmpeg concat', { episodeId, segments: String(allPreviewVisuals.length) });
 
       const uniqueSegments = allPreviewVisuals;
 
       const videoBuffer = await concatenateSegmentPreviews(
         uniqueSegments.map((v) => ({ order: v.order, previewUrl: v.previewUrl! })),
-        podcast.audioUrl,
+        episode.audioUrl,
       );
 
-      const videoKey = `podcasts/${podcastId}/video.mp4`;
+      const videoKey = `episodes/${episodeId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, videoBuffer, 'video/mp4');
 
       await prisma.videoGeneration.update({
         where: { id: videoGenerationId },
         data: { status: 'READY', videoUrl },
       });
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      await prisma.episode.update({
+        where: { id: episodeId },
         data: { videoUrl },
       });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         type: 'VIDEO_READY',
-        podcastId,
-        userId: podcast.userId,
+        episodeId,
+        userId: episode.userId,
       });
 
-      logger.info('Video composition complete (FFmpeg concat)', { podcastId, videoUrl });
+      logger.info('Video composition complete (FFmpeg concat)', { episodeId, videoUrl });
       await job.updateProgress(100);
       return;
     }
@@ -189,7 +189,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        audioUrl: podcast.audioUrl,
+        audioUrl: episode.audioUrl,
         segments: renderSegments,
         config: {
           width: 1280,
@@ -220,7 +220,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
     }
 
     const { jobId: renderJobId } = (await renderResponse.json()) as { jobId: string };
-    logger.info('Remotion render started', { podcastId, renderJobId });
+    logger.info('Remotion render started', { episodeId, renderJobId });
 
     await job.updateProgress(30);
 
@@ -277,7 +277,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
     await job.updateProgress(90);
 
     // Upload to R2
-    const r2Key = `podcasts/${podcastId}/video.mp4`;
+    const r2Key = `episodes/${episodeId}/video.mp4`;
     const videoUrl = await uploadFile(r2Key, videoBuffer, 'video/mp4');
 
     // Update VideoGeneration
@@ -287,26 +287,26 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         status: 'READY',
         videoUrl,
         fileSize: videoBuffer.length,
-        duration: podcast.duration,
+        duration: episode.duration,
       },
     });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { videoUrl },
     });
 
     // Queue notification
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-      userId: podcast.userId,
+      userId: episode.userId,
       type: 'VIDEO_READY',
       title: 'Video Ready',
-      message: `Video for "${podcast.title}" is ready to watch`,
-      data: { podcastId },
+      message: `Video for "${episode.title}" is ready to watch`,
+      data: { episodeId },
     });
 
     await job.updateProgress(100);
-    logger.info('Video composition complete', { podcastId, videoGenerationId, fileSize: String(videoBuffer.length) });
+    logger.info('Video composition complete', { episodeId, videoGenerationId, fileSize: String(videoBuffer.length) });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const descriptive = message === 'fetch failed'
@@ -314,7 +314,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       : message;
 
     logger.error('Video composition failed', {
-      podcastId, videoGenerationId,
+      episodeId, videoGenerationId,
       error: descriptive,
       remotionUrl: REMOTION_URL,
     });

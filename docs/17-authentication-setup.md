@@ -163,7 +163,7 @@ model User {
   sessions  Session[]
 
   // App relations
-  podcasts      Podcast[]
+  episodes      Episode[]
   discoveries   Discovery[]
   interactions  Interaction[]
   notifications Notification[]
@@ -466,7 +466,7 @@ export const config = {
 | `/settings`     | Yes                        | Redirect to `/auth/login?callbackUrl=/settings`                     |
 | `/auth/login`   | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/auth/signup`  | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
-| `/podcast/[id]` | Depends on visibility      | Public podcasts: no auth. Private/unlisted: checked in the page/API |
+| `/episode/[id]` | Depends on visibility      | Public episodes: no auth. Private/unlisted: checked in the page/API |
 | `/api/v1/*`        | Varies                     | Auth checked per-route in the API handler                           |
 
 ### API Route Auth Pattern
@@ -487,7 +487,7 @@ export async function GET() {
 }
 ```
 
-This pattern allows fine-grained control: public informational routes can stay unauthenticated, while private workspace routes such as `/api/v1/podcasts` POST require authentication.
+This pattern allows fine-grained control: public informational routes can stay unauthenticated, while private workspace routes such as `/api/v1/episodes` POST require authentication.
 
 ### Callback URL Preservation
 

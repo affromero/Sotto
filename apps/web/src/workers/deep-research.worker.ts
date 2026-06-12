@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { DeepResearchPayload, addJob, JobType, creativePlanningQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { buildResearchDossier, type BuildDossierParams } from '@/lib/research-agent';
-import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
@@ -11,41 +11,41 @@ import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 export async function processDeepResearch(job: Job<DeepResearchPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId, useAdminCredits } = job.data;
+  const { episodeId, userId, discoveryId, useAdminCredits } = job.data;
 
-  logger.info('Deep research starting', { podcastId });
+  logger.info('Deep research starting', { episodeId });
   await job.updateProgress(5);
 
   // Idempotency: skip if dossier already exists
   const existingDossier = await prisma.researchDossier.findUnique({
-    where: { podcastId },
+    where: { episodeId },
     select: { id: true },
   });
 
   if (existingDossier) {
-    logger.info('Research dossier already exists, skipping to planning', { podcastId });
+    logger.info('Research dossier already exists, skipping to planning', { episodeId });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    await prisma.episode.update({
+      where: { id: episodeId },
       data: { status: 'PLANNING' },
     });
-    await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'PLANNING' });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
 
     await addJob(creativePlanningQueue, JobType.CREATIVE_PLANNING, {
-      podcastId,
+      episodeId,
       userId,
       discoveryId,
       dossierId: existingDossier.id,
       useAdminCredits,
-    }, { jobId: `plan-${podcastId}-${Date.now()}` });
+    }, { jobId: `plan-${episodeId}-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
   }
 
-  // Load discovery + podcast metadata
-  const [discovery, podcast] = await Promise.all([
+  // Load discovery + episode metadata
+  const [discovery, episode] = await Promise.all([
     prisma.discovery.findUniqueOrThrow({
       where: { id: discoveryId },
       select: {
@@ -61,30 +61,30 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
         messages: { select: { role: true, content: true }, orderBy: { createdAt: 'asc' } },
       },
     }),
-    prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
+    prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
       select: { source: true, aiProvider: true, aiModel: true },
     }),
   ]);
 
   await job.updateProgress(10);
 
-  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
-  if (!podcast.aiModel && !aiKey) {
+  const aiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
+  if (!episode.aiModel && !aiKey) {
     throw new Error('AI model is required for deep research when no AI key is configured.');
   }
 
   // Resolve AI model
   const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast.aiModel,
+    episodeAiModel: episode.aiModel,
     aiKey,
   });
 
   const providerAiKey =
-    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for deep research.`);
   }
 
@@ -124,7 +124,7 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   // Save dossier to DB
   const savedDossier = await prisma.researchDossier.create({
     data: {
-      podcastId,
+      episodeId,
       mode: dossier.mode,
       userBrief: dossier.userBrief as unknown as Prisma.InputJsonValue,
       sources: dossier.sources as unknown as Prisma.InputJsonValue,
@@ -147,32 +147,32 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
     category: 'research',
     inputTokens: dossier.totalInputTokens,
     outputTokens: dossier.totalOutputTokens,
-    podcastId,
+    episodeId,
     userId,
   });
 
-  await logPipelineStageComplete(podcastId, 'deep-research',
+  await logPipelineStageComplete(episodeId, 'deep-research',
     `mode=${mode} sources=${dossier.sources.length} evidence=${dossier.evidence.length} gaps=${dossier.gaps.length}`,
   );
 
   // Chain to creative planning
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  await prisma.episode.update({
+    where: { id: episodeId },
     data: { status: 'PLANNING' },
   });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'PLANNING' });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
 
   await addJob(creativePlanningQueue, JobType.CREATIVE_PLANNING, {
-    podcastId,
+    episodeId,
     userId,
     discoveryId,
     dossierId: savedDossier.id,
     useAdminCredits,
-  }, { jobId: `plan-${podcastId}-${Date.now()}` });
+  }, { jobId: `plan-${episodeId}-${Date.now()}` });
 
   logger.info('Deep research complete, queued creative planning', {
-    podcastId,
+    episodeId,
     mode,
     sources: String(dossier.sources.length),
     evidence: String(dossier.evidence.length),

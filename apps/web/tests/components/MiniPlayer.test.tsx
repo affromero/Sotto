@@ -15,8 +15,8 @@ vi.mock('@/components/ui/WaveformBars', () => ({
 
 describe('MiniPlayer', () => {
   const mockPlayer = {
-    podcastId: 'test-podcast-id',
-    podcastTitle: 'Test Podcast',
+    episodeId: 'test-episode-id',
+    episodeTitle: 'Test Episode',
     audioUrl: 'https://example.com/audio.mp3',
     isPlaying: true,
     currentTime: 45,
@@ -32,8 +32,8 @@ describe('MiniPlayer', () => {
     setPlaybackRate: vi.fn(),
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
-    loadPodcast: vi.fn(),
-    clearPodcast: vi.fn(),
+    loadEpisode: vi.fn(),
+    clearEpisode: vi.fn(),
   };
 
   beforeEach(() => {
@@ -46,22 +46,22 @@ describe('MiniPlayer', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders nothing when podcastId is null', () => {
+  it('renders nothing when episodeId is null', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
-      podcastId: null,
+      episodeId: null,
     });
     const { container } = render(<MiniPlayer />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders mini player when podcast is loaded', () => {
+  it('renders mini player when episode is loaded', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
-    render(<MiniPlayer podcastTitle="Test Podcast" />);
-    expect(screen.getByText('Test Podcast')).toBeInTheDocument();
+    render(<MiniPlayer episodeTitle="Test Episode" />);
+    expect(screen.getByText('Test Episode')).toBeInTheDocument();
   });
 
-  it('displays default title when no podcastTitle provided', () => {
+  it('displays default title when no episodeTitle provided', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<MiniPlayer />);
     expect(screen.getByText('Now Playing')).toBeInTheDocument();
@@ -72,16 +72,16 @@ describe('MiniPlayer', () => {
       ...mockPlayer,
       isPlaying: true,
     });
-    render(<MiniPlayer podcastTitle="Test Podcast" />);
+    render(<MiniPlayer episodeTitle="Test Episode" />);
     expect(screen.getByTestId('waveform-bars')).toBeInTheDocument();
   });
 
-  it('displays first letter of podcast title in artwork when paused', () => {
+  it('displays first letter of episode title in artwork when paused', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
       isPlaying: false,
     });
-    render(<MiniPlayer podcastTitle="Test Podcast" />);
+    render(<MiniPlayer episodeTitle="Test Episode" />);
     expect(screen.getByText('T')).toBeInTheDocument();
   });
 
@@ -133,8 +133,8 @@ describe('MiniPlayer', () => {
     const user = userEvent.setup();
     const onExpand = vi.fn();
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
-    render(<MiniPlayer podcastTitle="Test Podcast" onExpand={onExpand} />);
-    await user.click(screen.getByText('Test Podcast'));
+    render(<MiniPlayer episodeTitle="Test Episode" onExpand={onExpand} />);
+    await user.click(screen.getByText('Test Episode'));
     expect(onExpand).toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe('MiniPlayer', () => {
       ...mockPlayer,
       isPlaying: false,
     });
-    render(<MiniPlayer podcastTitle="quantum physics" />);
+    render(<MiniPlayer episodeTitle="quantum physics" />);
     expect(screen.getByText('Q')).toBeInTheDocument();
   });
 });

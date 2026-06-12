@@ -1,5 +1,5 @@
 /**
- * Visual classifier — single AI call to classify all segments in a podcast
+ * Visual classifier — single AI call to classify all segments in a episode
  * with visual types and generation metadata for video production.
  *
  * Supports multiple sub-visuals per segment: a 30s voice segment can have
@@ -201,8 +201,8 @@ export interface StructuredSourceData {
 
 export async function classifySegmentVisuals(
   segments: SegmentInput[],
-  podcastTitle: string,
-  podcastTopic: string,
+  episodeTitle: string,
+  episodeTopic: string,
   opts: { provider: string; model: string; apiKeyOverride?: string; structuredData?: StructuredSourceData; zeroCostVideo?: boolean },
 ): Promise<{ classifications: ClassifiedSegment[]; transitionRecommendations: TransitionRecommendation[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
@@ -235,8 +235,8 @@ export async function classifySegmentVisuals(
 
   const structuredBlock = structuredSections.length > 0 ? `\n${structuredSections.join('\n')}` : '';
 
-  const userMessage = `Lesson: "${podcastTitle}"
-Topic: ${podcastTopic}
+  const userMessage = `Lesson: "${episodeTitle}"
+Topic: ${episodeTopic}
 
 Segments:
 ${segmentList}
@@ -329,7 +329,7 @@ Classify each segment with sub-visuals. Return JSON only.`;
           durationFraction: 1,
           visualType: 'TEXT_CARD' as const,
           prompt: null,
-          metadata: { headline: podcastTitle, bullets: [s.text.slice(0, 200)] },
+          metadata: { headline: episodeTitle, bullets: [s.text.slice(0, 200)] },
           endStatePrompt: null,
         }],
       })),
@@ -400,7 +400,7 @@ Classify each segment with sub-visuals. Return JSON only.`;
           durationFraction: 1,
           visualType: 'TEXT_CARD',
           prompt: null,
-          metadata: { headline: podcastTitle, bullets: [seg.text.slice(0, 200)] },
+          metadata: { headline: episodeTitle, bullets: [seg.text.slice(0, 200)] },
           endStatePrompt: null,
         }],
       });
@@ -414,7 +414,7 @@ Classify each segment with sub-visuals. Return JSON only.`;
         if (sv.visualType === 'AI_ILLUSTRATION') {
           const seg = segments.find((s) => s.segmentId === cls.segmentId);
           sv.visualType = 'TEXT_CARD';
-          sv.metadata = { headline: seg?.text.slice(0, 60) ?? podcastTitle, bullets: [] };
+          sv.metadata = { headline: seg?.text.slice(0, 60) ?? episodeTitle, bullets: [] };
           sv.prompt = null;
           sv.endStatePrompt = null;
         }

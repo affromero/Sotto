@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       return errorResponse('User not found', 404);
     }
 
-    const podcastCount = await prisma.podcast.count({
+    const episodeCount = await prisma.episode.count({
       where: { userId: authResult.userId },
     });
 
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       handle: user.handle,
       image: user.image,
-      podcastCount,
+      episodeCount,
       createdAt: user.createdAt.toISOString(),
       voicePreferences: user.voicePreferences,
       preferredLanguage: user.preferredLanguage,
@@ -266,8 +266,8 @@ export async function DELETE(request: NextRequest) {
 
     const userId = authResult.userId;
 
-    // Collect podcast IDs and storage keys before deleting
-    const podcasts = await prisma.podcast.findMany({
+    // Collect episode IDs and storage keys before deleting
+    const episodes = await prisma.episode.findMany({
       where: { userId },
       select: { id: true, audioUrl: true, pdfUrl: true },
     });
@@ -289,10 +289,10 @@ export async function DELETE(request: NextRequest) {
     try {
       const deletePromises: Promise<void>[] = [];
 
-      // Delete all files under each podcast prefix (segments, audio, PDFs, versions)
+      // Delete all files under each episode prefix (segments, audio, PDFs, versions)
       // force: true — account deletion is the one legitimate bulk-delete scenario
-      for (const p of podcasts) {
-        const keys = await listFiles(`podcasts/${p.id}/`);
+      for (const p of episodes) {
+        const keys = await listFiles(`episodes/${p.id}/`);
         for (const key of keys) {
           deletePromises.push(deleteFile(key, { force: true }));
         }

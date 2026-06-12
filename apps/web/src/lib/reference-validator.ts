@@ -1,5 +1,5 @@
 /**
- * Reference Validator — 4-layer verification pipeline for podcast citations.
+ * Reference Validator — 4-layer verification pipeline for episode citations.
  *
  * Layer 1: URL Resolution (HTTP HEAD)
  * Layer 2: DOI via CrossRef API

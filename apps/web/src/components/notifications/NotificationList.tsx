@@ -26,18 +26,18 @@ interface NotificationListProps {
 
 const typeIcons: Record<string, typeof Bell> = {
   // Pipeline — success
-  PODCAST_READY: Headphones,
+  EPISODE_READY: Headphones,
   SCRIPT_READY: FileText,
   VIDEO_READY: Video,
 
   // Pipeline — failure
-  PODCAST_FAILED: AlertTriangle,
+  EPISODE_FAILED: AlertTriangle,
   VIDEO_FAILED: AlertTriangle,
   AVATAR_FAILED: AlertTriangle,
   KEY_INVALID: AlertTriangle,
   PIPELINE_FAILURE: AlertTriangle,
 
-  QUESTION_ON_YOUR_PODCAST: HelpCircle,
+  QUESTION_ON_YOUR_EPISODE: HelpCircle,
   REFERRAL_SIGNUP: Gift,
 
   // Moderation
