@@ -115,7 +115,7 @@ export async function mintLiveToken(
           model,
           config: {
             responseModalities: [Modality.AUDIO],
-            streamTranslationConfig: { targetLanguageCode, echoTargetLanguage: false },
+            translationConfig: { targetLanguageCode, echoTargetLanguage: false },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
           },

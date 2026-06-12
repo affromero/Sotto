@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import type { NotificationType } from '@prisma/client';
+import type { NotificationType } from '@/generated/prisma/client';
 import { SendNotificationPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { sendPushNotification, sendExpoPushNotification } from '@/lib/push-notifications';

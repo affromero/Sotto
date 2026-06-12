@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { NotificationType } from '@prisma/client';
+import { NotificationType } from '@/generated/prisma/client';
 
 /**
  * Create a new in-app notification for a user.

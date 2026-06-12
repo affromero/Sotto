@@ -1,4 +1,4 @@
-import { EpisodeSource, EpisodeStatus, EpisodeVisibility } from '@prisma/client';
+import { EpisodeSource, EpisodeStatus, EpisodeVisibility } from '@/generated/prisma/client';
 import { ReferenceData } from './reference';
 import type { VocabularyEntryData } from './vocabulary';
 import { EpisodeVersionSummary } from './version';

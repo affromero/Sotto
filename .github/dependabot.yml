@@ -1,7 +1,7 @@
 version: 2
 updates:
   # JavaScript / TypeScript (npm workspaces — the root lockfile covers
-  # apps/web, apps/mobile, packages/*, and services/*).
+  # apps/web, packages/*, and services/*).
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -23,21 +23,6 @@ updates:
         update-types:
           - minor
           - patch
-    ignore:
-      # Expo + React Native are a coupled native toolchain: the SDK, the React
-      # runtime it pins, and the native modules must move together via
-      # `npx expo install` / an Expo SDK upgrade — never piecemeal by
-      # Dependabot. Ignore their major (and RN's breaking minor) bumps so the
-      # mobile app upgrades as one deliberate step.
-      - dependency-name: 'expo'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'expo-*'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'react-native'
-        update-types:
-          ['version-update:semver-major', 'version-update:semver-minor']
-      - dependency-name: 'react-native-*'
-        update-types: ['version-update:semver-major']
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
     directory: /

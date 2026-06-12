@@ -36,7 +36,7 @@ import { InsufficientRefsBanner } from '@/components/create/InsufficientRefsBann
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
 import type { EpisodeDetail } from '@/types/episode';
-import type { EpisodeStatus } from '@prisma/client';
+import type { EpisodeStatus } from '@/generated/prisma/client';
 import styles from './page.module.css';
 
 interface EpisodePlayerViewProps {

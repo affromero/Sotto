@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { CreativePlanningPayload, addJob, JobType, scriptWritingQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { createCreativeOutline } from '@/lib/creative-director';

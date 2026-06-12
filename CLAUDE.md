@@ -21,9 +21,8 @@ Sotto is fully free and self-hosted: there is no billing, no payment path, and n
 | Layer | Technology |
 |-------|------------|
 | Frontend | Next.js 14+ App Router, TypeScript, CSS Modules |
-| Mobile | Expo React Native, expo-router, react-native-track-player |
 | Database | PostgreSQL 16 + Prisma ORM |
-| Auth | NextAuth.js v5 for web sessions; mobile uses API-token flows |
+| Auth | NextAuth.js v5 for web sessions |
 | Queue | Redis 7 + BullMQ worker pool |
 | AI | Provider-resolved LLM generation through configured model settings |
 | Audio | ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate, and local/provider-specific TTS integrations |
@@ -35,7 +34,6 @@ Sotto is fully free and self-hosted: there is no billing, no payment path, and n
 npm workspaces:
 
 - `@sotto/web` in `apps/web/`
-- `@sotto/mobile` in `apps/mobile/`
 - `@sotto/shared` in `packages/shared/`
 - `@sotto/mcp` in `packages/mcp/`
 - `@sotto/verification-standard` in `packages/verification-standard/`

@@ -56,6 +56,9 @@ COPY --chown=sotto:sotto packages/video ./packages/video/
 COPY --chown=sotto:sotto packages/verification-standard ./packages/verification-standard/
 COPY --chown=sotto:sotto packages/maps ./packages/maps/
 COPY --chown=sotto:sotto apps/web/src ./apps/web/src/
+# The host copy above omits the gitignored Prisma 7 generated client; bring it
+# from the deps stage (where `prisma generate` ran) so tsx can resolve it.
+COPY --from=deps --chown=sotto:sotto /app/apps/web/src/generated ./apps/web/src/generated/
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
 COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
 

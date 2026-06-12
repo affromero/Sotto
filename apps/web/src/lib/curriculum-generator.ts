@@ -3,7 +3,7 @@
 // writes the CEFR lesson skeleton on demand, cached as one Curriculum per pair
 // (shared across users). This is the design's "Compose" step.
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
