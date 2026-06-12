@@ -19,10 +19,12 @@ import {
   MINIMAX_VOICE_POOL,
   MISTRAL_VOICE_POOL,
   KOKORO_VOICE_POOL,
+  getLocalTtsVoicePool,
   type ProviderVoice,
 } from './providers/tts-voices';
 import { cache } from './redis';
 import { logger } from './logger';
+import { infra } from './server-config';
 
 export interface CatalogVoice {
   id: string;
@@ -158,6 +160,42 @@ async function fetchHumeCatalog(apiKey: string): Promise<CatalogVoice[]> {
   }));
 }
 
+async function fetchLocalCatalog(): Promise<CatalogVoice[]> {
+  const baseURL = infra('ttsBaseUrl', 'TTS_BASE_URL')?.replace(/\/+$/, '');
+  if (!baseURL) return providerVoiceToCatalog(getLocalTtsVoicePool());
+
+  const headers: Record<string, string> = {};
+  const apiKey = process.env.TTS_API_KEY?.trim();
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  const response = await fetch(`${baseURL}/voices`, { headers });
+  if (!response.ok) {
+    throw new Error(`Local TTS voices API error (${response.status})`);
+  }
+
+  const data = (await response.json()) as {
+    voices?: Array<{
+      id: string;
+      label?: string;
+      name?: string;
+      gender?: string;
+      description?: string;
+    }>;
+  };
+
+  const voices = Array.isArray(data.voices) ? data.voices : [];
+  if (voices.length === 0) return providerVoiceToCatalog(getLocalTtsVoicePool());
+
+  return voices
+    .filter((v) => v.id)
+    .map((v) => ({
+      id: v.id,
+      name: v.name ?? v.label ?? v.id,
+      gender: v.gender,
+      description: v.description,
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -252,6 +290,23 @@ export async function getVoiceCatalog(
 
     case 'kokoro':
       return providerVoiceToCatalog(KOKORO_VOICE_POOL);
+
+    case 'local': {
+      const cacheKey = 'tts:voicecatalog:local';
+      const cached = await cache.get<CatalogVoice[]>(cacheKey);
+      if (cached) return cached;
+
+      try {
+        const catalog = await fetchLocalCatalog();
+        await cache.set(cacheKey, catalog, CATALOG_TTL);
+        return catalog;
+      } catch (err) {
+        logger.warn('Local TTS catalog fetch failed, using configured voices', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return providerVoiceToCatalog(getLocalTtsVoicePool());
+      }
+    }
 
     default:
       return voicePoolToCatalog(VOICE_POOL, 'elevenlabs');

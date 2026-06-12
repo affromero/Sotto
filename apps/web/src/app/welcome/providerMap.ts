@@ -93,16 +93,16 @@ export function resolveAi(
 }
 
 /**
- * TTS → backend. The welcome TTS IDs already match TtsProviderId. Kokoro is the
- * keyless local provider (infra + base URL); the rest take a BYOK key.
+ * TTS → backend. The welcome TTS IDs already match TtsProviderId. Kokoro and
+ * local are keyless local providers (infra + base URL); the rest take a BYOK key.
  */
 export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsResolution {
-  if (ttsId === 'kokoro') {
+  if (ttsId === 'kokoro' || ttsId === 'local') {
     const u = clean(baseUrl);
     return {
       keyPost: null,
-      preferredTtsProvider: 'kokoro',
-      infra: { ttsProvider: 'kokoro', ...(u && { ttsBaseUrl: u }) },
+      preferredTtsProvider: ttsId,
+      infra: { ttsProvider: ttsId, ...(u && { ttsBaseUrl: u }) },
     };
   }
 

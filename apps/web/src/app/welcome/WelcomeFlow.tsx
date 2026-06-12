@@ -27,7 +27,7 @@ export interface VoiceState {
   tts: string;
   stt: string;
   keys: Record<string, string>;
-  /** Optional base URLs for keyless local providers (kokoro TTS, whisper STT). */
+  /** Optional base URLs for keyless local providers (kokoro/local TTS, whisper STT). */
   baseUrls: Record<string, string>;
 }
 

@@ -157,6 +157,7 @@ export const TTS_PROVIDERS: VoiceProvider[] = [
   { id: 'openai', name: 'OpenAI', note: 'natural, low cost', keyHint: 'sk-…' },
   { id: 'cartesia', name: 'Cartesia', note: 'low-latency Sonic voices', keyHint: 'sk_car_…' },
   { id: 'kokoro', name: 'Kokoro', note: 'runs on-device', local: true },
+  { id: 'local', name: 'Local sidecar', note: 'any Sotto-compatible TTS server', local: true },
 ];
 
 export const STT_PROVIDERS: VoiceProvider[] = [

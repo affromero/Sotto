@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET as getTtsOptions } from '@/app/api/v1/tts-options/route';
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-  resolveTtsIncludedModels: () => ['openai:tts-1'],
+  resolveTtsIncludedModels: () => ['openai:tts-1', 'local:local'],
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({
@@ -42,6 +42,18 @@ vi.mock('@/lib/providers/tts-registry', () => ({
         },
       ],
     },
+    {
+      id: 'local',
+      displayName: 'Local TTS sidecar',
+      models: [
+        {
+          id: 'local',
+          displayName: 'Local TTS',
+          tier: 'standard',
+          supportedLanguages: new Set(['en', 'es']),
+        },
+      ],
+    },
   ],
 }));
 
@@ -51,6 +63,11 @@ describe('GET /api/v1/tts-options', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockUserFindUnique.mockResolvedValue({ role: 'USER' });
     mockGetAutoModelConfig.mockResolvedValue({ includedTtsModels: ['openai:tts-1'] });
+    vi.stubEnv('TTS_BASE_URL', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns concrete BYOK options without an Auto placeholder', async () => {
@@ -71,5 +88,22 @@ describe('GET /api/v1/tts-options', () => {
     expect(body.options).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'auto' })])
     );
+  });
+
+  it('includes local TTS sidecar options when TTS_BASE_URL is configured', async () => {
+    vi.stubEnv('TTS_BASE_URL', 'http://localhost:8000');
+    mockListByokProviders.mockResolvedValue([]);
+
+    const request = new NextRequest('https://sotto.test/api/v1/tts-options');
+    const response = await getTtsOptions(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.options).toEqual([
+      expect.objectContaining({
+        id: 'local:local',
+        displayName: 'Local TTS sidecar Local TTS',
+      }),
+    ]);
   });
 });

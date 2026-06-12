@@ -22,7 +22,9 @@ describe('AI Provider Client DTO', () => {
 
   it('LLM providers have non-empty models, STT-only providers have empty models', () => {
     const llmProviders = meta.filter((m) => ['anthropic', 'openai', 'google'].includes(m.id));
-    const sttOnlyProviders = meta.filter((m) => ['together', 'deepgram', 'assemblyai'].includes(m.id));
+    const sttOnlyProviders = meta.filter((m) =>
+      ['together', 'deepgram', 'assemblyai'].includes(m.id)
+    );
 
     for (const provider of llmProviders) {
       expect(provider.models.length).toBeGreaterThan(0);
@@ -48,8 +50,10 @@ describe('AI Provider Client DTO', () => {
 describe('TTS Provider Client DTO', () => {
   const meta = getAllTtsProviderClientMeta();
 
-  it('returns all 8 TTS providers', () => {
+  it('returns the 8 BYOK TTS providers and excludes keyless locals', () => {
     expect(meta).toHaveLength(8);
+    expect(meta.map((m) => m.id)).not.toContain('kokoro');
+    expect(meta.map((m) => m.id)).not.toContain('local');
   });
 
   it('all providers have non-empty authFields and getApiKeyUrl', () => {

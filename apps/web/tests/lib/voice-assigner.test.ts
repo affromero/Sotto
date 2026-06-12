@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 
 const mockPodcastVoiceFindMany = vi.fn();
@@ -30,6 +30,10 @@ describe('assignVoicesForPodcast', () => {
     mockPodcastVoiceCreateMany.mockResolvedValue({ count: 0 });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('skips assignment for 1 speaker', async () => {
     await assignVoicesForPodcast('pod-1', [{ name: 'HOST' }], 'elevenlabs');
 
@@ -44,7 +48,11 @@ describe('assignVoicesForPodcast', () => {
       expect.objectContaining({
         data: expect.arrayContaining([
           expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST', provider: 'elevenlabs' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT', provider: 'elevenlabs' }),
+          expect.objectContaining({
+            podcastId: 'pod-1',
+            speaker: 'EXPERT',
+            provider: 'elevenlabs',
+          }),
         ]),
       })
     );
@@ -85,7 +93,11 @@ describe('assignVoicesForPodcast', () => {
       expect.objectContaining({
         data: expect.arrayContaining([
           expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST', provider: 'elevenlabs' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT', provider: 'elevenlabs' }),
+          expect.objectContaining({
+            podcastId: 'pod-1',
+            speaker: 'EXPERT',
+            provider: 'elevenlabs',
+          }),
           expect.objectContaining({ podcastId: 'pod-1', speaker: 'GUEST', provider: 'elevenlabs' }),
         ]),
       })
@@ -108,6 +120,23 @@ describe('assignVoicesForPodcast', () => {
         ]),
       })
     );
+  });
+
+  it('uses configured local sidecar voice IDs', async () => {
+    vi.stubEnv('TTS_VOICES', 'voice_a,voice_b,voice_c');
+
+    await assignVoicesForPodcast(
+      'pod-1',
+      [{ name: 'HOST' }, { name: 'EXPERT' }, { name: 'GUEST' }],
+      'local'
+    );
+
+    const createCall = mockPodcastVoiceCreateMany.mock.calls[0][0];
+    const data = createCall.data as Array<{ provider: string; voiceId: string }>;
+    expect(data).toEqual(expect.arrayContaining([expect.objectContaining({ provider: 'local' })]));
+    for (const entry of data) {
+      expect(['voice_a', 'voice_b', 'voice_c']).toContain(entry.voiceId);
+    }
   });
 
   it('rejects unsupported providers instead of falling back to ElevenLabs', async () => {

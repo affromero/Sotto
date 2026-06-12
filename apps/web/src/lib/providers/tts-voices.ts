@@ -15,6 +15,12 @@ export interface ProviderVoice {
   character: string;
 }
 
+function titleFromId(id: string): string {
+  return id
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // ---------------------------------------------------------------------------
 // Cartesia voices — curated subset of Cartesia's voice library
 // ---------------------------------------------------------------------------
@@ -164,6 +170,42 @@ export const KOKORO_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Generic local TTS sidecar voices. Operators can run any local model behind the
+// Sotto sidecar contract and configure voice IDs without adding app code:
+//   TTS_VOICES=voice_a,voice_b,voice_c
+//   TTS_HOST_VOICE=voice_a
+//   TTS_EXPERT_VOICE=voice_b
+// The sidecar should accept these IDs in POST /tts. If unset, the app sends
+// "default" and "alternate"; simple sidecars may map both to their default voice.
+// ---------------------------------------------------------------------------
+
+export const LOCAL_TTS_VOICE_POOL: ProviderVoice[] = [
+  { id: 'default', name: 'Default', gender: 'female', character: 'warm narrator' },
+  { id: 'alternate', name: 'Alternate', gender: 'male', character: 'authoritative expert' },
+];
+
+export function getLocalTtsVoicePool(): ProviderVoice[] {
+  const configured = process.env.TTS_VOICES?.split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  const ids = configured && configured.length > 0
+    ? configured
+    : [
+        process.env.TTS_HOST_VOICE?.trim() || 'default',
+        process.env.TTS_EXPERT_VOICE?.trim() || 'alternate',
+      ];
+
+  const unique = Array.from(new Set(ids)).filter(Boolean);
+  return unique.map((id, index) => ({
+    id,
+    name: titleFromId(id),
+    gender: index % 2 === 0 ? 'female' : 'male',
+    character: index % 2 === 0 ? 'warm narrator' : 'authoritative expert',
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Provider → voice pool map (auto-populated, never needs manual updates)
 // ---------------------------------------------------------------------------
 
@@ -177,6 +219,7 @@ const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
   minimax: MINIMAX_VOICE_POOL,
   mistral: MISTRAL_VOICE_POOL,
   kokoro: KOKORO_VOICE_POOL,
+  local: LOCAL_TTS_VOICE_POOL,
 };
 
 /** Voice IDs that can't be derived from a pool (legacy IDs, sidecar presets). */
@@ -193,6 +236,7 @@ const SPECIAL_TEST_VOICES: Partial<Record<TtsProviderId, string>> = {
 export function getTestVoiceId(providerId: TtsProviderId): string {
   const special = SPECIAL_TEST_VOICES[providerId];
   if (special) return special;
+  if (providerId === 'local') return getLocalTtsVoicePool()[0]?.id ?? 'default';
   const pool = PROVIDER_VOICE_POOLS[providerId];
   if (pool && pool.length > 0) return pool[0].id;
   return 'alloy'; // safe fallback
