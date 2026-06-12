@@ -105,7 +105,9 @@ async function contextItemFromFile(file: File): Promise<Omit<ContextItem, 'id'>>
   return {
     kind: 'file',
     label: file.name,
-    value: clipped ? `File: ${file.name}\n${clipped}${suffix}` : `Uploaded empty file: ${file.name}`,
+    value: clipped
+      ? `File: ${file.name}\n${clipped}${suffix}`
+      : `Uploaded empty file: ${file.name}`,
   };
 }
 
@@ -144,12 +146,19 @@ export function StepContext({
     const trimmed = entry.trim();
     if (!trimmed) return;
 
-    if (isLikelyUrl(trimmed)) {
-      const value = normalizeUrl(trimmed);
-      addContextItems([{ kind: 'link', label: labelForLink(value), value }]);
-    } else {
-      addContextItems([{ kind: 'text', label: 'Note', value: trimmed }]);
-    }
+    const directItems: Array<Omit<ContextItem, 'id'>> = trimmed
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        if (isLikelyUrl(line)) {
+          const value = normalizeUrl(line);
+          return { kind: 'link', label: labelForLink(value), value };
+        }
+        return { kind: 'text', label: 'Note/topic', value: line };
+      });
+
+    addContextItems(directItems);
     setEntry('');
   }
 
@@ -198,31 +207,62 @@ export function StepContext({
           : 'This is the part that makes Sotto yours. Choose what the agent may read, then add any links, notes, topics, or files you want woven into the course.'}
       </p>
 
-      <form className={c.contextBar} onSubmit={submitEntry}>
-        <span className={c.contextBarIcon} aria-hidden="true">
-          <Glyph name="link" size={18} />
-        </span>
-        <input
-          className={c.contextInput}
-          value={entry}
-          onChange={(event) => setEntry(event.currentTarget.value)}
-          aria-label="Add a link, note, or topic"
-          placeholder="Paste a link, note, or topic"
-        />
-        <button className={c.contextAdd} type="submit" disabled={!entry.trim()}>
-          Add
-        </button>
-        <button
-          className={c.contextUpload}
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          aria-label="Upload context files"
-          title="Upload context files"
-        >
-          <Glyph name="upload" size={17} />
-          {uploading ? 'Reading' : 'Upload files'}
-        </button>
+      <section className={c.contextDirect} aria-labelledby="direct-context-title">
+        <div className={c.contextDirectHead}>
+          <div>
+            <div id="direct-context-title" className={c.contextDirectLabel}>
+              Direct material
+            </div>
+            <p className={c.contextDirectCopy}>
+              Links, notes, topics, and text files become lesson seeds for the first course.
+            </p>
+          </div>
+          <span className={c.contextDirectCount}>
+            {directCount > 0 ? `${directCount} added` : 'Optional'}
+          </span>
+        </div>
+
+        <form className={c.contextEntry} onSubmit={submitEntry}>
+          <label className={c.contextTextLabel} htmlFor="context-entry">
+            Links, notes, or topics
+          </label>
+          <div className={c.contextEntryGrid}>
+            <span className={c.contextBarIcon} aria-hidden="true">
+              <Glyph name="link" size={18} />
+            </span>
+            <textarea
+              id="context-entry"
+              className={c.contextInput}
+              value={entry}
+              onChange={(event) => setEntry(event.currentTarget.value)}
+              placeholder={
+                'https://example.com/paper\nCooking verbs for Emilia-Romagna\nPodcast notes from last week'
+              }
+              rows={3}
+            />
+            <button className={c.contextAdd} type="submit" disabled={!entry.trim()}>
+              Add material
+            </button>
+          </div>
+        </form>
+
+        <div className={c.contextUploadRow}>
+          <button
+            className={c.contextUpload}
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            aria-label="Upload context files"
+            title="Upload context files"
+          >
+            <Glyph name="upload" size={17} />
+            {uploading ? 'Reading files' : 'Upload files'}
+          </button>
+          <span className={c.contextUploadHint}>
+            Text files are read locally; other files are kept as named references.
+          </span>
+        </div>
+
         <input
           ref={fileInputRef}
           className={c.fileInput}
@@ -232,7 +272,7 @@ export function StepContext({
           onChange={handleFileChange}
           aria-label="Choose context files"
         />
-      </form>
+      </section>
 
       {contextItems.length > 0 ? (
         <div className={c.contextItems} aria-label="Added context">
@@ -258,8 +298,8 @@ export function StepContext({
       {fileError ? <div className={c.contextNotice}>{fileError}</div> : null}
 
       <div className={c.sourceIntro}>
-        <span className={c.sourceIntroLabel}>Context sources</span>
-        <span>Selected sources and uploaded files shape lesson topics and examples.</span>
+        <span className={c.sourceIntroLabel}>Context permissions</span>
+        <span>These categories tell Sotto what it may use when it shapes lesson topics.</span>
       </div>
 
       <div className={c.sourceList}>

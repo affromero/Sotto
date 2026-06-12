@@ -390,18 +390,22 @@ describe('welcome hosted-demo mode', () => {
 
     expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
 
-    await user.type(screen.getByLabelText(/Add a link, note, or topic/i), 'example.com/paper');
-    await user.click(screen.getByRole('button', { name: /^Add$/i }));
+    expect(screen.getByText(/Direct material/i)).toBeInTheDocument();
+    expect(screen.getByText(/Text files are read locally/i)).toBeInTheDocument();
+    expect(screen.getByText(/Context permissions/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Links, notes, or topics/i), 'example.com/paper');
+    await user.click(screen.getByRole('button', { name: /^Add material$/i }));
     rerender(renderStep());
 
     expect(screen.getByText('example.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
 
     await user.type(
-      screen.getByLabelText(/Add a link, note, or topic/i),
+      screen.getByLabelText(/Links, notes, or topics/i),
       'cooking, distributed systems, and opera'
     );
-    await user.click(screen.getByRole('button', { name: /^Add$/i }));
+    await user.click(screen.getByRole('button', { name: /^Add material$/i }));
 
     const files = Array.from(
       { length: 7 },
