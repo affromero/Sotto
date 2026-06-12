@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { CompileScriptPayload, addJob, JobType, notificationQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { compileScript } from '@/lib/script-compiler';

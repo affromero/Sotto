@@ -1,4 +1,5 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Prisma, PrismaClient } from '@/generated/prisma/client';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
@@ -6,9 +7,12 @@ function createPrismaClient(): PrismaClient {
   const url = process.env.DATABASE_URL;
 
   if (!url) {
-    // During build time (next build), DATABASE_URL may not be set.
-    // Prisma client will fail at query time, not import time.
-    return new PrismaClient();
+    // During build time (next build), DATABASE_URL may not be set. The pg pool
+    // is lazy, so constructing the adapter against a placeholder connects to
+    // nothing — queries fail at call time, not at import/build time.
+    return new PrismaClient({
+      adapter: new PrismaPg({ connectionString: 'postgresql://placeholder' }),
+    });
   }
 
   if (!url.startsWith('postgresql://') && !url.startsWith('postgres://')) {
@@ -19,15 +23,11 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  const isPooler = url.includes('-pooler.') || url.includes('pgbouncer=true');
-  const poolUrl = url.includes('connection_limit')
-    ? url
-    : isPooler
-      ? `${url}${url.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=30&pgbouncer=true`
-      : `${url}${url.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=30`;
-
+  // Prisma 7 connects through a driver adapter. Pool tuning that used to be
+  // URL query params (connection_limit, pool_timeout) now lives in the
+  // node-postgres PoolConfig the adapter wraps.
   return new PrismaClient({
-    datasources: { db: { url: poolUrl } },
+    adapter: new PrismaPg({ connectionString: url, max: 10, connectionTimeoutMillis: 30_000 }),
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 }

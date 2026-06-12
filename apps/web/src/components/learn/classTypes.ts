@@ -5,7 +5,7 @@
  */
 
 import type { ReferenceData } from '@/types/reference';
-import type { ReferenceType, VerificationStatus } from '@prisma/client';
+import type { ReferenceType, VerificationStatus } from '@/generated/prisma/client';
 
 export type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 

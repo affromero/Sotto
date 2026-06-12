@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { SpeakingGradingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveLearningAi } from '@/lib/learning-ai';
