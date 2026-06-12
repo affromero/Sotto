@@ -10,7 +10,7 @@ import { colorForService } from '@/components/admin/serviceColors';
 import { AreaChart } from '@/components/admin/charts/AreaChart';
 import { ShareBar } from '@/components/admin/charts/ShareBar';
 import { Glyph } from '@/components/Glyph';
-import { GlassBead } from '@/components/landing/GlassBead';
+import { GlassOrb } from '@/components/landing/GlassOrb';
 import styles from '../adminTheme.module.css';
 
 const WINDOW_DAYS = 30;
@@ -36,7 +36,7 @@ export default async function AdminOverviewPage() {
     <>
       <div className={styles.adminHead}>
         <div className={styles.headLeft}>
-          <GlassBead className={styles.headBead} />
+          <GlassOrb size={40} />
           <div>
             <h1>Overview</h1>
             <div className={styles.ahSub}>Self-hosted · last {WINDOW_DAYS} days</div>
