@@ -1,5 +1,5 @@
 import { ConnectionOptions, Queue, Worker, Job } from 'bullmq';
-import { createRedisConnection, getSharedQueueRedisClient, cache } from './redis';
+import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
 import { markEpisodeFailed } from './pipeline-resume';
@@ -7,19 +7,6 @@ import { classifyError, isKeyInvalidationError, userMessage } from './byok-error
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
-
-/** Cached admin user lookup — avoids hitting DB on every worker failure. */
-async function getCachedAdminUsers(): Promise<Array<{ id: string }>> {
-  const cacheKey = 'admin_users';
-  const cached = await cache.get<Array<{ id: string }>>(cacheKey);
-  if (cached) return cached;
-  const admins = await prisma.user.findMany({
-    where: { role: 'ADMIN' },
-    select: { id: true },
-  });
-  await cache.set(cacheKey, admins, 3600);
-  return admins;
-}
 
 /**
  * Job types for the Sotto queue system
@@ -41,17 +28,8 @@ export enum JobType {
   GENERATE_PDF = 'generate_pdf',
   VALIDATE_KEYS = 'validate_keys',
   FETCH_PRICING = 'fetch_pricing',
-  CLASSIFY_VISUALS = 'classify_visuals',
-  GENERATE_VISUAL = 'generate_visual',
-  GENERATE_TRANSITION = 'generate_transition',
-  COMPOSE_VIDEO = 'compose_video',
-  GENERATE_AVATAR = 'generate_avatar',
-  PLACE_ENRICHMENT = 'place_enrichment',
-  LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
-  CLASSIFY_PIPELINE = 'classify_pipeline',
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
-  RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
   SPEAKING_GRADING = 'speaking_grading',
   WORKSHEET_PDF = 'worksheet_pdf',
   VERIFY_CLASS_REFERENCES = 'verify_class_references',
@@ -188,72 +166,9 @@ export interface FetchPricingPayload {}
 
 export interface MonitorTtsProvidersPayload {}
 
-export interface ClassifyVisualsPayload {
-  episodeId: string;
-  videoGenerationId: string;
-  userId: string;
-  zeroCostVideo?: boolean;
-}
-
-export interface GenerateVisualPayload {
-  episodeId: string;
-  videoGenerationId: string;
-  segmentVisualId: string;
-  visualType: string;
-  prompt: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface ComposeVideoPayload {
-  episodeId: string;
-  videoGenerationId: string;
-}
-
-export interface RenderSegmentPreviewPayload {
-  episodeId: string;
-  videoGenerationId: string;
-  segmentVisualId: string;
-  quality: 'preview' | 'full';
-}
-
-export interface PlaceEnrichmentPayload {
-  segmentVisualId: string;
-  episodeId: string;
-  videoGenerationId: string;
-  places: Array<{ name: string; yearHint?: number }>;
-}
-
-export interface GenerateAvatarPayload {
-  episodeId: string;
-  videoGenerationId: string;
-  avatarOverlayId: string;
-  speaker: string;
-  avatarId: string;
-  avatarProvider?: 'heygen' | 'runway' | 'fal' | 'replicate';
-  avatarImageUrl?: string;
-  avatarModelId?: string;
-  isPreset?: boolean;
-}
-
-export interface GenerateTransitionPayload {
-  episodeId: string;
-  videoGenerationId: string;
-  transitionId: string;
-  userId: string;
-}
-
 export interface GenerateWaveformPayload {
   episodeId: string;
   userId: string;
-}
-
-export interface ClassifyPipelinePayload {
-  classificationId: string;
-  episodeId: string;
-  userId: string;
-  aiProvider: string;
-  aiModel: string;
-  apiKeyOverride?: string;
 }
 
 /**
@@ -290,15 +205,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'pdf-generation': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
-  'visual-classification': { attempts: 2 },
-  'visual-generation': { attempts: 3 },
-  'transition-generation': { attempts: 3 },
-  'video-composition': { attempts: 2 },
-  'avatar-generation': { attempts: 2 },
-  'place-enrichment': { attempts: 2 },
-  'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
-  'pipeline-classification': { attempts: 2, skipEvents: true },
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
@@ -424,70 +331,6 @@ async function handleWorkerFailure(
 
     const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
     const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
-
-    const VIDEO_QUEUES = [
-      'visual-classification',
-      'visual-generation',
-      'transition-generation',
-      'video-composition',
-      'place-enrichment',
-    ];
-    if (VIDEO_QUEUES.includes(queueName)) {
-      const videoGenerationId = (job?.data as Record<string, unknown> | undefined)
-        ?.videoGenerationId as string | undefined;
-      if (!videoGenerationId) {
-        return;
-      }
-
-      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
-      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
-      if (!isTerminal) {
-        return;
-      }
-
-      // Don't update VideoGeneration or send notifications here.
-      // The worker's checkAllReady() handles aggregate state + notifications
-      // once ALL visuals are done — avoids duplicate notifications per failed job.
-      // PipelineEvent (logged above) still captures every individual failure.
-      return;
-    }
-
-    const AVATAR_QUEUES = ['avatar-generation'];
-    if (AVATAR_QUEUES.includes(queueName)) {
-      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
-      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
-      if (!isTerminal) {
-        return;
-      }
-
-      if (notifQueue) {
-        await notifQueue.add('send_notification', {
-          userId: episode.userId,
-          type: 'AVATAR_FAILED',
-          title: 'Avatar Generation Failed',
-          message: `Avatar generation failed: ${failedReason || 'Unknown error'}`,
-          data: { episodeId },
-        });
-      }
-
-      const episodeLabel = episode.title || episodeId;
-      const allAdmins = await getCachedAdminUsers();
-      const adminUsers = allAdmins.filter((a) => a.id !== episode.userId);
-      for (const admin of adminUsers) {
-        if (notifQueue) {
-          notifQueue
-            .add('send_notification', {
-              userId: admin.id,
-              type: 'PIPELINE_FAILURE',
-              title: 'Avatar Pipeline Failure',
-              message: `[avatar-generation] ${episodeLabel} (by ${ownerLabel}) — ${errorKind}`,
-              data: { episodeId },
-            })
-            .catch(() => {});
-        }
-      }
-      return;
-    }
 
     if (queueName === 'interactions') {
       if (isKeyInvalidationError(errorKind)) {
@@ -742,17 +585,6 @@ export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
-export const visualClassificationQueue = createQueueReference('visual-classification');
-export const visualGenerationQueue = createQueueReference('visual-generation');
-export const transitionGenerationQueue = createQueueReference('transition-generation');
-export const videoCompositionQueue = createQueueReference('video-composition');
-export const avatarGenerationQueue = createQueueReference('avatar-generation');
-export interface LipSyncTestPayload {
-  userId: string;
-  audioUrl: string;
-  avatarImageUrl: string;
-  avatarModelId: string;
-}
 
 export interface SpeakingGradingPayload {
   recordingId: string;
@@ -766,12 +598,8 @@ export interface WorksheetPdfPayload {
 export interface VerifyClassReferencesPayload {
   episodeId: string;
 }
-export const lipSyncTestQueue = createQueueReference('lip-sync-test');
-export const placeEnrichmentQueue = createQueueReference('place-enrichment');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
-export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
-export const segmentPreviewQueue = createQueueReference('segment-preview');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
 export const verifyClassReferencesQueue = createQueueReference('verify-class-references');

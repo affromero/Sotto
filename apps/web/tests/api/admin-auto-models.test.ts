@@ -67,16 +67,6 @@ const config = {
   includedModels: null,
   includedTtsModels: null,
   includedSttModels: null,
-  imageProvider: 'fal',
-  imageModel: 'fal-flux-1-schnell',
-  includedImageModels: null,
-  videoProvider: 'fal',
-  videoModel: 'fal-wan2.5-480p',
-  includedVideoModels: null,
-  avatarProvider: 'heygen',
-  avatarModel: 'heygen-avatar-standard',
-  includedAvatarModels: null,
-  motionProvider: 'remotion',
 };
 
 describe('GET /api/v1/admin/auto-models', () => {
@@ -139,7 +129,7 @@ describe('PATCH /api/v1/admin/auto-models', () => {
     expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 
-  it('accepts unified defaults, included lists, and category model config', async () => {
+  it('accepts unified defaults and included lists', async () => {
     const body = {
       model: {
         aiProvider: 'openai',
@@ -153,16 +143,6 @@ describe('PATCH /api/v1/admin/auto-models', () => {
       includedModels: ['gpt-5'],
       includedTtsModels: ['elevenlabs:eleven_v3'],
       includedSttModels: ['deepgram:nova-3'],
-      imageProvider: 'fal',
-      imageModel: 'fal-flux-2-pro',
-      includedImageModels: ['fal-flux-2-pro'],
-      videoProvider: 'fal',
-      videoModel: 'fal-kling3-1080p',
-      includedVideoModels: ['fal-kling3-1080p'],
-      avatarProvider: 'heygen',
-      avatarModel: 'heygen-avatar-iv',
-      includedAvatarModels: ['heygen-avatar-iv'],
-      motionProvider: 'hera',
     };
 
     const response = await PATCH(patchRequest(body));
@@ -177,9 +157,6 @@ describe('PATCH /api/v1/admin/auto-models', () => {
       includedModels: null,
       includedTtsModels: null,
       includedSttModels: null,
-      includedImageModels: null,
-      includedVideoModels: null,
-      includedAvatarModels: null,
     };
 
     const response = await PATCH(patchRequest(body));
@@ -202,13 +179,6 @@ describe('PATCH /api/v1/admin/auto-models', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: expect.stringContaining('belongs to "openai"'),
     });
-    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
-  });
-
-  it('rejects invalid motion provider values', async () => {
-    const response = await PATCH(patchRequest({ motionProvider: 'invalid' }));
-
-    expect(response.status).toBe(400);
     expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 });

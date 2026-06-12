@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { isLocalAuthEnabled } from '@/lib/local-auth';
+import { isSelfHosted } from '@/lib/self-hosted';
 import { getSiteConfig } from '@/lib/site-config';
 import { AuthButtons } from '../AuthButtons';
 import styles from '../login/page.module.css';
@@ -10,8 +11,12 @@ export const metadata = {
 };
 
 export default async function SignupPage() {
+  if (!isSelfHosted()) {
+    redirect('/welcome');
+  }
+
   // When the local profile picker is the web auth (self-hosted and the managed
-  // showcase), there is no public signup: the first visitor creates the owner
+  // instance), there is no public signup: the first visitor creates the owner
   // profile and the owner adds household members. Send people to the profile
   // screen instead of an invite-only dead end. Only a real OAuth multi-tenant
   // deployment (ADMIN_EMAILS configured) renders the signup content below.
@@ -36,8 +41,8 @@ export default async function SignupPage() {
           <>
             <h1 className={styles.title}>Join Sotto</h1>
             <p className={styles.subtitle}>
-              This managed instance is not open for new accounts right now. Sotto is open source
-              and self-hostable, so you can also run your own.
+              This managed instance is not open for new accounts right now. Sotto is open source and
+              self-hostable, so you can also run your own.
             </p>
           </>
         )}

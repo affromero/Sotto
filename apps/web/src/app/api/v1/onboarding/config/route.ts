@@ -15,13 +15,17 @@ import { logger } from '@/lib/logger';
  */
 export async function GET() {
   try {
+    const selfHosted = isSelfHosted();
+    if (!selfHosted) {
+      return NextResponse.json({ selfHosted: false, isOwner: false, infra: null });
+    }
+
     const session = await auth();
     if (!session?.user?.id) {
       return errorResponse('Unauthorized', 401);
     }
 
-    const selfHosted = isSelfHosted();
-    const isOwner = selfHosted && (await requireAdmin()) !== null;
+    const isOwner = (await requireAdmin()) !== null;
 
     const config = await getSiteConfig();
     const infra = isOwner

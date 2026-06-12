@@ -1,9 +1,9 @@
 # App services — deployed on every push via blue-green swap.
-# Parameterized by WEB_PORT and MAPS_PORT for slot isolation.
+# Parameterized by WEB_PORT for slot isolation.
 #
 # Usage:
-#   WEB_PORT=3000 MAPS_PORT=3002 docker compose -f docker-compose.app.yml -p sotto-blue up -d
-#   WEB_PORT=3010 MAPS_PORT=3012 docker compose -f docker-compose.app.yml -p sotto-green up -d
+#   WEB_PORT=3000 docker compose -f docker-compose.app.yml -p sotto-blue up -d
+#   WEB_PORT=3010 docker compose -f docker-compose.app.yml -p sotto-green up -d
 
 services:
   web:
@@ -44,38 +44,6 @@ services:
       options:
         max-size: '50m'
         max-file: '5'
-
-  maps:
-    build:
-      context: .
-      dockerfile: apps/maps/Dockerfile
-      args:
-        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: production
-      HOSTNAME: '0.0.0.0'
-    ports:
-      - '127.0.0.1:${MAPS_PORT:?Set MAPS_PORT}:3002'
-    healthcheck:
-      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3002/api/v1/health']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - sotto-network
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
 
 networks:
   sotto-network:

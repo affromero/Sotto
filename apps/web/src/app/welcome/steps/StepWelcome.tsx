@@ -8,12 +8,13 @@ import c from '../components.module.css';
 
 interface Props {
   state: FlowState;
+  demoMode: boolean;
   setBaseLang: (code: string) => void;
   setLanguage: (code: string) => void;
   onNext: () => void;
 }
 
-export function StepWelcome({ state, setBaseLang, setLanguage, onNext }: Props) {
+export function StepWelcome({ state, demoMode, setBaseLang, setLanguage, onNext }: Props) {
   const { baseLang, language } = state;
 
   return (
@@ -25,8 +26,8 @@ export function StepWelcome({ state, setBaseLang, setLanguage, onNext }: Props) 
         A course composed <em>sotto voce</em>, in the tongue you choose.
       </h1>
       <p className={t.lede}>
-        Sotto runs on your stack and teaches through the things you already care about. First —
-        set the pair you&apos;re bridging.
+        Sotto runs on your stack and teaches through the things you already care about. First — set
+        the pair you&apos;re bridging.
       </p>
 
       <div className={c.fromRow}>
@@ -62,7 +63,7 @@ export function StepWelcome({ state, setBaseLang, setLanguage, onNext }: Props) 
                 <Glyph name="check" size={16} />
               </span>
               <div className={c.langNative}>{l.native}</div>
-              <div className={c.langEn}>{l.name}</div>
+              <div className={c.langEn}>{l.names?.[baseLang] ?? l.name}</div>
               <div className={c.langHi}>&ldquo;{l.hi}&rdquo;</div>
             </button>
           );
@@ -82,7 +83,9 @@ export function StepWelcome({ state, setBaseLang, setLanguage, onNext }: Props) 
           </span>
         </button>
         <span className={t.spacer} />
-        <span className={t.mlabel}>open-source · self-hosted</span>
+        <span className={t.mlabel}>
+          {demoMode ? 'public demo · no signup' : 'open-source · self-hosted'}
+        </span>
       </div>
     </div>
   );

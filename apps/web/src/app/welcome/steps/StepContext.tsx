@@ -8,13 +8,12 @@ import c from '../components.module.css';
 interface Props {
   sources: Set<string>;
   toggle: (id: string) => void;
-  note: string;
-  setNote: (v: string) => void;
+  demoMode: boolean;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function StepContext({ sources, toggle, note, setNote, onNext, onBack }: Props) {
+export function StepContext({ sources, toggle, demoMode, onNext, onBack }: Props) {
   const n = sources.size;
 
   return (
@@ -26,8 +25,9 @@ export function StepContext({ sources, toggle, note, setNote, onNext, onBack }: 
         Teach it <em>what you care about</em>.
       </h1>
       <p className={t.lede}>
-        This is the part that makes Sotto yours. Choose what the agent may read — it draws every
-        lesson, reading, and audio lesson from the context you share. Nothing leaves your machine.
+        {demoMode
+          ? 'This is the part that makes Sotto yours. In the hosted demo, these are mock context signals so you can see how a course gets shaped without connecting anything.'
+          : 'This is the part that makes Sotto yours. Choose what the agent may read — it draws every lesson, reading, and audio lesson from the context you share. Nothing leaves your machine.'}
       </p>
 
       <div className={c.sourceList}>
@@ -72,32 +72,12 @@ export function StepContext({ sources, toggle, note, setNote, onNext, onBack }: 
         )}
       </div>
 
-      <div className={c.noteBlock}>
-        <label className={c.noteLabel} htmlFor="welcome-note">
-          Tell it about you <span className={c.noteOptional}>(optional)</span>
-        </label>
-        <textarea
-          id="welcome-note"
-          className={c.noteField}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-          maxLength={4000}
-          placeholder="Goals, interests, why you're learning — e.g. “I'm a nurse moving to Madrid; I want medical and everyday Spanish.” It shapes your placement, classes, and practice."
-          aria-label="Tell Sotto about your goals and background"
-        />
-      </div>
-
       <div className={t.actions}>
         <button className={`${t.btn} ${t.btnBare}`} onClick={onBack}>
           ← Back
         </button>
         <span className={t.spacer} />
-        <button
-          className={`${t.btn} ${t.btnPrimary}`}
-          disabled={n === 0}
-          onClick={onNext}
-        >
+        <button className={`${t.btn} ${t.btnPrimary}`} disabled={n === 0} onClick={onNext}>
           Continue{' '}
           <span className={t.btnArrow}>
             <Glyph name="arrow" size={17} />

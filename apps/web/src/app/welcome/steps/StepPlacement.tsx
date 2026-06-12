@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { LANGUAGES, PLACEMENT_BY_LANG, LEVELS } from '../data';
 import type { CefrLevel } from '../data';
 import { Glyph } from '../Glyph';
@@ -41,13 +40,14 @@ export function StepPlacement({
         Where do you <em>start</em> in {lang.native}?
       </h1>
       <p className={t.lede}>
-        Tap every sentence you fully understand. Sotto anchors your syllabus to the CEFR level
-        just above your reach — never busywork, never over your head.
+        Tap every sentence you fully understand. Sotto anchors your syllabus to the CEFR level just
+        above your reach — never busywork, never over your head.
       </p>
 
       <div className={c.placementList}>
         {items.map((p) => {
           const on = understood.has(p.level);
+          const gloss = p.glosses?.[baseLang] ?? p.gloss;
           return (
             <button
               key={p.level}
@@ -65,7 +65,7 @@ export function StepPlacement({
                 >
                   {p.text}
                 </span>
-                <span className={c.plGloss}>{p.gloss}</span>
+                <span className={c.plGloss}>{gloss}</span>
               </span>
               <span className={c.plCheck}>
                 <Glyph name="check" size={18} />
@@ -75,13 +75,6 @@ export function StepPlacement({
         })}
       </div>
 
-      <p className={c.placementTestLink}>
-        Not sure?{' '}
-        <Link href={`/learn/placement?native=${baseLang}&target=${language}`}>
-          Take the full placement test
-        </Link>
-      </p>
-
       <div className={c.cefr}>
         <div className={c.cefrTrack}>
           <div className={c.cefrFill} style={{ width: `${pct}%` }} />
@@ -89,10 +82,7 @@ export function StepPlacement({
         </div>
         <div className={c.cefrTicks}>
           {LEVELS.map((l) => (
-            <span
-              key={l}
-              className={`${c.cefrTick} ${l === level ? c.cefrTickHit : ''}`}
-            >
+            <span key={l} className={`${c.cefrTick} ${l === level ? c.cefrTickHit : ''}`}>
               {l}
             </span>
           ))}
@@ -113,11 +103,7 @@ export function StepPlacement({
           ← Back
         </button>
         <span className={t.spacer} />
-        <button
-          className={`${t.btn} ${t.btnPrimary}`}
-          disabled={!level}
-          onClick={onNext}
-        >
+        <button className={`${t.btn} ${t.btnPrimary}`} disabled={!level} onClick={onNext}>
           Compose my course{' '}
           <span className={t.btnArrow}>
             <Glyph name="arrow" size={17} />

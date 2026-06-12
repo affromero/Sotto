@@ -47,12 +47,14 @@ describe('Middleware Security Tests', () => {
     vi.resetModules();
     vi.clearAllMocks();
     process.env.AUTH_SECRET = TEST_SECRET;
+    delete process.env.SELF_HOSTED;
     mockGetToken.mockResolvedValue(null);
     middleware = await getMiddleware();
   });
 
   afterEach(() => {
     delete process.env.AUTH_SECRET;
+    delete process.env.SELF_HOSTED;
   });
 
   // =====================================================================
@@ -73,18 +75,51 @@ describe('Middleware Security Tests', () => {
       const res = await middleware(createRequest('/welcome'));
       expect(getRedirectLocation(res)).toBe('/auth/login');
     });
+
+    it('allows /welcome without auth on the managed showcase', async () => {
+      process.env.SELF_HOSTED = 'false';
+      const res = await middleware(createRequest('/welcome'));
+      expect(isPassThrough(res)).toBe(true);
+    });
+
+    it('redirects hosted auth pages to the welcome mock even with an old session', async () => {
+      process.env.SELF_HOSTED = 'false';
+      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
+
+      const res = await middleware(createRequest('/auth/login'));
+
+      expect(getRedirectLocation(res)).toBe('/welcome');
+      expect(mockGetToken).not.toHaveBeenCalled();
+    });
+
+    it('redirects hosted learning app routes to the welcome mock', async () => {
+      process.env.SELF_HOSTED = 'false';
+      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
+
+      const res = await middleware(createRequest('/learn'));
+
+      expect(getRedirectLocation(res)).toBe('/welcome');
+      expect(mockGetToken).not.toHaveBeenCalled();
+    });
+
+    for (const path of ['/ref/alice', '/invite/code_123', '/memory', '/classes/class_1/worksheet', '/episode/ep_1']) {
+      it(`redirects hosted ${path} to the welcome mock`, async () => {
+        process.env.SELF_HOSTED = 'false';
+        mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
+
+        const res = await middleware(createRequest(path));
+
+        expect(getRedirectLocation(res)).toBe('/welcome');
+        expect(mockGetToken).not.toHaveBeenCalled();
+      });
+    }
   });
 
   // =====================================================================
   // PUBLIC ROUTES — Always accessible without auth
   // =====================================================================
   describe('Public Routes — Always Accessible', () => {
-    const publicPaths = [
-      '/',
-      '/api/v1/health',
-      '/feedback',
-      '/api/v1/feedback',
-    ];
+    const publicPaths = ['/', '/api/v1/health', '/feedback', '/api/v1/feedback'];
 
     for (const path of publicPaths) {
       it(`allows ${path} without auth`, async () => {
@@ -102,7 +137,6 @@ describe('Middleware Security Tests', () => {
       const res = await middleware(createRequest('/api/v1/auth/callback/google'));
       expect(isPassThrough(res)).toBe(true);
     });
-
   });
 
   // =====================================================================

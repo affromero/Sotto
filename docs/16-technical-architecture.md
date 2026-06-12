@@ -48,12 +48,9 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 |---|---|
 | `apps/web` | Next.js app, `/api/v1` routes, Prisma schema, workers, tests |
 | `apps/mobile` | Expo app and mobile/iPad learning surfaces |
-| `apps/maps` | Next.js playground for `@sotto/maps` |
 | `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
-| `packages/maps` | Language curriculum maps and related utilities |
 | `packages/mcp` | MCP integration surface for local agents |
 | `packages/verification-standard` | Reference verification standard package |
-| `services/remotion` | Video/worksheet rendering service |
 | `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
 | `e2e` | Playwright and Maestro tests |
 | `scripts` | Setup, launch, recording, migration, and release automation |

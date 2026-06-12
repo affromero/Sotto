@@ -402,8 +402,6 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps runtime infrastructure surfaces free of hosted defaults', () => {
     const runtimeInfraSources = [
       'packages/shared/src/brand.ts',
-      'apps/maps/src/components/SottoLogo.tsx',
-      'apps/maps/src/app/api/v1/health/route.ts',
       'apps/web/src/lib/push-notifications.ts',
       'apps/web/src/lib/reference-validator.ts',
     ]
@@ -440,8 +438,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'accounting/ledger/main.beancount',
       'accounting/ledger/opening.beancount',
       'accounting/ledger/2026/02-february.beancount',
-      'packages/maps/README.md',
-      'packages/video/src/compositions/shared/SottoWatermark.tsx',
       'packages/verification-standard/package.json',
       'packages/verification-standard/README.md',
       'packages/verification-standard/CONTRIBUTING.md',
@@ -586,16 +582,11 @@ describe('open-source language-learning OSS surfaces', () => {
     const releaseHygieneSources = [
       'SECURITY.md',
       'scripts/generate-apple-secret.mjs',
+      'CLAUDE.md',
       'docs/05-plan.md',
       'docs/23-local-development.md',
       'docs/27-launch-readiness-status.md',
-      'apps/maps/CLAUDE.md',
-      'apps/web/scripts/test-runway-browser.ts',
-      'apps/web/scripts/test-runway-native.ts',
       'apps/web/src/lib/CLAUDE.md',
-      'apps/web/src/lib/providers/video.ts',
-      'packages/maps/CLAUDE.md',
-      'packages/maps/README.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -639,7 +630,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh'
     );
     expect(caddyTemplate).toContain('__SOTTO_APP_DOMAIN__');
-    expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_MAPS');
     expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_WWW');
     expect(deploymentSources).not.toContain('doppler');
     expect(deploymentSources).not.toContain('Doppler');

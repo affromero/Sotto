@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
 import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { EpisodePlayerView } from './EpisodePlayerView';
@@ -67,52 +66,22 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
   const isOwner = userId === episode.userId;
   const isAdmin = session?.user?.role === 'ADMIN';
 
-  // All secondary queries in parallel
-  const [interactions, ownerData] = await Promise.all([
-    // Interactions (separate from cached query because it depends on userId)
-    userId
-      ? prisma.interaction.findMany({
-          where: { episodeId: episode.id, userId },
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            question: true,
-            timestamp: true,
-            status: true,
-            answer: true,
-            helpful: true,
-            segmentOrder: true,
-          },
-        })
-      : Promise.resolve([]),
-
-    // Owner-only gates (already internally parallel)
-    isOwner && userId
-      ? Promise.all([
-          getVideoGenerationStatus(userId),
-          getAvatarGenerationStatus(userId),
-        ])
-      : Promise.resolve(null),
-  ]);
-
-  // Owner data
-  let videoStatus:
-    | {
-        available: boolean;
-        hasByokKey: boolean;
-      }
-    | undefined;
-  let avatarStatus:
-    | {
-        available: boolean;
-        hasByokKey: boolean;
-      }
-    | undefined;
-  if (ownerData) {
-    const [vidStatus, avStatus] = ownerData;
-    videoStatus = vidStatus;
-    avatarStatus = avStatus;
-  }
+  // Interactions (separate from cached query because it depends on userId)
+  const interactions = userId
+    ? await prisma.interaction.findMany({
+        where: { episodeId: episode.id, userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          question: true,
+          timestamp: true,
+          status: true,
+          answer: true,
+          helpful: true,
+          segmentOrder: true,
+        },
+      })
+    : [];
 
   const visibility = episode.visibility;
 
@@ -121,7 +90,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
     resolvedAudioUrl,
     resolvedSegments,
     resolvedVersions,
-    resolvedVideoUrl,
   ] = await Promise.all([
     resolveAudioUrl(episode.audioUrl, visibility),
     Promise.all(
@@ -145,7 +113,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
         createdAt: v.createdAt.toISOString(),
       }))
     ),
-    episode.videoUrl ? resolveAudioUrl(episode.videoUrl, visibility) : Promise.resolve(null),
   ]);
 
   const episodeData = {
@@ -184,7 +151,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
     })),
     vocabularyEntries: episode.vocabularyEntries,
     pdfUrl: episode.pdfUrl,
-    videoUrl: resolvedVideoUrl ?? null,
     tags: episode.tags.map((pt) => pt.tag),
     versions: resolvedVersions,
     isSaved: false,
@@ -198,8 +164,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
           isOwner={isOwner}
           isAdmin={isAdmin}
           isAuthenticated={!!userId}
-          videoStatus={videoStatus}
-          avatarStatus={avatarStatus}
         />
         {!userId && episode.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={episode.user.handle} creatorName={episode.user.name} />

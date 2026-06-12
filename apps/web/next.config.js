@@ -19,7 +19,6 @@ const nextConfig = {
     '@auth/core',
     '@sotto/shared',
     '@sotto/verification-standard',
-    '@sotto/maps',
   ],
   turbopack: {
     root: path.resolve(__dirname, '../..'),

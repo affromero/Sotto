@@ -29,16 +29,7 @@ import { processPdfGeneration } from './pdf-generation.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
 import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
-import { processVisualClassification } from './visual-classification.worker';
-import { processVisualGeneration } from './visual-generation.worker';
-import { processVideoComposition } from './video-composition.worker';
-import { processAvatarGeneration } from './avatar-generation.worker';
-import { processPlaceEnrichment } from './place-enrichment.worker';
-import { processTransitionGeneration } from './transition-generation.worker';
-import { processSegmentPreview } from './segment-preview.worker';
-import { processLipSyncTest } from './lip-sync-test.worker';
 import { processWaveformGeneration } from './waveform-generation.worker';
-import { processPipelineClassification } from './pipeline-classification.worker';
 import { processSpeakingGrading } from './speaking-grading.worker';
 import { processWorksheetPdf } from './worksheet-pdf.worker';
 import { processVerifyClassReferences } from './verify-class-references.worker';
@@ -105,16 +96,7 @@ const workers = [
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
   shouldRun('tts-provider-monitor') && createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
-  shouldRun('visual-classification') && createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
-  shouldRun('visual-generation') && createWorker('visual-generation', processVisualGeneration, { concurrency: 5 }),
-  shouldRun('video-composition') && createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
-  shouldRun('avatar-generation') && createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 1200000 }),
-  shouldRun('place-enrichment') && createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
-  shouldRun('transition-generation') && createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
-  shouldRun('segment-preview') && createWorker('segment-preview', processSegmentPreview, { concurrency: 3, lockDuration: 300000 }),
-  shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
-  shouldRun('pipeline-classification') && createWorker('pipeline-classification', processPipelineClassification, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('speaking-grading') && createWorker('speaking-grading', processSpeakingGrading, { concurrency: 5 }),
   shouldRun('worksheet-pdf') && createWorker('worksheet-pdf', processWorksheetPdf, { concurrency: 2 }),
   shouldRun('verify-class-references') && createWorker('verify-class-references', processVerifyClassReferences, { concurrency: 2 }),
@@ -122,7 +104,6 @@ const workers = [
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
-// Schedule cleanup every 2 hours (stale drafts + stuck video generations)
 // Schedule BYOK key re-validation every 24 hours
 if (shouldRun('key-validation')) {
   keyValidationQueue

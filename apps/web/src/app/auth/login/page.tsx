@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation';
 import { isLocalAuthEnabled } from '@/lib/local-auth';
+import { isSelfHosted } from '@/lib/self-hosted';
 import { ProfilePicker } from '@/components/auth/ProfilePicker';
 import { AuthButtons } from '../AuthButtons';
 import styles from './page.module.css';
@@ -14,6 +16,10 @@ interface PageProps {
 
 export default async function LoginPage({ searchParams }: PageProps) {
   const params = await searchParams;
+
+  if (!isSelfHosted()) {
+    redirect('/welcome');
+  }
 
   // Self-hosted local sign-in: the Netflix-style profile picker, unless OAuth was
   // explicitly requested via ?oauth=1.

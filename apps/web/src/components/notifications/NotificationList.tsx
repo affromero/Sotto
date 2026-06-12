@@ -10,7 +10,6 @@ import {
   FileText,
   Trash2,
   Gift,
-  Video,
   Megaphone,
 } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
@@ -28,12 +27,9 @@ const typeIcons: Record<string, typeof Bell> = {
   // Pipeline — success
   EPISODE_READY: Headphones,
   SCRIPT_READY: FileText,
-  VIDEO_READY: Video,
 
   // Pipeline — failure
   EPISODE_FAILED: AlertTriangle,
-  VIDEO_FAILED: AlertTriangle,
-  AVATAR_FAILED: AlertTriangle,
   KEY_INVALID: AlertTriangle,
   PIPELINE_FAILURE: AlertTriangle,
 

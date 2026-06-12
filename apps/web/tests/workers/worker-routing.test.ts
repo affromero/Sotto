@@ -29,7 +29,7 @@ describe('matchesProfile', () => {
 
   it('profile=heavy matches only HEAVY_WORKERS', () => {
     expect(matchesProfile('audio-generation', 'heavy')).toBe(true);
-    expect(matchesProfile('video-composition', 'heavy')).toBe(true);
+    expect(matchesProfile('audio-stitching', 'heavy')).toBe(true);
     expect(matchesProfile('content-extraction', 'heavy')).toBe(false);
     expect(matchesProfile('notifications', 'heavy')).toBe(false);
   });
@@ -56,7 +56,7 @@ describe('matchesProfile', () => {
 describe('matchesPreset', () => {
   it('preset=full includes everything', () => {
     expect(matchesPreset('audio-generation', 'full')).toBe(true);
-    expect(matchesPreset('lip-sync-test', 'full')).toBe(true);
+    expect(matchesPreset('some-new-worker', 'full')).toBe(true);
   });
 
   it('preset=core has no experimental denylist after demo workers were removed', () => {
@@ -66,9 +66,7 @@ describe('matchesPreset', () => {
   it('preset=core includes production workers', () => {
     expect(matchesPreset('audio-generation', 'core')).toBe(true);
     expect(matchesPreset('audio-stitching', 'core')).toBe(true);
-    expect(matchesPreset('visual-generation', 'core')).toBe(true);
-    expect(matchesPreset('transition-generation', 'core')).toBe(true);
-    expect(matchesPreset('video-composition', 'core')).toBe(true);
+    expect(matchesPreset('speaking-grading', 'core')).toBe(true);
     expect(matchesPreset('notifications', 'core')).toBe(true);
     expect(matchesPreset('content-extraction', 'core')).toBe(true);
   });
@@ -83,33 +81,18 @@ describe('shouldRun — the bug fix', () => {
     expect(shouldRun('audio-stitching', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
   });
 
-  it('visual-generation runs with heavy+core', () => {
-    expect(shouldRun('visual-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
-  });
-
-  it('transition-generation runs with heavy+core', () => {
-    expect(shouldRun('transition-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
-  });
-
-  it('video-composition runs with heavy+core', () => {
-    expect(shouldRun('video-composition', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
-  });
-});
-
-describe('shouldRun — retained video workers', () => {
-  it('avatar-generation runs with heavy+core (not experimental)', () => {
-    expect(shouldRun('avatar-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
+  it('audio-generation runs with heavy+core', () => {
+    expect(shouldRun('audio-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
   });
 });
 
 describe('shouldRun — preset=full includes everything', () => {
-  it('visual-generation included with heavy+full', () => {
-    expect(shouldRun('visual-generation', opts({ profile: 'heavy', preset: 'full' }))).toBe(true);
+  it('audio-generation included with heavy+full', () => {
+    expect(shouldRun('audio-generation', opts({ profile: 'heavy', preset: 'full' }))).toBe(true);
   });
 
-  it('lip-sync-test included with heavy+full', () => {
-    // lip-sync-test is not in HEAVY_WORKERS, so it won't match heavy profile
-    expect(shouldRun('lip-sync-test', opts({ profile: 'all', preset: 'full' }))).toBe(true);
+  it('unknown workers run by default under full (denylist semantics)', () => {
+    expect(shouldRun('some-new-worker', opts({ profile: 'all', preset: 'full' }))).toBe(true);
   });
 });
 
@@ -144,9 +127,9 @@ describe('shouldRun — profile filtering with preset=core', () => {
 
   it('pipeline workers run with pipeline+core (non-experimental)', () => {
     expect(shouldRun('content-extraction', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
-    expect(shouldRun('visual-classification', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
-    expect(shouldRun('place-enrichment', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
-    expect(shouldRun('pipeline-classification', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
+    expect(shouldRun('script-generation', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
+    expect(shouldRun('speaking-grading', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
+    expect(shouldRun('verify-class-references', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
   });
 });
 
@@ -162,8 +145,8 @@ describe('set integrity', () => {
     }
   });
 
-  it('segment-preview is in HEAVY_WORKERS (not experimental)', () => {
-    expect(HEAVY_WORKERS.has('segment-preview')).toBe(true);
-    expect(EXPERIMENTAL_WORKERS.has('segment-preview')).toBe(false);
+  it('audio-stitching is in HEAVY_WORKERS (not experimental)', () => {
+    expect(HEAVY_WORKERS.has('audio-stitching')).toBe(true);
+    expect(EXPERIMENTAL_WORKERS.has('audio-stitching')).toBe(false);
   });
 });

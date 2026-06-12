@@ -1,4 +1,5 @@
 import { WelcomeFlow } from './WelcomeFlow';
+import { isSelfHosted } from '@/lib/self-hosted';
 
 export const metadata = {
   title: 'Welcome to Sotto',
@@ -6,5 +7,5 @@ export const metadata = {
 };
 
 export default function WelcomePage() {
-  return <WelcomeFlow />;
+  return <WelcomeFlow initialConfig={{ selfHosted: isSelfHosted(), isOwner: false }} />;
 }

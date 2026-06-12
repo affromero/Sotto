@@ -53,39 +53,12 @@ export type NotificationType =
   | 'ACCOUNT_WARNING'
   | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
-  | 'VIDEO_READY'
-  | 'VIDEO_FAILED'
-  | 'AVATAR_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
 export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'ARCHIVED';
-
-export type VisualType =
-  | 'DATA_CHART'
-  | 'QUOTE'
-  | 'COMPARISON'
-  | 'TIMELINE'
-  | 'DIAGRAM'
-  | 'STOCK_FOOTAGE'
-  | 'AI_ILLUSTRATION'
-  | 'TEXT_CARD'
-  | 'MAP_OVERLAY'
-  | 'DATA_TABLE'
-  | 'SOURCE_FIGURE';
-
-export type VideoStatus =
-  | 'DRAFT'
-  | 'PENDING'
-  | 'CLASSIFYING'
-  | 'GENERATING_VISUALS'
-  | 'GENERATING_TRANSITIONS'
-  | 'GENERATING_AVATARS'
-  | 'COMPOSING'
-  | 'READY'
-  | 'FAILED';
 
 // Language learning
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';

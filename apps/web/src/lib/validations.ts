@@ -342,82 +342,6 @@ export const regenerateWithFeedbackSchema = z
   .optional();
 
 /**
- * Video generation request validation
- */
-const pipelineSubVisualSchema = z.object({
-  subOrder: z.number().int().min(0),
-  startOffset: z.number().min(0),
-  duration: z.number().positive(),
-  visualType: z.string(),
-  visualMode: z.enum(['image', 'video', 'programmatic']),
-  model: z.string().nullable(),
-  prompt: z.string().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
-  endStatePrompt: z.string().nullable().optional(),
-});
-
-export const pipelineTransitionSchema = z.object({
-  fromSegmentOrder: z.number().int(),
-  toSegmentOrder: z.number().int(),
-  fromSegmentId: z.string(),
-  toSegmentId: z.string(),
-  enabled: z.boolean(),
-  recommended: z.boolean().optional().default(false),
-  recommendationReason: z.string().optional(),
-  transitionModel: z.string().nullable(),
-  durationSeconds: z.number().min(0.5).max(3).default(1),
-  estimatedCost: z.number().optional().default(0),
-});
-
-export const generateVideoSchema = z
-  .object({
-    imageModel: z.string().optional(),
-    pipeline: z
-      .object({
-        version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-        defaultImageModel: z.string(),
-        defaultVideoModel: z.string(),
-        segments: z.array(
-          z.object({
-            segmentId: z.string(),
-            order: z.number(),
-            visualType: z.string(),
-            visualMode: z.enum(['image', 'video', 'programmatic']),
-            model: z.string().nullable(),
-            prompt: z.string().nullable(),
-            metadata: z.record(z.unknown()).nullable(),
-            endStatePrompt: z.string().nullable().optional(),
-            subVisuals: z.array(pipelineSubVisualSchema).optional(),
-          })
-        ),
-        transitions: z.array(pipelineTransitionSchema).optional(),
-        defaultTransitionModel: z.string().optional(),
-      })
-      .optional(),
-  })
-  .optional();
-
-/**
- * Video segment update validation — selective regeneration via PATCH
- */
-export const updateVideoSegmentsSchema = z.object({
-  segments: z
-    .array(
-      z.object({
-        segmentVisualId: z.string(),
-        visualType: z.string().optional(),
-        visualMode: z.enum(['image', 'video', 'programmatic']).optional(),
-        model: z.string().nullable().optional(),
-        prompt: z.string().nullable().optional(),
-        metadata: z.record(z.unknown()).nullable().optional(),
-        endStatePrompt: z.string().nullable().optional(),
-        feedback: z.string().optional(),
-      })
-    )
-    .min(1),
-});
-
-/**
  * AI-generated script validation — applied after JSON parse in script-generator
  */
 export const generatedScriptSchema = z.object({
@@ -521,48 +445,6 @@ export const toggleInvitationSchema = z.object({
 export const redeemInvitationSchema = z.object({
   code: z.string().min(1).max(50),
   email: z.string().email().max(200),
-});
-
-export const configureAvatarsSchema = z.object({
-  avatars: z
-    .array(
-      z.object({
-        speaker: z.string().min(1).max(50),
-        avatarId: z.string().min(1).optional(),
-        avatarProvider: z.enum(['heygen', 'runway', 'fal']).optional(),
-        avatarImageUrl: z.string().url().optional(),
-        avatarModelId: z.string().optional(),
-        isPreset: z.boolean().optional(),
-        enabledSegmentIds: z.array(z.string()).optional(),
-      })
-    )
-    .min(1)
-    .max(4),
-});
-
-export const updateAvatarPositionsSchema = z.object({
-  positions: z.array(
-    z.object({
-      speaker: z.string().min(1),
-      posX: z.number().min(0).max(1).optional(),
-      posY: z.number().min(0).max(1).optional(),
-      width: z.number().min(0.05).max(0.8).optional(),
-      height: z.number().min(0.05).max(0.8).optional(),
-      maskShape: z
-        .enum(['none', 'rounded', 'circle', 'hexagon', 'diamond', 'blob', 'squircle'])
-        .optional(),
-    })
-  ),
-});
-
-export const avatarImageUploadSchema = z.object({
-  name: z.string().min(1).max(100),
-  consentAcknowledged: z.enum(['true']).transform(() => true),
-});
-
-export const avatarImageGenerateSchema = z.object({
-  name: z.string().min(1).max(100),
-  prompt: z.string().min(1).max(1000),
 });
 
 // Sourced classes: build the next class from a real link or an interest topic.

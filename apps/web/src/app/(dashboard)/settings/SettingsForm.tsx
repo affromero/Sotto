@@ -16,7 +16,6 @@ import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
-import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -779,16 +778,6 @@ export function SettingsForm({
           initialConfigured={configuredTtsProviders}
           providerMeta={ttsProviderMeta}
         />
-      </section>
-
-      {/* Avatar Images */}
-      <section className={styles.section} id="avatar-images">
-        <h2 className={styles.sectionTitle}>Avatar Images</h2>
-        <p className={styles.sectionDesc}>
-          Manage portrait images for lip-sync models. Verified users can upload their own photos
-          with consent. Share images with other users for collaborative projects.
-        </p>
-        <AvatarImageManager />
       </section>
 
       {/* Referrals */}

@@ -52,7 +52,6 @@ Create DNS records at your registrar:
 | `A` | `@` | `YOUR_SERVER_IPV4` |
 | `AAAA` | `@` | `YOUR_SERVER_IPV6` if used |
 | `CNAME` | `www` | `your-domain.example` if you want the www redirect |
-| `A` or `CNAME` | `maps` | your server or apex domain if exposing maps |
 
 Wait until this resolves from your local machine:
 
@@ -106,14 +105,13 @@ STORAGE_PROVIDER=local
 LOCAL_STORAGE_DIR=./.sotto/storage
 ```
 
-For optional Caddy blocks:
+For optional Caddy www-redirect:
 
 ```bash
 SOTTO_WWW_DOMAIN=www.your-domain.example
-SOTTO_MAPS_DOMAIN=maps.your-domain.example
 ```
 
-Leave optional domains unset if you do not want those hosts exposed.
+Leave that unset if you do not want the optional www-redirect Caddy block rendered.
 
 ## 5. Configure Caddy Import
 

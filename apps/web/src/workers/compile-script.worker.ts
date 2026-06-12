@@ -31,7 +31,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     }),
     prisma.episode.findUniqueOrThrow({
       where: { id: episodeId },
-      select: { source: true, zeroCostVideo: true },
+      select: { source: true },
     }),
   ]);
 
@@ -104,7 +104,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
   const genFeatures = getGenerationFeatures();
 
   const isWebOrImport = episode.source === 'WEB' || episode.source === 'IMPORT';
-  const shouldAutoApprove = genFeatures.autoApproveScript || !isWebOrImport || episode.zeroCostVideo;
+  const shouldAutoApprove = genFeatures.autoApproveScript || !isWebOrImport;
 
   if (!shouldAutoApprove) {
     // Pause for user review

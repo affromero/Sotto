@@ -17,6 +17,7 @@ interface VoicePickerProps {
   baseUrls: Record<string, string>;
   onBaseUrl: (id: string, val: string) => void;
   localPlaceholder: string;
+  demoMode: boolean;
 }
 
 function VoicePicker({
@@ -30,6 +31,7 @@ function VoicePicker({
   baseUrls,
   onBaseUrl,
   localPlaceholder,
+  demoMode,
 }: VoicePickerProps) {
   const sel = providers.find((p) => p.id === value) ?? providers[0];
   const k = keys[sel.id] ?? '';
@@ -68,7 +70,14 @@ function VoicePicker({
         })}
       </div>
 
-      {sel.local ? (
+      {demoMode ? (
+        <div className={c.voiceKey}>
+          <div className={c.voiceNote}>
+            <Glyph name="lock" size={13} />
+            Hosted demo preview · no key or local endpoint is requested or saved.
+          </div>
+        </div>
+      ) : sel.local ? (
         <div className={c.voiceKey}>
           <div className={c.voiceNote}>
             <Glyph name="lock" size={13} />
@@ -87,9 +96,7 @@ function VoicePicker({
               aria-label={`${sel.name} endpoint URL (optional)`}
             />
           </div>
-          <div className={c.vkNote}>
-            Optional · leave blank to use the default local endpoint.
-          </div>
+          <div className={c.vkNote}>Optional · leave blank to use the default local endpoint.</div>
         </div>
       ) : (
         <div className={c.voiceKey}>
@@ -119,12 +126,13 @@ function VoicePicker({
 
 interface Props {
   voice: VoiceState;
+  demoMode: boolean;
   setVoice: (updater: (prev: VoiceState) => VoiceState) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
+export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) {
   const setKey = (id: string, val: string) =>
     setVoice((s) => ({ ...s, keys: { ...s.keys, [id]: val } }));
   const setBaseUrl = (id: string, val: string) =>
@@ -139,9 +147,9 @@ export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
         Choose the voice that <em>speaks with you</em>.
       </h1>
       <p className={t.lede}>
-        Listening and speaking run on providers you pick — swap them anytime. Drop in your keys
-        now so the whole stack is wired from the first session; you can change any of it later in
-        settings.
+        {demoMode
+          ? 'This hosted walkthrough previews the voice stack without asking for keys. In self-hosted Sotto, these choices power listening lessons and pronunciation feedback.'
+          : 'Listening and speaking run on providers you pick — swap them anytime. Drop in your keys now so the whole stack is wired from the first session; you can change any of it later in settings.'}
       </p>
 
       <VoicePicker
@@ -155,6 +163,7 @@ export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
         baseUrls={voice.baseUrls}
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8000"
+        demoMode={demoMode}
       />
 
       <VoicePicker
@@ -168,12 +177,14 @@ export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
         baseUrls={voice.baseUrls}
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8000/v1"
+        demoMode={demoMode}
       />
 
       <div className={`${c.locknote} ${c.voiceFoot}`}>
         <Glyph name="spark" size={15} />
-        Keys are shared where it makes sense — enter ElevenLabs or OpenAI once and it powers
-        both. Everything writes to your local config, nothing leaves your machine.
+        {demoMode
+          ? 'No credentials are requested or stored in the hosted demo; this is only a preview of the provider choices.'
+          : 'Keys are shared where it makes sense — enter ElevenLabs or OpenAI once and it powers both. Everything writes to your local config, nothing leaves your machine.'}
       </div>
 
       <div className={t.actions}>
