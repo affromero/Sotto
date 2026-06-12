@@ -303,30 +303,6 @@ export const deleteAccountSchema = z.object({
 });
 
 /**
- * Taste quiz question request validation
- */
-export const tasteQuizQuerySchema = z.object({
-  count: z.coerce.number().int().min(1).max(20).default(10),
-});
-
-/**
- * Taste quiz answer submission validation
- */
-export const tasteQuizAnswerSchema = z.object({
-  answers: z
-    .array(
-      z.object({
-        questionId: z.string().min(1).max(20),
-        question: z.string().min(1).max(500),
-        tagSlugs: z.array(z.string().min(1).max(100)).min(1).max(3),
-        response: z.enum(['yes', 'no', 'skip']),
-      })
-    )
-    .min(1)
-    .max(20),
-});
-
-/**
  * Referral attribution validation
  */
 export const referralSchema = z.object({

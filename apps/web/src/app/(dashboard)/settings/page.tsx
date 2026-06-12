@@ -26,7 +26,6 @@ export default async function SettingsPage() {
     categories,
     byokKeys,
     aiKeys,
-    tasteQuizAnswerCount,
     referredUsers,
   ] = await Promise.all([
     prisma.user.findUnique({
@@ -67,7 +66,6 @@ export default async function SettingsPage() {
     }),
     listByokProviders(userId),
     listAiProviders(userId),
-    prisma.tasteQuizAnswer.count({ where: { userId } }),
     prisma.user.findMany({
       where: { referredById: userId },
       select: { name: true, handle: true, image: true, createdAt: true, referralVerified: true },
@@ -113,7 +111,6 @@ export default async function SettingsPage() {
         ttsProviderMeta={ttsProviderMeta}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        quizAnswerCount={tasteQuizAnswerCount}
         referredUsers={referredUsers.map((u) => ({
           name: u.name,
           handle: u.handle,

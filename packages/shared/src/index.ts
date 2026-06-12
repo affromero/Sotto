@@ -54,8 +54,6 @@ export type {
   DiscoveryMessage,
   DiscoveryMetadata,
   DiscoveryState,
-  TasteQuestion,
-  TasteAnswer,
 } from './types/discovery';
 
 
