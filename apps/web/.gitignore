@@ -1,0 +1,3 @@
+# Prisma 7 generates the client into the source tree. It is regenerated on every
+# install (postinstall), CI run, and Docker build, so it must not be committed.
+src/generated/prisma/

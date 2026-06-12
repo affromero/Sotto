@@ -276,7 +276,7 @@ describe('getOrCreateCurriculum', () => {
       .mockResolvedValueOnce({ id: 'winner-id' }); // re-fetch after race
 
     // Make the thrown error behave like a PrismaClientKnownRequestError for the instanceof check
-    const { Prisma } = await import('@prisma/client');
+    const { Prisma } = await import('@/generated/prisma/client');
     const prismaError = Object.create(Prisma.PrismaClientKnownRequestError.prototype);
     Object.assign(prismaError, { message: 'Unique constraint failed', code: 'P2002', clientVersion: '5.0.0' });
     mockTransaction.mockRejectedValue(prismaError);

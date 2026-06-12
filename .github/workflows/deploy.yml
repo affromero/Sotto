@@ -20,7 +20,7 @@ jobs:
       - run: git config --global url."git@github.com:".insteadOf "https://github.com/" && git submodule update --init --recursive
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npx prisma generate --schema=apps/web/prisma/schema.prisma

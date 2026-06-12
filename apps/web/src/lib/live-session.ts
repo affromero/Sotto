@@ -52,13 +52,13 @@ export async function openLiveSession(
 
   const session: Session = await ai.live.connect({
     model: payload.model,
-    // Educational translation aid, NOT a conversational agent. streamTranslationConfig
+    // Educational translation aid, NOT a conversational agent. translationConfig
     // puts the model in pure translation mode: it only ever speaks back the translation
     // of the learner's audio. We deliberately do not enable enableAffectiveDialog or any
     // proactivity, so the model has no agenda of its own and never chats or interrupts.
     config: {
       responseModalities: [Modality.AUDIO],
-      streamTranslationConfig: { targetLanguageCode: payload.targetLanguageCode },
+      translationConfig: { targetLanguageCode: payload.targetLanguageCode },
       inputAudioTranscription: {},
       outputAudioTranscription: {},
     },

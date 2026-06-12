@@ -8,7 +8,7 @@ import {
   scriptVerificationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { markEpisodeFailed } from '@/lib/pipeline-resume';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { verifyScript, type ClaimAnalysis } from '@/lib/script-verifier';

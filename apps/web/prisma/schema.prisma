@@ -2,14 +2,14 @@
 // Interactive Episode Platform
 
 generator client {
-  provider        = "prisma-client-js"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  moduleFormat    = "cjs"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_DATABASE_URL")
   extensions = [vector]
 }
 

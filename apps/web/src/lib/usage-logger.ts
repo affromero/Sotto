@@ -2,6 +2,7 @@
  * Unified API usage logger — single entry point for all provider cost tracking.
  * Replaces the old logApiUsage() from claude.ts with proper model-aware cost computation.
  */
+import type { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { getAiCost } from './pricing';
 import { logger } from './logger';
@@ -40,7 +41,7 @@ export async function logUsage(params: {
           durationMs: params.durationMs ?? null,
           episodeId: params.episodeId ?? null,
           userId: params.userId ?? null,
-          metadata: params.metadata ?? {},
+          metadata: (params.metadata ?? {}) as Prisma.InputJsonValue,
         },
       })
       .catch((err) => {

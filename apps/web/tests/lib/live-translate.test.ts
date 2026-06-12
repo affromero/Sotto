@@ -112,7 +112,7 @@ describe('mintLiveToken', () => {
     expect(result.targetLanguageCode).toBe('de');
     expect(result.nativeLanguageCode).toBe('en');
     const cfg = mockAuthTokensCreate.mock.calls[0][0].config.liveConnectConstraints.config;
-    expect(cfg.streamTranslationConfig.targetLanguageCode).toBe('de');
+    expect(cfg.translationConfig.targetLanguageCode).toBe('de');
     expect(cfg.responseModalities).toEqual(['AUDIO']);
   });
 
@@ -120,7 +120,7 @@ describe('mintLiveToken', () => {
     const result = await mintLiveToken('u1', 'c1', 'target_to_native');
     expect(result.targetLanguageCode).toBe('en');
     const cfg = mockAuthTokensCreate.mock.calls[0][0].config.liveConnectConstraints.config;
-    expect(cfg.streamTranslationConfig.targetLanguageCode).toBe('en');
+    expect(cfg.translationConfig.targetLanguageCode).toBe('en');
   });
 
   it('mints on the v1alpha surface with the resolved BYOK key', async () => {

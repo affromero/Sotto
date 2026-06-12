@@ -6,7 +6,7 @@ import {
   notificationQueue,
   referenceValidationQueue,
 } from '@/lib/queue';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { type ReferenceInput } from '@/lib/reference-validator';

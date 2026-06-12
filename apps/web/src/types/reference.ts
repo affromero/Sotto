@@ -1,4 +1,4 @@
-import { ReferenceType, VerificationStatus } from '@prisma/client';
+import { ReferenceType, VerificationStatus } from '@/generated/prisma/client';
 
 export interface VerificationLayerResult {
   layer: string;
