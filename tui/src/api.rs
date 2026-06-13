@@ -10,6 +10,7 @@
 //! module is `allow(dead_code)` until Phase 4 consumes it.
 #![allow(dead_code)]
 
+use async_trait::async_trait;
 use color_eyre::{Result, eyre::eyre};
 
 /// Generated client + models. The spec path is resolved relative to
@@ -23,6 +24,26 @@ mod generated {
 
 pub(crate) use generated::Client as GeneratedClient;
 pub(crate) use generated::types;
+
+/// The async seam the [`crate::app::App`] dispatches through. Production uses
+/// [`SottoClient`] (the progenitor-backed impl below); tests inject a stub that
+/// returns canned results, so the App's dispatch/reducer logic is exercised
+/// with zero network and no dependence on task-scheduling timing. P5/P6 reuse
+/// this trait to mock new endpoints.
+///
+/// `#[async_trait]` boxes the returned futures so the trait is dyn-compatible
+/// (`Arc<dyn Api>`). Methods return the same generated types the App consumes.
+#[async_trait]
+pub(crate) trait Api: Send + Sync {
+    async fn courses(&self) -> Result<types::CoursesListResponse>;
+    async fn practice_overview(&self, course_id: &str) -> Result<types::PracticeOverviewResponse>;
+    async fn start_vocab_practice(&self, course_id: &str) -> Result<types::StartPracticeResponse>;
+    async fn submit_practice(
+        &self,
+        session_id: &str,
+        answers: Vec<types::SubmitPracticeRequestAnswersItem>,
+    ) -> Result<types::SubmitPracticeResponse>;
+}
 
 /// Thin wrapper over the progenitor-generated [`GeneratedClient`] that bakes in
 /// the configured base URL and a default `Authorization: Bearer <api_key>`
@@ -74,5 +95,76 @@ impl SottoClient {
             .await
             .map_err(|e| eyre!("failed to list courses: {e}"))?;
         Ok(resp.into_inner())
+    }
+
+    /// Fetch the practice overview (due counts + recent sessions) for a course.
+    pub async fn practice_overview(
+        &self,
+        course_id: &str,
+    ) -> Result<types::PracticeOverviewResponse> {
+        let resp = self
+            .inner
+            .get_practice_overview(course_id)
+            .await
+            .map_err(|e| eyre!("failed to load practice overview: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Start a vocabulary review session for a course. The response is a
+    /// discriminated union: `ready` when items are available, otherwise
+    /// `unavailable` with a reason (or another skill's ready shape).
+    pub async fn start_vocab_practice(
+        &self,
+        course_id: &str,
+    ) -> Result<types::StartPracticeResponse> {
+        let body = types::StartPracticeRequest {
+            kind: types::PracticeKind::Vocab,
+        };
+        let resp = self
+            .inner
+            .start_practice(course_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to start vocab review: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Submit graded answers for a practice session and return the score.
+    pub async fn submit_practice(
+        &self,
+        session_id: &str,
+        answers: Vec<types::SubmitPracticeRequestAnswersItem>,
+    ) -> Result<types::SubmitPracticeResponse> {
+        let body = types::SubmitPracticeRequest { answers };
+        let resp = self
+            .inner
+            .submit_practice(session_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to submit practice answers: {e}"))?;
+        Ok(resp.into_inner())
+    }
+}
+
+/// The real implementation of the [`Api`] seam: each method delegates to the
+/// inherent progenitor-backed method above.
+#[async_trait]
+impl Api for SottoClient {
+    async fn courses(&self) -> Result<types::CoursesListResponse> {
+        SottoClient::courses(self).await
+    }
+
+    async fn practice_overview(&self, course_id: &str) -> Result<types::PracticeOverviewResponse> {
+        SottoClient::practice_overview(self, course_id).await
+    }
+
+    async fn start_vocab_practice(&self, course_id: &str) -> Result<types::StartPracticeResponse> {
+        SottoClient::start_vocab_practice(self, course_id).await
+    }
+
+    async fn submit_practice(
+        &self,
+        session_id: &str,
+        answers: Vec<types::SubmitPracticeRequestAnswersItem>,
+    ) -> Result<types::SubmitPracticeResponse> {
+        SottoClient::submit_practice(self, session_id, answers).await
     }
 }

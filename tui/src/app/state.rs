@@ -1,0 +1,742 @@
+//! Pure view-state machine for the vocabulary spaced-repetition loop.
+//!
+//! This module owns the screen state and all the *pure* transitions between
+//! screens: nothing here touches the network or the terminal. The async
+//! [`crate::app::App`] event loop dispatches API calls and feeds their results
+//! back in as [`crate::action::Action`]s, but the resulting state changes are
+//! computed here so they can be unit-tested without a live server.
+//!
+//! View flow:
+//!
+//! ```text
+//! Loading -> Courses(list) -> CourseHome { course, due }
+//!   -> (start vocab) -> VocabReview { ... } -> Result { ... }
+//! ```
+
+use crate::api::types;
+
+/// A single multiple-choice vocabulary item the learner answers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct VocabItem {
+    pub id: String,
+    pub prompt: String,
+    pub options: Vec<String>,
+}
+
+impl From<&types::PracticeItem> for VocabItem {
+    fn from(item: &types::PracticeItem) -> Self {
+        Self {
+            id: item.id.clone(),
+            prompt: item.prompt.clone(),
+            options: item.options.clone(),
+        }
+    }
+}
+
+/// Counts of items due for review on a course, plus the total tracked vocab.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct DueCounts {
+    pub vocab: u32,
+    pub grammar: u32,
+    pub total_vocab: u32,
+}
+
+impl From<&types::PracticeOverviewResponse> for DueCounts {
+    fn from(overview: &types::PracticeOverviewResponse) -> Self {
+        // The contract sends these as JSON numbers (f64 after progenitor); they
+        // are non-negative counts, so clamp + truncate into a display-friendly
+        // unsigned integer.
+        Self {
+            vocab: count(overview.due.vocab),
+            grammar: count(overview.due.grammar),
+            total_vocab: count(overview.total_vocab),
+        }
+    }
+}
+
+fn count(value: f64) -> u32 {
+    if value.is_finite() && value > 0.0 {
+        value as u32
+    } else {
+        0
+    }
+}
+
+/// The course the learner has selected, reduced to what the screens render.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Course {
+    pub id: String,
+    pub title: String,
+    pub native_lang: String,
+    pub target_lang: String,
+    pub current_level: String,
+}
+
+impl From<&types::CourseSummary> for Course {
+    fn from(summary: &types::CourseSummary) -> Self {
+        Self {
+            id: summary.id.clone(),
+            title: summary.curriculum.title.clone(),
+            native_lang: summary.native_lang.clone(),
+            target_lang: summary.target_lang.clone(),
+            current_level: summary.current_level.to_string(),
+        }
+    }
+}
+
+/// Why a practice session could not be started right now (server-reported or
+/// detected locally on ingestion).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Unavailable {
+    NotEnoughVocab,
+    NothingDue,
+    NoContent,
+    /// The server sent a `ready` shape we cannot present (empty items, or an
+    /// item with no answer options). Detected locally; never trusted into a
+    /// review, since a missing option would fabricate an answer.
+    Malformed,
+    /// A `ready` response for a skill the terminal does not handle yet (P6 adds
+    /// grammar/reading/listening/speaking/writing). Carries the friendly skill
+    /// name for the notice.
+    NotInTerminal(&'static str),
+}
+
+impl Unavailable {
+    pub fn message(&self) -> String {
+        match self {
+            Self::NotEnoughVocab => {
+                "Not enough vocabulary yet — keep learning to unlock review.".to_string()
+            }
+            Self::NothingDue => {
+                "Nothing is due for review right now. Check back later.".to_string()
+            }
+            Self::NoContent => "No review content is available for this course yet.".to_string(),
+            Self::Malformed => {
+                "This review came back malformed and was skipped to protect your answers."
+                    .to_string()
+            }
+            Self::NotInTerminal(skill) => {
+                format!("{skill} practice is not available in the terminal yet.")
+            }
+        }
+    }
+}
+
+impl From<types::StartPracticeUnavailableReason> for Unavailable {
+    fn from(reason: types::StartPracticeUnavailableReason) -> Self {
+        match reason {
+            types::StartPracticeUnavailableReason::NotEnoughVocab => Self::NotEnoughVocab,
+            types::StartPracticeUnavailableReason::NothingDue => Self::NothingDue,
+            types::StartPracticeUnavailableReason::NoContent => Self::NoContent,
+        }
+    }
+}
+
+/// Friendly skill name for a practice kind, used in notices.
+fn skill_name(kind: types::PracticeKind) -> &'static str {
+    match kind {
+        types::PracticeKind::Vocab => "Vocabulary",
+        types::PracticeKind::Grammar => "Grammar",
+        types::PracticeKind::Reading => "Reading",
+        types::PracticeKind::Listening => "Listening",
+        types::PracticeKind::Speaking => "Speaking",
+        types::PracticeKind::Writing => "Writing",
+    }
+}
+
+/// What a persistent [`View::Error`] should retry when the learner presses `r`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RetryKind {
+    /// Re-run the initial course list fetch.
+    Courses,
+}
+
+/// The score returned after submitting a completed review.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PracticeResult {
+    pub score: u32,
+    pub correct: u32,
+    pub total: u32,
+}
+
+impl From<&types::SubmitPracticeResponse> for PracticeResult {
+    fn from(resp: &types::SubmitPracticeResponse) -> Self {
+        Self {
+            score: count(resp.score),
+            correct: count(resp.correct),
+            total: count(resp.total),
+        }
+    }
+}
+
+/// The active screen and its state.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum View {
+    /// Initial course fetch in flight.
+    Loading,
+    /// A persistent failure screen that strands no other view: shows `message`
+    /// and offers `r` to retry the `retry` action (and `q`/Esc to quit).
+    Error { message: String, retry: RetryKind },
+    /// The learner's courses, with a cursor for selection.
+    Courses { courses: Vec<Course>, cursor: usize },
+    /// A selected course: due counts plus a single "start vocab review" action.
+    CourseHome {
+        course: Course,
+        due: DueCounts,
+        /// Set when a start attempt came back `unavailable`/malformed.
+        notice: Option<Unavailable>,
+        /// True while a start request for this course is in flight; blocks a
+        /// second start dispatch and shows a "starting…" hint.
+        starting: bool,
+    },
+    /// An in-progress vocabulary review.
+    VocabReview {
+        course: Course,
+        session_id: String,
+        items: Vec<VocabItem>,
+        /// Index of the item currently shown.
+        index: usize,
+        /// Highlighted option for the current item (keyboard cursor).
+        cursor: usize,
+        /// Recorded selection per item; `None` until the learner picks one.
+        selected: Vec<Option<usize>>,
+        /// True while the final submit is in flight; blocks a second submit
+        /// dispatch and shows a "submitting…" hint.
+        submitting: bool,
+    },
+    /// The graded outcome of a completed review.
+    Result {
+        course: Course,
+        result: PracticeResult,
+    },
+}
+
+impl View {
+    /// Build a `Courses` view from generated course summaries.
+    pub fn courses(summaries: &[types::CourseSummary]) -> Self {
+        View::Courses {
+            courses: summaries.iter().map(Course::from).collect(),
+            cursor: 0,
+        }
+    }
+
+    /// A fresh `CourseHome` for `course` with empty due counts.
+    pub fn course_home(course: Course) -> Self {
+        View::CourseHome {
+            course,
+            due: DueCounts::default(),
+            notice: None,
+            starting: false,
+        }
+    }
+
+    /// Start a vocab review from a validated `ready` start-practice response.
+    pub fn start_vocab(course: Course, session_id: String, items: Vec<VocabItem>) -> Self {
+        let selected = vec![None; items.len()];
+        View::VocabReview {
+            course,
+            session_id,
+            items,
+            index: 0,
+            cursor: 0,
+            selected,
+            submitting: false,
+        }
+    }
+}
+
+/// Reduce a start-practice response against the current `CourseHome` view.
+///
+/// Routing is kind-aware so later phases plug in cleanly:
+/// - `ready` with `kind = VOCAB` and well-formed items → `VocabReview`.
+/// - `ready` with any other kind → a "not available in the terminal yet"
+///   notice on `CourseHome` (P6 will add those skills).
+/// - `ready` that is empty or has a zero-option item → a `Malformed` notice;
+///   we never enter a review we cannot answer honestly.
+/// - `unavailable` → the server's reason as a notice.
+/// - speaking/writing ready shapes → a not-in-terminal notice.
+///
+/// In every non-review case the learner stays on `CourseHome` (the start
+/// in-flight flag is cleared). If `view` is not a `CourseHome`, it is returned
+/// unchanged (the learner navigated away before the response arrived).
+pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> View {
+    let View::CourseHome { course, due, .. } = view else {
+        return view;
+    };
+
+    match resp {
+        types::StartPracticeResponse::Ready(ready) => match ready.kind {
+            types::PracticeKind::Vocab => match validate_vocab_items(&ready.items) {
+                Some(items) => View::start_vocab(course, ready.session_id.clone(), items),
+                None => course_home_notice(course, due, Unavailable::Malformed),
+            },
+            other => course_home_notice(course, due, Unavailable::NotInTerminal(skill_name(other))),
+        },
+        types::StartPracticeResponse::Unavailable(unavailable) => {
+            course_home_notice(course, due, Unavailable::from(unavailable.reason))
+        }
+        // VOCAB never resolves to a speaking/writing shape, but route the same
+        // not-in-terminal way rather than crashing if the server ever does.
+        types::StartPracticeResponse::ReadySpeaking(_) => course_home_notice(
+            course,
+            due,
+            Unavailable::NotInTerminal(skill_name(types::PracticeKind::Speaking)),
+        ),
+        types::StartPracticeResponse::ReadyWriting(_) => course_home_notice(
+            course,
+            due,
+            Unavailable::NotInTerminal(skill_name(types::PracticeKind::Writing)),
+        ),
+    }
+}
+
+/// Validate a `ready` vocab payload before it becomes a review. Returns the
+/// converted items only when the set is non-empty and every item has at least
+/// one answer option; otherwise `None` (malformed). A zero-option item would
+/// let Enter record a fabricated answer, so it is rejected here at ingestion.
+fn validate_vocab_items(items: &[types::PracticeItem]) -> Option<Vec<VocabItem>> {
+    if items.is_empty() {
+        return None;
+    }
+    if items.iter().any(|item| item.options.is_empty()) {
+        return None;
+    }
+    Some(items.iter().map(VocabItem::from).collect())
+}
+
+fn course_home_notice(course: Course, due: DueCounts, reason: Unavailable) -> View {
+    View::CourseHome {
+        course,
+        due,
+        notice: Some(reason),
+        starting: false,
+    }
+}
+
+/// Whether a course's due counts allow starting a vocab review at all. We let
+/// the learner attempt a review when there is due vocab *or* any tracked vocab
+/// (the server decides for sure and may still answer `unavailable`).
+pub(crate) fn can_review_vocab(due: &DueCounts) -> bool {
+    due.vocab > 0 || due.total_vocab > 0
+}
+
+/// Outcome of recording an answer for the current vocab item.
+///
+/// Not `PartialEq`: the generated [`types::SubmitPracticeRequestAnswersItem`]
+/// payload does not implement it. Tests match on the variant instead.
+#[derive(Clone, Debug)]
+pub(crate) enum AnswerStep {
+    /// Advanced to the next item.
+    Advanced,
+    /// That was the last item; the caller should submit the built payload. The
+    /// `Result` carries an error instead of a partial payload when any answer
+    /// fails id validation, so a malformed id is surfaced rather than silently
+    /// dropped.
+    Submit(Result<Vec<types::SubmitPracticeRequestAnswersItem>, String>),
+}
+
+/// Move the option cursor up within the current item, saturating at 0.
+pub(crate) fn cursor_up(cursor: usize) -> usize {
+    cursor.saturating_sub(1)
+}
+
+/// Move the option cursor down within the current item, clamped to the last
+/// option.
+pub(crate) fn cursor_down(cursor: usize, option_count: usize) -> usize {
+    let last = option_count.saturating_sub(1);
+    (cursor + 1).min(last)
+}
+
+/// Move the list cursor up within `len` items, saturating at 0.
+pub(crate) fn list_up(cursor: usize) -> usize {
+    cursor.saturating_sub(1)
+}
+
+/// Move the list cursor down within `len` items, clamped to the last index.
+pub(crate) fn list_down(cursor: usize, len: usize) -> usize {
+    let last = len.saturating_sub(1);
+    (cursor + 1).min(last)
+}
+
+/// Record `choice` for the item at `index`, advance to the next item, and
+/// return whether more items remain or the answers are ready to submit.
+///
+/// `selected` is mutated in place; `index`/`cursor` are returned to the caller
+/// so the view can update its own copies. The returned [`AnswerStep::Submit`]
+/// payload is built from `items` + the just-updated `selected`, so callers do
+/// not reconstruct it.
+pub(crate) fn answer_current(
+    items: &[VocabItem],
+    selected: &mut [Option<usize>],
+    index: usize,
+    choice: usize,
+) -> AnswerStep {
+    if index < selected.len() {
+        selected[index] = Some(choice);
+    }
+
+    if index + 1 < items.len() {
+        AnswerStep::Advanced
+    } else {
+        AnswerStep::Submit(build_answers(items, selected))
+    }
+}
+
+/// Build the `submit` request payload from items and their recorded selections.
+///
+/// Items the learner skipped (no recorded selection) are omitted — that is a
+/// legitimate "no answer", not corruption. But if an *answered* item carries an
+/// id the contract rejects, this returns `Err` rather than dropping it: a
+/// partial payload would silently misgrade the session, so the caller surfaces
+/// the error instead of submitting.
+pub(crate) fn build_answers(
+    items: &[VocabItem],
+    selected: &[Option<usize>],
+) -> Result<Vec<types::SubmitPracticeRequestAnswersItem>, String> {
+    let mut answers = Vec::new();
+    for (item, choice) in items.iter().zip(selected.iter()) {
+        let Some(choice) = *choice else {
+            continue;
+        };
+        let item_id = types::SubmitPracticeRequestAnswersItemItemId::try_from(item.id.clone())
+            .map_err(|e| format!("invalid item id {:?}: {e}", item.id))?;
+        answers.push(types::SubmitPracticeRequestAnswersItem {
+            item_id,
+            selected_index: choice as i64,
+        });
+    }
+    Ok(answers)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(id: &str, options: &[&str]) -> VocabItem {
+        VocabItem {
+            id: id.to_string(),
+            prompt: format!("prompt for {id}"),
+            options: options.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    fn course() -> Course {
+        Course {
+            id: "c1".into(),
+            title: "Spanish".into(),
+            native_lang: "en".into(),
+            target_lang: "es".into(),
+            current_level: "A2".into(),
+        }
+    }
+
+    fn course_home() -> View {
+        View::CourseHome {
+            course: course(),
+            due: DueCounts {
+                vocab: 4,
+                grammar: 0,
+                total_vocab: 12,
+            },
+            notice: None,
+            starting: false,
+        }
+    }
+
+    /// Deserialize a `StartPracticeResponse` from JSON. The generated type is a
+    /// `status`-discriminated union, so this exercises the real decoder rather
+    /// than hand-constructing variants.
+    fn start_response(json: serde_json::Value) -> types::StartPracticeResponse {
+        serde_json::from_value(json).expect("valid StartPracticeResponse JSON")
+    }
+
+    #[test]
+    fn answering_a_non_final_item_advances() {
+        let items = vec![item("v1", &["a", "b"]), item("v2", &["c", "d"])];
+        let mut selected = vec![None; items.len()];
+
+        let step = answer_current(&items, &mut selected, 0, 1);
+
+        assert!(matches!(step, AnswerStep::Advanced));
+        assert_eq!(selected, vec![Some(1), None]);
+    }
+
+    #[test]
+    fn answering_the_final_item_yields_a_submit_payload() {
+        let items = vec![item("v1", &["a", "b"]), item("v2", &["c", "d"])];
+        let mut selected = vec![Some(0), None];
+
+        let step = answer_current(&items, &mut selected, 1, 1);
+
+        match step {
+            AnswerStep::Submit(Ok(answers)) => {
+                assert_eq!(answers.len(), 2);
+                assert_eq!(&*answers[0].item_id, "v1");
+                assert_eq!(answers[0].selected_index, 0);
+                assert_eq!(&*answers[1].item_id, "v2");
+                assert_eq!(answers[1].selected_index, 1);
+            }
+            other => panic!("expected Submit(Ok), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_answers_skips_unanswered_items() {
+        let items = vec![
+            item("v1", &["a", "b"]),
+            item("v2", &["c", "d"]),
+            item("v3", &["e", "f"]),
+        ];
+        // Only the first and third items were answered.
+        let selected = vec![Some(1), None, Some(0)];
+
+        let answers = build_answers(&items, &selected).expect("valid ids");
+
+        assert_eq!(answers.len(), 2);
+        assert_eq!(&*answers[0].item_id, "v1");
+        assert_eq!(answers[0].selected_index, 1);
+        assert_eq!(&*answers[1].item_id, "v3");
+        assert_eq!(answers[1].selected_index, 0);
+    }
+
+    #[test]
+    fn build_answers_errors_on_an_answered_item_with_an_invalid_id() {
+        // The id newtype rejects empty strings (minLength: 1). An *answered*
+        // item with such an id must error, not be silently dropped.
+        let items = vec![item("v1", &["a", "b"]), item("", &["c", "d"])];
+        let selected = vec![Some(0), Some(1)];
+
+        let result = build_answers(&items, &selected);
+
+        assert!(result.is_err(), "expected an error, got {result:?}");
+    }
+
+    #[test]
+    fn start_vocab_seeds_one_selection_slot_per_item() {
+        let course = Course {
+            id: "c1".into(),
+            title: "Spanish".into(),
+            native_lang: "en".into(),
+            target_lang: "es".into(),
+            current_level: "A2".into(),
+        };
+        let items = vec![item("v1", &["a", "b"]), item("v2", &["c", "d"])];
+
+        let view = View::start_vocab(course, "sess-1".into(), items.clone());
+
+        match view {
+            View::VocabReview {
+                index,
+                cursor,
+                selected,
+                items: view_items,
+                session_id,
+                ..
+            } => {
+                assert_eq!(index, 0);
+                assert_eq!(cursor, 0);
+                assert_eq!(session_id, "sess-1");
+                assert_eq!(view_items, items);
+                assert_eq!(selected, vec![None, None]);
+            }
+            other => panic!("expected VocabReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn can_review_vocab_requires_due_or_tracked_vocab() {
+        assert!(!can_review_vocab(&DueCounts::default()));
+        assert!(can_review_vocab(&DueCounts {
+            vocab: 3,
+            grammar: 0,
+            total_vocab: 0,
+        }));
+        assert!(can_review_vocab(&DueCounts {
+            vocab: 0,
+            grammar: 0,
+            total_vocab: 10,
+        }));
+        // Grammar-only due does not enable the vocab review.
+        assert!(!can_review_vocab(&DueCounts {
+            vocab: 0,
+            grammar: 5,
+            total_vocab: 0,
+        }));
+    }
+
+    #[test]
+    fn unavailable_maps_reason_to_a_clear_message() {
+        let cases = [
+            (
+                types::StartPracticeUnavailableReason::NotEnoughVocab,
+                Unavailable::NotEnoughVocab,
+            ),
+            (
+                types::StartPracticeUnavailableReason::NothingDue,
+                Unavailable::NothingDue,
+            ),
+            (
+                types::StartPracticeUnavailableReason::NoContent,
+                Unavailable::NoContent,
+            ),
+        ];
+        for (reason, expected) in cases {
+            let mapped = Unavailable::from(reason);
+            assert_eq!(mapped, expected);
+            assert!(!mapped.message().is_empty());
+        }
+    }
+
+    #[test]
+    fn option_cursor_clamps_at_bounds() {
+        assert_eq!(cursor_up(0), 0);
+        assert_eq!(cursor_up(2), 1);
+        assert_eq!(cursor_down(0, 3), 1);
+        assert_eq!(cursor_down(2, 3), 2); // already at last option
+        assert_eq!(cursor_down(0, 0), 0); // no options
+    }
+
+    #[test]
+    fn list_cursor_clamps_at_bounds() {
+        assert_eq!(list_up(0), 0);
+        assert_eq!(list_up(2), 1);
+        assert_eq!(list_down(0, 3), 1);
+        assert_eq!(list_down(2, 3), 2);
+        assert_eq!(list_down(0, 0), 0);
+    }
+
+    #[test]
+    fn ready_start_response_enters_vocab_review() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-42",
+            "kind": "VOCAB",
+            "items": [
+                { "id": "v1", "prompt": "casa", "options": ["house", "dog"] },
+                { "id": "v2", "prompt": "perro", "options": ["cat", "dog"] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::VocabReview {
+                session_id,
+                items,
+                index,
+                cursor,
+                selected,
+                ..
+            } => {
+                assert_eq!(session_id, "sess-42");
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0].prompt, "casa");
+                assert_eq!(index, 0);
+                assert_eq!(cursor, 0);
+                assert_eq!(selected, vec![None, None]);
+            }
+            other => panic!("expected VocabReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unavailable_start_response_stays_on_course_home_with_reason() {
+        let resp = start_response(serde_json::json!({
+            "status": "unavailable",
+            "reason": "nothing_due"
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, due, .. } => {
+                assert_eq!(notice, Some(Unavailable::NothingDue));
+                // Due counts are preserved across the failed start.
+                assert_eq!(due.vocab, 4);
+                assert_eq!(due.total_vocab, 12);
+            }
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn empty_ready_start_response_is_treated_as_malformed() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-empty",
+            "kind": "VOCAB",
+            "items": []
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => {
+                assert_eq!(notice, Some(Unavailable::Malformed));
+            }
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ready_with_a_zero_option_item_is_rejected_as_malformed() {
+        // A zero-option item would let Enter fabricate an answer; reject it at
+        // ingestion instead of entering the review.
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-bad",
+            "kind": "VOCAB",
+            "items": [
+                { "id": "v1", "prompt": "casa", "options": ["house", "dog"] },
+                { "id": "v2", "prompt": "perro", "options": [] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => {
+                assert_eq!(notice, Some(Unavailable::Malformed));
+            }
+            other => panic!("expected CourseHome (malformed), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn non_vocab_ready_routes_to_not_in_terminal_notice_not_review() {
+        // P6 adds the other skills; for now a non-VOCAB ready stays on
+        // CourseHome with a clear notice rather than entering VocabReview.
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-grammar",
+            "kind": "GRAMMAR",
+            "items": [
+                { "id": "g1", "prompt": "conjugate", "options": ["soy", "es"] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => match notice {
+                Some(Unavailable::NotInTerminal(skill)) => assert_eq!(skill, "Grammar"),
+                other => panic!("expected NotInTerminal notice, got {other:?}"),
+            },
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn start_response_is_ignored_when_not_on_course_home() {
+        // The learner navigated to the course list before the response landed.
+        let view = View::courses(&[]);
+        let resp = start_response(serde_json::json!({
+            "status": "unavailable",
+            "reason": "no_content"
+        }));
+
+        let next = reduce_start(view.clone(), &resp);
+
+        assert_eq!(next, view);
+    }
+}
