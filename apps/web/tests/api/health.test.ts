@@ -330,7 +330,6 @@ describe('GET /api/v1/health', () => {
 
   it('includes env var map in response', async () => {
     process.env.DATABASE_URL = 'postgresql://test';
-    process.env.AUTH_SECRET = 'secret';
     process.env.CF_API_TOKEN = 'test-token';
     delete process.env.ANTHROPIC_API_KEY;
 
@@ -338,21 +337,8 @@ describe('GET /api/v1/health', () => {
     const body = await response.json();
 
     expect(body.env.DATABASE_URL).toBe(true);
-    expect(body.env.AUTH_SECRET).toBe(true);
     expect(body.env.ANTHROPIC_API_KEY).toBe(false);
     expect(body.env.CF_API_TOKEN).toBe(true);
-  });
-
-  it('includes oauth provider map in response', async () => {
-    process.env.GOOGLE_CLIENT_ID = 'g-id';
-    process.env.GOOGLE_CLIENT_SECRET = 'g-secret';
-    delete process.env.APPLE_CLIENT_ID;
-
-    const response = await GET();
-    const body = await response.json();
-
-    expect(body.oauth.google).toBe(true);
-    expect(body.oauth.apple).toBe(false);
   });
 
   it('includes vapid flag in response', async () => {

@@ -78,11 +78,9 @@ wait_for_service redis "redis-cli ping | grep -q PONG"
 # Generate .env.local if not exists
 if [ ! -f "$ENV_FILE" ]; then
   echo "Generating .env.local..."
-  AUTH_SECRET=$(openssl rand -base64 32)
   BYOK_ENCRYPTION_KEY=$(openssl rand -hex 32)
 
   cp "$ENV_TEMPLATE" "$ENV_FILE"
-  set_env_value AUTH_SECRET "$AUTH_SECRET"
   set_env_value BYOK_ENCRYPTION_KEY "$BYOK_ENCRYPTION_KEY"
 
   echo "  Created .env.local with auto-generated secrets"

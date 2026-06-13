@@ -188,7 +188,7 @@ describe('open-source language-learning OSS surfaces', () => {
       .map(readSource)
       .join('\n');
 
-    expect(runtimeUrlSources).toContain('NEXT_PUBLIC_APP_URL or NEXTAUTH_URL is required');
+    expect(runtimeUrlSources).toContain('NEXT_PUBLIC_APP_URL is required');
     expect(runtimeUrlSources).toContain('getPublicAppBaseUrl');
     expect(runtimeUrlSources).not.toContain('https://sotto.fm');
     expect(runtimeUrlSources).not.toContain("|| 'https://sotto.fm'");
@@ -204,10 +204,8 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/episode/[episodeId]/page.tsx',
       'src/components/landing/JsonLd.tsx',
       'src/app/api/v1/admin/invitations/route.ts',
-      'src/app/api/v1/users/unsubscribe/route.ts',
       'src/lib/extractors/index.ts',
       'src/lib/extractors/html.ts',
-      'src/lib/email-templates.ts',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
     ]
       .map(readSource)
@@ -233,7 +231,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSource).toContain('compose up -d postgres redis');
     expect(setupSource).toContain('bash "$SCRIPT_DIR/install-deps.sh" --node --docker --ffmpeg');
     expect(setupSource).toContain('Fastest path: set OPENAI_API_KEY');
-    expect(setupSource).toContain('set_env_value AUTH_SECRET "$AUTH_SECRET"');
     expect(setupSource).not.toContain('uv sync --group pitch');
     expect(setupSource).not.toContain('AI_PROVIDER="anthropic"');
     expect(setupSource).not.toContain('docker-compose up -d');
@@ -292,7 +289,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(envExample).toContain('Use your own secret manager');
     expect(envExample).toContain('copy .env.oss.example to .env.local');
-    expect(envTemplateSources).toContain('AUTH_SECRET');
     expect(envTemplateSources).not.toContain('NEXTAUTH_SECRET');
     expect(envTemplateSources).not.toContain('dashboard.doppler.com/workplace/projects/sotto');
     expect(envTemplateSources).not.toContain('doppler secrets download');
@@ -301,29 +297,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(envTemplateSources).not.toContain('Use the apex domain (sotto.fm)');
     expect(envTemplateSources).not.toContain('DNS domain verification for sotto.fm');
     expect(envTemplateSources).not.toContain('Doppler dev/prd configs');
-  });
-
-  it('uses AUTH_SECRET as the only runtime session secret', () => {
-    const authSecretSources = [
-      'apps/web/src/lib/auth.ts',
-      'apps/web/src/middleware.ts',
-      'apps/web/src/lib/email-templates.ts',
-      'apps/web/src/app/api/v1/users/unsubscribe/route.ts',
-      'apps/web/src/lib/health.ts',
-      'docs/02-authentication-setup.md',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-
-    expect(authSecretSources).toContain('process.env.AUTH_SECRET');
-    expect(authSecretSources).toContain('AUTH_SECRET is required');
-    expect(authSecretSources).not.toContain('NEXTAUTH_SECRET');
-    expect(authSecretSources).not.toContain('AUTH_SECRET ??');
-    expect(authSecretSources).not.toContain('AUTH_SECRET ||');
-    expect(authSecretSources).not.toContain('Secret fallback');
-    expect(authSecretSources).not.toContain('Legacy name');
-    expect(authSecretSources).not.toContain('via Doppler');
-    expect(authSecretSources).not.toContain('doppler run --');
   });
 
   it('keeps runtime infrastructure surfaces free of hosted defaults', () => {
@@ -400,7 +373,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
       'apps/web/src/components/layout/Footer.tsx',
-      'apps/web/src/lib/email-templates.ts',
       'apps/web/src/workers/CLAUDE.md',
       'packages/shared/src/brand.ts',
     ]
@@ -471,7 +443,6 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps security and operations guidance self-host neutral', () => {
     const releaseHygieneSources = [
       'SECURITY.md',
-      'scripts/generate-apple-secret.mjs',
       'CLAUDE.md',
       'docs/05-local-development.md',
       'apps/web/src/lib/CLAUDE.md',
@@ -484,8 +455,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
-    expect(releaseHygieneSources).toContain('secret manager or env file');
-    expect(releaseHygieneSources).toContain('Set in your deployment environment:');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
     expect(releaseHygieneSources).not.toContain('sotto.fm/api');
     expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');

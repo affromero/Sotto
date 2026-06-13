@@ -1,4 +1,4 @@
-const APP_BASE_URL_ENV_NAMES = ['NEXT_PUBLIC_APP_URL', 'NEXTAUTH_URL'] as const;
+const APP_BASE_URL_ENV_NAMES = ['NEXT_PUBLIC_APP_URL'] as const;
 
 export class AppUrlConfigurationError extends Error {
   constructor(message: string) {
@@ -45,7 +45,7 @@ export function getAppBaseUrl(env: AppUrlEnv = process.env): string {
   }
 
   throw new AppUrlConfigurationError(
-    'NEXT_PUBLIC_APP_URL or NEXTAUTH_URL is required to generate absolute Sotto URLs.'
+    'NEXT_PUBLIC_APP_URL is required to generate absolute Sotto URLs.'
   );
 }
 
@@ -54,7 +54,7 @@ export function getPublicAppBaseUrl(env: AppUrlEnv = process.env): string {
   const parsed = new URL(appUrl);
   if (parsed.protocol !== 'https:') {
     throw new AppUrlConfigurationError(
-      'NEXT_PUBLIC_APP_URL or NEXTAUTH_URL must use https for public bot links.'
+      'NEXT_PUBLIC_APP_URL must use https for public bot links.'
     );
   }
   return appUrl;
