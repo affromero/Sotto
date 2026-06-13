@@ -759,6 +759,201 @@ pub(crate) enum FlowKind {
     Exam,
 }
 
+// ===========================================================================
+// Placement, memory graph, onboarding/settings (P6d).
+// ===========================================================================
+
+/// Selectable languages for the placement picker: ISO 639-1 code + display
+/// name. Mirrors the common subset of `@sotto/shared` LANGUAGE_DISPLAY; the
+/// placement route accepts any 2-letter code, so this is a convenience list.
+pub(crate) const LANGUAGES: &[(&str, &str)] = &[
+    ("en", "English"),
+    ("es", "Spanish"),
+    ("fr", "French"),
+    ("de", "German"),
+    ("pt", "Portuguese"),
+    ("it", "Italian"),
+    ("ja", "Japanese"),
+    ("ko", "Korean"),
+    ("zh", "Chinese"),
+    ("ar", "Arabic"),
+    ("hi", "Hindi"),
+    ("ru", "Russian"),
+    ("nl", "Dutch"),
+    ("sv", "Swedish"),
+    ("pl", "Polish"),
+    ("tr", "Turkish"),
+    ("uk", "Ukrainian"),
+    ("el", "Greek"),
+    ("vi", "Vietnamese"),
+    ("id", "Indonesian"),
+];
+
+/// Which column of the placement language picker is focused.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LangColumn {
+    Native,
+    Target,
+}
+
+/// One placement question (the public MC projection). Reuses the same shape as
+/// a [`ClassQuestion`] so it renders through the shared MC machinery.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PlacementQuestion {
+    pub id: String,
+    pub prompt: String,
+    pub options: Vec<String>,
+}
+
+impl From<&types::PlacementQuestion> for PlacementQuestion {
+    fn from(q: &types::PlacementQuestion) -> Self {
+        // Surface the CEFR band + skill in the prompt for context.
+        let prompt = format!("[{} · {}] {}", q.cefr, q.skill, q.prompt);
+        Self {
+            id: q.id.clone(),
+            prompt,
+            options: q.options.clone(),
+        }
+    }
+}
+
+/// Validate + convert a generated placement batch. Returns `None` (malformed)
+/// when there are no questions or any question has no answer options.
+pub(crate) fn placement_questions(
+    resp: &types::GeneratePlacementResponse,
+) -> Option<Vec<PlacementQuestion>> {
+    if resp.questions.is_empty() {
+        return None;
+    }
+    if resp.questions.iter().any(|q| q.options.is_empty()) {
+        return None;
+    }
+    Some(resp.questions.iter().map(PlacementQuestion::from).collect())
+}
+
+/// Build the placement submit payload from questions + recorded selections.
+/// Unanswered questions are omitted; an answered question whose id is empty
+/// errors rather than being silently dropped (the contract requires non-empty
+/// ids; a partial payload would misgrade).
+pub(crate) fn build_placement_answers(
+    questions: &[PlacementQuestion],
+    selected: &[Option<usize>],
+) -> Result<Vec<types::SubmitPlacementRequestAnswersItem>, String> {
+    let mut answers = Vec::new();
+    for (q, choice) in questions.iter().zip(selected.iter()) {
+        if let Some(idx) = choice {
+            if q.id.is_empty() {
+                return Err("a placement answer has an empty question id".to_string());
+            }
+            answers.push(types::SubmitPlacementRequestAnswersItem {
+                id: q.id.clone(),
+                selected_index: *idx as i64,
+            });
+        }
+    }
+    Ok(answers)
+}
+
+/// The assessed outcome of a submitted placement: the created/updated course id,
+/// the CEFR level, and per-skill ratios (0..100 percentages, sorted by skill).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PlacementOutcome {
+    pub course_id: String,
+    pub level: String,
+    pub score_by_skill: Vec<(String, u32)>,
+}
+
+impl From<&types::SubmitPlacementResponse> for PlacementOutcome {
+    fn from(r: &types::SubmitPlacementResponse) -> Self {
+        let mut score_by_skill: Vec<(String, u32)> = r
+            .score_by_skill
+            .iter()
+            .map(|(k, v)| (k.clone(), pct(*v)))
+            .collect();
+        score_by_skill.sort_by(|a, b| a.0.cmp(&b.0));
+        Self {
+            course_id: r.course_id.clone(),
+            level: r.level.to_string(),
+            score_by_skill,
+        }
+    }
+}
+
+/// One memory-graph node, reduced to what the read-only memory screen renders.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct MemoryItem {
+    /// "vocab" or "grammar".
+    pub kind: String,
+    pub label: String,
+    pub translation: Option<String>,
+    /// Mastery, as a 0..100 percentage.
+    pub mastery: u32,
+    pub due: bool,
+}
+
+/// Convert a memory graph into a sorted, renderable item list: vocab first,
+/// then grammar; within each, due items first, then by descending mastery.
+pub(crate) fn memory_items(graph: &types::MemoryGraphResponse) -> Vec<MemoryItem> {
+    let mut items: Vec<MemoryItem> = graph
+        .nodes
+        .iter()
+        .map(|n| MemoryItem {
+            kind: match n.kind {
+                types::MemoryNodeKind::Vocab => "vocab".to_string(),
+                types::MemoryNodeKind::Grammar => "grammar".to_string(),
+            },
+            label: n.label.clone(),
+            translation: n.translation.clone(),
+            mastery: pct(n.strength),
+            due: n.due,
+        })
+        .collect();
+    // Rank vocab before grammar (not alphabetical, which would invert them).
+    let rank = |kind: &str| if kind == "vocab" { 0 } else { 1 };
+    items.sort_by(|a, b| {
+        rank(&a.kind)
+            .cmp(&rank(&b.kind))
+            .then(b.due.cmp(&a.due))
+            .then(b.mastery.cmp(&a.mastery))
+            .then(a.label.cmp(&b.label))
+    });
+    items
+}
+
+/// The non-secret instance/owner config the settings screen renders.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ConfigView {
+    pub self_hosted: bool,
+    pub is_owner: bool,
+    /// Present only when self-hosted AND the user is the owner.
+    pub infra: Option<ConfigInfra>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ConfigInfra {
+    pub ai_provider: Option<String>,
+    pub ai_model: Option<String>,
+    pub stt_provider: Option<String>,
+    pub tts_provider: Option<String>,
+    pub storage_provider: Option<String>,
+}
+
+impl From<&types::OnboardingConfigResponse> for ConfigView {
+    fn from(c: &types::OnboardingConfigResponse) -> Self {
+        Self {
+            self_hosted: c.self_hosted,
+            is_owner: c.is_owner,
+            infra: c.infra.as_ref().map(|i| ConfigInfra {
+                ai_provider: i.ai_provider.clone(),
+                ai_model: i.ai_model.clone(),
+                stt_provider: i.stt_provider.clone(),
+                tts_provider: i.tts_provider.clone(),
+                storage_provider: i.storage_provider.clone(),
+            }),
+        }
+    }
+}
+
 /// The active screen and its state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum View {
@@ -863,6 +1058,44 @@ pub(crate) enum View {
     },
     /// The graded band/score outcome of a submitted exam.
     ExamOutcome { course: Course, result: ExamResult },
+
+    // --- Placement / memory / settings (P6d) ---
+    /// Pick the native + target languages before placement. Two columns; the
+    /// focused one is `column`, with per-column cursors.
+    PlacementLang {
+        native_cursor: usize,
+        target_cursor: usize,
+        column: LangColumn,
+        /// True while the placement-questions request is in flight.
+        loading: bool,
+    },
+    /// Answer the generated placement MC questions (reuses the MC machinery).
+    PlacementReview {
+        native: String,
+        target: String,
+        questions: Vec<PlacementQuestion>,
+        index: usize,
+        cursor: usize,
+        selected: Vec<Option<usize>>,
+        prompt_scroll: u16,
+        /// True while the placement submit is in flight.
+        submitting: bool,
+    },
+    /// The assessed CEFR level + created course, before landing in the course.
+    PlacementResult { outcome: PlacementOutcome },
+    /// Read-only memory graph (vocab + grammar) for a course.
+    Memory {
+        course: Course,
+        /// `None` while the graph load is in flight.
+        items: Option<Vec<MemoryItem>>,
+        /// Scroll offset into the list.
+        scroll: usize,
+    },
+    /// Read-only instance/owner settings (onboarding config).
+    Settings {
+        /// `None` while the config load is in flight.
+        config: Option<ConfigView>,
+    },
 }
 
 impl View {
@@ -964,6 +1197,36 @@ impl View {
             exam_id: None,
             sections: None,
             cursor: 0,
+            submitting: false,
+        }
+    }
+
+    /// Enter the placement language picker (defaults: native English, target
+    /// Spanish — the learner adjusts both).
+    pub fn placement_lang() -> Self {
+        View::PlacementLang {
+            native_cursor: 0,
+            target_cursor: 1,
+            column: LangColumn::Native,
+            loading: false,
+        }
+    }
+
+    /// Begin a placement review from a validated question batch.
+    pub fn placement_review(
+        native: String,
+        target: String,
+        questions: Vec<PlacementQuestion>,
+    ) -> Self {
+        let selected = vec![None; questions.len()];
+        View::PlacementReview {
+            native,
+            target,
+            questions,
+            index: 0,
+            cursor: 0,
+            selected,
+            prompt_scroll: 0,
             submitting: false,
         }
     }
@@ -1267,8 +1530,10 @@ pub(crate) fn answer_current(
 /// last question (so the section is complete). Used by the class MC/listening
 /// sections, whose answers are collected later by [`collect_class_answers`]
 /// rather than built into a payload here. Pure.
+/// `total` is the question count (the question type itself is irrelevant — only
+/// the count matters), so class and placement MC reviews share this helper.
 pub(crate) fn answer_current_choice(
-    questions: &[ClassQuestion],
+    total: usize,
     selected: &mut [Option<usize>],
     index: usize,
     choice: usize,
@@ -1276,7 +1541,7 @@ pub(crate) fn answer_current_choice(
     if index < selected.len() {
         selected[index] = Some(choice);
     }
-    index + 1 >= questions.len()
+    index + 1 >= total
 }
 
 /// Build the `submit` request payload from items and their recorded selections.
@@ -2203,22 +2468,11 @@ mod tests {
 
     #[test]
     fn answer_current_choice_records_and_flags_the_last_question() {
-        let qs = vec![
-            ClassQuestion {
-                id: "q0".into(),
-                prompt: "a".into(),
-                options: vec!["x".into(), "y".into()],
-            },
-            ClassQuestion {
-                id: "q1".into(),
-                prompt: "b".into(),
-                options: vec!["x".into(), "y".into()],
-            },
-        ];
+        // Two questions: answering index 0 is not the last; index 1 is.
         let mut selected = vec![None, None];
-        assert!(!answer_current_choice(&qs, &mut selected, 0, 1));
+        assert!(!answer_current_choice(2, &mut selected, 0, 1));
         assert_eq!(selected, vec![Some(1), None]);
-        assert!(answer_current_choice(&qs, &mut selected, 1, 0));
+        assert!(answer_current_choice(2, &mut selected, 1, 0));
         assert_eq!(selected, vec![Some(1), Some(0)]);
     }
 
@@ -2397,5 +2651,140 @@ mod tests {
         assert_eq!(result.sections[0].skill, "GRAMMAR");
         assert_eq!(result.sections[0].score, 80);
         assert_eq!(result.sections[1].score, 60);
+    }
+
+    // --- P6d: placement / memory / settings --------------------------------
+
+    fn placement_response(json: serde_json::Value) -> types::GeneratePlacementResponse {
+        serde_json::from_value(json).expect("valid placement JSON")
+    }
+
+    #[test]
+    fn placement_questions_convert_with_cefr_and_skill_in_the_prompt() {
+        let resp = placement_response(serde_json::json!({
+            "native": "en", "target": "es",
+            "questions": [
+                { "id": "pq_0", "cefr": "A2", "skill": "grammar", "prompt": "Choose", "options": ["el","la"] }
+            ]
+        }));
+        let qs = placement_questions(&resp).expect("well-formed");
+        assert_eq!(qs.len(), 1);
+        assert_eq!(qs[0].id, "pq_0");
+        assert!(qs[0].prompt.contains("A2"));
+        assert!(qs[0].prompt.contains("grammar"));
+        assert!(qs[0].prompt.contains("Choose"));
+    }
+
+    #[test]
+    fn empty_placement_batch_is_malformed() {
+        let resp = placement_response(serde_json::json!({
+            "native": "en", "target": "es", "questions": []
+        }));
+        assert!(placement_questions(&resp).is_none());
+    }
+
+    #[test]
+    fn placement_question_with_no_options_is_malformed() {
+        let resp = placement_response(serde_json::json!({
+            "native": "en", "target": "es",
+            "questions": [{ "id": "pq_0", "cefr": "A1", "skill": "vocab", "prompt": "?", "options": [] }]
+        }));
+        assert!(placement_questions(&resp).is_none());
+    }
+
+    #[test]
+    fn build_placement_answers_omits_unanswered_questions() {
+        let qs = vec![
+            PlacementQuestion {
+                id: "pq_0".into(),
+                prompt: "a".into(),
+                options: vec!["x".into(), "y".into()],
+            },
+            PlacementQuestion {
+                id: "pq_1".into(),
+                prompt: "b".into(),
+                options: vec!["x".into(), "y".into()],
+            },
+        ];
+        let selected = vec![Some(1), None];
+        let answers = build_placement_answers(&qs, &selected).expect("valid");
+        assert_eq!(answers.len(), 1);
+        assert_eq!(answers[0].id, "pq_0");
+        assert_eq!(answers[0].selected_index, 1);
+    }
+
+    #[test]
+    fn placement_outcome_converts_level_and_sorted_skill_percentages() {
+        let resp: types::SubmitPlacementResponse = serde_json::from_value(serde_json::json!({
+            "courseId": "c-new", "level": "B1",
+            "scoreBySkill": { "vocab": 0.4, "grammar": 0.8, "reading": 0.6 }
+        }))
+        .expect("valid");
+        let outcome = PlacementOutcome::from(&resp);
+        assert_eq!(outcome.course_id, "c-new");
+        assert_eq!(outcome.level, "B1");
+        // Sorted by skill name: grammar, reading, vocab.
+        assert_eq!(
+            outcome.score_by_skill,
+            vec![
+                ("grammar".to_string(), 80),
+                ("reading".to_string(), 60),
+                ("vocab".to_string(), 40),
+            ]
+        );
+    }
+
+    #[test]
+    fn memory_items_sort_vocab_first_then_due_then_mastery() {
+        let graph: types::MemoryGraphResponse = serde_json::from_value(serde_json::json!({
+            "nodes": [
+                { "id": "g0", "kind": "grammar", "label": "Past tense", "strength": 0.5, "due": false },
+                { "id": "v0", "kind": "vocab", "label": "casa", "translation": "house", "strength": 0.9, "due": false },
+                { "id": "v1", "kind": "vocab", "label": "perro", "translation": "dog", "strength": 0.3, "due": true }
+            ],
+            "edges": []
+        }))
+        .expect("valid");
+        let items = memory_items(&graph);
+        assert_eq!(items.len(), 3);
+        // Vocab before grammar; within vocab, due (perro) before not-due (casa).
+        assert_eq!(items[0].kind, "vocab");
+        assert_eq!(items[0].label, "perro");
+        assert!(items[0].due);
+        assert_eq!(items[0].mastery, 30);
+        assert_eq!(items[1].label, "casa");
+        assert_eq!(items[1].translation.as_deref(), Some("house"));
+        assert_eq!(items[2].kind, "grammar");
+    }
+
+    #[test]
+    fn config_view_maps_self_hosted_owner_and_infra() {
+        let resp: types::OnboardingConfigResponse = serde_json::from_value(serde_json::json!({
+            "selfHosted": true, "isOwner": true,
+            "infra": {
+                "aiProvider": "openai", "aiModel": "gpt-5", "aiBaseUrl": null,
+                "sttProvider": "whisper", "sttBaseUrl": null, "sttModel": null,
+                "ttsProvider": "elevenlabs", "ttsBaseUrl": null,
+                "storageProvider": "r2", "s3Bucket": "sotto", "s3Region": "auto"
+            }
+        }))
+        .expect("valid");
+        let view = ConfigView::from(&resp);
+        assert!(view.self_hosted);
+        assert!(view.is_owner);
+        let infra = view.infra.expect("infra present for owner");
+        assert_eq!(infra.ai_provider.as_deref(), Some("openai"));
+        assert_eq!(infra.tts_provider.as_deref(), Some("elevenlabs"));
+        assert_eq!(infra.storage_provider.as_deref(), Some("r2"));
+    }
+
+    #[test]
+    fn config_view_has_no_infra_when_not_owner() {
+        let resp: types::OnboardingConfigResponse = serde_json::from_value(serde_json::json!({
+            "selfHosted": true, "isOwner": false, "infra": null
+        }))
+        .expect("valid");
+        let view = ConfigView::from(&resp);
+        assert!(view.infra.is_none());
     }
 }

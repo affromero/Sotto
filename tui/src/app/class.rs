@@ -178,7 +178,7 @@ impl App {
                     selected,
                     prompt_scroll,
                 } => {
-                    let last = answer_current_choice(questions, selected, *index, choice);
+                    let last = answer_current_choice(questions.len(), selected, *index, choice);
                     if last {
                         true
                     } else {
@@ -195,7 +195,7 @@ impl App {
                     selected,
                     ..
                 } => {
-                    let last = answer_current_choice(questions, selected, *index, choice);
+                    let last = answer_current_choice(questions.len(), selected, *index, choice);
                     if last {
                         true
                     } else {

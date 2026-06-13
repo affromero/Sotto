@@ -566,6 +566,120 @@ export const submitExamResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// PLACEMENT — assess a CEFR level and create/update the course. Two steps:
+//   GET  /api/v1/placement?native=&target=  -> generated MC questions
+//   POST /api/v1/placement                  -> { courseId, level, scoreBySkill }
+// Mirrors apps/web/src/app/api/v1/placement/route.ts + lib/placement-test.ts
+// (`toPublic`). Both responses are the exact projections the route returns, so
+// they are closed.
+// ---------------------------------------------------------------------------
+
+// The public projection of a placement question (the answer key is stripped).
+export const placementQuestionSchema = z.object({
+  id: z.string(),
+  cefr: cefrLevelSchema,
+  // PLACEMENT_SKILLS = grammar | vocab | reading (display-only here).
+  skill: z.string(),
+  prompt: z.string(),
+  options: z.array(z.string()),
+});
+
+export const generatePlacementResponseSchema = z.object({
+  native: z.string(),
+  target: z.string(),
+  questions: z.array(placementQuestionSchema),
+});
+
+// POST body: the answered questions for the (native, target) pair. selectedIndex
+// is 0..3 per the route; at least one answer is required (`.min(1)`).
+export const submitPlacementRequestSchema = z.object({
+  native: z.string().length(2),
+  target: z.string().length(2),
+  answers: z
+    .array(
+      z.object({
+        id: z.string(),
+        selectedIndex: z.number().int().min(0).max(3),
+      }),
+    )
+    .min(1),
+});
+
+export const submitPlacementResponseSchema = z.object({
+  courseId: z.string(),
+  level: cefrLevelSchema,
+  // Per-skill ratios (0..1), keyed by skill name.
+  scoreBySkill: z.record(z.string(), z.number()),
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/courses/{courseId}/graph — the vocabulary/grammar memory graph.
+// Mirrors apps/web/src/lib/knowledge-graph.ts (getMemoryGraph). The route
+// returns exactly `{ nodes, edges }`; `.loose()` on the node tolerates any
+// extra fields a future projection adds.
+// ---------------------------------------------------------------------------
+
+export const memoryNodeSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(['vocab', 'grammar']),
+    label: z.string(),
+    // Vocab nodes carry a translation; grammar nodes do not.
+    translation: z.string().optional(),
+    // 0..1 mastery strength.
+    strength: z.number(),
+    due: z.boolean(),
+  })
+  .loose();
+
+export const memoryEdgeSchema = z
+  .object({
+    source: z.string(),
+    target: z.string(),
+    type: z.string(),
+    weight: z.number(),
+  })
+  .loose();
+
+export const memoryGraphResponseSchema = z
+  .object({
+    nodes: z.array(memoryNodeSchema),
+    edges: z.array(memoryEdgeSchema),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/onboarding/config — instance + owner config for the wizard. No
+// secrets. Mirrors apps/web/src/app/api/v1/onboarding/config/route.ts:
+// { selfHosted, isOwner, infra: {...non-secret provider/storage fields} | null }
+// (`infra` is null unless self-hosted AND the user is the owner).
+// ---------------------------------------------------------------------------
+
+// `.loose()`: the non-secret infra projection. Every field is an optional/
+// nullable display string; open to tolerate any provider fields added later.
+export const onboardingInfraSchema = z
+  .object({
+    aiProvider: z.string().nullable().optional(),
+    aiModel: z.string().nullable().optional(),
+    aiBaseUrl: z.string().nullable().optional(),
+    sttProvider: z.string().nullable().optional(),
+    sttBaseUrl: z.string().nullable().optional(),
+    sttModel: z.string().nullable().optional(),
+    ttsProvider: z.string().nullable().optional(),
+    ttsBaseUrl: z.string().nullable().optional(),
+    storageProvider: z.string().nullable().optional(),
+    s3Bucket: z.string().nullable().optional(),
+    s3Region: z.string().nullable().optional(),
+  })
+  .loose();
+
+export const onboardingConfigResponseSchema = z.object({
+  selfHosted: z.boolean(),
+  isOwner: z.boolean(),
+  infra: onboardingInfraSchema.nullable(),
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/v1/auth/pair/redeem  (auth: none — the pairing token is the credential)
 // Request mirrors redeemPairingSchema; response mints an sk_sotto_ API key and
 // returns the owning user (the findUnique select), which can be null.

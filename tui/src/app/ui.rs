@@ -12,8 +12,9 @@ use ratatui::{
 use crate::config::Config;
 
 use super::state::{
-    ClassResult, ClassSection, Course, DueCounts, ExamResult, PracticeResult, ReviewKind,
-    SectionProgress, SkillChoice, SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
+    ClassResult, ClassSection, ConfigView, Course, DueCounts, ExamResult, LANGUAGES, LangColumn,
+    MemoryItem, PlacementOutcome, PracticeResult, ReviewKind, SectionProgress, SkillChoice,
+    SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
 };
 use crate::api::types::SkillType;
 
@@ -82,6 +83,11 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
         View::ClassDone { course } => draw_class_done(frame, area, course),
         View::Exam { .. } => draw_exam(frame, area, view),
         View::ExamOutcome { course, result } => draw_exam_result(frame, area, course, result),
+        View::PlacementLang { .. } => draw_placement_lang(frame, area, view),
+        View::PlacementReview { .. } => draw_placement_review(frame, area, view),
+        View::PlacementResult { outcome } => draw_placement_result(frame, area, outcome),
+        View::Memory { .. } => draw_memory(frame, area, view),
+        View::Settings { config } => draw_settings(frame, area, config.as_ref()),
     }
 }
 
@@ -163,9 +169,13 @@ fn draw_courses(frame: &mut Frame, area: Rect, courses: &[Course], cursor: usize
     if courses.is_empty() {
         let body = Paragraph::new(Text::from(vec![
             Line::default(),
-            Line::from(Span::styled("No courses yet.", Style::default().fg(INK))),
             Line::from(Span::styled(
-                "Create one in the web app, then come back.",
+                "No courses yet.",
+                Style::default().fg(INK).add_modifier(Modifier::BOLD),
+            )),
+            Line::default(),
+            Line::from(Span::styled(
+                "Press (n) to take a placement test and create your first course.",
                 Style::default().fg(INK_MUTED),
             )),
         ]))
@@ -202,10 +212,18 @@ fn draw_courses(frame: &mut Frame, area: Rect, courses: &[Course], cursor: usize
         frame.render_stateful_widget(list, chunks[0], &mut list_state);
     }
 
-    frame.render_widget(
-        Paragraph::new(hint_line(&["↑/↓ move", "1-9 jump", "enter open", "q quit"])),
-        chunks[1],
-    );
+    let hints: &[&str] = if courses.is_empty() {
+        &["n new course", "s settings", "q quit"]
+    } else {
+        &[
+            "↑/↓ move",
+            "enter open",
+            "n new course",
+            "s settings",
+            "q quit",
+        ]
+    };
+    frame.render_widget(Paragraph::new(hint_line(hints)), chunks[1]);
 }
 
 fn draw_course_home(
@@ -311,13 +329,15 @@ fn draw_course_home(
         &["q back"]
     } else {
         // Mirrors the CourseHome keymap: ↑/↓ select a practice skill, enter
-        // starts it, `c` starts/resumes the next class, `e` starts a mock exam.
+        // starts it, c=next class, e=mock exam, m=memory, s=settings.
         &[
             "↑/↓ skill",
             "enter practice",
-            "c next class",
-            "e mock exam",
-            "q quit",
+            "c class",
+            "e exam",
+            "m memory",
+            "s settings",
+            "q back",
         ]
     };
     frame.render_widget(Paragraph::new(hint_line(hints)), chunks[3]);
@@ -1160,4 +1180,305 @@ fn draw_exam_result(frame: &mut Frame, area: Rect, course: &Course, result: &Exa
         chunks[0],
     );
     frame.render_widget(Paragraph::new(hint_line(&["enter / q back"])), chunks[1]);
+}
+
+// --- Placement / memory / settings (P6d) -----------------------------------
+
+fn draw_placement_lang(frame: &mut Frame, area: Rect, view: &View) {
+    let View::PlacementLang {
+        native_cursor,
+        target_cursor,
+        column,
+        loading,
+    } = view
+    else {
+        return;
+    };
+    let inner = panel(frame, area, "New course · placement");
+    let chunks = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .split(inner);
+
+    frame.render_widget(
+        Paragraph::new(Text::from(vec![
+            Line::default(),
+            Line::from(Span::styled(
+                "Pick the language you speak and the one you're learning.",
+                Style::default().fg(INK),
+            )),
+        ]))
+        .wrap(Wrap { trim: true }),
+        chunks[0],
+    );
+
+    // Two side-by-side language lists.
+    let cols = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[1]);
+    draw_lang_column(
+        frame,
+        cols[0],
+        "I speak",
+        *native_cursor,
+        matches!(column, LangColumn::Native),
+    );
+    draw_lang_column(
+        frame,
+        cols[1],
+        "I'm learning",
+        *target_cursor,
+        matches!(column, LangColumn::Target),
+    );
+
+    let hints: &[&str] = if *loading {
+        &["loading…", "q back"]
+    } else {
+        &["↑/↓ pick", "tab switch", "enter start", "q back"]
+    };
+    frame.render_widget(Paragraph::new(hint_line(hints)), chunks[2]);
+}
+
+fn draw_lang_column(frame: &mut Frame, area: Rect, title: &str, cursor: usize, focused: bool) {
+    let border = if focused { AULA_BLUE } else { INK_MUTED };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border))
+        .title(Span::styled(
+            format!(" {title} "),
+            Style::default().fg(border).add_modifier(Modifier::BOLD),
+        ));
+    let body = block.inner(area);
+    frame.render_widget(block, area);
+
+    let items: Vec<ListItem> = LANGUAGES
+        .iter()
+        .map(|(_, name)| {
+            ListItem::new(Line::from(Span::styled(
+                (*name).to_string(),
+                Style::default().fg(INK),
+            )))
+        })
+        .collect();
+    let mut state = ListState::default();
+    state.select(Some(cursor.min(LANGUAGES.len().saturating_sub(1))));
+    let highlight = if focused { AULA_BLUE } else { INK_MUTED };
+    let list = List::new(items)
+        .highlight_style(Style::default().fg(highlight).add_modifier(Modifier::BOLD))
+        .highlight_symbol("▌ ");
+    frame.render_stateful_widget(list, body, &mut state);
+}
+
+fn draw_placement_review(frame: &mut Frame, area: Rect, view: &View) {
+    let View::PlacementReview {
+        questions,
+        index,
+        cursor,
+        prompt_scroll,
+        submitting,
+        ..
+    } = view
+    else {
+        return;
+    };
+    let Some(q) = questions.get(*index) else {
+        return;
+    };
+    let title = format!("Placement · {}/{}", index + 1, questions.len());
+    let inner = panel(frame, area, &title);
+    draw_choice_section(
+        frame,
+        inner,
+        index + 1,
+        questions.len(),
+        &q.prompt,
+        &q.options,
+        *cursor,
+        *prompt_scroll,
+        if *submitting {
+            &["submitting…", "q back"]
+        } else {
+            &["↑/↓ choose", "1-9 pick", "enter answer", "q back"]
+        },
+    );
+}
+
+fn draw_placement_result(frame: &mut Frame, area: Rect, outcome: &PlacementOutcome) {
+    let inner = panel(frame, area, "Placement result");
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let mut lines = vec![
+        Line::default(),
+        Line::from(Span::styled(
+            "Your assessed level",
+            Style::default().fg(INK_MUTED),
+        )),
+        Line::from(Span::styled(
+            outcome.level.clone(),
+            Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+        )),
+        Line::default(),
+    ];
+    for (skill, score) in &outcome.score_by_skill {
+        lines.push(Line::from(vec![
+            Span::styled(format!("{skill}: "), Style::default().fg(INK_MUTED)),
+            Span::styled(format!("{score}%"), Style::default().fg(INK)),
+        ]));
+    }
+    lines.push(Line::default());
+    lines.push(Line::from(Span::styled(
+        "Your course is ready.",
+        Style::default().fg(INK),
+    )));
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).alignment(Alignment::Center),
+        chunks[0],
+    );
+    frame.render_widget(
+        Paragraph::new(hint_line(&["enter start course", "q back"])),
+        chunks[1],
+    );
+}
+
+fn draw_memory(frame: &mut Frame, area: Rect, view: &View) {
+    let View::Memory {
+        course,
+        items,
+        scroll,
+    } = view
+    else {
+        return;
+    };
+    let inner = panel(frame, area, &format!("{} · memory", course.title));
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let Some(items) = items else {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Loading memory…",
+                Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center),
+            chunks[0],
+        );
+        return;
+    };
+
+    if items.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Text::from(vec![
+                Line::default(),
+                Line::from(Span::styled(
+                    "No vocabulary or grammar tracked yet.",
+                    Style::default().fg(INK_MUTED),
+                )),
+                Line::from(Span::styled(
+                    "Work through some practice to build your memory graph.",
+                    Style::default().fg(INK_MUTED),
+                )),
+            ]))
+            .alignment(Alignment::Center),
+            chunks[0],
+        );
+    } else {
+        let rows: Vec<ListItem> = items.iter().map(memory_row).collect();
+        let mut state = ListState::default();
+        state.select(Some((*scroll).min(items.len().saturating_sub(1))));
+        let list = List::new(rows)
+            .highlight_style(Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD))
+            .highlight_symbol("▌ ");
+        frame.render_stateful_widget(list, chunks[0], &mut state);
+    }
+
+    frame.render_widget(
+        Paragraph::new(hint_line(&["↑/↓ scroll", "q back"])),
+        chunks[1],
+    );
+}
+
+fn memory_row(item: &MemoryItem) -> ListItem<'static> {
+    let kind_tag = if item.kind == "vocab" { "V" } else { "G" };
+    let term = match &item.translation {
+        Some(t) if !t.is_empty() => format!("{} — {}", item.label, t),
+        _ => item.label.clone(),
+    };
+    let due = if item.due { " · due" } else { "" };
+    ListItem::new(Line::from(vec![
+        Span::styled(format!("[{kind_tag}] "), Style::default().fg(INK_MUTED)),
+        Span::styled(term, Style::default().fg(INK)),
+        Span::styled(
+            format!("  {}%{}", item.mastery, due),
+            Style::default().fg(if item.due { PINK } else { INK_MUTED }),
+        ),
+    ]))
+}
+
+fn draw_settings(frame: &mut Frame, area: Rect, config: Option<&ConfigView>) {
+    let inner = panel(frame, area, "Settings");
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let Some(config) = config else {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Loading config…",
+                Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center),
+            chunks[0],
+        );
+        return;
+    };
+
+    let on_off = |b: bool| if b { "yes" } else { "no" };
+    let mut lines = vec![
+        Line::default(),
+        Line::from(vec![
+            Span::styled("Self-hosted  ", Style::default().fg(INK_MUTED)),
+            Span::styled(on_off(config.self_hosted), Style::default().fg(INK)),
+        ]),
+        Line::from(vec![
+            Span::styled("Owner        ", Style::default().fg(INK_MUTED)),
+            Span::styled(on_off(config.is_owner), Style::default().fg(INK)),
+        ]),
+        Line::default(),
+    ];
+    match &config.infra {
+        Some(infra) => {
+            let field = |label: &str, v: &Option<String>| {
+                let value = v.clone().unwrap_or_else(|| "—".to_string());
+                Line::from(vec![
+                    Span::styled(format!("{label:<10}"), Style::default().fg(INK_MUTED)),
+                    Span::styled(value, Style::default().fg(INK)),
+                ])
+            };
+            lines.push(Line::from(Span::styled(
+                "Providers",
+                Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(field("AI", &infra.ai_provider));
+            lines.push(field("AI model", &infra.ai_model));
+            lines.push(field("STT", &infra.stt_provider));
+            lines.push(field("TTS", &infra.tts_provider));
+            lines.push(field("Storage", &infra.storage_provider));
+        }
+        None => {
+            lines.push(Line::from(Span::styled(
+                "Provider config is owner-only.",
+                Style::default().fg(INK_MUTED),
+            )));
+        }
+    }
+    lines.push(Line::default());
+    lines.push(Line::from(Span::styled(
+        "Edit providers and BYOK keys in the web app's /settings.",
+        Style::default()
+            .fg(INK_MUTED)
+            .add_modifier(Modifier::ITALIC),
+    )));
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
+        chunks[0],
+    );
+    frame.render_widget(Paragraph::new(hint_line(&["q back"])), chunks[1]);
 }
