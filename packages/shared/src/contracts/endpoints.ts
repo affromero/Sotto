@@ -4,15 +4,20 @@
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
 import {
+  classDetailResponseSchema,
   coursesListResponseSchema,
   episodeDetailResponseSchema,
   healthResponseSchema,
+  nextClassCreatedResponseSchema,
+  nextClassDoneResponseSchema,
   practiceOverviewResponseSchema,
   redeemPairingRequestSchema,
   redeemPairingResponseSchema,
   speakingPollResponseSchema,
   startPracticeRequestSchema,
   startPracticeResponseSchema,
+  submitClassRequestSchema,
+  submitClassResponseSchema,
   submitPracticeRequestSchema,
   submitPracticeResponseSchema,
 } from './schemas';
@@ -31,13 +36,26 @@ export interface EndpointDef {
   summary: string;
   auth: 'bearer' | 'none';
   request?: z.ZodType;
-  response: z.ZodType;
+  // A response schema. Use ONE of:
+  //   - `response` + optional `successStatuses`: the same schema for every
+  //     listed status (defaults to [200]).
+  //   - `responses`: a DISTINCT schema per status code, when the route returns
+  //     genuinely different shapes per status (e.g. next-class 201 {classId} vs
+  //     200 {done}). Exactly one of `response`/`responses` must be set.
+  response?: z.ZodType;
+  responses?: Record<number, z.ZodType>;
   // Query-string parameters (path params are derived from the path template).
   query?: QueryParamDef[];
-  // HTTP statuses the route can return with the response body. The same response
-  // schema is emitted for each (verified against the route handlers). Defaults to
-  // [200] when omitted.
+  // HTTP statuses the route can return with the (single) `response` schema.
+  // Verified against the route handlers. Defaults to [200] when omitted.
+  // Ignored when `responses` is used.
   successStatuses?: number[];
+  // When true, this operation is documented in the truthful `openapi.json` but
+  // EXCLUDED from the progenitor codegen spec (`openapi.codegen.json`). Used for
+  // operations progenitor cannot generate (e.g. `nextClass`, whose 200 and 201
+  // carry genuinely different bodies — progenitor allows only one 2xx body per
+  // operation). The Rust client hand-rolls these via raw reqwest.
+  codegenExclude?: boolean;
 }
 
 export const endpoints: EndpointDef[] = [
@@ -107,6 +125,41 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     query: [{ name: 'recordingId', required: true }],
     response: speakingPollResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'nextClass',
+    method: 'POST',
+    path: '/api/v1/courses/{courseId}/next-class',
+    summary: 'Create/advance to the next gated class (or report the course done).',
+    auth: 'bearer',
+    // Distinct closed shapes per status: 201 { classId } on create, 200
+    // { done: true } when the curriculum is complete.
+    responses: {
+      200: nextClassDoneResponseSchema,
+      201: nextClassCreatedResponseSchema,
+    },
+    // progenitor cannot generate an operation with two distinct 2xx bodies, so
+    // this stays in the truthful spec but is hand-rolled in the Rust client.
+    codegenExclude: true,
+  },
+  {
+    id: 'getClass',
+    method: 'GET',
+    path: '/api/v1/classes/{classId}',
+    summary: 'A gated class with its ordered, mixed-skill sections.',
+    auth: 'bearer',
+    response: classDetailResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'submitClass',
+    method: 'POST',
+    path: '/api/v1/classes/{classId}/submit',
+    summary: 'Grade a class submission and release the gate on pass.',
+    auth: 'bearer',
+    request: submitClassRequestSchema,
+    response: submitClassResponseSchema,
     successStatuses: [200],
   },
   {

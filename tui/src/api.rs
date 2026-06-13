@@ -17,10 +17,16 @@ use serde::Deserialize;
 /// Generated client + models. The spec path is resolved relative to
 /// `CARGO_MANIFEST_DIR` (the `tui/` crate root), so it points at the
 /// repo-committed contract in `packages/shared/`.
+///
+/// We feed progenitor the `openapi.codegen.json` view — the truthful
+/// `openapi.json` minus operations progenitor cannot generate (currently only
+/// `next-class`, whose 200 and 201 carry different bodies). Those excluded
+/// operations are hand-rolled below in [`SottoClient`]. The two specs are
+/// generated together by `npm run gen:openapi` and both are drift-tested.
 mod generated {
     #![allow(clippy::all)]
     #![allow(dead_code)]
-    progenitor::generate_api!("../packages/shared/openapi.json");
+    progenitor::generate_api!("../packages/shared/openapi.codegen.json");
 }
 
 pub(crate) use generated::Client as GeneratedClient;
@@ -35,6 +41,32 @@ pub(crate) use generated::types;
 pub(crate) struct SpeakingUploadResponse {
     pub recording_id: String,
     pub status: String,
+}
+
+/// Response of the class writing submit (POST `{ text }`), graded synchronously.
+/// Modeled here rather than in the OpenAPI contract because the writing submit
+/// endpoint is hand-rolled in this client (its request is a plain `{ text }`
+/// body the codegen does not need). Mirrors `gradeWriting`'s `WritingGrade`.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WritingGradeResponse {
+    /// 0..1 overall writing score.
+    pub overall_score: f64,
+    pub feedback: String,
+}
+
+/// Outcome of `next-class`. The route returns two genuinely different bodies by
+/// status — `201 { classId }` (a class was created/returned) or
+/// `200 { done: true }` (the curriculum is complete). progenitor cannot model
+/// two distinct 2xx bodies for one operation, so `next-class` is excluded from
+/// the codegen spec and hand-rolled in [`SottoClient::next_class`], which
+/// dispatches on the HTTP status into this enum.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum NextClassOutcome {
+    /// A class is ready to work (201).
+    Created { class_id: String },
+    /// The course curriculum is complete (200).
+    Done,
 }
 
 /// The async seam the [`crate::app::App`] dispatches through. Production uses
@@ -77,6 +109,39 @@ pub(crate) trait Api: Send + Sync {
     ) -> Result<SpeakingUploadResponse>;
     /// Download raw bytes from an absolute (presigned) URL — segment audio.
     async fn download(&self, url: &str) -> Result<Vec<u8>>;
+
+    // --- Classes (the gated CEFR curriculum flow) ---
+    /// Create/advance to the next gated class, or report the course done.
+    async fn next_class(&self, course_id: &str) -> Result<NextClassOutcome>;
+    /// Fetch a class with its ordered, mixed-skill sections.
+    async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse>;
+    /// Submit a class's MC answers and get the grade result.
+    async fn submit_class(
+        &self,
+        class_id: &str,
+        answers: Vec<types::SubmitClassRequestAnswersItem>,
+    ) -> Result<types::SubmitClassResponse>;
+    /// Upload a class speaking attempt (raw multipart at the class path).
+    async fn upload_class_speaking(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        wav: Vec<u8>,
+    ) -> Result<SpeakingUploadResponse>;
+    /// Poll grading for a class speaking attempt.
+    async fn poll_class_speaking(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse>;
+    /// Submit a class writing response (`{ text }`), graded synchronously.
+    async fn submit_class_writing(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse>;
 }
 
 /// Thin wrapper over the progenitor-generated [`GeneratedClient`] that bakes in
@@ -227,9 +292,7 @@ impl SottoClient {
         Ok(resp.into_inner())
     }
 
-    /// Upload a recorded WAV attempt for a speaking prompt via raw multipart.
-    /// The form field is `audio` with filename `attempt.wav` and `audio/wav`
-    /// mime; the Bearer header rides on the shared reqwest client.
+    /// Upload a recorded WAV attempt for a practice speaking prompt.
     pub async fn upload_speaking(
         &self,
         session_id: &str,
@@ -240,6 +303,13 @@ impl SottoClient {
             "{}/api/v1/practice/{}/speaking/{}",
             self.base_url, session_id, prompt_id
         );
+        self.upload_wav(&url, wav).await
+    }
+
+    /// POST a WAV as multipart (field `audio`, filename `attempt.wav`, mime
+    /// `audio/wav`) to `url`. The Bearer header rides on the shared client.
+    /// Shared by the practice and class speaking upload paths.
+    async fn upload_wav(&self, url: &str, wav: Vec<u8>) -> Result<SpeakingUploadResponse> {
         let part = reqwest::multipart::Part::bytes(wav)
             .file_name("attempt.wav")
             .mime_str("audio/wav")
@@ -248,7 +318,7 @@ impl SottoClient {
 
         let resp = self
             .http
-            .post(&url)
+            .post(url)
             .multipart(form)
             .send()
             .await
@@ -287,6 +357,144 @@ impl SottoClient {
             .await
             .map_err(|_| eyre!("could not read audio bytes"))?;
         Ok(bytes.to_vec())
+    }
+
+    // --- Classes ----------------------------------------------------------
+
+    /// Create/advance to the next gated class. Hand-rolled (not progenitor-
+    /// generated) because the route returns two distinct bodies by status:
+    /// `201 { classId }` or `200 { done: true }`. Dispatches on the status into
+    /// [`NextClassOutcome`]. The 409 "gated" case surfaces as an error.
+    pub async fn next_class(&self, course_id: &str) -> Result<NextClassOutcome> {
+        let url = format!("{}/api/v1/courses/{}/next-class", self.base_url, course_id);
+        // The route accepts an optional `{ sourceUrl?, topic? }` body; an empty
+        // object requests a normal curriculum class.
+        let resp = self
+            .http
+            .post(&url)
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .map_err(|e| eyre!("next-class request failed: {e}"))?;
+
+        match resp.status().as_u16() {
+            201 => {
+                let body: types::NextClassCreatedResponse = resp
+                    .json()
+                    .await
+                    .map_err(|e| eyre!("could not parse next-class (created): {e}"))?;
+                Ok(NextClassOutcome::Created {
+                    class_id: body.class_id,
+                })
+            }
+            200 => {
+                // 200 always carries { done: true }; parse to validate the shape.
+                let _body: types::NextClassDoneResponse = resp
+                    .json()
+                    .await
+                    .map_err(|e| eyre!("could not parse next-class (done): {e}"))?;
+                Ok(NextClassOutcome::Done)
+            }
+            status => {
+                let body = resp.text().await.unwrap_or_default();
+                Err(eyre!("next-class failed ({status}): {body}"))
+            }
+        }
+    }
+
+    /// Fetch a class with its sections.
+    pub async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse> {
+        let resp = self
+            .inner
+            .get_class(class_id)
+            .await
+            .map_err(|e| eyre!("failed to load class: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Submit a class's MC answers and get the grade result.
+    pub async fn submit_class(
+        &self,
+        class_id: &str,
+        answers: Vec<types::SubmitClassRequestAnswersItem>,
+    ) -> Result<types::SubmitClassResponse> {
+        let body = types::SubmitClassRequest { answers };
+        let resp = self
+            .inner
+            .submit_class(class_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to submit class: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Upload a class speaking attempt (raw multipart at the class path).
+    pub async fn upload_class_speaking(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        wav: Vec<u8>,
+    ) -> Result<SpeakingUploadResponse> {
+        let url = format!(
+            "{}/api/v1/classes/{}/speaking/{}",
+            self.base_url, class_id, prompt_id
+        );
+        self.upload_wav(&url, wav).await
+    }
+
+    /// Poll grading for a class speaking attempt (raw GET; same response shape
+    /// as the generated practice poll).
+    pub async fn poll_class_speaking(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse> {
+        let url = format!(
+            "{}/api/v1/classes/{}/speaking/{}",
+            self.base_url, class_id, prompt_id
+        );
+        let resp = self
+            .http
+            .get(&url)
+            .query(&[("recordingId", recording_id)])
+            .send()
+            .await
+            .map_err(|e| eyre!("class speaking poll request failed: {e}"))?;
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(eyre!("class speaking poll failed ({status})"));
+        }
+        resp.json::<types::SpeakingPollResponse>()
+            .await
+            .map_err(|e| eyre!("could not parse class speaking poll: {e}"))
+    }
+
+    /// Submit a class writing response (`{ text }`), graded synchronously.
+    pub async fn submit_class_writing(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse> {
+        let url = format!(
+            "{}/api/v1/classes/{}/writing/{}",
+            self.base_url, class_id, prompt_id
+        );
+        let resp = self
+            .http
+            .post(&url)
+            .json(&serde_json::json!({ "text": text }))
+            .send()
+            .await
+            .map_err(|e| eyre!("class writing submit request failed: {e}"))?;
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(eyre!("class writing submit failed ({status}): {body}"));
+        }
+        resp.json::<WritingGradeResponse>()
+            .await
+            .map_err(|e| eyre!("could not parse writing grade: {e}"))
     }
 }
 
@@ -342,6 +550,49 @@ impl Api for SottoClient {
 
     async fn download(&self, url: &str) -> Result<Vec<u8>> {
         SottoClient::download(self, url).await
+    }
+
+    async fn next_class(&self, course_id: &str) -> Result<NextClassOutcome> {
+        SottoClient::next_class(self, course_id).await
+    }
+
+    async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse> {
+        SottoClient::class(self, class_id).await
+    }
+
+    async fn submit_class(
+        &self,
+        class_id: &str,
+        answers: Vec<types::SubmitClassRequestAnswersItem>,
+    ) -> Result<types::SubmitClassResponse> {
+        SottoClient::submit_class(self, class_id, answers).await
+    }
+
+    async fn upload_class_speaking(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        wav: Vec<u8>,
+    ) -> Result<SpeakingUploadResponse> {
+        SottoClient::upload_class_speaking(self, class_id, prompt_id, wav).await
+    }
+
+    async fn poll_class_speaking(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse> {
+        SottoClient::poll_class_speaking(self, class_id, prompt_id, recording_id).await
+    }
+
+    async fn submit_class_writing(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse> {
+        SottoClient::submit_class_writing(self, class_id, prompt_id, text).await
     }
 }
 

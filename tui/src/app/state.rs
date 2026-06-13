@@ -290,6 +290,16 @@ impl From<&types::PracticeSpeakingPrompt> for SpeakingPrompt {
     }
 }
 
+impl From<&types::ClassSpeakingPrompt> for SpeakingPrompt {
+    fn from(p: &types::ClassSpeakingPrompt) -> Self {
+        Self {
+            id: p.id.clone(),
+            target_phrase: p.target_phrase.clone(),
+            translation: p.translation.clone(),
+        }
+    }
+}
+
 /// The grading lifecycle of the current speaking prompt's attempt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum SpeakingPhase {
@@ -326,6 +336,276 @@ impl From<&types::SubmitPracticeResponse> for PracticeResult {
             correct: count(resp.correct),
             total: count(resp.total),
         }
+    }
+}
+
+// ===========================================================================
+// Classes — the gated CEFR curriculum flow.
+// ===========================================================================
+
+/// A multiple-choice question inside a class section (grammar/reading/listening
+/// comprehension). Same render/answer shape as a [`VocabItem`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ClassQuestion {
+    pub id: String,
+    pub prompt: String,
+    pub options: Vec<String>,
+}
+
+impl From<&types::ClassQuestion> for ClassQuestion {
+    fn from(q: &types::ClassQuestion) -> Self {
+        // READING passages arrive in `passage_text`; prepend so the learner
+        // reads the passage above the question in one scrollable prompt.
+        let prompt = match &q.passage_text {
+            Some(p) if !p.is_empty() => format!("{p}\n\n{}", q.question),
+            _ => q.question.clone(),
+        };
+        Self {
+            id: q.id.clone(),
+            prompt,
+            options: q.options.clone(),
+        }
+    }
+}
+
+/// One class writing prompt the learner answers with free text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ClassWritingPrompt {
+    pub id: String,
+    pub task: String,
+    pub guidance: Option<String>,
+}
+
+impl From<&types::ClassWritingPrompt> for ClassWritingPrompt {
+    fn from(p: &types::ClassWritingPrompt) -> Self {
+        Self {
+            id: p.id.clone(),
+            task: p.task.clone(),
+            guidance: p.guidance.clone(),
+        }
+    }
+}
+
+/// A minimal multi-line text buffer for the writing section. In-house (no extra
+/// dep): tracks lines + a cursor; the App feeds it characters/edits. Submission
+/// joins the lines with `\n`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct WritingInput {
+    /// Wrapped as lines; always at least one (possibly empty) line.
+    lines: Vec<String>,
+}
+
+impl WritingInput {
+    pub fn new() -> Self {
+        Self {
+            lines: vec![String::new()],
+        }
+    }
+
+    /// Append a typed character to the last line.
+    pub fn push_char(&mut self, c: char) {
+        if self.lines.is_empty() {
+            self.lines.push(String::new());
+        }
+        if let Some(last) = self.lines.last_mut() {
+            last.push(c);
+        }
+    }
+
+    /// Start a new line (Enter).
+    pub fn newline(&mut self) {
+        self.lines.push(String::new());
+    }
+
+    /// Delete the last character, joining lines when a line empties (Backspace).
+    pub fn backspace(&mut self) {
+        if let Some(last) = self.lines.last_mut()
+            && last.pop().is_none()
+            && self.lines.len() > 1
+        {
+            self.lines.pop();
+        }
+    }
+
+    /// The composed text (lines joined by newlines).
+    pub fn text(&self) -> String {
+        self.lines.join("\n")
+    }
+
+    /// True when there is no non-whitespace content (cannot submit).
+    pub fn is_empty(&self) -> bool {
+        self.text().trim().is_empty()
+    }
+
+    /// The lines, for rendering.
+    pub fn lines(&self) -> &[String] {
+        &self.lines
+    }
+}
+
+/// Lifecycle of a writing prompt's submission within a class section.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum WritingPhase {
+    /// Composing the response; `enter` adds a newline, Ctrl-D submits.
+    Editing,
+    /// Submit in flight.
+    Submitting,
+    /// Graded; carries the 0..100 score and feedback.
+    Graded { score: u32, feedback: String },
+    /// Submission failed.
+    Failed { message: String },
+}
+
+/// Per-section interactive state, one variant per skill. Mixed-skill class
+/// sections reuse the same machinery the standalone practice screens use.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SectionProgress {
+    /// GRAMMAR / READING (and any listening comprehension) multiple-choice.
+    Mc {
+        questions: Vec<ClassQuestion>,
+        index: usize,
+        cursor: usize,
+        selected: Vec<Option<usize>>,
+        prompt_scroll: u16,
+    },
+    /// LISTENING: play the episode, then answer comprehension MCs (if any).
+    Listening {
+        episode_id: String,
+        episode: Option<EpisodeDetail>,
+        questions: Vec<ClassQuestion>,
+        index: usize,
+        cursor: usize,
+        selected: Vec<Option<usize>>,
+        audio_note: Option<String>,
+    },
+    /// SPEAKING: one prompt at a time, record → upload → poll.
+    Speaking {
+        prompts: Vec<SpeakingPrompt>,
+        index: usize,
+        phase: SpeakingPhase,
+    },
+    /// WRITING: free-text response per prompt, graded synchronously.
+    Writing {
+        prompts: Vec<ClassWritingPrompt>,
+        index: usize,
+        input: WritingInput,
+        phase: WritingPhase,
+    },
+}
+
+/// One class section: its id, skill, and interactive progress.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ClassSection {
+    pub id: String,
+    pub skill: types::SkillType,
+    pub progress: SectionProgress,
+}
+
+impl ClassSection {
+    /// Build a section's progress from the generated section by its skill. MC
+    /// sections (grammar/reading) and listening comprehension use `questions`;
+    /// speaking uses `prompts`; writing uses `writing_prompts`.
+    fn from_generated(s: &types::ClassSection) -> Self {
+        let questions: Vec<ClassQuestion> = s.questions.iter().map(ClassQuestion::from).collect();
+        let progress = match s.skill {
+            types::SkillType::Speaking => SectionProgress::Speaking {
+                prompts: s.prompts.iter().map(SpeakingPrompt::from).collect(),
+                index: 0,
+                phase: SpeakingPhase::Idle,
+            },
+            types::SkillType::Writing => SectionProgress::Writing {
+                prompts: s
+                    .writing_prompts
+                    .iter()
+                    .map(ClassWritingPrompt::from)
+                    .collect(),
+                index: 0,
+                input: WritingInput::new(),
+                phase: WritingPhase::Editing,
+            },
+            types::SkillType::Listening => SectionProgress::Listening {
+                episode_id: s.episode.as_ref().map(|e| e.id.clone()).unwrap_or_default(),
+                episode: None,
+                selected: vec![None; questions.len()],
+                questions,
+                index: 0,
+                cursor: 0,
+                audio_note: None,
+            },
+            // GRAMMAR / READING.
+            _ => SectionProgress::Mc {
+                selected: vec![None; questions.len()],
+                questions,
+                index: 0,
+                cursor: 0,
+                prompt_scroll: 0,
+            },
+        };
+        Self {
+            id: s.id.clone(),
+            skill: s.skill,
+            progress,
+        }
+    }
+}
+
+/// The graded outcome of a class submission.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ClassResult {
+    pub passed: bool,
+    pub overall_score: u32,
+    pub passed_sections: u32,
+    pub total_sections: u32,
+}
+
+impl From<&types::SubmitClassResponse> for ClassResult {
+    fn from(r: &types::SubmitClassResponse) -> Self {
+        Self {
+            passed: r.passed,
+            overall_score: (r.overall_score.clamp(0.0, 1.0) * 100.0).round() as u32,
+            passed_sections: count(r.passed_sections),
+            total_sections: count(r.total_sections),
+        }
+    }
+}
+
+/// Validate + convert the generated class into orderable sections. Returns the
+/// sections (already in route order) or `None` when malformed: no sections, or
+/// any section that lacks the content its skill needs to be worked through.
+/// Rejecting up front prevents entering a dead section that the learner could
+/// neither answer nor leave except by backing out.
+pub(crate) fn class_sections(cls: &types::ClassDetailResponse) -> Option<Vec<ClassSection>> {
+    if cls.sections.is_empty() {
+        return None;
+    }
+    if !cls.sections.iter().all(section_is_valid) {
+        return None;
+    }
+    Some(
+        cls.sections
+            .iter()
+            .map(ClassSection::from_generated)
+            .collect(),
+    )
+}
+
+/// Whether a section carries the content its skill requires:
+/// - GRAMMAR/READING: at least one question, each with at least one option.
+/// - LISTENING: an episode is present; any questions must each be answerable
+///   (transcript-only with zero questions is valid — the episode is the content).
+/// - SPEAKING: at least one prompt.
+/// - WRITING: at least one prompt.
+fn section_is_valid(s: &types::ClassSection) -> bool {
+    // Any present MC question must have options (a zero-option item would let
+    // Enter fabricate an answer).
+    let questions_answerable = s.questions.iter().all(|q| !q.options.is_empty());
+    match s.skill {
+        types::SkillType::Grammar | types::SkillType::Reading => {
+            !s.questions.is_empty() && questions_answerable
+        }
+        types::SkillType::Listening => s.episode.is_some() && questions_answerable,
+        types::SkillType::Speaking => !s.prompts.is_empty(),
+        types::SkillType::Writing => !s.writing_prompts.is_empty(),
     }
 }
 
@@ -405,6 +685,21 @@ pub(crate) enum View {
         course: Course,
         result: PracticeResult,
     },
+    /// An in-progress gated class: walk `sections` in order, then submit.
+    Class {
+        course: Course,
+        class_id: String,
+        /// The fetched class sections; `None` while the class load is in flight.
+        sections: Option<Vec<ClassSection>>,
+        /// Index of the section currently shown.
+        cursor: usize,
+        /// True while the class MC submit is in flight.
+        submitting: bool,
+    },
+    /// The graded outcome of a submitted class, with a "next class" option.
+    ClassOutcome { course: Course, result: ClassResult },
+    /// The course has no further classes (next-class returned `{ done: true }`).
+    ClassDone { course: Course },
 }
 
 impl View {
@@ -485,6 +780,70 @@ impl View {
             index: 0,
             phase: SpeakingPhase::Idle,
         }
+    }
+
+    /// Enter a class: sections load separately, so `sections` is `None` here.
+    pub fn class_view(course: Course, class_id: String) -> Self {
+        View::Class {
+            course,
+            class_id,
+            sections: None,
+            cursor: 0,
+            submitting: false,
+        }
+    }
+}
+
+/// Collect the MC answers recorded across all class sections so far, ready for
+/// the class submit. Only answered MC/listening-comprehension questions are
+/// included (speaking/writing are graded via their own endpoints; the class
+/// submit grades MC and aggregates the rest server-side). Pure.
+pub(crate) fn collect_class_answers(
+    sections: &[ClassSection],
+) -> Vec<types::SubmitClassRequestAnswersItem> {
+    let mut answers = Vec::new();
+    for section in sections {
+        let (questions, selected) = match &section.progress {
+            SectionProgress::Mc {
+                questions,
+                selected,
+                ..
+            }
+            | SectionProgress::Listening {
+                questions,
+                selected,
+                ..
+            } => (questions, selected),
+            _ => continue,
+        };
+        for (q, choice) in questions.iter().zip(selected.iter()) {
+            if let Some(idx) = choice {
+                answers.push(types::SubmitClassRequestAnswersItem {
+                    question_id: q.id.clone(),
+                    selected_index: *idx as i64,
+                });
+            }
+        }
+    }
+    answers
+}
+
+/// Whether every section of the class has been worked through to a submittable
+/// state: MC/listening have an answer for every question, speaking has graded
+/// (or failed) every prompt, writing has graded (or failed) every prompt. Pure;
+/// drives whether the class can be submitted.
+pub(crate) fn class_ready_to_submit(sections: &[ClassSection]) -> bool {
+    sections.iter().all(section_complete)
+}
+
+fn section_complete(section: &ClassSection) -> bool {
+    match &section.progress {
+        SectionProgress::Mc { selected, .. } | SectionProgress::Listening { selected, .. } => {
+            selected.iter().all(Option::is_some)
+        }
+        // Speaking/writing are graded via their own endpoints during the
+        // section; they never gate the MC class submit.
+        SectionProgress::Speaking { .. } | SectionProgress::Writing { .. } => true,
     }
 }
 
@@ -689,6 +1048,22 @@ pub(crate) fn answer_current(
     } else {
         AnswerStep::Submit(build_answers(items, selected))
     }
+}
+
+/// Record `choice` for the question at `index` and report whether it was the
+/// last question (so the section is complete). Used by the class MC/listening
+/// sections, whose answers are collected later by [`collect_class_answers`]
+/// rather than built into a payload here. Pure.
+pub(crate) fn answer_current_choice(
+    questions: &[ClassQuestion],
+    selected: &mut [Option<usize>],
+    index: usize,
+    choice: usize,
+) -> bool {
+    if index < selected.len() {
+        selected[index] = Some(choice);
+    }
+    index + 1 >= questions.len()
 }
 
 /// Build the `submit` request payload from items and their recorded selections.
@@ -1382,5 +1757,299 @@ mod tests {
         assert_eq!(SkillChoice::MENU.len(), 5);
         assert!(SkillChoice::MENU.contains(&SkillChoice::Grammar));
         assert!(SkillChoice::MENU.contains(&SkillChoice::Reading));
+    }
+
+    // --- P6b: classes ------------------------------------------------------
+
+    fn class_response(json: serde_json::Value) -> types::ClassDetailResponse {
+        serde_json::from_value(json).expect("valid ClassDetailResponse JSON")
+    }
+
+    /// A class with one section of each kind, in a fixed order, for walk tests.
+    fn mixed_class() -> types::ClassDetailResponse {
+        class_response(serde_json::json!({
+            "id": "cls1",
+            "status": "IN_PROGRESS",
+            "order": 1,
+            "passThreshold": 0.7,
+            "submitted": false,
+            "sections": [
+                {
+                    "id": "sec-g", "skill": "GRAMMAR", "status": "READY",
+                    "episode": null, "prompts": [], "writingPrompts": [],
+                    "questions": [
+                        { "id": "g0", "order": 0, "question": "Article?", "options": ["el", "la"], "passageRef": null, "passageText": null }
+                    ]
+                },
+                {
+                    "id": "sec-r", "skill": "READING", "status": "READY",
+                    "episode": null, "prompts": [], "writingPrompts": [],
+                    "questions": [
+                        { "id": "r0", "order": 0, "question": "What?", "options": ["a", "b"], "passageRef": null, "passageText": "Long passage here." }
+                    ]
+                },
+                {
+                    "id": "sec-l", "skill": "LISTENING", "status": "READY",
+                    "episode": { "id": "ep1", "audioUrl": "https://cdn/ep1.mp3", "title": "Cafe", "references": [] },
+                    "prompts": [], "writingPrompts": [],
+                    "questions": [
+                        { "id": "l0", "order": 0, "question": "Heard?", "options": ["x", "y"], "passageRef": null, "passageText": null }
+                    ]
+                },
+                {
+                    "id": "sec-s", "skill": "SPEAKING", "status": "READY",
+                    "episode": null, "questions": [], "writingPrompts": [],
+                    "prompts": [
+                        { "id": "s0", "order": 0, "targetPhrase": "Hola", "translation": "Hi", "ipa": null, "referenceTtsUrl": null }
+                    ]
+                },
+                {
+                    "id": "sec-w", "skill": "WRITING", "status": "READY",
+                    "episode": null, "questions": [], "prompts": [],
+                    "writingPrompts": [
+                        { "id": "w0", "order": 0, "task": "Describe", "guidance": null, "response": null }
+                    ]
+                }
+            ]
+        }))
+    }
+
+    #[test]
+    fn class_sections_walk_in_route_order_with_kind_routing() {
+        let sections = class_sections(&mixed_class()).expect("well-formed class");
+        assert_eq!(sections.len(), 5);
+        // Order preserved.
+        let ids: Vec<&str> = sections.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, ["sec-g", "sec-r", "sec-l", "sec-s", "sec-w"]);
+        // Each section routed to the right progress variant by skill.
+        assert!(matches!(sections[0].progress, SectionProgress::Mc { .. }));
+        assert!(matches!(sections[1].progress, SectionProgress::Mc { .. }));
+        assert!(matches!(
+            sections[2].progress,
+            SectionProgress::Listening { .. }
+        ));
+        assert!(matches!(
+            sections[3].progress,
+            SectionProgress::Speaking { .. }
+        ));
+        assert!(matches!(
+            sections[4].progress,
+            SectionProgress::Writing { .. }
+        ));
+    }
+
+    #[test]
+    fn reading_section_prepends_the_passage_to_the_prompt() {
+        let sections = class_sections(&mixed_class()).expect("well-formed");
+        if let SectionProgress::Mc { questions, .. } = &sections[1].progress {
+            assert!(questions[0].prompt.contains("Long passage here."));
+            assert!(questions[0].prompt.contains("What?"));
+        } else {
+            panic!("reading section should be Mc");
+        }
+    }
+
+    #[test]
+    fn empty_class_is_malformed() {
+        let cls = class_response(serde_json::json!({
+            "id": "c", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": []
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    #[test]
+    fn class_with_a_zero_option_question_is_malformed() {
+        let cls = class_response(serde_json::json!({
+            "id": "c", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false,
+            "sections": [{
+                "id": "sec-g", "skill": "GRAMMAR", "status": "READY",
+                "episode": null, "prompts": [], "writingPrompts": [],
+                "questions": [
+                    { "id": "g0", "order": 0, "question": "ok", "options": ["a", "b"], "passageRef": null, "passageText": null },
+                    { "id": "g1", "order": 1, "question": "broken", "options": [], "passageRef": null, "passageText": null }
+                ]
+            }]
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    /// A one-section class with the given skill and content overrides, for
+    /// per-skill emptiness checks.
+    fn single_section_class(section: serde_json::Value) -> types::ClassDetailResponse {
+        class_response(serde_json::json!({
+            "id": "c", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": [section]
+        }))
+    }
+
+    #[test]
+    fn empty_grammar_section_is_malformed() {
+        let cls = single_section_class(serde_json::json!({
+            "id": "sec-g", "skill": "GRAMMAR", "status": "READY",
+            "episode": null, "prompts": [], "writingPrompts": [], "questions": []
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    #[test]
+    fn empty_reading_section_is_malformed() {
+        let cls = single_section_class(serde_json::json!({
+            "id": "sec-r", "skill": "READING", "status": "READY",
+            "episode": null, "prompts": [], "writingPrompts": [], "questions": []
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    #[test]
+    fn listening_section_without_an_episode_is_malformed() {
+        let cls = single_section_class(serde_json::json!({
+            "id": "sec-l", "skill": "LISTENING", "status": "READY",
+            "episode": null, "prompts": [], "writingPrompts": [], "questions": []
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    #[test]
+    fn listening_section_with_episode_and_no_questions_is_valid_transcript_only() {
+        let cls = single_section_class(serde_json::json!({
+            "id": "sec-l", "skill": "LISTENING", "status": "READY",
+            "episode": { "id": "ep1", "audioUrl": "https://cdn/ep1.mp3", "title": "Cafe", "references": [] },
+            "prompts": [], "writingPrompts": [], "questions": []
+        }));
+        let sections = class_sections(&cls).expect("transcript-only listening is valid");
+        assert!(matches!(
+            sections[0].progress,
+            SectionProgress::Listening { .. }
+        ));
+    }
+
+    #[test]
+    fn empty_speaking_section_is_malformed() {
+        let cls = single_section_class(serde_json::json!({
+            "id": "sec-s", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [], "prompts": []
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    #[test]
+    fn empty_writing_section_is_malformed() {
+        let cls = single_section_class(serde_json::json!({
+            "id": "sec-w", "skill": "WRITING", "status": "READY",
+            "episode": null, "questions": [], "prompts": [], "writingPrompts": []
+        }));
+        assert!(class_sections(&cls).is_none());
+    }
+
+    #[test]
+    fn collect_class_answers_aggregates_answered_mc_across_sections() {
+        let mut sections = class_sections(&mixed_class()).expect("well-formed");
+        // Answer the grammar (g0 -> 1), reading (r0 -> 0), and listening (l0 -> 1)
+        // MC questions; speaking/writing contribute nothing to the MC payload.
+        for s in sections.iter_mut() {
+            match &mut s.progress {
+                SectionProgress::Mc { selected, .. }
+                | SectionProgress::Listening { selected, .. } => {
+                    selected[0] = Some(if s.id == "sec-r" { 0 } else { 1 });
+                }
+                _ => {}
+            }
+        }
+        let answers = collect_class_answers(&sections);
+        assert_eq!(answers.len(), 3);
+        let by_id: std::collections::HashMap<_, _> = answers
+            .iter()
+            .map(|a| (a.question_id.clone(), a.selected_index))
+            .collect();
+        assert_eq!(by_id.get("g0"), Some(&1));
+        assert_eq!(by_id.get("r0"), Some(&0));
+        assert_eq!(by_id.get("l0"), Some(&1));
+    }
+
+    #[test]
+    fn class_ready_to_submit_requires_all_mc_answered() {
+        let mut sections = class_sections(&mixed_class()).expect("well-formed");
+        // Unanswered MC -> not ready.
+        assert!(!class_ready_to_submit(&sections));
+        // Answer every MC/listening question; speaking/writing never gate.
+        for s in sections.iter_mut() {
+            match &mut s.progress {
+                SectionProgress::Mc { selected, .. }
+                | SectionProgress::Listening { selected, .. } => {
+                    for slot in selected.iter_mut() {
+                        *slot = Some(0);
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert!(class_ready_to_submit(&sections));
+    }
+
+    #[test]
+    fn answer_current_choice_records_and_flags_the_last_question() {
+        let qs = vec![
+            ClassQuestion {
+                id: "q0".into(),
+                prompt: "a".into(),
+                options: vec!["x".into(), "y".into()],
+            },
+            ClassQuestion {
+                id: "q1".into(),
+                prompt: "b".into(),
+                options: vec!["x".into(), "y".into()],
+            },
+        ];
+        let mut selected = vec![None, None];
+        assert!(!answer_current_choice(&qs, &mut selected, 0, 1));
+        assert_eq!(selected, vec![Some(1), None]);
+        assert!(answer_current_choice(&qs, &mut selected, 1, 0));
+        assert_eq!(selected, vec![Some(1), Some(0)]);
+    }
+
+    #[test]
+    fn class_result_converts_score_to_percent() {
+        let resp: types::SubmitClassResponse = serde_json::from_value(serde_json::json!({
+            "passed": true, "overallScore": 0.8, "passedSections": 4, "totalSections": 5,
+            "sections": []
+        }))
+        .expect("valid");
+        let result = ClassResult::from(&resp);
+        assert!(result.passed);
+        assert_eq!(result.overall_score, 80);
+        assert_eq!(result.passed_sections, 4);
+        assert_eq!(result.total_sections, 5);
+    }
+
+    #[test]
+    fn writing_input_captures_lines_and_backspace() {
+        let mut input = WritingInput::new();
+        for c in "hola".chars() {
+            input.push_char(c);
+        }
+        input.newline();
+        for c in "mundo".chars() {
+            input.push_char(c);
+        }
+        assert_eq!(input.text(), "hola\nmundo");
+        assert!(!input.is_empty());
+        // Backspace within a line, then across the line boundary.
+        input.backspace(); // mund
+        assert_eq!(input.text(), "hola\nmund");
+        for _ in 0..4 {
+            input.backspace();
+        }
+        // The now-empty second line is removed on the next backspace.
+        input.backspace();
+        assert_eq!(input.text(), "hola");
+    }
+
+    #[test]
+    fn empty_writing_input_is_empty() {
+        let input = WritingInput::new();
+        assert!(input.is_empty());
+        assert_eq!(input.text(), "");
     }
 }

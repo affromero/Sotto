@@ -267,6 +267,166 @@ export const speakingPollResponseSchema = z
   .loose();
 
 // ---------------------------------------------------------------------------
+// CLASSES — the gated CEFR curriculum flow.
+//   POST /api/v1/courses/{courseId}/next-class  -> { classId } | { done: true }
+//   GET  /api/v1/classes/{classId}              -> class + sections
+//   POST /api/v1/classes/{classId}/submit       -> grade result
+// Class speaking/writing prompts are submitted via their own endpoints (see
+// classes/{classId}/speaking|writing) — the class submit only grades MC answers.
+// Worksheet (PDF) and ink (PencilKit) routes are intentionally out of scope for
+// the terminal client (not renderable headless).
+//
+// Mirrors apps/web/src/lib/class-service.ts + the classes/[classId] GET route.
+// Sections are a FLAT row keyed by `skill` (not a discriminated union): every
+// section carries `questions`, `prompts`, and `writingPrompts` arrays, mostly
+// empty depending on its skill. The client reads the array matching `skill`.
+// ---------------------------------------------------------------------------
+
+// Mirrors the Prisma `SkillType` enum (gates the four class section skills).
+export const skillTypeSchema = z.enum([
+  'GRAMMAR',
+  'READING',
+  'LISTENING',
+  'SPEAKING',
+  'WRITING',
+]);
+
+// Mirrors the Prisma `ClassStatus` enum.
+export const classStatusSchema = z.enum([
+  'LOCKED',
+  'GENERATING',
+  'AVAILABLE',
+  'IN_PROGRESS',
+  'SUBMITTED',
+  'PASSED',
+  'FAILED',
+]);
+
+// Mirrors the Prisma `SectionStatus` enum.
+export const sectionStatusSchema = z.enum([
+  'PENDING',
+  'GENERATING',
+  'READY',
+  'IN_PROGRESS',
+  'SUBMITTED',
+  'PASSED',
+  'FAILED',
+]);
+
+// `.loose()`: the route adds correctIndex/explanation only after submission, so
+// the open object covers both the pre- and post-submit projections.
+export const classQuestionSchema = z
+  .object({
+    id: z.string(),
+    order: z.number().int(),
+    question: z.string(),
+    options: z.array(z.string()),
+    passageRef: z.string().nullable(),
+    // Sourced-class READING passage; null for curriculum classes.
+    passageText: z.string().nullable(),
+  })
+  .loose();
+
+export const classSpeakingPromptSchema = z.object({
+  id: z.string(),
+  order: z.number().int(),
+  targetPhrase: z.string(),
+  translation: z.string(),
+  ipa: z.string().nullable(),
+  referenceTtsUrl: z.string().nullable(),
+});
+
+// `.loose()`: `response` is a graded WritingResponse row (text/score/corrections/
+// feedback) the client only reads loosely; keep it open.
+export const classWritingPromptSchema = z
+  .object({
+    id: z.string(),
+    order: z.number().int(),
+    task: z.string(),
+    guidance: z.string().nullable(),
+  })
+  .loose();
+
+// `.loose()`: the section's episode carries a `references` Json the client
+// ignores; the playable `audioUrl` is what the listening screen uses.
+export const classEpisodeRefSchema = z
+  .object({
+    id: z.string(),
+    audioUrl: z.string().nullable(),
+    title: z.string(),
+  })
+  .loose();
+
+// `.loose()`: a flat section row with all content arrays. Open because the route
+// returns more per-row fields than the client renders.
+export const classSectionSchema = z
+  .object({
+    id: z.string(),
+    skill: skillTypeSchema,
+    status: sectionStatusSchema,
+    questions: z.array(classQuestionSchema),
+    prompts: z.array(classSpeakingPromptSchema),
+    writingPrompts: z.array(classWritingPromptSchema),
+    episode: classEpisodeRefSchema.nullable(),
+  })
+  .loose();
+
+// `.loose()`: the class carries `lesson` + `submission` (Json) and sourced-class
+// attribution the client does not need; only the modeled fields are read.
+export const classDetailResponseSchema = z
+  .object({
+    id: z.string(),
+    status: classStatusSchema,
+    order: z.number().int(),
+    passThreshold: z.number(),
+    submitted: z.boolean(),
+    sections: z.array(classSectionSchema),
+  })
+  .loose();
+
+// next-class returns EXACTLY one of two closed shapes, distinguished by status:
+//   201 -> { classId }   (a class was created/returned)
+//   200 -> { done: true } (the course curriculum is complete)
+// Each is modeled as its own closed schema and emitted under its own status code
+// (see the per-status `responses` map in endpoints.ts). The 409 "gated" case is
+// an error response, not a success body, so it is not modeled here.
+export const nextClassCreatedResponseSchema = z.object({
+  classId: z.string(),
+});
+
+export const nextClassDoneResponseSchema = z.object({
+  done: z.literal(true),
+});
+
+// POST /api/v1/classes/{classId}/submit — MC answers only (speaking/writing are
+// graded via their own endpoints). selectedIndex is 0..3 per the route.
+export const submitClassRequestSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string(),
+        selectedIndex: z.number().int().min(0).max(3),
+      }),
+    )
+    .min(1),
+});
+
+export const submitClassSectionResultSchema = z.object({
+  id: z.string(),
+  skill: skillTypeSchema,
+  score: z.number(),
+  passed: z.boolean(),
+});
+
+export const submitClassResponseSchema = z.object({
+  passed: z.boolean(),
+  overallScore: z.number(),
+  passedSections: z.number(),
+  totalSections: z.number(),
+  sections: z.array(submitClassSectionResultSchema),
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/v1/auth/pair/redeem  (auth: none — the pairing token is the credential)
 // Request mirrors redeemPairingSchema; response mints an sk_sotto_ API key and
 // returns the owning user (the findUnique select), which can be null.

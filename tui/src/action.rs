@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::api::{SpeakingUploadResponse, types};
+use crate::api::{NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse, types};
 
 /// Actions are the reduced intents the [`crate::app::App`] event loop applies
 /// to its state. Terminal input is mapped to actions; async API calls dispatch
@@ -45,6 +45,16 @@ pub(crate) enum Action {
     ScrollUp,
     /// Scroll the current item's prompt down (PageDown).
     ScrollDown,
+    /// A typed character for the writing editor.
+    Input(char),
+    /// Newline in the writing editor (Enter).
+    InputNewline,
+    /// Backspace in the writing editor.
+    InputBackspace,
+    /// Submit the writing editor's text (Ctrl-D).
+    SubmitText,
+    /// Continue the course / advance to the next class.
+    NextClass,
 
     // --- Async API results, delivered by spawned tasks ---
     //
@@ -68,6 +78,24 @@ pub(crate) enum Action {
     SpeakingUploaded(u64, ApiResult<SpeakingUploadResponse>),
     /// A speaking grading poll returned (or failed).
     SpeakingPolled(u64, ApiResult<types::SpeakingPollResponse>),
+
+    // --- Classes (the gated CEFR curriculum flow) ---
+    /// `POST /courses/{id}/next-class` returned (or failed).
+    NextClassResolved(u64, ApiResult<NextClassOutcome>),
+    /// `GET /classes/{id}` returned (or failed).
+    ClassLoaded(u64, ApiResult<types::ClassDetailResponse>),
+    /// `POST /classes/{id}/submit` returned (or failed).
+    ClassSubmitted(u64, ApiResult<types::SubmitClassResponse>),
+    /// A class listening section's episode loaded (or failed).
+    ClassEpisodeLoaded(u64, ApiResult<types::EpisodeDetailResponse>),
+    /// Class listening audio bytes were downloaded (or failed).
+    ClassAudioDownloaded(u64, ApiResult<Vec<u8>>),
+    /// A class speaking attempt upload returned (or failed).
+    ClassSpeakingUploaded(u64, ApiResult<SpeakingUploadResponse>),
+    /// A class speaking grading poll returned (or failed).
+    ClassSpeakingPolled(u64, ApiResult<types::SpeakingPollResponse>),
+    /// A class writing submission was graded (or failed).
+    ClassWritingGraded(u64, ApiResult<WritingGradeResponse>),
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries

@@ -11,6 +11,13 @@ import { z } from 'zod';
 import { endpoints, type EndpointDef } from '../src/contracts/endpoints';
 import {
   cefrLevelSchema,
+  classDetailResponseSchema,
+  classEpisodeRefSchema,
+  classQuestionSchema,
+  classSectionSchema,
+  classSpeakingPromptSchema,
+  classStatusSchema,
+  classWritingPromptSchema,
   courseSummarySchema,
   coursesListResponseSchema,
   episodeDetailResponseSchema,
@@ -18,6 +25,8 @@ import {
   episodeStatusSchema,
   healthCheckResultSchema,
   healthResponseSchema,
+  nextClassCreatedResponseSchema,
+  nextClassDoneResponseSchema,
   pairedUserSchema,
   practiceItemSchema,
   practiceKindSchema,
@@ -28,6 +37,8 @@ import {
   practiceWritingPromptSchema,
   redeemPairingRequestSchema,
   redeemPairingResponseSchema,
+  sectionStatusSchema,
+  skillTypeSchema,
   speakingGradeStatusSchema,
   speakingPollResponseSchema,
   startPracticeReadySchema,
@@ -36,6 +47,9 @@ import {
   startPracticeRequestSchema,
   startPracticeResponseSchema,
   startPracticeUnavailableSchema,
+  submitClassRequestSchema,
+  submitClassResponseSchema,
+  submitClassSectionResultSchema,
   submitPracticeRequestSchema,
   submitPracticeResponseSchema,
   userRoleSchema,
@@ -93,6 +107,20 @@ const namedSchemas: Record<string, z.ZodType> = {
   EpisodeDetailResponse: episodeDetailResponseSchema,
   SpeakingGradeStatus: speakingGradeStatusSchema,
   SpeakingPollResponse: speakingPollResponseSchema,
+  SkillType: skillTypeSchema,
+  ClassStatus: classStatusSchema,
+  SectionStatus: sectionStatusSchema,
+  ClassQuestion: classQuestionSchema,
+  ClassSpeakingPrompt: classSpeakingPromptSchema,
+  ClassWritingPrompt: classWritingPromptSchema,
+  ClassEpisodeRef: classEpisodeRefSchema,
+  ClassSection: classSectionSchema,
+  ClassDetailResponse: classDetailResponseSchema,
+  NextClassCreatedResponse: nextClassCreatedResponseSchema,
+  NextClassDoneResponse: nextClassDoneResponseSchema,
+  SubmitClassRequest: submitClassRequestSchema,
+  SubmitClassSectionResult: submitClassSectionResultSchema,
+  SubmitClassResponse: submitClassResponseSchema,
   RedeemPairingRequest: redeemPairingRequestSchema,
   RedeemPairingResponse: redeemPairingResponseSchema,
   PairedUser: pairedUserSchema,
@@ -248,14 +276,29 @@ function queryParameters(endpoint: EndpointDef): JsonValue[] {
 }
 
 function operationFor(endpoint: EndpointDef): JsonValue {
-  const statuses = endpoint.successStatuses ?? [200];
-  const responseRef = refFor(endpoint.response);
   const responses: JsonSchema = {};
-  for (const status of statuses) {
-    responses[String(status)] = {
-      description: status >= 500 ? 'Degraded' : 'Success',
-      content: { 'application/json': { schema: responseRef } },
-    };
+  if (endpoint.responses) {
+    // Distinct schema per status code.
+    for (const [status, schema] of Object.entries(endpoint.responses)) {
+      const code = Number(status);
+      responses[status] = {
+        description: code >= 500 ? 'Degraded' : 'Success',
+        content: { 'application/json': { schema: refFor(schema) } },
+      };
+    }
+  } else {
+    if (!endpoint.response) {
+      throw new Error(
+        `Endpoint ${endpoint.id} must define either \`response\` or \`responses\`.`,
+      );
+    }
+    const responseRef = refFor(endpoint.response);
+    for (const status of endpoint.successStatuses ?? [200]) {
+      responses[String(status)] = {
+        description: status >= 500 ? 'Degraded' : 'Success',
+        content: { 'application/json': { schema: responseRef } },
+      };
+    }
   }
 
   const operation: JsonSchema = {
@@ -282,16 +325,23 @@ function operationFor(endpoint: EndpointDef): JsonValue {
   return operation;
 }
 
-function buildPaths(): Record<string, JsonValue> {
+function buildPaths(opts: { codegen: boolean }): Record<string, JsonValue> {
   const paths: Record<string, JsonSchema> = {};
   for (const endpoint of endpoints) {
+    // The codegen spec omits operations progenitor cannot generate; they remain
+    // in the truthful spec and are hand-rolled in the Rust client.
+    if (opts.codegen && endpoint.codegenExclude) continue;
     const entry = (paths[endpoint.path] ??= {});
     entry[endpoint.method.toLowerCase()] = operationFor(endpoint);
   }
   return paths;
 }
 
-export function buildOpenApiDocument(): JsonSchema {
+// Build the OpenAPI document. `codegen: true` produces the progenitor-targeted
+// spec (excludes `codegenExclude` operations); the default produces the full,
+// truthful contract.
+export function buildOpenApiDocument(opts: { codegen?: boolean } = {}): JsonSchema {
+  const codegen = opts.codegen ?? false;
   const pkg = JSON.parse(
     readFileSync(resolve(sharedRoot, 'package.json'), 'utf8'),
   ) as { version: string };
@@ -315,16 +365,30 @@ export function buildOpenApiDocument(): JsonSchema {
       },
       schemas: buildComponentsSchemas(),
     },
-    paths: buildPaths(),
+    paths: buildPaths({ codegen }),
   };
 }
 
 export const OPENAPI_OUTPUT_PATH = resolve(sharedRoot, 'openapi.json');
+// The progenitor codegen input: the truthful spec minus operations progenitor
+// cannot generate. The Rust `generate_api!` macro reads THIS file.
+export const OPENAPI_CODEGEN_OUTPUT_PATH = resolve(
+  sharedRoot,
+  'openapi.codegen.json',
+);
 
 function main(): void {
   const doc = buildOpenApiDocument();
   writeFileSync(OPENAPI_OUTPUT_PATH, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
   process.stdout.write(`Wrote ${OPENAPI_OUTPUT_PATH}\n`);
+
+  const codegenDoc = buildOpenApiDocument({ codegen: true });
+  writeFileSync(
+    OPENAPI_CODEGEN_OUTPUT_PATH,
+    `${JSON.stringify(codegenDoc, null, 2)}\n`,
+    'utf8',
+  );
+  process.stdout.write(`Wrote ${OPENAPI_CODEGEN_OUTPUT_PATH}\n`);
 }
 
 const invokedDirectly =
