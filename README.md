@@ -15,14 +15,13 @@ Open-source, self-hostable language-learning infrastructure — taught in the co
 [![Runs 100% offline](https://img.shields.io/badge/runs-100%25%20offline-1F8A5B)](#run-it-100-offline)
 [![CI](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/ci.yml?branch=main&label=CI)](https://github.com/affromero/Sotto/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/codeql.yml?branch=main&label=CodeQL)](https://github.com/affromero/Sotto/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/affromero/Sotto/badge)](https://securityscorecards.dev/viewer/?uri=github.com/affromero/Sotto)
 [![gitleaks](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/gitleaks.yml?branch=main&label=gitleaks)](https://github.com/affromero/Sotto/actions/workflows/gitleaks.yml)
 [![Socket](https://img.shields.io/badge/Socket-protected-blueviolet?logo=socket.dev)](https://socket.dev)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
-[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://prisma.io)
+[![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://prisma.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=astral&logoColor=white)](https://github.com/astral-sh/uv)
@@ -88,8 +87,8 @@ Plus the rest of the loop:
 - **Personal memory graph** — a per-course, [Obsidian](https://obsidian.md/)-style vocabulary/grammar graph with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition that drives review, seeds the listening episode, and renders as an interactive [Cytoscape](https://js.cytoscape.org/) visualization.
 - **Notes that personalize everything** — tell Sotto your goals and background once; it threads through placement, classes, and practice.
 - **Any language pair** — German/English/Spanish ship as hand-authored reference curricula; any other native→target pair is composed by your connected agent on demand.
-- **Worksheets** — a print-optimized worksheet + server-side PDF, with iPad PencilKit annotation.
-- **Web + iPad** — the whole flow runs on the Next.js web app and the Expo iOS/iPad app against the same APIs.
+- **Worksheets** — a print-optimized worksheet + server-side PDF for any class, ready to print or hand out.
+- **Web + PWA** — the whole flow runs on the Next.js web app, installable from any browser as an offline-capable PWA on phone, tablet, or laptop.
 
 ## How Sotto Compares
 
@@ -156,7 +155,7 @@ A quick map of the nouns you'll meet in the app and the code:
 
 ```
 apps/web          Next.js 16 App Router — web UI, API routes, Prisma schema, Vitest tests
-apps/mobile       Expo React Native — iPad-first UI with react-native-track-player
+apps/desktop      Tauri launcher — runs the whole self-hosted stack on your machine, no terminal
 packages/shared   Shared types, Zod schemas, brand copy
 packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex locally
 ```
@@ -171,7 +170,7 @@ packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex loca
 - **Provider-resolved AI / TTS / STT** — explicit resolvers (`resolveLearningAi`, `resolveTtsProvider`, `resolveSttProvider`) pick the configured provider, never by key availability.
 - **Keyless local agent** — `AI_PROVIDER=claude-code` (or `codex`) routes every LLM call through your local CLI; no outbound API key required.
 - **[MCP](https://modelcontextprotocol.io/) server** (`packages/mcp`) — your local agent calls `ingest_agent_output` and other Sotto tools directly.
-- **Web + iPad** — [Next.js](https://nextjs.org/) + [React](https://react.dev/) on the web; [Expo](https://expo.dev/) React Native with [react-native-track-player](https://rntp.dev/) and [PencilKit](https://developer.apple.com/documentation/pencilkit) on iPad.
+- **Web + PWA** — [Next.js](https://nextjs.org/) + [React](https://react.dev/), installable from any browser as an offline-capable PWA.
 
 </details>
 
@@ -191,7 +190,7 @@ During install you choose how Sotto reaches your AI:
 
 ### From source (contributors)
 
-Prerequisites: [Node.js](https://nodejs.org/) 18+, [Docker](https://www.docker.com/), [FFmpeg](https://ffmpeg.org/).
+Prerequisites: [Node.js](https://nodejs.org/) 22+, [Docker](https://www.docker.com/), [FFmpeg](https://ffmpeg.org/).
 
 ```bash
 git clone https://github.com/SottoFM/sotto.git
@@ -250,11 +249,10 @@ OPENAI_API_KEY=sk-...
 
 ## Your devices and household
 
-The product is self-hosted: you run it, then reach it from anywhere. Apps are distributed from **[sotto.fm/download](https://sotto.fm/download)**.
+The product is self-hosted: you run it, then reach it from anywhere.
 
-- **Desktop.** _Sotto Host_ (a tiny [Tauri](https://tauri.app) launcher in `apps/desktop/`) runs the whole stack on your computer with no terminal. Open it, click **Start**, and it brings up the containers and opens the app.
-- **Mobile and iPad.** The [Expo](https://expo.dev) app connects to _your_ server. The smooth path is **scan to connect**: on the server open **Settings → Devices**, scan the QR, and the device is paired (a one-time token mints a session, no password). iPad with Apple Pencil is first-class (PencilKit ink on worksheets).
-- **Web and PWA.** Installable from any browser. Add to home screen for full-screen, offline-capable access.
+- **Desktop.** _Sotto Host_ (a tiny [Tauri](https://tauri.app) launcher in `apps/desktop/`, from **[sotto.fm/download](https://sotto.fm/download)**) runs the whole stack on your computer with no terminal. Open it, click **Start**, and it brings up the containers and opens the app.
+- **Web and PWA.** Installable from any browser — add to home screen on a phone, tablet, or laptop for full-screen, offline-capable access against _your_ server.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
 **Households (invite your family).** The first account on a fresh self-host becomes the **owner** (admin). From **Settings → Household** the owner generates invite links and QRs, sees the roster, and toggles **invite-only vs open** sign-up. Every learner is a fully isolated account with their own courses, progress, vocabulary graph, and keys, and there is no social layer.
@@ -277,10 +275,10 @@ The full learning loop is shipped and self-hostable today:
 - ✅ **Mastery-gated classes** across all five skills, with similar-but-not-identical regeneration on failure.
 - ✅ **Ungated practice + learner notes** — per-skill spaced-repetition practice; notes personalize placement, classes, and practice.
 - ✅ **Vocabulary memory graph** — per-course SM-2 graph, Cytoscape visualization, drives review + adaptive listening.
-- ✅ **Worksheets + web/iPad** — print/PDF worksheets with PencilKit ink; the whole flow runs on web and iPad.
+- ✅ **Worksheets + web** — print/PDF worksheets for any class; the whole flow runs on the web app and installable PWA.
 - ✅ **Runs 100% offline:** keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
 - ✅ **Households:** first account becomes owner; invite your family, invite-only/open toggle, fully isolated per-learner accounts.
-- ✅ **Your devices:** desktop launcher (Sotto Host), scan-to-connect pairing, installable PWA, and a one-command secure tunnel.
+- ✅ **Your devices:** desktop launcher (Sotto Host), installable PWA on any device, and a one-command secure tunnel.
 - ✅ **Sourced classes:** build a class from a real article, paper, or YouTube link (or a topic from your interests). Sotto extracts it, levels it to your CEFR, and teaches from it with verified `[N]` citations and a sources panel.
 - ✅ **Practice exams:** full multi-section mock exams modeled on each language's flagship (Goethe / DELE / Cambridge) at your level, with a mock band and per-section feedback. Clearly unaffiliated practice, never an official score.
 - ✅ **Live conversation:** real-time spoken translation (Gemini Live) on your own Google key; new vocabulary feeds the memory graph.
