@@ -28,6 +28,7 @@ Open-source, self-hostable language-learning infrastructure — a full **[CEFR](
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://prisma.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-1F8A5B.svg)](CONTRIBUTING.md)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/afromero)
 
@@ -51,6 +52,8 @@ curl -fsSL https://sotto.fm/install.sh | bash
 
 The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code / Codex** CLI with no key, or your agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything.
 
+**Prefer a one-click app?** Download the desktop installer — macOS `.dmg`, Windows `.exe`, or Linux `.AppImage` — from **[sotto.fm/download](https://sotto.fm/download)**. _Sotto Host_ runs the whole stack for you, no terminal.
+
 1. Open **[localhost:3000](http://localhost:3000)**
 2. Take a 2-minute placement test → it puts you at the right CEFR level
 3. Start your first mastery-gated class, or sharpen one skill in ungated practice
@@ -67,10 +70,10 @@ Every serious language app is closed, hosted, and subscription-funded. Your prog
 
 > **The differentiators**
 >
-> - 🧠 **Taught in your own context** — connect your agent and grant the context you choose (notes, goals, what you're working on); lessons, readings, and listening are drawn from _that_, not generic content.
-> - 🔑 **You own the learning stack** — self-host with your keys, your database, your files. No Sotto account holds your progress hostage.
-> - 🎓 **Pedagogy over gamification** — mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect); adaptive listening is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's _i+1_); the memory graph is [SM-2](https://super-memory.com/english/ol/sm2.htm) [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition). No streaks, no leaderboards — **there is no social layer at all.**
-> - 🧩 **Bring your own everything** — LLM, TTS, STT via explicit provider selection, BYOK, or a keyless local agent. You pay your providers directly; nothing is billed through the self-hosted build.
+> - **Taught in your own context** — connect your agent and grant the context you choose (notes, goals, what you're working on); lessons, readings, and listening are drawn from _that_, not generic content.
+> - **You own the learning stack** — self-host with your keys, your database, your files. No Sotto account holds your progress hostage.
+> - **Pedagogy over gamification** — mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect); adaptive listening is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's _i+1_); the memory graph is [SM-2](https://super-memory.com/english/ol/sm2.htm) [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition). No streaks, no leaderboards — **there is no social layer at all.**
+> - **Bring your own everything** — LLM, TTS, STT via explicit provider selection, BYOK, or a keyless local agent. You pay your providers directly; nothing is billed through the self-hosted build.
 
 ---
 
@@ -80,11 +83,11 @@ A complete CEFR course across **five graded skills**, on a stack you control:
 
 |                  |                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------- |
-| 🧩 **Grammar**   | Multiple-choice drills with elaborative feedback from your connected LLM                     |
-| 📖 **Reading**   | Graded passages with comprehension checks + vocabulary extraction                           |
-| 🎧 **Listening** | An adaptive audio episode generated + narrated by your TTS, seeded with your due vocabulary |
-| 🎤 **Speaking**  | Record → STT → pronunciation scoring with a rubric                                          |
-| ✍️ **Writing**   | Free-text tasks graded synchronously with inline AI corrections (old → new + why)           |
+| **Grammar**   | Multiple-choice drills with elaborative feedback from your connected LLM                     |
+| **Reading**   | Graded passages with comprehension checks + vocabulary extraction                           |
+| **Listening** | An adaptive audio episode generated + narrated by your TTS, seeded with your due vocabulary |
+| **Speaking**  | Record → STT → pronunciation scoring with a rubric                                          |
+| **Writing**   | Free-text tasks graded synchronously with inline AI corrections (old → new + why)           |
 
 …and the rest of the loop:
 
@@ -290,18 +293,18 @@ Sotto is built around BYOK from the start, surfaced three ways:
 
 The full learning loop is shipped and self-hostable today:
 
-- ✅ **Clean OSS core** — AGPL-3.0; `.env.oss.example`, `npm run setup`, local-storage default, payments disabled; no social/news/briefing surfaces.
-- ✅ **BYOK / own agent** — keyless `claude-code`/`codex`, encrypted per-account keys, MCP ingestion.
-- ✅ **Placement → any-language courses** — CEFR placement assigns a level and creates a directed course for any native→target pair.
-- ✅ **Mastery-gated classes** across all five skills, with similar-but-not-identical regeneration on failure.
-- ✅ **Ungated practice + learner notes** — per-skill spaced-repetition practice; notes personalize placement, classes, and practice.
-- ✅ **Vocabulary memory graph** — per-course SM-2 graph, Cytoscape visualization, drives review + adaptive listening.
-- ✅ **Sourced classes** — build a class from a real article, paper, or YouTube link (or a topic from your interests), leveled to your CEFR with verified `[N]` citations and a sources panel.
-- ✅ **Practice exams** — full multi-section mock exams modeled on each language's flagship (Goethe / DELE / Cambridge) at your level, with a mock band and per-section feedback. Clearly unaffiliated practice, never an official score.
-- ✅ **Live conversation** — real-time spoken translation (Gemini Live) on your own Google key; new vocabulary feeds the memory graph.
-- ✅ **Runs 100% offline** — keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
-- ✅ **Households + your devices** — first account becomes owner, invite your family, fully isolated per-learner accounts; desktop launcher (Sotto Host), installable PWA on any device, one-command secure tunnel.
-- ✅ **Worksheets** — print/PDF worksheets for any class; the whole flow runs on the web app and installable PWA.
+- **Clean OSS core** — AGPL-3.0; `.env.oss.example`, `npm run setup`, local-storage default, payments disabled; no social/news/briefing surfaces.
+- **BYOK / own agent** — keyless `claude-code`/`codex`, encrypted per-account keys, MCP ingestion.
+- **Placement → any-language courses** — CEFR placement assigns a level and creates a directed course for any native→target pair.
+- **Mastery-gated classes** across all five skills, with similar-but-not-identical regeneration on failure.
+- **Ungated practice + learner notes** — per-skill spaced-repetition practice; notes personalize placement, classes, and practice.
+- **Vocabulary memory graph** — per-course SM-2 graph, Cytoscape visualization, drives review + adaptive listening.
+- **Sourced classes** — build a class from a real article, paper, or YouTube link (or a topic from your interests), leveled to your CEFR with verified `[N]` citations and a sources panel.
+- **Practice exams** — full multi-section mock exams modeled on each language's flagship (Goethe / DELE / Cambridge) at your level, with a mock band and per-section feedback. Clearly unaffiliated practice, never an official score.
+- **Live conversation** — real-time spoken translation (Gemini Live) on your own Google key; new vocabulary feeds the memory graph.
+- **Runs 100% offline** — keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
+- **Households + your devices** — first account becomes owner, invite your family, fully isolated per-learner accounts; desktop launcher (Sotto Host), installable PWA on any device, one-command secure tunnel.
+- **Worksheets** — print/PDF worksheets for any class; the whole flow runs on the web app and installable PWA.
 
 **Planned (optional managed offering):** hosted infrastructure for non-technical learners — workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and self-hostable.
 
