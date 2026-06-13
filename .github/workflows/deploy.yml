@@ -12,6 +12,10 @@ jobs:
   ci:
     name: CI Checks
     runs-on: ubuntu-latest
+    # `next build` statically generates /_not-found, which resolves absolute
+    # Sotto URLs at build time and throws without this. ci.yml sets the same.
+    env:
+      NEXT_PUBLIC_APP_URL: https://selfhost.example.com
     steps:
       - uses: actions/checkout@v6
       - uses: webfactory/ssh-agent@v0.10.0
