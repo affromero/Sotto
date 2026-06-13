@@ -95,7 +95,6 @@
 | `/api/v1/classes/[classId]/writing/[promptId]`     | POST             | Yes   | Submit a writing response; graded synchronously by the LLM → `{overallScore, corrections, feedback}`                                                                                                 |
 | `/api/v1/practice/[sessionId]/writing/[promptId]`  | POST             | Yes   | Submit a practice writing response; graded synchronously                                                                                                                                             |
 | `/api/v1/classes/[classId]/worksheet`              | GET              | Yes   | Fetch or generate the worksheet PDF URL for a class                                                                                                                                                  |
-| `/api/v1/classes/[classId]/ink`                    | GET/POST         | Yes   | Get/save ClassInkLayer PKDrawing strokes for a worksheet surface                                                                                                                                     |
 | `/api/v1/admin/*`                                  | Various          | ADMIN | Admin endpoints (auto-models, model-pricing, handles, queues, site-config, voices, test-model)                                                                                                       |
 
 ## Route Groups
