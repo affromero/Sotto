@@ -423,41 +423,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(removedBotSources).not.toContain('https://twitter.com/SottoFM');
   });
 
-  it('keeps system owner identity configurable for self-hosted deployments', () => {
-    const systemOwnerSources = [
-      '.env.example',
-      '.env.oss.example',
-      'apps/web/prisma/seed.ts',
-      'apps/web/src/lib/system-user.ts',
-      'apps/web/src/workers/CLAUDE.md',
-      'apps/web/src/app/api/v1/admin/episodes/create-as-system-owner/route.ts',
-      'apps/web/src/app/api/v1/admin/impersonate/targets/route.ts',
-      'apps/web/src/app/(admin)/admin/episodes/CreateAsSystemOwnerButton.tsx',
-      'apps/web/src/app/(admin)/admin/episodes/page.tsx',
-      'apps/web/src/app/(admin)/admin/episodes/page.module.css',
-      'apps/web/src/components/layout/AccountSwitcher.tsx',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-
-    expect(systemOwnerSources).toContain('SYSTEM_USER_HANDLE');
-    expect(systemOwnerSources).toContain('SYSTEM_USER_EMAIL');
-    expect(systemOwnerSources).toContain('create-as-system-owner');
-    expect(systemOwnerSources).toContain('configured system owner');
-    expect(
-      existsSync(resolve(repoRoot, 'apps/web/src/app/api/v1/admin/episodes/create-as-sotto'))
-    ).toBe(false);
-    expect(systemOwnerSources).not.toContain("handle: 'sotto'");
-    expect(systemOwnerSources).not.toContain('create-as-sotto');
-    expect(systemOwnerSources).not.toContain('as=sotto');
-    expect(systemOwnerSources).not.toContain('Create as @sotto');
-    expect(systemOwnerSources).not.toContain('as if tagging @sotto');
-    expect(systemOwnerSources).not.toContain('official Sotto account');
-    expect(systemOwnerSources).not.toContain('@sotto system account');
-    expect(systemOwnerSources).not.toContain('sottoUser');
-    expect(systemOwnerSources).not.toContain('sottoDropdown');
-  });
-
   it('keeps public project and verification links configurable', () => {
     const publicLinkSources = [
       '.env.example',

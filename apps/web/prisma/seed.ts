@@ -1,6 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
-import { getSystemUserConfig } from '../src/lib/system-user';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL }) });
 
@@ -296,31 +295,8 @@ async function main() {
 
   console.warn(`✅ Created ${taxonomyCategories.length} taxonomy categories with ${taxonomyTagCount} tags`);
 
-  const systemUserConfig = getSystemUserConfig();
-
-  // Upsert configured system owner account
-  await prisma.user.upsert({
-    where: { email: systemUserConfig.email },
-    update: {
-      handle: systemUserConfig.handle,
-      role: 'SYSTEM',
-      name: systemUserConfig.name,
-      image: systemUserConfig.image,
-    },
-    create: {
-      email: systemUserConfig.email,
-      handle: systemUserConfig.handle,
-      role: 'SYSTEM',
-      name: systemUserConfig.name,
-      image: systemUserConfig.image,
-    },
-  });
-
-  console.warn(`✅ Created @${systemUserConfig.handle} system owner account`);
-
   // Seed reserved handles
   const reservedHandles = [
-    systemUserConfig.handle,
     'admin',
     'support',
     'help',

@@ -1,7 +1,6 @@
 import React from 'react';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { CreateAsSystemOwnerButton } from './CreateAsSystemOwnerButton';
 import { CopyButton } from '@/components/admin/CopyButton';
 import { CreateGitHubIssueButton } from './CreateGitHubIssueButton';
 import { RetryButton } from './RetryButton';
@@ -78,7 +77,6 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
           <h1 className={styles.title}>Lessons</h1>
           <p className={styles.subtitle}>{total.toLocaleString()} total lessons</p>
         </div>
-        <CreateAsSystemOwnerButton />
       </div>
 
       <form className={styles.filters} action="/admin/episodes" method="get">
