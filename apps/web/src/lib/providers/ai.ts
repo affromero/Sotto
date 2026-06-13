@@ -521,6 +521,31 @@ class ClaudeCodeLazyProvider implements AIProvider {
   }
 }
 
+class CodexLazyProvider implements AIProvider {
+  private async createProvider(): Promise<AIProvider> {
+    const { CodexProvider } = await import('./codex');
+    return new CodexProvider();
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    const provider = await this.createProvider();
+    return provider.generateResponse(system, messages, opts);
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    const provider = await this.createProvider();
+    yield* provider.streamResponse(system, messages, opts);
+  }
+}
+
 export function createAIProvider(type: string): AIProvider {
   if (!type) {
     throw new Error('AI provider type is required. Pass an explicit provider from the AI registry.');
@@ -535,10 +560,12 @@ export function createAIProvider(type: string): AIProvider {
       return new GoogleProvider();
     case 'claude-code':
       return new ClaudeCodeLazyProvider();
+    case 'codex':
+      return new CodexLazyProvider();
     case 'local':
       return new LocalProvider();
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, local`);
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local`);
   }
 }
 

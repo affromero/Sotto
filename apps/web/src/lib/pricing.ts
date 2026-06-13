@@ -32,6 +32,8 @@ function buildPricingMap(): Record<string, ModelPricing> {
   for (const m of ccMeta.models) {
     map[`claude-code:${m.id}`] = { inputPerMTok: 0, outputPerMTok: 0 };
   }
+  // Codex — zero-cost local CLI (no per-token cost to us)
+  map['codex'] = { inputPerMTok: 0, outputPerMTok: 0 };
   // Embeddings — not in AI registry (not an LLM model)
   map['text-embedding-3-small'] = { inputPerMTok: 0.02, outputPerMTok: 0 };
   return map;
@@ -65,7 +67,7 @@ export function getAiCost(model: string, inputTokens: number, outputTokens: numb
 export function getCheapestModel(): string {
   let cheapest: { model: string; cost: number } | null = null;
   for (const [model, pricing] of Object.entries(activePricing)) {
-    if (model.startsWith('text-embedding') || model.startsWith('claude-code:')) continue;
+    if (model.startsWith('text-embedding') || model.startsWith('claude-code:') || model === 'codex') continue;
     if (!isValidModelId(model)) continue;
     const totalCost = pricing.inputPerMTok + pricing.outputPerMTok;
     if (!cheapest || totalCost < cheapest.cost) {
