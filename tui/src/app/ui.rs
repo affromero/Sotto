@@ -12,7 +12,7 @@ use ratatui::{
 use crate::config::Config;
 
 use super::state::{
-    Course, DueCounts, PracticeResult, SkillChoice, SpeakingPhase, Unavailable, View,
+    Course, DueCounts, PracticeResult, ReviewKind, SkillChoice, SpeakingPhase, Unavailable, View,
     can_review_vocab,
 };
 
@@ -44,26 +44,32 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
             notice.as_ref(),
             *starting,
         ),
-        View::VocabReview {
+        View::ItemReview {
             course,
+            kind,
             items,
             index,
             cursor,
+            prompt_scroll,
             submitting,
             ..
         } => {
             // Items is guaranteed non-empty when this view is constructed.
             if let Some(item) = items.get(*index) {
-                draw_vocab_review(
+                draw_item_review(
                     frame,
                     area,
-                    course,
-                    *index,
-                    items.len(),
-                    &item.prompt,
-                    &item.options,
-                    *cursor,
-                    *submitting,
+                    ItemReviewView {
+                        course,
+                        kind: *kind,
+                        index: *index,
+                        total: items.len(),
+                        prompt: &item.prompt,
+                        options: &item.options,
+                        cursor: *cursor,
+                        prompt_scroll: *prompt_scroll,
+                        submitting: *submitting,
+                    },
                 );
             }
         }
@@ -303,35 +309,50 @@ fn draw_course_home(
     frame.render_widget(Paragraph::new(hint_line(hints)), chunks[3]);
 }
 
-#[allow(clippy::too_many_arguments)]
-fn draw_vocab_review(
-    frame: &mut Frame,
-    area: Rect,
-    course: &Course,
+/// Render args for the shared multiple-choice review screen.
+struct ItemReviewView<'a> {
+    course: &'a Course,
+    kind: ReviewKind,
     index: usize,
     total: usize,
-    prompt: &str,
-    options: &[String],
+    prompt: &'a str,
+    options: &'a [String],
     cursor: usize,
+    prompt_scroll: u16,
     submitting: bool,
-) {
-    let title = format!("{} · vocab {}/{}", course.title, index + 1, total);
+}
+
+/// One review screen shared by VOCAB / GRAMMAR / READING: a wrapping, scrollable
+/// prompt (long reading passages live here) above the selectable options.
+fn draw_item_review(frame: &mut Frame, area: Rect, v: ItemReviewView) {
+    let title = format!(
+        "{} · {} {}/{}",
+        v.course.title,
+        v.kind.label(),
+        v.index + 1,
+        v.total
+    );
     let inner = panel(frame, area, &title);
+    // Reading prompts can be long, so give the prompt a flexible block that
+    // wraps and scrolls; options sit in a fixed block below.
+    let option_rows = (v.options.len() as u16).saturating_add(1);
     let chunks = Layout::vertical([
-        Constraint::Length(3),
         Constraint::Fill(1),
+        Constraint::Length(option_rows.max(2)),
         Constraint::Length(1),
     ])
     .split(inner);
 
-    let prompt_para = Paragraph::new(Line::from(Span::styled(
-        prompt.to_string(),
+    let prompt_para = Paragraph::new(Span::styled(
+        v.prompt.to_string(),
         Style::default().fg(INK).add_modifier(Modifier::BOLD),
-    )))
-    .wrap(Wrap { trim: true });
+    ))
+    .wrap(Wrap { trim: true })
+    .scroll((v.prompt_scroll, 0));
     frame.render_widget(prompt_para, chunks[0]);
 
-    let items: Vec<ListItem> = options
+    let items: Vec<ListItem> = v
+        .options
         .iter()
         .enumerate()
         .map(|(i, option)| {
@@ -346,15 +367,22 @@ fn draw_vocab_review(
         .highlight_style(Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD))
         .highlight_symbol("▌ ");
     let mut list_state = ListState::default();
-    if !options.is_empty() {
-        list_state.select(Some(cursor.min(options.len() - 1)));
+    if !v.options.is_empty() {
+        list_state.select(Some(v.cursor.min(v.options.len() - 1)));
     }
     frame.render_stateful_widget(list, chunks[1], &mut list_state);
 
-    let hints: &[&str] = if submitting {
+    // Reading benefits from the scroll hint; keep it for all MC reviews.
+    let hints: &[&str] = if v.submitting {
         &["submitting…", "q back"]
     } else {
-        &["↑/↓ choose", "1-9 pick", "enter answer", "q back"]
+        &[
+            "↑/↓ choose",
+            "1-9 pick",
+            "PgUp/PgDn scroll",
+            "enter answer",
+            "q back",
+        ]
     };
     frame.render_widget(Paragraph::new(hint_line(hints)), chunks[2]);
 }

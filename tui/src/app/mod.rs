@@ -135,6 +135,8 @@ impl App {
             Action::Retry => self.on_retry(),
             Action::PlayPause => self.on_play_pause(),
             Action::ToggleRecord => self.on_toggle_record(),
+            Action::ScrollUp => self.on_scroll(false),
+            Action::ScrollDown => self.on_scroll(true),
             Action::CoursesLoaded(req_gen, result) => self.on_courses_loaded(req_gen, result),
             Action::DueLoaded(req_gen, result) => self.on_due_loaded(req_gen, result),
             Action::PracticeStarted(req_gen, result) => self.on_practice_started(req_gen, result),
@@ -189,6 +191,8 @@ impl App {
 
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => Some(self.back_action()),
+            KeyCode::PageUp => Some(Action::ScrollUp),
+            KeyCode::PageDown => Some(Action::ScrollDown),
             KeyCode::Up | KeyCode::Char('k') => Some(Action::Up),
             KeyCode::Down | KeyCode::Char('j') => Some(Action::Down),
             KeyCode::Enter | KeyCode::Char(' ') => Some(Action::Select),
@@ -221,7 +225,7 @@ impl App {
                 *menu_cursor = list_up(*menu_cursor);
                 self.render();
             }
-            View::VocabReview { cursor, .. } => {
+            View::ItemReview { cursor, .. } => {
                 *cursor = cursor_up(*cursor);
                 self.render();
             }
@@ -243,7 +247,7 @@ impl App {
                 *menu_cursor = list_down(*menu_cursor, SkillChoice::MENU.len());
                 self.render();
             }
-            View::VocabReview {
+            View::ItemReview {
                 items,
                 index,
                 cursor,
@@ -264,6 +268,19 @@ impl App {
                 self.render();
             }
             _ => {}
+        }
+    }
+
+    /// Scroll the current item's prompt (PageUp/PageDown), for long reading
+    /// passages. Only `ItemReview` has a scrollable prompt; clamps at 0.
+    fn on_scroll(&mut self, down: bool) {
+        if let View::ItemReview { prompt_scroll, .. } = &mut self.view {
+            *prompt_scroll = if down {
+                prompt_scroll.saturating_add(1)
+            } else {
+                prompt_scroll.saturating_sub(1)
+            };
+            self.render();
         }
     }
 
@@ -296,7 +313,7 @@ impl App {
                     }
                 }
             }
-            View::VocabReview {
+            View::ItemReview {
                 cursor, submitting, ..
             } => {
                 if !*submitting {
@@ -338,7 +355,7 @@ impl App {
                     self.enter_course_home(course);
                 }
             }
-            View::VocabReview {
+            View::ItemReview {
                 items,
                 index: item_index,
                 submitting,
@@ -371,7 +388,7 @@ impl App {
                 self.fetch_courses();
                 self.render();
             }
-            View::VocabReview { course, .. }
+            View::ItemReview { course, .. }
             | View::ListeningReview { course, .. }
             | View::SpeakingReview { course, .. }
             | View::Result { course, .. } => {
@@ -421,18 +438,28 @@ impl App {
         }
     }
 
-    /// Record `choice` for the current item of a VocabReview or ListeningReview,
+    /// Record `choice` for the current item of an ItemReview or ListeningReview,
     /// advancing or submitting. Shared by both choice-based review screens.
     fn answer_choice(&mut self, choice: usize) {
         let submit = match &mut self.view {
-            View::VocabReview {
+            View::ItemReview {
                 items,
                 selected,
                 index,
                 cursor,
+                prompt_scroll,
                 ..
-            }
-            | View::ListeningReview {
+            } => match answer_current(items, selected, *index, choice) {
+                AnswerStep::Advanced => {
+                    *index += 1;
+                    *cursor = 0;
+                    // New item: reset the prompt scroll for long reading text.
+                    *prompt_scroll = 0;
+                    None
+                }
+                AnswerStep::Submit(answers) => Some(answers),
+            },
+            View::ListeningReview {
                 items,
                 selected,
                 index,
@@ -526,7 +553,7 @@ impl App {
     fn submit_answers(&mut self, answers: Vec<types::SubmitPracticeRequestAnswersItem>) {
         let req_gen = self.bump_gen();
         let session_id = match &mut self.view {
-            View::VocabReview {
+            View::ItemReview {
                 session_id,
                 submitting,
                 ..
@@ -810,7 +837,7 @@ impl App {
                 // Both vocab and listening reviews submit answers and end on the
                 // Result screen.
                 let course = match &self.view {
-                    View::VocabReview { course, .. } | View::ListeningReview { course, .. } => {
+                    View::ItemReview { course, .. } | View::ListeningReview { course, .. } => {
                         Some(course.clone())
                     }
                     _ => None,
@@ -826,7 +853,7 @@ impl App {
             Err(message) => {
                 // Clear the in-flight flag so the learner can resubmit.
                 match &mut self.view {
-                    View::VocabReview { submitting, .. }
+                    View::ItemReview { submitting, .. }
                     | View::ListeningReview { submitting, .. } => *submitting = false,
                     _ => {}
                 }
@@ -1151,6 +1178,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn grammar_start_result_routes_to_the_shared_item_review() {
+        let mut app = test_app();
+        // On a CourseHome (bumps gen, dispatches due fetch).
+        app.enter_course_home(course("A"));
+        let req_gen = app.request_gen;
+
+        let resp: ApiResult<types::StartPracticeResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "status": "ready",
+                "sessionId": "sess-gram",
+                "kind": "GRAMMAR",
+                "items": [
+                    { "id": "q0", "prompt": "Pick the verb", "options": ["ser", "casa"] }
+                ]
+            }))
+            .expect("valid grammar ready")));
+
+        app.on_practice_started(req_gen, resp);
+
+        match &app.view {
+            View::ItemReview {
+                kind,
+                session_id,
+                items,
+                ..
+            } => {
+                assert_eq!(*kind, state::ReviewKind::Grammar);
+                assert_eq!(session_id, "sess-gram");
+                assert_eq!(items.len(), 1);
+            }
+            other => panic!("expected ItemReview after grammar start, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn second_select_while_starting_does_not_dispatch_twice() {
         let mut app = test_app();
         // Sit on a CourseHome that can start a review.
@@ -1186,8 +1248,9 @@ mod tests {
     async fn second_select_while_submitting_does_not_dispatch_twice() {
         let mut app = test_app();
         // A single-item review, sitting on its last (only) item so Select submits.
-        app.view = View::start_vocab(
+        app.view = View::start_items(
             course("A"),
+            super::state::ReviewKind::Vocab,
             "sess-1".into(),
             vec![super::state::VocabItem {
                 id: "v1".into(),
@@ -1203,7 +1266,7 @@ mod tests {
         assert!(
             matches!(
                 app.view,
-                View::VocabReview {
+                View::ItemReview {
                     submitting: true,
                     ..
                 }
