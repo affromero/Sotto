@@ -1,6 +1,6 @@
 # Self-Host Deployment Guide
 
-**Date:** 2026-05-18
+**Date:** 2026-06-13
 
 **Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private episode storage, and no hosted Sotto services.
 
