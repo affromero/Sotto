@@ -13,11 +13,11 @@
   --mono: var(--font-ibm-plex-mono, 'ui-monospace', monospace);
   --sans: var(--font-ibm-plex-sans, 'system-ui', sans-serif);
 
-  /* accent — locked aula blue */
-  --accent: #3f4fb0;
+  /* accent — user-customizable (falls back to aula blue) */
+  --accent: var(--user-accent, #3f4fb0);
   --accent-fg: #f0f2ff;
-  --accent-soft: color-mix(in oklab, #3f4fb0 14%, transparent);
-  --accent-line: color-mix(in oklab, #3f4fb0 42%, transparent);
+  --accent-soft: color-mix(in oklab, var(--user-accent, #3f4fb0) 14%, transparent);
+  --accent-line: color-mix(in oklab, var(--user-accent, #3f4fb0) 42%, transparent);
 
   /* aula palette */
   --paper: #f5f4f0;
@@ -40,6 +40,18 @@
 
   font-family: var(--sans);
   color: var(--ink);
+}
+
+/* paper warm palette — light mode only */
+:global(html[data-palette='paper']:not([data-theme='dark'])) .surface {
+  --paper: #f1eadc;
+  --paper-2: #e7decb;
+  --well: #ede4d3;
+  --ink: #221c15;
+  --ink-soft: #6a604f;
+  --ink-mute: #9a8e7a;
+  --line: rgba(34, 28, 21, 0.12);
+  --line-strong: rgba(34, 28, 21, 0.24);
 }
 
 /* dark mode — terminal palette, driven by the global ThemeProvider toggle */

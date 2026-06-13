@@ -20,7 +20,7 @@ export default async function AdminProvidersPage() {
   ]);
 
   const aiProviders = getAllAiProviderMeta()
-    .filter((p) => p.id !== 'claude-code' && p.id !== 'deepgram' && p.id !== 'assemblyai')
+    .filter((p) => p.id !== 'deepgram' && p.id !== 'assemblyai')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,

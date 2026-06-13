@@ -72,6 +72,17 @@ export async function generateResponse(
     return { ...result, model: options.model };
   }
 
+  // Per-request codex routing (model "codex" or "codex:<model>")
+  if (options?.model === 'codex' || options?.model?.startsWith('codex:')) {
+    const { executeCodex } = await import('./codex-client');
+    const { serializeMessages } = await import('./claude-code-client');
+    const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
+    const result = await executeCodex(systemPrompt, serializeMessages(textMessages), {
+      model: options.model,
+    });
+    return { ...result, model: options.model };
+  }
+
   // Per-request local routing (OpenAI-compatible local server, e.g. "local:qwen3").
   // Routed by prefix here so the registry guardrail below never sees the
   // host-defined model name.
@@ -205,6 +216,16 @@ export async function* streamResponse(
       model: ccModel,
       useWebSearch: hasWebSearch,
     });
+    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
+    return;
+  }
+
+  // Per-request codex routing (model "codex" or "codex:<model>")
+  if (options?.model === 'codex' || options?.model?.startsWith('codex:')) {
+    const { streamCodex } = await import('./codex-client');
+    const { serializeMessages } = await import('./claude-code-client');
+    const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
+    yield* streamCodex(systemPrompt, serializeMessages(textMessages), { model: options.model });
     options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
     return;
   }

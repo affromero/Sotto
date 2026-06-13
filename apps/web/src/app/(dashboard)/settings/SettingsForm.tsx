@@ -14,7 +14,7 @@ import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
-import { ThemeSelector } from '@/components/settings/ThemeSelector';
+import { AppearanceControls } from '@/components/settings/AppearanceControls';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
 
@@ -44,6 +44,7 @@ interface SettingsFormProps {
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
+  aiSystemProviders: Array<{ id: string; label: string; description: string; available: boolean }>;
   ttsProviderMeta: TtsProviderClientMeta[];
   initialPreferredAiModel: string | null;
   initialEmailNotifications: boolean;
@@ -70,6 +71,7 @@ export function SettingsForm({
   configuredTtsProviders,
   configuredAiProviders,
   aiProviderMeta,
+  aiSystemProviders,
   ttsProviderMeta,
   initialPreferredAiModel,
   initialEmailNotifications,
@@ -268,8 +270,8 @@ export function SettingsForm({
       {/* Appearance Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Appearance</h2>
-        <p className={styles.sectionDesc}>Choose your preferred theme</p>
-        <ThemeSelector />
+        <p className={styles.sectionDesc}>Choose your mode, light palette, and accent color</p>
+        <AppearanceControls />
       </section>
 
       {/* Household Section — owner only */}
@@ -663,7 +665,11 @@ export function SettingsForm({
           Configure your preferred AI providers for lesson generation, Q&amp;A, and live conversation.
           Keys are encrypted with AES-256-GCM.
         </p>
-        <AiProviderCards initialConfigured={configuredAiProviders} providerMeta={aiProviderMeta} />
+        <AiProviderCards
+          initialConfigured={configuredAiProviders}
+          providerMeta={aiProviderMeta}
+          systemProviders={aiSystemProviders}
+        />
       </section>
 
       {/* TTS Provider Keys */}

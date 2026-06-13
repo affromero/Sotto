@@ -43,7 +43,7 @@ export function getPricetokenModelInfo(modelId: string): {
   };
 }
 
-export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'local' | 'together' | 'deepgram' | 'assemblyai';
+export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'codex' | 'local' | 'together' | 'deepgram' | 'assemblyai';
 
 export interface AiProviderAuthField {
   key: string;
@@ -169,6 +169,22 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
       { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', contextWindow: 200_000, maxOutputTokens: 64_000 },
       { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', contextWindow: 200_000, maxOutputTokens: 128_000 },
     ],
+    auth: {
+      fields: [],
+      validate: async () => true,
+    },
+  },
+
+  // Codex CLI — like claude-code, a keyless system-linked agent. Routes through
+  // `codex exec` (read-only sandbox); excluded from the BYOK client DTO and
+  // surfaced separately as a system-linked provider when the `codex` CLI exists.
+  codex: {
+    id: 'codex',
+    displayName: 'Codex (CLI)',
+    shortLabel: 'Codex',
+    defaultModel: '',
+    getApiKeyUrl: '',
+    models: [],
     auth: {
       fields: [],
       validate: async () => true,
@@ -357,7 +373,7 @@ export function getAiModelDisplayName(modelId: string): string {
 // ---------------------------------------------------------------------------
 
 export interface AiProviderClientMeta {
-  id: Exclude<AiProviderId, 'claude-code' | 'local'>;
+  id: Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'>;
   displayName: string;
   getApiKeyUrl: string;
   models: AiModelOption[];
@@ -366,7 +382,7 @@ export interface AiProviderClientMeta {
   badge: 'optional' | 'free' | null;
 }
 
-const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'local'>, { description: string; badge: 'optional' | 'free' | null }> = {
+const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'>, { description: string; badge: 'optional' | 'free' | null }> = {
   anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
   openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
   google: { description: 'Gemini models with 1M context window', badge: 'optional' },
@@ -382,7 +398,7 @@ const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'loca
  */
 export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
   return Object.values(AI_PROVIDERS)
-    .filter((p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code' | 'local'> } => p.id !== 'claude-code' && p.id !== 'local')
+    .filter((p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'> } => p.id !== 'claude-code' && p.id !== 'codex' && p.id !== 'local')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,

@@ -28,7 +28,7 @@ const NAV: NavItem[] = [
     href: '/admin/providers',
     label: 'Providers & models',
     glyph: 'spark',
-    match: ['/admin/providers', '/admin/auto-models', '/admin/models'],
+    match: ['/admin/providers', '/admin/models'],
   },
   {
     href: '/admin/users',

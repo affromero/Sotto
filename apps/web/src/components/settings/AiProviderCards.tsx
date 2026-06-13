@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
+import { Glyph } from '@/components/Glyph';
 import styles from './ProviderCards.module.css';
 
 interface ProviderStatus {
@@ -13,15 +14,25 @@ interface ProviderStatus {
   isValid: boolean;
 }
 
+interface SystemProvider {
+  id: string;
+  label: string;
+  description: string;
+  available: boolean;
+}
+
 interface AiProviderCardsProps {
   initialConfigured: Array<ProviderStatus>;
   providerMeta: AiProviderClientMeta[];
+  /** CLI-backed agents linked from the host (Claude Code, Codex) — no API key. */
+  systemProviders?: SystemProvider[];
   onReadyChange?: (ready: boolean) => void;
 }
 
 export function AiProviderCards({
   initialConfigured,
   providerMeta,
+  systemProviders,
   onReadyChange,
 }: AiProviderCardsProps) {
   const [configured, setConfigured] = useState<Map<string, boolean>>(
@@ -118,7 +129,6 @@ export function AiProviderCards({
                   <span className={styles.cardNameRow}>
                     <span className={styles.cardName}>{provider.displayName}</span>
                     {provider.badge === 'free' && <Badge variant="success">Free</Badge>}
-                    {provider.badge === 'optional' && <Badge variant="system">Optional</Badge>}
                   </span>
                   <span className={styles.cardQuality}>{provider.description}</span>
                   <span className={styles.cardQuality}>{modelNames}</span>
@@ -222,6 +232,28 @@ export function AiProviderCards({
           </div>
         );
       })}
+
+      {systemProviders?.map((sp) => (
+        <div key={sp.id} className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardHeaderLeft}>
+              <Glyph name="plug" size={28} />
+              <div className={styles.cardInfo}>
+                <span className={styles.cardNameRow}>
+                  <span className={styles.cardName}>{sp.label}</span>
+                  <Badge variant="system">System</Badge>
+                </span>
+                <span className={styles.cardQuality}>{sp.description}</span>
+              </div>
+            </div>
+            {sp.available ? (
+              <span className={styles.statusConnected}>Connected</span>
+            ) : (
+              <span className={styles.statusNone}>CLI not found</span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
