@@ -209,7 +209,7 @@ export default function PrivacyPage() {
             You can export all your data at any time from your account settings or by
             calling <code>GET /api/v1/users/me/export</code>. The export includes your
             profile, lessons, scripts, discovery conversations, interactions,
-            saves, ratings, feedback, taste quiz answers, and saved ideas, all in a
+            saves, and feedback, all in a
             single JSON file.
           </p>
 

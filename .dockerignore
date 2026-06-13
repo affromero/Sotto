@@ -42,4 +42,3 @@ apps/web/prisma/migrations
 .vercel
 
 # Mobile app (not needed for web Docker builds)
-apps/mobile
