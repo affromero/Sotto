@@ -2,12 +2,12 @@
 
 ## `shared/` (`@sotto/shared`)
 
-Shared code consumed by both `apps/web/` and `apps/mobile/`.
+Shared code consumed by `apps/web/`.
 
 ### What belongs here
 
 - **Types** — Prisma-free interfaces and string union enums (e.g., `EpisodeStatus`, `Speaker`)
-- **Validations** — Zod schemas used for client-side validation on both platforms
+- **Validations** — Zod schemas used for client-side validation
 - **Design tokens** — Colors, spacing, typography constants from the "Warm Intimacy" design system
 - **Content badges** — `content-badge.ts` — badge logic for content type, AI/TTS provider, and language
 - **Provider display** — `provider-display.ts` — display name maps and label helpers for AI/TTS providers, models, and languages
@@ -15,7 +15,7 @@ Shared code consumed by both `apps/web/` and `apps/mobile/`.
 ### What does NOT belong here
 
 - **Prisma models** — server-side only, stay in `apps/web/`
-- **React components** — platform-specific (CSS Modules vs StyleSheet)
+- **React components** — web-only (CSS Modules)
 - **Server-side libs** — auth, queue, storage clients stay in `apps/web/src/lib/`
 - **API route logic** — stays in `apps/web/src/app/api/v1/`
 

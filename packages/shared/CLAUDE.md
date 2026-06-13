@@ -1,6 +1,6 @@
 # @sotto/shared — Shared Types, Validations & Design Tokens
 
-Prisma-free package consumed by both `apps/web/` and `apps/mobile/`.
+Prisma-free package consumed by `apps/web/`.
 
 ## Structure
 
@@ -10,8 +10,8 @@ src/
 │   ├── enums.ts          # String union equivalents of Prisma enums — includes language-learning enums: CefrLevel, SkillType, ClassStatus, SectionStatus, SpeakingGradeStatus, EdgeType, PracticeKind, PracticeStatus, ExamInstitution, MockExamStatus, PedagogyStyle (language pairs are flexible native→target ISO codes, no enum)
 │   ├── episode.ts        # EpisodeSummary, EpisodeDetail, SegmentData, CreateEpisodeRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData (includes contentDomain: string | null), VerificationLayerResult
-│   ├── class-document.ts # ClassDocument, ClassDocumentSection, ClassDocumentQuestion, ClassDocumentPrompt — render contract for web worksheet page and mobile PencilKit ClassWorksheet
-│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, VerificationMode, TasteQuestion, TasteAnswer
+│   ├── class-document.ts # ClassDocument, ClassDocumentSection, ClassDocumentQuestion, ClassDocumentPrompt — render contract for the web worksheet page
+│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, VerificationMode
 │   ├── player.ts         # PlayerState, PlayerControls
 │   ├── interaction.ts    # InteractionRequest, InteractionResponse
 │   ├── notification.ts   # NotificationData, PushSubscriptionData
@@ -31,7 +31,7 @@ src/
 
 - **No Prisma imports** — use string union types from `enums.ts` instead
 - **No React imports** — types only, no components or hooks
-- **No Node.js APIs** — must work in both web and React Native
+- **No Node.js APIs** — must stay browser-safe
 - **Keep enums in sync** — when Prisma schema adds an enum value, add it to `enums.ts` too
 
 ## How web app consumes this
