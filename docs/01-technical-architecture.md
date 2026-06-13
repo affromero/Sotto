@@ -2,6 +2,8 @@
 
 > **Date**: 2026-06-13
 >
+> **Diagrams**: [06-architecture-diagrams.md](./06-architecture-diagrams.md) renders every flow below as Mermaid.
+>
 > **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
 
 ---
@@ -65,7 +67,7 @@ The active data model is learner and course oriented. Important groups:
 
 | Group | Models |
 |---|---|
-| Identity | `User`, `Account`, `Session`, `VerificationToken`, `ApiKey` |
+| Identity | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`) |
 | Curriculum | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle` |
 | Enrollment | `Course`, `CourseNote`, `PlacementResult` |
 | Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`, `ClassInkLayer` |
@@ -136,13 +138,17 @@ Audio statuses remain:
 PENDING
 DISCOVERING
 EXTRACTING
+RESEARCHING
+PLANNING
 SCRIPTING
-VERIFYING_SCRIPT
-VALIDATING_REFERENCES
+COMPILING
 SCRIPT_READY
 GENERATING_AUDIO
 STITCHING
 READY
+UPDATING
+IMPORTING
+TRANSCRIBING
 FAILED
 ```
 
