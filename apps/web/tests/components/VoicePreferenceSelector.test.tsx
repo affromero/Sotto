@@ -29,7 +29,7 @@ describe('VoicePreferenceSelector', () => {
     expect(screen.getByText('Host Voice')).toBeInTheDocument();
     expect(screen.getByLabelText('Host Voice')).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Auto-assign (recommended)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Auto-assign' })).toBeInTheDocument();
   });
 
   it('disables select while loading and enables after loading completes', async () => {
@@ -130,6 +130,6 @@ describe('VoicePreferenceSelector', () => {
 
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(1);
-    expect(options[0]).toHaveTextContent('Auto-assign (recommended)');
+    expect(options[0]).toHaveTextContent('Auto-assign');
   });
 });

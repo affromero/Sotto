@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
@@ -134,7 +133,6 @@ export function TtsProviderCards({
                 <div className={styles.cardInfo}>
                   <span className={styles.cardNameRow}>
                     <span className={styles.cardName}>{provider.displayName}</span>
-                    {provider.recommended && <Badge variant="success">Recommended</Badge>}
                   </span>
                   <span className={styles.cardQuality}>
                     {qualityLabel} · {modelCount} {modelCount === 1 ? 'model' : 'models'}
