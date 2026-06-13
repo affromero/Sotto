@@ -7,18 +7,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ProfileMenu } from './ProfileMenu';
 import styles from './TopBar.module.css';
 
-interface TopBarUser {
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-  id?: string;
-}
-
-interface TopBarProps {
-  user?: TopBarUser | null;
-}
-
-export function TopBar({ user }: TopBarProps) {
+export function TopBar() {
   return (
     <header className={styles.topBar}>
       <Link href="/" className={styles.logo}>
@@ -41,13 +30,7 @@ export function TopBar({ user }: TopBarProps) {
           <Search size={18} aria-hidden="true" />
         </button>
         <ThemeToggle />
-        {user ? (
-          <ProfileMenu />
-        ) : (
-          <Link href="/auth/login" className={styles.signIn}>
-            Sign In
-          </Link>
-        )}
+        <ProfileMenu />
       </div>
     </header>
   );

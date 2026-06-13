@@ -30,7 +30,6 @@ describe('robots.ts', () => {
     const disallowed = defaultRule.disallow;
     expect(disallowed).toContain('/api/v1/');
     expect(disallowed).toContain('/admin');
-    expect(disallowed).toContain('/auth/');
     expect(disallowed).toContain('/dashboard');
     expect(disallowed).toContain('/create');
     expect(disallowed).toContain('/settings');

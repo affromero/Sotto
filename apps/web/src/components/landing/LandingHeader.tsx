@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { getPublicGithubUrl } from '@/lib/public-links';
 import { GlassBead } from './GlassBead';
 import styles from './LandingHeader.module.css';
@@ -16,17 +14,12 @@ const NAV_LINKS = [
 ] as const;
 
 /**
- * Top navigation for the landing page. Auth-aware: signed-in learners see a
- * "Dashboard" entry; signed-out visitors see "Sign in". The public demo points
- * to the welcome flow instead of auth. Hydration-safe via useHasMounted so the
- * server render is stable.
+ * Top navigation for the landing page. Sotto is fully self-hosted with no login,
+ * so the CTA goes straight to the course. The managed showcase (demoMode) points
+ * to the welcome flow instead.
  */
 export function LandingHeader({ demoMode = false }: { demoMode?: boolean }) {
-  const { isAuthenticated } = useAuth();
-  const mounted = useHasMounted();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const signedIn = mounted && isAuthenticated;
 
   return (
     <header className={styles.header}>
@@ -65,13 +58,9 @@ export function LandingHeader({ demoMode = false }: { demoMode?: boolean }) {
             <Link href="/welcome" className={styles.navCta}>
               Try demo
             </Link>
-          ) : signedIn ? (
-            <Link href="/dashboard" className={styles.navCta}>
-              Dashboard
-            </Link>
           ) : (
-            <Link href="/auth/login" className={styles.navCta}>
-              Sign in
+            <Link href="/learn" className={styles.navCta}>
+              Start learning
             </Link>
           )}
         </div>

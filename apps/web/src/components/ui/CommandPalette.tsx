@@ -10,9 +10,7 @@ import {
   Key,
   Sun,
   Moon,
-  LogOut,
 } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import styles from './CommandPalette.module.css';
 
@@ -28,9 +26,7 @@ export function CommandPalette() {
   const [closing, setClosing] = useState(false);
   const [search, setSearch] = useState('');
   const router = useRouter();
-  const { data: session } = useSession();
   const { resolvedTheme, setTheme } = useTheme();
-  const userRole = (session?.user as { role?: string } | undefined)?.role;
 
   // Animated close: set closing state, wait for animation, then unmount
   const handleOpenChange = useCallback(
@@ -82,13 +78,6 @@ export function CommandPalette() {
     handleOpenChange(false);
   }, [resolvedTheme, setTheme, handleOpenChange]);
 
-  const signOut = useCallback(() => {
-    handleOpenChange(false);
-    router.push('/auth/signout');
-  }, [router, handleOpenChange]);
-
-  const isAdmin = userRole === 'ADMIN';
-
   return (
     <Command.Dialog
       open={open}
@@ -119,16 +108,14 @@ export function CommandPalette() {
               <span className={styles.itemLabel}>{label}</span>
             </Command.Item>
           ))}
-          {isAdmin && (
-            <Command.Item
-              value="Admin Panel"
-              onSelect={() => navigate('/admin')}
-              className={styles.item}
-            >
-              <Settings size={16} aria-hidden="true" />
-              <span className={styles.itemLabel}>Admin Panel</span>
-            </Command.Item>
-          )}
+          <Command.Item
+            value="Admin Panel"
+            onSelect={() => navigate('/admin')}
+            className={styles.item}
+          >
+            <Settings size={16} aria-hidden="true" />
+            <span className={styles.itemLabel}>Admin Panel</span>
+          </Command.Item>
         </Command.Group>
 
         {/* Actions */}
@@ -146,10 +133,6 @@ export function CommandPalette() {
             <span className={styles.itemLabel}>
               Switch to {resolvedTheme === 'dark' ? 'Light' : 'Dark'} Mode
             </span>
-          </Command.Item>
-          <Command.Item value="Sign Out" onSelect={signOut} className={styles.item}>
-            <LogOut size={16} aria-hidden="true" />
-            <span className={styles.itemLabel}>Sign Out</span>
           </Command.Item>
         </Command.Group>
       </Command.List>

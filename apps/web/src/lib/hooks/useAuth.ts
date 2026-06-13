@@ -1,68 +1,55 @@
 'use client';
 
-import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react';
-import { useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   name: string | null;
   email: string | null;
   image: string | null;
-  role: string;
-  isImpersonating?: boolean;
-  impersonatedRole?: string;
-  originalUser?: { id: string; name: string | null; image: string | null };
+  role: 'ADMIN';
 }
 
 interface UseAuthReturn {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  signIn: () => void;
-  signOut: () => void;
-  impersonate: (userId: string) => Promise<void>;
-  stopImpersonating: () => Promise<void>;
 }
 
+/**
+ * Sotto is fully self-hosted for a single learner — there is no login. The
+ * current user is the one local owner; their profile is fetched once from
+ * /api/v1/users/me so the header can show a name and avatar. There is no
+ * sign-in, sign-out, or account switching.
+ */
 export function useAuth(): UseAuthReturn {
-  const { data: session, status, update } = useSession();
-  const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isLoading = status === 'loading';
-  const isAuthenticated = status === 'authenticated';
-
-  const sessionUser = session?.user as Record<string, unknown> | undefined;
-  const user: AuthUser | null = sessionUser
-    ? {
-        id: sessionUser.id as string,
-        name: (sessionUser.name as string) ?? null,
-        email: (sessionUser.email as string) ?? null,
-        image: (sessionUser.image as string) ?? null,
-        role: (sessionUser.role as string) ?? 'USER',
-        isImpersonating: (sessionUser.isImpersonating as boolean) ?? false,
-        impersonatedRole: (sessionUser.impersonatedRole as string) ?? undefined,
-        originalUser: sessionUser.originalUser as AuthUser['originalUser'],
-      }
-    : null;
-
-  const signIn = useCallback(() => {
-    nextAuthSignIn(undefined, { callbackUrl: '/learn' });
+  useEffect(() => {
+    let active = true;
+    fetch('/api/v1/users/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { id?: string; name?: string | null; email?: string | null; image?: string | null } | null) => {
+        if (!active) return;
+        if (data?.id) {
+          setUser({
+            id: data.id,
+            name: data.name ?? null,
+            email: data.email ?? null,
+            image: data.image ?? null,
+            role: 'ADMIN',
+          });
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const signOut = useCallback(() => {
-    nextAuthSignOut({ callbackUrl: '/' });
-  }, []);
-
-  const impersonate = useCallback(async (userId: string) => {
-    await update({ impersonateUserId: userId });
-    router.refresh();
-  }, [update, router]);
-
-  const stopImpersonating = useCallback(async () => {
-    await update({ stopImpersonating: true });
-    router.refresh();
-  }, [update, router]);
-
-  return { user, isAuthenticated, isLoading, signIn, signOut, impersonate, stopImpersonating };
+  return { user, isAuthenticated: true, isLoading };
 }

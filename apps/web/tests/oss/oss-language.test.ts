@@ -354,7 +354,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/privacy/page.tsx',
       'apps/web/src/app/feedback/page.tsx',
       'apps/web/src/app/join/page.tsx',
-      'apps/web/src/app/api/v1/auth/mobile/route.ts',
       'apps/web/src/app/opengraph-image.tsx',
       'apps/web/public/manifest.json',
       'apps/web/prisma/seed.ts',

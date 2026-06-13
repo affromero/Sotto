@@ -1,8 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { getPublicGithubUrl } from '@/lib/public-links';
 import styles from './LandingCTA.module.css';
 
@@ -33,23 +31,13 @@ const ArrowIcon = () => (
 );
 
 /**
- * Auth-aware call to action.
- *
- * - Demo       → "Try the welcome flow" → /welcome
- * - Signed in  → "Continue your course" → /learn
- * - Signed out → "Start your course" → /auth/login (the profile picker)
- * - Secondary  → "View on GitHub" (the open-source repo)
+ * Primary call to action. Sotto is fully self-hosted with no login, so the
+ * button goes straight to the course. The managed showcase (demoMode) sends
+ * visitors through the mock welcome flow instead.
  */
 export function LandingCTA({ withGhost = false, demoMode = false }: LandingCTAProps) {
-  const { isAuthenticated } = useAuth();
-  const mounted = useHasMounted();
-  const signedIn = mounted && isAuthenticated;
-  const primaryHref = demoMode ? '/welcome' : signedIn ? '/learn' : '/auth/login';
-  const primaryLabel = demoMode
-    ? 'Try the welcome flow'
-    : signedIn
-      ? 'Continue your course'
-      : 'Start your course';
+  const primaryHref = demoMode ? '/welcome' : '/learn';
+  const primaryLabel = demoMode ? 'Try the welcome flow' : 'Start your course';
 
   return (
     <div className={styles.actions}>
