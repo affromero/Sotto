@@ -14,7 +14,6 @@ export function Footer() {
             <h4>Product</h4>
             <a href="/languages">Languages</a>
             <a href="/developers">Developers</a>
-            <a href="/changelog">Changelog</a>
             <a href="https://github.com/affromero/Sotto" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>

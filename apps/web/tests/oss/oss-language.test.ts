@@ -357,7 +357,6 @@ describe('open-source language-learning OSS surfaces', () => {
       '.env.oss.example',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
-      'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
       'apps/web/src/components/layout/Footer.tsx',
@@ -516,7 +515,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
       'apps/web/src/lib/CLAUDE.md',
-      'CHANGELOG.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -609,7 +607,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps automation harnesses private-first', () => {
     const harnessSources = [
-      'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/auth-guards.ts',

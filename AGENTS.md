@@ -24,7 +24,7 @@ Run from repo root unless noted.
 
 ## Testing Guidelines
 - Web uses Vitest; `apps/web/tests/` contains unit/integration/smoke tests.
-- `packages/maps` and `packages/verification-standard` also use Vitest.
+- `packages/verification-standard` also uses Vitest.
 - If you change a source file, update its corresponding tests in the same PR.
 
 ## Commit & Pull Request Guidelines
