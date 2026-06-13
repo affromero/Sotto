@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   // Try Redis cache first (shared, non-user-specific data)
   const cacheKey = `episode:public:${episodeId}`;
   let episode: Record<string, any> | null = await cache.get(cacheKey);
-  if (episode?.visibility !== 'PUBLIC') {
+  if (episode?.visibility !== 'UNLISTED') {
     episode = null;
   }
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    if (episode?.visibility === 'PUBLIC') {
+    if (episode?.visibility === 'UNLISTED') {
       const ttl = getEpisodeCacheTtl(episode.status);
       await cache.set(cacheKey, episode, ttl);
     }
@@ -67,11 +67,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
   const [resolvedAudioUrl, resolvedSegments] = await Promise.all([
-    resolveAudioUrl(episode.audioUrl, episode.visibility),
+    resolveAudioUrl(episode.audioUrl),
     Promise.all(
       episode.segments.map(async (s: Record<string, unknown>) => ({
         ...s,
-        audioUrl: await resolveAudioUrl(s.audioUrl as string | null, episode.visibility),
+        audioUrl: await resolveAudioUrl(s.audioUrl as string | null),
       }))
     ),
   ]);

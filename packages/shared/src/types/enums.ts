@@ -19,7 +19,7 @@ export type EpisodeStatus =
   | 'IMPORTING'
   | 'TRANSCRIBING';
 
-export type EpisodeVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+export type EpisodeVisibility = 'UNLISTED' | 'PRIVATE';
 
 export type EpisodeSource =
   | 'WEB'
@@ -47,7 +47,6 @@ export type NotificationType =
   | 'EPISODE_READY'
   | 'EPISODE_FAILED'
   | 'KEY_INVALID'
-  | 'QUESTION_ON_YOUR_EPISODE'
   | 'SCRIPT_READY'
   | 'PLATFORM_ANNOUNCEMENT'
   | 'PIPELINE_FAILURE';

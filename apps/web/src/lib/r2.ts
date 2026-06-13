@@ -123,17 +123,12 @@ export function extractR2Key(urlOrKey: string): string {
 }
 
 /**
- * Resolve an audio URL based on episode visibility.
- * PUBLIC → return the CDN URL as-is.
- * PRIVATE/UNLISTED → return a presigned URL (1hr TTL).
+ * Resolve an audio URL. All non-null audio is served via a presigned URL
+ * (1hr TTL); private and unlisted lessons are never exposed as a raw CDN URL.
  * null → return null.
  */
-export async function resolveAudioUrl(
-  audioUrl: string | null,
-  visibility: string
-): Promise<string | null> {
+export async function resolveAudioUrl(audioUrl: string | null): Promise<string | null> {
   if (!audioUrl) return null;
-  if (visibility === 'PUBLIC') return audioUrl;
   const key = extractR2Key(audioUrl);
   return getPresignedUrl(key);
 }

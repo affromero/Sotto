@@ -273,7 +273,7 @@ describe('updateEpisodeSchema', () => {
     const result = updateEpisodeSchema.safeParse({
       title: 'New Title',
       topic: 'New Topic',
-      visibility: 'PUBLIC',
+      visibility: 'UNLISTED',
     });
     expect(result.success).toBe(true);
   });
