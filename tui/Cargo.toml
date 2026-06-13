@@ -1,0 +1,44 @@
+[package]
+name = "sotto"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Sotto terminal client — your course in the terminal"
+license = "MIT"
+
+[[bin]]
+name = "sotto"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = { version = "0.30", features = ["serde"] }
+crossterm = { version = "0.29", features = ["event-stream", "serde"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures = "0.3"
+color-eyre = "0.6"
+clap = { version = "4", features = ["derive"] }
+
+# reqwest 0.13 is required because progenitor-client 0.14 depends on
+# reqwest ^0.13.2; the generated client and our wrapper must share the
+# same reqwest major version or the `reqwest::Client` type will not match.
+# In 0.13 the rustls TLS feature is named `rustls` (it bundles the
+# platform verifier), not `rustls-tls` as in 0.12.
+reqwest = { version = "0.13", default-features = false, features = [
+    "json",
+    "multipart",
+    "rustls",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+directories = "6"
+
+# Generated API client + its runtime requirements.
+progenitor = "0.14"
+progenitor-client = "0.14"
+bytes = "1"
+futures-core = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
