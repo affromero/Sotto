@@ -125,6 +125,16 @@ pub(crate) enum Action {
     GraphLoaded(u64, ApiResult<types::MemoryGraphResponse>),
     /// `GET /onboarding/config` returned (or failed).
     ConfigLoaded(u64, ApiResult<types::OnboardingConfigResponse>),
+
+    // --- Adaptive-listening Q&A (P6e) ---
+    /// Toggle the "ask a question" overlay on a listening screen (`a`).
+    ToggleAsk,
+    /// `POST /episodes/{id}/interact` returned (or failed) — the PENDING ask.
+    InteractionAsked(u64, ApiResult<types::InteractionResponse>),
+    /// `GET /episodes/{id}/interact/{interactionId}` poll returned (or failed).
+    InteractionPolled(u64, ApiResult<types::InteractionResponse>),
+    /// Answer-audio bytes downloaded (or failed) for spoken-clarification playback.
+    AnswerAudioDownloaded(u64, ApiResult<Vec<u8>>),
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries

@@ -10,6 +10,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { endpoints, type EndpointDef } from '../src/contracts/endpoints';
 import {
+  askInteractionRequestSchema,
   cefrLevelSchema,
   classDetailResponseSchema,
   classEpisodeRefSchema,
@@ -32,6 +33,8 @@ import {
   generatePlacementResponseSchema,
   healthCheckResultSchema,
   healthResponseSchema,
+  interactionResponseSchema,
+  interactionStatusSchema,
   memoryEdgeSchema,
   memoryGraphResponseSchema,
   memoryNodeSchema,
@@ -161,6 +164,9 @@ const namedSchemas: Record<string, z.ZodType> = {
   MemoryGraphResponse: memoryGraphResponseSchema,
   OnboardingInfra: onboardingInfraSchema,
   OnboardingConfigResponse: onboardingConfigResponseSchema,
+  InteractionStatus: interactionStatusSchema,
+  AskInteractionRequest: askInteractionRequestSchema,
+  InteractionResponse: interactionResponseSchema,
   RedeemPairingRequest: redeemPairingRequestSchema,
   RedeemPairingResponse: redeemPairingResponseSchema,
   PairedUser: pairedUserSchema,

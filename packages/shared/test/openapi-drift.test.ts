@@ -7,12 +7,14 @@ import {
 } from '../scripts/generate-openapi';
 import { endpoints } from '../src/contracts';
 import {
+  askInteractionRequestSchema,
   classDetailResponseSchema,
   coursesListResponseSchema,
   episodeDetailResponseSchema,
   examDetailResponseSchema,
   generatePlacementResponseSchema,
   healthResponseSchema,
+  interactionResponseSchema,
   memoryGraphResponseSchema,
   nextClassCreatedResponseSchema,
   nextClassDoneResponseSchema,
@@ -125,6 +127,8 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/placement',
         'GET /api/v1/courses/{courseId}/graph',
         'GET /api/v1/onboarding/config',
+        'POST /api/v1/episodes/{episodeId}/interact',
+        'GET /api/v1/episodes/{episodeId}/interact/{interactionId}',
         'POST /api/v1/auth/pair/redeem',
       ].sort(),
     );
@@ -171,6 +175,8 @@ describe('openapi.json drift guard', () => {
       'MemoryEdge',
       'MemoryGraphResponse',
       'OnboardingInfra',
+      // The interaction response is a subset of the richer Prisma row -> open.
+      'InteractionResponse',
     ]) {
       expect(schemas[open].additionalProperties).not.toBe(false);
     }
@@ -201,6 +207,8 @@ describe('openapi.json drift guard', () => {
       'SubmitPlacementRequest',
       'SubmitPlacementResponse',
       'OnboardingConfigResponse',
+      // The ask request is the exact body the route validates -> closed.
+      'AskInteractionRequest',
     ]) {
       expect(schemas[closed].additionalProperties).toBe(false);
     }
@@ -324,6 +332,13 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/placement', 'post')).toEqual(['200']);
     expect(codes('/api/v1/courses/{courseId}/graph', 'get')).toEqual(['200']);
     expect(codes('/api/v1/onboarding/config', 'get')).toEqual(['200']);
+    // Ask creates a PENDING interaction (201); polling reads it (200).
+    expect(codes('/api/v1/episodes/{episodeId}/interact', 'post')).toEqual([
+      '201',
+    ]);
+    expect(
+      codes('/api/v1/episodes/{episodeId}/interact/{interactionId}', 'get'),
+    ).toEqual(['200']);
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
   });
 
@@ -813,6 +828,52 @@ describe('response schemas accept representative payloads', () => {
         selfHosted: false,
         isOwner: false,
         infra: null,
+      }),
+    ).toBeTruthy();
+  });
+
+  it('ask interaction request (the exact validated body)', () => {
+    expect(
+      askInteractionRequestSchema.parse({
+        question: 'What does casa mean?',
+        timestamp: 12.5,
+      }),
+    ).toBeTruthy();
+    // Empty question and negative timestamp are rejected.
+    expect(() =>
+      askInteractionRequestSchema.parse({ question: '', timestamp: 0 }),
+    ).toThrow();
+    expect(() =>
+      askInteractionRequestSchema.parse({ question: 'hi', timestamp: -1 }),
+    ).toThrow();
+  });
+
+  it('interaction response (pending -> answered, nullable fields)', () => {
+    // Pending: no answer yet.
+    expect(
+      interactionResponseSchema.parse({
+        id: 'int-1',
+        question: 'What does casa mean?',
+        timestamp: 0,
+        status: 'PENDING',
+        answer: null,
+        helpful: null,
+        segmentOrder: null,
+      }),
+    ).toBeTruthy();
+    // Answered: text present, and the POST's extra row fields are tolerated
+    // because the schema is `.loose()`.
+    expect(
+      interactionResponseSchema.parse({
+        id: 'int-1',
+        question: 'What does casa mean?',
+        timestamp: 0,
+        status: 'ANSWERED',
+        answer: 'It means house.',
+        helpful: true,
+        segmentOrder: 2,
+        userId: 'u-extra',
+        createdAt: '2026-06-13T00:00:00.000Z',
       }),
     ).toBeTruthy();
   });

@@ -1646,6 +1646,75 @@
         ],
         "additionalProperties": false
       },
+      "InteractionStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "ANSWERING",
+          "ANSWERED",
+          "RESOLVED",
+          "INCORPORATING",
+          "INCORPORATED"
+        ]
+      },
+      "AskInteractionRequest": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "timestamp": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "question",
+          "timestamp"
+        ],
+        "additionalProperties": false
+      },
+      "InteractionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InteractionStatus"
+          },
+          "answer": {
+            "type": "string",
+            "nullable": true
+          },
+          "helpful": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "segmentOrder": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "timestamp",
+          "status",
+          "answer",
+          "helpful",
+          "segmentOrder"
+        ],
+        "additionalProperties": {}
+      },
       "RedeemPairingRequest": {
         "type": "object",
         "properties": {
@@ -2328,6 +2397,90 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/episodes/{episodeId}/interact": {
+      "post": {
+        "operationId": "askInteraction",
+        "summary": "Ask a contextual question about an episode; queues an answer.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "episodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskInteractionRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/episodes/{episodeId}/interact/{interactionId}": {
+      "get": {
+        "operationId": "pollInteraction",
+        "summary": "Poll an interaction until it is ANSWERED with answer text.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "episodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "interactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "security": [
           {
             "bearerAuth": []

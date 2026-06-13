@@ -4,12 +4,14 @@
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
 import {
+  askInteractionRequestSchema,
   classDetailResponseSchema,
   coursesListResponseSchema,
   episodeDetailResponseSchema,
   examDetailResponseSchema,
   generatePlacementResponseSchema,
   healthResponseSchema,
+  interactionResponseSchema,
   memoryGraphResponseSchema,
   nextClassCreatedResponseSchema,
   nextClassDoneResponseSchema,
@@ -241,6 +243,26 @@ export const endpoints: EndpointDef[] = [
     summary: 'Instance + owner config (self-hosted, owner, non-secret infra).',
     auth: 'bearer',
     response: onboardingConfigResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'askInteraction',
+    method: 'POST',
+    path: '/api/v1/episodes/{episodeId}/interact',
+    summary: 'Ask a contextual question about an episode; queues an answer.',
+    auth: 'bearer',
+    request: askInteractionRequestSchema,
+    response: interactionResponseSchema,
+    // The route returns 201 with the created (PENDING) interaction.
+    successStatuses: [201],
+  },
+  {
+    id: 'pollInteraction',
+    method: 'GET',
+    path: '/api/v1/episodes/{episodeId}/interact/{interactionId}',
+    summary: 'Poll an interaction until it is ANSWERED with answer text.',
+    auth: 'bearer',
+    response: interactionResponseSchema,
     successStatuses: [200],
   },
   {

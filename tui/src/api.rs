@@ -198,6 +198,22 @@ pub(crate) trait Api: Send + Sync {
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse>;
     /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
     async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse>;
+
+    // --- Adaptive-listening Q&A (P6e) ---
+    /// Ask a contextual question about an episode at `timestamp` seconds; the
+    /// answer is generated asynchronously, so this returns a PENDING interaction.
+    async fn ask_interaction(
+        &self,
+        episode_id: &str,
+        question: String,
+        timestamp: f64,
+    ) -> Result<types::InteractionResponse>;
+    /// Poll an interaction until it is ANSWERED with answer text.
+    async fn poll_interaction(
+        &self,
+        episode_id: &str,
+        interaction_id: &str,
+    ) -> Result<types::InteractionResponse>;
 }
 
 /// Thin wrapper over the progenitor-generated [`GeneratedClient`] that bakes in
@@ -714,6 +730,43 @@ impl SottoClient {
             .map_err(|e| eyre!("failed to load config: {e}"))?;
         Ok(resp.into_inner())
     }
+
+    // --- Adaptive-listening Q&A -------------------------------------------
+
+    /// Ask a contextual question about an episode; returns a PENDING interaction.
+    pub async fn ask_interaction(
+        &self,
+        episode_id: &str,
+        question: String,
+        timestamp: f64,
+    ) -> Result<types::InteractionResponse> {
+        let question = types::AskInteractionRequestQuestion::try_from(question)
+            .map_err(|e| eyre!("invalid question: {e}"))?;
+        let body = types::AskInteractionRequest {
+            question,
+            timestamp,
+        };
+        let resp = self
+            .inner
+            .ask_interaction(episode_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to ask question: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Poll an interaction's status/answer.
+    pub async fn poll_interaction(
+        &self,
+        episode_id: &str,
+        interaction_id: &str,
+    ) -> Result<types::InteractionResponse> {
+        let resp = self
+            .inner
+            .poll_interaction(episode_id, interaction_id)
+            .await
+            .map_err(|e| eyre!("failed to poll question: {e}"))?;
+        Ok(resp.into_inner())
+    }
 }
 
 /// The real implementation of the [`Api`] seam: each method delegates to the
@@ -883,6 +936,23 @@ impl Api for SottoClient {
 
     async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse> {
         SottoClient::onboarding_config(self).await
+    }
+
+    async fn ask_interaction(
+        &self,
+        episode_id: &str,
+        question: String,
+        timestamp: f64,
+    ) -> Result<types::InteractionResponse> {
+        SottoClient::ask_interaction(self, episode_id, question, timestamp).await
+    }
+
+    async fn poll_interaction(
+        &self,
+        episode_id: &str,
+        interaction_id: &str,
+    ) -> Result<types::InteractionResponse> {
+        SottoClient::poll_interaction(self, episode_id, interaction_id).await
     }
 }
 
