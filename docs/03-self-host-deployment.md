@@ -72,8 +72,6 @@ Set these first:
 
 ```bash
 NEXT_PUBLIC_APP_URL=https://your-domain.example
-NEXTAUTH_URL=https://your-domain.example
-AUTH_SECRET=<openssl rand -base64 32>
 BYOK_ENCRYPTION_KEY=<openssl rand -base64 32>
 ```
 
@@ -169,20 +167,7 @@ docker compose -f docker-compose.app.yml -p sotto-green ps
 
 Exactly one app slot should be active after a successful deploy.
 
-## 8. OAuth Providers
-
-For each OAuth provider you enable, configure callback URLs using your exact app URL:
-
-| Provider | Callback |
-| --- | --- |
-| Google | `https://your-domain.example/api/v1/auth/callback/google` |
-| GitHub | `https://your-domain.example/api/v1/auth/callback/github` |
-| Twitter/X | `https://your-domain.example/api/v1/auth/callback/twitter` |
-| Apple | `https://your-domain.example/api/v1/auth/callback/apple` |
-
-Providers are optional. If you leave a provider's env vars unset, its button is not shown.
-
-## 9. Storage CORS
+## 8. Storage CORS
 
 For S3-compatible storage, restrict CORS to your exact public app URL:
 
@@ -199,7 +184,7 @@ For S3-compatible storage, restrict CORS to your exact public app URL:
 
 Do not use wildcard origins for private episode audio.
 
-## 10. Backups
+## 9. Backups
 
 Enable database backups:
 
@@ -218,7 +203,6 @@ Also back up the selected storage backend. A database backup without the generat
 | Caddy reload fails | `sudo caddy validate --config /etc/caddy/Caddyfile` |
 | Health check fails | `docker compose -f docker-compose.app.yml -p sotto-blue logs web --tail 80` and the green equivalent |
 | Workers do not process jobs | `REDIS_URL`, `DATABASE_URL`, and worker logs |
-| OAuth redirect mismatch | Provider callback must exactly match `NEXTAUTH_URL` plus `/api/v1/auth/callback/{provider}` |
 | Audio is not reachable | storage provider env, bucket CORS, and private stream route authorization |
 
 ## Update Flow

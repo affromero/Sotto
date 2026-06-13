@@ -65,7 +65,7 @@ Point your own domain at the VPS:
 | `AAAA` | `@` | `YOUR_SERVER_IPV6` if enabled |
 | `CNAME` | `www` | your apex domain, if you want a www redirect |
 
-Use the exact public URL in both `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL`.
+Use the exact public URL in `NEXT_PUBLIC_APP_URL`.
 
 ## Environment File
 
@@ -81,8 +81,7 @@ Minimum required production categories:
 
 | Category | Variables |
 | --- | --- |
-| Public URL | `NEXT_PUBLIC_APP_URL`, `NEXTAUTH_URL` |
-| Auth | `AUTH_SECRET` |
+| Public URL | `NEXT_PUBLIC_APP_URL` |
 | Database | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`, `DIRECT_DATABASE_URL` |
 | Redis | `REDIS_PASSWORD`, `REDIS_URL` |
 | Storage | `STORAGE_PROVIDER` plus the matching local or S3/R2 values |
@@ -173,7 +172,7 @@ For single-VPS deployments, also enable provider snapshots or equivalent block-v
 
 ## Release Checklist
 
-- `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL` use the operator's domain.
+- `NEXT_PUBLIC_APP_URL` uses the operator's domain.
 - `.env.production` exists on the server and is mode `600`.
 - Caddy imports `/etc/caddy/conf.d/*`.
 - DNS points to the server.

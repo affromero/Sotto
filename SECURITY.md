@@ -35,7 +35,7 @@ The following are in scope:
 
 The following are **out of scope**:
 
-- Third-party services (OAuth providers, AI/TTS providers)
+- Third-party services (AI/TTS providers)
 - Social engineering attacks against Sotto team members
 - Denial of service attacks
 - Issues in dependencies without a demonstrated exploit in Sotto
