@@ -200,17 +200,10 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     }
   }
 
-  const oauth: Record<string, boolean> = {
-    google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-    twitter: !!(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET),
-    apple: !!(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET),
-  };
-
   const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 
   const envKeys = [
-    'DATABASE_URL', 'REDIS_URL', 'AUTH_SECRET',
+    'DATABASE_URL', 'REDIS_URL',
     'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY',
     'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
     'CF_API_TOKEN',
@@ -225,7 +218,6 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     version: process.env.COMMIT_SHA || 'dev',
     timestamp: new Date().toISOString(),
     checks,
-    oauth,
     vapid,
     env,
   };

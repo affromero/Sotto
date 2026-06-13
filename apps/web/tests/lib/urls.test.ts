@@ -21,23 +21,18 @@ describe('url helpers', () => {
     expect(episodeUrl({ id: 'pod-1', slug: null }, 'alice')).toBe('/episode/pod-1');
   });
 
-  it('uses NEXT_PUBLIC_APP_URL as the primary app base URL', () => {
+  it('uses NEXT_PUBLIC_APP_URL as the app base URL', () => {
     expect(
       getAppBaseUrl({
         NEXT_PUBLIC_APP_URL: 'https://episodes.example.com/',
-        NEXTAUTH_URL: 'https://auth.example.com',
       })
     ).toBe('https://episodes.example.com');
-  });
-
-  it('falls back to NEXTAUTH_URL when the public app URL is not configured', () => {
-    expect(getAppBaseUrl({ NEXTAUTH_URL: 'http://localhost:3000/' })).toBe('http://localhost:3000');
   });
 
   it('rejects missing app URL configuration', () => {
     expect(() => getAppBaseUrl({})).toThrow(AppUrlConfigurationError);
     expect(() => getAppBaseUrl({})).toThrow(
-      'NEXT_PUBLIC_APP_URL or NEXTAUTH_URL is required to generate absolute Sotto URLs.'
+      'NEXT_PUBLIC_APP_URL is required to generate absolute Sotto URLs.'
     );
   });
 
@@ -65,7 +60,7 @@ describe('url helpers', () => {
     );
     expect(() =>
       getPublicAppBaseUrl({ NEXT_PUBLIC_APP_URL: 'http://selfhost.example.com' })
-    ).toThrow('NEXT_PUBLIC_APP_URL or NEXTAUTH_URL must use https for public bot links.');
+    ).toThrow('NEXT_PUBLIC_APP_URL must use https for public bot links.');
   });
 
   it('builds absolute episode URLs from explicit deployment configuration', () => {
