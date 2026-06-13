@@ -16,19 +16,16 @@ Open-source, self-hostable language-learning infrastructure — a full **[CEFR](
 [![Bring your own agent](https://img.shields.io/badge/agent-Claude%20Code%20%2F%20Codex-3F4FB0)](#bring-your-own-claude--codex)
 [![Runs 100% offline](https://img.shields.io/badge/runs-100%25%20offline-1F8A5B)](#run-it-100-offline)
 [![No social layer](https://img.shields.io/badge/social%20layer-none-565B68)](#why-sotto)
-
 [![CI](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/ci.yml?branch=main&label=CI)](https://github.com/affromero/Sotto/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/codeql.yml?branch=main&label=CodeQL)](https://github.com/affromero/Sotto/actions/workflows/codeql.yml)
 [![gitleaks](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/gitleaks.yml?branch=main&label=gitleaks)](https://github.com/affromero/Sotto/actions/workflows/gitleaks.yml)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
 [![Socket](https://img.shields.io/badge/Socket-protected-blueviolet?logo=socket.dev)](https://socket.dev)
-
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://prisma.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-1F8A5B.svg)](CONTRIBUTING.md)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/afromero)
 
