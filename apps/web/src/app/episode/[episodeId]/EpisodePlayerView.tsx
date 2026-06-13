@@ -772,7 +772,7 @@ export function EpisodePlayerView({
         )}
 
         {/* Made with Sotto */}
-        {!isOwner && episode.visibility === 'PUBLIC' && (
+        {!isOwner && episode.visibility === 'UNLISTED' && (
           <div className={styles.badgeSection}>
             <SottoBadge />
           </div>

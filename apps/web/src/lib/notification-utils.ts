@@ -34,7 +34,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'EPISODE_READY':
     case 'EPISODE_FAILED':
     case 'SCRIPT_READY':
-    case 'QUESTION_ON_YOUR_EPISODE':
       return episodeId ? `/episode/${episodeId}` : null;
 
     // Settings / BYOK

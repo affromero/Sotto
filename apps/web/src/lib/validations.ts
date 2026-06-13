@@ -95,7 +95,7 @@ export const updateEpisodeSchema = z
   .object({
     title: z.string().min(1).max(200).optional(),
     topic: z.string().min(1).max(5000).optional(),
-    visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+    visibility: z.enum(['UNLISTED', 'PRIVATE']).optional(),
   })
   .strict();
 

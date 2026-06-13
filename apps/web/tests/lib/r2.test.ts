@@ -466,19 +466,13 @@ describe('r2.ts', () => {
   });
 
   describe('resolveAudioUrl', () => {
-    it('returns public URL as-is for PUBLIC visibility', async () => {
-      const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
-      const result = await resolveAudioUrl(url, 'PUBLIC');
-      expect(result).toBe(url);
-    });
-
     it('returns presigned URL for PRIVATE visibility', async () => {
       (getSignedUrl as Mock).mockResolvedValue(
         'https://signed.example.com/episodes/abc/audio.mp3?X-Amz-Signature=xyz'
       );
 
       const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
-      const result = await resolveAudioUrl(url, 'PRIVATE');
+      const result = await resolveAudioUrl(url);
 
       expect(result).toBe('https://signed.example.com/episodes/abc/audio.mp3?X-Amz-Signature=xyz');
       expect(getSignedUrl).toHaveBeenCalled();
@@ -490,13 +484,13 @@ describe('r2.ts', () => {
       );
 
       const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
-      const result = await resolveAudioUrl(url, 'UNLISTED');
+      const result = await resolveAudioUrl(url);
 
       expect(result).toContain('sig=abc');
     });
 
     it('returns null for null input', async () => {
-      const result = await resolveAudioUrl(null, 'PRIVATE');
+      const result = await resolveAudioUrl(null);
       expect(result).toBeNull();
     });
   });

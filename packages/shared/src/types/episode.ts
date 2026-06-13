@@ -76,7 +76,7 @@ export interface CreateEpisodeRequest {
   ttsProvider?: string;
   ttsModel?: string;
   aiModel?: string;
-  visibility?: 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+  visibility?: 'UNLISTED' | 'PRIVATE';
   metadata?: {
     topic: string;
     depth?: string;
