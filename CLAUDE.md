@@ -176,6 +176,5 @@ Provider variables are optional until the selected workflow needs them. Common e
 
 ## Reference
 
-Active product plan: `docs/05-plan.md`
-Architecture: `docs/16-technical-architecture.md`
-Local setup: `docs/23-local-development.md`
+Architecture: `docs/01-technical-architecture.md`
+Local setup: `docs/05-local-development.md`

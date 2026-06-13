@@ -13,7 +13,7 @@ This service is also the reference implementation of Sotto's generic local TTS
 sidecar shape. If you are wrapping a different local model, use
 `TTS_PROVIDER=local`, keep the same `/health`, `/voices`, and `/tts` endpoints,
 and configure your voice IDs with `TTS_VOICES` or `TTS_HOST_VOICE` /
-`TTS_EXPERT_VOICE`. See `docs/28-provider-extension-guide.md`.
+`TTS_EXPERT_VOICE`. See `docs/06-provider-extension-guide.md`.
 
 ## HTTP contract
 
