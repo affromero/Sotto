@@ -6,6 +6,6 @@ import { defineConfig } from 'vitest/config';
 // Day-to-day test runs still happen inside apps/web against its own config.
 export default defineConfig({
   test: {
-    projects: ['apps/web'],
+    projects: ['apps/web', 'packages/shared'],
   },
 });
