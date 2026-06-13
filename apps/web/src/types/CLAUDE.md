@@ -15,7 +15,6 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
 | `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
 | `version.ts`      | EpisodeVersionData, EpisodeVersionSegmentData                                                                                                                     |
-| `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 
 ## Shared Package Re-export Pattern
 
@@ -32,7 +31,6 @@ This means `@/types/*` imports throughout the web app don't change.
 
 - `episode.ts` — uses `EpisodeStatus`, `EpisodeVisibility`, `EpisodeSource`, `Speaker`
 - `reference.ts` — uses `ReferenceType`, `VerificationStatus`
-- `next-auth.d.ts` — uses `UserRole` (NextAuth module augmentation)
 
 ## Rules
 
