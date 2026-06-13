@@ -1,6 +1,6 @@
 # docs/ - Project Documentation
 
-User-facing documentation for self-hosting, deploying, developing, and extending Sotto. These are the docs that matter to a public reader — a self-hoster or contributor. Internal vision, planning, and strategy notes are intentionally kept out.
+User-facing documentation for self-hosting, deploying, developing, and extending Sotto. These are the docs that matter to a public reader — a self-hoster or contributor.
 
 ## Docs
 
@@ -15,8 +15,8 @@ User-facing documentation for self-hosting, deploying, developing, and extending
 ## Rules
 
 - Every doc must open with a title, date, and one-line summary.
-- Keep docs aligned with code in the same commit; remove a surface's docs when the surface is removed.
-- Describe the self-hostable, private-first product only: no social primitives, no removed mobile app, no billing/plan gates.
+- Keep docs aligned with code in the same commit.
+- Describe the self-hostable, private-first, single-learner product.
 - Do not require Doppler for local OSS setup.
 - Document explicit provider selection and typed setup errors, never provider fallback chains.
 - Use tables for comparisons and code blocks for exact commands or payloads.

@@ -78,20 +78,7 @@ The active data model is learner and course oriented. Important groups:
 | Provider config | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings |
 | Operations | queue/job metadata, reports, audit/admin records, usage and cost records |
 
-`Episode` remains because the listening skill reuses the existing audio engine for script generation, verification, TTS, stitching, playback, and references. It is an implementation detail for listening sections, listening practice, and exam listening, not a current episode-platform product.
-
-Removed social primitives must stay removed:
-
-- `Follow`
-- `Comment`
-- `Like`
-- `CollectionFollow`
-- `Activity`
-- `InteractionVote`
-- episode fork lineage fields
-- public engagement counters for likes, comments, forks, and followers
-
-Billing, plan, tier, quota, and paid feature-gate models must not control access to the learning loop.
+`Episode` is the audio engine the listening skill reuses — script generation, verification, TTS, stitching, playback, and references — backing listening sections, listening practice, and exam listening.
 
 ---
 
@@ -342,15 +329,14 @@ If managed infrastructure exists, it reuses the same architecture:
 Boundaries:
 
 - Privacy stays available on OSS and local paths.
-- There are no paid feature tiers, daily limits, generation quotas, or plan gates in the learning product.
 - Provider custody must be explicit when Sotto-managed keys are used.
-- A learner's course level, memory graph, and content access must not depend on payment state.
+- Every learner gets full access to the learning loop for free, on infrastructure they control.
 
 ---
 
 ## 13. Observability
 
-Track private learning and operational health, not public popularity:
+Track private learning and operational health:
 
 - course count and active class status
 - placement completion
@@ -364,8 +350,6 @@ Track private learning and operational health, not public popularity:
 - storage writes and recording/audio availability
 - setup readiness for LLM, TTS, STT, local agent, Redis, database, and storage
 
-Do not add public engagement metrics such as likes, public comments, public fork counts, followers, leaderboards, community rank, or public popularity score.
-
 ---
 
 ## 14. Release Guardrails
@@ -374,7 +358,7 @@ The architecture is considered aligned when:
 
 - `npm run ci` passes.
 - Prisma validates and generates.
-- OSS guard tests fail if removed social, billing, plan, tier, quota, news, briefing, or public-discovery language returns as current behavior.
+- OSS guard tests pass.
 - Root docs describe free, self-hostable language-learning onboarding.
 - Local setup works without Doppler.
 - Placement, courses, classes, practice, exams, memory, speaking, writing, and listening are documented against current routes and schema.

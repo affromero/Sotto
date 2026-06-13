@@ -12,9 +12,9 @@ Sotto is open-source, self-hostable language-learning infrastructure. Learners w
 4. A personal vocabulary memory graph tracks words and grammar points across all four skills, surfacing spaced-repetition review when needed.
 5. Self-hosters connect their own agents (Claude Code, Codex, OpenClaw, Hermes) and any supported TTS/STT/LLM provider through BYOK configuration.
 6. Non-technical learners can use managed Sotto-hosted infrastructure when the product offers it.
-7. There is no social layer: no public feed, follows, likes, comments, leaderboards, or community ranking.
+7. Each learner works in a private, single-learner space; their courses, progress, and vocabulary graph stay theirs, on a stack they control.
 
-Sotto is fully free and self-hosted: there is no billing, no payment path, and no plans, tiers, quotas, or daily limits — every learner gets full access on infrastructure they control. Do not reintroduce billing, plans, free/pro tiers, generation quotas, or position generic AI-generated content as the core value — learner progress and ownership of the learning stack are the differentiators.
+Sotto is fully free and self-hosted: every learner gets full access on infrastructure they control. Learner progress and ownership of the learning stack are the differentiators.
 
 ## Tech Stack
 
@@ -120,7 +120,6 @@ PENDING -> DISCOVERING -> EXTRACTING -> SCRIPTING -> VERIFYING_SCRIPT -> VALIDAT
 
 ## DON'T
 
-- Do not reintroduce social primitives: public feeds, follows, likes, comments, forks, remix lineage, community counters, or activity feeds.
 - Do not use Tailwind, inline styles, or styled-components.
 - Do not hardcode model names or provider IDs.
 - Do not create fallback chains that pick providers by key availability. Use explicit provider selection through `resolveSttProvider()`, `resolveTtsProvider()`, `resolveAutoModel()`, or the closest existing resolver.

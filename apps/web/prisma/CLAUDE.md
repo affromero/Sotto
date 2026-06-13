@@ -54,7 +54,7 @@ The schema is organized into logical sections:
 | `PedagogyStyle`      | BALANCED, IMMERSION, GRAMMAR, COMMUNICATION, INTENSIVE                                                                                                               | Course.pedagogy              |
 | `ReferenceType`      | WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT                                                                                                                                        | Reference.type               |
 | `VerificationStatus` | PENDING, VERIFIED, FAILED, REPLACED, REMOVED                                                                                                                                    | Reference.verificationStatus |
-| `NotificationType`   | Includes QUESTION_ON_YOUR_EPISODE, SCRIPT_READY (+ others); public-platform account suspension/ban events are not part of the schema | Notification.type            |
+| `NotificationType`   | Includes QUESTION_ON_YOUR_EPISODE, SCRIPT_READY (+ others) | Notification.type            |
 
 ## Commands
 
@@ -83,6 +83,6 @@ npx prisma studio      # Visual database browser
 5. Update `src/types/` if API response shapes changed
 6. If adding/changing enums, also update `packages/shared/src/types/enums.ts` (string union equivalents)
 
-## Removed Platform Tooling
+## Scope
 
-The schema intentionally excludes public-platform reporting tables, user action audit tables, episode human-content flags, and account suspension/ban columns. Do not reintroduce those operator features for self-hosted language-learning flows.
+The schema covers the self-hosted language-learning product: learners, courses, classes, the listening audio engine, the memory graph, and the provider/infra config that backs them.
