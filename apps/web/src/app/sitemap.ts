@@ -12,7 +12,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/join',
     '/terms',
     '/privacy',
-    '/changelog',
     '/developers',
     '/support',
     '/feedback',

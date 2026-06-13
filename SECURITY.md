@@ -51,7 +51,7 @@ We will not pursue legal action against researchers who:
 
 ## Recognition
 
-We appreciate the security research community. With your permission, we will acknowledge your contribution in our changelog when the vulnerability is resolved.
+We appreciate the security research community. With your permission, we will acknowledge your contribution when the vulnerability is resolved.
 
 ## Automated Safeguards
 
