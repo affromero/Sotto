@@ -18,6 +18,10 @@ jobs:
   analyze:
     name: Analyze (javascript-typescript)
     runs-on: ubuntu-latest
+    # Code scanning needs a public repo or GitHub Advanced Security, so it fails
+    # while this repo is private. Skip it until the repo is public; the job then
+    # activates automatically (no further change needed).
+    if: ${{ !github.event.repository.private }}
     timeout-minutes: 360
     permissions:
       actions: read

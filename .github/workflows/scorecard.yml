@@ -18,6 +18,9 @@ jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
+    # OSSF Scorecard + the SARIF upload require a public repo; they fail while
+    # this repo is private. Skip until the repo is public; runs automatically then.
+    if: ${{ !github.event.repository.private }}
     permissions:
       # Needed to upload the results to the code-scanning dashboard.
       security-events: write
