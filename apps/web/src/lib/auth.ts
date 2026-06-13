@@ -1,291 +1,39 @@
-import NextAuth from 'next-auth';
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import Google from 'next-auth/providers/google';
-import GitHub from 'next-auth/providers/github';
-import Twitter from 'next-auth/providers/twitter';
-import Apple from 'next-auth/providers/apple';
-import Resend from 'next-auth/providers/resend';
-import Credentials from 'next-auth/providers/credentials';
+import { cache } from 'react';
+import type { UserRole } from '@/generated/prisma/client';
 import { prisma } from './prisma';
-import { generateUniqueHandle } from './handles';
-import { isAdminEmail } from './admin-emails';
-import { bootstrapFirstUserAsOwner } from './owner-bootstrap';
-import { getOptionalEmailProviderConfig, sendEmail } from './email';
-import { buildMagicLinkEmail } from './email-templates';
-import { isOpenSignup } from './site-config';
-import { isLocalAuthEnabled } from './local-auth';
-import { verifyPassword } from './password';
-import { credentialsAuthSchema } from './validations';
-import { checkRateLimit } from './redis';
+import { LOCAL_USER_ID, ensureLocalUser } from './local-user';
 
-const emailProviderConfig = getOptionalEmailProviderConfig();
+export interface AuthUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  role: UserRole;
+}
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
-  basePath: '/api/v1/auth',
-  secret: process.env.AUTH_SECRET,
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? [
-          Google({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+export interface AuthSession {
+  user: AuthUser;
+}
 
-          }),
-        ]
-      : []),
-    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
-      ? [
-          GitHub({
-            clientId: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET,
-
-          }),
-        ]
-      : []),
-    ...(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET
-      ? [
-          Twitter({
-            clientId: process.env.TWITTER_CLIENT_ID,
-            clientSecret: process.env.TWITTER_CLIENT_SECRET,
-
-          }),
-        ]
-      : []),
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
-      ? [
-          Apple({
-            clientId: process.env.APPLE_CLIENT_ID,
-            clientSecret: process.env.APPLE_CLIENT_SECRET,
-
-          }),
-        ]
-      : []),
-    ...(emailProviderConfig
-      ? [
-          Resend({
-            apiKey: emailProviderConfig.apiKey,
-            from: emailProviderConfig.from,
-            async sendVerificationRequest({ identifier: to, url }) {
-              const { subject, html } = buildMagicLinkEmail(url);
-              await sendEmail({ to, subject, html });
-            },
-          }),
-        ]
-      : []),
-    // Local profile sign-in (self-hosted). Always present, but authorize refuses
-    // unless localAuth is enabled, so it is inert on OAuth-only instances.
-    Credentials({
-      id: 'credentials',
-      name: 'Profile',
-      credentials: { userId: {}, password: {} },
-      async authorize(raw) {
-        const parsed = credentialsAuthSchema.safeParse(raw);
-        if (!parsed.success) return null;
-        if (!(await isLocalAuthEnabled())) return null;
-
-        const { userId, password } = parsed.data;
-
-        // Rate-limit by user id to slow password guessing.
-        const allowed = await checkRateLimit(`creds:${userId}`, 10, 300);
-        if (!allowed) return null;
-
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) return null;
-
-        if (user.passwordHash) {
-          // Password-protected member: a valid password is required.
-          if (!password || !(await verifyPassword(password, user.passwordHash))) return null;
-        } else if (!user.passwordless) {
-          // No password hash and not an intentional passwordless member (e.g. an
-          // OAuth-only account): credentials sign-in is refused so such accounts
-          // can never be entered without a password.
-          return null;
-        }
-        // Passwordless member (passwordHash null + passwordless true): taps in.
-
-        return { id: user.id, name: user.name, email: user.email, image: user.image };
-      },
-    }),
-  ],
-  session: {
-    strategy: 'jwt',
-  },
-  pages: {
-    signIn: '/auth/login',
-    newUser: '/welcome',
-  },
-  events: {
-    async createUser({ user }) {
-      // First-user-becomes-owner: a fresh self-host's first account is promoted
-      // to household owner (ADMIN). No-op on hosted installs (ADMIN_EMAILS set)
-      // and once an owner already exists.
-      if (user.id) {
-        await bootstrapFirstUserAsOwner(user.id);
-      }
-
-      if (user.email) {
-        // Welcome email
-        if (user.name) {
-          const { buildWelcomeEmail } = await import('./email-templates');
-          const { sendEmail } = await import('./email');
-          const { subject, html } = buildWelcomeEmail(user.name);
-          await sendEmail({ to: user.email, subject, html });
-        }
-      }
+/**
+ * Sotto is fully self-hosted for a single learner — there is no login. Every
+ * request resolves to one implicit local user, which is always the owner
+ * (ADMIN). The result is memoized per request via React `cache()`.
+ *
+ * The signature stays `Promise<AuthSession | null>` so existing route guards
+ * (`if (!session?.user?.id) return 401`) keep compiling and the tests that mock
+ * this to `null` keep passing; at runtime the local user is always present.
+ */
+export const auth = cache(async (): Promise<AuthSession | null> => {
+  let user = await prisma.user.findUnique({ where: { id: LOCAL_USER_ID } });
+  if (!user) user = await ensureLocalUser();
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+      role: 'ADMIN',
     },
-  },
-  callbacks: {
-    async signIn({ user, profile }) {
-      // OAuth account linking — user already exists in DB.
-      if (user?.id) {
-        const existing = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
-        if (existing) return true;
-      }
-
-      const email = profile?.email ?? user?.email;
-      if (!email) return '/auth/login?reason=no-email';
-
-      // Existing users can always sign in
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true },
-      });
-      if (existingUser) return true;
-
-      // Admins always allowed.
-      if (isAdminEmail(email)) return true;
-
-      // New user — allowed when signups are open, or when a redeemed invitation
-      // exists for this email. Otherwise signups are closed.
-      if (!(await isOpenSignup())) {
-        const invite = await prisma.invitationLink.findFirst({
-          where: { email, usedAt: { not: null } },
-          select: { id: true },
-        });
-        if (!invite) return '/auth/login?reason=invite-required';
-      }
-      return true;
-    },
-    async session({ session, token }) {
-      if (session.user && token.sub) {
-        if (token.impersonateUserId) {
-          session.user.id = token.impersonateUserId;
-          session.user.name = token.impersonateName ?? null;
-          session.user.email = token.impersonateEmail ?? '';
-          session.user.image = token.impersonateImage ?? null;
-          session.user.role = token.role ?? 'ADMIN';
-          session.user.isImpersonating = true;
-          session.user.impersonatedRole = token.impersonateRole;
-          session.user.originalUser = {
-            id: token.originalUserId!,
-            name: token.originalUserName ?? null,
-            image: token.originalUserImage ?? null,
-          };
-        } else {
-          session.user.id = token.sub;
-          session.user.role = token.role ?? 'USER';
-        }
-      }
-      return session;
-    },
-    async jwt({ token, user, account, trigger, session }) {
-      if (user) {
-        token.sub = user.id;
-      }
-
-      // Handle impersonation triggers from session.update()
-      if (trigger === 'update' && session) {
-        const updateData = session as { impersonateUserId?: string; stopImpersonating?: boolean };
-
-        if (updateData.impersonateUserId && token.role === 'ADMIN') {
-          const target = await prisma.user.findUnique({
-            where: { id: updateData.impersonateUserId },
-            select: { id: true, name: true, email: true, image: true, role: true },
-          });
-          if (target) {
-            if (!token.impersonateUserId) {
-              token.originalUserId = token.sub;
-              token.originalUserName = token.name as string | null;
-              token.originalUserImage = token.picture as string | null;
-            }
-            token.impersonateUserId = target.id;
-            token.impersonateName = target.name;
-            token.impersonateEmail = target.email;
-            token.impersonateImage = target.image;
-            token.impersonateRole = target.role;
-          }
-          return token;
-        }
-
-        if (updateData.stopImpersonating && token.impersonateUserId) {
-          delete token.impersonateUserId;
-          delete token.impersonateName;
-          delete token.impersonateEmail;
-          delete token.impersonateImage;
-          delete token.impersonateRole;
-          delete token.originalUserId;
-          delete token.originalUserName;
-          delete token.originalUserImage;
-        }
-      }
-
-      // On sign-in or session update, fetch role from DB
-      if ((user || trigger === 'update') && token.sub) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { email: true, role: true, handle: true, name: true, tokenVersion: true },
-        });
-
-        if (dbUser) {
-          // Mark local (Credentials) sessions and snapshot the token version so it
-          // can be invalidated when the member is removed or the password reset.
-          if (account?.provider === 'credentials') token.local = true;
-          token.tokenVersion = dbUser.tokenVersion;
-
-          // Auto-assign ADMIN role if email is in admin list
-          if (dbUser.email && isAdminEmail(dbUser.email) && dbUser.role !== 'ADMIN') {
-            await prisma.user.update({
-              where: { id: token.sub },
-              data: { role: 'ADMIN' },
-            });
-            token.role = 'ADMIN';
-          } else {
-            token.role = dbUser.role;
-          }
-
-          // Auto-generate handle if missing
-          if (!dbUser.handle) {
-            try {
-              const handle = await generateUniqueHandle(
-                dbUser.email ? dbUser.email.split('@')[0] : dbUser.name
-              );
-              await prisma.user.update({
-                where: { id: token.sub },
-                data: { handle },
-              });
-            } catch {
-              // Non-fatal — handle will be generated on next sign-in
-            }
-          }
-        }
-      }
-
-      // On every request for a local (Credentials) session, verify the token
-      // version. A mismatch (member removed, password reset) clears the subject,
-      // so the session callback yields a logged-out session.
-      if (token.local && token.sub && !user) {
-        const current = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { tokenVersion: true },
-        });
-        if (!current || current.tokenVersion !== token.tokenVersion) {
-          delete token.sub;
-        }
-      }
-
-      return token;
-    },
-  },
+  };
 });

@@ -18,7 +18,7 @@ export async function PATCH(
     return errorResponse('Unauthorized', 401);
   }
 
-  const userRole = (session.user as Record<string, unknown>)?.role as string;
+  const userRole = session.user.role;
 
   if (userRole !== 'ADMIN') {
     return errorResponse('Forbidden', 403);

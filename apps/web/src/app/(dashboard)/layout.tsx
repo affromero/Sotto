@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         name: session.user.name ?? null,
         email: session.user.email ?? null,
         image: session.user.image ?? null,
-        role: ((session.user as Record<string, unknown>).role as string) ?? 'USER',
+        role: session.user.role,
       }}
       hasEpisodes={episodeCount > 0}
     >
