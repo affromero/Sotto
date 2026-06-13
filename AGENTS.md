@@ -3,10 +3,10 @@
 ## Project Structure & Module Organization
 This is an npm workspaces monorepo. Key areas:
 - `apps/web/` Next.js web app (App Router), workers, Prisma, tests.
-- `apps/mobile/` Expo React Native app.
+- `apps/desktop/` Tauri desktop shell (built outside the npm workspaces).
 - `packages/` shared libraries (`shared`, `mcp`, `verification-standard`).
 - `services/` backend services (for example `local-tts`).
-- `e2e/` Playwright (web) and Maestro (mobile) tests.
+- `e2e/` Playwright end-to-end tests.
 - `scripts/` dev/ops automation; `docs/` product/architecture docs; `extension/` browser extension; `accounting/` beancount ledger.
 
 ## Build, Test, and Development Commands
@@ -16,19 +16,18 @@ Run from repo root unless noted.
 - `SKIP_DB_SYNC=1 npm run dev` faster start without DB sync.
 - `npm run dev:web` or `npm run dev:workers` for scoped dev.
 - `npm run build`, `npm run lint`, `npm run type-check`, `npm run test` proxy to `@sotto/web`.
-- `npm run test:e2e:web` Playwright; `npm run test:e2e:mobile` Maestro.
-- `npm run mobile:ios` / `npm run mobile:android` for Expo.
+- `npm run test:e2e:web` Playwright.
 
 ## Coding Style & Naming Conventions
 - TypeScript first, no `any`. Prefer Server Components; add `'use client'` only when needed.
-- CSS Modules only for web (`Name.tsx` + `Name.module.css`). React Native uses `StyleSheet.create()`.
+- CSS Modules only (`Name.tsx` + `Name.module.css`).
 - Formatting via Prettier; linting via ESLint. Run `npm run format` and `npm run lint`.
 - API routes: `auth()` then Zod validation, Prisma, `NextResponse.json()`.
 
 ## Testing Guidelines
 - Web uses Vitest; `apps/web/tests/` contains unit/integration/smoke tests.
 - `packages/maps` and `packages/verification-standard` also use Vitest.
-- E2E: Playwright (web) and Maestro (mobile).
+- E2E: Playwright.
 - If you change a source file, update its corresponding tests in the same PR.
 
 ## Commit & Pull Request Guidelines
