@@ -33,6 +33,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1"
 directories = "6"
+async-trait = "0.1"
 
 # Generated API client + its runtime requirements.
 progenitor = "0.14"
