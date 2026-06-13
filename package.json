@@ -57,12 +57,10 @@
     "@prisma/client": "7.8.0",
     "geoip-lite": "^2.0.2",
     "pg": "^8.13.0",
-    "pricetoken": "^0.13.9"
+    "pricetoken": "^0.13.9",
+    "zod": "4.4.3"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "^16.1.7"
-  },
-  "overrides": {
-    "zod": "4.4.3"
   }
 }
