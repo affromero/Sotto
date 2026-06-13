@@ -22,7 +22,6 @@ export default async function SettingsPage() {
 
   const [
     user,
-    accounts,
     userInterests,
     categories,
     byokKeys,
@@ -35,17 +34,10 @@ export default async function SettingsPage() {
         email: true,
         handle: true,
         image: true,
-        role: true,
         preferredLanguage: true,
         preferredAiModel: true,
         emailNotifications: true,
         pushNotifications: true,
-      },
-    }),
-    prisma.account.findMany({
-      where: { userId },
-      select: {
-        provider: true,
       },
     }),
     prisma.userInterest.findMany({
@@ -70,7 +62,6 @@ export default async function SettingsPage() {
 
   if (!user) return null;
 
-  const connectedProviders = accounts.map((a) => a.provider);
   const selectedInterestTagIds = userInterests.map((i) => i.tagId);
 
   // Sort categories by the order defined in ONBOARDING_TAG_SLUGS
@@ -109,8 +100,6 @@ export default async function SettingsPage() {
         initialHandle={user.handle ?? ''}
         email={user.email}
         image={user.image}
-        role={user.role}
-        connectedProviders={connectedProviders}
         preferredLanguage={user.preferredLanguage}
         initialPreferredAiModel={user.preferredAiModel}
         interestCategories={categories}

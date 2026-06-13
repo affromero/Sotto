@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { signOut as nextAuthSignOut } from 'next-auth/react';
-import { BookOpen, Network, Settings, Smartphone, Users, Shield, RefreshCw, LogOut } from 'lucide-react';
+import { BookOpen, Network, Settings, Smartphone, Shield } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import styles from './ProfileMenu.module.css';
 
@@ -90,32 +89,11 @@ export function ProfileMenu() {
           {isAdmin && (
             <>
               <div className={styles.divider} role="separator" />
-              <Link href="/settings/household" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
-                <Users size={16} aria-hidden="true" /> Manage household
-              </Link>
               <Link href="/admin" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
                 <Shield size={16} aria-hidden="true" /> Admin dashboard
               </Link>
             </>
           )}
-
-          <div className={styles.divider} role="separator" />
-          <button
-            className={styles.item}
-            role="menuitem"
-            type="button"
-            onClick={() => nextAuthSignOut({ callbackUrl: '/auth/login' })}
-          >
-            <RefreshCw size={16} aria-hidden="true" /> Switch user
-          </button>
-          <button
-            className={`${styles.item} ${styles.danger}`}
-            role="menuitem"
-            type="button"
-            onClick={() => nextAuthSignOut({ callbackUrl: '/' })}
-          >
-            <LogOut size={16} aria-hidden="true" /> Log out
-          </button>
         </div>
       )}
     </div>

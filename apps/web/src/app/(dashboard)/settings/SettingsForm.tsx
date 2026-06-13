@@ -3,8 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { signOut } from 'next-auth/react';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
@@ -36,8 +34,6 @@ interface SettingsFormProps {
   initialHandle: string;
   email: string;
   image: string | null;
-  role: 'USER' | 'ADMIN' | 'SYSTEM';
-  connectedProviders: string[];
   preferredLanguage: string | null;
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
@@ -51,20 +47,11 @@ interface SettingsFormProps {
   initialPushNotifications: boolean;
 }
 
-const providerLabels: Record<string, string> = {
-  google: 'Google',
-  github: 'GitHub',
-  apple: 'Apple',
-  twitter: 'Twitter',
-};
-
 export function SettingsForm({
   initialName,
   initialHandle,
   email,
   image,
-  role,
-  connectedProviders,
   preferredLanguage: initialPreferredLanguage,
   interestCategories,
   selectedInterestTagIds,
@@ -215,7 +202,7 @@ export function SettingsForm({
       method: 'DELETE',
     });
     if (response.ok) {
-      signOut({ callbackUrl: '/' });
+      window.location.href = '/';
     }
   };
 
@@ -274,33 +261,6 @@ export function SettingsForm({
         <AppearanceControls />
       </section>
 
-      {/* Household Section — owner only */}
-      {role === 'ADMIN' && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Household</h2>
-          <p className={styles.sectionDesc}>
-            Invite your family to this instance. Each person learns on a private account of their
-            own.
-          </p>
-          <Link href="/settings/household" className={styles.householdLink}>
-            <span className={styles.householdLinkText}>Manage household</span>
-            <span aria-hidden="true">&rarr;</span>
-          </Link>
-        </section>
-      )}
-
-      {/* Password — local sign-in only; the page redirects OAuth accounts away */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Password</h2>
-        <p className={styles.sectionDesc}>
-          Change the password you use to sign in to this instance.
-        </p>
-        <Link href="/settings/password" className={styles.householdLink}>
-          <span className={styles.householdLinkText}>Change password</span>
-          <span aria-hidden="true">&rarr;</span>
-        </Link>
-      </section>
-
       {/* Connect a device — available to every learner */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Devices</h2>
@@ -332,16 +292,7 @@ export function SettingsForm({
               )}
             </div>
             <div className={styles.avatarInfo}>
-              <p className={styles.avatarEmail}>
-                {email}
-                {role !== 'USER' && (
-                  <Badge
-                    variant={role === 'ADMIN' ? 'admin' : role === 'SYSTEM' ? 'system' : 'creator'}
-                  >
-                    {role}
-                  </Badge>
-                )}
-              </p>
+              <p className={styles.avatarEmail}>{email}</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -576,27 +527,6 @@ export function SettingsForm({
               aria-label="Toggle push notifications"
             />
           </label>
-        </div>
-      </section>
-
-      {/* Connected Accounts Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Connected Accounts</h2>
-        <div className={styles.providerList}>
-          {connectedProviders.map((provider) => (
-            <div key={provider} className={styles.providerRow}>
-              <span className={styles.providerName}>{providerLabels[provider] || provider}</span>
-              <span className={styles.providerStatus}>Connected</span>
-            </div>
-          ))}
-          {connectedProviders.length === 0 && (
-            <p className={styles.noProviders}>No connected accounts</p>
-          )}
-        </div>
-        <div className={styles.formActions}>
-          <Button variant="secondary" onClick={() => signOut({ callbackUrl: '/' })}>
-            Sign Out
-          </Button>
         </div>
       </section>
 

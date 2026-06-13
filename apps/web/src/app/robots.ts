@@ -43,7 +43,6 @@ const AI_CRAWLERS = [
 const DISALLOWED_PATHS = [
   '/api/v1/',
   '/admin',
-  '/auth/',
   '/dashboard',
   '/create',
   '/settings',

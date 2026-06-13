@@ -1,29 +1,14 @@
 /**
- * Hosted landing entry points must stay in the public welcome mock. They should
- * not expose sign-in, signup, profile, or app navigation even if the browser has
- * an old authenticated session.
+ * The managed-showcase landing entry points must route into the /welcome demo
+ * and never expose sign-in, signup, profile, or app navigation. Sotto is fully
+ * self-hosted with no login, so these are purely demoMode checks.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LandingCTA } from '@/components/landing/LandingCTA';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 
-const mockUseAuth = vi.fn();
-
-vi.mock('@/lib/hooks/useAuth', () => ({
-  useAuth: () => mockUseAuth(),
-}));
-
-vi.mock('@/lib/hooks/useHasMounted', () => ({
-  useHasMounted: () => true,
-}));
-
 describe('landing hosted entry points', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({ isAuthenticated: false });
-  });
-
   it('routes the hosted primary CTA to the welcome mock', () => {
     render(<LandingCTA withGhost demoMode />);
 
@@ -33,8 +18,6 @@ describe('landing hosted entry points', () => {
   });
 
   it('routes the hosted header CTA to the welcome mock instead of auth or profile', () => {
-    mockUseAuth.mockReturnValue({ isAuthenticated: true });
-
     render(<LandingHeader demoMode />);
 
     const demo = screen.getByRole('link', { name: /try demo/i });

@@ -1,14 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
-import { SessionProvider } from '@/components/providers/SessionProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
-import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import { getAppBaseUrl } from '@/lib/urls';
 import '@/styles/globals.css';
@@ -88,20 +86,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body>
-        <SessionProvider>
-          <ImpersonationBanner />
-          <ThemeProvider>
-            <ToastProvider>
-              <NotificationProvider>
-                <AudioPlayerProvider>
-                  {children}
-                  <GlobalMiniPlayer />
-                  <CommandPaletteLoader />
-                </AudioPlayerProvider>
-              </NotificationProvider>
-            </ToastProvider>
-          </ThemeProvider>
-        </SessionProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <NotificationProvider>
+              <AudioPlayerProvider>
+                {children}
+                <GlobalMiniPlayer />
+                <CommandPaletteLoader />
+              </AudioPlayerProvider>
+            </NotificationProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
