@@ -1,6 +1,6 @@
 # Technical Architecture - Sotto
 
-> **Date**: 2026-05-15
+> **Date**: 2026-06-13
 >
 > **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
 

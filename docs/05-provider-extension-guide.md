@@ -1,6 +1,6 @@
 # Provider Extension Guide
 
-Date: 2026-06-12
+Date: 2026-06-13
 
 > **Summary**: Add local LLM, STT, and TTS models to Sotto with the least possible code. Prefer OpenAI-compatible local servers for LLM and STT, and the Sotto local TTS sidecar contract for TTS. Only write a native provider adapter when a model or vendor cannot fit those simple HTTP shapes.
 

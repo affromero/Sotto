@@ -1,6 +1,6 @@
 # Local Development Guide - Sotto
 
-> **Date**: 2026-05-15
+> **Date**: 2026-06-13
 >
 > **Summary**: Run Sotto locally without Doppler, production database sync, cloud storage, or hosted infrastructure. The default local path uses PostgreSQL, Redis, local file storage, and explicit provider configuration.
 

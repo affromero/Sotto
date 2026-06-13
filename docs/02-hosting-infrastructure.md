@@ -1,6 +1,6 @@
 # Hosting Infrastructure
 
-**Date:** 2026-05-18
+**Date:** 2026-06-13
 
 **Summary:** Self-hosting options, the recommended single-VPS topology, and the production services Sotto expects when released as private-first open source software.
 
