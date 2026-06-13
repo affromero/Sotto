@@ -3,6 +3,7 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
   openai: { label: 'OpenAI', shortLabel: 'GPT' },
   google: { label: 'Google (Gemini)', shortLabel: 'Gemini' },
   'claude-code': { label: 'Claude Code (Local)', shortLabel: 'Claude' },
+  codex: { label: 'Codex (Local)', shortLabel: 'Codex' },
   local: { label: 'Local model (Ollama / vLLM)', shortLabel: 'Local' },
   together: { label: 'Together AI', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },

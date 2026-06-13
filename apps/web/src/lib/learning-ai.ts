@@ -34,6 +34,12 @@ export async function resolveLearningAi(userId: string): Promise<ResolvedLearnin
     return { provider: 'claude-code', model };
   }
 
+  // Codex CLI — keyless; uses the model configured in the user's Codex setup
+  // (the bare "codex" routing sentinel; an explicit model can be set via CODEX_MODEL).
+  if (envProvider === 'codex') {
+    return { provider: 'codex', model: 'codex' };
+  }
+
   // Totally-local inference: an OpenAI-compatible server (Ollama / vLLM / LM Studio).
   // The model is host-defined (AI_MODEL) and routed by the "local:" prefix so the
   // llm.ts guardrail does not require it to be a registered model id.
