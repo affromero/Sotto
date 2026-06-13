@@ -18,6 +18,7 @@
     "dev:workers": "scripts/run-with-env.sh npm run dev:workers --workspace=@sotto/web",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "gen:openapi": "npm run -w @sotto/shared gen:openapi",
     "lint": "npm run lint --workspace=@sotto/web",
     "lint:fix": "npm run lint:fix --workspace=@sotto/web",
     "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",

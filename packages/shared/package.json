@@ -9,6 +9,10 @@
     ".": "./src/index.ts",
     "./*": "./src/*"
   },
+  "scripts": {
+    "gen:openapi": "tsx scripts/generate-openapi.ts",
+    "test": "vitest run"
+  },
   "dependencies": {
     "pricetoken": "^0.13.8",
     "zod": "^4.4.3"
