@@ -247,16 +247,9 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps root and e2e commands env-file driven without hosted secret tooling', () => {
     const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
     const envRunner = readFileSync(resolve(repoRoot, 'scripts/run-with-env.sh'), 'utf8');
-    const e2eSources = [
-      'e2e/playwright/playwright.config.ts',
-      'e2e/playwright/fixtures/auth.ts',
-      'e2e/playwright/helpers/seed.ts',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
     const agentDocs = readFileSync(resolve(repoRoot, 'AGENTS.md'), 'utf8');
     const rootClaude = readFileSync(resolve(repoRoot, 'CLAUDE.md'), 'utf8');
-    const commandSources = [packageJson, envRunner, e2eSources].join('\n');
+    const commandSources = [packageJson, envRunner].join('\n');
 
     expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
     expect(packageJson).not.toContain('"record": "scripts/run-with-env.sh');
@@ -264,9 +257,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(packageJson).not.toContain('"db:sync"');
     expect(existsSync(resolve(repoRoot, 'scripts/sync-prod-db.sh'))).toBe(false);
     expect(envRunner).toContain('SOTTO_ENV_FILE');
-    expect(e2eSources).toContain('scripts/run-with-env.sh');
-    expect(e2eSources).toContain('test-e2e@example.com');
-    expect(e2eSources).toContain('https://media.example.com/e2e/test-audio.mp3');
     expect(commandSources).not.toContain('doppler run');
     expect(commandSources).not.toContain(':doppler');
     expect(commandSources).not.toContain('@sotto.fm');
@@ -595,7 +585,6 @@ describe('open-source language-learning OSS surfaces', () => {
         readFileSync(resolve(repoRoot, 'packages/shared/src/types/enums.ts'), 'utf8'),
         readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'),
         readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8'),
-        readFileSync(resolve(repoRoot, 'e2e/playwright/helpers/seed.ts'), 'utf8'),
       ])
       .join('\n');
     const removedTests = [
@@ -620,8 +609,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps automation harnesses private-first', () => {
     const harnessSources = [
-      'e2e/llmock/setup.ts',
-      'e2e/playwright/tests/episode-player.spec.ts',
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
@@ -909,7 +896,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const seedSources = [
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
-      'e2e/playwright/helpers/seed.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');

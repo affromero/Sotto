@@ -28,8 +28,7 @@
     "test:coverage": "npm run test:coverage --workspace=@sotto/web",
     "test:watch": "npm run test:watch --workspace=@sotto/web",
     "type-check": "npm run type-check --workspace=@sotto/web",
-    "update-mbfc": "curl -sL https://raw.githubusercontent.com/drmikecrowe/mbfcext/master/docs/v5/data/combined.json -o apps/web/src/data/mbfc-combined.json",
-    "test:e2e:web": "npx playwright test --config e2e/playwright/playwright.config.ts"
+    "update-mbfc": "curl -sL https://raw.githubusercontent.com/drmikecrowe/mbfcext/master/docs/v5/data/combined.json -o apps/web/src/data/mbfc-combined.json"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

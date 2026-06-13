@@ -6,7 +6,6 @@ This is an npm workspaces monorepo. Key areas:
 - `apps/desktop/` Tauri desktop shell (built outside the npm workspaces).
 - `packages/` shared libraries (`shared`, `mcp`, `verification-standard`).
 - `services/` backend services (for example `local-tts`).
-- `e2e/` Playwright end-to-end tests.
 - `scripts/` dev/ops automation; `docs/` product/architecture docs; `extension/` browser extension; `accounting/` beancount ledger.
 
 ## Build, Test, and Development Commands
@@ -16,7 +15,6 @@ Run from repo root unless noted.
 - `SKIP_DB_SYNC=1 npm run dev` faster start without DB sync.
 - `npm run dev:web` or `npm run dev:workers` for scoped dev.
 - `npm run build`, `npm run lint`, `npm run type-check`, `npm run test` proxy to `@sotto/web`.
-- `npm run test:e2e:web` Playwright.
 
 ## Coding Style & Naming Conventions
 - TypeScript first, no `any`. Prefer Server Components; add `'use client'` only when needed.
@@ -27,7 +25,6 @@ Run from repo root unless noted.
 ## Testing Guidelines
 - Web uses Vitest; `apps/web/tests/` contains unit/integration/smoke tests.
 - `packages/maps` and `packages/verification-standard` also use Vitest.
-- E2E: Playwright.
 - If you change a source file, update its corresponding tests in the same PR.
 
 ## Commit & Pull Request Guidelines
