@@ -35,7 +35,7 @@ export function JsonLd() {
     url: appUrl,
     logo: `${appUrl}/icon-512.png`,
     sameAs: BRAND.twitter ? [BRAND.twitter] : [],
-    description: BRAND.elevatorPitch,
+    description: BRAND.longDescription,
   };
 
   return (

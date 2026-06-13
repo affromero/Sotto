@@ -60,9 +60,9 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    // brand.ts must carry the new language-learning taglines
+    // brand.ts must carry the new language-learning positioning
     expect(sharedPositioningSource).toContain('Learn a language, taught in your own context.');
-    expect(sharedPositioningSource).toContain('Context-aware, self-hostable language learning.');
+    expect(sharedPositioningSource).toContain('Open-source, self-hostable courses');
 
     // old social-episode and episode-network copy must be gone
     expect(landingSource).not.toContain('social episode network');

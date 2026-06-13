@@ -598,7 +598,7 @@ export default function LandingPage() {
             </a>
           </nav>
           <p className={styles.footerNote}>
-            {BRAND.name}. {BRAND.pitchTagline}
+            {BRAND.name}. {BRAND.tagline}
           </p>
         </div>
       </footer>

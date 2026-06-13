@@ -21,8 +21,6 @@ services:
           memory: 1g
     ports:
       - '127.0.0.1:${WEB_PORT:?Set WEB_PORT}:3000'
-    volumes:
-      - ./.pitch:/app/apps/web/.pitch:ro
     env_file:
       - .env
     environment:

@@ -72,7 +72,7 @@ export default function JoinPage() {
                 <h3 className={styles.valueTitle}>AI-native, not AI-hype</h3>
                 <p className={styles.valueDescription}>
                   AI is at the core of what we build, not a buzzword in our
-                  pitch deck. We use it every day — to generate content, verify
+                  marketing. We use it every day — to generate content, verify
                   claims, and make the product smarter.
                 </p>
               </li>

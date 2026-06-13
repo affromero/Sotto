@@ -72,10 +72,6 @@ snap/
 .venv/
 __pycache__/
 
-# Pitch builds (generated HTML)
-.pitch/
-!.pitch/.gitkeep
-
 # Generated reports (traffic, analytics)
 /reports/
 
