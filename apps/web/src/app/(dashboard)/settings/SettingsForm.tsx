@@ -44,6 +44,7 @@ interface SettingsFormProps {
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
+  aiSystemProviders: Array<{ id: string; label: string; description: string; available: boolean }>;
   ttsProviderMeta: TtsProviderClientMeta[];
   initialPreferredAiModel: string | null;
   initialEmailNotifications: boolean;
@@ -70,6 +71,7 @@ export function SettingsForm({
   configuredTtsProviders,
   configuredAiProviders,
   aiProviderMeta,
+  aiSystemProviders,
   ttsProviderMeta,
   initialPreferredAiModel,
   initialEmailNotifications,
@@ -663,7 +665,11 @@ export function SettingsForm({
           Configure your preferred AI providers for lesson generation, Q&amp;A, and live conversation.
           Keys are encrypted with AES-256-GCM.
         </p>
-        <AiProviderCards initialConfigured={configuredAiProviders} providerMeta={aiProviderMeta} />
+        <AiProviderCards
+          initialConfigured={configuredAiProviders}
+          providerMeta={aiProviderMeta}
+          systemProviders={aiSystemProviders}
+        />
       </section>
 
       {/* TTS Provider Keys */}

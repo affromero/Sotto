@@ -50,7 +50,7 @@ export function VoicePreferenceSelector({
         disabled={loading}
         aria-label={label}
       >
-        <option value="">Auto-assign (recommended)</option>
+        <option value="">Auto-assign</option>
 
         {poolVoices.length > 0 && (
           <optgroup label="Voice Library">

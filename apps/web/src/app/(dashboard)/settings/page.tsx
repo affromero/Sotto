@@ -4,6 +4,8 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import { isClaudeAvailable } from '@/lib/claude-code-client';
+import { isCodexAvailable } from '@/lib/codex-client';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -79,6 +81,24 @@ export default async function SettingsPage() {
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
+  const [claudeCodeAvailable, codexAvailable] = await Promise.all([
+    isClaudeAvailable(),
+    isCodexAvailable(),
+  ]);
+  const aiSystemProviders = [
+    {
+      id: 'claude-code',
+      label: 'Claude Code',
+      description: 'Linked via the local Claude Code CLI. No API key needed.',
+      available: claudeCodeAvailable,
+    },
+    {
+      id: 'codex',
+      label: 'Codex',
+      description: 'Linked via the local Codex CLI. No API key needed.',
+      available: codexAvailable,
+    },
+  ];
 
   return (
     <main className={styles.main}>
@@ -98,6 +118,7 @@ export default async function SettingsPage() {
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
         aiProviderMeta={aiProviderMeta}
+        aiSystemProviders={aiSystemProviders}
         ttsProviderMeta={ttsProviderMeta}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
