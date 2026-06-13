@@ -17,9 +17,6 @@ const nextConfig = {
     viewTransition: true,
   },
   transpilePackages: [
-    'next-auth',
-    '@auth/prisma-adapter',
-    '@auth/core',
     '@sotto/shared',
     '@sotto/verification-standard',
   ],

@@ -43,14 +43,6 @@ apps/web/models/*
 *.swp
 *.swo
 
-# iOS / Android / EAS builds
-*.ipa
-*.apk
-apps/mobile/ios/
-apps/mobile/android/
-google-services.json
-google-play-service-account.json
-
 # Vercel
 .vercel
 

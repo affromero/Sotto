@@ -68,7 +68,7 @@ The active data model is learner and course oriented. Important groups:
 | Identity | `User`, `Account`, `Session`, `VerificationToken`, `ApiKey` |
 | Curriculum | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle` |
 | Enrollment | `Course`, `CourseNote`, `PlacementResult` |
-| Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`, `ClassInkLayer` |
+| Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer` |
 | Speaking | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus` |
 | Writing | `WritingPrompt`, `WritingResponse` |
 | Practice | `PracticeSession`, `PracticeKind`, `PracticeStatus` |
@@ -261,7 +261,6 @@ The current learning API surface is under `/api/v1`:
 | `/api/v1/classes/[classId]/speaking/[promptId]` | Upload a class speaking recording |
 | `/api/v1/classes/[classId]/writing/[promptId]` | Submit and score class writing |
 | `/api/v1/classes/[classId]/worksheet` | Fetch or generate worksheet PDF |
-| `/api/v1/classes/[classId]/ink` | Get/save PencilKit worksheet ink |
 | `/api/v1/practice/[sessionId]/submit` | Submit ungated practice and update SRS |
 | `/api/v1/practice/[sessionId]/speaking/[promptId]` | Upload/poll practice speaking |
 | `/api/v1/practice/[sessionId]/writing/[promptId]` | Submit and score practice writing |

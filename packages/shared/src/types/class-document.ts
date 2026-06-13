@@ -1,6 +1,6 @@
-// The single render contract for a class worksheet. Both surfaces consume it:
-// the web print-optimized page and the iPad PencilKit ClassWorksheet. The
-// learner variant omits answer-key fields; the answer-key variant keeps them.
+// The render contract for a class worksheet, consumed by the web
+// print-optimized worksheet page. The learner variant omits answer-key fields;
+// the answer-key variant keeps them.
 import type { SkillType } from './enums';
 
 export interface ClassDocumentQuestion {
