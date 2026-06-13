@@ -96,6 +96,17 @@ pub(crate) enum Action {
     ClassSpeakingPolled(u64, ApiResult<types::SpeakingPollResponse>),
     /// A class writing submission was graded (or failed).
     ClassWritingGraded(u64, ApiResult<WritingGradeResponse>),
+
+    // --- Exams (ungated mock exams; reuse the class section-walk actions
+    //     ClassEpisodeLoaded/ClassAudioDownloaded/ClassSpeaking*/ClassWriting* ) ---
+    /// Start the mock-exam flow (from the course screen).
+    StartExam,
+    /// `POST /exams` returned (or failed) — mints the exam id.
+    ExamStarted(u64, ApiResult<types::StartExamResponse>),
+    /// `GET /exams/{id}` returned (or failed).
+    ExamLoaded(u64, ApiResult<types::ExamDetailResponse>),
+    /// `POST /exams/{id}/submit` returned (or failed) — band/score result.
+    ExamSubmitted(u64, ApiResult<types::SubmitExamResponse>),
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries

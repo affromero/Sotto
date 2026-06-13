@@ -10,6 +10,7 @@ import {
   classDetailResponseSchema,
   coursesListResponseSchema,
   episodeDetailResponseSchema,
+  examDetailResponseSchema,
   healthResponseSchema,
   nextClassCreatedResponseSchema,
   nextClassDoneResponseSchema,
@@ -18,6 +19,7 @@ import {
   speakingPollResponseSchema,
   startPracticeResponseSchema,
   submitClassResponseSchema,
+  submitExamResponseSchema,
   submitPracticeResponseSchema,
 } from '../src/contracts/schemas';
 
@@ -112,6 +114,9 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/courses/{courseId}/next-class',
         'GET /api/v1/classes/{classId}',
         'POST /api/v1/classes/{classId}/submit',
+        'POST /api/v1/exams',
+        'GET /api/v1/exams/{examId}',
+        'POST /api/v1/exams/{examId}/submit',
         'POST /api/v1/auth/pair/redeem',
       ].sort(),
     );
@@ -148,6 +153,11 @@ describe('openapi.json drift guard', () => {
       'ClassEpisodeRef',
       'ClassSection',
       'ClassDetailResponse',
+      // Exam schemas are subsets of richer Prisma rows -> open.
+      'ExamEpisodeRef',
+      'ExamSection',
+      'ExamResult',
+      'ExamDetailResponse',
     ]) {
       expect(schemas[open].additionalProperties).not.toBe(false);
     }
@@ -165,6 +175,13 @@ describe('openapi.json drift guard', () => {
       // next-class returns exactly one closed shape per status.
       'NextClassCreatedResponse',
       'NextClassDoneResponse',
+      // Exam start/submit + speaking-prompt are exact-match -> closed.
+      'ExamSpeakingPrompt',
+      'StartExamRequest',
+      'StartExamResponse',
+      'SubmitExamRequest',
+      'ExamSectionScore',
+      'SubmitExamResponse',
     ]) {
       expect(schemas[closed].additionalProperties).toBe(false);
     }
@@ -279,6 +296,10 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     ]);
     expect(codes('/api/v1/classes/{classId}', 'get')).toEqual(['200']);
     expect(codes('/api/v1/classes/{classId}/submit', 'post')).toEqual(['200']);
+    // Exam start returns 201; get/submit return 200.
+    expect(codes('/api/v1/exams', 'post')).toEqual(['201']);
+    expect(codes('/api/v1/exams/{examId}', 'get')).toEqual(['200']);
+    expect(codes('/api/v1/exams/{examId}/submit', 'post')).toEqual(['200']);
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
   });
 });
@@ -581,6 +602,95 @@ describe('response schemas accept representative payloads', () => {
         passedSections: 4,
         totalSections: 5,
         sections: [{ id: 'sec-g', skill: 'GRAMMAR', score: 0.9, passed: true }],
+      }),
+    ).toBeTruthy();
+  });
+
+  it('exam detail (mixed sections, route superset is loose)', () => {
+    const parsed = examDetailResponseSchema.parse({
+      id: 'exam1',
+      institution: 'CEFR_GENERIC',
+      institutionLabel: 'CEFR (generic)',
+      level: 'B1',
+      status: 'IN_PROGRESS',
+      examName: 'Mock B1',
+      // Server-only / extra fields the client ignores; must survive (loose).
+      createdAt: '2026-06-13T00:00:00.000Z',
+      result: null,
+      sections: [
+        {
+          id: 'ex-g',
+          skill: 'GRAMMAR',
+          part: 'Part 1',
+          order: 0,
+          format: 'mcq',
+          weight: 0.25,
+          status: 'READY',
+          score: null,
+          episode: null,
+          speakingPrompts: [],
+          writingPrompts: [],
+          questions: [
+            {
+              id: 'g0',
+              order: 0,
+              question: 'Choose',
+              options: ['a', 'b', 'c', 'd'],
+              passageRef: null,
+              passageText: null,
+            },
+          ],
+        },
+        {
+          id: 'ex-l',
+          skill: 'LISTENING',
+          part: 'Part 3',
+          order: 1,
+          format: 'mcq',
+          weight: 0.2,
+          status: 'READY',
+          score: null,
+          episode: { id: 'ep1', audioUrl: null, status: 'GENERATING_AUDIO' },
+          speakingPrompts: [],
+          writingPrompts: [],
+          questions: [],
+        },
+      ],
+    }) as Record<string, unknown>;
+    expect(parsed.createdAt).toBeDefined();
+
+    // A scored exam carries the band/feedback result.
+    expect(
+      examDetailResponseSchema.parse({
+        id: 'exam1',
+        institution: 'CEFR_GENERIC',
+        institutionLabel: 'CEFR',
+        level: 'B2',
+        status: 'SCORED',
+        examName: 'Mock B2',
+        sections: [],
+        result: {
+          overallScore: 0.74,
+          band: 'B2',
+          feedback: 'Strong reading.',
+          sectionResults: [
+            { sectionId: 'ex-g', skill: 'GRAMMAR', score: 0.8, feedback: null },
+          ],
+        },
+      }),
+    ).toBeTruthy();
+  });
+
+  it('submit exam result (band + per-section)', () => {
+    expect(
+      submitExamResponseSchema.parse({
+        overallScore: 0.72,
+        band: 'B2',
+        feedback: 'Solid overall.',
+        sections: [
+          { sectionId: 'ex-g', skill: 'GRAMMAR', weight: 0.5, score: 0.8 },
+          { sectionId: 'ex-r', skill: 'READING', weight: 0.5, score: 0.6 },
+        ],
       }),
     ).toBeTruthy();
   });

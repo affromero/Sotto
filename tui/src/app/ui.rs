@@ -12,8 +12,8 @@ use ratatui::{
 use crate::config::Config;
 
 use super::state::{
-    ClassResult, ClassSection, Course, DueCounts, PracticeResult, ReviewKind, SectionProgress,
-    SkillChoice, SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
+    ClassResult, ClassSection, Course, DueCounts, ExamResult, PracticeResult, ReviewKind,
+    SectionProgress, SkillChoice, SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
 };
 use crate::api::types::SkillType;
 
@@ -80,6 +80,8 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
         View::Class { .. } => draw_class(frame, area, view),
         View::ClassOutcome { course, result } => draw_class_result(frame, area, course, result),
         View::ClassDone { course } => draw_class_done(frame, area, course),
+        View::Exam { .. } => draw_exam(frame, area, view),
+        View::ExamOutcome { course, result } => draw_exam_result(frame, area, course, result),
     }
 }
 
@@ -308,7 +310,15 @@ fn draw_course_home(
     let hints: &[&str] = if starting {
         &["q back"]
     } else {
-        &["↑/↓ skill", "enter start", "q back"]
+        // Mirrors the CourseHome keymap: ↑/↓ select a practice skill, enter
+        // starts it, `c` starts/resumes the next class, `e` starts a mock exam.
+        &[
+            "↑/↓ skill",
+            "enter practice",
+            "c next class",
+            "e mock exam",
+            "q quit",
+        ]
     };
     frame.render_widget(Paragraph::new(hint_line(hints)), chunks[3]);
 }
@@ -1050,4 +1060,104 @@ fn draw_class_done(frame: &mut Frame, area: Rect, course: &Course) {
         chunks[0],
     );
     frame.render_widget(Paragraph::new(hint_line(&["q back"])), chunks[1]);
+}
+
+// --- Exams -----------------------------------------------------------------
+
+fn draw_exam(frame: &mut Frame, area: Rect, view: &View) {
+    let View::Exam {
+        course,
+        sections,
+        cursor,
+        submitting,
+        ..
+    } = view
+    else {
+        return;
+    };
+
+    let Some(sections) = sections else {
+        // Exam is still being started / loaded.
+        let inner = panel(frame, area, &format!("{} · exam", course.title));
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Preparing your mock exam…",
+                Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center),
+            inner,
+        );
+        return;
+    };
+
+    let Some(section) = sections.get(*cursor) else {
+        return;
+    };
+    let title = format!(
+        "{} · exam — section {}/{} ({})",
+        course.title,
+        cursor + 1,
+        sections.len(),
+        skill_label(section.skill)
+    );
+    let inner = panel(frame, area, &title);
+
+    if *submitting {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Scoring your exam…",
+                Style::default()
+                    .fg(INK_MUTED)
+                    .add_modifier(Modifier::ITALIC),
+            )))
+            .alignment(Alignment::Center),
+            inner,
+        );
+        return;
+    }
+
+    // Exam sections render identically to class sections (shared machinery).
+    draw_section(frame, inner, section);
+}
+
+fn draw_exam_result(frame: &mut Frame, area: Rect, course: &Course, result: &ExamResult) {
+    let inner = panel(frame, area, &format!("{} · exam result", course.title));
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let mut lines = vec![
+        Line::default(),
+        Line::from(vec![
+            Span::styled("Band ", Style::default().fg(INK_MUTED)),
+            Span::styled(
+                result.band.clone(),
+                Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(Span::styled(
+            format!("Overall {}%", result.overall_score),
+            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+        )),
+        Line::default(),
+    ];
+    // Per-section breakdown.
+    for s in &result.sections {
+        lines.push(Line::from(vec![
+            Span::styled(format!("{}: ", s.skill), Style::default().fg(INK_MUTED)),
+            Span::styled(format!("{}%", s.score), Style::default().fg(INK)),
+        ]));
+    }
+    if !result.feedback.is_empty() {
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            result.feedback.clone(),
+            Style::default().fg(INK_MUTED),
+        )));
+    }
+    frame.render_widget(
+        Paragraph::new(Text::from(lines))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true }),
+        chunks[0],
+    );
+    frame.render_widget(Paragraph::new(hint_line(&["enter / q back"])), chunks[1]);
 }
