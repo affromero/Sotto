@@ -9,8 +9,10 @@
 //! View flow:
 //!
 //! ```text
-//! Loading -> Courses(list) -> CourseHome { course, due }
-//!   -> (start vocab) -> VocabReview { ... } -> Result { ... }
+//! Loading -> Courses(list) -> CourseHome { course, due, skill menu }
+//!   -> (start vocab/grammar/reading) -> ItemReview { ... } -> Result { ... }
+//!   -> (start listening) -> ListeningReview { ... } -> Result { ... }
+//!   -> (start speaking)  -> SpeakingReview { ... }
 //! ```
 
 use crate::api::types;
@@ -151,20 +153,24 @@ pub(crate) enum RetryKind {
     Courses,
 }
 
-/// The skills the terminal can start from the CourseHome menu. Vocab, listening,
-/// and speaking are wired in P5; grammar/reading/writing are added in P6 and
-/// route to a "not in the terminal yet" notice via [`reduce_start`].
+/// The skills the terminal can start from the CourseHome menu. Vocab/listening/
+/// speaking landed in P4/P5; grammar/reading are wired in P6a. Writing still
+/// routes to a "not in the terminal yet" notice via [`reduce_start`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SkillChoice {
     Vocab,
+    Grammar,
+    Reading,
     Listening,
     Speaking,
 }
 
 impl SkillChoice {
     /// Menu order, top to bottom.
-    pub const MENU: [SkillChoice; 3] = [
+    pub const MENU: [SkillChoice; 5] = [
         SkillChoice::Vocab,
+        SkillChoice::Grammar,
+        SkillChoice::Reading,
         SkillChoice::Listening,
         SkillChoice::Speaking,
     ];
@@ -173,6 +179,8 @@ impl SkillChoice {
     pub fn kind(self) -> types::PracticeKind {
         match self {
             SkillChoice::Vocab => types::PracticeKind::Vocab,
+            SkillChoice::Grammar => types::PracticeKind::Grammar,
+            SkillChoice::Reading => types::PracticeKind::Reading,
             SkillChoice::Listening => types::PracticeKind::Listening,
             SkillChoice::Speaking => types::PracticeKind::Speaking,
         }
@@ -182,8 +190,42 @@ impl SkillChoice {
     pub fn label(self) -> &'static str {
         match self {
             SkillChoice::Vocab => "Vocabulary review",
+            SkillChoice::Grammar => "Grammar",
+            SkillChoice::Reading => "Reading",
             SkillChoice::Listening => "Listening",
             SkillChoice::Speaking => "Speaking",
+        }
+    }
+}
+
+/// Which multiple-choice skill an [`View::ItemReview`] is running. VOCAB,
+/// GRAMMAR, and READING share the same `{ sessionId, kind, items }` `ready`
+/// shape and the same review screen; only the title differs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReviewKind {
+    Vocab,
+    Grammar,
+    Reading,
+}
+
+impl ReviewKind {
+    /// Title-bar label for the review screen.
+    pub fn label(self) -> &'static str {
+        match self {
+            ReviewKind::Vocab => "vocab",
+            ReviewKind::Grammar => "grammar",
+            ReviewKind::Reading => "reading",
+        }
+    }
+
+    /// Map a generated practice kind to a review kind, when it is one of the
+    /// three multiple-choice review skills.
+    pub fn from_kind(kind: types::PracticeKind) -> Option<Self> {
+        match kind {
+            types::PracticeKind::Vocab => Some(ReviewKind::Vocab),
+            types::PracticeKind::Grammar => Some(ReviewKind::Grammar),
+            types::PracticeKind::Reading => Some(ReviewKind::Reading),
+            _ => None,
         }
     }
 }
@@ -309,9 +351,14 @@ pub(crate) enum View {
         /// second start dispatch and shows a "starting…" hint.
         starting: bool,
     },
-    /// An in-progress vocabulary review.
-    VocabReview {
+    /// An in-progress multiple-choice review (VOCAB / GRAMMAR / READING). All
+    /// three share the same `{ sessionId, kind, items }` shape, this screen, and
+    /// the submit flow; `kind` only changes the title. For READING the question
+    /// text (with any passage baked in by the generator) lives in each item's
+    /// `prompt`, which the screen wraps/scrolls for long content.
+    ItemReview {
         course: Course,
+        kind: ReviewKind,
         session_id: String,
         items: Vec<VocabItem>,
         /// Index of the item currently shown.
@@ -320,6 +367,9 @@ pub(crate) enum View {
         cursor: usize,
         /// Recorded selection per item; `None` until the learner picks one.
         selected: Vec<Option<usize>>,
+        /// Scroll offset (lines) into the current item's prompt, for long
+        /// reading passages.
+        prompt_scroll: u16,
         /// True while the final submit is in flight; blocks a second submit
         /// dispatch and shows a "submitting…" hint.
         submitting: bool,
@@ -377,16 +427,24 @@ impl View {
         }
     }
 
-    /// Start a vocab review from a validated `ready` start-practice response.
-    pub fn start_vocab(course: Course, session_id: String, items: Vec<VocabItem>) -> Self {
+    /// Start a multiple-choice review (VOCAB / GRAMMAR / READING) from a
+    /// validated `ready` response.
+    pub fn start_items(
+        course: Course,
+        kind: ReviewKind,
+        session_id: String,
+        items: Vec<VocabItem>,
+    ) -> Self {
         let selected = vec![None; items.len()];
-        View::VocabReview {
+        View::ItemReview {
             course,
+            kind,
             session_id,
             items,
             index: 0,
             cursor: 0,
             selected,
+            prompt_scroll: 0,
             submitting: false,
         }
     }
@@ -433,12 +491,12 @@ impl View {
 /// Reduce a start-practice response against the current `CourseHome` view.
 ///
 /// Routing is kind-aware so each skill enters its own screen:
-/// - `ready` `VOCAB` with well-formed items → `VocabReview`.
+/// - `ready` `VOCAB`/`GRAMMAR`/`READING` with well-formed items → `ItemReview`
+///   (one shared multiple-choice screen; the kind only changes the title).
 /// - `ready` `LISTENING` with an `episodeId` → `ListeningReview` (items, if any,
 ///   must each have options; a zero-option item is `Malformed`).
 /// - `ready_speaking` → `SpeakingReview` (must carry at least one prompt).
-/// - `ready` `GRAMMAR`/`READING`/`WRITING` → a "not available in the terminal
-///   yet" notice on `CourseHome` (P6 adds those skills).
+/// - `ready` `WRITING` → a "not available in the terminal yet" notice (P6b).
 /// - `ready` that is empty/malformed for its skill → a `Malformed` notice; we
 ///   never enter a review we cannot present honestly.
 /// - `unavailable` → the server's reason as a notice.
@@ -453,13 +511,20 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
     };
 
     match resp {
-        types::StartPracticeResponse::Ready(ready) => match ready.kind {
-            types::PracticeKind::Vocab => match validate_choice_items(&ready.items) {
-                Some(items) => View::start_vocab(course, ready.session_id.clone(), items),
+        types::StartPracticeResponse::Ready(ready) => match ReviewKind::from_kind(ready.kind) {
+            // VOCAB / GRAMMAR / READING share the multiple-choice review screen.
+            Some(review_kind) => match validate_choice_items(&ready.items) {
+                Some(items) => {
+                    View::start_items(course, review_kind, ready.session_id.clone(), items)
+                }
                 None => course_home_notice(course, due, Unavailable::Malformed),
             },
-            types::PracticeKind::Listening => reduce_listening(course, due, ready),
-            other => course_home_notice(course, due, Unavailable::NotInTerminal(skill_name(other))),
+            None => match ready.kind {
+                types::PracticeKind::Listening => reduce_listening(course, due, ready),
+                other => {
+                    course_home_notice(course, due, Unavailable::NotInTerminal(skill_name(other)))
+                }
+            },
         },
         types::StartPracticeResponse::ReadySpeaking(ready) => {
             if ready.prompts.is_empty() {
@@ -757,34 +822,31 @@ mod tests {
     }
 
     #[test]
-    fn start_vocab_seeds_one_selection_slot_per_item() {
-        let course = Course {
-            id: "c1".into(),
-            title: "Spanish".into(),
-            native_lang: "en".into(),
-            target_lang: "es".into(),
-            current_level: "A2".into(),
-        };
+    fn start_items_seeds_one_selection_slot_per_item() {
         let items = vec![item("v1", &["a", "b"]), item("v2", &["c", "d"])];
 
-        let view = View::start_vocab(course, "sess-1".into(), items.clone());
+        let view = View::start_items(course(), ReviewKind::Vocab, "sess-1".into(), items.clone());
 
         match view {
-            View::VocabReview {
+            View::ItemReview {
+                kind,
                 index,
                 cursor,
+                prompt_scroll,
                 selected,
                 items: view_items,
                 session_id,
                 ..
             } => {
+                assert_eq!(kind, ReviewKind::Vocab);
                 assert_eq!(index, 0);
                 assert_eq!(cursor, 0);
+                assert_eq!(prompt_scroll, 0);
                 assert_eq!(session_id, "sess-1");
                 assert_eq!(view_items, items);
                 assert_eq!(selected, vec![None, None]);
             }
-            other => panic!("expected VocabReview, got {other:?}"),
+            other => panic!("expected ItemReview, got {other:?}"),
         }
     }
 
@@ -865,7 +927,8 @@ mod tests {
         let next = reduce_start(course_home(), &resp);
 
         match next {
-            View::VocabReview {
+            View::ItemReview {
+                kind,
                 session_id,
                 items,
                 index,
@@ -873,6 +936,7 @@ mod tests {
                 selected,
                 ..
             } => {
+                assert_eq!(kind, ReviewKind::Vocab);
                 assert_eq!(session_id, "sess-42");
                 assert_eq!(items.len(), 2);
                 assert_eq!(items[0].prompt, "casa");
@@ -880,7 +944,7 @@ mod tests {
                 assert_eq!(cursor, 0);
                 assert_eq!(selected, vec![None, None]);
             }
-            other => panic!("expected VocabReview, got {other:?}"),
+            other => panic!("expected ItemReview, got {other:?}"),
         }
     }
 
@@ -948,23 +1012,23 @@ mod tests {
     }
 
     #[test]
-    fn non_vocab_ready_routes_to_not_in_terminal_notice_not_review() {
-        // P6 adds the other skills; for now a non-VOCAB ready stays on
-        // CourseHome with a clear notice rather than entering VocabReview.
+    fn unhandled_ready_kind_routes_to_not_in_terminal_notice_not_review() {
+        // VOCAB/GRAMMAR/READING -> ItemReview and LISTENING -> ListeningReview;
+        // any other kind arriving as a plain `ready` (defensive — WRITING comes
+        // via ready_writing) stays on CourseHome with a clear notice rather than
+        // entering a review.
         let resp = start_response(serde_json::json!({
             "status": "ready",
-            "sessionId": "sess-grammar",
-            "kind": "GRAMMAR",
-            "items": [
-                { "id": "g1", "prompt": "conjugate", "options": ["soy", "es"] }
-            ]
+            "sessionId": "sess-writing",
+            "kind": "WRITING",
+            "items": []
         }));
 
         let next = reduce_start(course_home(), &resp);
 
         match next {
             View::CourseHome { notice, .. } => match notice {
-                Some(Unavailable::NotInTerminal(skill)) => assert_eq!(skill, "Grammar"),
+                Some(Unavailable::NotInTerminal(skill)) => assert_eq!(skill, "Writing"),
                 other => panic!("expected NotInTerminal notice, got {other:?}"),
             },
             other => panic!("expected CourseHome, got {other:?}"),
@@ -1190,5 +1254,133 @@ mod tests {
 
         assert!(matches!(phase, SpeakingPhase::Failed { .. }));
         assert!(poll_is_terminal(&phase));
+    }
+
+    // --- P6a: grammar + reading multiple-choice review --------------------
+
+    #[test]
+    fn grammar_ready_enters_item_review_with_grammar_kind() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-gram",
+            "kind": "GRAMMAR",
+            "items": [
+                { "id": "q0", "prompt": "Choose the correct article", "options": ["el", "la"] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::ItemReview {
+                kind,
+                session_id,
+                items,
+                prompt_scroll,
+                ..
+            } => {
+                assert_eq!(kind, ReviewKind::Grammar);
+                assert_eq!(session_id, "sess-gram");
+                assert_eq!(items.len(), 1);
+                assert_eq!(prompt_scroll, 0);
+            }
+            other => panic!("expected ItemReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reading_ready_enters_item_review_and_keeps_the_passage_prompt() {
+        // READING folds the passage into each question's prompt (the route does
+        // not surface a separate passage field); the long prompt must survive.
+        let passage = "El gato se sentó en la alfombra. ".repeat(20);
+        let prompt = format!("{passage}\n\nWhat sat on the rug?");
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-read",
+            "kind": "READING",
+            "items": [
+                { "id": "q0", "prompt": prompt, "options": ["el gato", "el perro"] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::ItemReview { kind, items, .. } => {
+                assert_eq!(kind, ReviewKind::Reading);
+                // The full passage text is preserved in the item prompt.
+                assert!(items[0].prompt.contains("alfombra"));
+                assert!(items[0].prompt.contains("What sat on the rug?"));
+            }
+            other => panic!("expected ItemReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn grammar_ready_with_a_zero_option_item_is_malformed() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-gram",
+            "kind": "GRAMMAR",
+            "items": [
+                { "id": "q0", "prompt": "ok", "options": ["a", "b"] },
+                { "id": "q1", "prompt": "broken", "options": [] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => assert_eq!(notice, Some(Unavailable::Malformed)),
+            other => panic!("expected CourseHome (malformed), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn empty_grammar_ready_is_malformed() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-gram",
+            "kind": "GRAMMAR",
+            "items": []
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => assert_eq!(notice, Some(Unavailable::Malformed)),
+            other => panic!("expected CourseHome (malformed), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn submitting_a_reading_session_builds_the_answer_payload() {
+        // A grammar/reading session submits via the same answer flow as vocab:
+        // answering the last item yields the submit payload from selections.
+        let items = vec![item("q0", &["a", "b"]), item("q1", &["c", "d"])];
+        let mut selected = vec![Some(0), None];
+
+        let step = answer_current(&items, &mut selected, 1, 1);
+
+        match step {
+            AnswerStep::Submit(Ok(answers)) => {
+                assert_eq!(answers.len(), 2);
+                assert_eq!(&*answers[0].item_id, "q0");
+                assert_eq!(answers[0].selected_index, 0);
+                assert_eq!(&*answers[1].item_id, "q1");
+                assert_eq!(answers[1].selected_index, 1);
+            }
+            other => panic!("expected Submit(Ok), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn skill_choice_kinds_map_to_practice_kinds() {
+        assert_eq!(SkillChoice::Grammar.kind(), types::PracticeKind::Grammar);
+        assert_eq!(SkillChoice::Reading.kind(), types::PracticeKind::Reading);
+        // Grammar + Reading are now wired into the menu (5 entries).
+        assert_eq!(SkillChoice::MENU.len(), 5);
+        assert!(SkillChoice::MENU.contains(&SkillChoice::Grammar));
+        assert!(SkillChoice::MENU.contains(&SkillChoice::Reading));
     }
 }

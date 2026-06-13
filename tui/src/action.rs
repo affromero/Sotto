@@ -41,6 +41,10 @@ pub(crate) enum Action {
     PlayPause,
     /// Start/stop a speaking recording (`r`, on the speaking screen).
     ToggleRecord,
+    /// Scroll the current item's prompt up (PageUp; long reading passages).
+    ScrollUp,
+    /// Scroll the current item's prompt down (PageDown).
+    ScrollDown,
 
     // --- Async API results, delivered by spawned tasks ---
     //
