@@ -1,5 +1,5 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.3",
   "info": {
     "title": "Sotto API",
     "version": "0.0.1",
@@ -86,18 +86,12 @@
           },
           "checks": {
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
             "additionalProperties": {
               "$ref": "#/components/schemas/HealthCheckResult"
             }
           },
           "oauth": {
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
             "additionalProperties": {
               "type": "boolean"
             }
@@ -107,9 +101,6 @@
           },
           "env": {
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
             "additionalProperties": {
               "type": "boolean"
             }
@@ -140,14 +131,8 @@
             "$ref": "#/components/schemas/CefrLevel"
           },
           "activeClassId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           },
           "curriculum": {
             "type": "object",
@@ -162,27 +147,21 @@
             "additionalProperties": false
           },
           "placement": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "level": {
-                    "$ref": "#/components/schemas/CefrLevel"
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "level",
-                  "createdAt"
-                ],
-                "additionalProperties": false
+            "type": "object",
+            "properties": {
+              "level": {
+                "$ref": "#/components/schemas/CefrLevel"
               },
-              {
-                "type": "null"
+              "createdAt": {
+                "type": "string"
               }
-            ]
+            },
+            "required": [
+              "level",
+              "createdAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
           }
         },
         "required": [
@@ -225,27 +204,15 @@
             "$ref": "#/components/schemas/PracticeStatus"
           },
           "score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "number",
+            "nullable": true
           },
           "startedAt": {
             "type": "string"
           },
           "completedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -330,14 +297,8 @@
             "type": "string"
           },
           "referenceTtsUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -358,14 +319,8 @@
             "type": "string"
           },
           "guidance": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -387,110 +342,139 @@
         ],
         "additionalProperties": false
       },
+      "StartPracticeUnavailable": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "not_enough_vocab",
+              "nothing_due",
+              "no_content"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeReady": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PracticeKind"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeItem"
+            }
+          },
+          "episodeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "kind",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeReadySpeaking": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready_speaking"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeSpeakingPrompt"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "prompts"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeReadyWriting": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready_writing"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeWritingPrompt"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "prompts"
+        ],
+        "additionalProperties": false
+      },
       "StartPracticeResponse": {
         "oneOf": [
           {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "const": "unavailable"
-              },
-              "reason": {
-                "type": "string",
-                "enum": [
-                  "not_enough_vocab",
-                  "nothing_due",
-                  "no_content"
-                ]
-              }
-            },
-            "required": [
-              "status",
-              "reason"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/StartPracticeUnavailable"
           },
           {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "const": "ready"
-              },
-              "sessionId": {
-                "type": "string"
-              },
-              "kind": {
-                "$ref": "#/components/schemas/PracticeKind"
-              },
-              "items": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/PracticeItem"
-                }
-              },
-              "episodeId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "status",
-              "sessionId",
-              "kind",
-              "items"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/StartPracticeReady"
           },
           {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "const": "ready_speaking"
-              },
-              "sessionId": {
-                "type": "string"
-              },
-              "prompts": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/PracticeSpeakingPrompt"
-                }
-              }
-            },
-            "required": [
-              "status",
-              "sessionId",
-              "prompts"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/StartPracticeReadySpeaking"
           },
           {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "const": "ready_writing"
-              },
-              "sessionId": {
-                "type": "string"
-              },
-              "prompts": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/PracticeWritingPrompt"
-                }
-              }
-            },
-            "required": [
-              "status",
-              "sessionId",
-              "prompts"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/StartPracticeReadyWriting"
           }
-        ]
+        ],
+        "discriminator": {
+          "propertyName": "status",
+          "mapping": {
+            "unavailable": "#/components/schemas/StartPracticeUnavailable",
+            "ready": "#/components/schemas/StartPracticeReady",
+            "ready_speaking": "#/components/schemas/StartPracticeReadySpeaking",
+            "ready_writing": "#/components/schemas/StartPracticeReadyWriting"
+          }
+        }
       },
       "SubmitPracticeRequest": {
         "type": "object",
@@ -564,12 +548,10 @@
             "type": "string"
           },
           "user": {
-            "anyOf": [
+            "nullable": true,
+            "allOf": [
               {
                 "$ref": "#/components/schemas/PairedUser"
-              },
-              {
-                "type": "null"
               }
             ]
           }
@@ -587,37 +569,19 @@
             "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           },
           "email": {
             "type": "string"
           },
           "handle": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           },
           "image": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "nullable": true
           },
           "role": {
             "$ref": "#/components/schemas/UserRole"
@@ -643,6 +607,16 @@
         "responses": {
           "200": {
             "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Degraded",
             "content": {
               "application/json": {
                 "schema": {
@@ -713,6 +687,16 @@
         "operationId": "startPractice",
         "summary": "Start an ungated, single-skill practice session.",
         "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartPracticeResponse"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Success",
             "content": {
@@ -756,7 +740,7 @@
         "operationId": "submitPractice",
         "summary": "Grade a practice session and update spaced-repetition state.",
         "responses": {
-          "201": {
+          "200": {
             "description": "Success",
             "content": {
               "application/json": {
@@ -799,7 +783,7 @@
         "operationId": "redeemPairingToken",
         "summary": "Exchange a single-use pairing token for a long-lived API key.",
         "responses": {
-          "201": {
+          "200": {
             "description": "Success",
             "content": {
               "application/json": {
