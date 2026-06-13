@@ -1,19 +1,13 @@
 /**
- * Middleware Security Tests
+ * Middleware tests
  *
- * Tests route protection, auth redirects, admin privilege escalation,
- * and public route accessibility.
+ * Sotto is fully self-hosted with no login, so the middleware does no auth
+ * gating. It only (a) skips static/SEO assets and (b) steers the managed
+ * showcase (SELF_HOSTED=false) into its /welcome demo. Real self-hosted
+ * installs pass every request through.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-
-// Mock next-auth/jwt
-const mockGetToken = vi.fn();
-vi.mock('next-auth/jwt', () => ({
-  getToken: (...args: unknown[]) => mockGetToken(...args),
-}));
-
-const TEST_SECRET = 'test-secret-for-middleware-tests-32ch';
 
 function createRequest(path: string): NextRequest {
   const url = new URL(path, 'http://localhost:3000');
@@ -34,120 +28,32 @@ function isPassThrough(response: Response): boolean {
   return !response.headers.get('location');
 }
 
-// Lazy-import middleware after mocks are set up
 async function getMiddleware() {
   const mod = await import('@/middleware');
   return mod.middleware;
 }
 
-describe('Middleware Security Tests', () => {
+describe('Middleware', () => {
   let middleware: Awaited<ReturnType<typeof getMiddleware>>;
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.clearAllMocks();
-    process.env.AUTH_SECRET = TEST_SECRET;
     delete process.env.SELF_HOSTED;
-    mockGetToken.mockResolvedValue(null);
     middleware = await getMiddleware();
   });
 
   afterEach(() => {
-    delete process.env.AUTH_SECRET;
     delete process.env.SELF_HOSTED;
   });
 
-  // =====================================================================
-  // PATH TRAVERSAL — Trying to sneak past route checks
-  // =====================================================================
-  describe('Path Traversal & URL Tricks', () => {
-    it('redirects /dashboard/ to login (trailing slash)', async () => {
-      const res = await middleware(createRequest('/dashboard/'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
-
-    it('redirects /admin/secret-page to login', async () => {
-      const res = await middleware(createRequest('/admin/secret-page'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
-
-    it('redirects /welcome to login', async () => {
-      const res = await middleware(createRequest('/welcome'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
-
-    it('allows /welcome without auth on the managed showcase', async () => {
-      process.env.SELF_HOSTED = 'false';
-      const res = await middleware(createRequest('/welcome'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('redirects hosted auth pages to the welcome mock even with an old session', async () => {
-      process.env.SELF_HOSTED = 'false';
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-
-      const res = await middleware(createRequest('/auth/login'));
-
-      expect(getRedirectLocation(res)).toBe('/welcome');
-      expect(mockGetToken).not.toHaveBeenCalled();
-    });
-
-    it('redirects hosted learning app routes to the welcome mock', async () => {
-      process.env.SELF_HOSTED = 'false';
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-
-      const res = await middleware(createRequest('/learn'));
-
-      expect(getRedirectLocation(res)).toBe('/welcome');
-      expect(mockGetToken).not.toHaveBeenCalled();
-    });
-
-    for (const path of ['/ref/alice', '/invite/code_123', '/memory', '/classes/class_1/worksheet', '/episode/ep_1']) {
-      it(`redirects hosted ${path} to the welcome mock`, async () => {
-        process.env.SELF_HOSTED = 'false';
-        mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-
-        const res = await middleware(createRequest(path));
-
-        expect(getRedirectLocation(res)).toBe('/welcome');
-        expect(mockGetToken).not.toHaveBeenCalled();
-      });
-    }
-  });
-
-  // =====================================================================
-  // PUBLIC ROUTES — Always accessible without auth
-  // =====================================================================
-  describe('Public Routes — Always Accessible', () => {
-    const publicPaths = ['/', '/api/v1/health', '/feedback', '/api/v1/feedback'];
-
-    for (const path of publicPaths) {
-      it(`allows ${path} without auth`, async () => {
-        const res = await middleware(createRequest(path));
-        expect(isPassThrough(res)).toBe(true);
-      });
-    }
-
-    it('allows /api/v1/auth/providers (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/v1/auth/providers'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows /api/v1/auth/callback/google (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/v1/auth/callback/google'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-  });
-
-  // =====================================================================
-  // STATIC FILES — Always skipped
-  // =====================================================================
-  describe('Static Files — Always Skipped', () => {
+  describe('Static and SEO assets pass through', () => {
     const staticPaths = [
       '/_next/static/chunks/main.js',
       '/_next/image?url=test',
       '/favicon.ico',
       '/fonts/inter.woff2',
+      '/sitemap.xml',
+      '/robots.txt',
     ];
 
     for (const path of staticPaths) {
@@ -158,96 +64,71 @@ describe('Middleware Security Tests', () => {
     }
   });
 
-  // =====================================================================
-  // AUTH LAYER — Route protection and redirects
-  // =====================================================================
-  describe('Auth Layer', () => {
-    it('redirects unauthenticated user from /dashboard to /auth/login', async () => {
-      const res = await middleware(createRequest('/dashboard'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
+  describe('Self-hosted: no login, everything passes through', () => {
+    const paths = [
+      '/',
+      '/dashboard',
+      '/dashboard/',
+      '/admin',
+      '/admin/users',
+      '/create',
+      '/settings',
+      '/learn',
+      '/welcome',
+      '/episode/ep_1',
+      '/api/v1/health',
+      '/api/v1/episodes',
+    ];
 
-    it('includes callbackUrl when redirecting to login', async () => {
-      const res = await middleware(createRequest('/create'));
-      const fullLocation = res.headers.get('location')!;
-      expect(fullLocation).toContain('callbackUrl=%2Fcreate');
-    });
-
-    it('/auth/login redirects authenticated users to /learn', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/auth/login'));
-      expect(getRedirectLocation(res)).toBe('/learn');
-    });
-
-    it('/auth/signup redirects authenticated users to /learn', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/auth/signup'));
-      expect(getRedirectLocation(res)).toBe('/learn');
-    });
-
-    it('allows authenticated user to access /dashboard', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/dashboard'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows authenticated user to access /create', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/create'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('passes through API routes (own auth handling)', async () => {
-      const res = await middleware(createRequest('/api/v1/episodes'));
-      // API routes without Authorization header still need to reach the API handler
-      // They pass through because they're not in PROTECTED_ROUTES check (starts with /api/v1/)
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('passes through public feedback route', async () => {
-      const res = await middleware(createRequest('/feedback'));
-      expect(isPassThrough(res)).toBe(true);
-    });
+    for (const path of paths) {
+      it(`passes through ${path} with no auth redirect`, async () => {
+        const res = await middleware(createRequest(path));
+        expect(isPassThrough(res)).toBe(true);
+      });
+    }
   });
 
-  // =====================================================================
-  // ADMIN PRIVILEGE ESCALATION — Trying to access /admin without role
-  // =====================================================================
-  describe('Admin Privilege Escalation', () => {
-    it('blocks regular USER from /admin', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/learn');
+  describe('Managed showcase (SELF_HOSTED=false)', () => {
+    beforeEach(() => {
+      process.env.SELF_HOSTED = 'false';
     });
 
-    it('blocks user with no role from /admin', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-3' });
-      const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/learn');
-    });
+    const mockRoutes = [
+      '/dashboard',
+      '/admin',
+      '/admin/users',
+      '/learn',
+      '/create',
+      '/settings',
+      '/memory',
+      '/profile',
+      '/voices',
+      '/classes/class_1/worksheet',
+      '/episode/ep_1',
+      '/invite/code_123',
+      '/ref/alice',
+    ];
 
-    it('blocks user with fabricated role string from /admin', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-4', role: 'SUPERADMIN' });
-      const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/learn');
-    });
+    for (const path of mockRoutes) {
+      it(`redirects ${path} to the /welcome demo`, async () => {
+        const res = await middleware(createRequest(path));
+        expect(getRedirectLocation(res)).toBe('/welcome');
+      });
+    }
 
-    it('allows ADMIN to access /admin', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'admin-1', role: 'ADMIN' });
-      const res = await middleware(createRequest('/admin'));
+    it('lets /welcome itself render the demo', async () => {
+      const res = await middleware(createRequest('/welcome'));
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows ADMIN to access /admin/users', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'admin-1', role: 'ADMIN' });
-      const res = await middleware(createRequest('/admin/users'));
+    it('does not redirect the public landing page', async () => {
+      const res = await middleware(createRequest('/'));
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('blocks USER from /admin/users subpath', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/admin/users'));
-      expect(getRedirectLocation(res)).toBe('/learn');
+    it('does not redirect the public health route', async () => {
+      const res = await middleware(createRequest('/api/v1/health'));
+      expect(isPassThrough(res)).toBe(true);
     });
   });
 });

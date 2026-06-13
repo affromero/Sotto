@@ -30,7 +30,6 @@ All auth-related environment variables required for the system to function:
 | `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://your-domain.example`                  |
 | `GOOGLE_CLIENT_ID`     | No               | Google OAuth client ID                            | `123456.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | No               | Google OAuth client secret                        | `GOCSPX-xxxxxxxxxxxx`               |
-| `GOOGLE_IOS_CLIENT_ID` | No               | Google OAuth client ID for iOS app                | `123456.apps.googleusercontent.com` |
 | `GITHUB_CLIENT_ID`     | No               | GitHub OAuth app client ID                        | `Iv1.xxxxxxxxxxxx`                  |
 | `GITHUB_CLIENT_SECRET` | No               | GitHub OAuth app client secret                    | `xxxxxxxxxxxxxxxxxxxx`              |
 | `TWITTER_CLIENT_ID`    | No               | Twitter OAuth 2.0 client ID                       | `xxxxxxxxxxxxxxxxxxxx`              |
@@ -378,7 +377,7 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
 **Important notes:**
 
 - The client secret JWT expires every 6 months. Set a calendar reminder to regenerate it.
-- Apple Sign In on web uses a redirect flow. On native iOS (React Native, future), it uses the native Apple Sign In SDK.
+- Apple Sign In on web uses a redirect flow.
 - Apple may only provide the user's name on the first sign-in. Store it immediately because subsequent sign-ins will not include it.
 - Apple allows users to hide their real email, providing a relay address (`xxxxx@privaterelay.appleid.com`). Your app must handle this.
 
@@ -669,30 +668,3 @@ Sotto is deployed on a Hetzner VPS with Docker Compose + Caddy reverse proxy:
 - Use `Secure` cookies in production (handled automatically by NextAuth when `NEXTAUTH_URL` uses `https://`)
 - The `sameSite` attribute on cookies is set to `lax` by default, which protects against CSRF in most scenarios
 - All OAuth tokens stored in the `Account` table are encrypted at rest by the database
-
----
-
-## Mobile Auth (iOS)
-
-The React Native iOS app (`apps/mobile/`) authenticates against the same NextAuth backend.
-
-### Environment Variables
-
-| Variable               | Description                                  |
-| ---------------------- | -------------------------------------------- |
-| `GOOGLE_IOS_CLIENT_ID` | Google OAuth client ID for iOS (different from web) |
-
-### Authentication Flow
-
-1. User taps "Sign in with Google/Apple/GitHub/Twitter" in the mobile app
-2. `expo-auth-session` opens the OAuth flow in a system browser
-3. On callback, the mobile app receives the auth token
-4. Token is stored securely via `expo-secure-store`
-5. All subsequent API calls include the token in the `Authorization` header
-
-### Social Login Providers
-
-- **Google Sign-In**: `expo-auth-session` with `GOOGLE_IOS_CLIENT_ID` (separate iOS client in Google Cloud Console)
-- **Apple Sign-In**: `expo-apple-authentication` (native SDK, required for App Store)
-- **GitHub**: Same OAuth flow as web via `expo-auth-session`
-- **Twitter**: Same OAuth 2.0 flow via `expo-auth-session`

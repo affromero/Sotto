@@ -183,9 +183,6 @@ Expected behavior:
 | `npm run dev` | start web app and workers |
 | `npm run dev:web` | start web app only |
 | `npm run dev:workers` | start workers only |
-| `npm run mobile:env` | sync Expo public env from `.env.local` |
-| `npm run mobile:ios` | start the iOS app after syncing mobile env |
-| `npm run mobile:android` | start the Android app after syncing mobile env |
 | `npm run lint` | run ESLint |
 | `npm run type-check` | run TypeScript checks |
 | `npm run test` | run Vitest |

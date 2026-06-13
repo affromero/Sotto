@@ -9,7 +9,7 @@
 ## 1. System Overview
 
 ```text
-Browser / Mobile / Local Agent
+Browser / Desktop / Local Agent
         |
         v
 Next.js App Router + /api/v1 routes
@@ -47,12 +47,12 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 | Path | Responsibility |
 |---|---|
 | `apps/web` | Next.js app, `/api/v1` routes, Prisma schema, workers, tests |
-| `apps/mobile` | Expo app and mobile/iPad learning surfaces |
+| `apps/desktop` | Tauri desktop shell, built outside the npm workspaces |
 | `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
 | `packages/mcp` | MCP integration surface for local agents |
 | `packages/verification-standard` | Reference verification standard package |
 | `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
-| `e2e` | Playwright and Maestro tests |
+| `e2e` | Playwright end-to-end tests |
 | `scripts` | Setup, launch, recording, migration, and release automation |
 
 Root scripts proxy the primary web commands to `@sotto/web`.
@@ -316,7 +316,7 @@ Security priorities:
 - Session auth for dashboard, learning routes, settings, and admin.
 - Route-level ownership checks for every course, class, practice session, exam, recording, and memory graph.
 - Encrypted user provider keys.
-- Token-authenticated local-agent and mobile API flows.
+- Token-authenticated local-agent and connected-device API flows.
 - Short-lived live-translation tokens that keep the learner's BYOK Google key server-side.
 - Redaction of provider keys, course notes, prompts, recordings, transcripts, and raw source content from logs.
 - Admin inspection that is explicit and auditable.
