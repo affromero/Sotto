@@ -13,6 +13,9 @@ import {
   cefrLevelSchema,
   courseSummarySchema,
   coursesListResponseSchema,
+  episodeDetailResponseSchema,
+  episodeSegmentSchema,
+  episodeStatusSchema,
   healthCheckResultSchema,
   healthResponseSchema,
   pairedUserSchema,
@@ -25,6 +28,8 @@ import {
   practiceWritingPromptSchema,
   redeemPairingRequestSchema,
   redeemPairingResponseSchema,
+  speakingGradeStatusSchema,
+  speakingPollResponseSchema,
   startPracticeReadySchema,
   startPracticeReadySpeakingSchema,
   startPracticeReadyWritingSchema,
@@ -83,6 +88,11 @@ const namedSchemas: Record<string, z.ZodType> = {
   [START_PRACTICE_RESPONSE_NAME]: startPracticeResponseSchema,
   SubmitPracticeRequest: submitPracticeRequestSchema,
   SubmitPracticeResponse: submitPracticeResponseSchema,
+  EpisodeStatus: episodeStatusSchema,
+  EpisodeSegment: episodeSegmentSchema,
+  EpisodeDetailResponse: episodeDetailResponseSchema,
+  SpeakingGradeStatus: speakingGradeStatusSchema,
+  SpeakingPollResponse: speakingPollResponseSchema,
   RedeemPairingRequest: redeemPairingRequestSchema,
   RedeemPairingResponse: redeemPairingResponseSchema,
   PairedUser: pairedUserSchema,
@@ -227,6 +237,16 @@ function pathParameters(path: string): JsonValue[] {
   }));
 }
 
+// Declared query-string params -> OpenAPI query parameter objects.
+function queryParameters(endpoint: EndpointDef): JsonValue[] {
+  return (endpoint.query ?? []).map((param) => ({
+    name: param.name,
+    in: 'query',
+    required: param.required,
+    schema: { type: 'string' },
+  }));
+}
+
 function operationFor(endpoint: EndpointDef): JsonValue {
   const statuses = endpoint.successStatuses ?? [200];
   const responseRef = refFor(endpoint.response);
@@ -244,7 +264,10 @@ function operationFor(endpoint: EndpointDef): JsonValue {
     responses,
   };
 
-  const parameters = pathParameters(endpoint.path);
+  const parameters = [
+    ...pathParameters(endpoint.path),
+    ...queryParameters(endpoint),
+  ];
   if (parameters.length > 0) operation.parameters = parameters;
 
   if (endpoint.request) {

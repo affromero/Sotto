@@ -5,15 +5,24 @@
 import { z } from 'zod';
 import {
   coursesListResponseSchema,
+  episodeDetailResponseSchema,
   healthResponseSchema,
   practiceOverviewResponseSchema,
   redeemPairingRequestSchema,
   redeemPairingResponseSchema,
+  speakingPollResponseSchema,
   startPracticeRequestSchema,
   startPracticeResponseSchema,
   submitPracticeRequestSchema,
   submitPracticeResponseSchema,
 } from './schemas';
+
+// A query-string parameter on a GET endpoint. Always typed as a string in the
+// OpenAPI document (the route reads searchParams as strings).
+export interface QueryParamDef {
+  name: string;
+  required: boolean;
+}
 
 export interface EndpointDef {
   id: string;
@@ -23,6 +32,8 @@ export interface EndpointDef {
   auth: 'bearer' | 'none';
   request?: z.ZodType;
   response: z.ZodType;
+  // Query-string parameters (path params are derived from the path template).
+  query?: QueryParamDef[];
   // HTTP statuses the route can return with the response body. The same response
   // schema is emitted for each (verified against the route handlers). Defaults to
   // [200] when omitted.
@@ -77,6 +88,25 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     request: submitPracticeRequestSchema,
     response: submitPracticeResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'getEpisode',
+    method: 'GET',
+    path: '/api/v1/episodes/{episodeId}',
+    summary: 'Episode detail with ordered segments and playable audio URLs.',
+    auth: 'bearer',
+    response: episodeDetailResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'pollSpeaking',
+    method: 'GET',
+    path: '/api/v1/practice/{sessionId}/speaking/{promptId}',
+    summary: 'Poll grading status for an uploaded speaking attempt.',
+    auth: 'bearer',
+    query: [{ name: 'recordingId', required: true }],
+    response: speakingPollResponseSchema,
     successStatuses: [200],
   },
   {

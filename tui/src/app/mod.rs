@@ -12,7 +12,8 @@ use ratatui::{
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::action::{Action, ApiResult};
-use crate::api::{Api, SottoClient, types};
+use crate::api::{Api, SottoClient, SpeakingUploadResponse, types};
+use crate::audio::{AudioPlayer, Recorder};
 use crate::components::Component;
 use crate::components::status_bar::StatusBar;
 use crate::config::Config;
@@ -20,8 +21,9 @@ use crate::event::Event;
 use crate::tui::Tui;
 
 use state::{
-    AnswerStep, Course, DueCounts, PracticeResult, RetryKind, View, answer_current,
-    can_review_vocab, cursor_down, cursor_up, list_down, list_up, reduce_start,
+    AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SkillChoice,
+    SpeakingPhase, View, answer_current, can_review_vocab, cursor_down, cursor_up, list_down,
+    list_up, poll_is_terminal, reduce_speaking_poll, reduce_start,
 };
 
 /// The interactive Sotto client. Owns the session [`Config`], the [`Api`] seam
@@ -42,6 +44,12 @@ pub(crate) struct App {
     /// onto its result action; stale results (gen mismatch) are dropped, so a
     /// fetch for course A never applies once the learner moved to course B.
     request_gen: u64,
+    /// Lazily-initialized audio output. `None` until first listening playback;
+    /// holds `Err`-derived absence so a headless host degrades gracefully.
+    player: Option<AudioPlayer>,
+    /// Microphone capture for speaking. Always present (idle until `start`);
+    /// device failures surface from `start`/`stop`, not construction.
+    recorder: Recorder,
 }
 
 impl App {
@@ -67,6 +75,8 @@ impl App {
             action_tx,
             action_rx,
             request_gen: 0,
+            player: None,
+            recorder: Recorder::new(),
         }
     }
 
@@ -123,10 +133,16 @@ impl App {
             Action::Choose(n) => self.on_choose(n),
             Action::Back => self.on_back(),
             Action::Retry => self.on_retry(),
+            Action::PlayPause => self.on_play_pause(),
+            Action::ToggleRecord => self.on_toggle_record(),
             Action::CoursesLoaded(req_gen, result) => self.on_courses_loaded(req_gen, result),
             Action::DueLoaded(req_gen, result) => self.on_due_loaded(req_gen, result),
             Action::PracticeStarted(req_gen, result) => self.on_practice_started(req_gen, result),
             Action::Submitted(req_gen, result) => self.on_submitted(req_gen, result),
+            Action::EpisodeLoaded(req_gen, result) => self.on_episode_loaded(req_gen, result),
+            Action::AudioDownloaded(req_gen, result) => self.on_audio_downloaded(req_gen, result),
+            Action::SpeakingUploaded(req_gen, result) => self.on_speaking_uploaded(req_gen, result),
+            Action::SpeakingPolled(req_gen, result) => self.on_speaking_polled(req_gen, result),
         }
         Ok(())
     }
@@ -154,9 +170,21 @@ impl App {
             return Some(Action::Quit);
         }
 
-        // On the persistent error screen, `r` retries the failed action.
-        if matches!(self.view, View::Error { .. }) && matches!(key.code, KeyCode::Char('r')) {
-            return Some(Action::Retry);
+        // Screen-specific keys take priority over the generic mapping below.
+        match &self.view {
+            // Persistent error screen: `r` retries the failed action.
+            View::Error { .. } if matches!(key.code, KeyCode::Char('r')) => {
+                return Some(Action::Retry);
+            }
+            // Listening: space toggles playback (it would otherwise Select).
+            View::ListeningReview { .. } if matches!(key.code, KeyCode::Char(' ')) => {
+                return Some(Action::PlayPause);
+            }
+            // Speaking: `r` toggles recording.
+            View::SpeakingReview { .. } if matches!(key.code, KeyCode::Char('r')) => {
+                return Some(Action::ToggleRecord);
+            }
+            _ => {}
         }
 
         match key.code {
@@ -185,12 +213,19 @@ impl App {
 
     fn on_up(&mut self) {
         match &mut self.view {
-            View::Courses { courses, cursor } => {
-                let _ = courses;
+            View::Courses { cursor, .. } => {
                 *cursor = list_up(*cursor);
                 self.render();
             }
+            View::CourseHome { menu_cursor, .. } => {
+                *menu_cursor = list_up(*menu_cursor);
+                self.render();
+            }
             View::VocabReview { cursor, .. } => {
+                *cursor = cursor_up(*cursor);
+                self.render();
+            }
+            View::ListeningReview { cursor, .. } => {
                 *cursor = cursor_up(*cursor);
                 self.render();
             }
@@ -204,7 +239,21 @@ impl App {
                 *cursor = list_down(*cursor, courses.len());
                 self.render();
             }
+            View::CourseHome { menu_cursor, .. } => {
+                *menu_cursor = list_down(*menu_cursor, SkillChoice::MENU.len());
+                self.render();
+            }
             View::VocabReview {
+                items,
+                index,
+                cursor,
+                ..
+            } => {
+                let option_count = items.get(*index).map_or(0, |i| i.options.len());
+                *cursor = cursor_down(*cursor, option_count);
+                self.render();
+            }
+            View::ListeningReview {
                 items,
                 index,
                 cursor,
@@ -228,14 +277,23 @@ impl App {
             View::CourseHome {
                 course,
                 due,
+                menu_cursor,
                 starting,
                 ..
             } => {
                 // Ignore a repeat Select while a start is already in flight so
                 // key-mashing cannot spawn duplicate server work.
-                if !*starting && can_review_vocab(due) {
-                    let course = course.clone();
-                    self.start_vocab(course);
+                if !*starting {
+                    let skill = SkillChoice::MENU
+                        .get(*menu_cursor)
+                        .copied()
+                        .unwrap_or(SkillChoice::Vocab);
+                    // Vocab is gated on having vocab to review; listening/speaking
+                    // always attempt (the server answers `unavailable` if not).
+                    if skill != SkillChoice::Vocab || can_review_vocab(due) {
+                        let course = course.clone();
+                        self.start_skill(course, skill);
+                    }
                 }
             }
             View::VocabReview {
@@ -243,7 +301,27 @@ impl App {
             } => {
                 if !*submitting {
                     let choice = *cursor;
-                    self.record_answer(choice);
+                    self.answer_choice(choice);
+                }
+            }
+            View::ListeningReview {
+                cursor,
+                submitting,
+                items,
+                ..
+            } => {
+                if !*submitting && !items.is_empty() {
+                    let choice = *cursor;
+                    self.answer_choice(choice);
+                }
+            }
+            View::SpeakingReview { phase, .. } => {
+                // Enter advances to the next prompt once this one is graded/failed.
+                if matches!(
+                    phase,
+                    SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. }
+                ) {
+                    self.next_speaking_prompt();
                 }
             }
             View::Result { .. } => self.dismiss_result(),
@@ -268,7 +346,18 @@ impl App {
             } => {
                 let option_count = items.get(*item_index).map_or(0, |i| i.options.len());
                 if !*submitting && index < option_count {
-                    self.record_answer(index);
+                    self.answer_choice(index);
+                }
+            }
+            View::ListeningReview {
+                items,
+                index: item_index,
+                submitting,
+                ..
+            } => {
+                let option_count = items.get(*item_index).map_or(0, |i| i.options.len());
+                if !*submitting && index < option_count {
+                    self.answer_choice(index);
                 }
             }
             _ => {}
@@ -282,15 +371,26 @@ impl App {
                 self.fetch_courses();
                 self.render();
             }
-            View::VocabReview { course, .. } => {
+            View::VocabReview { course, .. }
+            | View::ListeningReview { course, .. }
+            | View::SpeakingReview { course, .. }
+            | View::Result { course, .. } => {
                 let course = course.clone();
-                self.enter_course_home(course);
-            }
-            View::Result { course, .. } => {
-                let course = course.clone();
+                // Stop any audio/recording before leaving a review screen.
+                self.stop_audio();
                 self.enter_course_home(course);
             }
             View::Loading | View::Courses { .. } | View::Error { .. } => {}
+        }
+    }
+
+    /// Stop playback and discard any in-progress recording (best-effort).
+    fn stop_audio(&mut self) {
+        if let Some(player) = &self.player {
+            player.stop();
+        }
+        if self.recorder.is_recording() {
+            let _ = self.recorder.stop();
         }
     }
 
@@ -321,25 +421,32 @@ impl App {
         }
     }
 
-    fn record_answer(&mut self, choice: usize) {
-        let submit = if let View::VocabReview {
-            items,
-            selected,
-            index,
-            cursor,
-            ..
-        } = &mut self.view
-        {
-            match answer_current(items, selected, *index, choice) {
+    /// Record `choice` for the current item of a VocabReview or ListeningReview,
+    /// advancing or submitting. Shared by both choice-based review screens.
+    fn answer_choice(&mut self, choice: usize) {
+        let submit = match &mut self.view {
+            View::VocabReview {
+                items,
+                selected,
+                index,
+                cursor,
+                ..
+            }
+            | View::ListeningReview {
+                items,
+                selected,
+                index,
+                cursor,
+                ..
+            } => match answer_current(items, selected, *index, choice) {
                 AnswerStep::Advanced => {
                     *index += 1;
                     *cursor = 0;
                     None
                 }
                 AnswerStep::Submit(answers) => Some(answers),
-            }
-        } else {
-            None
+            },
+            _ => None,
         };
 
         if let Some(answers) = submit {
@@ -394,7 +501,7 @@ impl App {
         );
     }
 
-    fn start_vocab(&mut self, course: Course) {
+    fn start_skill(&mut self, course: Course, skill: SkillChoice) {
         // New target: invalidate prior in-flight requests, clear any stale
         // notice, and mark the start in flight so a repeat Select is ignored.
         let req_gen = self.bump_gen();
@@ -407,9 +514,10 @@ impl App {
         }
         let client = Arc::clone(&self.client);
         let course_id = course.id.clone();
+        let kind = skill.kind();
         self.dispatch(
             req_gen,
-            async move { client.start_vocab_practice(&course_id).await },
+            async move { client.start_practice(&course_id, kind).await },
             Action::PracticeStarted,
         );
         self.render();
@@ -419,6 +527,11 @@ impl App {
         let req_gen = self.bump_gen();
         let session_id = match &mut self.view {
             View::VocabReview {
+                session_id,
+                submitting,
+                ..
+            }
+            | View::ListeningReview {
                 session_id,
                 submitting,
                 ..
@@ -434,6 +547,182 @@ impl App {
             async move { client.submit_practice(&session_id, answers).await },
             Action::Submitted,
         );
+    }
+
+    // --- Listening ---------------------------------------------------------
+
+    /// Fetch the episode for the current ListeningReview (called on entry).
+    fn fetch_episode(&self, episode_id: &str, req_gen: u64) {
+        let client = Arc::clone(&self.client);
+        let episode_id = episode_id.to_string();
+        self.dispatch(
+            req_gen,
+            async move { client.episode(&episode_id).await },
+            Action::EpisodeLoaded,
+        );
+    }
+
+    /// Toggle play/pause on the listening screen. The first press downloads and
+    /// plays the episode audio; subsequent presses pause/resume.
+    fn on_play_pause(&mut self) {
+        let url = match &self.view {
+            View::ListeningReview { episode, .. } => {
+                episode.as_ref().and_then(|e| e.audio_url.clone())
+            }
+            _ => return,
+        };
+
+        // If audio is already loaded, just toggle; otherwise download + play.
+        if let Some(player) = &self.player
+            && !player.is_finished()
+        {
+            let playing = player.toggle();
+            self.set_audio_note(if playing { "Playing" } else { "Paused" });
+            self.render();
+            return;
+        }
+
+        match url {
+            Some(url) => {
+                self.set_audio_note("Loading audio…");
+                let req_gen = self.request_gen;
+                let client = Arc::clone(&self.client);
+                self.dispatch(
+                    req_gen,
+                    async move { client.download(&url).await },
+                    Action::AudioDownloaded,
+                );
+            }
+            None => self.set_audio_note("No audio available for this episode yet."),
+        }
+        self.render();
+    }
+
+    fn set_audio_note(&mut self, note: &str) {
+        if let View::ListeningReview { audio_note, .. } = &mut self.view {
+            *audio_note = Some(note.to_string());
+        }
+    }
+
+    // --- Speaking ----------------------------------------------------------
+
+    /// Start or stop a recording on the speaking screen. Start → `Recording`;
+    /// stop → encode WAV, upload, then poll grading. Guards re-entry by phase.
+    fn on_toggle_record(&mut self) {
+        let phase = match &self.view {
+            View::SpeakingReview { phase, .. } => phase.clone(),
+            _ => return,
+        };
+
+        match phase {
+            SpeakingPhase::Idle | SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
+                match self.recorder.start() {
+                    Ok(()) => {
+                        if let View::SpeakingReview { phase, .. } = &mut self.view {
+                            *phase = SpeakingPhase::Recording;
+                        }
+                    }
+                    Err(e) => self.status_bar.set_error(e.to_string()),
+                }
+                self.render();
+            }
+            SpeakingPhase::Recording => self.stop_and_upload(),
+            // Upload/poll already in flight: ignore further toggles.
+            SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => {}
+        }
+    }
+
+    /// Stop the recorder, encode the WAV, and dispatch the multipart upload.
+    fn stop_and_upload(&mut self) {
+        let wav = match self.recorder.stop() {
+            Ok(wav) => wav,
+            Err(e) => {
+                self.status_bar.set_error(e.to_string());
+                if let View::SpeakingReview { phase, .. } = &mut self.view {
+                    *phase = SpeakingPhase::Idle;
+                }
+                self.render();
+                return;
+            }
+        };
+
+        let req_gen = self.bump_gen();
+        let (session_id, prompt_id) = match &mut self.view {
+            View::SpeakingReview {
+                session_id,
+                prompts,
+                index,
+                phase,
+                ..
+            } => {
+                let Some(prompt) = prompts.get(*index) else {
+                    return;
+                };
+                *phase = SpeakingPhase::Uploading;
+                (session_id.clone(), prompt.id.clone())
+            }
+            _ => return,
+        };
+
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.upload_speaking(&session_id, &prompt_id, wav).await },
+            Action::SpeakingUploaded,
+        );
+        self.render();
+    }
+
+    /// Dispatch a single grading poll for `recording_id`. The result handler
+    /// re-schedules another poll while grading is still pending.
+    fn poll_grade(&self, recording_id: String, req_gen: u64) {
+        let (session_id, prompt_id) = match &self.view {
+            View::SpeakingReview {
+                session_id,
+                prompts,
+                index,
+                ..
+            } => match prompts.get(*index) {
+                Some(prompt) => (session_id.clone(), prompt.id.clone()),
+                None => return,
+            },
+            _ => return,
+        };
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move {
+                client
+                    .poll_speaking(&session_id, &prompt_id, &recording_id)
+                    .await
+            },
+            Action::SpeakingPolled,
+        );
+    }
+
+    /// Advance to the next speaking prompt, or finish the session by returning
+    /// to the course home when the last prompt is done.
+    fn next_speaking_prompt(&mut self) {
+        let course = match &mut self.view {
+            View::SpeakingReview {
+                course,
+                prompts,
+                index,
+                phase,
+                ..
+            } => {
+                if *index + 1 < prompts.len() {
+                    *index += 1;
+                    *phase = SpeakingPhase::Idle;
+                    self.render();
+                    return;
+                }
+                course.clone()
+            }
+            _ => return,
+        };
+        // Last prompt done — back to the course home (refetches due counts).
+        self.enter_course_home(course);
     }
 
     // --- Result reducers ---------------------------------------------------
@@ -490,9 +779,16 @@ impl App {
         match result.as_ref() {
             Ok(resp) => {
                 // Reduce against the current view (pure, unit-tested in
-                // state.rs). reduce_start clears the `starting` flag.
+                // state.rs). reduce_start clears the `starting` flag and routes
+                // by kind into the right review screen.
                 let next = reduce_start(std::mem::replace(&mut self.view, View::Loading), resp);
                 self.view = next;
+                // Listening needs its episode fetched as a follow-up.
+                if let View::ListeningReview { episode_id, .. } = &self.view {
+                    let episode_id = episode_id.clone();
+                    let req_gen = self.request_gen;
+                    self.fetch_episode(&episode_id, req_gen);
+                }
             }
             Err(message) => {
                 // Clear the in-flight flag so the learner can retry.
@@ -511,8 +807,16 @@ impl App {
         }
         match result.as_ref() {
             Ok(resp) => {
-                if let View::VocabReview { course, .. } = &self.view {
-                    let course = course.clone();
+                // Both vocab and listening reviews submit answers and end on the
+                // Result screen.
+                let course = match &self.view {
+                    View::VocabReview { course, .. } | View::ListeningReview { course, .. } => {
+                        Some(course.clone())
+                    }
+                    _ => None,
+                };
+                if let Some(course) = course {
+                    self.stop_audio();
                     self.view = View::Result {
                         course,
                         result: PracticeResult::from(resp),
@@ -521,13 +825,155 @@ impl App {
             }
             Err(message) => {
                 // Clear the in-flight flag so the learner can resubmit.
-                if let View::VocabReview { submitting, .. } = &mut self.view {
-                    *submitting = false;
+                match &mut self.view {
+                    View::VocabReview { submitting, .. }
+                    | View::ListeningReview { submitting, .. } => *submitting = false,
+                    _ => {}
                 }
                 self.status_bar.set_error(message.clone());
             }
         }
         self.render();
+    }
+
+    fn on_episode_loaded(&mut self, req_gen: u64, result: ApiResult<types::EpisodeDetailResponse>) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(resp) => {
+                if let View::ListeningReview { episode, .. } = &mut self.view {
+                    *episode = Some(EpisodeDetail::from(resp));
+                }
+            }
+            // Listening stays usable (transcript may be unavailable); surface a
+            // transient error rather than stranding the screen.
+            Err(message) => self.status_bar.set_error(message.clone()),
+        }
+        self.render();
+    }
+
+    fn on_audio_downloaded(&mut self, req_gen: u64, result: ApiResult<Vec<u8>>) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(bytes) => self.play_bytes(bytes.clone()),
+            Err(message) => self.set_audio_note(&format!("Audio unavailable: {message}")),
+        }
+        self.render();
+    }
+
+    /// Lazily open the audio output (guarded) and play the downloaded bytes.
+    fn play_bytes(&mut self, bytes: Vec<u8>) {
+        if self.player.is_none() {
+            match AudioPlayer::new() {
+                Ok(p) => self.player = Some(p),
+                Err(e) => {
+                    self.set_audio_note(&format!("Playback unavailable: {e}"));
+                    return;
+                }
+            }
+        }
+        let Some(player) = &self.player else {
+            return;
+        };
+        match player.play(bytes) {
+            Ok(()) => self.set_audio_note("Playing"),
+            Err(e) => self.set_audio_note(&format!("Could not play audio: {e}")),
+        }
+    }
+
+    fn on_speaking_uploaded(&mut self, req_gen: u64, result: ApiResult<SpeakingUploadResponse>) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(resp) => {
+                let recording_id = resp.recording_id.clone();
+                if let View::SpeakingReview { phase, .. } = &mut self.view {
+                    *phase = SpeakingPhase::Polling {
+                        recording_id: recording_id.clone(),
+                    };
+                }
+                // Begin the grading poll loop under the same generation.
+                self.poll_grade(recording_id, req_gen);
+            }
+            Err(message) => {
+                if let View::SpeakingReview { phase, .. } = &mut self.view {
+                    *phase = SpeakingPhase::Failed {
+                        message: message.clone(),
+                    };
+                }
+                self.status_bar.set_error(message.clone());
+            }
+        }
+        self.render();
+    }
+
+    fn on_speaking_polled(&mut self, req_gen: u64, result: ApiResult<types::SpeakingPollResponse>) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        // Capture the recording id we are polling (drops a result for a
+        // superseded attempt).
+        let recording_id = match &self.view {
+            View::SpeakingReview {
+                phase: SpeakingPhase::Polling { recording_id },
+                ..
+            } => recording_id.clone(),
+            _ => return,
+        };
+
+        match result.as_ref() {
+            Ok(resp) => {
+                let next = reduce_speaking_poll(&recording_id, resp);
+                let terminal = poll_is_terminal(&next);
+                if let View::SpeakingReview { phase, .. } = &mut self.view {
+                    *phase = next;
+                }
+                // Still pending: schedule another poll after a short delay.
+                if !terminal {
+                    self.schedule_poll(recording_id, req_gen);
+                }
+            }
+            Err(message) => {
+                if let View::SpeakingReview { phase, .. } = &mut self.view {
+                    *phase = SpeakingPhase::Failed {
+                        message: message.clone(),
+                    };
+                }
+                self.status_bar.set_error(message.clone());
+            }
+        }
+        self.render();
+    }
+
+    /// Re-poll grading after a short delay, still tagged with `req_gen` so a
+    /// navigation away invalidates the loop.
+    fn schedule_poll(&self, recording_id: String, req_gen: u64) {
+        let (session_id, prompt_id) = match &self.view {
+            View::SpeakingReview {
+                session_id,
+                prompts,
+                index,
+                ..
+            } => match prompts.get(*index) {
+                Some(prompt) => (session_id.clone(), prompt.id.clone()),
+                None => return,
+            },
+            _ => return,
+        };
+        let client = Arc::clone(&self.client);
+        let tx = self.action_tx.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            let result = client
+                .poll_speaking(&session_id, &prompt_id, &recording_id)
+                .await
+                .map_err(|e| e.to_string());
+            let _ = tx.send(Action::SpeakingPolled(req_gen, Arc::new(result)));
+        });
     }
 
     // --- Rendering ---------------------------------------------------------
@@ -554,7 +1000,7 @@ mod tests {
 
     /// A pure canned-response [`Api`] stub for App tests: returns benign results
     /// and never touches the network, so dispatch + reducer behavior is
-    /// exercised hermetically. P5/P6 extend the same pattern for new endpoints.
+    /// exercised hermetically. The audio paths are never reached in tests.
     struct StubApi;
 
     #[async_trait]
@@ -570,9 +1016,10 @@ mod tests {
             Ok(overview(0.0, 0.0))
         }
 
-        async fn start_vocab_practice(
+        async fn start_practice(
             &self,
             _course_id: &str,
+            _kind: types::PracticeKind,
         ) -> Result<types::StartPracticeResponse> {
             Ok(serde_json::from_value(serde_json::json!({
                 "status": "unavailable",
@@ -591,6 +1038,50 @@ mod tests {
                 correct: 0.0,
                 total: 0.0,
             })
+        }
+
+        async fn episode(&self, _episode_id: &str) -> Result<types::EpisodeDetailResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "id": "ep-stub",
+                "title": "Stub episode",
+                "status": "READY",
+                "audioUrl": null,
+                "duration": null,
+                "language": "es",
+                "segments": []
+            }))
+            .expect("valid episode JSON"))
+        }
+
+        async fn poll_speaking(
+            &self,
+            _session_id: &str,
+            _prompt_id: &str,
+            _recording_id: &str,
+        ) -> Result<types::SpeakingPollResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "status": "PENDING",
+                "overallScore": null,
+                "transcript": null,
+                "feedback": null
+            }))
+            .expect("valid poll JSON"))
+        }
+
+        async fn upload_speaking(
+            &self,
+            _session_id: &str,
+            _prompt_id: &str,
+            _wav: Vec<u8>,
+        ) -> Result<SpeakingUploadResponse> {
+            Ok(SpeakingUploadResponse {
+                recording_id: "rec-stub".into(),
+                status: "PENDING".into(),
+            })
+        }
+
+        async fn download(&self, _url: &str) -> Result<Vec<u8>> {
+            Ok(Vec::new())
         }
     }
 
@@ -670,6 +1161,7 @@ mod tests {
                 grammar: 0,
                 total_vocab: 9,
             },
+            menu_cursor: 0,
             notice: None,
             starting: false,
         };

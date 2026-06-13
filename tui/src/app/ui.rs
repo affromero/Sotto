@@ -1,5 +1,5 @@
-//! Rendering for the vocabulary review screens. Pure draw functions: they take
-//! the current [`View`] and paint it, with no side effects on app state.
+//! Rendering for the practice screens. Pure draw functions: they take the
+//! current [`View`] and paint it, with no side effects on app state.
 
 use ratatui::{
     Frame,
@@ -11,7 +11,10 @@ use ratatui::{
 
 use crate::config::Config;
 
-use super::state::{Course, DueCounts, PracticeResult, Unavailable, View, can_review_vocab};
+use super::state::{
+    Course, DueCounts, PracticeResult, SkillChoice, SpeakingPhase, Unavailable, View,
+    can_review_vocab,
+};
 
 // aula palette, matching components/status_bar.rs.
 const AULA_BLUE: Color = Color::Rgb(0x3F, 0x4F, 0xB0);
@@ -29,9 +32,18 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
         View::CourseHome {
             course,
             due,
+            menu_cursor,
             notice,
             starting,
-        } => draw_course_home(frame, area, course, due, notice.as_ref(), *starting),
+        } => draw_course_home(
+            frame,
+            area,
+            course,
+            due,
+            *menu_cursor,
+            notice.as_ref(),
+            *starting,
+        ),
         View::VocabReview {
             course,
             items,
@@ -55,6 +67,8 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
                 );
             }
         }
+        View::ListeningReview { .. } => draw_listening_review(frame, area, view),
+        View::SpeakingReview { .. } => draw_speaking_review(frame, area, view),
         View::Result { course, result } => draw_result(frame, area, course, result),
     }
 }
@@ -187,14 +201,21 @@ fn draw_course_home(
     area: Rect,
     course: &Course,
     due: &DueCounts,
+    menu_cursor: usize,
     notice: Option<&Unavailable>,
     starting: bool,
 ) {
     let inner = panel(frame, area, &course.title);
-    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+    // Header (course + due), the skill menu, an optional notice, and hints.
+    let chunks = Layout::vertical([
+        Constraint::Length(4),
+        Constraint::Fill(1),
+        Constraint::Length(2),
+        Constraint::Length(1),
+    ])
+    .split(inner);
 
-    let can_review = can_review_vocab(due);
-    let mut lines = vec![
+    let header = Text::from(vec![
         Line::default(),
         Line::from(vec![
             Span::styled(
@@ -206,7 +227,6 @@ fn draw_course_home(
                 Style::default().fg(INK_MUTED),
             ),
         ]),
-        Line::default(),
         Line::from(vec![
             Span::styled("Due  ", Style::default().fg(INK_MUTED)),
             Span::styled(
@@ -218,54 +238,69 @@ fn draw_course_home(
                 format!("{} grammar", due.grammar),
                 Style::default().fg(INK_SLATE),
             ),
+            Span::styled(
+                format!("   {} words tracked", due.total_vocab),
+                Style::default().fg(INK_MUTED),
+            ),
         ]),
-        Line::from(Span::styled(
-            format!("{} words tracked", due.total_vocab),
-            Style::default().fg(INK_MUTED),
-        )),
-        Line::default(),
-    ];
+    ]);
+    frame.render_widget(Paragraph::new(header).wrap(Wrap { trim: true }), chunks[0]);
 
+    // Skill menu.
+    let can_review = can_review_vocab(due);
+    let items: Vec<ListItem> = SkillChoice::MENU
+        .iter()
+        .map(|skill| {
+            // Vocab is disabled (greyed) when there is nothing to review.
+            let disabled = *skill == SkillChoice::Vocab && !can_review;
+            let style = if disabled {
+                Style::default().fg(INK_MUTED)
+            } else {
+                Style::default().fg(INK).add_modifier(Modifier::BOLD)
+            };
+            let suffix = if disabled { "  (nothing due)" } else { "" };
+            ListItem::new(Line::from(Span::styled(
+                format!("{}{}", skill.label(), suffix),
+                style,
+            )))
+        })
+        .collect();
+    let list = List::new(items)
+        .highlight_style(Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD))
+        .highlight_symbol("▌ ");
+    let mut list_state = ListState::default();
+    list_state.select(Some(
+        menu_cursor.min(SkillChoice::MENU.len().saturating_sub(1)),
+    ));
+    frame.render_stateful_widget(list, chunks[1], &mut list_state);
+
+    // Notice / starting status.
+    let mut footer: Vec<Line> = Vec::new();
     if starting {
-        lines.push(Line::from(Span::styled(
-            "Starting review…",
+        footer.push(Line::from(Span::styled(
+            "Starting…",
             Style::default()
                 .fg(INK_MUTED)
                 .add_modifier(Modifier::ITALIC),
         )));
-    } else if can_review {
-        lines.push(Line::from(Span::styled(
-            "▶ Start vocab review",
-            Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "No vocabulary to review yet.",
-            Style::default().fg(INK_MUTED),
-        )));
     }
-
     if let Some(reason) = notice {
-        lines.push(Line::default());
-        lines.push(Line::from(Span::styled(
+        footer.push(Line::from(Span::styled(
             reason.message(),
             Style::default().fg(PINK).add_modifier(Modifier::BOLD),
         )));
     }
-
     frame.render_widget(
-        Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
-        chunks[0],
+        Paragraph::new(Text::from(footer)).wrap(Wrap { trim: true }),
+        chunks[2],
     );
 
     let hints: &[&str] = if starting {
         &["q back"]
-    } else if can_review {
-        &["enter start review", "q back"]
     } else {
-        &["q back"]
+        &["↑/↓ skill", "enter start", "q back"]
     };
-    frame.render_widget(Paragraph::new(hint_line(hints)), chunks[1]);
+    frame.render_widget(Paragraph::new(hint_line(hints)), chunks[3]);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -350,4 +385,219 @@ fn draw_result(frame: &mut Frame, area: Rect, course: &Course, result: &Practice
         Paragraph::new(hint_line(&["enter continue", "q back"])),
         chunks[1],
     );
+}
+
+fn draw_listening_review(frame: &mut Frame, area: Rect, view: &View) {
+    let View::ListeningReview {
+        course,
+        episode,
+        items,
+        index,
+        cursor,
+        submitting,
+        audio_note,
+        ..
+    } = view
+    else {
+        return;
+    };
+
+    let title = match episode {
+        Some(ep) => format!("{} · listening — {}", course.title, ep.title),
+        None => format!("{} · listening", course.title),
+    };
+    let inner = panel(frame, area, &title);
+    let chunks = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .split(inner);
+
+    // Top: audio status line.
+    let status = audio_note.clone().unwrap_or_else(|| match episode {
+        Some(_) => "Press space to play the episode audio.".to_string(),
+        None => "Loading episode…".to_string(),
+    });
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            status,
+            Style::default().fg(AULA_BLUE),
+        ))),
+        chunks[0],
+    );
+
+    // Middle: either the current comprehension item, or the transcript.
+    if let Some(item) = items.get(*index) {
+        // Comprehension question with selectable options.
+        let body = Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(chunks[1]);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!("Q{}/{}: {}", index + 1, items.len(), item.prompt),
+                Style::default().fg(INK).add_modifier(Modifier::BOLD),
+            )))
+            .wrap(Wrap { trim: true }),
+            body[0],
+        );
+        let opts: Vec<ListItem> = item
+            .options
+            .iter()
+            .enumerate()
+            .map(|(i, option)| {
+                ListItem::new(Line::from(vec![
+                    Span::styled(format!("{}. ", i + 1), Style::default().fg(INK_MUTED)),
+                    Span::styled(option.clone(), Style::default().fg(INK)),
+                ]))
+            })
+            .collect();
+        let list = List::new(opts)
+            .highlight_style(Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD))
+            .highlight_symbol("▌ ");
+        let mut list_state = ListState::default();
+        if !item.options.is_empty() {
+            list_state.select(Some((*cursor).min(item.options.len() - 1)));
+        }
+        frame.render_stateful_widget(list, body[1], &mut list_state);
+    } else {
+        // Transcript-only: list speaker + line.
+        let lines: Vec<Line> = match episode {
+            Some(ep) => ep
+                .segments
+                .iter()
+                .map(|seg| {
+                    Line::from(vec![
+                        Span::styled(
+                            format!("{}: ", seg.speaker),
+                            Style::default().fg(INK_MUTED).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(seg.text.clone(), Style::default().fg(INK)),
+                    ])
+                })
+                .collect(),
+            None => vec![Line::from(Span::styled(
+                "Loading transcript…",
+                Style::default().fg(INK_MUTED),
+            ))],
+        };
+        frame.render_widget(
+            Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
+            chunks[1],
+        );
+    }
+
+    let hints: &[&str] = if *submitting {
+        &["submitting…", "q back"]
+    } else if items.is_empty() {
+        &["space play/pause", "q back"]
+    } else {
+        &["space play/pause", "↑/↓ choose", "enter answer", "q back"]
+    };
+    frame.render_widget(Paragraph::new(hint_line(hints)), chunks[2]);
+}
+
+fn draw_speaking_review(frame: &mut Frame, area: Rect, view: &View) {
+    let View::SpeakingReview {
+        course,
+        prompts,
+        index,
+        phase,
+        ..
+    } = view
+    else {
+        return;
+    };
+
+    let title = format!(
+        "{} · speaking {}/{}",
+        course.title,
+        index + 1,
+        prompts.len()
+    );
+    let inner = panel(frame, area, &title);
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let mut lines: Vec<Line> = Vec::new();
+    if let Some(prompt) = prompts.get(*index) {
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            "Say this aloud:",
+            Style::default().fg(INK_MUTED),
+        )));
+        lines.push(Line::from(Span::styled(
+            prompt.target_phrase.clone(),
+            Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            prompt.translation.clone(),
+            Style::default().fg(INK_MUTED),
+        )));
+        lines.push(Line::default());
+    }
+
+    match phase {
+        SpeakingPhase::Idle => lines.push(Line::from(Span::styled(
+            "Press r to record.",
+            Style::default().fg(INK),
+        ))),
+        SpeakingPhase::Recording => lines.push(Line::from(Span::styled(
+            "● Recording — press r to stop.",
+            Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+        ))),
+        SpeakingPhase::Uploading => lines.push(Line::from(Span::styled(
+            "Uploading…",
+            Style::default()
+                .fg(INK_MUTED)
+                .add_modifier(Modifier::ITALIC),
+        ))),
+        SpeakingPhase::Polling { .. } => lines.push(Line::from(Span::styled(
+            "Grading…",
+            Style::default()
+                .fg(INK_MUTED)
+                .add_modifier(Modifier::ITALIC),
+        ))),
+        SpeakingPhase::Graded {
+            score,
+            transcript,
+            feedback,
+        } => {
+            lines.push(Line::from(vec![
+                Span::styled("Score: ", Style::default().fg(INK_MUTED)),
+                Span::styled(
+                    score.map_or_else(|| "—".to_string(), |s| format!("{s}%")),
+                    Style::default().fg(PINK).add_modifier(Modifier::BOLD),
+                ),
+            ]));
+            if let Some(t) = transcript {
+                lines.push(Line::from(Span::styled(
+                    format!("Heard: {t}"),
+                    Style::default().fg(INK),
+                )));
+            }
+            if let Some(f) = feedback {
+                lines.push(Line::from(Span::styled(
+                    f.clone(),
+                    Style::default().fg(INK_MUTED),
+                )));
+            }
+        }
+        SpeakingPhase::Failed { message } => lines.push(Line::from(Span::styled(
+            message.clone(),
+            Style::default().fg(PINK),
+        ))),
+    }
+
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
+        chunks[0],
+    );
+
+    let hints: &[&str] = match phase {
+        SpeakingPhase::Idle => &["r record", "q back"],
+        SpeakingPhase::Recording => &["r stop", "q back"],
+        SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => &["q back"],
+        SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
+            &["enter next", "r retry", "q back"]
+        }
+    };
+    frame.render_widget(Paragraph::new(hint_line(hints)), chunks[1]);
 }

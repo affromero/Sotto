@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::api::types;
+use crate::api::{SpeakingUploadResponse, types};
 
 /// Actions are the reduced intents the [`crate::app::App`] event loop applies
 /// to its state. Terminal input is mapped to actions; async API calls dispatch
@@ -37,6 +37,10 @@ pub(crate) enum Action {
     Back,
     /// Retry the failed action on the persistent error screen (`r`).
     Retry,
+    /// Toggle audio play/pause (space, on the listening screen).
+    PlayPause,
+    /// Start/stop a speaking recording (`r`, on the speaking screen).
+    ToggleRecord,
 
     // --- Async API results, delivered by spawned tasks ---
     //
@@ -52,6 +56,14 @@ pub(crate) enum Action {
     PracticeStarted(u64, ApiResult<types::StartPracticeResponse>),
     /// `POST /practice/{sessionId}/submit` returned (or failed).
     Submitted(u64, ApiResult<types::SubmitPracticeResponse>),
+    /// `GET /episodes/{id}` returned (or failed) for a listening session.
+    EpisodeLoaded(u64, ApiResult<types::EpisodeDetailResponse>),
+    /// Segment/episode audio bytes were downloaded (or failed) for playback.
+    AudioDownloaded(u64, ApiResult<Vec<u8>>),
+    /// Multipart speaking upload returned (or failed).
+    SpeakingUploaded(u64, ApiResult<SpeakingUploadResponse>),
+    /// A speaking grading poll returned (or failed).
+    SpeakingPolled(u64, ApiResult<types::SpeakingPollResponse>),
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries

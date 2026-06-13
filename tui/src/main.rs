@@ -1,6 +1,7 @@
 mod action;
 mod api;
 mod app;
+mod audio;
 mod auth;
 mod components;
 mod config;

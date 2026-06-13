@@ -174,6 +174,99 @@ export const submitPracticeResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/v1/episodes/{episodeId}  (auth: bearer for private; public otherwise)
+// The listening backbone. Mirrors the GET response in
+// apps/web/src/app/api/v1/episodes/[episodeId]/route.ts: the episode plus its
+// ordered segments, each with `audioUrl` resolved by resolveAudioUrl to a
+// playable (presigned for PRIVATE/UNLISTED, CDN for PUBLIC) URL. Only the fields
+// the terminal client plays/renders are modeled; the route returns a superset
+// (tags, interactions, isSaved, etc.) that the client ignores.
+// ---------------------------------------------------------------------------
+
+// Mirrors the Prisma `EpisodeStatus` enum (apps/web/prisma/schema.prisma);
+// keep in sync when that enum changes.
+export const episodeStatusSchema = z.enum([
+  'PENDING',
+  'DISCOVERING',
+  'EXTRACTING',
+  'RESEARCHING',
+  'PLANNING',
+  'SCRIPTING',
+  'COMPILING',
+  'SCRIPT_READY',
+  'GENERATING_AUDIO',
+  'STITCHING',
+  'READY',
+  'UPDATING',
+  'FAILED',
+  'IMPORTING',
+  'TRANSCRIBING',
+]);
+
+// `.loose()`: the route returns the full Prisma segment row (episodeId,
+// wordTimings, version, ttsProvider, createdAt, updatedAt, ...). We model only
+// the fields the terminal client reads and leave the object OPEN so the
+// contract is truthful and the generated client tolerates the extra fields
+// (loose objects never emit `additionalProperties: false`).
+export const episodeSegmentSchema = z
+  .object({
+    id: z.string(),
+    speaker: z.string(),
+    text: z.string(),
+    // Resolved to a playable URL by the route; null when the segment has no audio.
+    audioUrl: z.string().nullable(),
+    order: z.number().int(),
+    startTime: z.number().nullable(),
+    duration: z.number().nullable(),
+  })
+  .loose();
+
+// `.loose()`: the route returns the whole episode (tags, interactions, isSaved,
+// fileSize, slug, ...). Open object — model only what the client renders/plays.
+export const episodeDetailResponseSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    status: episodeStatusSchema,
+    // Stitched full-episode audio, resolved to a playable URL; null until ready.
+    audioUrl: z.string().nullable(),
+    duration: z.number().nullable(),
+    language: z.string().nullable(),
+    segments: z.array(episodeSegmentSchema),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/practice/{sessionId}/speaking/{promptId}?recordingId=...
+//   (auth: bearer)
+// Grading poll for an uploaded speaking attempt. Mirrors the GET select in
+// apps/web/src/app/api/v1/practice/[sessionId]/speaking/[promptId]/route.ts.
+// The upload itself is multipart and intentionally NOT in the contract — the
+// Rust client posts it with raw reqwest. The route also returns rubricScores
+// and phonemeScores (Json); the terminal client only uses these scalar fields.
+// ---------------------------------------------------------------------------
+
+export const speakingGradeStatusSchema = z.enum([
+  'PENDING',
+  'GRADING',
+  'SCORED',
+  'FAILED',
+]);
+
+// `.loose()`: the GET route also returns rubricScores and phonemeScores (Json).
+// We model only the scalar fields the client uses and keep the object OPEN so
+// the contract is truthful about the superset the route returns.
+export const speakingPollResponseSchema = z
+  .object({
+    status: speakingGradeStatusSchema,
+    // 0..1 combined pronunciation score; null until SCORED.
+    overallScore: z.number().nullable(),
+    transcript: z.string().nullable(),
+    feedback: z.string().nullable(),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
 // POST /api/v1/auth/pair/redeem  (auth: none — the pairing token is the credential)
 // Request mirrors redeemPairingSchema; response mints an sk_sotto_ API key and
 // returns the owning user (the findUnique select), which can be null.

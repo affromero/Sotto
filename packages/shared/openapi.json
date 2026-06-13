@@ -527,6 +527,145 @@
         ],
         "additionalProperties": false
       },
+      "EpisodeStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "DISCOVERING",
+          "EXTRACTING",
+          "RESEARCHING",
+          "PLANNING",
+          "SCRIPTING",
+          "COMPILING",
+          "SCRIPT_READY",
+          "GENERATING_AUDIO",
+          "STITCHING",
+          "READY",
+          "UPDATING",
+          "FAILED",
+          "IMPORTING",
+          "TRANSCRIBING"
+        ]
+      },
+      "EpisodeSegment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "speaker": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "startTime": {
+            "type": "number",
+            "nullable": true
+          },
+          "duration": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "speaker",
+          "text",
+          "audioUrl",
+          "order",
+          "startTime",
+          "duration"
+        ],
+        "additionalProperties": {}
+      },
+      "EpisodeDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EpisodeStatus"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration": {
+            "type": "number",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EpisodeSegment"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "audioUrl",
+          "duration",
+          "language",
+          "segments"
+        ],
+        "additionalProperties": {}
+      },
+      "SpeakingGradeStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "GRADING",
+          "SCORED",
+          "FAILED"
+        ]
+      },
+      "SpeakingPollResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/SpeakingGradeStatus"
+          },
+          "overallScore": {
+            "type": "number",
+            "nullable": true
+          },
+          "transcript": {
+            "type": "string",
+            "nullable": true
+          },
+          "feedback": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "overallScore",
+          "transcript",
+          "feedback"
+        ],
+        "additionalProperties": {}
+      },
       "RedeemPairingRequest": {
         "type": "object",
         "properties": {
@@ -771,6 +910,88 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/episodes/{episodeId}": {
+      "get": {
+        "operationId": "getEpisode",
+        "summary": "Episode detail with ordered segments and playable audio URLs.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "episodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/{sessionId}/speaking/{promptId}": {
+      "get": {
+        "operationId": "pollSpeaking",
+        "summary": "Poll grading status for an uploaded speaking attempt.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpeakingPollResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "security": [
           {
             "bearerAuth": []
