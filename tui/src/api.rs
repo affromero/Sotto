@@ -179,6 +179,25 @@ pub(crate) trait Api: Send + Sync {
         prompt_id: &str,
         text: String,
     ) -> Result<WritingGradeResponse>;
+
+    // --- Placement, memory graph, onboarding (P6d) ---
+    /// Generate an adaptive placement batch for a native/target language pair.
+    async fn generate_placement(
+        &self,
+        native: &str,
+        target: &str,
+    ) -> Result<types::GeneratePlacementResponse>;
+    /// Submit placement answers; assigns a CEFR level and creates the course.
+    async fn submit_placement(
+        &self,
+        native: &str,
+        target: &str,
+        answers: Vec<types::SubmitPlacementRequestAnswersItem>,
+    ) -> Result<types::SubmitPlacementResponse>;
+    /// Fetch the course's vocabulary/grammar memory graph.
+    async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse>;
+    /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
+    async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse>;
 }
 
 /// Thin wrapper over the progenitor-generated [`GeneratedClient`] that bakes in
@@ -635,6 +654,66 @@ impl SottoClient {
         );
         self.submit_writing_at(&url, text).await
     }
+
+    // --- Placement / memory / onboarding ----------------------------------
+
+    /// Generate a placement batch for the `native`/`target` language pair.
+    pub async fn generate_placement(
+        &self,
+        native: &str,
+        target: &str,
+    ) -> Result<types::GeneratePlacementResponse> {
+        let resp = self
+            .inner
+            .generate_placement(native, target)
+            .await
+            .map_err(|e| eyre!("failed to generate placement: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Submit placement answers; assigns a CEFR level and creates the course.
+    pub async fn submit_placement(
+        &self,
+        native: &str,
+        target: &str,
+        answers: Vec<types::SubmitPlacementRequestAnswersItem>,
+    ) -> Result<types::SubmitPlacementResponse> {
+        let native = types::SubmitPlacementRequestNative::try_from(native.to_string())
+            .map_err(|e| eyre!("invalid native language code: {e}"))?;
+        let target = types::SubmitPlacementRequestTarget::try_from(target.to_string())
+            .map_err(|e| eyre!("invalid target language code: {e}"))?;
+        let body = types::SubmitPlacementRequest {
+            native,
+            target,
+            answers,
+        };
+        let resp = self
+            .inner
+            .submit_placement(&body)
+            .await
+            .map_err(|e| eyre!("failed to submit placement: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Fetch the course's memory graph (vocab/grammar nodes + edges).
+    pub async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse> {
+        let resp = self
+            .inner
+            .get_graph(course_id)
+            .await
+            .map_err(|e| eyre!("failed to load memory graph: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
+    pub async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse> {
+        let resp = self
+            .inner
+            .onboarding_config()
+            .await
+            .map_err(|e| eyre!("failed to load config: {e}"))?;
+        Ok(resp.into_inner())
+    }
 }
 
 /// The real implementation of the [`Api`] seam: each method delegates to the
@@ -779,6 +858,31 @@ impl Api for SottoClient {
         text: String,
     ) -> Result<WritingGradeResponse> {
         SottoClient::submit_exam_writing(self, exam_id, prompt_id, text).await
+    }
+
+    async fn generate_placement(
+        &self,
+        native: &str,
+        target: &str,
+    ) -> Result<types::GeneratePlacementResponse> {
+        SottoClient::generate_placement(self, native, target).await
+    }
+
+    async fn submit_placement(
+        &self,
+        native: &str,
+        target: &str,
+        answers: Vec<types::SubmitPlacementRequestAnswersItem>,
+    ) -> Result<types::SubmitPlacementResponse> {
+        SottoClient::submit_placement(self, native, target, answers).await
+    }
+
+    async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse> {
+        SottoClient::graph(self, course_id).await
+    }
+
+    async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse> {
+        SottoClient::onboarding_config(self).await
     }
 }
 

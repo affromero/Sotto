@@ -1,5 +1,6 @@
 mod class;
 mod exam;
+mod onboard;
 mod state;
 mod ui;
 
@@ -180,6 +181,16 @@ impl App {
             Action::ExamStarted(req_gen, result) => self.on_exam_started(req_gen, result),
             Action::ExamLoaded(req_gen, result) => self.on_exam_loaded(req_gen, result),
             Action::ExamSubmitted(req_gen, result) => self.on_exam_submitted(req_gen, result),
+            Action::StartPlacement => self.on_start_placement(),
+            Action::OpenMemory => self.on_open_memory(),
+            Action::OpenSettings => self.on_open_settings(),
+            Action::ToggleLangColumn => self.on_toggle_lang_column(),
+            Action::PlacementLoaded(req_gen, result) => self.on_placement_loaded(req_gen, result),
+            Action::PlacementSubmitted(req_gen, result) => {
+                self.on_placement_submitted(req_gen, result)
+            }
+            Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),
+            Action::ConfigLoaded(req_gen, result) => self.on_config_loaded(req_gen, result),
         }
         Ok(())
     }
@@ -261,6 +272,29 @@ impl App {
                 starting: false, ..
             } if matches!(key.code, KeyCode::Char('e')) => {
                 return Some(Action::StartExam);
+            }
+            // CourseHome: `m` opens the memory graph, `s` opens settings.
+            View::CourseHome {
+                starting: false, ..
+            } if matches!(key.code, KeyCode::Char('m')) => {
+                return Some(Action::OpenMemory);
+            }
+            View::CourseHome {
+                starting: false, ..
+            } if matches!(key.code, KeyCode::Char('s')) => {
+                return Some(Action::OpenSettings);
+            }
+            // Courses: `n` and `s` start placement / open settings (the empty
+            // courses state must be actionable for a fresh self-hoster).
+            View::Courses { .. } if matches!(key.code, KeyCode::Char('n')) => {
+                return Some(Action::StartPlacement);
+            }
+            View::Courses { .. } if matches!(key.code, KeyCode::Char('s')) => {
+                return Some(Action::OpenSettings);
+            }
+            // Placement picker: Tab switches the focused language column.
+            View::PlacementLang { .. } if matches!(key.code, KeyCode::Tab) => {
+                return Some(Action::ToggleLangColumn);
             }
             _ => {}
         }
@@ -380,6 +414,9 @@ impl App {
                 *cursor = cursor_up(*cursor);
                 self.render();
             }
+            View::PlacementLang { .. } => self.placement_lang_move(true),
+            View::PlacementReview { .. } => self.placement_cursor_move(true),
+            View::Memory { .. } => self.memory_scroll(false),
             _ => {}
         }
     }
@@ -418,24 +455,33 @@ impl App {
                 *cursor = cursor_down(*cursor, option_count);
                 self.render();
             }
+            View::PlacementLang { .. } => self.placement_lang_move(false),
+            View::PlacementReview { .. } => self.placement_cursor_move(false),
+            View::Memory { .. } => self.memory_scroll(true),
             _ => {}
         }
     }
 
     /// Scroll the current item's prompt (PageUp/PageDown), for long reading
-    /// passages. `ItemReview` and class MC sections have scrollable prompts.
+    /// passages. `ItemReview`, class MC sections, and placement have scrollable
+    /// prompts; the memory list scrolls by page.
     fn on_scroll(&mut self, down: bool) {
         if self.in_section_walk() {
             self.class_scroll(down);
             return;
         }
-        if let View::ItemReview { prompt_scroll, .. } = &mut self.view {
-            *prompt_scroll = if down {
-                prompt_scroll.saturating_add(1)
-            } else {
-                prompt_scroll.saturating_sub(1)
-            };
-            self.render();
+        match &mut self.view {
+            View::ItemReview { prompt_scroll, .. } => {
+                *prompt_scroll = if down {
+                    prompt_scroll.saturating_add(1)
+                } else {
+                    prompt_scroll.saturating_sub(1)
+                };
+                self.render();
+            }
+            View::PlacementReview { .. } => self.placement_scroll(down),
+            View::Memory { .. } => self.memory_scroll(down),
+            _ => {}
         }
     }
 
@@ -505,6 +551,20 @@ impl App {
                 let course = course.clone();
                 self.enter_course_home(course);
             }
+            // Placement: confirm the picked languages, answer a question, or
+            // continue from the result into the created course.
+            View::PlacementLang { .. } => self.placement_lang_confirm(),
+            View::PlacementReview {
+                cursor, submitting, ..
+            } => {
+                if !*submitting {
+                    let choice = *cursor;
+                    self.placement_answer(choice);
+                }
+            }
+            View::PlacementResult { .. } => self.placement_result_continue(),
+            // Memory and settings are read-only; Enter does nothing.
+            View::Memory { .. } | View::Settings { .. } => {}
             View::Loading | View::Error { .. } => {}
         }
     }
@@ -544,6 +604,17 @@ impl App {
                     self.answer_choice(index);
                 }
             }
+            View::PlacementReview {
+                questions,
+                index: q_index,
+                submitting,
+                ..
+            } => {
+                let option_count = questions.get(*q_index).map_or(0, |q| q.options.len());
+                if !*submitting && index < option_count {
+                    self.placement_answer(index);
+                }
+            }
             _ => {}
         }
     }
@@ -563,11 +634,21 @@ impl App {
             | View::ClassOutcome { course, .. }
             | View::ClassDone { course, .. }
             | View::Exam { course, .. }
-            | View::ExamOutcome { course, .. } => {
+            | View::ExamOutcome { course, .. }
+            // Memory belongs to a course -> back to its home.
+            | View::Memory { course, .. } => {
                 let course = course.clone();
                 // Stop any audio/recording before leaving a review screen.
                 self.stop_audio();
                 self.enter_course_home(course);
+            }
+            // Placement and settings have no owning course -> back to the list.
+            View::PlacementLang { .. }
+            | View::PlacementReview { .. }
+            | View::PlacementResult { .. }
+            | View::Settings { .. } => {
+                self.fetch_courses();
+                self.render();
             }
             View::Loading | View::Courses { .. } | View::Error { .. } => {}
         }
@@ -1427,6 +1508,46 @@ mod tests {
                 feedback: "Good.".into(),
             })
         }
+
+        async fn generate_placement(
+            &self,
+            _native: &str,
+            _target: &str,
+        ) -> Result<types::GeneratePlacementResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "native": "en", "target": "es",
+                "questions": [
+                    { "id": "pq_0", "cefr": "A1", "skill": "grammar", "prompt": "?", "options": ["a","b"] }
+                ]
+            }))
+            .expect("valid placement JSON"))
+        }
+
+        async fn submit_placement(
+            &self,
+            _native: &str,
+            _target: &str,
+            _answers: Vec<types::SubmitPlacementRequestAnswersItem>,
+        ) -> Result<types::SubmitPlacementResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-stub", "level": "A2", "scoreBySkill": { "grammar": 0.5 }
+            }))
+            .expect("valid submit-placement JSON"))
+        }
+
+        async fn graph(&self, _course_id: &str) -> Result<types::MemoryGraphResponse> {
+            Ok(
+                serde_json::from_value(serde_json::json!({ "nodes": [], "edges": [] }))
+                    .expect("valid graph JSON"),
+            )
+        }
+
+        async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "selfHosted": true, "isOwner": false, "infra": null
+            }))
+            .expect("valid config JSON"))
+        }
     }
 
     /// Build an `App` around a [`StubApi`]. No terminal is created and no
@@ -2158,6 +2279,213 @@ mod tests {
                 "sections": []
             })),
         );
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    // --- P6d: placement / memory / settings (hermetic, StubApi) -----------
+
+    fn placement_loaded(json: serde_json::Value) -> ApiResult<types::GeneratePlacementResponse> {
+        Arc::new(Ok(
+            serde_json::from_value(json).expect("valid placement JSON")
+        ))
+    }
+
+    #[tokio::test]
+    async fn empty_courses_n_opens_the_placement_picker() {
+        let mut app = test_app();
+        app.view = View::courses(&[]); // no courses
+        app.on_start_placement();
+        assert!(
+            matches!(app.view, View::PlacementLang { .. }),
+            "the empty-courses state must lead into placement"
+        );
+    }
+
+    #[tokio::test]
+    async fn placement_run_creates_a_course_and_lands_in_it() {
+        let mut app = test_app();
+        app.on_start_placement();
+        // Native English (cursor 0), target Spanish (cursor 1) by default.
+        app.placement_lang_confirm();
+        assert!(
+            matches!(app.view, View::PlacementLang { loading: true, .. }),
+            "confirm marks the question fetch in flight"
+        );
+
+        // Questions arrive -> placement review.
+        let load_gen = app.request_gen;
+        app.on_placement_loaded(
+            load_gen,
+            placement_loaded(serde_json::json!({
+                "native": "en", "target": "es",
+                "questions": [
+                    { "id": "pq_0", "cefr": "A1", "skill": "grammar", "prompt": "?", "options": ["a","b"] }
+                ]
+            })),
+        );
+        assert!(matches!(app.view, View::PlacementReview { .. }));
+
+        // Answer the only question -> submits placement.
+        let before = app.request_gen;
+        app.on_select();
+        let after = app.request_gen;
+        assert_eq!(
+            after,
+            before + 1,
+            "answering the last question submits once"
+        );
+        assert!(matches!(
+            app.view,
+            View::PlacementReview {
+                submitting: true,
+                ..
+            }
+        ));
+
+        // The assessed result lands.
+        let resp: ApiResult<types::SubmitPlacementResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-new", "level": "B1", "scoreBySkill": { "grammar": 0.7 }
+            }))
+            .expect("valid")));
+        app.on_placement_submitted(after, resp);
+        match &app.view {
+            View::PlacementResult { outcome } => {
+                assert_eq!(outcome.course_id, "course-new");
+                assert_eq!(outcome.level, "B1");
+            }
+            other => panic!("expected PlacementResult, got {other:?}"),
+        }
+
+        // Continue -> land in the created course's home.
+        app.placement_result_continue();
+        match &app.view {
+            View::CourseHome { course, .. } => assert_eq!(course.id, "course-new"),
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn placement_picker_rejects_identical_languages() {
+        let mut app = test_app();
+        app.on_start_placement();
+        // Make both columns point at the same language.
+        if let View::PlacementLang {
+            native_cursor,
+            target_cursor,
+            ..
+        } = &mut app.view
+        {
+            *native_cursor = 0;
+            *target_cursor = 0;
+        }
+        let before = app.request_gen;
+        app.placement_lang_confirm();
+        assert_eq!(
+            app.request_gen, before,
+            "identical languages must not dispatch a placement fetch"
+        );
+        assert!(matches!(
+            app.view,
+            View::PlacementLang { loading: false, .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn stale_placement_result_for_a_previous_run_is_ignored() {
+        let mut app = test_app();
+        app.view = View::placement_review(
+            "en".into(),
+            "es".into(),
+            vec![state::PlacementQuestion {
+                id: "pq_0".into(),
+                prompt: "?".into(),
+                options: vec!["a".into(), "b".into()],
+            }],
+        );
+        let stale_gen = app.request_gen;
+        // Navigate away (bumps gen) before the submit result lands.
+        app.enter_course_home(course("A"));
+
+        let resp: ApiResult<types::SubmitPlacementResponse> = Arc::new(Ok(serde_json::from_value(
+            serde_json::json!({ "courseId": "c", "level": "C2", "scoreBySkill": {} }),
+        )
+        .expect("valid")));
+        app.on_placement_submitted(stale_gen, resp);
+
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    #[tokio::test]
+    async fn memory_opens_and_renders_the_graph() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_open_memory();
+        assert!(matches!(app.view, View::Memory { items: None, .. }));
+
+        let req_gen = app.request_gen;
+        let graph: ApiResult<types::MemoryGraphResponse> = Arc::new(Ok(serde_json::from_value(
+            serde_json::json!({
+                "nodes": [
+                    { "id": "v0", "kind": "vocab", "label": "casa", "translation": "house", "strength": 0.6, "due": true }
+                ],
+                "edges": []
+            }),
+        )
+        .expect("valid")));
+        app.on_graph_loaded(req_gen, graph);
+        match &app.view {
+            View::Memory {
+                items: Some(items), ..
+            } => {
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0].label, "casa");
+                assert_eq!(items[0].mastery, 60);
+                assert!(items[0].due);
+            }
+            other => panic!("expected loaded Memory, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn settings_opens_and_renders_config() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_open_settings();
+        assert!(matches!(app.view, View::Settings { config: None }));
+
+        let req_gen = app.request_gen;
+        let config: ApiResult<types::OnboardingConfigResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "selfHosted": true, "isOwner": false, "infra": null
+            }))
+            .expect("valid")));
+        app.on_config_loaded(req_gen, config);
+        match &app.view {
+            View::Settings { config: Some(c) } => {
+                assert!(c.self_hosted);
+                assert!(!c.is_owner);
+                assert!(c.infra.is_none());
+            }
+            other => panic!("expected loaded Settings, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_graph_result_for_a_previous_course_is_ignored() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_open_memory();
+        let stale_gen = app.request_gen;
+        app.enter_course_home(course("B")); // navigate away (bumps gen)
+
+        let graph: ApiResult<types::MemoryGraphResponse> = Arc::new(Ok(serde_json::from_value(
+            serde_json::json!({ "nodes": [{ "id": "x", "kind": "vocab", "label": "stale", "strength": 1.0, "due": false }], "edges": [] }),
+        )
+        .expect("valid")));
+        app.on_graph_loaded(stale_gen, graph);
+
+        // The stale graph must not render onto course B's home.
         assert!(matches!(app.view, View::CourseHome { .. }));
     }
 }

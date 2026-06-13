@@ -11,15 +11,19 @@ import {
   coursesListResponseSchema,
   episodeDetailResponseSchema,
   examDetailResponseSchema,
+  generatePlacementResponseSchema,
   healthResponseSchema,
+  memoryGraphResponseSchema,
   nextClassCreatedResponseSchema,
   nextClassDoneResponseSchema,
+  onboardingConfigResponseSchema,
   practiceOverviewResponseSchema,
   redeemPairingResponseSchema,
   speakingPollResponseSchema,
   startPracticeResponseSchema,
   submitClassResponseSchema,
   submitExamResponseSchema,
+  submitPlacementResponseSchema,
   submitPracticeResponseSchema,
 } from '../src/contracts/schemas';
 
@@ -117,6 +121,10 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/exams',
         'GET /api/v1/exams/{examId}',
         'POST /api/v1/exams/{examId}/submit',
+        'GET /api/v1/placement',
+        'POST /api/v1/placement',
+        'GET /api/v1/courses/{courseId}/graph',
+        'GET /api/v1/onboarding/config',
         'POST /api/v1/auth/pair/redeem',
       ].sort(),
     );
@@ -158,6 +166,11 @@ describe('openapi.json drift guard', () => {
       'ExamSection',
       'ExamResult',
       'ExamDetailResponse',
+      // Memory + onboarding-infra are subsets/projections -> open.
+      'MemoryNode',
+      'MemoryEdge',
+      'MemoryGraphResponse',
+      'OnboardingInfra',
     ]) {
       expect(schemas[open].additionalProperties).not.toBe(false);
     }
@@ -182,6 +195,12 @@ describe('openapi.json drift guard', () => {
       'SubmitExamRequest',
       'ExamSectionScore',
       'SubmitExamResponse',
+      // Placement question + responses + config are exact projections -> closed.
+      'PlacementQuestion',
+      'GeneratePlacementResponse',
+      'SubmitPlacementRequest',
+      'SubmitPlacementResponse',
+      'OnboardingConfigResponse',
     ]) {
       expect(schemas[closed].additionalProperties).toBe(false);
     }
@@ -300,7 +319,31 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/exams', 'post')).toEqual(['201']);
     expect(codes('/api/v1/exams/{examId}', 'get')).toEqual(['200']);
     expect(codes('/api/v1/exams/{examId}/submit', 'post')).toEqual(['200']);
+    // Placement / graph / config are all single-200.
+    expect(codes('/api/v1/placement', 'get')).toEqual(['200']);
+    expect(codes('/api/v1/placement', 'post')).toEqual(['200']);
+    expect(codes('/api/v1/courses/{courseId}/graph', 'get')).toEqual(['200']);
+    expect(codes('/api/v1/onboarding/config', 'get')).toEqual(['200']);
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
+  });
+
+  it('declares the placement native/target query parameters', () => {
+    const doc = buildOpenApiDocument();
+    const op = (
+      doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>
+    )['/api/v1/placement'].get;
+    expect(op.parameters).toContainEqual({
+      name: 'native',
+      in: 'query',
+      required: true,
+      schema: { type: 'string' },
+    });
+    expect(op.parameters).toContainEqual({
+      name: 'target',
+      in: 'query',
+      required: true,
+      schema: { type: 'string' },
+    });
   });
 });
 
@@ -691,6 +734,85 @@ describe('response schemas accept representative payloads', () => {
           { sectionId: 'ex-g', skill: 'GRAMMAR', weight: 0.5, score: 0.8 },
           { sectionId: 'ex-r', skill: 'READING', weight: 0.5, score: 0.6 },
         ],
+      }),
+    ).toBeTruthy();
+  });
+
+  it('placement questions (generate response)', () => {
+    expect(
+      generatePlacementResponseSchema.parse({
+        native: 'en',
+        target: 'es',
+        questions: [
+          {
+            id: 'pq_0',
+            cefr: 'A2',
+            skill: 'grammar',
+            prompt: 'Choose the article',
+            options: ['el', 'la', 'los', 'las'],
+          },
+        ],
+      }),
+    ).toBeTruthy();
+  });
+
+  it('submit placement result (level + per-skill ratios)', () => {
+    expect(
+      submitPlacementResponseSchema.parse({
+        courseId: 'c-new',
+        level: 'B1',
+        scoreBySkill: { grammar: 0.8, vocab: 0.5, reading: 0.6 },
+      }),
+    ).toBeTruthy();
+  });
+
+  it('memory graph (vocab + grammar nodes, loose superset)', () => {
+    const parsed = memoryGraphResponseSchema.parse({
+      nodes: [
+        {
+          id: 'v0',
+          kind: 'vocab',
+          label: 'casa',
+          translation: 'house',
+          strength: 0.6,
+          due: true,
+          // Server-only extra fields the client ignores; must survive (loose).
+          lastReviewedAt: '2026-06-13T00:00:00.000Z',
+        },
+        { id: 'g0', kind: 'grammar', label: 'Past tense', strength: 0.4, due: false },
+      ],
+      edges: [{ source: 'v0', target: 'g0', type: 'reinforces', weight: 1 }],
+    }) as { nodes: Array<Record<string, unknown>> };
+    expect(parsed.nodes[0].lastReviewedAt).toBeDefined();
+    // Grammar nodes have no translation.
+    expect(parsed.nodes[1].translation).toBeUndefined();
+  });
+
+  it('onboarding config (owner sees infra, non-owner gets null)', () => {
+    expect(
+      onboardingConfigResponseSchema.parse({
+        selfHosted: true,
+        isOwner: true,
+        infra: {
+          aiProvider: 'openai',
+          aiModel: 'gpt-5',
+          aiBaseUrl: null,
+          sttProvider: 'whisper',
+          sttBaseUrl: null,
+          sttModel: null,
+          ttsProvider: 'elevenlabs',
+          ttsBaseUrl: null,
+          storageProvider: 'r2',
+          s3Bucket: 'sotto',
+          s3Region: 'auto',
+        },
+      }),
+    ).toBeTruthy();
+    expect(
+      onboardingConfigResponseSchema.parse({
+        selfHosted: false,
+        isOwner: false,
+        infra: null,
       }),
     ).toBeTruthy();
   });

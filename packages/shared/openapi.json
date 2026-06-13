@@ -1370,6 +1370,282 @@
         ],
         "additionalProperties": false
       },
+      "PlacementQuestion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cefr": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "cefr",
+          "skill",
+          "prompt",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "GeneratePlacementResponse": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlacementQuestion"
+            }
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "questions"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitPlacementRequest": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "target": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "answers": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                }
+              },
+              "required": [
+                "id",
+                "selectedIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitPlacementResponse": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "scoreBySkill": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "courseId",
+          "level",
+          "scoreBySkill"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "vocab",
+              "grammar"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "number"
+          },
+          "due": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "strength",
+          "due"
+        ],
+        "additionalProperties": {}
+      },
+      "MemoryEdge": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "type",
+          "weight"
+        ],
+        "additionalProperties": {}
+      },
+      "MemoryGraphResponse": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryEdge"
+            }
+          }
+        },
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "additionalProperties": {}
+      },
+      "OnboardingInfra": {
+        "type": "object",
+        "properties": {
+          "aiProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "aiModel": {
+            "type": "string",
+            "nullable": true
+          },
+          "aiBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sttProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "sttBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sttModel": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttsProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttsBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "storageProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "s3Bucket": {
+            "type": "string",
+            "nullable": true
+          },
+          "s3Region": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": {}
+      },
+      "OnboardingConfigResponse": {
+        "type": "object",
+        "properties": {
+          "selfHosted": {
+            "type": "boolean"
+          },
+          "isOwner": {
+            "type": "boolean"
+          },
+          "infra": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingInfra"
+              }
+            ]
+          }
+        },
+        "required": [
+          "selfHosted",
+          "isOwner",
+          "infra"
+        ],
+        "additionalProperties": false
+      },
       "RedeemPairingRequest": {
         "type": "object",
         "properties": {
@@ -1920,6 +2196,134 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SubmitExamRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/placement": {
+      "get": {
+        "operationId": "generatePlacement",
+        "summary": "Generate an adaptive placement batch for a native/target pair.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratePlacementResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "native",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "submitPlacement",
+        "summary": "Submit placement answers; assign a CEFR level and create the course.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPlacementResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPlacementRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/graph": {
+      "get": {
+        "operationId": "getGraph",
+        "summary": "The course's vocabulary/grammar memory graph.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryGraphResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/onboarding/config": {
+      "get": {
+        "operationId": "onboardingConfig",
+        "summary": "Instance + owner config (self-hosted, owner, non-secret infra).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingConfigResponse"
+                }
               }
             }
           }

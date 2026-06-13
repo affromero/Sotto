@@ -107,6 +107,24 @@ pub(crate) enum Action {
     ExamLoaded(u64, ApiResult<types::ExamDetailResponse>),
     /// `POST /exams/{id}/submit` returned (or failed) — band/score result.
     ExamSubmitted(u64, ApiResult<types::SubmitExamResponse>),
+
+    // --- Placement / memory / settings (P6d) ---
+    /// Start placement (from the empty courses state or `n` on courses).
+    StartPlacement,
+    /// Open the memory graph for the current course (`m` on CourseHome).
+    OpenMemory,
+    /// Open the read-only settings/config view (`s`).
+    OpenSettings,
+    /// Toggle the placement language picker column (Tab).
+    ToggleLangColumn,
+    /// `GET /placement` returned (or failed) — the question batch.
+    PlacementLoaded(u64, ApiResult<types::GeneratePlacementResponse>),
+    /// `POST /placement` returned (or failed) — the assessed level + course id.
+    PlacementSubmitted(u64, ApiResult<types::SubmitPlacementResponse>),
+    /// `GET /courses/{id}/graph` returned (or failed) — the memory graph.
+    GraphLoaded(u64, ApiResult<types::MemoryGraphResponse>),
+    /// `GET /onboarding/config` returned (or failed).
+    ConfigLoaded(u64, ApiResult<types::OnboardingConfigResponse>),
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries
