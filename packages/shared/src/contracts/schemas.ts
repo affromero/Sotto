@@ -680,6 +680,53 @@ export const onboardingConfigResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// ADAPTIVE-LISTENING Q&A — ask a contextual question during a listening lesson.
+//   POST /api/v1/episodes/{episodeId}/interact                  -> 201 Interaction
+//   GET  /api/v1/episodes/{episodeId}/interact/{interactionId}  -> 200 Interaction
+// Mirrors apps/web/src/app/api/v1/episodes/[episodeId]/interact + the Interaction
+// model. The worker answers asynchronously; the client polls until the status is
+// ANSWERED with a non-null `answer`. The answer is TEXT only — the Interaction
+// model has no answer-audio field, so none is modeled (the loose response would
+// tolerate one if the route ever adds it).
+// ---------------------------------------------------------------------------
+
+// Mirrors the Prisma `InteractionStatus` enum. There is no FAILED state — a
+// worker failure leaves the interaction PENDING/ANSWERING (the client times out
+// and surfaces an error); a content-policy block resolves to ANSWERED with a
+// fallback answer text.
+export const interactionStatusSchema = z.enum([
+  'PENDING',
+  'ANSWERING',
+  'ANSWERED',
+  'RESOLVED',
+  'INCORPORATING',
+  'INCORPORATED',
+]);
+
+// POST body: a contextual question + the playback position (seconds) it was
+// asked at. `interactionSchema` on the route: question 1..2000, timestamp >= 0.
+export const askInteractionRequestSchema = z.object({
+  question: z.string().min(1).max(2000),
+  timestamp: z.number().min(0),
+});
+
+// `.loose()`: the POST returns the full Interaction row (plus `user`); the GET
+// returns the safe projection. One open schema covers both — the client reads
+// the shared subset and tolerates the POST's extra fields.
+export const interactionResponseSchema = z
+  .object({
+    id: z.string(),
+    question: z.string(),
+    timestamp: z.number(),
+    status: interactionStatusSchema,
+    // Populated once the worker finishes (ANSWERED); null while pending.
+    answer: z.string().nullable(),
+    helpful: z.boolean().nullable(),
+    segmentOrder: z.number().nullable(),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
 // POST /api/v1/auth/pair/redeem  (auth: none — the pairing token is the credential)
 // Request mirrors redeemPairingSchema; response mints an sk_sotto_ API key and
 // returns the owning user (the findUnique select), which can be null.

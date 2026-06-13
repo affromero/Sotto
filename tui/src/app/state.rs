@@ -466,6 +466,115 @@ pub(crate) enum WritingPhase {
     Failed { message: String },
 }
 
+// ===========================================================================
+// Adaptive-listening Q&A (P6e) — ask a contextual question during a listening
+// lesson. The same `AskState` is carried by BOTH the standalone listening
+// review and the in-class listening section, so the overlay + poll work in
+// either context.
+// ===========================================================================
+
+/// The lifecycle of an "ask a question" interaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum AskPhase {
+    /// Composing the question; Enter adds a newline, Ctrl-D submits.
+    Editing,
+    /// The POST (which creates the interaction) is in flight.
+    Asking,
+    /// Polling the interaction until it is ANSWERED. Carries the id being polled
+    /// so a late answer for a previous question is dropped on a fresh ask.
+    Polling { interaction_id: String },
+    /// The answer arrived (text; `answer_audio` is reserved for a future route
+    /// field — the current Interaction model is text-only, so it is `None`).
+    Answered {
+        answer: String,
+        answer_audio: Option<String>,
+    },
+    /// The ask failed or timed out (the interaction never reached ANSWERED).
+    Failed { message: String },
+}
+
+/// The Q&A overlay state for a listening screen. `None` (via `AskState::closed`)
+/// means the overlay is not open. Multiple questions per session work because
+/// each ask resets the input + phase.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AskState {
+    /// True while the overlay is open (editing/asking/polling/answered/failed).
+    pub open: bool,
+    /// The multi-line question buffer (reuses [`WritingInput`]).
+    pub input: WritingInput,
+    pub phase: AskPhase,
+    /// How many poll attempts remain before timing out (no FAILED status exists
+    /// server-side, so the client bounds the wait).
+    pub polls_left: u32,
+}
+
+/// The maximum number of poll attempts (~1.5s each) before an ask times out.
+pub(crate) const ASK_MAX_POLLS: u32 = 40;
+
+impl AskState {
+    /// The closed (overlay not shown) default.
+    pub fn closed() -> Self {
+        Self {
+            open: false,
+            input: WritingInput::new(),
+            phase: AskPhase::Editing,
+            polls_left: ASK_MAX_POLLS,
+        }
+    }
+
+    /// Open the overlay with a fresh, empty question (used for each new ask).
+    pub fn opened() -> Self {
+        Self {
+            open: true,
+            input: WritingInput::new(),
+            phase: AskPhase::Editing,
+            polls_left: ASK_MAX_POLLS,
+        }
+    }
+}
+
+impl Default for AskState {
+    fn default() -> Self {
+        Self::closed()
+    }
+}
+
+/// Map a polled interaction to the next ask phase: ANSWERED with a non-null
+/// answer → `Answered`; any other status → keep `Polling` for the same id (the
+/// caller schedules another poll). Pure — no network, no timers.
+pub(crate) fn reduce_interaction_poll(
+    interaction_id: &str,
+    resp: &types::InteractionResponse,
+) -> AskPhase {
+    match resp.status {
+        types::InteractionStatus::Answered
+        | types::InteractionStatus::Resolved
+        | types::InteractionStatus::Incorporating
+        | types::InteractionStatus::Incorporated => match &resp.answer {
+            Some(answer) if !answer.is_empty() => AskPhase::Answered {
+                answer: answer.clone(),
+                // The episode-interact route has no answer-audio field; reserved.
+                answer_audio: None,
+            },
+            // Reached a terminal-ish status without an answer — surface it.
+            _ => AskPhase::Failed {
+                message: "No answer was produced for this question.".to_string(),
+            },
+        },
+        // Still working (PENDING / ANSWERING): keep polling.
+        types::InteractionStatus::Pending | types::InteractionStatus::Answering => {
+            AskPhase::Polling {
+                interaction_id: interaction_id.to_string(),
+            }
+        }
+    }
+}
+
+/// Whether an ask phase is terminal (the poll loop should stop).
+pub(crate) fn ask_is_terminal(phase: &AskPhase) -> bool {
+    matches!(phase, AskPhase::Answered { .. } | AskPhase::Failed { .. })
+}
+
 /// Per-section interactive state, one variant per skill. Mixed-skill class
 /// sections reuse the same machinery the standalone practice screens use.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -487,6 +596,9 @@ pub(crate) enum SectionProgress {
         cursor: usize,
         selected: Vec<Option<usize>>,
         audio_note: Option<String>,
+        /// "Ask a question" overlay state (P6e). Boxed to keep the enum
+        /// variant size small.
+        ask: Box<AskState>,
     },
     /// SPEAKING: one prompt at a time, record → upload → poll.
     Speaking {
@@ -541,6 +653,7 @@ impl ClassSection {
                 index: 0,
                 cursor: 0,
                 audio_note: None,
+                ask: Box::new(AskState::closed()),
             },
             // GRAMMAR / READING.
             _ => SectionProgress::Mc {
@@ -661,6 +774,7 @@ impl ClassSection {
                 index: 0,
                 cursor: 0,
                 audio_note: None,
+                ask: Box::new(AskState::closed()),
             },
             // GRAMMAR / READING.
             _ => SectionProgress::Mc {
@@ -1015,6 +1129,9 @@ pub(crate) enum View {
         submitting: bool,
         /// Last play/pause status line shown to the learner.
         audio_note: Option<String>,
+        /// "Ask a question" overlay state (P6e). Boxed to keep the enum
+        /// variant size small.
+        ask: Box<AskState>,
     },
     /// An in-progress speaking session: one prompt at a time, record → upload →
     /// poll grading → show score/feedback → next prompt.
@@ -1160,6 +1277,7 @@ impl View {
             selected,
             submitting: false,
             audio_note: None,
+            ask: Box::new(AskState::closed()),
         }
     }
 
@@ -2786,5 +2904,87 @@ mod tests {
         .expect("valid");
         let view = ConfigView::from(&resp);
         assert!(view.infra.is_none());
+    }
+
+    // --- P6e: adaptive-listening Q&A ---------------------------------------
+
+    fn interaction(json: serde_json::Value) -> types::InteractionResponse {
+        serde_json::from_value(json).expect("valid InteractionResponse JSON")
+    }
+
+    #[test]
+    fn pending_interaction_keeps_polling() {
+        let resp = interaction(serde_json::json!({
+            "id": "i0", "question": "?", "timestamp": 0,
+            "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+        }));
+        let phase = reduce_interaction_poll("i0", &resp);
+        assert_eq!(
+            phase,
+            AskPhase::Polling {
+                interaction_id: "i0".into()
+            }
+        );
+        assert!(!ask_is_terminal(&phase));
+    }
+
+    #[test]
+    fn answering_interaction_keeps_polling() {
+        // ANSWERING (mid-generation) is not terminal.
+        let resp = interaction(serde_json::json!({
+            "id": "i0", "question": "?", "timestamp": 0,
+            "status": "ANSWERING", "answer": null, "helpful": null, "segmentOrder": null
+        }));
+        let phase = reduce_interaction_poll("i0", &resp);
+        assert!(matches!(phase, AskPhase::Polling { .. }));
+    }
+
+    #[test]
+    fn answered_interaction_yields_the_answer_text() {
+        let resp = interaction(serde_json::json!({
+            "id": "i0", "question": "What is 'casa'?", "timestamp": 12.5,
+            "status": "ANSWERED", "answer": "It means house.", "helpful": null, "segmentOrder": 2
+        }));
+        let phase = reduce_interaction_poll("i0", &resp);
+        match &phase {
+            AskPhase::Answered {
+                answer,
+                answer_audio,
+            } => {
+                assert_eq!(answer, "It means house.");
+                // The episode-interact route is text-only.
+                assert!(answer_audio.is_none());
+            }
+            other => panic!("expected Answered, got {other:?}"),
+        }
+        assert!(ask_is_terminal(&phase));
+    }
+
+    #[test]
+    fn answered_without_answer_text_is_treated_as_failed() {
+        // A terminal status with no answer text -> Failed (defensive).
+        let resp = interaction(serde_json::json!({
+            "id": "i0", "question": "?", "timestamp": 0,
+            "status": "ANSWERED", "answer": null, "helpful": null, "segmentOrder": null
+        }));
+        let phase = reduce_interaction_poll("i0", &resp);
+        assert!(matches!(phase, AskPhase::Failed { .. }));
+        assert!(ask_is_terminal(&phase));
+    }
+
+    #[test]
+    fn ask_state_open_close_resets_the_question() {
+        let mut ask = AskState::opened();
+        assert!(ask.open);
+        for c in "hola".chars() {
+            ask.input.push_char(c);
+        }
+        assert_eq!(ask.input.text(), "hola");
+        // Re-opening starts a fresh, empty question (each ask is independent).
+        ask = AskState::opened();
+        assert!(ask.input.is_empty());
+        assert_eq!(ask.phase, AskPhase::Editing);
+        ask = AskState::closed();
+        assert!(!ask.open);
     }
 }

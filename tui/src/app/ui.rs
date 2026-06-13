@@ -12,9 +12,9 @@ use ratatui::{
 use crate::config::Config;
 
 use super::state::{
-    ClassResult, ClassSection, ConfigView, Course, DueCounts, ExamResult, LANGUAGES, LangColumn,
-    MemoryItem, PlacementOutcome, PracticeResult, ReviewKind, SectionProgress, SkillChoice,
-    SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
+    AskPhase, AskState, ClassResult, ClassSection, ConfigView, Course, DueCounts, ExamResult,
+    LANGUAGES, LangColumn, MemoryItem, PlacementOutcome, PracticeResult, ReviewKind,
+    SectionProgress, SkillChoice, SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
 };
 use crate::api::types::SkillType;
 
@@ -458,6 +458,7 @@ fn draw_listening_review(frame: &mut Frame, area: Rect, view: &View) {
         cursor,
         submitting,
         audio_note,
+        ask,
         ..
     } = view
     else {
@@ -488,6 +489,13 @@ fn draw_listening_review(frame: &mut Frame, area: Rect, view: &View) {
         ))),
         chunks[0],
     );
+
+    // The Q&A overlay takes over the body + hints when open.
+    if ask.open {
+        draw_ask_overlay(frame, chunks[1], ask);
+        frame.render_widget(Paragraph::new(hint_line(ask_hints(ask))), chunks[2]);
+        return;
+    }
 
     // Middle: either the current comprehension item, or the transcript.
     if let Some(item) = items.get(*index) {
@@ -550,9 +558,15 @@ fn draw_listening_review(frame: &mut Frame, area: Rect, view: &View) {
     let hints: &[&str] = if *submitting {
         &["submitting…", "q back"]
     } else if items.is_empty() {
-        &["space play/pause", "q back"]
+        &["space play/pause", "a ask", "q back"]
     } else {
-        &["space play/pause", "↑/↓ choose", "enter answer", "q back"]
+        &[
+            "space play",
+            "a ask",
+            "↑/↓ choose",
+            "enter answer",
+            "q back",
+        ]
     };
     frame.render_widget(Paragraph::new(hint_line(hints)), chunks[2]);
 }
@@ -766,6 +780,7 @@ fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection) {
             cursor,
             episode,
             audio_note,
+            ask,
             ..
         } => {
             let chunks = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).split(area);
@@ -780,7 +795,13 @@ fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection) {
                 ))),
                 chunks[0],
             );
-            if let Some(q) = questions.get(*index) {
+            if ask.open {
+                // The Q&A overlay takes over the body + its own hint line.
+                let body =
+                    Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(chunks[1]);
+                draw_ask_overlay(frame, body[0], ask);
+                frame.render_widget(Paragraph::new(hint_line(ask_hints(ask))), body[1]);
+            } else if let Some(q) = questions.get(*index) {
                 draw_choice_section(
                     frame,
                     chunks[1],
@@ -790,7 +811,13 @@ fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection) {
                     &q.options,
                     *cursor,
                     0,
-                    &["space play", "↑/↓ choose", "enter answer", "q back"],
+                    &[
+                        "space play",
+                        "a ask",
+                        "↑/↓ choose",
+                        "enter answer",
+                        "q back",
+                    ],
                 );
             } else {
                 // No comprehension questions: transcript only.
@@ -1481,4 +1508,96 @@ fn draw_settings(frame: &mut Frame, area: Rect, config: Option<&ConfigView>) {
         chunks[0],
     );
     frame.render_widget(Paragraph::new(hint_line(&["q back"])), chunks[1]);
+}
+
+// --- Adaptive-listening Q&A overlay (P6e) -----------------------------------
+
+fn draw_ask_overlay(frame: &mut Frame, area: Rect, ask: &AskState) {
+    let mut lines: Vec<Line> = vec![Line::from(Span::styled(
+        "Ask about this lesson",
+        Style::default().fg(AULA_BLUE).add_modifier(Modifier::BOLD),
+    ))];
+
+    match &ask.phase {
+        AskPhase::Editing => {
+            lines.push(Line::default());
+            // The typed question, line by line (cursor implied at the end).
+            for l in ask.input.lines() {
+                lines.push(Line::from(Span::styled(
+                    l.clone(),
+                    Style::default().fg(INK),
+                )));
+            }
+            if ask.input.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "Type your question…",
+                    Style::default()
+                        .fg(INK_MUTED)
+                        .add_modifier(Modifier::ITALIC),
+                )));
+            }
+        }
+        AskPhase::Asking => {
+            lines.push(Line::default());
+            lines.push(Line::from(Span::styled(
+                "Sending…",
+                Style::default()
+                    .fg(INK_MUTED)
+                    .add_modifier(Modifier::ITALIC),
+            )));
+        }
+        AskPhase::Polling { .. } => {
+            lines.push(Line::default());
+            lines.push(Line::from(Span::styled(
+                "Thinking…",
+                Style::default()
+                    .fg(INK_MUTED)
+                    .add_modifier(Modifier::ITALIC),
+            )));
+        }
+        AskPhase::Answered {
+            answer,
+            answer_audio,
+        } => {
+            lines.push(Line::default());
+            lines.push(Line::from(Span::styled(
+                "Answer",
+                Style::default().fg(INK_MUTED),
+            )));
+            for paragraph in answer.split('\n') {
+                lines.push(Line::from(Span::styled(
+                    paragraph.to_string(),
+                    Style::default().fg(INK),
+                )));
+            }
+            if answer_audio.is_some() {
+                lines.push(Line::default());
+                lines.push(Line::from(Span::styled(
+                    "♪ Playing spoken clarification…",
+                    Style::default().fg(AULA_BLUE),
+                )));
+            }
+        }
+        AskPhase::Failed { message } => {
+            lines.push(Line::default());
+            lines.push(Line::from(Span::styled(
+                message.clone(),
+                Style::default().fg(PINK),
+            )));
+        }
+    }
+
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
+        area,
+    );
+}
+
+fn ask_hints(ask: &AskState) -> &'static [&'static str] {
+    match &ask.phase {
+        AskPhase::Editing => &["type question", "enter newline", "Ctrl-D ask", "esc close"],
+        AskPhase::Asking | AskPhase::Polling { .. } => &["esc close"],
+        AskPhase::Answered { .. } => &["a ask again", "enter / esc close"],
+        AskPhase::Failed { .. } => &["r / Ctrl-D retry", "esc close"],
+    }
 }

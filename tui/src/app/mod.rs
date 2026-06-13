@@ -1,3 +1,4 @@
+mod ask;
 mod class;
 mod exam;
 mod onboard;
@@ -144,10 +145,36 @@ impl App {
             Action::ToggleRecord => self.on_toggle_record(),
             Action::ScrollUp => self.on_scroll(false),
             Action::ScrollDown => self.on_scroll(true),
-            Action::Input(c) => self.on_writing_input(c),
-            Action::InputNewline => self.on_writing_newline(),
-            Action::InputBackspace => self.on_writing_backspace(),
-            Action::SubmitText => self.on_writing_submit(),
+            // Text input + submit route to the ask overlay when it is open on a
+            // listening screen, otherwise to the writing section editor.
+            Action::Input(c) => {
+                if self.ask_overlay_open() {
+                    self.ask_input_char(c)
+                } else {
+                    self.on_writing_input(c)
+                }
+            }
+            Action::InputNewline => {
+                if self.ask_overlay_open() {
+                    self.ask_input_newline()
+                } else {
+                    self.on_writing_newline()
+                }
+            }
+            Action::InputBackspace => {
+                if self.ask_overlay_open() {
+                    self.ask_input_backspace()
+                } else {
+                    self.on_writing_backspace()
+                }
+            }
+            Action::SubmitText => {
+                if self.ask_overlay_open() {
+                    self.on_ask_submit()
+                } else {
+                    self.on_writing_submit()
+                }
+            }
             Action::NextClass => self.on_next_class(),
             Action::CoursesLoaded(req_gen, result) => self.on_courses_loaded(req_gen, result),
             Action::DueLoaded(req_gen, result) => self.on_due_loaded(req_gen, result),
@@ -191,6 +218,14 @@ impl App {
             }
             Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),
             Action::ConfigLoaded(req_gen, result) => self.on_config_loaded(req_gen, result),
+            Action::ToggleAsk => self.on_toggle_ask(),
+            Action::InteractionAsked(req_gen, result) => self.on_interaction_asked(req_gen, result),
+            Action::InteractionPolled(req_gen, result) => {
+                self.on_interaction_polled(req_gen, result)
+            }
+            Action::AnswerAudioDownloaded(req_gen, result) => {
+                self.on_answer_audio_downloaded(req_gen, result)
+            }
         }
         Ok(())
     }
@@ -216,6 +251,53 @@ impl App {
     fn map_key(&self, key: KeyEvent) -> Option<Action> {
         if key.modifiers.contains(KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('c')) {
             return Some(Action::Quit);
+        }
+
+        // Ask-a-question overlay (listening Q&A) is fully MODAL: while it is open
+        // in ANY phase, only its own keys act and EVERY other key is swallowed
+        // (return Some/None here, never fall through) so nothing reaches the
+        // listening/class/exam keymap behind the overlay — the UI hides the
+        // comprehension items and section body, so a leaked Enter/number could
+        // otherwise answer a hidden item or advance the section.
+        let ctrl_d =
+            matches!(key.code, KeyCode::Char('d')) && key.modifiers.contains(KeyModifiers::CONTROL);
+        if self.ask_editing() {
+            // Editing: WritingInput keys + Ctrl-D submit + Esc cancel.
+            return match key.code {
+                _ if ctrl_d => Some(Action::SubmitText),
+                KeyCode::Esc => Some(Action::ToggleAsk),
+                KeyCode::Enter => Some(Action::InputNewline),
+                KeyCode::Backspace => Some(Action::InputBackspace),
+                KeyCode::Char(c) => Some(Action::Input(c)),
+                _ => None,
+            };
+        }
+        if self.ask_failed() {
+            // Failed/timeout: `r` or Ctrl-D retries; Esc closes. Else swallow.
+            return match key.code {
+                KeyCode::Char('r') => Some(Action::SubmitText),
+                _ if ctrl_d => Some(Action::SubmitText),
+                KeyCode::Esc => Some(Action::ToggleAsk),
+                _ => None,
+            };
+        }
+        if self.ask_answered() {
+            // Answered: Esc/Enter (or `a`) close the overlay. Else swallow.
+            return match key.code {
+                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('a') => Some(Action::ToggleAsk),
+                _ => None,
+            };
+        }
+        if self.ask_overlay_open() {
+            // In flight (asking/polling): only Esc cancels. Else swallow.
+            return match key.code {
+                KeyCode::Esc => Some(Action::ToggleAsk),
+                _ => None,
+            };
+        }
+        // Listening (standalone or class/exam section): `a` opens the Q&A overlay.
+        if self.audio_screen() && matches!(key.code, KeyCode::Char('a')) {
+            return Some(Action::ToggleAsk);
         }
 
         // Writing editor: capture text input. Ctrl-D submits; Esc backs out.
@@ -1548,6 +1630,31 @@ mod tests {
             }))
             .expect("valid config JSON"))
         }
+
+        async fn ask_interaction(
+            &self,
+            _episode_id: &str,
+            _question: String,
+            _timestamp: f64,
+        ) -> Result<types::InteractionResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "id": "int-stub", "question": "?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            }))
+            .expect("valid interaction JSON"))
+        }
+
+        async fn poll_interaction(
+            &self,
+            _episode_id: &str,
+            _interaction_id: &str,
+        ) -> Result<types::InteractionResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "id": "int-stub", "question": "?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            }))
+            .expect("valid interaction JSON"))
+        }
     }
 
     /// Build an `App` around a [`StubApi`]. No terminal is created and no
@@ -2487,5 +2594,360 @@ mod tests {
 
         // The stale graph must not render onto course B's home.
         assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    // --- P6e: adaptive-listening Q&A ---------------------------------------
+
+    /// A standalone listening session with one comprehension item, ready to ask.
+    fn listening_app() -> App {
+        let mut app = test_app();
+        app.view = View::start_listening(
+            course("L"),
+            "sess-listen".into(),
+            "ep-42".into(),
+            vec![state::VocabItem {
+                id: "v1".into(),
+                prompt: "casa".into(),
+                options: vec!["house".into(), "dog".into()],
+            }],
+        );
+        app
+    }
+
+    fn interaction(json: serde_json::Value) -> ApiResult<types::InteractionResponse> {
+        Arc::new(Ok(
+            serde_json::from_value(json).expect("valid InteractionResponse JSON")
+        ))
+    }
+
+    /// Open the overlay and type a question, character by character (the same
+    /// path real key events take).
+    fn type_question(app: &mut App, q: &str) {
+        app.on_toggle_ask();
+        for c in q.chars() {
+            if c == '\n' {
+                app.ask_input_newline();
+            } else {
+                app.ask_input_char(c);
+            }
+        }
+    }
+
+    fn current_ask_phase(app: &App) -> state::AskPhase {
+        match &app.view {
+            View::ListeningReview { ask, .. } => ask.phase.clone(),
+            other => panic!("expected ListeningReview, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn ask_overlay_captures_the_typed_question() {
+        let mut app = listening_app();
+        assert!(!app.ask_overlay_open(), "overlay starts closed");
+
+        type_question(&mut app, "what does casa mean?");
+        assert!(app.ask_overlay_open(), "`a` opens the overlay");
+        match &app.view {
+            View::ListeningReview { ask, .. } => {
+                assert!(ask.open);
+                assert_eq!(ask.input.text(), "what does casa mean?");
+                assert_eq!(ask.phase, state::AskPhase::Editing);
+            }
+            other => panic!("expected ListeningReview, got {other:?}"),
+        }
+
+        // Toggling again closes it and discards the draft.
+        app.on_toggle_ask();
+        assert!(!app.ask_overlay_open());
+    }
+
+    #[tokio::test]
+    async fn ask_pending_then_answered_shows_the_answer_text() {
+        let mut app = listening_app();
+        type_question(&mut app, "what does casa mean?");
+
+        // Submit -> dispatch (gen bumps), phase goes Asking.
+        let ask_gen = {
+            let before = app.request_gen;
+            app.on_ask_submit();
+            assert_eq!(app.request_gen, before + 1, "asking dispatches once");
+            app.request_gen
+        };
+        assert_eq!(current_ask_phase(&app), state::AskPhase::Asking);
+
+        // The POST returns a PENDING interaction -> we start polling it.
+        app.on_interaction_asked(
+            ask_gen,
+            interaction(serde_json::json!({
+                "id": "int-7", "question": "what does casa mean?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            })),
+        );
+        assert_eq!(
+            current_ask_phase(&app),
+            state::AskPhase::Polling {
+                interaction_id: "int-7".into()
+            }
+        );
+
+        // A poll still PENDING keeps polling and burns a budget tick.
+        let polls_before = match &app.view {
+            View::ListeningReview { ask, .. } => ask.polls_left,
+            _ => unreachable!(),
+        };
+        app.on_interaction_polled(
+            ask_gen,
+            interaction(serde_json::json!({
+                "id": "int-7", "question": "?", "timestamp": 0,
+                "status": "ANSWERING", "answer": null, "helpful": null, "segmentOrder": null
+            })),
+        );
+        match &app.view {
+            View::ListeningReview { ask, .. } => {
+                assert!(matches!(ask.phase, state::AskPhase::Polling { .. }));
+                assert_eq!(
+                    ask.polls_left,
+                    polls_before - 1,
+                    "a non-terminal poll ticks"
+                );
+            }
+            _ => unreachable!(),
+        }
+
+        // The answer lands -> Answered with the text (route is text-only).
+        app.on_interaction_polled(
+            ask_gen,
+            interaction(serde_json::json!({
+                "id": "int-7", "question": "?", "timestamp": 0,
+                "status": "ANSWERED", "answer": "It means house.", "helpful": true, "segmentOrder": 1
+            })),
+        );
+        match current_ask_phase(&app) {
+            state::AskPhase::Answered {
+                answer,
+                answer_audio,
+            } => {
+                assert_eq!(answer, "It means house.");
+                assert!(
+                    answer_audio.is_none(),
+                    "the interact route returns no audio"
+                );
+            }
+            other => panic!("expected Answered, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn ask_failure_is_retryable() {
+        let mut app = listening_app();
+        type_question(&mut app, "?");
+        app.on_ask_submit();
+        let ask_gen = app.request_gen;
+
+        // The POST itself fails.
+        app.on_interaction_asked(ask_gen, Arc::new(Err("network down".into())));
+        match current_ask_phase(&app) {
+            state::AskPhase::Failed { message } => assert!(message.contains("network down")),
+            other => panic!("expected Failed, got {other:?}"),
+        }
+        assert!(app.ask_failed(), "a failed ask is flagged for retry");
+
+        // Re-submitting from Failed preserves the question and dispatches again.
+        let before = app.request_gen;
+        app.on_ask_submit();
+        assert_eq!(app.request_gen, before + 1, "retry re-asks");
+        assert_eq!(current_ask_phase(&app), state::AskPhase::Asking);
+    }
+
+    #[tokio::test]
+    async fn second_ask_while_in_flight_does_not_dispatch_twice() {
+        let mut app = listening_app();
+        type_question(&mut app, "?");
+        app.on_ask_submit();
+        let gen_after_first = app.request_gen;
+        assert_eq!(current_ask_phase(&app), state::AskPhase::Asking);
+
+        // A second submit while still Asking/Polling is ignored.
+        app.on_ask_submit();
+        assert_eq!(
+            app.request_gen, gen_after_first,
+            "an in-flight ask must not dispatch a second request"
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_answer_for_a_superseded_ask_is_dropped() {
+        let mut app = listening_app();
+        type_question(&mut app, "first question?");
+        app.on_ask_submit();
+        let stale_gen = app.request_gen;
+        app.on_interaction_asked(
+            stale_gen,
+            interaction(serde_json::json!({
+                "id": "int-A", "question": "first question?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            })),
+        );
+
+        // The learner navigates away (bumps the generation) before the answer
+        // for the first question lands.
+        app.enter_course_home(course("Z"));
+
+        // The late answer, tagged with the stale generation, must be dropped.
+        app.on_interaction_polled(
+            stale_gen,
+            interaction(serde_json::json!({
+                "id": "int-A", "question": "?", "timestamp": 0,
+                "status": "ANSWERED", "answer": "stale answer", "helpful": true, "segmentOrder": 1
+            })),
+        );
+        assert!(
+            matches!(app.view, View::CourseHome { .. }),
+            "a stale answer must not resurrect the ask overlay"
+        );
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    /// Apply whatever `map_key` produced, restricted to the actions that could
+    /// possibly mutate the underlying listening/class flow. The overlay is modal,
+    /// so this must collapse to a no-op (ToggleAsk/None) for non-overlay keys.
+    fn apply_mapped(app: &mut App, action: Option<Action>) {
+        match action {
+            Some(Action::Select) => app.on_select(),
+            Some(Action::Choose(n)) => app.on_choose(n),
+            Some(Action::Up) => app.on_up(),
+            Some(Action::Down) => app.on_down(),
+            // ToggleAsk / Input* / None and friends do not touch the underlying
+            // listening state; nothing to apply for this assertion.
+            _ => {}
+        }
+    }
+
+    #[tokio::test]
+    async fn modal_ask_overlay_swallows_keys_in_standalone_listening() {
+        let mut app = listening_app();
+        type_question(&mut app, "what does casa mean?");
+        app.on_ask_submit();
+        // Drive to the ANSWERED (terminal, non-editing) phase.
+        let ask_gen = app.request_gen;
+        app.on_interaction_asked(
+            ask_gen,
+            interaction(serde_json::json!({
+                "id": "int-9", "question": "?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            })),
+        );
+        app.on_interaction_polled(
+            ask_gen,
+            interaction(serde_json::json!({
+                "id": "int-9", "question": "?", "timestamp": 0,
+                "status": "ANSWERED", "answer": "It means house.", "helpful": true, "segmentOrder": 1
+            })),
+        );
+        assert!(matches!(
+            current_ask_phase(&app),
+            state::AskPhase::Answered { .. }
+        ));
+
+        let gen_before = app.request_gen;
+        // Enter and number keys would normally answer the hidden comprehension
+        // item; while the overlay is open they must not reach the keymap.
+        for code in [KeyCode::Enter, KeyCode::Char('1'), KeyCode::Char('2')] {
+            let mapped = app.map_key(key(code));
+            assert!(
+                !matches!(mapped, Some(Action::Select) | Some(Action::Choose(_))),
+                "{code:?} must not answer a hidden item while the overlay is open",
+            );
+            apply_mapped(&mut app, mapped);
+        }
+
+        match &app.view {
+            View::ListeningReview { selected, .. } => assert!(
+                selected.iter().all(Option::is_none),
+                "no comprehension item may be answered behind the overlay",
+            ),
+            other => panic!("expected ListeningReview, got {other:?}"),
+        }
+        assert_eq!(
+            app.request_gen, gen_before,
+            "swallowed keys must not dispatch any underlying flow",
+        );
+    }
+
+    #[tokio::test]
+    async fn modal_ask_overlay_swallows_keys_in_class_listening() {
+        // A single-question listening section: answering it would advance/submit.
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-l", "skill": "LISTENING", "status": "READY",
+              "episode": { "id": "epL", "audioUrl": null, "title": "L", "references": [] },
+              "prompts": [], "writingPrompts": [],
+              "questions": [{ "id": "q0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+        ]));
+
+        // Open the overlay over the listening section and put it in flight (Polling).
+        app.on_toggle_ask();
+        for c in "explain?".chars() {
+            app.ask_input_char(c);
+        }
+        app.on_ask_submit();
+        let ask_gen = app.request_gen;
+        app.on_interaction_asked(
+            ask_gen,
+            interaction(serde_json::json!({
+                "id": "int-c", "question": "?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            })),
+        );
+        assert!(matches!(
+            current_ask_phase_section(&app),
+            state::AskPhase::Polling { .. }
+        ));
+
+        let gen_before = app.request_gen;
+        let cursor_before = match &app.view {
+            View::Class { cursor, .. } => *cursor,
+            other => panic!("expected Class, got {other:?}"),
+        };
+
+        // Enter / number would answer q0 and advance + submit the class. Modal.
+        for code in [KeyCode::Enter, KeyCode::Char('1')] {
+            let mapped = app.map_key(key(code));
+            assert!(
+                !matches!(mapped, Some(Action::Select) | Some(Action::Choose(_))),
+                "{code:?} must not advance the class behind the overlay",
+            );
+            apply_mapped(&mut app, mapped);
+        }
+
+        match app.current_section().map(|s| &s.progress) {
+            Some(SectionProgress::Listening { selected, .. }) => assert!(
+                selected.iter().all(Option::is_none),
+                "no listening question may be answered behind the overlay",
+            ),
+            other => panic!("expected a current Listening section, got {other:?}"),
+        }
+        match &app.view {
+            View::Class { cursor, .. } => assert_eq!(
+                *cursor, cursor_before,
+                "the section must not advance behind the overlay",
+            ),
+            other => panic!("expected Class, got {other:?}"),
+        }
+        assert_eq!(
+            app.request_gen, gen_before,
+            "swallowed keys must not dispatch the class flow",
+        );
+    }
+
+    /// The ask phase of the current in-class/in-exam listening section.
+    fn current_ask_phase_section(app: &App) -> state::AskPhase {
+        match app.current_section().map(|s| &s.progress) {
+            Some(SectionProgress::Listening { ask, .. }) => ask.phase.clone(),
+            _ => panic!("expected a current Listening section with an ask state"),
+        }
     }
 }
