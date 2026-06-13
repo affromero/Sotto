@@ -36,7 +36,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
     ],
     late: [
       { text: 'Cross-referencing sources for accuracy', topicAware: false },
-      { text: 'Building a knowledge dossier for your hosts', topicAware: false },
+      { text: 'Building a knowledge dossier for the lesson speakers', topicAware: false },
       { text: 'Most AI skips this. We don\u2019t.', topicAware: false },
     ],
   },
@@ -44,7 +44,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
     early: [
       { text: 'Choosing the best angle for {topic}', topicAware: true },
       { text: 'Designing the narrative arc', topicAware: false },
-      { text: 'Finding the hook that pulls listeners in', topicAware: false },
+      { text: 'Finding the hook that draws learners in', topicAware: false },
       { text: 'Crafting the story structure', topicAware: false },
     ],
     late: [
@@ -56,7 +56,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
   SCRIPTING: {
     early: [
       { text: 'Writing dialogue grounded in verified research', topicAware: false },
-      { text: 'Building a natural conversation between hosts', topicAware: false },
+      { text: 'Building a natural conversation between speakers', topicAware: false },
       { text: 'Making sure {topic} is explained clearly', topicAware: true },
       { text: 'Turning research into engaging back-and-forth', topicAware: false },
       { text: 'Adding interesting examples and analogies', topicAware: false },

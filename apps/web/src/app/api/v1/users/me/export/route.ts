@@ -21,7 +21,6 @@ export async function GET() {
     interactions,
     saves,
     feedback,
-    tasteQuizAnswers,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -118,16 +117,6 @@ export async function GET() {
         createdAt: true,
       },
     }),
-    prisma.tasteQuizAnswer.findMany({
-      where: { userId },
-      select: {
-        questionId: true,
-        question: true,
-        tagSlugs: true,
-        response: true,
-        createdAt: true,
-      },
-    }),
   ]);
 
   if (!user) {
@@ -145,7 +134,6 @@ export async function GET() {
     interactions,
     saves,
     feedback,
-    tasteQuizAnswers,
   };
 
   const date = new Date().toISOString().split('T')[0];

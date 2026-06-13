@@ -13,7 +13,6 @@ export interface EpisodeSummary {
   visibility: EpisodeVisibility;
   audioUrl: string | null;
   duration: number | null;
-  playCount: number;
   createdAt: string;
   source: EpisodeSource;
   lowReferences?: boolean;
@@ -36,7 +35,6 @@ export interface EpisodeSummary {
 }
 
 export interface EpisodeDetail extends EpisodeSummary {
-  saveCount: number;
   failureReason: string | null;
   failedAtStatus?: string | null;
   errorId?: string | null;

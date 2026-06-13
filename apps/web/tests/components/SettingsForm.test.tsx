@@ -30,7 +30,6 @@ const defaultProps = {
   aiProviderMeta: [],
   ttsProviderMeta: [],
   initialPreferredAiModel: null,
-  quizAnswerCount: 0,
   referredUsers: [],
   initialEmailNotifications: true,
   initialPushNotifications: true,

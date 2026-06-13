@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { EpisodePlayerView } from './EpisodePlayerView';
-import { JoinCTA } from '@/components/referral/JoinCTA';
 import { getEpisodeForDetailPage } from '@/lib/episode-data';
 import { absoluteEpisodeUrl, getAppBaseUrl } from '@/lib/urls';
 import styles from './page.module.css';
@@ -36,7 +35,6 @@ export async function generateMetadata({ params }: EpisodePageProps): Promise<Me
       type: 'article',
       url: episodeUrl,
       siteName: 'Sotto',
-      ...(episode.visibility === 'PUBLIC' && episode.audioUrl ? { audio: episode.audioUrl } : {}),
     },
     twitter: {
       card: 'summary_large_image',
@@ -91,11 +89,11 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
     resolvedSegments,
     resolvedVersions,
   ] = await Promise.all([
-    resolveAudioUrl(episode.audioUrl, visibility),
+    resolveAudioUrl(episode.audioUrl),
     Promise.all(
       episode.segments.map(async (s) => ({
         ...s,
-        audioUrl: await resolveAudioUrl(s.audioUrl, visibility),
+        audioUrl: await resolveAudioUrl(s.audioUrl),
         startTime: s.startTime,
         duration: s.duration,
         wordTimings: s.wordTimings as Array<{ word: string; start: number; end: number }> | null,
@@ -105,7 +103,7 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
       episode.versions.map(async (v) => ({
         id: v.id,
         version: v.version,
-        audioUrl: (await resolveAudioUrl(v.audioUrl, visibility)) ?? v.audioUrl,
+        audioUrl: (await resolveAudioUrl(v.audioUrl)) ?? v.audioUrl,
         duration: v.duration,
         changeType: v.changeType,
         changeSummary: v.changeSummary,
@@ -124,8 +122,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
     visibility,
     audioUrl: resolvedAudioUrl,
     duration: episode.duration,
-    playCount: episode.playCount,
-    saveCount: episode.saveCount,
     createdAt: episode.createdAt.toISOString(),
     source: episode.source,
     lowReferences: episode.lowReferences,
@@ -165,9 +161,7 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
           isAdmin={isAdmin}
           isAuthenticated={!!userId}
         />
-        {!userId && episode.visibility === 'PUBLIC' && (
-          <JoinCTA creatorHandle={episode.user.handle} creatorName={episode.user.name} />
-        )}
+
       </div>
     </main>
   );

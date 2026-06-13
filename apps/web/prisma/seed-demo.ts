@@ -1117,8 +1117,7 @@ async function main() {
       title: 'The Hidden History of Cryptography',
       topic:
         'From ancient ciphers to modern encryption — how secret codes shaped wars, commerce, and the digital age.',
-      visibility: 'PUBLIC' as const,
-      playCount: 500,
+      visibility: 'UNLISTED' as const,
       tags: ['history', 'technology'],
       userId: demoUser.id,
     },
@@ -1126,8 +1125,7 @@ async function main() {
       title: 'Understanding Quantum Computing',
       topic:
         'Qubits, superposition, and entanglement explained for curious minds. What quantum computers can (and cannot) do today.',
-      visibility: 'PUBLIC' as const,
-      playCount: 320,
+      visibility: 'UNLISTED' as const,
       tags: ['science', 'technology'],
       userId: demoUser.id,
     },
@@ -1135,8 +1133,7 @@ async function main() {
       title: 'The Future of Remote Work',
       topic:
         'How distributed teams, async communication, and AI tools are reshaping the way we work — and what it means for cities, culture, and careers.',
-      visibility: 'PUBLIC' as const,
-      playCount: 210,
+      visibility: 'UNLISTED' as const,
       tags: ['business', 'technology'],
       userId: demoUser.id,
     },
@@ -1144,8 +1141,7 @@ async function main() {
       title: 'AI Ethics: Where Do We Draw the Line?',
       topic:
         'Bias in models, deepfakes, autonomous weapons, surveillance — the ethical dilemmas of artificial intelligence and who gets to decide.',
-      visibility: 'PUBLIC' as const,
-      playCount: 180,
+      visibility: 'UNLISTED' as const,
       tags: ['ai-ml', 'philosophy'],
       userId: demoUser.id,
     },
@@ -1153,8 +1149,7 @@ async function main() {
       title: 'Stoicism for Modern Life',
       topic:
         'Marcus Aurelius, Seneca, and Epictetus — how ancient Stoic philosophy offers practical wisdom for dealing with stress, uncertainty, and ambition today.',
-      visibility: 'PUBLIC' as const,
-      playCount: 150,
+      visibility: 'UNLISTED' as const,
       tags: ['philosophy', 'health'],
       userId: demoUser.id,
     },
@@ -1163,7 +1158,6 @@ async function main() {
       topic:
         'The science behind mRNA vaccine technology, from basic cell biology to the Pfizer and Moderna COVID-19 vaccines. How they were developed so quickly and what comes next.',
       visibility: 'PRIVATE' as const,
-      playCount: 0,
       tags: ['science', 'health'],
       userId: demoUser.id,
     },
@@ -1630,7 +1624,6 @@ async function main() {
           topic: def.topic,
           status: 'READY',
           visibility: def.visibility,
-          playCount: def.playCount,
           duration: segments.length * 25, // ~25 seconds per segment
         },
       });
@@ -1642,7 +1635,6 @@ async function main() {
           topic: def.topic,
           status: 'READY',
           visibility: def.visibility,
-          playCount: def.playCount,
           duration: segments.length * 25,
         },
       });
@@ -1778,7 +1770,7 @@ async function main() {
       where: { id: scriptReadyEpisode.id },
       data: {
         status: 'SCRIPT_READY',
-        visibility: 'PUBLIC',
+        visibility: 'UNLISTED',
         topic:
           'Why we make irrational choices — anchoring, loss aversion, the paradox of choice, and the cognitive biases that shape our decisions.',
       },
@@ -1791,8 +1783,7 @@ async function main() {
         topic:
           'Why we make irrational choices — anchoring, loss aversion, the paradox of choice, and the cognitive biases that shape our decisions.',
         status: 'SCRIPT_READY',
-        visibility: 'PUBLIC',
-        playCount: 0,
+        visibility: 'UNLISTED',
         duration: 0,
       },
     });

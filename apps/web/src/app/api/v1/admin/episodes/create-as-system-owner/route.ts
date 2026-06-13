@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       topic,
       slug,
       status: hasMetadata ? 'EXTRACTING' : 'PENDING',
-      visibility: 'PUBLIC',
+      visibility: 'UNLISTED',
       source: 'WEB',
       ...(ttsProvider ? { ttsProvider } : {}),
       ...(ttsModel ? { ttsModel } : {}),

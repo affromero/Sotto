@@ -4,7 +4,6 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import { getAppBaseUrl } from '@/lib/urls';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -26,8 +25,6 @@ export default async function SettingsPage() {
     categories,
     byokKeys,
     aiKeys,
-    tasteQuizAnswerCount,
-    referredUsers,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -67,13 +64,6 @@ export default async function SettingsPage() {
     }),
     listByokProviders(userId),
     listAiProviders(userId),
-    prisma.tasteQuizAnswer.count({ where: { userId } }),
-    prisma.user.findMany({
-      where: { referredById: userId },
-      select: { name: true, handle: true, image: true, createdAt: true, referralVerified: true },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    }),
   ]);
 
   if (!user) return null;
@@ -89,8 +79,6 @@ export default async function SettingsPage() {
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
-
-  const appBaseUrl = getAppBaseUrl();
 
   return (
     <main className={styles.main}>
@@ -113,15 +101,6 @@ export default async function SettingsPage() {
         ttsProviderMeta={ttsProviderMeta}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        quizAnswerCount={tasteQuizAnswerCount}
-        referredUsers={referredUsers.map((u) => ({
-          name: u.name,
-          handle: u.handle,
-          image: u.image,
-          joinedAt: u.createdAt.toISOString(),
-          verified: u.referralVerified,
-        }))}
-        appBaseUrl={appBaseUrl}
       />
     </main>
   );

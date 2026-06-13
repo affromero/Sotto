@@ -7,7 +7,6 @@ export interface Episode {
   source: string | null;
   duration: number | null;
   audioUrl: string | null;
-  playCount: number;
   createdAt: string;
   updatedAt: string;
   user?: {

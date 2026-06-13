@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  Play,
   FileText,
   Download,
   Pencil,
@@ -66,7 +65,6 @@ const statusVariants: Record<EpisodeStatus, 'default' | 'success' | 'warning' | 
     FAILED: 'error',
     IMPORTING: 'info',
     TRANSCRIBING: 'info',
-    DUPLICATE_REVIEW: 'warning',
   };
 
 function formatDate(dateString: string): string {
@@ -75,12 +73,6 @@ function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-function formatCount(count: number): string {
-  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-  return count.toString();
 }
 
 function formatDuration(seconds: number | null): string {
@@ -559,10 +551,6 @@ export function EpisodePlayerView({
         <div className={styles.actionsRow}>
           {isOwner && (
             <div className={styles.statsRow}>
-              <span className={styles.stat}>
-                <Play size={16} aria-hidden="true" />
-                {formatCount(episode.playCount)}
-              </span>
               <OwnerOnlyBadge />
             </div>
           )}
@@ -784,7 +772,7 @@ export function EpisodePlayerView({
         )}
 
         {/* Made with Sotto */}
-        {!isOwner && episode.visibility === 'PUBLIC' && (
+        {!isOwner && episode.visibility === 'UNLISTED' && (
           <div className={styles.badgeSection}>
             <SottoBadge />
           </div>

@@ -253,34 +253,6 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
     expect(response.status).toBe(201);
   });
 
-  it('enqueues QUESTION_ON_YOUR_EPISODE notification for episode owner', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
-    mockEpisodeFindUnique.mockResolvedValue(mockEpisode);
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-    mockUserFindUnique.mockResolvedValue({ name: 'Test User' });
-
-    const { request, params } = createRequest('episode-123', {
-      question: 'Can you explain quantum entanglement?',
-      timestamp: 120.5,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
-
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(mockAddJob).toHaveBeenCalledWith(
-      expect.anything(),
-      'SEND_NOTIFICATION',
-      expect.objectContaining({
-        userId: 'owner-123',
-        type: 'QUESTION_ON_YOUR_EPISODE',
-      })
-    );
-  });
-
   it('does not enqueue notification when asking on own episode', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'owner-123' });
     mockEpisodeFindUnique.mockResolvedValue(mockEpisode);

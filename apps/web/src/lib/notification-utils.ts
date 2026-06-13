@@ -34,25 +34,15 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'EPISODE_READY':
     case 'EPISODE_FAILED':
     case 'SCRIPT_READY':
-    case 'QUESTION_ON_YOUR_EPISODE':
       return episodeId ? `/episode/${episodeId}` : null;
 
     // Settings / BYOK
     case 'KEY_INVALID':
       return '/settings/api';
 
-    // Account moderation
-    case 'ACCOUNT_WARNING':
-    case 'CONTENT_REMOVED':
-      return '/settings';
-
     // Pipeline failure (admin)
     case 'PIPELINE_FAILURE':
       return episodeId ? `/episode/${episodeId}` : '/admin';
-
-    // Referral
-    case 'REFERRAL_SIGNUP':
-      return '/settings';
 
     default:
       return null;

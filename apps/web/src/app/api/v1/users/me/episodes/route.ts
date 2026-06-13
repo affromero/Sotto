@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
     visibility: p.visibility,
     audioUrl: p.audioUrl,
     duration: p.duration,
-    playCount: p.playCount,
     createdAt: p.createdAt.toISOString(),
     source: p.source,
     sourcePlatform: p.sourcePlatform,

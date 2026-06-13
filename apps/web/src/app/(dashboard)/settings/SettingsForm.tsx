@@ -9,9 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
 import type { CustomTag } from '@/components/discovery/InterestGrid';
-import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
-import { TasteQuiz } from '@/components/discovery/TasteQuiz';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
@@ -50,15 +48,6 @@ interface SettingsFormProps {
   initialPreferredAiModel: string | null;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  quizAnswerCount: number;
-  referredUsers: Array<{
-    name: string | null;
-    handle: string | null;
-    image: string | null;
-    joinedAt: string;
-    verified: boolean;
-  }>;
-  appBaseUrl: string;
 }
 
 const providerLabels: Record<string, string> = {
@@ -85,9 +74,6 @@ export function SettingsForm({
   initialPreferredAiModel,
   initialEmailNotifications,
   initialPushNotifications,
-  quizAnswerCount,
-  referredUsers,
-  appBaseUrl,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [handle, setHandle] = useState(initialHandle);
@@ -166,13 +152,6 @@ export function SettingsForm({
       })
       .catch(() => {});
   }, []);
-
-  // Taste quiz state
-  const [quizCount, setQuizCount] = useState(quizAnswerCount);
-  const [quizActive, setQuizActive] = useState(false);
-  const [quizQuestions, setQuizQuestions] = useState<TasteQuestion[]>([]);
-  const [quizLoading, setQuizLoading] = useState(false);
-  const [quizResetting, setQuizResetting] = useState(false);
 
   // Interests state
   const [interestIds, setInterestIds] = useState<string[]>(selectedInterestTagIds);
@@ -481,91 +460,11 @@ export function SettingsForm({
         </div>
       </section>
 
-      {/* Taste Quiz Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Taste Quiz</h2>
-        <p className={styles.sectionDesc}>
-          Answer quick yes/no questions to improve your recommendations.
-          {quizCount > 0 &&
-            ` You\u2019ve answered ${quizCount} question${quizCount !== 1 ? 's' : ''}.`}
-        </p>
-
-        {quizActive ? (
-          <TasteQuiz
-            initialQuestions={quizQuestions}
-            onComplete={async (answers: TasteAnswer[]) => {
-              if (answers.length > 0) {
-                await fetch('/api/v1/taste-quiz', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ answers }),
-                });
-                setQuizCount((prev) => prev + answers.filter((a) => a.response !== 'skip').length);
-              }
-              setQuizActive(false);
-            }}
-            onRequestMore={async () => {
-              const res = await fetch('/api/v1/taste-quiz?count=10');
-              if (!res.ok) return [];
-              const data = await res.json();
-              return data.questions;
-            }}
-            onSkipAll={() => setQuizActive(false)}
-          />
-        ) : (
-          <div className={styles.formActions}>
-            <Button
-              onClick={async () => {
-                setQuizLoading(true);
-                try {
-                  const res = await fetch('/api/v1/taste-quiz?count=10');
-                  if (res.ok) {
-                    const data = await res.json();
-                    setQuizQuestions(data.questions);
-                    setQuizActive(true);
-                  }
-                } finally {
-                  setQuizLoading(false);
-                }
-              }}
-              loading={quizLoading}
-              disabled={quizLoading}
-            >
-              {quizCount > 0 ? 'Take More Questions' : 'Take the Quiz'}
-            </Button>
-            {quizCount > 0 && (
-              <Button
-                variant="ghost"
-                onClick={async () => {
-                  if (
-                    !confirm('Reset all quiz answers? This will remove quiz-based interest data.')
-                  )
-                    return;
-                  setQuizResetting(true);
-                  try {
-                    const res = await fetch('/api/v1/taste-quiz', { method: 'DELETE' });
-                    if (res.ok) {
-                      setQuizCount(0);
-                    }
-                  } finally {
-                    setQuizResetting(false);
-                  }
-                }}
-                loading={quizResetting}
-                disabled={quizResetting}
-              >
-                Reset Quiz Answers
-              </Button>
-            )}
-          </div>
-        )}
-      </section>
-
       {/* Interests Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Interests</h2>
         <p className={styles.interestsDescription}>
-          Select topics you&apos;re curious about. This helps us recommend better lessons for you.
+          Select topics you want to study. Sotto uses these to suggest sourced-class topics on things that interest you.
         </p>
         <InterestGrid
           categories={interestCategories}
@@ -761,7 +660,7 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>AI Providers</h2>
         <p className={styles.sectionDesc}>
-          Configure your preferred AI providers for scripts, Q&amp;A, and discovery chat.
+          Configure your preferred AI providers for lesson generation, Q&amp;A, and live conversation.
           Keys are encrypted with AES-256-GCM.
         </p>
         <AiProviderCards initialConfigured={configuredAiProviders} providerMeta={aiProviderMeta} />
@@ -779,66 +678,6 @@ export function SettingsForm({
           providerMeta={ttsProviderMeta}
         />
       </section>
-
-      {/* Referrals */}
-      {handle && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Referrals</h2>
-          <p className={styles.sectionDescription}>
-            Invite friends to self-host Sotto or join your instance.
-          </p>
-
-          <div className={styles.referralRow}>
-            <Input value={`${new URL(appBaseUrl).host}/ref/${handle}`} readOnly />
-            <Button
-              variant="secondary"
-              onClick={() => {
-                navigator.clipboard.writeText(`${appBaseUrl}/ref/${handle}`);
-              }}
-            >
-              Copy
-            </Button>
-          </div>
-
-          {referredUsers.length > 0 && (
-            <div className={styles.referralList}>
-              <h3 className={styles.referralListTitle}>
-                {referredUsers.length} {referredUsers.length === 1 ? 'person' : 'people'} joined via
-                your link
-              </h3>
-              <ul className={styles.referralUsers}>
-                {referredUsers.map((user) => (
-                  <li key={user.handle ?? user.joinedAt} className={styles.referralUser}>
-                    {user.image ? (
-                      <Image
-                        src={user.image}
-                        alt=""
-                        width={28}
-                        height={28}
-                        className={styles.referralAvatar}
-                      />
-                    ) : (
-                      <span className={styles.referralAvatarFallback}>
-                        {(user.name || user.handle || '?')[0].toUpperCase()}
-                      </span>
-                    )}
-                    <span className={styles.referralName}>{user.name || `@${user.handle}`}</span>
-                    <Badge variant={user.verified ? 'success' : 'default'}>
-                      {user.verified ? 'Verified' : 'Pending'}
-                    </Badge>
-                    <span className={styles.referralDate}>
-                      {new Date(user.joinedAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-      )}
 
       {/* Danger Zone */}
       <section className={`${styles.section} ${styles.dangerSection}`}>

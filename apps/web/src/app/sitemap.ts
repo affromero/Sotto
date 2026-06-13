@@ -1,15 +1,13 @@
 import { MetadataRoute } from 'next';
-import { prisma } from '@/lib/prisma';
 import { getAppBaseUrl } from '@/lib/urls';
 
 export const revalidate = 3600;
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = getAppBaseUrl();
 
-  const staticPages = [
+  return [
     '',
-    '/voices',
     '/about',
     '/join',
     '/terms',
@@ -25,28 +23,4 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'weekly' as const,
     priority: path === '' ? 1.0 : 0.8,
   }));
-
-  try {
-    const episodes = await prisma.episode.findMany({
-      where: { visibility: 'PUBLIC', status: 'READY' },
-      select: { id: true, slug: true, updatedAt: true, user: { select: { handle: true } } },
-      orderBy: { updatedAt: 'desc' },
-      take: 5000,
-    });
-
-    const episodePages = episodes.map((p) => ({
-      url:
-        p.slug && p.user.handle
-          ? `${baseUrl}/@${p.user.handle}/${p.slug}`
-          : `${baseUrl}/episode/${p.id}`,
-      lastModified: p.updatedAt,
-      changeFrequency: 'monthly' as const,
-      priority: 0.6,
-    }));
-
-    return [...staticPages, ...episodePages];
-  } catch (error) {
-    console.error('[sitemap] DB query failed, returning static pages only:', error);
-    return staticPages;
-  }
 }

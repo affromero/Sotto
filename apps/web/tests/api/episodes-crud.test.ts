@@ -173,8 +173,6 @@ const mockEpisode = {
   audioUrl: 'https://r2.example.com/audio/pod-1.mp3',
   duration: 600,
   fileSize: 1024000,
-  playCount: 42,
-  saveCount: 5,
   hostVoiceId: 'voice-host-1',
   expertVoiceId: 'voice-expert-1',
   createdAt: new Date('2025-01-15T10:00:00Z'),
