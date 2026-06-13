@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { getProviderMeta, isValidProviderId, type TtsProviderId } from '@/lib/providers/tts-registry';
 
 import { errorResponse } from '@/lib/api-response';
@@ -24,24 +25,25 @@ function modelsResponse(providerId: TtsProviderId) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
+  const userId = authed.userId;
 
   const providerId = new URL(request.url).searchParams.get('provider');
   if (!providerId || !isValidProviderId(providerId)) {
     return NextResponse.json({ models: [], provider: null });
   }
 
-  const byokProviders = await listByokProviders(session.user.id);
+  const byokProviders = await listByokProviders(userId);
   const hasKey = byokProviders.some((p) => p.provider === providerId && p.isValid);
   if (hasKey) {
     return modelsResponse(providerId as TtsProviderId);
   }
 
   // No BYOK key — admins fall back to platform env vars
-  const isAdmin = session.user.role === 'ADMIN';
+  const isAdmin = await isUserAdmin(userId);
   if (isAdmin) {
     const envVar = PLATFORM_TTS_ENV[providerId as TtsProviderId];
     if (envVar && process.env[envVar]) {

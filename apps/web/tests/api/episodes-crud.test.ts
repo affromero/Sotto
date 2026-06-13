@@ -101,7 +101,7 @@ vi.mock('@/lib/r2', () => ({
 }));
 
 vi.mock('@/lib/auth-guards', () => ({
-  requireAdmin: vi.fn().mockReturnValue(null),
+  isUserAdmin: vi.fn().mockResolvedValue(false),
 }));
 
 import { GET as getList, POST as createEpisode } from '@/app/api/v1/episodes/route';

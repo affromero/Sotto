@@ -87,8 +87,13 @@ function makePostRequest(
 }
 
 function makeAudioFile(type = 'audio/webm') {
+  // Lead with the WebM/EBML magic bytes so detectAudioFormat() recognizes the
+  // container the browser's MediaRecorder produces (the upload route derives the
+  // R2 key extension + content-type from the bytes, not the declared MIME).
+  const bytes = new Uint8Array(64);
+  bytes.set([0x1a, 0x45, 0xdf, 0xa3], 0);
   return {
-    arrayBuffer: async () => new ArrayBuffer(64),
+    arrayBuffer: async () => bytes.buffer,
     type,
   };
 }

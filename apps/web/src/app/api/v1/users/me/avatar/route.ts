@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { uploadFile, deleteFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
@@ -10,10 +10,11 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return errorResponse('Unauthorized', 401);
     }
+    const userId = authed.userId;
 
     const formData = await request.formData();
     const file = formData.get('avatar') as File | null;
@@ -32,13 +33,13 @@ export async function POST(request: NextRequest) {
 
     // Delete old avatar from R2 if one exists
     const currentUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: { image: true },
     });
     if (currentUser?.image) {
       deleteFile(currentUser.image).catch((err) => {
         logger.warn('Failed to delete old avatar from R2', {
-          userId: session.user.id,
+          userId,
           error: err instanceof Error ? err.message : String(err),
         });
       });
@@ -49,12 +50,12 @@ export async function POST(request: NextRequest) {
 
     const extension = file.type.split('/')[1];
     const timestamp = Date.now();
-    const key = `avatars/${session.user.id}/${timestamp}.${extension}`;
+    const key = `avatars/${userId}/${timestamp}.${extension}`;
 
     const url = await uploadFile(key, buffer, file.type);
 
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { image: url },
     });
 

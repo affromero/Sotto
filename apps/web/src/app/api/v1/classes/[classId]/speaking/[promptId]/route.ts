@@ -5,6 +5,7 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
+import { detectAudioFormat } from '@/lib/audio-format';
 import { addJob, speakingGradingQueue, JobType } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ classId: string; promptId: string }> };
@@ -49,12 +50,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const contentType =
-      audioFile instanceof File ? (audioFile.type || 'audio/webm') : 'audio/webm';
+    const { ext, mime } = detectAudioFormat(buffer);
 
     // Upload to R2
-    const key = `speaking/${userId}/${promptId}/${crypto.randomUUID()}.webm`;
-    const audioUrl = await uploadFile(key, buffer, contentType);
+    const key = `speaking/${userId}/${promptId}/${crypto.randomUUID()}.${ext}`;
+    const audioUrl = await uploadFile(key, buffer, mime);
 
     // Create SpeakingRecording
     const recording = await prisma.speakingRecording.create({

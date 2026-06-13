@@ -7,7 +7,7 @@ import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getGenerationFeatures, getJobPriority } from '@/lib/generation-features';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
-import { requireAdmin } from '@/lib/auth-guards';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { generateEpisodeSlug } from '@/lib/slugify';
 import type { ExtractContentPayload } from '@/lib/queue';
 
@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Admin request context.
-  const adminId = await requireAdmin();
-  const isAdmin = adminId !== null;
+  // Admin request context — resolve the role for the authenticated principal
+  // (Bearer key or session), not the ambient session.
+  const isAdmin = await isUserAdmin(authResult.userId);
 
   const genFeatures = getGenerationFeatures();
 

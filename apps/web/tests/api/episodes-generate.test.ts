@@ -108,10 +108,10 @@ vi.mock('@/lib/generation-features', () => ({
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
-const mockRequireAdmin = vi.fn();
+const mockIsUserAdmin = vi.fn();
 
 vi.mock('@/lib/auth-guards', () => ({
-  requireAdmin: (...args: unknown[]) => mockRequireAdmin(...args),
+  isUserAdmin: (...args: unknown[]) => mockIsUserAdmin(...args),
 }));
 
 // ---- Import under test ----
@@ -148,7 +148,7 @@ async function createMockParams(episodeId: string) {
 describe('POST /api/v1/episodes/[episodeId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAdmin.mockResolvedValue(null); // non-admin by default
+    mockIsUserAdmin.mockResolvedValue(false); // non-admin by default
     mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPrismaEpisodeUpdateMany.mockResolvedValue({ count: 1 });
     mockAddJob.mockResolvedValue({ id: 'job-1' });
@@ -481,7 +481,7 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
 
   describe('admin bypass', () => {
     it('admin can generate episode owned by another user', async () => {
-      mockRequireAdmin.mockResolvedValue('admin-user-id');
+      mockIsUserAdmin.mockResolvedValue(true);
       mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
       mockPrismaEpisodeFindUnique.mockResolvedValue({
         id: 'episode-other',
