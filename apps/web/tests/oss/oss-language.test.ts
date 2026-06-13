@@ -221,7 +221,7 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps the local setup script OSS-first and template-driven', () => {
     const setupSource = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
     const installDepsSource = readFileSync(resolve(repoRoot, 'scripts/install-deps.sh'), 'utf8');
-    const localSetupDocs = ['README.md', 'docs/05-local-development.md', '.env.oss.example']
+    const localSetupDocs = ['README.md', 'docs/04-local-development.md', '.env.oss.example']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -277,7 +277,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(rootClaude).not.toContain('Compatibility scripts for the old hosted setup');
     expect(rootClaude).not.toContain('Hosted deployments may still use Doppler');
     expect(rootClaude).toContain(
-      'Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`'
+      'Critical local variables: `DATABASE_URL`, `REDIS_URL`, `BYOK_ENCRYPTION_KEY`'
     );
   });
 
@@ -365,7 +365,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const removedBotSources = [
       '.env.example',
       '.env.oss.example',
-      'docs/02-authentication-setup.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
@@ -443,7 +442,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const releaseHygieneSources = [
       'SECURITY.md',
       'CLAUDE.md',
-      'docs/05-local-development.md',
+      'docs/04-local-development.md',
       'apps/web/src/lib/CLAUDE.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -451,7 +450,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(releaseHygieneSources).toContain('security/advisories/new');
     expect(releaseHygieneSources).not.toContain('security@example.com');
-    expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
@@ -497,9 +495,8 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps release deployment docs self-host neutral', () => {
     const releaseDocs = [
-      'docs/02-authentication-setup.md',
-      'docs/03-hosting-infrastructure.md',
-      'docs/04-self-host-deployment.md',
+      'docs/02-hosting-infrastructure.md',
+      'docs/03-self-host-deployment.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -517,7 +514,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocs).not.toContain('dashboard.doppler.com');
     expect(releaseDocs).not.toContain('doppler secrets');
     expect(releaseDocs).not.toContain('docker-compose.prod.yml');
-    expect(releaseIndexSources).toContain('04-self-host-deployment.md');
+    expect(releaseIndexSources).toContain('03-self-host-deployment.md');
   });
 
   it('does not ship the standalone social feed ranking workspace', () => {

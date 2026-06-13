@@ -22,7 +22,7 @@ Sotto is fully free and self-hosted: there is no billing, no payment path, and n
 |-------|------------|
 | Frontend | Next.js 14+ App Router, TypeScript, CSS Modules |
 | Database | PostgreSQL 16 + Prisma ORM |
-| Auth | NextAuth.js v5 for web sessions |
+| Auth | None — single-learner self-hosted instance with no login |
 | Queue | Redis 7 + BullMQ worker pool |
 | AI | Provider-resolved LLM generation through configured model settings |
 | Audio | ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate, and local/provider-specific TTS integrations |
@@ -161,7 +161,7 @@ Run `npm run ci` before every commit. No exceptions.
 
 Local OSS development uses `.env.oss.example` copied to `.env.local`. Root npm scripts source `.env.local` through `scripts/run-with-env.sh`; set `SOTTO_ENV_FILE` to point them at a different env file.
 
-Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`.
+Critical local variables: `DATABASE_URL`, `REDIS_URL`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`.
 
 Provider variables are optional until the selected workflow needs them. Common examples: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`.
 
@@ -177,4 +177,4 @@ Provider variables are optional until the selected workflow needs them. Common e
 ## Reference
 
 Architecture: `docs/01-technical-architecture.md`
-Local setup: `docs/05-local-development.md`
+Local setup: `docs/04-local-development.md`

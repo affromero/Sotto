@@ -212,7 +212,7 @@ Prerequisites: [Node.js](https://nodejs.org/) 22+, [Docker](https://www.docker.c
 ```bash
 git clone https://github.com/SottoFM/sotto.git
 cd sotto
-npm run setup     # deps, .env.local (AUTH_SECRET + BYOK_ENCRYPTION_KEY), Postgres + Redis, schema, seed
+npm run setup     # deps, .env.local (BYOK_ENCRYPTION_KEY), Postgres + Redis, schema, seed
 npm run dev
 ```
 
@@ -235,7 +235,7 @@ STT_PROVIDER=local   STT_BASE_URL=http://localhost:8001/v1   STT_MODEL=deepdml/f
 TTS_PROVIDER=kokoro  TTS_BASE_URL=http://localhost:8000
 ```
 
-Multilingual by design: **Qwen3 / Gemma 3** (100+ languages) for generation, **Whisper large-v3-turbo** (99+) for pronunciation, **Kokoro** (8 languages) for narration. A GPU helps the LLM but isn't required — Whisper and Kokoro are comfortable on CPU. To bring your own local TTS, keep the `TTS_BASE_URL` pattern with `TTS_PROVIDER=local`; your sidecar only needs `GET /health`, `GET /voices`, and `POST /tts`. See [docs/06-provider-extension-guide.md](docs/06-provider-extension-guide.md).
+Multilingual by design: **Qwen3 / Gemma 3** (100+ languages) for generation, **Whisper large-v3-turbo** (99+) for pronunciation, **Kokoro** (8 languages) for narration. A GPU helps the LLM but isn't required — Whisper and Kokoro are comfortable on CPU. To bring your own local TTS, keep the `TTS_BASE_URL` pattern with `TTS_PROVIDER=local`; your sidecar only needs `GET /health`, `GET /voices`, and `POST /tts`. See [docs/05-provider-extension-guide.md](docs/05-provider-extension-guide.md).
 
 <details>
 <summary><b>Bring your own agent / keys (.env.local)</b></summary>
@@ -272,7 +272,7 @@ The product is self-hosted: you run it, then reach it from anywhere.
 - **Web and PWA.** Installable from any browser — add to home screen on a phone, tablet, or laptop for full-screen, offline-capable access against _your_ server.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
-**Households (invite your family).** The first account on a fresh self-host becomes the **owner** (admin). From **Settings → Household** the owner generates invite links and QRs, sees the roster, and toggles **invite-only vs open** sign-up. Every learner is a fully isolated account with their own courses, progress, vocabulary graph, and keys — and there is no social layer.
+**One learner, no login.** A self-hosted instance is yours alone — open it and you are in, with no sign-up, accounts, or passwords to manage. Your courses, progress, vocabulary graph, and keys live entirely on your own stack, and there is no social layer.
 
 ---
 

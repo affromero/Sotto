@@ -67,10 +67,7 @@ Use `.env.oss.example` for local onboarding. `.env.example` may include hosted d
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sotto?schema=public"
 DIRECT_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sotto?schema=public"
 REDIS_URL="redis://localhost:6379"
-NEXTAUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-EXPO_PUBLIC_API_URL="http://localhost:3000/api/v1"
-AUTH_SECRET="<generated>"
 BYOK_ENCRYPTION_KEY="<generated>"
 STORAGE_PROVIDER="local"
 LOCAL_STORAGE_DIR="./.sotto/storage"
@@ -137,7 +134,7 @@ TTS_MODEL="my-local-tts-model"
 TTS_VOICES="default,alternate"
 ```
 
-See `docs/06-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
+See `docs/05-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
 
 ---
 
@@ -145,8 +142,7 @@ See `docs/06-provider-extension-guide.md` for the exact LLM/STT/TTS contracts an
 
 | Configuration | Available |
 |---|---|
-| local DB + Redis + storage | app shell, auth scaffolding, settings, local library metadata |
-| plus OAuth or dev auth path | authenticated dashboard and private RSS token management |
+| local DB + Redis + storage | app shell, dashboard, settings, local library metadata |
 | plus selected LLM or local agent | discovery, scripting, Q&A text paths |
 | plus selected TTS | end-to-end audio generation |
 | plus selected STT | meeting/audio transcription |
@@ -157,7 +153,7 @@ No missing capability should be hidden by an implicit provider fallback.
 
 ## 7. Private RSS Smoke Test
 
-After signing in:
+With the app running:
 
 ```http
 POST /api/v1/rss/private

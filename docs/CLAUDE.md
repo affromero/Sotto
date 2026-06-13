@@ -7,11 +7,10 @@ User-facing documentation for self-hosting, deploying, developing, and extending
 | File | Purpose |
 |---|---|
 | `01-technical-architecture.md` | System architecture and data model |
-| `02-authentication-setup.md` | OAuth and authentication setup |
-| `03-hosting-infrastructure.md` | Self-hosting infrastructure and topology |
-| `04-self-host-deployment.md` | Deployment guide |
-| `05-local-development.md` | Local OSS setup (no Doppler) |
-| `06-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
+| `02-hosting-infrastructure.md` | Self-hosting infrastructure and topology |
+| `03-self-host-deployment.md` | Deployment guide |
+| `04-local-development.md` | Local OSS setup (no Doppler) |
+| `05-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
 
 ## Rules
 
