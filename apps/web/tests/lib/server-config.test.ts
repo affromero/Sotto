@@ -19,8 +19,6 @@ import {
 } from '@/lib/server-config';
 
 const EMPTY: SiteConfigData = {
-  openSignup: false,
-  localAuth: null,
   aiProvider: null,
   aiModel: null,
   aiBaseUrl: null,

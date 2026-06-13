@@ -203,7 +203,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/sitemap.ts',
       'src/app/episode/[episodeId]/page.tsx',
       'src/components/landing/JsonLd.tsx',
-      'src/app/api/v1/admin/invitations/route.ts',
       'src/lib/extractors/index.ts',
       'src/lib/extractors/html.ts',
       'src/app/(dashboard)/settings/SettingsForm.tsx',

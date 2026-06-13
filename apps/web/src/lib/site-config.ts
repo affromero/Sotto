@@ -21,11 +21,7 @@ export interface ServerInfraConfig {
   s3Region: string | null;
 }
 
-export interface SiteConfigData extends ServerInfraConfig {
-  openSignup: boolean;
-  /** Local profile sign-in. null = default (on for self-hosted, no ADMIN_EMAILS). */
-  localAuth: boolean | null;
-}
+export type SiteConfigData = ServerInfraConfig;
 
 const EMPTY_INFRA: ServerInfraConfig = {
   aiProvider: null,
@@ -41,11 +37,7 @@ const EMPTY_INFRA: ServerInfraConfig = {
   s3Region: null,
 };
 
-const DEFAULTS: SiteConfigData = {
-  openSignup: false,
-  localAuth: null,
-  ...EMPTY_INFRA,
-};
+const DEFAULTS: SiteConfigData = { ...EMPTY_INFRA };
 
 export const INFRA_KEYS: (keyof ServerInfraConfig)[] = [
   'aiProvider',
@@ -68,8 +60,6 @@ export async function getSiteConfig(): Promise<SiteConfigData> {
     });
     if (!row) return DEFAULTS;
     return {
-      openSignup: row.openSignup,
-      localAuth: row.localAuth,
       aiProvider: row.aiProvider,
       aiModel: row.aiModel,
       aiBaseUrl: row.aiBaseUrl,
@@ -116,22 +106,13 @@ export async function setSiteConfig(
   await prisma.siteConfig.upsert({
     where: { id: 'singleton' },
     update: {
-      ...(data.openSignup !== undefined && { openSignup: data.openSignup }),
-      ...(data.localAuth !== undefined && { localAuth: data.localAuth }),
       ...infra,
       updatedBy: adminId,
     },
     create: {
       id: 'singleton',
-      openSignup: data.openSignup ?? DEFAULTS.openSignup,
-      ...(data.localAuth !== undefined && { localAuth: data.localAuth }),
       ...infra,
       updatedBy: adminId,
     },
   });
-}
-
-export async function isOpenSignup(): Promise<boolean> {
-  const config = await getSiteConfig();
-  return config.openSignup;
 }

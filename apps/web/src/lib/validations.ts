@@ -463,49 +463,7 @@ export const serverInfraSchema = z.object({
   s3Region: infraField,
 });
 
-export const siteConfigUpdateSchema = serverInfraSchema.extend({
-  openSignup: z.boolean().optional(),
-  localAuth: z.boolean().nullable().optional(),
-});
-
-// Local profile sign-in (the Netflix-style picker). The Credentials authorize
-// input: a user id from the picker and the password.
-export const credentialsAuthSchema = z.object({
-  userId: z.string().trim().min(1).max(64),
-  // Optional: passwordless members sign in without one. The authorize callback
-  // still refuses an empty password for any account that has a passwordHash.
-  password: z.string().max(200).optional(),
-});
-
-// First-run owner creation (public, only when local auth is on and zero users).
-export const createOwnerSchema = z.object({
-  // Optional: defaults to "Owner" server-side when blank.
-  name: z.string().trim().max(100).optional(),
-  // Omit (or send empty) to create a passwordless owner who taps to sign in.
-  password: z.string().min(8).max(200).optional().or(z.literal('')),
-  avatar: z.string().trim().max(64).optional(),
-});
-
-// Admin household member management.
-export const createMemberSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  // Omit (or send empty) to create a passwordless member who taps to sign in.
-  password: z.string().min(8).max(200).optional().or(z.literal('')),
-  avatar: z.string().trim().max(64).optional(),
-});
-
-export const updateMemberSchema = z.object({
-  memberId: z.string().trim().min(1).max(64),
-  name: z.string().trim().min(1).max(100).optional(),
-  avatar: z.string().trim().max(64).optional(),
-  resetPassword: z.string().min(8).max(200).optional(),
-});
-
-// Self-service password change.
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(8).max(200),
-});
+export const siteConfigUpdateSchema = serverInfraSchema;
 
 // Unified onboarding-wizard save. Per-user fields persist on every self-hosted
 // save; `infra` persists only when the caller is the owner (enforced server-side).
