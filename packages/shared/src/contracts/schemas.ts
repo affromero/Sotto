@@ -119,28 +119,38 @@ export const practiceWritingPromptSchema = z.object({
   guidance: z.string().nullable(),
 });
 
+// Each StartPractice variant is its own schema so it can be registered as a
+// named OpenAPI component and referenced from the response's oneOf/discriminator.
+export const startPracticeUnavailableSchema = z.object({
+  status: z.literal('unavailable'),
+  reason: z.enum(['not_enough_vocab', 'nothing_due', 'no_content']),
+});
+
+export const startPracticeReadySchema = z.object({
+  status: z.literal('ready'),
+  sessionId: z.string(),
+  kind: practiceKindSchema,
+  items: z.array(practiceItemSchema),
+  episodeId: z.string().optional(),
+});
+
+export const startPracticeReadySpeakingSchema = z.object({
+  status: z.literal('ready_speaking'),
+  sessionId: z.string(),
+  prompts: z.array(practiceSpeakingPromptSchema),
+});
+
+export const startPracticeReadyWritingSchema = z.object({
+  status: z.literal('ready_writing'),
+  sessionId: z.string(),
+  prompts: z.array(practiceWritingPromptSchema),
+});
+
 export const startPracticeResponseSchema = z.discriminatedUnion('status', [
-  z.object({
-    status: z.literal('unavailable'),
-    reason: z.enum(['not_enough_vocab', 'nothing_due', 'no_content']),
-  }),
-  z.object({
-    status: z.literal('ready'),
-    sessionId: z.string(),
-    kind: practiceKindSchema,
-    items: z.array(practiceItemSchema),
-    episodeId: z.string().optional(),
-  }),
-  z.object({
-    status: z.literal('ready_speaking'),
-    sessionId: z.string(),
-    prompts: z.array(practiceSpeakingPromptSchema),
-  }),
-  z.object({
-    status: z.literal('ready_writing'),
-    sessionId: z.string(),
-    prompts: z.array(practiceWritingPromptSchema),
-  }),
+  startPracticeUnavailableSchema,
+  startPracticeReadySchema,
+  startPracticeReadySpeakingSchema,
+  startPracticeReadyWritingSchema,
 ]);
 
 // ---------------------------------------------------------------------------

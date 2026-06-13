@@ -23,6 +23,10 @@ export interface EndpointDef {
   auth: 'bearer' | 'none';
   request?: z.ZodType;
   response: z.ZodType;
+  // HTTP statuses the route can return with the response body. The same response
+  // schema is emitted for each (verified against the route handlers). Defaults to
+  // [200] when omitted.
+  successStatuses?: number[];
 }
 
 export const endpoints: EndpointDef[] = [
@@ -33,6 +37,8 @@ export const endpoints: EndpointDef[] = [
     summary: 'Liveness and dependency health for the instance.',
     auth: 'none',
     response: healthResponseSchema,
+    // route returns 200 when healthy, 503 (same body) when degraded.
+    successStatuses: [200, 503],
   },
   {
     id: 'listCourses',
@@ -41,6 +47,7 @@ export const endpoints: EndpointDef[] = [
     summary: "List the authenticated learner's courses.",
     auth: 'bearer',
     response: coursesListResponseSchema,
+    successStatuses: [200],
   },
   {
     id: 'getPracticeOverview',
@@ -49,6 +56,7 @@ export const endpoints: EndpointDef[] = [
     summary: 'Due counts per skill, total vocab, and recent practice sessions.',
     auth: 'bearer',
     response: practiceOverviewResponseSchema,
+    successStatuses: [200],
   },
   {
     id: 'startPractice',
@@ -58,6 +66,8 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     request: startPracticeRequestSchema,
     response: startPracticeResponseSchema,
+    // 200 when the session is unavailable; 201 when a session is created.
+    successStatuses: [200, 201],
   },
   {
     id: 'submitPractice',
@@ -67,6 +77,7 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     request: submitPracticeRequestSchema,
     response: submitPracticeResponseSchema,
+    successStatuses: [200],
   },
   {
     id: 'redeemPairingToken',
@@ -76,5 +87,6 @@ export const endpoints: EndpointDef[] = [
     auth: 'none',
     request: redeemPairingRequestSchema,
     response: redeemPairingResponseSchema,
+    successStatuses: [200],
   },
 ];

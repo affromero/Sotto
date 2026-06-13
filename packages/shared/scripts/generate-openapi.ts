@@ -1,7 +1,9 @@
-// Generates packages/shared/openapi.json — an OpenAPI 3.1 document built from
-// the Zod contract registry in src/contracts. The committed JSON is the codegen
-// input for the Rust terminal client; a drift test keeps it in sync. Run with:
-//   npm run gen:openapi
+// Generates packages/shared/openapi.json — an OpenAPI 3.0.3 document built from
+// the Zod contract registry in src/contracts. 3.0.3 (not 3.1) is deliberate:
+// the Rust codegen phase uses `progenitor`, which only supports OpenAPI 3.0.x.
+// Zod emits JSON Schema 2020-12, so every schema is post-processed through a pure
+// `to30` transform before assembly. The committed JSON is the codegen input; a
+// drift test keeps it in sync. Run with: npm run gen:openapi
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -23,8 +25,12 @@ import {
   practiceWritingPromptSchema,
   redeemPairingRequestSchema,
   redeemPairingResponseSchema,
+  startPracticeReadySchema,
+  startPracticeReadySpeakingSchema,
+  startPracticeReadyWritingSchema,
   startPracticeRequestSchema,
   startPracticeResponseSchema,
+  startPracticeUnavailableSchema,
   submitPracticeRequestSchema,
   submitPracticeResponseSchema,
   userRoleSchema,
@@ -33,7 +39,24 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const sharedRoot = resolve(here, '..');
 
-type JsonSchema = Record<string, unknown>;
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+type JsonSchema = { [key: string]: JsonValue };
+
+// The response emitted for the StartPracticeResponse component: a 3.0
+// discriminated oneOf over the four named variant components.
+const START_PRACTICE_RESPONSE_NAME = 'StartPracticeResponse';
+const startPracticeVariants: Record<string, string> = {
+  unavailable: 'StartPracticeUnavailable',
+  ready: 'StartPracticeReady',
+  ready_speaking: 'StartPracticeReadySpeaking',
+  ready_writing: 'StartPracticeReadyWriting',
+};
 
 // Named component schemas. Reusable leaves are registered so they emit `$ref`
 // pointers instead of being inlined — this keeps the document DRY and gives the
@@ -53,7 +76,11 @@ const namedSchemas: Record<string, z.ZodType> = {
   PracticeSpeakingPrompt: practiceSpeakingPromptSchema,
   PracticeWritingPrompt: practiceWritingPromptSchema,
   StartPracticeRequest: startPracticeRequestSchema,
-  StartPracticeResponse: startPracticeResponseSchema,
+  StartPracticeUnavailable: startPracticeUnavailableSchema,
+  StartPracticeReady: startPracticeReadySchema,
+  StartPracticeReadySpeaking: startPracticeReadySpeakingSchema,
+  StartPracticeReadyWriting: startPracticeReadyWritingSchema,
+  [START_PRACTICE_RESPONSE_NAME]: startPracticeResponseSchema,
   SubmitPracticeRequest: submitPracticeRequestSchema,
   SubmitPracticeResponse: submitPracticeResponseSchema,
   RedeemPairingRequest: redeemPairingRequestSchema,
@@ -76,10 +103,87 @@ function refFor(schema: z.ZodType): { $ref: string } {
   return { $ref: `#/components/schemas/${name}` };
 }
 
+function isObject(value: JsonValue): value is { [key: string]: JsonValue } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNullBranch(value: JsonValue): boolean {
+  return isObject(value) && value.type === 'null' && Object.keys(value).length === 1;
+}
+
+// JSON-Schema-2020-12 keywords that OpenAPI 3.0 rejects. Dropped wholesale.
+const DROP_KEYWORDS = new Set([
+  '$schema',
+  '$id',
+  'propertyNames',
+  'unevaluatedProperties',
+  'unevaluatedItems',
+  'prefixItems',
+]);
+
+// Pure, deterministic transform: JSON Schema 2020-12 (Zod output) -> OpenAPI 3.0.
+// Recurses into every schema-bearing position and rewrites the handful of
+// constructs that differ between the dialects. Key insertion order is preserved
+// so the serialized document stays stable for the drift test.
+function to30(node: JsonValue): JsonValue {
+  if (Array.isArray(node)) return node.map(to30);
+  if (!isObject(node)) return node;
+
+  // Nullable: `anyOf`/`oneOf` of [schema, {type:'null'}] -> drop the null branch,
+  // mark the survivor nullable. Also handles a lone tail null branch.
+  for (const combinator of ['anyOf', 'oneOf'] as const) {
+    const branches = node[combinator];
+    if (Array.isArray(branches) && branches.some(isNullBranch)) {
+      const kept = branches.filter((b) => !isNullBranch(b));
+      if (kept.length === 1 && isObject(kept[0])) {
+        const survivor = to30(kept[0]) as { [key: string]: JsonValue };
+        const rest = { ...node };
+        delete rest[combinator];
+        // A bare `$ref` can't carry sibling keywords in 3.0; wrap it in `allOf`
+        // so `nullable` is legal. Otherwise merge keywords onto the survivor.
+        if ('$ref' in survivor) {
+          return { ...to30Object(rest), nullable: true, allOf: [survivor] };
+        }
+        return { ...to30Object(rest), ...survivor, nullable: true };
+      }
+      // Multiple non-null branches: keep the combinator, mark it nullable.
+      const rebuilt: JsonSchema = { ...node, [combinator]: kept, nullable: true };
+      return to30Object(rebuilt);
+    }
+  }
+
+  // `type: [T, 'null']` tuple -> `type: T` + nullable.
+  if (Array.isArray(node.type) && node.type.includes('null')) {
+    const nonNull = node.type.filter((t) => t !== 'null');
+    const rebuilt: JsonSchema = { ...node };
+    rebuilt.type = nonNull.length === 1 ? nonNull[0] : nonNull;
+    rebuilt.nullable = true;
+    return to30Object(rebuilt);
+  }
+
+  return to30Object(node);
+}
+
+// Transform an object node's own keywords (after nullable handling above).
+function to30Object(node: { [key: string]: JsonValue }): JsonSchema {
+  const out: JsonSchema = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (DROP_KEYWORDS.has(key)) continue;
+
+    // 3.0 has no `const`; express the single value as a one-element enum.
+    if (key === 'const') {
+      out.enum = [value];
+      continue;
+    }
+    out[key] = to30(value);
+  }
+  return out;
+}
+
 // Build components.schemas via a single registry pass so cross-references emit
-// as `$ref`. Strip the per-schema `$schema`/`$id` keys (not valid inside an
-// OpenAPI components.schemas entry).
-function buildComponentsSchemas(): Record<string, JsonSchema> {
+// as `$ref`, then run each through `to30`. The StartPracticeResponse entry is
+// replaced with an explicit oneOf + discriminator over its named variants.
+function buildComponentsSchemas(): Record<string, JsonValue> {
   const registry = z.registry<{ id: string }>();
   for (const [name, schema] of Object.entries(namedSchemas)) {
     registry.add(schema, { id: name });
@@ -88,18 +192,32 @@ function buildComponentsSchemas(): Record<string, JsonSchema> {
     target: 'draft-2020-12',
     uri: (id) => `#/components/schemas/${id}`,
   });
-  const out: Record<string, JsonSchema> = {};
+
+  const out: Record<string, JsonValue> = {};
   for (const [name, schema] of Object.entries(schemas)) {
-    const { $schema: _schema, $id: _id, ...rest } = schema as JsonSchema;
-    void _schema;
-    void _id;
-    out[name] = rest;
+    out[name] = to30(schema as JsonValue);
   }
+
+  out[START_PRACTICE_RESPONSE_NAME] = {
+    oneOf: Object.values(startPracticeVariants).map((variant) => ({
+      $ref: `#/components/schemas/${variant}`,
+    })),
+    discriminator: {
+      propertyName: 'status',
+      mapping: Object.fromEntries(
+        Object.entries(startPracticeVariants).map(([value, variant]) => [
+          value,
+          `#/components/schemas/${variant}`,
+        ]),
+      ),
+    },
+  };
+
   return out;
 }
 
 // Path-template params (e.g. {courseId}) -> OpenAPI path parameter objects.
-function pathParameters(path: string): JsonSchema[] {
+function pathParameters(path: string): JsonValue[] {
   const names = [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
   return names.map((name) => ({
     name,
@@ -109,17 +227,21 @@ function pathParameters(path: string): JsonSchema[] {
   }));
 }
 
-function operationFor(endpoint: EndpointDef): JsonSchema {
-  const successStatus = endpoint.method === 'POST' ? '201' : '200';
+function operationFor(endpoint: EndpointDef): JsonValue {
+  const statuses = endpoint.successStatuses ?? [200];
+  const responseRef = refFor(endpoint.response);
+  const responses: JsonSchema = {};
+  for (const status of statuses) {
+    responses[String(status)] = {
+      description: status >= 500 ? 'Degraded' : 'Success',
+      content: { 'application/json': { schema: responseRef } },
+    };
+  }
+
   const operation: JsonSchema = {
     operationId: endpoint.id,
     summary: endpoint.summary,
-    responses: {
-      [successStatus]: {
-        description: 'Success',
-        content: { 'application/json': { schema: refFor(endpoint.response) } },
-      },
-    },
+    responses,
   };
 
   const parameters = pathParameters(endpoint.path);
@@ -137,7 +259,7 @@ function operationFor(endpoint: EndpointDef): JsonSchema {
   return operation;
 }
 
-function buildPaths(): Record<string, JsonSchema> {
+function buildPaths(): Record<string, JsonValue> {
   const paths: Record<string, JsonSchema> = {};
   for (const endpoint of endpoints) {
     const entry = (paths[endpoint.path] ??= {});
@@ -152,7 +274,7 @@ export function buildOpenApiDocument(): JsonSchema {
   ) as { version: string };
 
   return {
-    openapi: '3.1.0',
+    openapi: '3.0.3',
     info: {
       title: 'Sotto API',
       version: pkg.version,
