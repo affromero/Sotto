@@ -44,6 +44,7 @@ interface BuildSetupReadinessInput {
   selectedTtsProvider?: string | null;
   selectedSttProvider?: string | null;
   claudeCodeAvailable?: boolean;
+  codexAvailable?: boolean;
   env?: Record<string, string | undefined>;
 }
 
@@ -115,6 +116,7 @@ function hasPlatformProvider(
 function normalizeAiProvider(value?: string | null): string | null {
   if (!value) return null;
   if (value.startsWith('claude-code')) return 'claude-code';
+  if (value.startsWith('codex')) return 'codex';
   if (value.startsWith('gpt-') || value.startsWith('o1') || value.startsWith('o3')) return 'openai';
   if (value.startsWith('claude-')) return 'anthropic';
   if (value.startsWith('gemini-')) return 'google';
@@ -133,11 +135,13 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   const selectedTtsProvider = input.selectedTtsProvider || env.TTS_PROVIDER || null;
   const selectedSttProvider = input.selectedSttProvider || env.STT_PROVIDER || null;
   const claudeCodeSelected = selectedAiProvider === 'claude-code';
+  const codexSelected = selectedAiProvider === 'codex';
   const localAiSelected = selectedAiProvider === 'local';
   const localTtsSelected = selectedTtsProvider === 'kokoro' || selectedTtsProvider === 'local';
   const localSttSelected = selectedSttProvider === 'local';
   const aiReady =
     (claudeCodeSelected && input.claudeCodeAvailable === true) ||
+    (codexSelected && input.codexAvailable === true) ||
     hasValidProvider(input.aiProviders, selectedAiProvider) ||
     hasPlatformProvider(env, AI_PLATFORM_KEYS, selectedAiProvider);
   const ttsReady =

@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { Glyph } from '@/components/Glyph';
-import { AutoModelForm } from '../auto-models/AutoModelForm';
+import { ProviderModelConfig, type ProviderModelConfigProps } from './ProviderModelConfig';
 import { ModelTestPanel } from '../models/ModelTestPanel';
 import shell from '../../adminTheme.module.css';
 
 type Tab = 'models' | 'test';
 
 interface ProvidersTabsProps {
-  autoModels: React.ComponentProps<typeof AutoModelForm>;
+  autoModels: ProviderModelConfigProps;
   testable: React.ComponentProps<typeof ModelTestPanel>;
 }
 
@@ -39,7 +39,7 @@ export function ProvidersTabs({ autoModels, testable }: ProvidersTabsProps) {
         </button>
       </div>
 
-      {tab === 'models' ? <AutoModelForm {...autoModels} /> : <ModelTestPanel {...testable} />}
+      {tab === 'models' ? <ProviderModelConfig {...autoModels} /> : <ModelTestPanel {...testable} />}
     </>
   );
 }

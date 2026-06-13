@@ -28,6 +28,7 @@ const defaultProps = {
   configuredTtsProviders: [],
   configuredAiProviders: [],
   aiProviderMeta: [],
+  aiSystemProviders: [],
   ttsProviderMeta: [],
   initialPreferredAiModel: null,
   referredUsers: [],
