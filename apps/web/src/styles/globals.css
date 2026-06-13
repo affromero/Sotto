@@ -69,8 +69,8 @@ body::before {
   --full-height: 100vh;
   --full-height: 100dvh;
 
-  /* Colors - Primary (Aula Blue) */
-  --color-primary: #3F4FB0;
+  /* Colors - Primary (Aula Blue — overridden by user accent via --user-accent) */
+  --color-primary: var(--user-accent, #3F4FB0);
   --color-primary-hover: #34419A;
   --color-primary-active: #2A3580;
   --color-primary-light: #E3E6F6;
@@ -288,6 +288,28 @@ body::before {
   --state-hover-primary-shadow: var(--shadow-primary-glow);
   --state-hover-border: var(--color-primary);
   --state-hover-border-shadow: 0 2px 8px var(--color-primary-subtle);
+}
+
+/* ============================================ */
+/* PAPER PALETTE (light mode only)               */
+/* Activated by html[data-palette='paper'].      */
+/* Dark mode (terminal) is unaffected.           */
+/* ============================================ */
+
+/* Only apply paper overrides when NOT in dark mode */
+[data-palette='paper']:not([data-theme='dark']) {
+  --color-background: #F1EADC;
+  --color-surface: #EDE4D3;
+  --color-surface-hover: #E7DECB;
+  --color-surface-elevated: #EDE4D3;
+  --color-surface-nested: #E7DECB;
+  --color-surface-sunken: #E0D7C5;
+  --color-border: #D3C9B6;
+  --color-border-hover: #BDB2A0;
+  --color-text-primary: #221C15;
+  --color-text: var(--color-text-primary);
+  --color-text-secondary: #6A604F;
+  --color-text-tertiary: #9A8E7A;
 }
 
 /* ============================================ */
