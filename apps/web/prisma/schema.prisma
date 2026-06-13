@@ -18,7 +18,6 @@ datasource db {
 enum UserRole {
   USER
   ADMIN
-  SYSTEM
 }
 
 // ============ USERS & AUTH ============
@@ -30,21 +29,8 @@ model User {
   handle        String?   @unique
   image         String?
   role          UserRole  @default(USER)
-  emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-
-  // Local profile sign-in (self-hosted). passwordHash is scrypt (lib/password.ts);
-  // forcePasswordChange makes a member set a new password on first sign-in;
-  // tokenVersion is bumped to invalidate active JWT sessions (member removal,
-  // password reset). All null/zero for OAuth-only accounts.
-  passwordHash        String?
-  // passwordless marks an INTENTIONAL no-password local member (taps to sign in,
-  // Netflix style). Kept distinct from passwordHash null on OAuth accounts, which
-  // must never be allowed to sign in without a password.
-  passwordless        Boolean @default(false)
-  forcePasswordChange Boolean @default(false)
-  tokenVersion        Int     @default(0)
 
   preferredLanguage    String?
   preferredTtsProvider String?
@@ -57,8 +43,6 @@ model User {
   pushNotifications  Boolean @default(true)
 
   // Relations
-  accounts            Account[]
-  sessions            Session[]
   episodes            Episode[]
   discoveries         Discovery[]
   discoveryChatErrors DiscoveryChatError[]
@@ -91,9 +75,6 @@ model User {
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
 
-  // Invitation links created by admin
-  invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
-
   // Language learning
   courses            Course[]
   classSubmissions   ClassSubmission[]
@@ -103,42 +84,6 @@ model User {
 
   @@index([role])
   @@index([handle])
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
 }
 
 // ============ EPISODES ============
@@ -773,24 +718,6 @@ enum FeedbackStatus {
   ARCHIVED
 }
 
-// ============ INVITATION LINKS ============
-
-model InvitationLink {
-  id        String    @id @default(cuid())
-  code      String    @unique
-  createdBy String
-  email     String?
-  enabled   Boolean   @default(true)
-  usedAt    DateTime?
-  expiresAt DateTime
-  createdAt DateTime  @default(now())
-
-  creator User @relation("InvitationLinksCreated", fields: [createdBy], references: [id])
-
-  @@index([code])
-  @@index([createdBy])
-}
-
 // ============ API KEYS ============
 
 model ApiKey {
@@ -963,12 +890,6 @@ model AutoModelConfig {
 
 model SiteConfig {
   id         String   @id @default("singleton")
-  openSignup Boolean  @default(false)
-
-  // Local profile sign-in (the Netflix-style picker). When true, the Credentials
-  // provider is active and the profile picker is the primary sign-in. Owner-set.
-  // null means "use the default": on for self-hosted instances with no ADMIN_EMAILS.
-  localAuth Boolean?
 
   // Owner-set server infrastructure (non-secret selection only; null = fall back to env).
   // Secrets (provider keys, R2/S3 credentials) never live here — they stay in env or the

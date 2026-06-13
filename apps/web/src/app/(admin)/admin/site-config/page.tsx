@@ -5,8 +5,6 @@ import styles from './page.module.css';
 
 // The same server settings the onboarding wizard sets for the owner, editable here.
 interface Config {
-  openSignup: boolean;
-  localAuth: boolean | null;
   aiProvider: string | null;
   aiModel: string | null;
   aiBaseUrl: string | null;
@@ -20,7 +18,7 @@ interface Config {
   s3Region: string | null;
 }
 
-type InfraKey = Exclude<keyof Config, 'openSignup' | 'localAuth'>;
+type InfraKey = keyof Config;
 
 const GROUPS: Array<{ title: string; fields: Array<{ key: InfraKey; label: string; placeholder: string }> }> = [
   {
@@ -56,12 +54,6 @@ const GROUPS: Array<{ title: string; fields: Array<{ key: InfraKey; label: strin
   },
 ];
 
-const LOCAL_AUTH_OPTIONS = [
-  { value: 'auto', label: 'Auto (self-hosted default)' },
-  { value: 'on', label: 'On (profile picker sign-in)' },
-  { value: 'off', label: 'Off (OAuth sign-in)' },
-];
-
 export default function SiteConfigPage() {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +86,7 @@ export default function SiteConfigPage() {
       const res = await fetch('/api/v1/admin/site-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ openSignup: cfg.openSignup, localAuth: cfg.localAuth, ...infra }),
+        body: JSON.stringify(infra),
       });
       if (!res.ok) throw new Error('Failed to save');
       setStatus('saved');
@@ -105,8 +97,6 @@ export default function SiteConfigPage() {
 
   if (loading || !cfg) return <div className={styles.container}>Loading...</div>;
 
-  const localAuthValue = cfg.localAuth === null ? 'auto' : cfg.localAuth ? 'on' : 'off';
-
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -115,45 +105,6 @@ export default function SiteConfigPage() {
           The same server settings the onboarding wizard sets, editable here. Changes take effect
           immediately. Leave a field blank to fall back to the environment variable.
         </p>
-      </div>
-
-      <h2 className={styles.sectionTitle}>Access</h2>
-      <div className={styles.row}>
-        <div className={styles.rowLabel}>
-          <div className={styles.rowLabelText}>Open signup</div>
-          <div className={styles.rowLabelDesc}>
-            When enabled, anyone can sign up without an invitation link.
-          </div>
-        </div>
-        <label className={styles.toggle}>
-          <input
-            type="checkbox"
-            className={styles.toggleInput}
-            checked={cfg.openSignup}
-            onChange={(e) => setField('openSignup', e.target.checked)}
-          />
-          <span className={styles.toggleTrack} />
-          <span className={styles.toggleThumb} />
-        </label>
-      </div>
-      <div className={styles.field}>
-        <label className={styles.fieldLabel} htmlFor="localAuth">
-          Local sign-in (profile picker)
-        </label>
-        <select
-          id="localAuth"
-          className={styles.select}
-          value={localAuthValue}
-          onChange={(e) =>
-            setField('localAuth', e.target.value === 'auto' ? null : e.target.value === 'on')
-          }
-        >
-          {LOCAL_AUTH_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {GROUPS.map((group) => (

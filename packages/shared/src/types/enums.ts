@@ -1,6 +1,6 @@
 // String union equivalents of Prisma enums — Prisma-free for mobile consumption
 
-export type UserRole = 'USER' | 'ADMIN' | 'SYSTEM';
+export type UserRole = 'USER' | 'ADMIN';
 
 export type EpisodeStatus =
   | 'PENDING'
