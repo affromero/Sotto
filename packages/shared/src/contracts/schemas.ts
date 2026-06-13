@@ -427,6 +427,145 @@ export const submitClassResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// EXAMS — ungated, full-length mock exams (no course-level advance).
+//   POST /api/v1/exams                  -> { examId } (201)
+//   GET  /api/v1/exams/{examId}         -> exam + sections + (when scored) result
+//   POST /api/v1/exams/{examId}/submit  -> band/score result
+// Exam speaking/writing prompts are submitted via their own per-prompt endpoints
+// (mirroring classes); the exam submit only carries MC answers.
+//
+// Mirrors apps/web/src/lib/mock-exam-service.ts (getExamForUser) + the scoring
+// service. Exam sections parallel class sections but carry exam-only metadata
+// (`part`, `format`, `weight`) and a different episode projection (status, no
+// title/references). The MC question and writing-prompt shapes are identical to
+// classes, so those schemas are reused; the speaking prompt differs (no `ipa`).
+// ---------------------------------------------------------------------------
+
+// Mirrors the Prisma `MockExamStatus` enum.
+export const mockExamStatusSchema = z.enum([
+  'GENERATING',
+  'READY',
+  'IN_PROGRESS',
+  'SUBMITTED',
+  'SCORED',
+  'FAILED',
+]);
+
+// Exam speaking prompt — like the class one but without `ipa` (the exam route
+// does not surface it). Closed: this is exactly what the route projects.
+export const examSpeakingPromptSchema = z.object({
+  id: z.string(),
+  order: z.number().int(),
+  targetPhrase: z.string(),
+  translation: z.string(),
+  referenceTtsUrl: z.string().nullable(),
+});
+
+// `.loose()`: the exam section's episode projection is `{ id, audioUrl, status }`
+// (no title/references, unlike classes). Open to tolerate any extra fields.
+export const examEpisodeRefSchema = z
+  .object({
+    id: z.string(),
+    audioUrl: z.string().nullable(),
+    status: episodeStatusSchema,
+  })
+  .loose();
+
+// `.loose()`: a flat exam-section row. Carries exam-only metadata (part, format,
+// weight) plus the per-skill content arrays. The MC question and writing-prompt
+// shapes are reused from classes.
+export const examSectionSchema = z
+  .object({
+    id: z.string(),
+    skill: skillTypeSchema,
+    part: z.string(),
+    order: z.number().int(),
+    format: z.string(),
+    weight: z.number(),
+    // Prisma `SectionStatus` (same enum the class section uses).
+    status: sectionStatusSchema,
+    score: z.number().nullable(),
+    episode: examEpisodeRefSchema.nullable(),
+    questions: z.array(classQuestionSchema),
+    speakingPrompts: z.array(examSpeakingPromptSchema),
+    writingPrompts: z.array(classWritingPromptSchema),
+  })
+  .loose();
+
+// The scored exam result (present only once status is SCORED).
+export const examResultSchema = z
+  .object({
+    overallScore: z.number().nullable(),
+    band: z.string().nullable(),
+    feedback: z.string().nullable(),
+    sectionResults: z.array(
+      z
+        .object({
+          sectionId: z.string(),
+          skill: skillTypeSchema,
+          score: z.number(),
+          feedback: z.string().nullable(),
+        })
+        .loose(),
+    ),
+  })
+  .loose();
+
+// `.loose()`: the exam carries institution metadata the client renders plus
+// fields it ignores; only the modeled fields are read.
+export const examDetailResponseSchema = z
+  .object({
+    id: z.string(),
+    institution: z.string(),
+    institutionLabel: z.string(),
+    level: cefrLevelSchema,
+    status: mockExamStatusSchema,
+    examName: z.string(),
+    sections: z.array(examSectionSchema),
+    // The scored result; null until the exam is submitted/scored.
+    result: examResultSchema.nullable(),
+  })
+  .loose();
+
+// POST /api/v1/exams — start a mock exam for a course at an optional level.
+export const startExamRequestSchema = z.object({
+  courseId: z.string().min(1),
+  level: cefrLevelSchema.optional(),
+});
+
+export const startExamResponseSchema = z.object({
+  examId: z.string(),
+});
+
+// POST /api/v1/exams/{examId}/submit — MC answers only (max 200; an EMPTY array
+// is accepted — speaking/writing are graded per-prompt during the exam). Unlike
+// the class submit, this route has no `.min(1)`.
+export const submitExamRequestSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string().min(1),
+        selectedIndex: z.number().int().min(0),
+      }),
+    )
+    .max(200),
+});
+
+export const examSectionScoreSchema = z.object({
+  sectionId: z.string(),
+  skill: skillTypeSchema,
+  weight: z.number(),
+  score: z.number(),
+});
+
+export const submitExamResponseSchema = z.object({
+  overallScore: z.number(),
+  band: z.string(),
+  sections: z.array(examSectionScoreSchema),
+  feedback: z.string(),
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/v1/auth/pair/redeem  (auth: none — the pairing token is the credential)
 // Request mirrors redeemPairingSchema; response mints an sk_sotto_ API key and
 // returns the owning user (the findUnique select), which can be null.

@@ -1023,6 +1023,353 @@
         ],
         "additionalProperties": false
       },
+      "MockExamStatus": {
+        "type": "string",
+        "enum": [
+          "GENERATING",
+          "READY",
+          "IN_PROGRESS",
+          "SUBMITTED",
+          "SCORED",
+          "FAILED"
+        ]
+      },
+      "ExamSpeakingPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "targetPhrase": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string"
+          },
+          "referenceTtsUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "targetPhrase",
+          "translation",
+          "referenceTtsUrl"
+        ],
+        "additionalProperties": false
+      },
+      "ExamEpisodeRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/EpisodeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "audioUrl",
+          "status"
+        ],
+        "additionalProperties": {}
+      },
+      "ExamSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "skill": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "part": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "format": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SectionStatus"
+          },
+          "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "episode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExamEpisodeRef"
+              }
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassQuestion"
+            }
+          },
+          "speakingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamSpeakingPrompt"
+            }
+          },
+          "writingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassWritingPrompt"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "skill",
+          "part",
+          "order",
+          "format",
+          "weight",
+          "status",
+          "score",
+          "episode",
+          "questions",
+          "speakingPrompts",
+          "writingPrompts"
+        ],
+        "additionalProperties": {}
+      },
+      "ExamResult": {
+        "type": "object",
+        "properties": {
+          "overallScore": {
+            "type": "number",
+            "nullable": true
+          },
+          "band": {
+            "type": "string",
+            "nullable": true
+          },
+          "feedback": {
+            "type": "string",
+            "nullable": true
+          },
+          "sectionResults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sectionId": {
+                  "type": "string"
+                },
+                "skill": {
+                  "$ref": "#/components/schemas/SkillType"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "feedback": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "sectionId",
+                "skill",
+                "score",
+                "feedback"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "overallScore",
+          "band",
+          "feedback",
+          "sectionResults"
+        ],
+        "additionalProperties": {}
+      },
+      "ExamDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "institution": {
+            "type": "string"
+          },
+          "institutionLabel": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MockExamStatus"
+          },
+          "examName": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamSection"
+            }
+          },
+          "result": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExamResult"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "institution",
+          "institutionLabel",
+          "level",
+          "status",
+          "examName",
+          "sections",
+          "result"
+        ],
+        "additionalProperties": {}
+      },
+      "StartExamRequest": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          }
+        },
+        "required": [
+          "courseId"
+        ],
+        "additionalProperties": false
+      },
+      "StartExamResponse": {
+        "type": "object",
+        "properties": {
+          "examId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "examId"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitExamRequest": {
+        "type": "object",
+        "properties": {
+          "answers": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questionId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "questionId",
+                "selectedIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "ExamSectionScore": {
+        "type": "object",
+        "properties": {
+          "sectionId": {
+            "type": "string"
+          },
+          "skill": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sectionId",
+          "skill",
+          "weight",
+          "score"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitExamResponse": {
+        "type": "object",
+        "properties": {
+          "overallScore": {
+            "type": "number"
+          },
+          "band": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamSectionScore"
+            }
+          },
+          "feedback": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "overallScore",
+          "band",
+          "sections",
+          "feedback"
+        ],
+        "additionalProperties": false
+      },
       "RedeemPairingRequest": {
         "type": "object",
         "properties": {
@@ -1421,6 +1768,115 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SubmitClassRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exams": {
+      "post": {
+        "operationId": "startExam",
+        "summary": "Start a full-length mock exam for a course.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartExamResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExamRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exams/{examId}": {
+      "get": {
+        "operationId": "getExam",
+        "summary": "A mock exam with its ordered sections and (once scored) result.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "examId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exams/{examId}/submit": {
+      "post": {
+        "operationId": "submitExam",
+        "summary": "Score a completed mock exam and return the band breakdown.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitExamResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "examId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitExamRequest"
               }
             }
           }

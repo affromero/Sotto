@@ -300,6 +300,16 @@ impl From<&types::ClassSpeakingPrompt> for SpeakingPrompt {
     }
 }
 
+impl From<&types::ExamSpeakingPrompt> for SpeakingPrompt {
+    fn from(p: &types::ExamSpeakingPrompt) -> Self {
+        Self {
+            id: p.id.clone(),
+            target_phrase: p.target_phrase.clone(),
+            translation: p.translation.clone(),
+        }
+    }
+}
+
 /// The grading lifecycle of the current speaking prompt's attempt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum SpeakingPhase {
@@ -609,6 +619,146 @@ fn section_is_valid(s: &types::ClassSection) -> bool {
     }
 }
 
+// ===========================================================================
+// Exams — ungated mock exams. They reuse the class section-walk machinery
+// ([`SectionProgress`], [`ClassSection`]); only the source shape differs, so a
+// parallel converter/validator maps `types::ExamSection` into the same
+// `ClassSection`. The exam ends with a band/score result (no level advance).
+// ===========================================================================
+
+impl ClassSection {
+    /// Build a section's progress from a generated EXAM section by its skill.
+    /// The exam section shape parallels the class section (same `ClassQuestion`
+    /// and `ClassWritingPrompt` types are reused in the contract); only the
+    /// speaking-prompt and episode types differ.
+    fn from_exam_section(s: &types::ExamSection) -> Self {
+        let questions: Vec<ClassQuestion> = s.questions.iter().map(ClassQuestion::from).collect();
+        let progress = match s.skill {
+            types::SkillType::Speaking => SectionProgress::Speaking {
+                prompts: s
+                    .speaking_prompts
+                    .iter()
+                    .map(SpeakingPrompt::from)
+                    .collect(),
+                index: 0,
+                phase: SpeakingPhase::Idle,
+            },
+            types::SkillType::Writing => SectionProgress::Writing {
+                prompts: s
+                    .writing_prompts
+                    .iter()
+                    .map(ClassWritingPrompt::from)
+                    .collect(),
+                index: 0,
+                input: WritingInput::new(),
+                phase: WritingPhase::Editing,
+            },
+            types::SkillType::Listening => SectionProgress::Listening {
+                episode_id: s.episode.as_ref().map(|e| e.id.clone()).unwrap_or_default(),
+                episode: None,
+                selected: vec![None; questions.len()],
+                questions,
+                index: 0,
+                cursor: 0,
+                audio_note: None,
+            },
+            // GRAMMAR / READING.
+            _ => SectionProgress::Mc {
+                selected: vec![None; questions.len()],
+                questions,
+                index: 0,
+                cursor: 0,
+                prompt_scroll: 0,
+            },
+        };
+        Self {
+            id: s.id.clone(),
+            skill: s.skill,
+            progress,
+        }
+    }
+}
+
+/// The graded band/score outcome of an exam submission.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ExamResult {
+    /// Weighted overall, presented as a whole percentage (0..100).
+    pub overall_score: u32,
+    pub band: String,
+    pub feedback: String,
+    /// Per-section scores (skill label + percentage).
+    pub sections: Vec<ExamSectionResult>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ExamSectionResult {
+    pub skill: String,
+    pub score: u32,
+}
+
+impl From<&types::SubmitExamResponse> for ExamResult {
+    fn from(r: &types::SubmitExamResponse) -> Self {
+        Self {
+            overall_score: pct(r.overall_score),
+            band: r.band.clone(),
+            feedback: r.feedback.clone(),
+            sections: r
+                .sections
+                .iter()
+                .map(|s| ExamSectionResult {
+                    skill: s.skill.to_string(),
+                    score: pct(s.score),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Validate + convert the generated exam into orderable sections, mirroring
+/// [`class_sections`]: rejects an empty exam or any section lacking the content
+/// its skill needs (so the walk never enters a dead section).
+pub(crate) fn exam_sections(exam: &types::ExamDetailResponse) -> Option<Vec<ClassSection>> {
+    if exam.sections.is_empty() {
+        return None;
+    }
+    if !exam.sections.iter().all(exam_section_is_valid) {
+        return None;
+    }
+    Some(
+        exam.sections
+            .iter()
+            .map(ClassSection::from_exam_section)
+            .collect(),
+    )
+}
+
+/// Per-skill content validity for an exam section (same rules as classes).
+fn exam_section_is_valid(s: &types::ExamSection) -> bool {
+    let questions_answerable = s.questions.iter().all(|q| !q.options.is_empty());
+    match s.skill {
+        types::SkillType::Grammar | types::SkillType::Reading => {
+            !s.questions.is_empty() && questions_answerable
+        }
+        types::SkillType::Listening => s.episode.is_some() && questions_answerable,
+        types::SkillType::Speaking => !s.speaking_prompts.is_empty(),
+        types::SkillType::Writing => !s.writing_prompts.is_empty(),
+    }
+}
+
+/// A 0..1 score as a whole percentage (0..100), clamped.
+fn pct(score: f64) -> u32 {
+    (score.clamp(0.0, 1.0) * 100.0).round() as u32
+}
+
+/// Which section-walk flow is active. Classes and exams share the section-walk
+/// machinery; only the dispatch endpoints + the final result/submit differ, so
+/// the shared handlers branch on this.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FlowKind {
+    Class,
+    Exam,
+}
+
 /// The active screen and its state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum View {
@@ -700,6 +850,19 @@ pub(crate) enum View {
     ClassOutcome { course: Course, result: ClassResult },
     /// The course has no further classes (next-class returned `{ done: true }`).
     ClassDone { course: Course },
+    /// An in-progress mock exam: walk `sections` in order, then submit + score.
+    /// `exam_id` is `None` while the start request (which mints the id) is in
+    /// flight; `sections` is `None` while the exam load is in flight.
+    Exam {
+        course: Course,
+        exam_id: Option<String>,
+        sections: Option<Vec<ClassSection>>,
+        cursor: usize,
+        /// True while the exam submit is in flight.
+        submitting: bool,
+    },
+    /// The graded band/score outcome of a submitted exam.
+    ExamOutcome { course: Course, result: ExamResult },
 }
 
 impl View {
@@ -792,6 +955,18 @@ impl View {
             submitting: false,
         }
     }
+
+    /// Enter the exam flow: the exam is being started (id minted server-side),
+    /// so `exam_id` and `sections` are `None` until the start + load resolve.
+    pub fn exam_view(course: Course) -> Self {
+        View::Exam {
+            course,
+            exam_id: None,
+            sections: None,
+            cursor: 0,
+            submitting: false,
+        }
+    }
 }
 
 /// Collect the MC answers recorded across all class sections so far, ready for
@@ -828,10 +1003,48 @@ pub(crate) fn collect_class_answers(
     answers
 }
 
+/// Collect the MC answers recorded across all EXAM sections, for the exam
+/// submit. Like [`collect_class_answers`], but the exam item carries a validated
+/// `question_id` newtype, so an answered question whose id the contract rejects
+/// returns `Err` rather than being silently dropped (a partial payload would
+/// misgrade the exam). Skipped (unanswered) questions are legitimately omitted.
+pub(crate) fn collect_exam_answers(
+    sections: &[ClassSection],
+) -> Result<Vec<types::SubmitExamRequestAnswersItem>, String> {
+    let mut answers = Vec::new();
+    for section in sections {
+        let (questions, selected) = match &section.progress {
+            SectionProgress::Mc {
+                questions,
+                selected,
+                ..
+            }
+            | SectionProgress::Listening {
+                questions,
+                selected,
+                ..
+            } => (questions, selected),
+            _ => continue,
+        };
+        for (q, choice) in questions.iter().zip(selected.iter()) {
+            if let Some(idx) = choice {
+                let question_id =
+                    types::SubmitExamRequestAnswersItemQuestionId::try_from(q.id.clone())
+                        .map_err(|e| format!("invalid question id {:?}: {e}", q.id))?;
+                answers.push(types::SubmitExamRequestAnswersItem {
+                    question_id,
+                    selected_index: *idx as i64,
+                });
+            }
+        }
+    }
+    Ok(answers)
+}
+
 /// Whether every section of the class has been worked through to a submittable
 /// state: MC/listening have an answer for every question, speaking has graded
 /// (or failed) every prompt, writing has graded (or failed) every prompt. Pure;
-/// drives whether the class can be submitted.
+/// drives whether the class can be submitted. Reused for exams.
 pub(crate) fn class_ready_to_submit(sections: &[ClassSection]) -> bool {
     sections.iter().all(section_complete)
 }
@@ -2051,5 +2264,138 @@ mod tests {
         let input = WritingInput::new();
         assert!(input.is_empty());
         assert_eq!(input.text(), "");
+    }
+
+    // --- P6c: exams --------------------------------------------------------
+
+    fn exam_response(json: serde_json::Value) -> types::ExamDetailResponse {
+        serde_json::from_value(json).expect("valid ExamDetailResponse JSON")
+    }
+
+    /// An exam with one section of each kind, in a fixed order.
+    fn mixed_exam() -> types::ExamDetailResponse {
+        exam_response(serde_json::json!({
+            "id": "exam1", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+            "level": "B1", "status": "IN_PROGRESS", "examName": "Mock B1", "result": null,
+            "sections": [
+                { "id": "ex-g", "skill": "GRAMMAR", "part": "P1", "order": 0, "format": "mc", "weight": 0.25, "status": "READY", "score": null,
+                  "episode": null, "speakingPrompts": [], "writingPrompts": [],
+                  "questions": [{ "id": "g0", "order": 0, "question": "Article?", "options": ["el","la"], "passageRef": null, "passageText": null }] },
+                { "id": "ex-r", "skill": "READING", "part": "P2", "order": 1, "format": "mc", "weight": 0.25, "status": "READY", "score": null,
+                  "episode": null, "speakingPrompts": [], "writingPrompts": [],
+                  "questions": [{ "id": "r0", "order": 0, "question": "What?", "options": ["a","b"], "passageRef": null, "passageText": "Passage." }] },
+                { "id": "ex-l", "skill": "LISTENING", "part": "P3", "order": 2, "format": "mc", "weight": 0.2, "status": "READY", "score": null,
+                  "episode": { "id": "ep1", "audioUrl": "https://cdn/ep1.mp3", "status": "READY" },
+                  "speakingPrompts": [], "writingPrompts": [],
+                  "questions": [{ "id": "l0", "order": 0, "question": "Heard?", "options": ["x","y"], "passageRef": null, "passageText": null }] },
+                { "id": "ex-s", "skill": "SPEAKING", "part": "P4", "order": 3, "format": "oral", "weight": 0.15, "status": "READY", "score": null,
+                  "episode": null, "questions": [], "writingPrompts": [],
+                  "speakingPrompts": [{ "id": "s0", "order": 0, "targetPhrase": "Hola", "translation": "Hi", "referenceTtsUrl": null }] },
+                { "id": "ex-w", "skill": "WRITING", "part": "P5", "order": 4, "format": "essay", "weight": 0.15, "status": "READY", "score": null,
+                  "episode": null, "questions": [], "speakingPrompts": [],
+                  "writingPrompts": [{ "id": "w0", "order": 0, "task": "Describe", "guidance": null }] }
+            ]
+        }))
+    }
+
+    #[test]
+    fn exam_sections_walk_in_order_with_kind_routing() {
+        let sections = exam_sections(&mixed_exam()).expect("well-formed exam");
+        assert_eq!(sections.len(), 5);
+        let ids: Vec<&str> = sections.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, ["ex-g", "ex-r", "ex-l", "ex-s", "ex-w"]);
+        assert!(matches!(sections[0].progress, SectionProgress::Mc { .. }));
+        assert!(matches!(sections[1].progress, SectionProgress::Mc { .. }));
+        assert!(matches!(
+            sections[2].progress,
+            SectionProgress::Listening { .. }
+        ));
+        assert!(matches!(
+            sections[3].progress,
+            SectionProgress::Speaking { .. }
+        ));
+        assert!(matches!(
+            sections[4].progress,
+            SectionProgress::Writing { .. }
+        ));
+    }
+
+    #[test]
+    fn empty_exam_is_malformed() {
+        let exam = exam_response(serde_json::json!({
+            "id": "e", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+            "level": "B1", "status": "IN_PROGRESS", "examName": "M", "result": null, "sections": []
+        }));
+        assert!(exam_sections(&exam).is_none());
+    }
+
+    #[test]
+    fn exam_section_with_a_zero_option_question_is_malformed() {
+        let exam = exam_response(serde_json::json!({
+            "id": "e", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+            "level": "B1", "status": "IN_PROGRESS", "examName": "M", "result": null,
+            "sections": [{
+                "id": "ex-g", "skill": "GRAMMAR", "part": "P1", "order": 0, "format": "mc", "weight": 1.0, "status": "READY", "score": null,
+                "episode": null, "speakingPrompts": [], "writingPrompts": [],
+                "questions": [{ "id": "g0", "order": 0, "question": "broken", "options": [], "passageRef": null, "passageText": null }]
+            }]
+        }));
+        assert!(exam_sections(&exam).is_none());
+    }
+
+    #[test]
+    fn empty_speaking_exam_section_is_malformed() {
+        let exam = exam_response(serde_json::json!({
+            "id": "e", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+            "level": "B1", "status": "IN_PROGRESS", "examName": "M", "result": null,
+            "sections": [{
+                "id": "ex-s", "skill": "SPEAKING", "part": "P4", "order": 0, "format": "oral", "weight": 1.0, "status": "READY", "score": null,
+                "episode": null, "questions": [], "writingPrompts": [], "speakingPrompts": []
+            }]
+        }));
+        assert!(exam_sections(&exam).is_none());
+    }
+
+    #[test]
+    fn collect_exam_answers_aggregates_answered_mc_across_sections() {
+        let mut sections = exam_sections(&mixed_exam()).expect("well-formed");
+        for s in sections.iter_mut() {
+            match &mut s.progress {
+                SectionProgress::Mc { selected, .. }
+                | SectionProgress::Listening { selected, .. } => {
+                    selected[0] = Some(if s.id == "ex-r" { 1 } else { 0 });
+                }
+                _ => {}
+            }
+        }
+        let answers = collect_exam_answers(&sections).expect("valid ids");
+        assert_eq!(answers.len(), 3);
+        let by_id: std::collections::HashMap<_, _> = answers
+            .iter()
+            .map(|a| ((*a.question_id).clone(), a.selected_index))
+            .collect();
+        assert_eq!(by_id.get("g0"), Some(&0));
+        assert_eq!(by_id.get("r0"), Some(&1));
+        assert_eq!(by_id.get("l0"), Some(&0));
+    }
+
+    #[test]
+    fn exam_result_converts_band_and_percent() {
+        let resp: types::SubmitExamResponse = serde_json::from_value(serde_json::json!({
+            "overallScore": 0.72, "band": "B2", "feedback": "Solid.",
+            "sections": [
+                { "sectionId": "ex-g", "skill": "GRAMMAR", "weight": 0.5, "score": 0.8 },
+                { "sectionId": "ex-r", "skill": "READING", "weight": 0.5, "score": 0.6 }
+            ]
+        }))
+        .expect("valid");
+        let result = ExamResult::from(&resp);
+        assert_eq!(result.overall_score, 72);
+        assert_eq!(result.band, "B2");
+        assert_eq!(result.feedback, "Solid.");
+        assert_eq!(result.sections.len(), 2);
+        assert_eq!(result.sections[0].skill, "GRAMMAR");
+        assert_eq!(result.sections[0].score, 80);
+        assert_eq!(result.sections[1].score, 60);
     }
 }

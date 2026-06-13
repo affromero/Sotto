@@ -1,4 +1,5 @@
 mod class;
+mod exam;
 mod state;
 mod ui;
 
@@ -175,6 +176,10 @@ impl App {
             Action::ClassWritingGraded(req_gen, result) => {
                 self.on_class_writing_graded(req_gen, result)
             }
+            Action::StartExam => self.on_start_exam(),
+            Action::ExamStarted(req_gen, result) => self.on_exam_started(req_gen, result),
+            Action::ExamLoaded(req_gen, result) => self.on_exam_loaded(req_gen, result),
+            Action::ExamSubmitted(req_gen, result) => self.on_exam_submitted(req_gen, result),
         }
         Ok(())
     }
@@ -251,6 +256,12 @@ impl App {
             } if matches!(key.code, KeyCode::Char('c')) => {
                 return Some(Action::NextClass);
             }
+            // CourseHome: `e` starts a mock exam.
+            View::CourseHome {
+                starting: false, ..
+            } if matches!(key.code, KeyCode::Char('e')) => {
+                return Some(Action::StartExam);
+            }
             _ => {}
         }
 
@@ -320,24 +331,35 @@ impl App {
         )
     }
 
-    /// The class section the learner is currently on, if in a `Class`.
+    /// The section the learner is currently on, in a `Class` OR an `Exam`. Both
+    /// reuse the same `SectionProgress` walk, so the input handlers in
+    /// `app::class` operate on either via this accessor.
     fn current_section(&self) -> Option<&state::ClassSection> {
-        if let View::Class {
-            sections: Some(sections),
-            cursor,
-            ..
-        } = &self.view
-        {
-            sections.get(*cursor)
-        } else {
-            None
+        match &self.view {
+            View::Class {
+                sections: Some(sections),
+                cursor,
+                ..
+            }
+            | View::Exam {
+                sections: Some(sections),
+                cursor,
+                ..
+            } => sections.get(*cursor),
+            _ => None,
         }
+    }
+
+    /// True in a section-walk flow (a class OR an exam), so input is routed to
+    /// the shared `app::class` section handlers.
+    fn in_section_walk(&self) -> bool {
+        matches!(self.view, View::Class { .. } | View::Exam { .. })
     }
 
     // --- Input handlers ----------------------------------------------------
 
     fn on_up(&mut self) {
-        if matches!(self.view, View::Class { .. }) {
+        if self.in_section_walk() {
             self.class_cursor_move(true);
             return;
         }
@@ -363,7 +385,7 @@ impl App {
     }
 
     fn on_down(&mut self) {
-        if matches!(self.view, View::Class { .. }) {
+        if self.in_section_walk() {
             self.class_cursor_move(false);
             return;
         }
@@ -403,7 +425,7 @@ impl App {
     /// Scroll the current item's prompt (PageUp/PageDown), for long reading
     /// passages. `ItemReview` and class MC sections have scrollable prompts.
     fn on_scroll(&mut self, down: bool) {
-        if matches!(self.view, View::Class { .. }) {
+        if self.in_section_walk() {
             self.class_scroll(down);
             return;
         }
@@ -475,8 +497,14 @@ impl App {
                 }
             }
             View::Result { .. } => self.dismiss_result(),
-            View::Class { .. } => self.class_on_select(),
+            // Class and exam share the section-walk Select handler.
+            View::Class { .. } | View::Exam { .. } => self.class_on_select(),
             View::ClassOutcome { .. } | View::ClassDone { .. } => self.on_next_class(),
+            // Exams end with a band/score; Enter returns to the course home.
+            View::ExamOutcome { course, .. } => {
+                let course = course.clone();
+                self.enter_course_home(course);
+            }
             View::Loading | View::Error { .. } => {}
         }
     }
@@ -484,7 +512,7 @@ impl App {
     fn on_choose(&mut self, n: usize) {
         // `n` is 1-based from the number keys.
         let index = n.saturating_sub(1);
-        if matches!(self.view, View::Class { .. }) {
+        if self.in_section_walk() {
             self.class_on_choose(index);
             return;
         }
@@ -533,7 +561,9 @@ impl App {
             | View::Result { course, .. }
             | View::Class { course, .. }
             | View::ClassOutcome { course, .. }
-            | View::ClassDone { course, .. } => {
+            | View::ClassDone { course, .. }
+            | View::Exam { course, .. }
+            | View::ExamOutcome { course, .. } => {
                 let course = course.clone();
                 // Stop any audio/recording before leaving a review screen.
                 self.stop_audio();
@@ -734,7 +764,7 @@ impl App {
     /// Toggle play/pause on the listening screen. The first press downloads and
     /// plays the episode audio; subsequent presses pause/resume.
     fn on_play_pause(&mut self) {
-        if matches!(self.view, View::Class { .. }) {
+        if self.in_section_walk() {
             self.class_play_pause();
             return;
         }
@@ -782,7 +812,7 @@ impl App {
     /// Start or stop a recording on the speaking screen. Start → `Recording`;
     /// stop → encode WAV, upload, then poll grading. Guards re-entry by phase.
     fn on_toggle_record(&mut self) {
-        if matches!(self.view, View::Class { .. }) {
+        if self.in_section_walk() {
             self.class_toggle_record();
             return;
         }
@@ -1330,6 +1360,73 @@ mod tests {
                 feedback: "Good.".into(),
             })
         }
+
+        async fn start_exam(
+            &self,
+            _course_id: &str,
+            _level: Option<types::CefrLevel>,
+        ) -> Result<types::StartExamResponse> {
+            Ok(
+                serde_json::from_value(serde_json::json!({ "examId": "exam-stub" }))
+                    .expect("valid start-exam JSON"),
+            )
+        }
+
+        async fn exam(&self, _exam_id: &str) -> Result<types::ExamDetailResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "id": "exam-stub", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+                "level": "B1", "status": "IN_PROGRESS", "examName": "Mock", "sections": [],
+                "result": null
+            }))
+            .expect("valid exam JSON"))
+        }
+
+        async fn submit_exam(
+            &self,
+            _exam_id: &str,
+            _answers: Vec<types::SubmitExamRequestAnswersItem>,
+        ) -> Result<types::SubmitExamResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "overallScore": 1.0, "band": "C1", "feedback": "Strong.", "sections": []
+            }))
+            .expect("valid submit-exam JSON"))
+        }
+
+        async fn upload_exam_speaking(
+            &self,
+            _exam_id: &str,
+            _prompt_id: &str,
+            _wav: Vec<u8>,
+        ) -> Result<SpeakingUploadResponse> {
+            Ok(SpeakingUploadResponse {
+                recording_id: "rec-stub".into(),
+                status: "PENDING".into(),
+            })
+        }
+
+        async fn poll_exam_speaking(
+            &self,
+            _exam_id: &str,
+            _prompt_id: &str,
+            _recording_id: &str,
+        ) -> Result<types::SpeakingPollResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "status": "PENDING", "overallScore": null, "transcript": null, "feedback": null
+            }))
+            .expect("valid poll JSON"))
+        }
+
+        async fn submit_exam_writing(
+            &self,
+            _exam_id: &str,
+            _prompt_id: &str,
+            _text: String,
+        ) -> Result<crate::api::WritingGradeResponse> {
+            Ok(crate::api::WritingGradeResponse {
+                overall_score: 0.8,
+                feedback: "Good.".into(),
+            })
+        }
     }
 
     /// Build an `App` around a [`StubApi`]. No terminal is created and no
@@ -1870,5 +1967,197 @@ mod tests {
             before + 1,
             "advance dispatches next-class once"
         );
+    }
+
+    // --- P6c: exams (hermetic, StubApi) -----------------------------------
+
+    fn exam_detail(json: serde_json::Value) -> ApiResult<types::ExamDetailResponse> {
+        Arc::new(Ok(serde_json::from_value(json).expect("valid exam JSON")))
+    }
+
+    /// Build an `Exam` view whose sections are loaded from `sections` JSON.
+    fn exam_with_sections(sections: serde_json::Value) -> View {
+        let exam: types::ExamDetailResponse = serde_json::from_value(serde_json::json!({
+            "id": "exam1", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+            "level": "B1", "status": "IN_PROGRESS", "examName": "Mock", "result": null,
+            "sections": sections
+        }))
+        .expect("valid exam");
+        let built = state::exam_sections(&exam).expect("well-formed sections");
+        View::Exam {
+            course: course("A"),
+            exam_id: Some("exam1".into()),
+            sections: Some(built),
+            cursor: 0,
+            submitting: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn exam_start_enters_the_exam_and_loads_sections() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_start_exam();
+
+        // Entered the Exam view (id/sections load next).
+        assert!(
+            matches!(
+                app.view,
+                View::Exam {
+                    exam_id: None,
+                    sections: None,
+                    ..
+                }
+            ),
+            "on_start_exam enters the Exam view"
+        );
+
+        // The start response mints an id and triggers the exam load.
+        let started_gen = app.request_gen;
+        let resp: ApiResult<types::StartExamResponse> = Arc::new(Ok(serde_json::from_value(
+            serde_json::json!({ "examId": "exam1" }),
+        )
+        .expect("valid")));
+        app.on_exam_started(started_gen, resp);
+        match &app.view {
+            View::Exam {
+                exam_id, sections, ..
+            } => {
+                assert_eq!(exam_id.as_deref(), Some("exam1"));
+                assert!(sections.is_none(), "sections load separately");
+            }
+            other => panic!("expected Exam, got {other:?}"),
+        }
+
+        // The exam detail lands; sections populate, in order.
+        let load_gen = app.request_gen;
+        app.on_exam_loaded(
+            load_gen,
+            exam_detail(serde_json::json!({
+                "id": "exam1", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+                "level": "B1", "status": "IN_PROGRESS", "examName": "Mock", "result": null,
+                "sections": [
+                    { "id": "ex-g", "skill": "GRAMMAR", "part": "P1", "order": 0, "format": "mc", "weight": 1.0, "status": "READY", "score": null,
+                      "episode": null, "speakingPrompts": [], "writingPrompts": [],
+                      "questions": [{ "id": "g0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+                ]
+            })),
+        );
+        match &app.view {
+            View::Exam {
+                sections: Some(sections),
+                ..
+            } => assert_eq!(sections.len(), 1),
+            other => panic!("expected loaded Exam, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn answering_the_last_exam_question_submits_and_shows_the_band() {
+        let mut app = test_app();
+        app.view = exam_with_sections(serde_json::json!([
+            { "id": "ex-g", "skill": "GRAMMAR", "part": "P1", "order": 0, "format": "mc", "weight": 1.0, "status": "READY", "score": null,
+              "episode": null, "speakingPrompts": [], "writingPrompts": [],
+              "questions": [{ "id": "g0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+        ]));
+
+        let before = app.request_gen;
+        app.on_select(); // answers the only question -> submits the exam
+        let after = app.request_gen;
+        assert_eq!(after, before + 1, "submit dispatches once");
+        assert!(matches!(
+            app.view,
+            View::Exam {
+                submitting: true,
+                ..
+            }
+        ));
+
+        // The score result lands -> band/score outcome.
+        let resp: ApiResult<types::SubmitExamResponse> = Arc::new(Ok(serde_json::from_value(
+            serde_json::json!({
+                "overallScore": 0.9, "band": "C1", "feedback": "Strong.",
+                "sections": [{ "sectionId": "ex-g", "skill": "GRAMMAR", "weight": 1.0, "score": 0.9 }]
+            }),
+        )
+        .expect("valid")));
+        app.on_exam_submitted(after, resp);
+        match &app.view {
+            View::ExamOutcome { result, .. } => {
+                assert_eq!(result.band, "C1");
+                assert_eq!(result.overall_score, 90);
+                assert_eq!(result.sections.len(), 1);
+            }
+            other => panic!("expected ExamOutcome, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn second_exam_submit_enter_while_submitting_does_not_dispatch_twice() {
+        let mut app = test_app();
+        app.view = exam_with_sections(serde_json::json!([
+            { "id": "ex-g", "skill": "GRAMMAR", "part": "P1", "order": 0, "format": "mc", "weight": 1.0, "status": "READY", "score": null,
+              "episode": null, "speakingPrompts": [], "writingPrompts": [],
+              "questions": [{ "id": "g0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+        ]));
+
+        let before = app.request_gen;
+        app.on_select(); // answers -> submits
+        let after_first = app.request_gen;
+        assert_eq!(after_first, before + 1);
+        assert!(matches!(
+            app.view,
+            View::Exam {
+                submitting: true,
+                ..
+            }
+        ));
+
+        app.on_select(); // key-mash while submitting: ignored
+        assert_eq!(
+            app.request_gen, after_first,
+            "a second Enter while submitting must not dispatch again"
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_exam_result_for_a_previous_exam_is_ignored() {
+        let mut app = test_app();
+        app.view = View::exam_view(course("A"));
+        if let View::Exam { exam_id, .. } = &mut app.view {
+            *exam_id = Some("exam1".into());
+        }
+        let stale_gen = app.request_gen;
+        // Navigate away (bumps gen) before the submit result lands.
+        app.enter_course_home(course("A"));
+
+        let resp: ApiResult<types::SubmitExamResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "overallScore": 1.0, "band": "C2", "feedback": "x", "sections": []
+            }))
+            .expect("valid")));
+        app.on_exam_submitted(stale_gen, resp);
+
+        // The stale result must NOT replace the CourseHome with an exam outcome.
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    #[tokio::test]
+    async fn malformed_exam_backs_out_to_course_home() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.view = View::exam_view(course("A"));
+        let req_gen = app.request_gen;
+
+        // Empty sections -> malformed -> back to CourseHome.
+        app.on_exam_loaded(
+            req_gen,
+            exam_detail(serde_json::json!({
+                "id": "exam1", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+                "level": "B1", "status": "IN_PROGRESS", "examName": "Mock", "result": null,
+                "sections": []
+            })),
+        );
+        assert!(matches!(app.view, View::CourseHome { .. }));
     }
 }

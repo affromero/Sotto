@@ -142,6 +142,43 @@ pub(crate) trait Api: Send + Sync {
         prompt_id: &str,
         text: String,
     ) -> Result<WritingGradeResponse>;
+
+    // --- Exams (ungated mock exams) ---
+    /// Start a mock exam for a course at an optional CEFR level; returns its id.
+    async fn start_exam(
+        &self,
+        course_id: &str,
+        level: Option<types::CefrLevel>,
+    ) -> Result<types::StartExamResponse>;
+    /// Fetch an exam with its ordered, mixed-skill sections (+ result if scored).
+    async fn exam(&self, exam_id: &str) -> Result<types::ExamDetailResponse>;
+    /// Submit an exam's MC answers and get the band/score result.
+    async fn submit_exam(
+        &self,
+        exam_id: &str,
+        answers: Vec<types::SubmitExamRequestAnswersItem>,
+    ) -> Result<types::SubmitExamResponse>;
+    /// Upload an exam speaking attempt (raw multipart at the exam path).
+    async fn upload_exam_speaking(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        wav: Vec<u8>,
+    ) -> Result<SpeakingUploadResponse>;
+    /// Poll grading for an exam speaking attempt.
+    async fn poll_exam_speaking(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse>;
+    /// Submit an exam writing response (`{ text }`), graded synchronously.
+    async fn submit_exam_writing(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse>;
 }
 
 /// Thin wrapper over the progenitor-generated [`GeneratedClient`] that bakes in
@@ -453,20 +490,30 @@ impl SottoClient {
             "{}/api/v1/classes/{}/speaking/{}",
             self.base_url, class_id, prompt_id
         );
+        self.poll_speaking_at(&url, recording_id).await
+    }
+
+    /// GET a speaking grading poll at `url` (raw; the response shape matches the
+    /// generated practice poll). Shared by the class and exam speaking paths.
+    async fn poll_speaking_at(
+        &self,
+        url: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse> {
         let resp = self
             .http
-            .get(&url)
+            .get(url)
             .query(&[("recordingId", recording_id)])
             .send()
             .await
-            .map_err(|e| eyre!("class speaking poll request failed: {e}"))?;
+            .map_err(|e| eyre!("speaking poll request failed: {e}"))?;
         let status = resp.status();
         if !status.is_success() {
-            return Err(eyre!("class speaking poll failed ({status})"));
+            return Err(eyre!("speaking poll failed ({status})"));
         }
         resp.json::<types::SpeakingPollResponse>()
             .await
-            .map_err(|e| eyre!("could not parse class speaking poll: {e}"))
+            .map_err(|e| eyre!("could not parse speaking poll: {e}"))
     }
 
     /// Submit a class writing response (`{ text }`), graded synchronously.
@@ -480,21 +527,113 @@ impl SottoClient {
             "{}/api/v1/classes/{}/writing/{}",
             self.base_url, class_id, prompt_id
         );
+        self.submit_writing_at(&url, text).await
+    }
+
+    /// POST `{ text }` to a writing-grading `url`. Shared by the class and exam
+    /// writing paths.
+    async fn submit_writing_at(&self, url: &str, text: String) -> Result<WritingGradeResponse> {
         let resp = self
             .http
-            .post(&url)
+            .post(url)
             .json(&serde_json::json!({ "text": text }))
             .send()
             .await
-            .map_err(|e| eyre!("class writing submit request failed: {e}"))?;
+            .map_err(|e| eyre!("writing submit request failed: {e}"))?;
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            return Err(eyre!("class writing submit failed ({status}): {body}"));
+            return Err(eyre!("writing submit failed ({status}): {body}"));
         }
         resp.json::<WritingGradeResponse>()
             .await
             .map_err(|e| eyre!("could not parse writing grade: {e}"))
+    }
+
+    // --- Exams ------------------------------------------------------------
+
+    /// Start a mock exam for `course_id` at an optional CEFR level.
+    pub async fn start_exam(
+        &self,
+        course_id: &str,
+        level: Option<types::CefrLevel>,
+    ) -> Result<types::StartExamResponse> {
+        let course_id = types::StartExamRequestCourseId::try_from(course_id.to_string())
+            .map_err(|e| eyre!("invalid course id: {e}"))?;
+        let body = types::StartExamRequest { course_id, level };
+        let resp = self
+            .inner
+            .start_exam(&body)
+            .await
+            .map_err(|e| eyre!("failed to start exam: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Fetch an exam with its sections (and result, once scored).
+    pub async fn exam(&self, exam_id: &str) -> Result<types::ExamDetailResponse> {
+        let resp = self
+            .inner
+            .get_exam(exam_id)
+            .await
+            .map_err(|e| eyre!("failed to load exam: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Submit an exam's MC answers and get the band/score result.
+    pub async fn submit_exam(
+        &self,
+        exam_id: &str,
+        answers: Vec<types::SubmitExamRequestAnswersItem>,
+    ) -> Result<types::SubmitExamResponse> {
+        let body = types::SubmitExamRequest { answers };
+        let resp = self
+            .inner
+            .submit_exam(exam_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to submit exam: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Upload an exam speaking attempt (raw multipart at the exam path).
+    pub async fn upload_exam_speaking(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        wav: Vec<u8>,
+    ) -> Result<SpeakingUploadResponse> {
+        let url = format!(
+            "{}/api/v1/exams/{}/speaking/{}",
+            self.base_url, exam_id, prompt_id
+        );
+        self.upload_wav(&url, wav).await
+    }
+
+    /// Poll grading for an exam speaking attempt.
+    pub async fn poll_exam_speaking(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse> {
+        let url = format!(
+            "{}/api/v1/exams/{}/speaking/{}",
+            self.base_url, exam_id, prompt_id
+        );
+        self.poll_speaking_at(&url, recording_id).await
+    }
+
+    /// Submit an exam writing response (`{ text }`), graded synchronously.
+    pub async fn submit_exam_writing(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse> {
+        let url = format!(
+            "{}/api/v1/exams/{}/writing/{}",
+            self.base_url, exam_id, prompt_id
+        );
+        self.submit_writing_at(&url, text).await
     }
 }
 
@@ -593,6 +732,53 @@ impl Api for SottoClient {
         text: String,
     ) -> Result<WritingGradeResponse> {
         SottoClient::submit_class_writing(self, class_id, prompt_id, text).await
+    }
+
+    async fn start_exam(
+        &self,
+        course_id: &str,
+        level: Option<types::CefrLevel>,
+    ) -> Result<types::StartExamResponse> {
+        SottoClient::start_exam(self, course_id, level).await
+    }
+
+    async fn exam(&self, exam_id: &str) -> Result<types::ExamDetailResponse> {
+        SottoClient::exam(self, exam_id).await
+    }
+
+    async fn submit_exam(
+        &self,
+        exam_id: &str,
+        answers: Vec<types::SubmitExamRequestAnswersItem>,
+    ) -> Result<types::SubmitExamResponse> {
+        SottoClient::submit_exam(self, exam_id, answers).await
+    }
+
+    async fn upload_exam_speaking(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        wav: Vec<u8>,
+    ) -> Result<SpeakingUploadResponse> {
+        SottoClient::upload_exam_speaking(self, exam_id, prompt_id, wav).await
+    }
+
+    async fn poll_exam_speaking(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<types::SpeakingPollResponse> {
+        SottoClient::poll_exam_speaking(self, exam_id, prompt_id, recording_id).await
+    }
+
+    async fn submit_exam_writing(
+        &self,
+        exam_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse> {
+        SottoClient::submit_exam_writing(self, exam_id, prompt_id, text).await
     }
 }
 

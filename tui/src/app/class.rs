@@ -19,9 +19,10 @@ use crate::audio::AudioPlayer;
 
 use super::App;
 use super::state::{
-    ClassResult, ClassSection, Course, EpisodeDetail, SectionProgress, SpeakingPhase, View,
-    WritingInput, WritingPhase, answer_current_choice, class_ready_to_submit, class_sections,
-    collect_class_answers, cursor_down, cursor_up, poll_is_terminal, reduce_speaking_poll,
+    ClassResult, ClassSection, Course, EpisodeDetail, FlowKind, SectionProgress, SpeakingPhase,
+    View, WritingInput, WritingPhase, answer_current_choice, class_ready_to_submit, class_sections,
+    collect_class_answers, collect_exam_answers, cursor_down, cursor_up, poll_is_terminal,
+    reduce_speaking_poll,
 };
 
 impl App {
@@ -118,10 +119,14 @@ impl App {
 
     /// True while a class submit is in flight; blocks any input that could
     /// answer/advance/re-submit so key-mashing cannot spawn duplicate submits.
+    /// Covers both the class and exam flows.
     fn class_submitting(&self) -> bool {
         matches!(
             self.view,
             View::Class {
+                submitting: true,
+                ..
+            } | View::Exam {
                 submitting: true,
                 ..
             }
@@ -255,22 +260,28 @@ impl App {
         }
     }
 
-    /// Move to the next section, or submit the class when the last is done.
+    /// Move to the next section, or submit when the last is done. Shared by the
+    /// class and exam flows (only the submit differs).
     fn class_next_section(&mut self) {
-        let advanced = if let View::Class {
-            sections: Some(sections),
-            cursor,
-            ..
-        } = &mut self.view
-        {
-            if *cursor + 1 < sections.len() {
-                *cursor += 1;
-                true
-            } else {
-                false
+        let advanced = match &mut self.view {
+            View::Class {
+                sections: Some(sections),
+                cursor,
+                ..
             }
-        } else {
-            false
+            | View::Exam {
+                sections: Some(sections),
+                cursor,
+                ..
+            } => {
+                if *cursor + 1 < sections.len() {
+                    *cursor += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
         };
 
         if advanced {
@@ -283,7 +294,12 @@ impl App {
             self.stop_audio();
             self.class_fetch_current_episode();
         } else {
-            self.submit_class();
+            // Last section done — submit through the active flow.
+            match self.current_flow().map(|(flow, _)| flow) {
+                Some(FlowKind::Class) => self.submit_class(),
+                Some(FlowKind::Exam) => self.submit_exam(),
+                None => {}
+            }
         }
         self.render();
     }
@@ -372,7 +388,10 @@ impl App {
             }
         };
         let req_gen = self.bump_gen();
-        let class_id = self.class_id().unwrap_or_default();
+        let (flow, id) = match self.current_flow() {
+            Some((flow, Some(id))) => (flow, id),
+            _ => return,
+        };
         let prompt_id = match self.current_speaking_prompt_id() {
             Some(id) => id,
             None => return,
@@ -386,9 +405,10 @@ impl App {
         self.dispatch(
             req_gen,
             async move {
-                client
-                    .upload_class_speaking(&class_id, &prompt_id, wav)
-                    .await
+                match flow {
+                    FlowKind::Class => client.upload_class_speaking(&id, &prompt_id, wav).await,
+                    FlowKind::Exam => client.upload_exam_speaking(&id, &prompt_id, wav).await,
+                }
             },
             Action::ClassSpeakingUploaded,
         );
@@ -396,9 +416,9 @@ impl App {
     }
 
     fn class_poll_grade(&self, recording_id: String, req_gen: u64) {
-        let class_id = match self.class_id() {
-            Some(id) => id,
-            None => return,
+        let (flow, id) = match self.current_flow() {
+            Some((flow, Some(id))) => (flow, id),
+            _ => return,
         };
         let prompt_id = match self.current_speaking_prompt_id() {
             Some(id) => id,
@@ -408,27 +428,45 @@ impl App {
         self.dispatch(
             req_gen,
             async move {
-                client
-                    .poll_class_speaking(&class_id, &prompt_id, &recording_id)
-                    .await
+                match flow {
+                    FlowKind::Class => {
+                        client
+                            .poll_class_speaking(&id, &prompt_id, &recording_id)
+                            .await
+                    }
+                    FlowKind::Exam => {
+                        client
+                            .poll_exam_speaking(&id, &prompt_id, &recording_id)
+                            .await
+                    }
+                }
             },
             Action::ClassSpeakingPolled,
         );
     }
 
     fn class_schedule_poll(&self, recording_id: String, req_gen: u64) {
-        let (class_id, prompt_id) = match (self.class_id(), self.current_speaking_prompt_id()) {
-            (Some(c), Some(p)) => (c, p),
+        let (flow, id, prompt_id) = match (self.current_flow(), self.current_speaking_prompt_id()) {
+            (Some((flow, Some(id))), Some(p)) => (flow, id, p),
             _ => return,
         };
         let client = Arc::clone(&self.client);
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-            let result = client
-                .poll_class_speaking(&class_id, &prompt_id, &recording_id)
-                .await
-                .map_err(|e| e.to_string());
+            let result = match flow {
+                FlowKind::Class => {
+                    client
+                        .poll_class_speaking(&id, &prompt_id, &recording_id)
+                        .await
+                }
+                FlowKind::Exam => {
+                    client
+                        .poll_exam_speaking(&id, &prompt_id, &recording_id)
+                        .await
+                }
+            }
+            .map_err(|e| e.to_string());
             let _ = tx.send(Action::ClassSpeakingPolled(req_gen, Arc::new(result)));
         });
     }
@@ -484,7 +522,10 @@ impl App {
             _ => return,
         };
         let req_gen = self.bump_gen();
-        let class_id = self.class_id().unwrap_or_default();
+        let (flow, id) = match self.current_flow() {
+            Some((flow, Some(id))) => (flow, id),
+            _ => return,
+        };
         let prompt_id = match self.current_writing_prompt_id() {
             Some(id) => id,
             None => return,
@@ -498,9 +539,10 @@ impl App {
         self.dispatch(
             req_gen,
             async move {
-                client
-                    .submit_class_writing(&class_id, &prompt_id, text)
-                    .await
+                match flow {
+                    FlowKind::Class => client.submit_class_writing(&id, &prompt_id, text).await,
+                    FlowKind::Exam => client.submit_exam_writing(&id, &prompt_id, text).await,
+                }
             },
             Action::ClassWritingGraded,
         );
@@ -540,7 +582,7 @@ impl App {
             return;
         }
         let req_gen = self.bump_gen();
-        let class_id = self.class_id().unwrap_or_default();
+        let class_id = self.flow_id().unwrap_or_default();
         if let View::Class { submitting, .. } = &mut self.view {
             *submitting = true;
         }
@@ -549,6 +591,48 @@ impl App {
             req_gen,
             async move { client.submit_class(&class_id, answers).await },
             Action::ClassSubmitted,
+        );
+        self.render();
+    }
+
+    /// Submit an exam and produce its band/score result. Unlike the class submit,
+    /// the exam route accepts an EMPTY answers array (no `.min(1)`), so a no-MC
+    /// exam submits normally — no stall workaround needed.
+    fn submit_exam(&mut self) {
+        if self.class_submitting() {
+            return;
+        }
+        let answers = match &self.view {
+            View::Exam {
+                sections: Some(sections),
+                ..
+            } => {
+                if !class_ready_to_submit(sections) {
+                    return;
+                }
+                match collect_exam_answers(sections) {
+                    Ok(answers) => answers,
+                    // A malformed answer id would misgrade the exam; surface it
+                    // rather than sending a partial payload.
+                    Err(message) => {
+                        self.status_bar.set_error(message);
+                        self.render();
+                        return;
+                    }
+                }
+            }
+            _ => return,
+        };
+        let req_gen = self.bump_gen();
+        let exam_id = self.flow_id().unwrap_or_default();
+        if let View::Exam { submitting, .. } = &mut self.view {
+            *submitting = true;
+        }
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.submit_exam(&exam_id, answers).await },
+            Action::ExamSubmitted,
         );
         self.render();
     }
@@ -833,31 +917,43 @@ impl App {
     // --- Small accessors ---------------------------------------------------
 
     pub(super) fn current_section_mut(&mut self) -> Option<&mut ClassSection> {
-        if let View::Class {
-            sections: Some(sections),
-            cursor,
-            ..
-        } = &mut self.view
-        {
-            sections.get_mut(*cursor)
-        } else {
-            None
+        match &mut self.view {
+            View::Class {
+                sections: Some(sections),
+                cursor,
+                ..
+            }
+            | View::Exam {
+                sections: Some(sections),
+                cursor,
+                ..
+            } => sections.get_mut(*cursor),
+            _ => None,
         }
     }
 
-    fn class_id(&self) -> Option<String> {
-        if let View::Class { class_id, .. } = &self.view {
-            Some(class_id.clone())
-        } else {
-            None
+    /// The active section-walk flow (class or exam) and its target id, if the id
+    /// is known. For an exam the id is `None` until the start request mints it
+    /// (which only happens before any section dispatch), so callers that need a
+    /// concrete id treat `None` as "not ready".
+    fn current_flow(&self) -> Option<(FlowKind, Option<String>)> {
+        match &self.view {
+            View::Class { class_id, .. } => Some((FlowKind::Class, Some(class_id.clone()))),
+            View::Exam { exam_id, .. } => Some((FlowKind::Exam, exam_id.clone())),
+            _ => None,
         }
     }
 
+    /// The active flow's target id (class id or exam id), when known.
+    fn flow_id(&self) -> Option<String> {
+        self.current_flow().and_then(|(_, id)| id)
+    }
+
+    /// The course backing the active class/exam flow.
     fn class_course(&self) -> Option<Course> {
-        if let View::Class { course, .. } = &self.view {
-            Some(course.clone())
-        } else {
-            None
+        match &self.view {
+            View::Class { course, .. } | View::Exam { course, .. } => Some(course.clone()),
+            _ => None,
         }
     }
 
