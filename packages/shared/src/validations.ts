@@ -17,7 +17,7 @@ export const createEpisodeSchema = z.object({
   ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
   aiModel: z.string().optional(),
   ttsModel: z.string().optional(),
-  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+  visibility: z.enum(['UNLISTED', 'PRIVATE']).optional(),
   metadata: z
     .object({
       topic: z.string(),

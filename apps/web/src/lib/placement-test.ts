@@ -1,4 +1,4 @@
-// Adaptive CEFR placement test. Mirrors the taste-quiz LLM flow: resolve the
+// Adaptive CEFR placement test. The LLM flow: resolve the
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
 // model, parse JSON. A single batch of questions spans A1..B2; the learner's
 // level is the highest band they clear on a staircase.

@@ -63,7 +63,7 @@ export default async function AutoModelsPage() {
         <ul>
           <li>Handle screening &mdash; classifying usernames as names, offensive, or OK</li>
           <li>Credential lookup &mdash; verifying participant credentials via web search</li>
-          <li>Language detection &mdash; identifying non-English input in discovery chat and scripts</li>
+          <li>Language detection &mdash; identifying non-English input in lesson creation chat and scripts</li>
         </ul>
       </div>
     </div>

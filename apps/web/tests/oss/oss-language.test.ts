@@ -87,7 +87,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/support/page.tsx',
       'src/app/layout.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
-      'src/components/referral/JoinCTA.tsx',
     ]
       .map(readSource)
       .join('\n');
@@ -1028,7 +1027,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const episodeRouteSource = readSource('src/app/api/v1/episodes/[episodeId]/route.ts');
     const adminEpisodeRouteSource = readSource('src/app/api/v1/admin/episodes/[episodeId]/route.ts');
 
-    expect(summaryContractSources).toContain('saveCount');
+    expect(summaryContractSources).not.toContain('saveCount');
     expect(summaryContractSources).not.toContain('likeCount');
     expect(summaryContractSources).not.toContain('forkCount');
     expect(summaryContractSources).not.toContain('forkedFromId');

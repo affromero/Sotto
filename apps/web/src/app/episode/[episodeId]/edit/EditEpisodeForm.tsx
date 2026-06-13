@@ -90,7 +90,6 @@ export function EditEpisodeForm({
           value={visibility}
           onChange={(e) => setVisibility(e.target.value)}
         >
-          <option value="PUBLIC">Public</option>
           <option value="UNLISTED">Unlisted</option>
           <option value="PRIVATE">Private</option>
         </select>

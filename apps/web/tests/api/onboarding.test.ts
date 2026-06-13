@@ -56,7 +56,6 @@ vi.mock('@/lib/name-moderation', () => ({
   moderateDisplayName: (...args: unknown[]) => mockModerateDisplayName(...args),
 }));
 
-import { POST as completeOnboarding } from '@/app/api/v1/onboarding/complete/route';
 import { POST as saveInterests } from '@/app/api/v1/onboarding/interests/route';
 import { POST as setName } from '@/app/api/v1/onboarding/name/route';
 
@@ -69,43 +68,6 @@ function createRequest(body?: object): NextRequest {
   }
   return new NextRequest(url, init);
 }
-
-describe('POST /api/v1/onboarding/complete', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const response = await completeOnboarding();
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
-
-    const response = await completeOnboarding();
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('marks onboarding complete and returns success', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserUpdate.mockResolvedValue({ id: 'user-1', hasCompletedOnboarding: true });
-
-    const response = await completeOnboarding();
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true });
-  });
-});
 
 describe('POST /api/v1/onboarding/interests', () => {
   beforeEach(() => {

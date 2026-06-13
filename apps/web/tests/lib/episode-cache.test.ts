@@ -83,7 +83,7 @@ const baseEpisode = {
   title: 'Test Episode',
   status: 'READY',
   audioUrl: 'https://r2.example.com/audio.mp3',
-  visibility: 'PUBLIC',
+  visibility: 'UNLISTED',
   userId: 'user-1',
   user: { id: 'user-1', name: 'Test', image: null },
   tags: [],

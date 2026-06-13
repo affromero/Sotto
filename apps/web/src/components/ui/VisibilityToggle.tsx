@@ -2,15 +2,14 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Globe, Link2, Lock } from 'lucide-react';
+import { Link2, Lock } from 'lucide-react';
 import type { EpisodeVisibility } from '@/generated/prisma/client';
 import styles from './VisibilityToggle.module.css';
 
-const ALL_VISIBILITIES: EpisodeVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];
+const ALL_VISIBILITIES: EpisodeVisibility[] = ['UNLISTED', 'PRIVATE'];
 
-const config: Record<EpisodeVisibility, { icon: typeof Globe; label: string; className: string }> =
+const config: Record<EpisodeVisibility, { icon: typeof Link2; label: string; className: string }> =
   {
-    PUBLIC: { icon: Globe, label: 'Public', className: styles.public },
     UNLISTED: { icon: Link2, label: 'Unlisted', className: styles.unlisted },
     PRIVATE: { icon: Lock, label: 'Private', className: styles.private },
   };

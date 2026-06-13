@@ -62,19 +62,6 @@ export function CreateAsSystemOwnerButton() {
 
       {open && (
         <div className={styles.systemOwnerDropdownMenu} role="menu">
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.systemOwnerDropdownItem}
-            onClick={() => {
-              setOpen(false);
-              router.push('/create?as=system-owner');
-            }}
-          >
-            <span className={styles.systemOwnerDropdownItemName}>Custom (chat flow)</span>
-            <span className={styles.systemOwnerDropdownItemDesc}>Full discovery chat</span>
-          </button>
-          <div className={styles.systemOwnerDropdownDivider} />
           {MARKETING_TEMPLATES.map((t) => (
             <button
               key={t.id}

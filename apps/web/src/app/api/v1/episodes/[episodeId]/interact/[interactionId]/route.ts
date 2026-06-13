@@ -36,9 +36,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
   const isOwner = interaction.userId === session.user.id;
   const isEpisodeOwner = interaction.episode.userId === session.user.id;
-  const isPublic = interaction.episode.visibility === 'PUBLIC';
+  const isShared = interaction.episode.visibility === 'UNLISTED';
 
-  if (!isOwner && !isEpisodeOwner && !isPublic) {
+  if (!isOwner && !isEpisodeOwner && !isShared) {
     return errorResponse('Interaction not found', 404);
   }
 

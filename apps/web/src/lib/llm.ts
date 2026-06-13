@@ -172,7 +172,7 @@ export async function generateResponse(
 }
 
 /**
- * Stream a response from Claude (for discovery chat).
+ * Stream a response from Claude.
  * When apiKeyOverride is provided, creates a fresh client with that key.
  */
 export async function* streamResponse(

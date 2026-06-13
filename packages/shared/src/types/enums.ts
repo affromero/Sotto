@@ -17,10 +17,9 @@ export type EpisodeStatus =
   | 'UPDATING'
   | 'FAILED'
   | 'IMPORTING'
-  | 'TRANSCRIBING'
-  | 'DUPLICATE_REVIEW';
+  | 'TRANSCRIBING';
 
-export type EpisodeVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+export type EpisodeVisibility = 'UNLISTED' | 'PRIVATE';
 
 export type EpisodeSource =
   | 'WEB'
@@ -48,13 +47,9 @@ export type NotificationType =
   | 'EPISODE_READY'
   | 'EPISODE_FAILED'
   | 'KEY_INVALID'
-  | 'QUESTION_ON_YOUR_EPISODE'
   | 'SCRIPT_READY'
-  | 'ACCOUNT_WARNING'
-  | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
-  | 'PIPELINE_FAILURE'
-  | 'REFERRAL_SIGNUP';
+  | 'PIPELINE_FAILURE';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 

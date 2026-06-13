@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
     href: '/admin/users',
     label: 'Users & access',
     glyph: 'headset',
-    match: ['/admin/users', '/admin/handles'],
+    match: ['/admin/users'],
   },
   {
     href: '/admin/system',

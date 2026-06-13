@@ -25,7 +25,6 @@ export async function GET() {
           visibility: true,
           audioUrl: true,
           duration: true,
-          playCount: true,
           createdAt: true,
           source: true,
           sourcePlatform: true,

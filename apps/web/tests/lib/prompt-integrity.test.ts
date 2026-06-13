@@ -63,7 +63,6 @@ const EXPECTED_FILES = [
   'research/angle-discovery.md',
   'research/fact-extraction.md',
   'research/source-discovery.md',
-  'feeds/taste-quiz.md',
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
@@ -111,10 +110,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'verification/script-verifier-previous-feedback.md': ['PREVIOUS_FEEDBACK'],
   'verification/script-verifier-incremental.md': [
     'CARRIED_CLAIMS', 'CHANGED_LIST', 'UNCHANGED_INDICES',
-  ].sort(),
-  'feeds/taste-quiz.md': [
-    'DISLIKED_SUMMARY', 'INTEREST_SUMMARY', 'RECENT_QUESTIONS',
-    'REQUEST_COUNT', 'TAXONOMY',
   ].sort(),
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
@@ -305,13 +300,3 @@ describe('verification templates', () => {
   });
 });
 
-describe('feed templates', () => {
-  it('all feed templates produce JSON array output', () => {
-    for (const file of ['feeds/taste-quiz.md']) {
-      const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
-      expect(content).toContain('JSON array');
-      expect(content).toContain('"text"');
-      expect(content).toContain('"tagSlugs"');
-    }
-  });
-});

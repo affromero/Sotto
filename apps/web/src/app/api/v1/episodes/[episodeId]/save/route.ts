@@ -35,19 +35,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ saved: true });
   }
 
-  // Use a transaction to atomically create save and increment count
-  await prisma.$transaction(async (tx) => {
-    await tx.save.create({
-      data: {
-        userId,
-        episodeId,
-      },
-    });
-
-    await tx.episode.update({
-      where: { id: episodeId },
-      data: { saveCount: { increment: 1 } },
-    });
+  await prisma.save.create({
+    data: {
+      userId,
+      episodeId,
+    },
   });
 
   return NextResponse.json({ saved: true });
@@ -73,17 +65,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ saved: false });
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.save.delete({
-      where: {
-        userId_episodeId: { userId, episodeId },
-      },
-    });
-
-    await tx.episode.update({
-      where: { id: episodeId },
-      data: { saveCount: { decrement: 1 } },
-    });
+  await prisma.save.delete({
+    where: {
+      userId_episodeId: { userId, episodeId },
+    },
   });
 
   return NextResponse.json({ saved: false });
