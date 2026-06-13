@@ -2,17 +2,22 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   buildOpenApiDocument,
+  OPENAPI_CODEGEN_OUTPUT_PATH,
   OPENAPI_OUTPUT_PATH,
 } from '../scripts/generate-openapi';
 import { endpoints } from '../src/contracts';
 import {
+  classDetailResponseSchema,
   coursesListResponseSchema,
   episodeDetailResponseSchema,
   healthResponseSchema,
+  nextClassCreatedResponseSchema,
+  nextClassDoneResponseSchema,
   practiceOverviewResponseSchema,
   redeemPairingResponseSchema,
   speakingPollResponseSchema,
   startPracticeResponseSchema,
+  submitClassResponseSchema,
   submitPracticeResponseSchema,
 } from '../src/contracts/schemas';
 
@@ -25,6 +30,72 @@ describe('openapi.json drift guard', () => {
 
   it('regeneration is deterministic / idempotent', () => {
     expect(buildOpenApiDocument()).toEqual(buildOpenApiDocument());
+    expect(buildOpenApiDocument({ codegen: true })).toEqual(
+      buildOpenApiDocument({ codegen: true }),
+    );
+  });
+
+  it('matches the committed codegen spec (progenitor input)', () => {
+    const committed = JSON.parse(
+      readFileSync(OPENAPI_CODEGEN_OUTPUT_PATH, 'utf8'),
+    );
+    const regenerated = buildOpenApiDocument({ codegen: true });
+    expect(regenerated).toEqual(committed);
+  });
+
+  it('codegen spec excludes operations progenitor cannot generate', () => {
+    // next-class (two distinct 2xx bodies) is in the truthful spec but NOT the
+    // codegen spec, which progenitor's generate_api! consumes.
+    const full = buildOpenApiDocument();
+    const codegen = buildOpenApiDocument({ codegen: true });
+    const path = '/api/v1/courses/{courseId}/next-class';
+    expect((full.paths as Record<string, unknown>)[path]).toBeDefined();
+    expect((codegen.paths as Record<string, unknown>)[path]).toBeUndefined();
+    // No codegen operation declares two distinct 2xx response bodies (the
+    // progenitor constraint that motivated the exclusion).
+    for (const ops of Object.values(
+      codegen.paths as Record<string, Record<string, { responses?: object }>>,
+    )) {
+      for (const op of Object.values(ops)) {
+        const twoxx = Object.keys(op.responses ?? {}).filter((s) =>
+          s.startsWith('2'),
+        );
+        const refs = new Set(
+          twoxx.map(
+            (s) =>
+              (
+                (op.responses as Record<string, Record<string, unknown>>)[s]
+                  .content as Record<string, Record<string, { schema: { $ref?: string } }>>
+              )['application/json'].schema.$ref,
+          ),
+        );
+        expect(refs.size).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('next-class emits a distinct schema per success status', () => {
+    const doc = buildOpenApiDocument();
+    const op = (
+      doc.paths as Record<
+        string,
+        Record<
+          string,
+          {
+            responses: Record<
+              string,
+              { content: Record<string, { schema: { $ref: string } }> }
+            >;
+          }
+        >
+      >
+    )['/api/v1/courses/{courseId}/next-class'].post;
+    expect(op.responses['201'].content['application/json'].schema.$ref).toBe(
+      '#/components/schemas/NextClassCreatedResponse',
+    );
+    expect(op.responses['200'].content['application/json'].schema.$ref).toBe(
+      '#/components/schemas/NextClassDoneResponse',
+    );
   });
 
   it('exposes exactly the seeded endpoints with their methods', () => {
@@ -38,6 +109,9 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/practice/{sessionId}/submit',
         'GET /api/v1/episodes/{episodeId}',
         'GET /api/v1/practice/{sessionId}/speaking/{promptId}',
+        'POST /api/v1/courses/{courseId}/next-class',
+        'GET /api/v1/classes/{classId}',
+        'POST /api/v1/classes/{classId}/submit',
         'POST /api/v1/auth/pair/redeem',
       ].sort(),
     );
@@ -68,6 +142,12 @@ describe('openapi.json drift guard', () => {
       'EpisodeSegment',
       'EpisodeDetailResponse',
       'SpeakingPollResponse',
+      // Class schemas are subsets of richer Prisma rows -> open.
+      'ClassQuestion',
+      'ClassWritingPrompt',
+      'ClassEpisodeRef',
+      'ClassSection',
+      'ClassDetailResponse',
     ]) {
       expect(schemas[open].additionalProperties).not.toBe(false);
     }
@@ -77,6 +157,14 @@ describe('openapi.json drift guard', () => {
       'SubmitPracticeResponse',
       'StartPracticeReady',
       'RedeemPairingResponse',
+      // Class submit + speaking prompt are exact-match -> closed.
+      'ClassSpeakingPrompt',
+      'SubmitClassRequest',
+      'SubmitClassResponse',
+      'SubmitClassSectionResult',
+      // next-class returns exactly one closed shape per status.
+      'NextClassCreatedResponse',
+      'NextClassDoneResponse',
     ]) {
       expect(schemas[closed].additionalProperties).toBe(false);
     }
@@ -184,6 +272,13 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(
       codes('/api/v1/practice/{sessionId}/speaking/{promptId}', 'get'),
     ).toEqual(['200']);
+    // next-class returns 200 { done } or 201 { classId }.
+    expect(codes('/api/v1/courses/{courseId}/next-class', 'post')).toEqual([
+      '200',
+      '201',
+    ]);
+    expect(codes('/api/v1/classes/{classId}', 'get')).toEqual(['200']);
+    expect(codes('/api/v1/classes/{classId}/submit', 'post')).toEqual(['200']);
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
   });
 });
@@ -395,6 +490,98 @@ describe('response schemas accept representative payloads', () => {
     ).toBeTruthy();
     expect(
       redeemPairingResponseSchema.parse({ token: 'sk_sotto_xyz', user: null }),
+    ).toBeTruthy();
+  });
+
+  it('next class — distinct closed shapes per status', () => {
+    // 201 created: { classId } required, nothing extra.
+    expect(nextClassCreatedResponseSchema.parse({ classId: 'cls1' })).toBeTruthy();
+    expect(() => nextClassCreatedResponseSchema.parse({ done: true })).toThrow();
+    // 200 done: { done: true } required.
+    expect(nextClassDoneResponseSchema.parse({ done: true })).toBeTruthy();
+    expect(() => nextClassDoneResponseSchema.parse({ done: false })).toThrow();
+    expect(() => nextClassDoneResponseSchema.parse({ classId: 'x' })).toThrow();
+  });
+
+  it('class detail (mixed sections, route superset is loose)', () => {
+    const parsed = classDetailResponseSchema.parse({
+      id: 'cls1',
+      status: 'IN_PROGRESS',
+      order: 3,
+      passThreshold: 0.7,
+      submitted: false,
+      // Server-only fields the client ignores; must survive (loose).
+      lesson: { objective: 'Past tense' },
+      submission: null,
+      sourceUrl: null,
+      sourceTitle: null,
+      sections: [
+        {
+          id: 'sec-g',
+          skill: 'GRAMMAR',
+          status: 'READY',
+          attempt: 1,
+          score: null,
+          passed: false,
+          episode: null,
+          questions: [
+            {
+              id: 'q0',
+              order: 0,
+              question: 'Pick the article',
+              options: ['el', 'la', 'los', 'las'],
+              passageRef: null,
+              passageText: null,
+            },
+          ],
+          prompts: [],
+          writingPrompts: [],
+        },
+        {
+          id: 'sec-l',
+          skill: 'LISTENING',
+          status: 'READY',
+          attempt: 1,
+          score: null,
+          passed: false,
+          episode: {
+            id: 'ep1',
+            audioUrl: 'https://cdn.example/ep1.mp3',
+            title: 'At the cafe',
+            references: [],
+          },
+          questions: [],
+          prompts: [],
+          writingPrompts: [],
+        },
+        {
+          id: 'sec-w',
+          skill: 'WRITING',
+          status: 'READY',
+          attempt: 1,
+          score: null,
+          passed: false,
+          episode: null,
+          questions: [],
+          prompts: [],
+          writingPrompts: [
+            { id: 'w0', order: 0, task: 'Describe your day', guidance: null, response: null },
+          ],
+        },
+      ],
+    }) as Record<string, unknown>;
+    expect(parsed.lesson).toBeDefined();
+  });
+
+  it('submit class result', () => {
+    expect(
+      submitClassResponseSchema.parse({
+        passed: true,
+        overallScore: 0.8,
+        passedSections: 4,
+        totalSections: 5,
+        sections: [{ id: 'sec-g', skill: 'GRAMMAR', score: 0.9, passed: true }],
+      }),
     ).toBeTruthy();
   });
 });

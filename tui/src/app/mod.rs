@@ -1,3 +1,4 @@
+mod class;
 mod state;
 mod ui;
 
@@ -21,9 +22,9 @@ use crate::event::Event;
 use crate::tui::Tui;
 
 use state::{
-    AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SkillChoice,
-    SpeakingPhase, View, answer_current, can_review_vocab, cursor_down, cursor_up, list_down,
-    list_up, poll_is_terminal, reduce_speaking_poll, reduce_start,
+    AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SectionProgress,
+    SkillChoice, SpeakingPhase, View, WritingPhase, answer_current, can_review_vocab, cursor_down,
+    cursor_up, list_down, list_up, poll_is_terminal, reduce_speaking_poll, reduce_start,
 };
 
 /// The interactive Sotto client. Owns the session [`Config`], the [`Api`] seam
@@ -50,6 +51,9 @@ pub(crate) struct App {
     /// Microphone capture for speaking. Always present (idle until `start`);
     /// device failures surface from `start`/`stop`, not construction.
     recorder: Recorder,
+    /// The course carried across the `next-class` round trip, so the resolved
+    /// class (or the done screen) can keep offering "next class".
+    pending_course: Option<Course>,
 }
 
 impl App {
@@ -77,6 +81,7 @@ impl App {
             request_gen: 0,
             player: None,
             recorder: Recorder::new(),
+            pending_course: None,
         }
     }
 
@@ -137,6 +142,11 @@ impl App {
             Action::ToggleRecord => self.on_toggle_record(),
             Action::ScrollUp => self.on_scroll(false),
             Action::ScrollDown => self.on_scroll(true),
+            Action::Input(c) => self.on_writing_input(c),
+            Action::InputNewline => self.on_writing_newline(),
+            Action::InputBackspace => self.on_writing_backspace(),
+            Action::SubmitText => self.on_writing_submit(),
+            Action::NextClass => self.on_next_class(),
             Action::CoursesLoaded(req_gen, result) => self.on_courses_loaded(req_gen, result),
             Action::DueLoaded(req_gen, result) => self.on_due_loaded(req_gen, result),
             Action::PracticeStarted(req_gen, result) => self.on_practice_started(req_gen, result),
@@ -145,6 +155,26 @@ impl App {
             Action::AudioDownloaded(req_gen, result) => self.on_audio_downloaded(req_gen, result),
             Action::SpeakingUploaded(req_gen, result) => self.on_speaking_uploaded(req_gen, result),
             Action::SpeakingPolled(req_gen, result) => self.on_speaking_polled(req_gen, result),
+            Action::NextClassResolved(req_gen, result) => {
+                self.on_next_class_resolved(req_gen, result)
+            }
+            Action::ClassLoaded(req_gen, result) => self.on_class_loaded(req_gen, result),
+            Action::ClassSubmitted(req_gen, result) => self.on_class_submitted(req_gen, result),
+            Action::ClassEpisodeLoaded(req_gen, result) => {
+                self.on_class_episode_loaded(req_gen, result)
+            }
+            Action::ClassAudioDownloaded(req_gen, result) => {
+                self.on_class_audio_downloaded(req_gen, result)
+            }
+            Action::ClassSpeakingUploaded(req_gen, result) => {
+                self.on_class_speaking_uploaded(req_gen, result)
+            }
+            Action::ClassSpeakingPolled(req_gen, result) => {
+                self.on_class_speaking_polled(req_gen, result)
+            }
+            Action::ClassWritingGraded(req_gen, result) => {
+                self.on_class_writing_graded(req_gen, result)
+            }
         }
         Ok(())
     }
@@ -172,19 +202,54 @@ impl App {
             return Some(Action::Quit);
         }
 
+        // Writing editor: capture text input. Ctrl-D submits; Esc backs out.
+        if self.in_writing_editing() {
+            return match key.code {
+                KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    Some(Action::SubmitText)
+                }
+                KeyCode::Esc => Some(Action::Back),
+                KeyCode::Enter => Some(Action::InputNewline),
+                KeyCode::Backspace => Some(Action::InputBackspace),
+                KeyCode::Char(c) => Some(Action::Input(c)),
+                _ => None,
+            };
+        }
+
+        // Writing submission failed: `r` or Ctrl-D resubmits the preserved text.
+        if self.in_writing_failed()
+            && (matches!(key.code, KeyCode::Char('r'))
+                || (matches!(key.code, KeyCode::Char('d'))
+                    && key.modifiers.contains(KeyModifiers::CONTROL)))
+        {
+            return Some(Action::SubmitText);
+        }
+
         // Screen-specific keys take priority over the generic mapping below.
         match &self.view {
             // Persistent error screen: `r` retries the failed action.
             View::Error { .. } if matches!(key.code, KeyCode::Char('r')) => {
                 return Some(Action::Retry);
             }
-            // Listening: space toggles playback (it would otherwise Select).
-            View::ListeningReview { .. } if matches!(key.code, KeyCode::Char(' ')) => {
+            // Listening (standalone or class section): space toggles playback.
+            _ if self.audio_screen() && matches!(key.code, KeyCode::Char(' ')) => {
                 return Some(Action::PlayPause);
             }
-            // Speaking: `r` toggles recording.
-            View::SpeakingReview { .. } if matches!(key.code, KeyCode::Char('r')) => {
+            // Speaking (standalone or class section): `r` toggles recording.
+            _ if self.speaking_screen() && matches!(key.code, KeyCode::Char('r')) => {
                 return Some(Action::ToggleRecord);
+            }
+            // Class result: `n` continues to the next class.
+            View::ClassOutcome { .. } | View::ClassDone { .. }
+                if matches!(key.code, KeyCode::Char('n')) =>
+            {
+                return Some(Action::NextClass);
+            }
+            // CourseHome: `c` continues the course (start/resume the next class).
+            View::CourseHome {
+                starting: false, ..
+            } if matches!(key.code, KeyCode::Char('c')) => {
+                return Some(Action::NextClass);
             }
             _ => {}
         }
@@ -213,9 +278,69 @@ impl App {
         }
     }
 
+    /// True when the current screen plays audio (standalone listening or a class
+    /// listening section), so space maps to play/pause.
+    fn audio_screen(&self) -> bool {
+        matches!(self.view, View::ListeningReview { .. })
+            || matches!(
+                self.current_section().map(|s| &s.progress),
+                Some(SectionProgress::Listening { .. })
+            )
+    }
+
+    /// True when the current screen records speech (standalone speaking or a
+    /// class speaking section), so `r` maps to record toggle.
+    fn speaking_screen(&self) -> bool {
+        matches!(self.view, View::SpeakingReview { .. })
+            || matches!(
+                self.current_section().map(|s| &s.progress),
+                Some(SectionProgress::Speaking { .. })
+            )
+    }
+
+    /// True when the current class section is a writing prompt being edited.
+    fn in_writing_editing(&self) -> bool {
+        matches!(
+            self.current_section().map(|s| &s.progress),
+            Some(SectionProgress::Writing {
+                phase: WritingPhase::Editing,
+                ..
+            })
+        )
+    }
+
+    /// True when the current writing section's submission failed (retryable).
+    fn in_writing_failed(&self) -> bool {
+        matches!(
+            self.current_section().map(|s| &s.progress),
+            Some(SectionProgress::Writing {
+                phase: WritingPhase::Failed { .. },
+                ..
+            })
+        )
+    }
+
+    /// The class section the learner is currently on, if in a `Class`.
+    fn current_section(&self) -> Option<&state::ClassSection> {
+        if let View::Class {
+            sections: Some(sections),
+            cursor,
+            ..
+        } = &self.view
+        {
+            sections.get(*cursor)
+        } else {
+            None
+        }
+    }
+
     // --- Input handlers ----------------------------------------------------
 
     fn on_up(&mut self) {
+        if matches!(self.view, View::Class { .. }) {
+            self.class_cursor_move(true);
+            return;
+        }
         match &mut self.view {
             View::Courses { cursor, .. } => {
                 *cursor = list_up(*cursor);
@@ -238,6 +363,10 @@ impl App {
     }
 
     fn on_down(&mut self) {
+        if matches!(self.view, View::Class { .. }) {
+            self.class_cursor_move(false);
+            return;
+        }
         match &mut self.view {
             View::Courses { courses, cursor } => {
                 *cursor = list_down(*cursor, courses.len());
@@ -272,8 +401,12 @@ impl App {
     }
 
     /// Scroll the current item's prompt (PageUp/PageDown), for long reading
-    /// passages. Only `ItemReview` has a scrollable prompt; clamps at 0.
+    /// passages. `ItemReview` and class MC sections have scrollable prompts.
     fn on_scroll(&mut self, down: bool) {
+        if matches!(self.view, View::Class { .. }) {
+            self.class_scroll(down);
+            return;
+        }
         if let View::ItemReview { prompt_scroll, .. } = &mut self.view {
             *prompt_scroll = if down {
                 prompt_scroll.saturating_add(1)
@@ -342,6 +475,8 @@ impl App {
                 }
             }
             View::Result { .. } => self.dismiss_result(),
+            View::Class { .. } => self.class_on_select(),
+            View::ClassOutcome { .. } | View::ClassDone { .. } => self.on_next_class(),
             View::Loading | View::Error { .. } => {}
         }
     }
@@ -349,6 +484,10 @@ impl App {
     fn on_choose(&mut self, n: usize) {
         // `n` is 1-based from the number keys.
         let index = n.saturating_sub(1);
+        if matches!(self.view, View::Class { .. }) {
+            self.class_on_choose(index);
+            return;
+        }
         match &self.view {
             View::Courses { courses, .. } => {
                 if let Some(course) = courses.get(index).cloned() {
@@ -391,7 +530,10 @@ impl App {
             View::ItemReview { course, .. }
             | View::ListeningReview { course, .. }
             | View::SpeakingReview { course, .. }
-            | View::Result { course, .. } => {
+            | View::Result { course, .. }
+            | View::Class { course, .. }
+            | View::ClassOutcome { course, .. }
+            | View::ClassDone { course, .. } => {
                 let course = course.clone();
                 // Stop any audio/recording before leaving a review screen.
                 self.stop_audio();
@@ -592,6 +734,10 @@ impl App {
     /// Toggle play/pause on the listening screen. The first press downloads and
     /// plays the episode audio; subsequent presses pause/resume.
     fn on_play_pause(&mut self) {
+        if matches!(self.view, View::Class { .. }) {
+            self.class_play_pause();
+            return;
+        }
         let url = match &self.view {
             View::ListeningReview { episode, .. } => {
                 episode.as_ref().and_then(|e| e.audio_url.clone())
@@ -636,6 +782,10 @@ impl App {
     /// Start or stop a recording on the speaking screen. Start → `Recording`;
     /// stop → encode WAV, upload, then poll grading. Guards re-entry by phase.
     fn on_toggle_record(&mut self) {
+        if matches!(self.view, View::Class { .. }) {
+            self.class_toggle_record();
+            return;
+        }
         let phase = match &self.view {
             View::SpeakingReview { phase, .. } => phase.clone(),
             _ => return,
@@ -1021,7 +1171,7 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{Api, types};
+    use crate::api::{Api, NextClassOutcome, types};
     use async_trait::async_trait;
     use std::sync::Arc;
 
@@ -1109,6 +1259,76 @@ mod tests {
 
         async fn download(&self, _url: &str) -> Result<Vec<u8>> {
             Ok(Vec::new())
+        }
+
+        async fn next_class(&self, _course_id: &str) -> Result<NextClassOutcome> {
+            Ok(NextClassOutcome::Done)
+        }
+
+        async fn class(&self, _class_id: &str) -> Result<types::ClassDetailResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "id": "cls-stub",
+                "status": "IN_PROGRESS",
+                "order": 1,
+                "passThreshold": 0.7,
+                "submitted": false,
+                "sections": []
+            }))
+            .expect("valid class JSON"))
+        }
+
+        async fn submit_class(
+            &self,
+            _class_id: &str,
+            _answers: Vec<types::SubmitClassRequestAnswersItem>,
+        ) -> Result<types::SubmitClassResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "passed": true,
+                "overallScore": 1.0,
+                "passedSections": 1,
+                "totalSections": 1,
+                "sections": []
+            }))
+            .expect("valid submit-class JSON"))
+        }
+
+        async fn upload_class_speaking(
+            &self,
+            _class_id: &str,
+            _prompt_id: &str,
+            _wav: Vec<u8>,
+        ) -> Result<SpeakingUploadResponse> {
+            Ok(SpeakingUploadResponse {
+                recording_id: "rec-stub".into(),
+                status: "PENDING".into(),
+            })
+        }
+
+        async fn poll_class_speaking(
+            &self,
+            _class_id: &str,
+            _prompt_id: &str,
+            _recording_id: &str,
+        ) -> Result<types::SpeakingPollResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "status": "PENDING",
+                "overallScore": null,
+                "transcript": null,
+                "feedback": null
+            }))
+            .expect("valid poll JSON"))
+        }
+
+        async fn submit_class_writing(
+            &self,
+            _class_id: &str,
+            _prompt_id: &str,
+            _text: String,
+        ) -> Result<crate::api::WritingGradeResponse> {
+            Ok(crate::api::WritingGradeResponse {
+                overall_score: 0.9,
+                feedback: "Good.".into(),
+            })
         }
     }
 
@@ -1300,5 +1520,355 @@ mod tests {
         // Retrying re-dispatches the fetch and returns to Loading.
         app.on_retry();
         assert!(matches!(app.view, View::Loading));
+    }
+
+    // --- P6b: classes (hermetic, no device/network) -----------------------
+
+    fn next_outcome(outcome: NextClassOutcome) -> ApiResult<NextClassOutcome> {
+        Arc::new(Ok(outcome))
+    }
+
+    fn class_detail(json: serde_json::Value) -> ApiResult<types::ClassDetailResponse> {
+        Arc::new(Ok(serde_json::from_value(json).expect("valid class JSON")))
+    }
+
+    #[tokio::test]
+    async fn next_class_done_shows_the_course_complete_screen() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        // Start the class flow; the next-class resolver needs pending_course set.
+        app.on_next_class();
+        let req_gen = app.request_gen;
+
+        app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Done));
+
+        match &app.view {
+            View::ClassDone { course } => assert_eq!(course.id, "A"),
+            other => panic!("expected ClassDone, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn next_class_created_enters_the_class_and_loads_sections() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_next_class();
+        let req_gen = app.request_gen;
+
+        // next-class returns a class id -> enter Class (sections load next).
+        app.on_next_class_resolved(
+            req_gen,
+            next_outcome(NextClassOutcome::Created {
+                class_id: "cls1".into(),
+            }),
+        );
+        match &app.view {
+            View::Class {
+                class_id, sections, ..
+            } => {
+                assert_eq!(class_id, "cls1");
+                assert!(sections.is_none(), "sections load separately");
+            }
+            other => panic!("expected Class, got {other:?}"),
+        }
+
+        // The class detail lands and the sections populate, in order.
+        let load_gen = app.request_gen;
+        app.on_class_loaded(
+            load_gen,
+            class_detail(serde_json::json!({
+                "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+                "submitted": false,
+                "sections": [
+                    { "id": "sec-g", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                      "prompts": [], "writingPrompts": [],
+                      "questions": [{ "id": "g0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+                ]
+            })),
+        );
+        match &app.view {
+            View::Class {
+                sections: Some(sections),
+                ..
+            } => assert_eq!(sections.len(), 1),
+            other => panic!("expected loaded Class, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn malformed_class_backs_out_to_course_home() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.view = View::class_view(course("A"), "cls1".into());
+        let req_gen = app.request_gen;
+
+        // Empty sections -> malformed -> back to CourseHome.
+        app.on_class_loaded(
+            req_gen,
+            class_detail(serde_json::json!({
+                "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+                "submitted": false, "sections": []
+            })),
+        );
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    #[tokio::test]
+    async fn class_submit_result_shows_pass_and_offers_next_class() {
+        let mut app = test_app();
+        app.view = View::class_view(course("A"), "cls1".into());
+        let req_gen = app.request_gen;
+
+        let resp: ApiResult<types::SubmitClassResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "passed": true, "overallScore": 0.85, "passedSections": 5, "totalSections": 5,
+                "sections": []
+            }))
+            .expect("valid submit")));
+        app.on_class_submitted(req_gen, resp);
+
+        match &app.view {
+            View::ClassOutcome { result, .. } => {
+                assert!(result.passed);
+                assert_eq!(result.overall_score, 85);
+            }
+            other => panic!("expected ClassOutcome, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_class_result_for_a_previous_class_is_ignored() {
+        let mut app = test_app();
+        app.view = View::class_view(course("A"), "cls1".into());
+        let stale_gen = app.request_gen;
+        // Navigate away (bumps gen) before the submit result lands.
+        app.enter_course_home(course("A"));
+
+        let resp: ApiResult<types::SubmitClassResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "passed": true, "overallScore": 1.0, "passedSections": 1, "totalSections": 1,
+                "sections": []
+            }))
+            .expect("valid")));
+        app.on_class_submitted(stale_gen, resp);
+
+        // The stale result must NOT replace the CourseHome with a class outcome.
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    /// Build a `Class` view whose sections are loaded from `sections` JSON.
+    fn class_with_sections(sections: serde_json::Value) -> View {
+        let cls: types::ClassDetailResponse = serde_json::from_value(serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": sections
+        }))
+        .expect("valid class");
+        let built = state::class_sections(&cls).expect("well-formed sections");
+        View::Class {
+            course: course("A"),
+            class_id: "cls1".into(),
+            sections: Some(built),
+            cursor: 0,
+            submitting: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn second_submit_enter_while_submitting_does_not_dispatch_twice() {
+        // A single one-question grammar section: answering it submits the class.
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-g", "skill": "GRAMMAR", "status": "READY", "episode": null,
+              "prompts": [], "writingPrompts": [],
+              "questions": [{ "id": "g0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+        ]));
+
+        let before = app.request_gen;
+        app.on_select(); // answers the only question -> submits the class
+        let after_first = app.request_gen;
+        assert_eq!(after_first, before + 1, "first submit dispatches once");
+        assert!(
+            matches!(
+                app.view,
+                View::Class {
+                    submitting: true,
+                    ..
+                }
+            ),
+            "submit marked in flight"
+        );
+
+        app.on_select(); // key-mash while submitting: must be ignored
+        assert_eq!(
+            app.request_gen, after_first,
+            "a second Enter while submitting must not dispatch again"
+        );
+    }
+
+    #[tokio::test]
+    async fn writing_failure_can_be_retried() {
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-w", "skill": "WRITING", "status": "READY", "episode": null,
+              "questions": [], "prompts": [],
+              "writingPrompts": [{ "id": "w0", "order": 0, "task": "Write", "guidance": null, "response": null }] }
+        ]));
+
+        // Type something and submit.
+        for c in "hola".chars() {
+            app.on_writing_input(c);
+        }
+        app.on_writing_submit();
+        assert!(
+            matches!(
+                app.current_section().map(|s| &s.progress),
+                Some(SectionProgress::Writing {
+                    phase: WritingPhase::Submitting,
+                    ..
+                })
+            ),
+            "submit marks the writing in flight"
+        );
+
+        // Grading fails.
+        let req_gen = app.request_gen;
+        let err: ApiResult<crate::api::WritingGradeResponse> = Arc::new(Err("grader down".into()));
+        app.on_class_writing_graded(req_gen, err);
+        assert!(app.in_writing_failed(), "failure -> Failed phase");
+
+        // The preserved text can be resubmitted from Failed (the retry path).
+        let before = app.request_gen;
+        app.on_writing_submit();
+        assert_eq!(
+            app.request_gen,
+            before + 1,
+            "retry re-dispatches the submit"
+        );
+        assert!(
+            matches!(
+                app.current_section().map(|s| &s.progress),
+                Some(SectionProgress::Writing {
+                    phase: WritingPhase::Submitting,
+                    ..
+                })
+            ),
+            "retry returns to Submitting"
+        );
+    }
+
+    #[tokio::test]
+    async fn stale_episode_for_a_previous_section_is_ignored() {
+        // Section 0 listening, section 1 listening: advancing bumps the gen, so a
+        // late episode load for section 0 must not attach to section 1.
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-l0", "skill": "LISTENING", "status": "READY",
+              "episode": { "id": "ep0", "audioUrl": null, "title": "First", "references": [] },
+              "prompts": [], "writingPrompts": [],
+              "questions": [{ "id": "q0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] },
+            { "id": "sec-l1", "skill": "LISTENING", "status": "READY",
+              "episode": { "id": "ep1", "audioUrl": null, "title": "Second", "references": [] },
+              "prompts": [], "writingPrompts": [],
+              "questions": [{ "id": "q1", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+        ]));
+        // Capture section 0's in-flight generation, then answer to advance to
+        // section 1 (which bumps the generation).
+        let stale_gen = app.request_gen;
+        app.on_select(); // answers q0 (last in section 0) -> advance to section 1
+
+        // A late episode load for section 0, tagged with the stale generation.
+        let ep0: ApiResult<types::EpisodeDetailResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "id": "ep0", "title": "First", "status": "READY", "audioUrl": null,
+                "duration": null, "language": "es", "segments": []
+            }))
+            .expect("valid episode")));
+        app.on_class_episode_loaded(stale_gen, ep0);
+
+        // Section 1 is current; its episode must remain unloaded (the stale ep0
+        // result was dropped, not attached to section 1).
+        match app.current_section().map(|s| &s.progress) {
+            Some(SectionProgress::Listening { episode, .. }) => {
+                assert!(
+                    episode.is_none(),
+                    "stale episode for section 0 must not attach to section 1"
+                );
+            }
+            other => panic!("expected listening section 1, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn no_mc_transcript_only_class_advances_instead_of_stalling() {
+        // A class with a single transcript-only listening section (no MC
+        // questions). Completing it must advance via next-class, not stall on
+        // View::Class. The submit route rejects empty answers (.min(1)), so this
+        // class cannot be submitted; the no-MC path re-resolves via next-class.
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-l", "skill": "LISTENING", "status": "READY",
+              "episode": { "id": "ep0", "audioUrl": null, "title": "Listen", "references": [] },
+              "prompts": [], "writingPrompts": [], "questions": [] }
+        ]));
+
+        let before = app.request_gen;
+        // Enter on the transcript-only section -> it is the last section -> the
+        // no-MC completion path dispatches next-class.
+        app.on_select();
+
+        // It must NOT stall on View::Class; the next-class dispatch shows Loading
+        // and bumps the generation.
+        assert!(
+            matches!(app.view, View::Loading),
+            "no-MC class must advance (Loading after next-class dispatch), not stall on Class"
+        );
+        assert_eq!(
+            app.request_gen,
+            before + 1,
+            "next-class dispatch bumps the gen"
+        );
+
+        // The next-class result drives the outcome (here the stub reports done).
+        let req_gen = app.request_gen;
+        app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Done));
+        assert!(
+            matches!(app.view, View::ClassDone { .. }),
+            "no-MC completion resolves to an advance/outcome screen"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_mc_speaking_only_class_advances_after_last_prompt() {
+        // A speaking-only class: after the last prompt is graded, Enter advances
+        // past the final section into the no-MC completion path (next-class).
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-s", "skill": "SPEAKING", "status": "READY", "episode": null,
+              "questions": [], "writingPrompts": [],
+              "prompts": [{ "id": "s0", "order": 0, "targetPhrase": "Hola", "translation": "Hi", "ipa": null, "referenceTtsUrl": null }] }
+        ]));
+        // Mark the single prompt graded so Enter advances the section.
+        if let Some(section) = app.current_section_mut()
+            && let state::SectionProgress::Speaking { phase, .. } = &mut section.progress
+        {
+            *phase = state::SpeakingPhase::Graded {
+                score: Some(90),
+                transcript: None,
+                feedback: None,
+            };
+        }
+
+        let before = app.request_gen;
+        app.on_select(); // last graded prompt -> advance past last section -> next-class
+
+        assert!(
+            matches!(app.view, View::Loading),
+            "speaking-only class must advance, not stall"
+        );
+        assert_eq!(
+            app.request_gen,
+            before + 1,
+            "advance dispatches next-class once"
+        );
     }
 }

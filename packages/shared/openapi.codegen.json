@@ -1356,49 +1356,6 @@
         ]
       }
     },
-    "/api/v1/courses/{courseId}/next-class": {
-      "post": {
-        "operationId": "nextClass",
-        "summary": "Create/advance to the next gated class (or report the course done).",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NextClassDoneResponse"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NextClassCreatedResponse"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "courseId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/v1/classes/{classId}": {
       "get": {
         "operationId": "getClass",
