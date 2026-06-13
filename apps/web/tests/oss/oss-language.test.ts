@@ -401,7 +401,7 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('uses the neutral verification workspace namespace', () => {
-    const verificationNamespaceSources = [
+    const namespaceFiles = [
       'apps/web/package.json',
       'apps/web/next.config.js',
       'apps/web/src/lib/CLAUDE.md',
@@ -417,14 +417,25 @@ describe('open-source language-learning OSS surfaces', () => {
       'packages/verification-standard/CONTRIBUTING.md',
       'packages/verification-standard/CHANGELOG.md',
       'packages/verification-standard/LICENSE',
-    ]
+    ];
+
+    // The published package always uses the neutral @sotto npm scope, never @sottofm.
+    const verificationNamespaceSources = namespaceFiles
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-
     expect(verificationNamespaceSources).toContain('@sotto/verification-standard');
     expect(verificationNamespaceSources).not.toContain('@sottofm/verification-standard');
-    expect(verificationNamespaceSources).not.toContain('github.com/SottoFM');
-    expect(verificationNamespaceSources).not.toContain('SottoFM');
+
+    // The Sotto monorepo's own files must not reference the SottoFM org. The
+    // vendored verification-standard submodule legitimately points its own
+    // repository metadata at its public home (SottoFM/reference-verification-standard),
+    // so it is excluded from the org-neutrality check.
+    const monorepoOwnSources = namespaceFiles
+      .filter((file) => !file.startsWith('packages/verification-standard/'))
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    expect(monorepoOwnSources).not.toContain('github.com/SottoFM');
+    expect(monorepoOwnSources).not.toContain('SottoFM');
   });
 
   it('keeps security and operations guidance self-host neutral', () => {
