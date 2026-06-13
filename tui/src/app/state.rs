@@ -151,6 +151,124 @@ pub(crate) enum RetryKind {
     Courses,
 }
 
+/// The skills the terminal can start from the CourseHome menu. Vocab, listening,
+/// and speaking are wired in P5; grammar/reading/writing are added in P6 and
+/// route to a "not in the terminal yet" notice via [`reduce_start`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SkillChoice {
+    Vocab,
+    Listening,
+    Speaking,
+}
+
+impl SkillChoice {
+    /// Menu order, top to bottom.
+    pub const MENU: [SkillChoice; 3] = [
+        SkillChoice::Vocab,
+        SkillChoice::Listening,
+        SkillChoice::Speaking,
+    ];
+
+    /// The practice kind to request when this skill is started.
+    pub fn kind(self) -> types::PracticeKind {
+        match self {
+            SkillChoice::Vocab => types::PracticeKind::Vocab,
+            SkillChoice::Listening => types::PracticeKind::Listening,
+            SkillChoice::Speaking => types::PracticeKind::Speaking,
+        }
+    }
+
+    /// Menu label.
+    pub fn label(self) -> &'static str {
+        match self {
+            SkillChoice::Vocab => "Vocabulary review",
+            SkillChoice::Listening => "Listening",
+            SkillChoice::Speaking => "Speaking",
+        }
+    }
+}
+
+/// One ordered listening segment: speaker + text, with an optional playable URL.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ListeningSegment {
+    pub speaker: String,
+    pub text: String,
+    pub audio_url: Option<String>,
+}
+
+impl From<&types::EpisodeSegment> for ListeningSegment {
+    fn from(seg: &types::EpisodeSegment) -> Self {
+        Self {
+            speaker: seg.speaker.clone(),
+            text: seg.text.clone(),
+            audio_url: seg.audio_url.clone(),
+        }
+    }
+}
+
+/// The fetched episode for a listening session, reduced to what the screen
+/// renders/plays. Segments are kept in the order the route returned them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EpisodeDetail {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    /// Stitched full-episode audio, resolved to a playable URL when ready.
+    pub audio_url: Option<String>,
+    pub segments: Vec<ListeningSegment>,
+}
+
+impl From<&types::EpisodeDetailResponse> for EpisodeDetail {
+    fn from(ep: &types::EpisodeDetailResponse) -> Self {
+        Self {
+            id: ep.id.clone(),
+            title: ep.title.clone(),
+            status: ep.status.to_string(),
+            audio_url: ep.audio_url.clone(),
+            segments: ep.segments.iter().map(ListeningSegment::from).collect(),
+        }
+    }
+}
+
+/// One speaking prompt the learner says aloud.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SpeakingPrompt {
+    pub id: String,
+    pub target_phrase: String,
+    pub translation: String,
+}
+
+impl From<&types::PracticeSpeakingPrompt> for SpeakingPrompt {
+    fn from(p: &types::PracticeSpeakingPrompt) -> Self {
+        Self {
+            id: p.id.clone(),
+            target_phrase: p.target_phrase.clone(),
+            translation: p.translation.clone(),
+        }
+    }
+}
+
+/// The grading lifecycle of the current speaking prompt's attempt.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SpeakingPhase {
+    /// No attempt yet (or moved to a fresh prompt); `r` starts recording.
+    Idle,
+    /// Microphone capture is live; `r`/enter stops and uploads.
+    Recording,
+    /// Upload in flight.
+    Uploading,
+    /// Grading poll loop in flight for `recording_id`.
+    Polling { recording_id: String },
+    /// Grading finished.
+    Graded {
+        score: Option<u32>,
+        transcript: Option<String>,
+        feedback: Option<String>,
+    },
+    /// Grading failed (server-reported FAILED or an error).
+    Failed { message: String },
+}
+
 /// The score returned after submitting a completed review.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PracticeResult {
@@ -179,10 +297,12 @@ pub(crate) enum View {
     Error { message: String, retry: RetryKind },
     /// The learner's courses, with a cursor for selection.
     Courses { courses: Vec<Course>, cursor: usize },
-    /// A selected course: due counts plus a single "start vocab review" action.
+    /// A selected course: due counts plus a skill menu (vocab/listening/speaking).
     CourseHome {
         course: Course,
         due: DueCounts,
+        /// Highlighted skill in the menu.
+        menu_cursor: usize,
         /// Set when a start attempt came back `unavailable`/malformed.
         notice: Option<Unavailable>,
         /// True while a start request for this course is in flight; blocks a
@@ -204,7 +324,33 @@ pub(crate) enum View {
         /// dispatch and shows a "submitting…" hint.
         submitting: bool,
     },
-    /// The graded outcome of a completed review.
+    /// An in-progress listening session: play the episode audio, read the
+    /// transcript, and (when the session has comprehension items) answer them.
+    ListeningReview {
+        course: Course,
+        session_id: String,
+        episode_id: String,
+        /// The fetched episode; `None` while the episode load is in flight.
+        episode: Option<EpisodeDetail>,
+        /// Comprehension items, if the session has any (else transcript-only).
+        items: Vec<VocabItem>,
+        index: usize,
+        cursor: usize,
+        selected: Vec<Option<usize>>,
+        submitting: bool,
+        /// Last play/pause status line shown to the learner.
+        audio_note: Option<String>,
+    },
+    /// An in-progress speaking session: one prompt at a time, record → upload →
+    /// poll grading → show score/feedback → next prompt.
+    SpeakingReview {
+        course: Course,
+        session_id: String,
+        prompts: Vec<SpeakingPrompt>,
+        index: usize,
+        phase: SpeakingPhase,
+    },
+    /// The graded outcome of a completed (vocab/listening) review.
     Result {
         course: Course,
         result: PracticeResult,
@@ -225,6 +371,7 @@ impl View {
         View::CourseHome {
             course,
             due: DueCounts::default(),
+            menu_cursor: 0,
             notice: None,
             starting: false,
         }
@@ -243,18 +390,59 @@ impl View {
             submitting: false,
         }
     }
+
+    /// Start a listening session from a `ready` (LISTENING) response. The
+    /// episode is fetched separately; `episode` is `None` until it loads.
+    pub fn start_listening(
+        course: Course,
+        session_id: String,
+        episode_id: String,
+        items: Vec<VocabItem>,
+    ) -> Self {
+        let selected = vec![None; items.len()];
+        View::ListeningReview {
+            course,
+            session_id,
+            episode_id,
+            episode: None,
+            items,
+            index: 0,
+            cursor: 0,
+            selected,
+            submitting: false,
+            audio_note: None,
+        }
+    }
+
+    /// Start a speaking session from a `ready_speaking` response.
+    pub fn start_speaking(
+        course: Course,
+        session_id: String,
+        prompts: Vec<SpeakingPrompt>,
+    ) -> Self {
+        View::SpeakingReview {
+            course,
+            session_id,
+            prompts,
+            index: 0,
+            phase: SpeakingPhase::Idle,
+        }
+    }
 }
 
 /// Reduce a start-practice response against the current `CourseHome` view.
 ///
-/// Routing is kind-aware so later phases plug in cleanly:
-/// - `ready` with `kind = VOCAB` and well-formed items → `VocabReview`.
-/// - `ready` with any other kind → a "not available in the terminal yet"
-///   notice on `CourseHome` (P6 will add those skills).
-/// - `ready` that is empty or has a zero-option item → a `Malformed` notice;
-///   we never enter a review we cannot answer honestly.
+/// Routing is kind-aware so each skill enters its own screen:
+/// - `ready` `VOCAB` with well-formed items → `VocabReview`.
+/// - `ready` `LISTENING` with an `episodeId` → `ListeningReview` (items, if any,
+///   must each have options; a zero-option item is `Malformed`).
+/// - `ready_speaking` → `SpeakingReview` (must carry at least one prompt).
+/// - `ready` `GRAMMAR`/`READING`/`WRITING` → a "not available in the terminal
+///   yet" notice on `CourseHome` (P6 adds those skills).
+/// - `ready` that is empty/malformed for its skill → a `Malformed` notice; we
+///   never enter a review we cannot present honestly.
 /// - `unavailable` → the server's reason as a notice.
-/// - speaking/writing ready shapes → a not-in-terminal notice.
+/// - `ready_writing` → a not-in-terminal notice.
 ///
 /// In every non-review case the learner stays on `CourseHome` (the start
 /// in-flight flag is cleared). If `view` is not a `CourseHome`, it is returned
@@ -266,22 +454,24 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
 
     match resp {
         types::StartPracticeResponse::Ready(ready) => match ready.kind {
-            types::PracticeKind::Vocab => match validate_vocab_items(&ready.items) {
+            types::PracticeKind::Vocab => match validate_choice_items(&ready.items) {
                 Some(items) => View::start_vocab(course, ready.session_id.clone(), items),
                 None => course_home_notice(course, due, Unavailable::Malformed),
             },
+            types::PracticeKind::Listening => reduce_listening(course, due, ready),
             other => course_home_notice(course, due, Unavailable::NotInTerminal(skill_name(other))),
         },
+        types::StartPracticeResponse::ReadySpeaking(ready) => {
+            if ready.prompts.is_empty() {
+                course_home_notice(course, due, Unavailable::Malformed)
+            } else {
+                let prompts = ready.prompts.iter().map(SpeakingPrompt::from).collect();
+                View::start_speaking(course, ready.session_id.clone(), prompts)
+            }
+        }
         types::StartPracticeResponse::Unavailable(unavailable) => {
             course_home_notice(course, due, Unavailable::from(unavailable.reason))
         }
-        // VOCAB never resolves to a speaking/writing shape, but route the same
-        // not-in-terminal way rather than crashing if the server ever does.
-        types::StartPracticeResponse::ReadySpeaking(_) => course_home_notice(
-            course,
-            due,
-            Unavailable::NotInTerminal(skill_name(types::PracticeKind::Speaking)),
-        ),
         types::StartPracticeResponse::ReadyWriting(_) => course_home_notice(
             course,
             due,
@@ -290,11 +480,26 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
     }
 }
 
-/// Validate a `ready` vocab payload before it becomes a review. Returns the
+/// Reduce a `ready` LISTENING response: requires an `episodeId` (else malformed)
+/// and well-formed comprehension items if any are present (transcript-only
+/// listening with zero items is valid).
+fn reduce_listening(course: Course, due: DueCounts, ready: &types::StartPracticeReady) -> View {
+    let Some(episode_id) = ready.episode_id.clone() else {
+        return course_home_notice(course, due, Unavailable::Malformed);
+    };
+    // Items are optional for listening, but any present must be answerable.
+    if ready.items.iter().any(|item| item.options.is_empty()) {
+        return course_home_notice(course, due, Unavailable::Malformed);
+    }
+    let items = ready.items.iter().map(VocabItem::from).collect();
+    View::start_listening(course, ready.session_id.clone(), episode_id, items)
+}
+
+/// Validate a multiple-choice payload before it becomes a review. Returns the
 /// converted items only when the set is non-empty and every item has at least
 /// one answer option; otherwise `None` (malformed). A zero-option item would
 /// let Enter record a fabricated answer, so it is rejected here at ingestion.
-fn validate_vocab_items(items: &[types::PracticeItem]) -> Option<Vec<VocabItem>> {
+fn validate_choice_items(items: &[types::PracticeItem]) -> Option<Vec<VocabItem>> {
     if items.is_empty() {
         return None;
     }
@@ -308,9 +513,48 @@ fn course_home_notice(course: Course, due: DueCounts, reason: Unavailable) -> Vi
     View::CourseHome {
         course,
         due,
+        menu_cursor: 0,
         notice: Some(reason),
         starting: false,
     }
+}
+
+/// Map a speaking grading poll result to the next [`SpeakingPhase`]:
+/// - `SCORED` → `Graded` with the (rounded percent) score, transcript, feedback.
+/// - `FAILED` → `Failed`.
+/// - `PENDING`/`GRADING` → still `Polling` for the same `recording_id` (the App
+///   schedules another poll). Pure: no network, no timers.
+pub(crate) fn reduce_speaking_poll(
+    recording_id: &str,
+    resp: &types::SpeakingPollResponse,
+) -> SpeakingPhase {
+    match resp.status {
+        types::SpeakingGradeStatus::Scored => SpeakingPhase::Graded {
+            // overallScore is 0..1; present it as a whole percentage.
+            score: resp
+                .overall_score
+                .map(|s| (s.clamp(0.0, 1.0) * 100.0).round() as u32),
+            transcript: resp.transcript.clone(),
+            feedback: resp.feedback.clone(),
+        },
+        types::SpeakingGradeStatus::Failed => SpeakingPhase::Failed {
+            message: "Grading failed for this attempt. Try recording again.".to_string(),
+        },
+        types::SpeakingGradeStatus::Pending | types::SpeakingGradeStatus::Grading => {
+            SpeakingPhase::Polling {
+                recording_id: recording_id.to_string(),
+            }
+        }
+    }
+}
+
+/// Whether a poll result is terminal (grading reached a final state), so the App
+/// can stop the poll loop.
+pub(crate) fn poll_is_terminal(phase: &SpeakingPhase) -> bool {
+    matches!(
+        phase,
+        SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. }
+    )
 }
 
 /// Whether a course's due counts allow starting a vocab review at all. We let
@@ -438,6 +682,7 @@ mod tests {
                 grammar: 0,
                 total_vocab: 12,
             },
+            menu_cursor: 0,
             notice: None,
             starting: false,
         }
@@ -738,5 +983,212 @@ mod tests {
         let next = reduce_start(view.clone(), &resp);
 
         assert_eq!(next, view);
+    }
+
+    fn poll_response(json: serde_json::Value) -> types::SpeakingPollResponse {
+        serde_json::from_value(json).expect("valid SpeakingPollResponse JSON")
+    }
+
+    #[test]
+    fn listening_ready_enters_listening_review_with_episode_id() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-listen",
+            "kind": "LISTENING",
+            "episodeId": "ep-1",
+            "items": [
+                { "id": "q1", "prompt": "What did they order?", "options": ["café", "té"] }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::ListeningReview {
+                session_id,
+                episode_id,
+                episode,
+                items,
+                selected,
+                ..
+            } => {
+                assert_eq!(session_id, "sess-listen");
+                assert_eq!(episode_id, "ep-1");
+                assert!(episode.is_none(), "episode loads separately");
+                assert_eq!(items.len(), 1);
+                assert_eq!(selected, vec![None]);
+            }
+            other => panic!("expected ListeningReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn listening_ready_with_no_episode_id_is_malformed() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-listen",
+            "kind": "LISTENING",
+            "items": []
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => {
+                assert_eq!(notice, Some(Unavailable::Malformed));
+            }
+            other => panic!("expected CourseHome (malformed), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn listening_transcript_only_with_no_items_is_allowed() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready",
+            "sessionId": "sess-listen",
+            "kind": "LISTENING",
+            "episodeId": "ep-2",
+            "items": []
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::ListeningReview { items, .. } => assert!(items.is_empty()),
+            other => panic!("expected ListeningReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn speaking_ready_enters_speaking_review_idle() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready_speaking",
+            "sessionId": "sess-speak",
+            "prompts": [
+                {
+                    "id": "p1",
+                    "targetPhrase": "Buenos días",
+                    "translation": "Good morning",
+                    "referenceTtsUrl": null
+                }
+            ]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::SpeakingReview {
+                session_id,
+                prompts,
+                index,
+                phase,
+                ..
+            } => {
+                assert_eq!(session_id, "sess-speak");
+                assert_eq!(prompts.len(), 1);
+                assert_eq!(prompts[0].target_phrase, "Buenos días");
+                assert_eq!(index, 0);
+                assert_eq!(phase, SpeakingPhase::Idle);
+            }
+            other => panic!("expected SpeakingReview, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn empty_speaking_ready_is_malformed() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready_speaking",
+            "sessionId": "sess-speak",
+            "prompts": []
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => {
+                assert_eq!(notice, Some(Unavailable::Malformed));
+            }
+            other => panic!("expected CourseHome (malformed), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn writing_ready_routes_to_not_in_terminal() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready_writing",
+            "sessionId": "sess-write",
+            "prompts": [{ "id": "w1", "task": "Describe your day", "guidance": null }]
+        }));
+
+        let next = reduce_start(course_home(), &resp);
+
+        match next {
+            View::CourseHome { notice, .. } => match notice {
+                Some(Unavailable::NotInTerminal(skill)) => assert_eq!(skill, "Writing"),
+                other => panic!("expected NotInTerminal, got {other:?}"),
+            },
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn speaking_poll_pending_stays_polling() {
+        let resp = poll_response(serde_json::json!({
+            "status": "PENDING",
+            "overallScore": null,
+            "transcript": null,
+            "feedback": null
+        }));
+
+        let phase = reduce_speaking_poll("rec-1", &resp);
+
+        assert_eq!(
+            phase,
+            SpeakingPhase::Polling {
+                recording_id: "rec-1".into()
+            }
+        );
+        assert!(!poll_is_terminal(&phase));
+    }
+
+    #[test]
+    fn speaking_poll_scored_becomes_graded_percent() {
+        let resp = poll_response(serde_json::json!({
+            "status": "SCORED",
+            "overallScore": 0.834,
+            "transcript": "Buenos días",
+            "feedback": "Nice rhythm."
+        }));
+
+        let phase = reduce_speaking_poll("rec-1", &resp);
+
+        match &phase {
+            SpeakingPhase::Graded {
+                score,
+                transcript,
+                feedback,
+            } => {
+                assert_eq!(*score, Some(83), "0.834 -> 83%");
+                assert_eq!(transcript.as_deref(), Some("Buenos días"));
+                assert_eq!(feedback.as_deref(), Some("Nice rhythm."));
+            }
+            other => panic!("expected Graded, got {other:?}"),
+        }
+        assert!(poll_is_terminal(&phase));
+    }
+
+    #[test]
+    fn speaking_poll_failed_becomes_failed() {
+        let resp = poll_response(serde_json::json!({
+            "status": "FAILED",
+            "overallScore": null,
+            "transcript": null,
+            "feedback": null
+        }));
+
+        let phase = reduce_speaking_poll("rec-1", &resp);
+
+        assert!(matches!(phase, SpeakingPhase::Failed { .. }));
+        assert!(poll_is_terminal(&phase));
     }
 }

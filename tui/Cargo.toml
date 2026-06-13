@@ -41,5 +41,10 @@ progenitor-client = "0.14"
 bytes = "1"
 futures-core = "0.3"
 
+# Audio: playback (rodio), capture (cpal), and WAV encoding (hound).
+rodio = "0.22"
+cpal = "0.18"
+hound = "3"
+
 [dev-dependencies]
 tempfile = "3"

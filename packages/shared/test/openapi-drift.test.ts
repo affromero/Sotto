@@ -7,9 +7,11 @@ import {
 import { endpoints } from '../src/contracts';
 import {
   coursesListResponseSchema,
+  episodeDetailResponseSchema,
   healthResponseSchema,
   practiceOverviewResponseSchema,
   redeemPairingResponseSchema,
+  speakingPollResponseSchema,
   startPracticeResponseSchema,
   submitPracticeResponseSchema,
 } from '../src/contracts/schemas';
@@ -34,9 +36,57 @@ describe('openapi.json drift guard', () => {
         'GET /api/v1/courses/{courseId}/practice',
         'POST /api/v1/courses/{courseId}/practice',
         'POST /api/v1/practice/{sessionId}/submit',
+        'GET /api/v1/episodes/{episodeId}',
+        'GET /api/v1/practice/{sessionId}/speaking/{promptId}',
         'POST /api/v1/auth/pair/redeem',
       ].sort(),
     );
+  });
+
+  it('declares the speaking poll recordingId query parameter', () => {
+    const doc = buildOpenApiDocument();
+    const op = (
+      doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>
+    )['/api/v1/practice/{sessionId}/speaking/{promptId}'].get;
+    expect(op.parameters).toContainEqual({
+      name: 'recordingId',
+      in: 'query',
+      required: true,
+      schema: { type: 'string' },
+    });
+  });
+
+  // The episode + speaking-poll schemas model a SUBSET of the route response,
+  // so they must be OPEN (not `additionalProperties: false`) or the contract
+  // lies about the superset the routes return. Exact-match schemas stay closed.
+  it('leaves subset-of-route response schemas open and exact-match ones closed', () => {
+    const doc = buildOpenApiDocument();
+    const schemas = (doc.components as Record<string, Record<string, unknown>>)
+      .schemas as Record<string, { additionalProperties?: unknown }>;
+
+    for (const open of [
+      'EpisodeSegment',
+      'EpisodeDetailResponse',
+      'SpeakingPollResponse',
+    ]) {
+      expect(schemas[open].additionalProperties).not.toBe(false);
+    }
+    for (const closed of [
+      'CoursesListResponse',
+      'PracticeOverviewResponse',
+      'SubmitPracticeResponse',
+      'StartPracticeReady',
+      'RedeemPairingResponse',
+    ]) {
+      expect(schemas[closed].additionalProperties).toBe(false);
+    }
+  });
+
+  it('EpisodeStatus covers the Prisma enum including TRANSCRIBING', () => {
+    const doc = buildOpenApiDocument();
+    const schemas = (doc.components as Record<string, Record<string, unknown>>)
+      .schemas as Record<string, { enum?: string[] }>;
+    expect(schemas.EpisodeStatus.enum).toContain('TRANSCRIBING');
   });
 });
 
@@ -130,6 +180,10 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
       '201',
     ]);
     expect(codes('/api/v1/practice/{sessionId}/submit', 'post')).toEqual(['200']);
+    expect(codes('/api/v1/episodes/{episodeId}', 'get')).toEqual(['200']);
+    expect(
+      codes('/api/v1/practice/{sessionId}/speaking/{promptId}', 'get'),
+    ).toEqual(['200']);
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
   });
 });
@@ -225,6 +279,104 @@ describe('response schemas accept representative payloads', () => {
     expect(
       submitPracticeResponseSchema.parse({ score: 0.5, correct: 3, total: 6 }),
     ).toBeTruthy();
+  });
+
+  it('episode detail (segments with resolved audio, nullable fields)', () => {
+    expect(
+      episodeDetailResponseSchema.parse({
+        id: 'ep1',
+        title: 'Cafe conversation',
+        status: 'READY',
+        audioUrl: 'https://cdn.example/ep1.mp3',
+        duration: 312,
+        language: 'es',
+        segments: [
+          {
+            id: 'seg1',
+            speaker: 'Host',
+            text: 'Hola, ¿qué tal?',
+            audioUrl: 'https://cdn.example/seg1.mp3',
+            order: 0,
+            startTime: 0,
+            duration: 4.2,
+          },
+          {
+            id: 'seg2',
+            speaker: 'Guest',
+            text: 'Muy bien, gracias.',
+            audioUrl: null,
+            order: 1,
+            startTime: null,
+            duration: null,
+          },
+        ],
+      }),
+    ).toBeTruthy();
+  });
+
+  it('speaking poll (pending then scored)', () => {
+    expect(
+      speakingPollResponseSchema.parse({
+        status: 'PENDING',
+        overallScore: null,
+        transcript: null,
+        feedback: null,
+      }),
+    ).toBeTruthy();
+    expect(
+      speakingPollResponseSchema.parse({
+        status: 'SCORED',
+        overallScore: 0.87,
+        transcript: 'Hola, ¿qué tal?',
+        feedback: 'Great rhythm; soften the final vowel.',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('episode/segment schemas accept the route superset (loose)', () => {
+    // The real route returns full Prisma rows; the loosened schemas must accept
+    // and preserve the extra fields rather than rejecting them.
+    const parsed = episodeDetailResponseSchema.parse({
+      id: 'ep1',
+      title: 'Cafe conversation',
+      status: 'TRANSCRIBING',
+      audioUrl: null,
+      duration: null,
+      language: 'es',
+      // Server-only fields the client ignores but must not be rejected.
+      visibility: 'UNLISTED',
+      isSaved: false,
+      fileSize: 12345,
+      tags: [],
+      segments: [
+        {
+          id: 'seg1',
+          speaker: 'Host',
+          text: 'Hola',
+          audioUrl: null,
+          order: 0,
+          startTime: null,
+          duration: null,
+          episodeId: 'ep1',
+          version: 1,
+          wordTimings: null,
+          ttsProvider: 'openai',
+          createdAt: '2026-06-13T00:00:00.000Z',
+        },
+      ],
+    }) as Record<string, unknown>;
+    // Extra keys survive (loose passthrough), proving the object is open.
+    expect(parsed.visibility).toBe('UNLISTED');
+
+    const poll = speakingPollResponseSchema.parse({
+      status: 'SCORED',
+      overallScore: 0.9,
+      transcript: 'Hola',
+      feedback: 'Nice.',
+      rubricScores: { accuracy: 0.9, fluency: 0.88, completeness: 1 },
+      phonemeScores: [{ word: 'hola', ops: [] }],
+    }) as Record<string, unknown>;
+    expect(poll.rubricScores).toBeDefined();
   });
 
   it('redeem pairing token (user may be null)', () => {
