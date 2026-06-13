@@ -224,7 +224,7 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps the local setup script OSS-first and template-driven', () => {
     const setupSource = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
     const installDepsSource = readFileSync(resolve(repoRoot, 'scripts/install-deps.sh'), 'utf8');
-    const localSetupDocs = ['README.md', 'docs/23-local-development.md', '.env.oss.example']
+    const localSetupDocs = ['README.md', 'docs/05-local-development.md', '.env.oss.example']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -310,7 +310,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/email-templates.ts',
       'apps/web/src/app/api/v1/users/unsubscribe/route.ts',
       'apps/web/src/lib/health.ts',
-      'docs/17-authentication-setup.md',
+      'docs/02-authentication-setup.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -394,8 +394,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const removedBotSources = [
       '.env.example',
       '.env.oss.example',
-      'docs/07-ai-prompts.md',
-      'docs/17-authentication-setup.md',
+      'docs/02-authentication-setup.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
@@ -510,9 +509,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'SECURITY.md',
       'scripts/generate-apple-secret.mjs',
       'CLAUDE.md',
-      'docs/05-plan.md',
-      'docs/23-local-development.md',
-      'docs/27-launch-readiness-status.md',
+      'docs/05-local-development.md',
       'apps/web/src/lib/CLAUDE.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -568,10 +565,9 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps release deployment docs self-host neutral', () => {
     const releaseDocs = [
-      'docs/17-authentication-setup.md',
-      'docs/18-hosting-infrastructure.md',
-      'docs/19-self-host-deployment.md',
-      'docs/24-ios-testflight-appstore-guide.md',
+      'docs/02-authentication-setup.md',
+      'docs/03-hosting-infrastructure.md',
+      'docs/04-self-host-deployment.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -589,8 +585,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocs).not.toContain('dashboard.doppler.com');
     expect(releaseDocs).not.toContain('doppler secrets');
     expect(releaseDocs).not.toContain('docker-compose.prod.yml');
-    expect(releaseIndexSources).toContain('19-self-host-deployment.md');
-    expect(releaseIndexSources).not.toContain('19-deploy-sotto-fm.md');
+    expect(releaseIndexSources).toContain('04-self-host-deployment.md');
   });
 
   it('does not ship the standalone social feed ranking workspace', () => {
@@ -807,7 +802,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocsSource).toContain('Learn a language, taught in your own context.');
     expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
-    expect(releaseDocsSource).toContain('self-hosted paths');
+    expect(releaseDocsSource).toContain('keyless local agent');
   });
 
   it('does not ship creator or per-episode analytics product routes', () => {

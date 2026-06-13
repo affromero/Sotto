@@ -168,7 +168,7 @@ All lib functions throw descriptive errors. API routes catch and return proper H
 **Every new TTS provider with preset voices MUST touch all files below. Missing any causes wrong voice labels, wrong catalog coverage, or rejected voice preview requests.**
 
 For a self-hoster adding a new local TTS model, prefer the no-code path first:
-implement the sidecar contract in `docs/28-provider-extension-guide.md`, set
+implement the sidecar contract in `docs/06-provider-extension-guide.md`, set
 `TTS_PROVIDER=local`, `TTS_BASE_URL`, and optional `TTS_VOICES`. Only add a
 native provider when the model cannot fit that HTTP contract.
 

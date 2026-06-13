@@ -137,7 +137,7 @@ TTS_MODEL="my-local-tts-model"
 TTS_VOICES="default,alternate"
 ```
 
-See `docs/28-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
+See `docs/06-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
 
 ---
 

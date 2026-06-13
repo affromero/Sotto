@@ -1,37 +1,24 @@
 # docs/ - Project Documentation
 
-Docs are part of the product surface for the open source release. They must describe the private-first Sotto architecture that exists on this branch, not the removed public-network strategy.
+User-facing documentation for self-hosting, deploying, developing, and extending Sotto. These are the docs that matter to a public reader — a self-hoster or contributor. Internal vision, planning, and strategy notes are intentionally kept out.
 
-## Active Release Docs
+## Docs
 
 | File | Purpose |
 |---|---|
-| `01-product-vision.md` | Private-first product vision, positioning, and boundaries |
-| `05-plan.md` | Implementation plan for OSS onboarding, providers, agents, meetings, news, and webhooks |
-| `07-ai-prompts.md` | Prompt architecture for discovery, generation, verification, and Q&A |
-| `11-provider-pricing.md` | Provider pricing reference |
-| `16-technical-architecture.md` | System architecture and private data model |
-| `17-authentication-setup.md` | OAuth and auth setup |
-| `18-hosting-infrastructure.md` | Self-hosting infrastructure guide |
-| `19-self-host-deployment.md` | Deployment guide |
-| `20-roles-and-dashboards.md` | Role/admin behavior |
-| `21-logo-brief.md` | Logo design reference |
-| `23-local-development.md` | Local OSS setup without Doppler |
-| `24-ios-testflight-appstore-guide.md` | iOS distribution guide |
-| `27-launch-readiness-status.md` | Launch readiness tracking |
-| `28-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
-
-## Removed Pitch-Era Docs
-
-The old investor-pitch docs for public discovery, community ranking, creator network effects, and remix behavior were removed because they contradicted the active schema and routes. Do not re-add them as "historical context" in the release packet.
+| `01-technical-architecture.md` | System architecture and data model |
+| `02-authentication-setup.md` | OAuth and authentication setup |
+| `03-hosting-infrastructure.md` | Self-hosting infrastructure and topology |
+| `04-self-host-deployment.md` | Deployment guide |
+| `05-local-development.md` | Local OSS setup (no Doppler) |
+| `06-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
 
 ## Rules
 
-- Every active doc must have a title, date, and summary at the top.
-- Keep docs aligned with code in the same commit.
-- When removing a product surface, remove its stale docs in the same change.
-- Do not describe removed social primitives as current behavior.
-- Do not require Doppler for local OSS setup docs.
-- Do not document provider fallback chains. Document explicit provider selection and typed setup errors.
+- Every doc must open with a title, date, and one-line summary.
+- Keep docs aligned with code in the same commit; remove a surface's docs when the surface is removed.
+- Describe the self-hostable, private-first product only: no social primitives, no removed mobile app, no billing/plan gates.
+- Do not require Doppler for local OSS setup.
+- Document explicit provider selection and typed setup errors, never provider fallback chains.
 - Use tables for comparisons and code blocks for exact commands or payloads.
 - Avoid stale external pricing claims unless the doc includes a verification date.
