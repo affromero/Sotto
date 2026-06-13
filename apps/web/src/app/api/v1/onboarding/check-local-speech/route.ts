@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { DEFAULT_LOCAL_STT_BASE_URL, DEFAULT_LOCAL_TTS_BASE_URL } from '@/app/welcome/providerMap';
@@ -215,8 +215,8 @@ async function checkStt(baseUrl: string): Promise<CheckResult> {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return errorResponse('Unauthorized', 401);
+    const authed = await authenticateRequest(request);
+    if (!authed) return errorResponse('Unauthorized', 401);
 
     const parsed = checkLocalSpeechSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);

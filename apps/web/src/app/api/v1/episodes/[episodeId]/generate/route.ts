@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
-import { requireAdmin } from '@/lib/auth-guards';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import {
   contentExtractionQueue,
@@ -32,9 +32,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Unauthorized', 401);
   }
 
-  // Admin bypass: skip ownership checks.
-  const adminId = await requireAdmin();
-  const isAdmin = adminId !== null;
+  // Admin bypass: skip ownership checks. Resolve the role for the authenticated
+  // principal (Bearer key or session), not the ambient session.
+  const isAdmin = await isUserAdmin(authResult.userId);
 
   // Admin-only flag: use platform API keys.
   const useAdminCredits = isAdmin && request.nextUrl.searchParams.get('useAdminCredits') === 'true';

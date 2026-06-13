@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { listByokProviders } from '@/lib/byok';
 
-export async function GET() {
-  const session = await auth();
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
 
   const allProviders = getAllProviderMeta().map((meta) => ({
     id: meta.id,
@@ -21,8 +21,9 @@ export async function GET() {
 
   // If authenticated, also include which providers the user has keys for
   let configuredProviders: string[] = [];
-  if (session?.user?.id) {
-    const keys = await listByokProviders(session.user.id);
+  if (authed) {
+    const userId = authed.userId;
+    const keys = await listByokProviders(userId);
     configuredProviders = keys.filter((k) => k.isValid).map((k) => k.provider);
   }
 

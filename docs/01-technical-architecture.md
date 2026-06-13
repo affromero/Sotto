@@ -87,12 +87,14 @@ The active data model is learner and course oriented. Important groups:
 API routes follow the same shape:
 
 ```text
-auth()
+authenticateRequest()        # Bearer sk_sotto_... first, then the local session fallback
   -> validate input with Zod
-  -> check ownership or admin permission
+  -> check ownership or admin permission against the authenticated userId
   -> perform a small database change or enqueue work
   -> return NextResponse.json()
 ```
+
+Most `/api/v1` routes authenticate with `authenticateRequest()`, which accepts a Bearer `sk_sotto_` API key first — used by the `sotto` CLI, local agents, and connected devices — and falls back to the web session. In the single-learner build `auth()` resolves to the local owner without session verification, so the API trusts the local owner by construction: a remotely exposed instance must be gated at the proxy/deploy layer, and admin-only routes resolve the authenticated user's role with `isUserAdmin(userId)` rather than the ambient session.
 
 Routes should not run LLM calls, TTS calls, transcription, video work, or audio stitching directly. They enqueue jobs or call narrow synchronous helpers only when the work is intentionally lightweight, such as scoring a writing response.
 
@@ -153,6 +155,8 @@ SpeakingRecording
   -> rubric and phoneme feedback
   -> status SCORED or FAILED
 ```
+
+Speaking uploads carry containerized audio bytes only. `detectAudioFormat()` sniffs the leading magic bytes (WebM, WAV, Ogg, FLAC, MP4, MP3) to set the stored R2 extension, the content type, and the STT filename/MIME — the browser uploads WebM/Opus, the `sotto` CLI uploads WAV. Raw PCM must be wrapped as WAV before upload.
 
 Worker rules:
 
@@ -300,7 +304,7 @@ Storage rules:
 
 Security priorities:
 
-- Session auth for dashboard, learning routes, settings, and admin.
+- Bearer `sk_sotto_` API-key auth for `/api/v1` (CLI, local agents, connected devices), with the web session as fallback; admin-only routes resolve the authenticated user's DB role, not the ambient session.
 - Route-level ownership checks for every course, class, practice session, exam, recording, and memory graph.
 - Encrypted user provider keys.
 - Token-authenticated local-agent and connected-device API flows.

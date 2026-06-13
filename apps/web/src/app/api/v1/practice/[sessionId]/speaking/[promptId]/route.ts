@@ -5,6 +5,7 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
+import { detectAudioFormat } from '@/lib/audio-format';
 import { addJob, speakingGradingQueue, JobType } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ sessionId: string; promptId: string }> };
@@ -43,9 +44,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!audioFile || typeof audioFile === 'string') return errorResponse('Missing audio file', 400);
 
     const buffer = Buffer.from(await audioFile.arrayBuffer());
-    const contentType = audioFile instanceof File ? audioFile.type || 'audio/webm' : 'audio/webm';
-    const key = `speaking/${userId}/${promptId}/${crypto.randomUUID()}.webm`;
-    const audioUrl = await uploadFile(key, buffer, contentType);
+    const { ext, mime } = detectAudioFormat(buffer);
+    const key = `speaking/${userId}/${promptId}/${crypto.randomUUID()}.${ext}`;
+    const audioUrl = await uploadFile(key, buffer, mime);
 
     const recording = await prisma.speakingRecording.create({
       data: { practiceSessionId: sessionId, promptId, userId, audioUrl, status: 'PENDING' },
