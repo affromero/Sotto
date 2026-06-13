@@ -4,7 +4,6 @@
 # Usage:
 #   bash install-deps.sh          # Install all (default)
 #   bash install-deps.sh --all    # Install all
-#   bash install-deps.sh --pitch  # Only uv + pandoc (for pitch rebuild)
 #   bash install-deps.sh --node   # Only Node.js check
 #   bash install-deps.sh --docker # Only Docker check
 #   bash install-deps.sh --ffmpeg # Only FFmpeg check
@@ -107,10 +106,6 @@ for arg in $ARGS; do
       install_uv
       install_pandoc
       ;;
-    --pitch)
-      install_uv
-      install_pandoc
-      ;;
     --node)   install_node ;;
     --docker) install_docker ;;
     --ffmpeg) install_ffmpeg ;;
@@ -118,7 +113,7 @@ for arg in $ARGS; do
     --pandoc) install_pandoc ;;
     *)
       echo "Unknown flag: $arg"
-      echo "Usage: install-deps.sh [--all|--pitch|--node|--docker|--ffmpeg|--uv|--pandoc]"
+      echo "Usage: install-deps.sh [--all|--node|--docker|--ffmpeg|--uv|--pandoc]"
       exit 1
       ;;
   esac
