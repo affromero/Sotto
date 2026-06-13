@@ -14,7 +14,7 @@ import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
-import { ThemeSelector } from '@/components/settings/ThemeSelector';
+import { AppearanceControls } from '@/components/settings/AppearanceControls';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
 
@@ -270,8 +270,8 @@ export function SettingsForm({
       {/* Appearance Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Appearance</h2>
-        <p className={styles.sectionDesc}>Choose your preferred theme</p>
-        <ThemeSelector />
+        <p className={styles.sectionDesc}>Choose your mode, light palette, and accent color</p>
+        <AppearanceControls />
       </section>
 
       {/* Household Section — owner only */}

@@ -1,0 +1,203 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* ── Group ─────────────────────────────────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.groupLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+}
+
+.dimNote {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* ── Mode segmented control ─────────────────────────────────────────────────── */
+
+.segmented {
+  display: inline-flex;
+  background: var(--color-surface-nested);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 3px;
+  gap: 2px;
+}
+
+.segBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--text-body-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.segBtn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.segBtnActive {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.segBtnActive:hover {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.segIcon {
+  flex-shrink: 0;
+}
+
+/* ── Light palette buttons ──────────────────────────────────────────────────── */
+
+.paletteRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.paletteBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+  min-height: 44px;
+}
+
+.paletteBtn:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
+
+.paletteBtnActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+  box-shadow: 0 0 0 1px var(--color-primary-subtle);
+}
+
+.paletteBtnActive:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+
+.paletteBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paletteSwatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid;
+  flex-shrink: 0;
+}
+
+/* ── Accent swatches ─────────────────────────────────────────────────────────── */
+
+.accentRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.accentSwatch {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  border: 2px solid transparent;
+  background: var(--swatch-color);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.accentSwatch:hover {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
+}
+
+.accentSwatchActive {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 5px var(--swatch-color);
+}
+
+.accentSwatchActive:hover {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segBtn,
+  .paletteBtn,
+  .accentSwatch {
+    transition: none;
+  }
+
+  .accentSwatch:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .segmented {
+    width: 100%;
+  }
+
+  .segBtn {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+  }
+
+  .accentSwatch {
+    width: 44px;
+    height: 44px;
+  }
+}
