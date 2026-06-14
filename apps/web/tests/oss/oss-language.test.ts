@@ -326,9 +326,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'accounting/ledger/main.beancount',
       'accounting/ledger/opening.beancount',
       'accounting/ledger/2026/02-february.beancount',
-      'packages/verification-standard/package.json',
-      'packages/verification-standard/README.md',
-      'packages/verification-standard/CONTRIBUTING.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -400,7 +397,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(publicLinkSources).not.toContain('https://discord.gg/sotto');
   });
 
-  it('uses the neutral verification workspace namespace', () => {
+  it('vendors the renamed groundcheck library, free of legacy @sotto and SottoFM names', () => {
     const namespaceFiles = [
       'apps/web/package.json',
       'apps/web/next.config.js',
@@ -410,32 +407,27 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/reference-verification/pipeline.ts',
       'CLAUDE.md',
       'package-lock.json',
-      'packages/verification-standard/package.json',
-      'packages/verification-standard/package-lock.json',
-      'packages/verification-standard/.github/workflows/release.yml',
-      'packages/verification-standard/README.md',
-      'packages/verification-standard/CONTRIBUTING.md',
-      'packages/verification-standard/CHANGELOG.md',
-      'packages/verification-standard/LICENSE',
+      'packages/groundcheck/package.json',
+      'packages/groundcheck/package-lock.json',
+      'packages/groundcheck/.github/workflows/release.yml',
+      'packages/groundcheck/README.md',
+      'packages/groundcheck/CONTRIBUTING.md',
+      'packages/groundcheck/CHANGELOG.md',
+      'packages/groundcheck/LICENSE',
     ];
 
-    // The published package always uses the neutral @sotto npm scope, never @sottofm.
-    const verificationNamespaceSources = namespaceFiles
+    const verificationSources = namespaceFiles
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    expect(verificationNamespaceSources).toContain('@sotto/verification-standard');
-    expect(verificationNamespaceSources).not.toContain('@sottofm/verification-standard');
 
-    // The Sotto monorepo's own files must not reference the SottoFM org. The
-    // vendored verification-standard submodule legitimately points its own
-    // repository metadata at its public home (SottoFM/reference-verification-standard),
-    // so it is excluded from the org-neutrality check.
-    const monorepoOwnSources = namespaceFiles
-      .filter((file) => !file.startsWith('packages/verification-standard/'))
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-    expect(monorepoOwnSources).not.toContain('github.com/SottoFM');
-    expect(monorepoOwnSources).not.toContain('SottoFM');
+    // The library was renamed to the unscoped `groundcheck` package and moved to
+    // affromero/groundcheck. The legacy @sotto / @sottofm package names and the
+    // former SottoFM org must not linger anywhere, including the vendored copy.
+    expect(verificationSources).toContain('groundcheck');
+    expect(verificationSources).not.toContain('@sotto/verification-standard');
+    expect(verificationSources).not.toContain('@sottofm/verification-standard');
+    expect(verificationSources).not.toContain('github.com/SottoFM');
+    expect(verificationSources).not.toContain('SottoFM');
   });
 
   it('keeps security and operations guidance self-host neutral', () => {

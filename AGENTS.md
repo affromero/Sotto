@@ -4,7 +4,7 @@
 This is an npm workspaces monorepo. Key areas:
 - `apps/web/` Next.js web app (App Router), workers, Prisma, tests.
 - `apps/desktop/` Tauri desktop shell (built outside the npm workspaces).
-- `packages/` shared libraries (`shared`, `mcp`, `verification-standard`).
+- `packages/` shared libraries (`shared`, `mcp`, `groundcheck`).
 - `services/` backend services (for example `local-tts`).
 - `scripts/` dev/ops automation; `docs/` product/architecture docs; `extension/` browser extension; `accounting/` beancount ledger.
 
@@ -24,7 +24,7 @@ Run from repo root unless noted.
 
 ## Testing Guidelines
 - Web uses Vitest; `apps/web/tests/` contains unit/integration/smoke tests.
-- `packages/verification-standard` also uses Vitest.
+- `packages/groundcheck` also uses Vitest.
 - If you change a source file, update its corresponding tests in the same PR.
 
 ## Commit & Pull Request Guidelines

@@ -18,7 +18,7 @@ const nextConfig = {
   },
   transpilePackages: [
     '@sotto/shared',
-    '@sotto/verification-standard',
+    'groundcheck',
   ],
   turbopack: {
     root: path.resolve(__dirname, '../..'),

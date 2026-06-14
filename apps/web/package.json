@@ -38,7 +38,7 @@
     "@prisma/client": "7.8.0",
     "@sentry/nextjs": "^10.40.0",
     "@sotto/shared": "*",
-    "@sotto/verification-standard": "*",
+    "groundcheck": "*",
     "@steipete/summarize-core": "^0.16.3",
     "bullmq": "^5.67.0",
     "cheerio": "^1.2.0",

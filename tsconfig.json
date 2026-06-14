@@ -4,7 +4,7 @@
   "references": [
     { "path": "apps/web" },
     { "path": "packages/shared" },
-    { "path": "packages/verification-standard" }
+    { "path": "packages/groundcheck" }
   ],
   "files": []
 }
