@@ -16,6 +16,7 @@ import {
   generatePlacementResponseSchema,
   healthResponseSchema,
   interactionResponseSchema,
+  meResponseSchema,
   memoryGraphResponseSchema,
   nextClassCreatedResponseSchema,
   nextClassDoneResponseSchema,
@@ -137,6 +138,7 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/placement',
         'GET /api/v1/courses/{courseId}/graph',
         'GET /api/v1/onboarding/config',
+        'GET /api/v1/users/me',
         'POST /api/v1/episodes/{episodeId}/interact',
         'GET /api/v1/episodes/{episodeId}/interact/{interactionId}',
         'POST /api/v1/auth/pair/redeem',
@@ -187,6 +189,8 @@ describe('openapi.json drift guard', () => {
       'OnboardingInfra',
       // The interaction response is a subset of the richer Prisma row -> open.
       'InteractionResponse',
+      // /users/me returns a richer row; the CLI reads the identity subset -> open.
+      'MeResponse',
     ]) {
       expect(schemas[open].additionalProperties).not.toBe(false);
     }
@@ -342,6 +346,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/placement', 'post')).toEqual(['200']);
     expect(codes('/api/v1/courses/{courseId}/graph', 'get')).toEqual(['200']);
     expect(codes('/api/v1/onboarding/config', 'get')).toEqual(['200']);
+    expect(codes('/api/v1/users/me', 'get')).toEqual(['200']);
     // Ask creates a PENDING interaction (201); polling reads it (200).
     expect(codes('/api/v1/episodes/{episodeId}/interact', 'post')).toEqual([
       '201',
@@ -840,6 +845,23 @@ describe('response schemas accept representative payloads', () => {
         infra: null,
       }),
     ).toBeTruthy();
+  });
+
+  it('me (identity subset; tolerates the rich route extras)', () => {
+    // The route returns more than the CLI reads; `.loose()` keeps the extras.
+    const parsed = meResponseSchema.parse({
+      id: 'u_1',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      handle: 'ada',
+      image: null,
+      episodeCount: 12,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      preferredLanguage: 'es',
+    });
+    expect(parsed.id).toBe('u_1');
+    // A minimal identity (only id) is also valid.
+    expect(meResponseSchema.parse({ id: 'u_2' }).id).toBe('u_2');
   });
 
   it('ask interaction request (the exact validated body)', () => {

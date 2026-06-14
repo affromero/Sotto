@@ -10,10 +10,17 @@
 use color_eyre::{Result, eyre::eyre};
 use serde::{Deserialize, Serialize};
 
-use crate::config::Config;
-
 /// Default server when `--server` is not provided.
 pub(crate) const DEFAULT_SERVER: &str = "http://localhost:3000";
+
+/// A successful pairing: the resolved server, the minted API key, and the cached
+/// learner identity (name/email) if the server returned one. The caller stores
+/// these in a named profile.
+pub(crate) struct Credentials {
+    pub server_url: String,
+    pub api_key: String,
+    pub name: Option<String>,
+}
 
 #[derive(Serialize)]
 struct RedeemRequest<'a> {
@@ -32,9 +39,10 @@ struct RedeemResponse {
     user: Option<PairedUser>,
 }
 
-/// Exchange `token` at `server` for an API key and return the resulting
-/// [`Config`]. Prints a confirmation line on success.
-pub(crate) async fn login(server: &str, token: &str) -> Result<Config> {
+/// Exchange `token` at `server` for an API key and return the resolved
+/// [`Credentials`] (server, key, cached identity). The caller stores them in a
+/// named profile; the global theme is untouched here.
+pub(crate) async fn login(server: &str, token: &str) -> Result<Credentials> {
     let server = server.trim_end_matches('/');
     let url = format!("{server}/api/v1/auth/pair/redeem");
 
@@ -65,28 +73,15 @@ pub(crate) async fn login(server: &str, token: &str) -> Result<Config> {
         .await
         .map_err(|e| eyre!("could not parse redeem response: {e}"))?;
 
-    let who = redeemed
+    let name = redeemed
         .user
         .as_ref()
-        .and_then(|u| u.name.clone().or_else(|| u.email.clone()))
-        .unwrap_or_else(|| "(owner)".to_string());
+        .and_then(|u| u.name.clone().or_else(|| u.email.clone()));
 
-    println!("Logged in to {server} as {who}");
-
-    // Re-login overwrites only the credential fields and PRESERVES the existing
-    // theme block. `Config::load` is resilient (a corrupt/unreadable file yields
-    // defaults, never an error), so a valid prior theme is kept and only a truly
-    // missing/corrupt config falls back to the default appearance.
-    let theme = Config::load()
-        .ok()
-        .flatten()
-        .map(|c| c.theme)
-        .unwrap_or_default();
-
-    Ok(Config {
+    Ok(Credentials {
         server_url: server.to_string(),
         api_key: redeemed.token,
-        theme,
+        name,
     })
 }
 

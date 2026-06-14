@@ -1,5 +1,5 @@
-//! Two modal overlays for Phase 7 polish: the theme picker (`t`) and the
-//! key-help overlay (`?`). Both are modal like the ask overlay — while open they
+//! Modal overlays: the theme picker (`t`), the key-help overlay (`?`), and the
+//! account switcher (`A`). All are modal like the ask overlay — while open they
 //! swallow every key except their own (handled in `App::map_key`).
 //!
 //! The help overlay's key list is sourced from [`help_rows`], keyed on the
@@ -14,6 +14,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
+use crate::config::Profile;
 use crate::theme::{Palette, Theme};
 
 use super::state::View;
@@ -77,6 +78,44 @@ pub(crate) fn cycle_focused(theme: &mut Theme, row: PickerRow) {
         PickerRow::Mode => theme.cycle_mode(),
         PickerRow::LightPalette => theme.cycle_light_palette(),
         PickerRow::Accent => theme.cycle_accent(),
+    }
+}
+
+/// The account switcher overlay state: open flag + the highlighted row (an index
+/// into the profile-name list).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AccountsOverlay {
+    pub open: bool,
+    pub cursor: usize,
+}
+
+impl AccountsOverlay {
+    pub fn closed() -> Self {
+        Self {
+            open: false,
+            cursor: 0,
+        }
+    }
+
+    /// Open the switcher with the cursor on `start` (typically the active row).
+    pub fn opened(start: usize) -> Self {
+        Self {
+            open: true,
+            cursor: start,
+        }
+    }
+
+    /// Move the cursor up/down, clamped to `[0, len)`. No-op when empty.
+    pub fn move_cursor(&mut self, down: bool, len: usize) {
+        if len == 0 {
+            self.cursor = 0;
+            return;
+        }
+        self.cursor = if down {
+            (self.cursor + 1) % len
+        } else {
+            (self.cursor + len - 1) % len
+        };
     }
 }
 
@@ -244,6 +283,73 @@ pub(crate) fn draw_help(frame: &mut Frame, area: Rect, view: &View, p: &Palette)
     );
 }
 
+/// Draw the account switcher modal over `area`. `profiles` is the ordered
+/// (name, profile) list; `active` is the active profile name; `cursor` is the
+/// highlighted row.
+pub(crate) fn draw_accounts(
+    frame: &mut Frame,
+    area: Rect,
+    profiles: &[(String, Profile)],
+    active: &str,
+    cursor: usize,
+    p: &Palette,
+) {
+    let rows = (profiles.len() as u16).max(1);
+    let rect = modal_area(area, 56, rows + 6);
+    frame.render_widget(Clear, rect);
+    let block = modal_block("Accounts", p);
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let mut lines: Vec<Line> = vec![Line::default()];
+    if profiles.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No accounts yet. Run `sotto login` to add one.",
+            Style::default()
+                .fg(p.ink_soft)
+                .add_modifier(Modifier::ITALIC),
+        )));
+    } else {
+        for (i, (name, profile)) in profiles.iter().enumerate() {
+            let is_active = name == active;
+            let focused = i == cursor;
+            // Marker: `●` active, `▌` cursor, else spaces.
+            let marker = if focused { "▌ " } else { "  " };
+            let active_dot = if is_active { "● " } else { "  " };
+            let name_style = if focused {
+                Style::default().fg(p.primary).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(p.ink)
+            };
+            let who = profile.name.clone().unwrap_or_else(|| "—".to_string());
+            lines.push(Line::from(vec![
+                Span::styled(marker.to_string(), Style::default().fg(p.primary)),
+                Span::styled(active_dot.to_string(), Style::default().fg(p.primary)),
+                Span::styled(format!("{name:<12}"), name_style),
+                Span::styled(
+                    format!("{}  ", profile.server_url),
+                    Style::default().fg(p.ink_soft),
+                ),
+                Span::styled(who, Style::default().fg(p.accent)),
+            ]));
+        }
+    }
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
+        chunks[0],
+    );
+
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            " ↑/↓ move   enter switch   A / esc close ",
+            Style::default().fg(p.ink_soft),
+        ))),
+        chunks[1],
+    );
+}
+
 // --- Key-help source (single source for the overlay) ------------------------
 
 /// The global keys available on (almost) every screen.
@@ -251,6 +357,7 @@ pub(crate) fn global_rows() -> Vec<(&'static str, &'static str)> {
     vec![
         ("?", "this help"),
         ("t", "theme"),
+        ("A", "accounts"),
         ("q / esc", "back / quit"),
         ("Ctrl-C", "quit"),
     ]

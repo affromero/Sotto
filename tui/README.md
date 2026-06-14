@@ -93,15 +93,38 @@ not fully static — see [Audio](#audio).
    sotto login --server https://your-sotto.example --token sk_pair_xxx
    ```
 
-The redeemed API key and your server URL are saved to
-`~/.config/sotto/config.toml` (owner-only, `0600` on Unix). Your theme choice is
-stored there too and preserved across re-login.
+The redeemed API key and server URL are saved to `~/.config/sotto/config.toml`
+(owner-only, `0600` on Unix) under a named **profile**. Your theme is stored
+there too, shared across all profiles and preserved across re-login.
 
 Then just run:
 
 ```bash
 sotto
 ```
+
+## Accounts
+
+Each Sotto instance is single-learner, so an account is a named profile: a
+`(server, api key)` pair. Keep several and switch between them (your self-host, a
+colleague's server, a managed instance). `sotto login --as <name>` stores a
+profile; without `--as` the name is derived from the server host (e.g.
+`localhost`).
+
+```bash
+sotto login --server https://home.example --as home   # add/replace a profile
+sotto accounts            # list profiles (alias: profiles); * marks the active one
+sotto switch home         # make a profile active
+sotto whoami              # show the active server + learner (live, else cached)
+sotto logout work         # remove a profile (defaults to the active one)
+```
+
+`whoami` asks the server who you are and prints `... (live)`; if the server is
+unreachable it prints the identity cached at login and says `(cached)`.
+
+Inside the TUI, press **`A`** to open the account switcher: pick a profile and
+press Enter to switch the active account live (the client reconnects and the
+screen reloads). No restart needed.
 
 ## A quick tour
 
@@ -137,6 +160,7 @@ Press **`?`** on any screen for a help overlay listing that screen's keys.
 | `m` / `s` | memory graph / settings (course home) |
 | `?` | toggle the key-help overlay |
 | `t` | toggle the theme picker (mode / palette / accent) |
+| `A` | toggle the account switcher |
 | `q` / `Esc` | back out a screen (or quit at the top) |
 | `Ctrl-C` | quit |
 
@@ -174,17 +198,23 @@ notice below a hard floor (≈40×10) rather than clipping content.
 `~/.config/sotto/config.toml`:
 
 ```toml
-server_url = "https://your-sotto.example"
-api_key    = "sk_sotto_..."        # minted by `sotto login`; keep this secret
+active = "home"                     # the active profile
 
-[theme]
+[theme]                             # global, shared across profiles
 mode          = "light"             # light | dark
 light_palette = "aula"              # aula | paper
 accent        = "#3F4FB0"           # one of the five accent swatches
+
+[profiles.home]
+server_url = "https://your-sotto.example"
+api_key    = "sk_sotto_..."         # minted by `sotto login`; keep this secret
+name       = "Ada"                  # cached identity from login (optional)
 ```
 
-A missing or unreadable `[theme]` table falls back to defaults; a corrupt config
-never crashes startup — `sotto` simply asks you to log in.
+A pre-profiles config (top-level `server_url`/`api_key`) is migrated into a
+`default` profile automatically, so an existing login keeps working. A missing or
+unreadable `[theme]` table falls back to defaults; a corrupt config never crashes
+startup — `sotto` simply asks you to log in.
 
 ## Building from source
 

@@ -125,7 +125,13 @@ fn draw_loading(frame: &mut Frame, area: Rect, config: &Config, p: &Palette) {
         )),
         Line::default(),
         Line::from(Span::styled(
-            format!("Connected to {}", config.server_url),
+            format!(
+                "Connected to {}",
+                config
+                    .active_profile()
+                    .map(|prof| prof.server_url.as_str())
+                    .unwrap_or("(no profile)")
+            ),
             Style::default().fg(p.ink_soft),
         )),
     ]);
