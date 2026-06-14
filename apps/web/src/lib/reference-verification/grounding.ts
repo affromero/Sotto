@@ -310,7 +310,7 @@ async function aiGroundingSearch(
  *
  * Callers should cap input size if needed (e.g. verification loop caps at 5).
  */
-export async function groundReferenceCandidates(
+async function groundReferenceCandidates(
   inputs: GroundingInput[],
   topic: string,
   apiKeyOverride?: string,
