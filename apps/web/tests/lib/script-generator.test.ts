@@ -11,18 +11,13 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 // ---- Import under test ----
-import { generateScript as generateScriptImpl, generateScriptWithFeedback as generateScriptWithFeedbackImpl } from '@/lib/script-generator';
+import { generateScript as generateScriptImpl } from '@/lib/script-generator';
 
 const AI_RUNTIME = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' };
 type GenerateScriptParams = Parameters<typeof generateScriptImpl>[0];
-type GenerateScriptWithFeedbackParams = Parameters<typeof generateScriptWithFeedbackImpl>[0];
 
 function generateScript(params: Omit<GenerateScriptParams, 'provider' | 'model'> & Partial<Pick<GenerateScriptParams, 'provider' | 'model'>>) {
   return generateScriptImpl({ ...AI_RUNTIME, ...params });
-}
-
-function generateScriptWithFeedback(params: Omit<GenerateScriptWithFeedbackParams, 'provider' | 'model'> & Partial<Pick<GenerateScriptWithFeedbackParams, 'provider' | 'model'>>) {
-  return generateScriptWithFeedbackImpl({ ...AI_RUNTIME, ...params });
 }
 
 // ---- Tests ----
@@ -1124,123 +1119,6 @@ describe('generateScript', () => {
   });
 });
 
-describe('generateScriptWithFeedback', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('truncates sourceContent at 20000 chars', async () => {
-    const mockResponse = {
-      turns: [{ speaker: 'HOST', text: 'Revised content.' }, { speaker: 'EXPERT', text: 'Noted.' }],
-      soundCues: [],
-      references: [],
-    };
-
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify(mockResponse),
-      inputTokens: 3000,
-      outputTokens: 1200,
-    });
-
-    const longContent = 'B'.repeat(25000);
-
-    await generateScriptWithFeedback({
-      topic: 'Long Source Feedback',
-      depth: 'standard',
-      audienceLevel: 'intermediate',
-      focusAreas: [],
-      tone: 'professional',
-      durationTarget: 10,
-      sourceContent: longContent,
-      previousScript: [{ speaker: 'HOST', text: 'Old script.' }],
-      previousReferences: [],
-      verificationFeedback: 'Fix the citations.',
-    });
-
-    const call = mockGenerateResponse.mock.calls[0];
-    const userMessage = call[1][0].content;
-
-    expect(userMessage).toContain('Source material:');
-    const contentAfterHeader = userMessage.split('Source material:\n')[1];
-    // Content is truncated at 20000 chars (though it appears within a larger message)
-    expect(contentAfterHeader.length).toBeLessThanOrEqual(20100); // 20000 + small overhead
-  });
-
-  it('includes sourceMetadata in user message when provided', async () => {
-    const mockResponse = {
-      turns: [{ speaker: 'HOST', text: 'Revised with metadata.' }, { speaker: 'EXPERT', text: 'Updated.' }],
-      soundCues: [],
-      references: [],
-    };
-
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify(mockResponse),
-      inputTokens: 2000,
-      outputTokens: 1000,
-    });
-
-    await generateScriptWithFeedback({
-      topic: 'Metadata Feedback',
-      depth: 'deep_dive',
-      audienceLevel: 'expert',
-      focusAreas: ['accuracy'],
-      tone: 'professional',
-      durationTarget: 15,
-      sourceContent: 'Article content',
-      sourceMetadata: {
-        title: 'Research Paper',
-        author: 'Dr. Smith',
-        publishedDate: '2024-06-01',
-        siteName: 'Nature',
-      },
-      previousScript: [{ speaker: 'HOST', text: 'Old.' }],
-      previousReferences: [],
-      verificationFeedback: 'Add more citations.',
-    });
-
-    const call = mockGenerateResponse.mock.calls[0];
-    const userMessage = call[1][0].content;
-
-    expect(userMessage).toContain('Title: Research Paper');
-    expect(userMessage).toContain('Author: Dr. Smith');
-    expect(userMessage).toContain('Source: Nature');
-  });
-
-  it('passes web search tool to generateResponse', async () => {
-    const mockResponse = {
-      turns: [{ speaker: 'HOST', text: 'Revised.' }, { speaker: 'EXPERT', text: 'Confirmed.' }],
-      soundCues: [],
-      references: [],
-    };
-
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify(mockResponse),
-      inputTokens: 1000,
-      outputTokens: 500,
-    });
-
-    await generateScriptWithFeedback({
-      topic: 'Feedback Web Search',
-      depth: 'standard',
-      audienceLevel: 'intermediate',
-      focusAreas: [],
-      tone: 'professional',
-      durationTarget: 10,
-      previousScript: [{ speaker: 'HOST', text: 'Old.' }],
-      previousReferences: [],
-      verificationFeedback: 'Verify claims.',
-    });
-
-    expect(mockGenerateResponse).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({
-        useWebSearch: true,
-      })
-    );
-  });
-});
-
 describe('reference deduplication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1382,41 +1260,5 @@ describe('reference deduplication', () => {
     expect(result.references).toHaveLength(2);
     expect(result.turns[0].text).toBe('First source [1].');
     expect(result.turns[1].text).toBe('Second source [2].');
-  });
-
-  it('deduplicates references in generateScriptWithFeedback too', async () => {
-    const mockResponse = {
-      turns: [
-        { speaker: 'HOST', text: 'Revised with [1] and [2].' },
-        { speaker: 'EXPERT', text: 'Confirmed [2].' },
-      ],
-      soundCues: [],
-      references: [
-        { number: 1, title: 'Study X', authors: ['X'], year: 2023, url: null, type: 'PAPER', publisher: null, doi: '10.1/same' },
-        { number: 2, title: 'Study Y', authors: ['Y'], year: 2023, url: null, type: 'PAPER', publisher: null, doi: '10.1/same' },
-      ],
-    };
-
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify(mockResponse),
-      inputTokens: 1000,
-      outputTokens: 500,
-    });
-
-    const result = await generateScriptWithFeedback({
-      topic: 'Dedup Feedback',
-      depth: 'standard',
-      audienceLevel: 'intermediate',
-      focusAreas: [],
-      tone: 'professional',
-      durationTarget: 10,
-      previousScript: [{ speaker: 'HOST', text: 'Old.' }],
-      previousReferences: [],
-      verificationFeedback: 'Fix sources.',
-    });
-
-    expect(result.references).toHaveLength(1);
-    expect(result.turns[0].text).toBe('Revised with [1] and [1].');
-    expect(result.turns[1].text).toBe('Confirmed [1].');
   });
 });
