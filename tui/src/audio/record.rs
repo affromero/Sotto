@@ -283,4 +283,22 @@ mod tests {
         assert_eq!(s0, i16::MAX, "clamped to +full scale");
         assert_eq!(s1, -i16::MAX, "clamped to -full scale");
     }
+
+    #[test]
+    fn stop_without_start_is_a_clear_error_not_a_panic() {
+        // A fresh recorder is idle; stopping without a capture is a graceful Err
+        // (the App surfaces it to the status bar) rather than a panic. This is the
+        // one device-free error path of the recorder lifecycle.
+        let mut recorder = Recorder::new();
+        assert!(!recorder.is_recording(), "a fresh recorder is idle");
+        let err = recorder
+            .stop()
+            .expect_err("stop with no capture must error");
+        assert!(
+            err.to_string().contains("no recording in progress"),
+            "maps to a clear message: {err}"
+        );
+        // Still idle and reusable afterward.
+        assert!(!recorder.is_recording());
+    }
 }
