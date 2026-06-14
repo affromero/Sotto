@@ -42,8 +42,7 @@ impl AudioPlayer {
     /// from the start, replacing anything currently queued. Returns `Err` on a
     /// decode failure (corrupt/empty/unsupported bytes).
     pub fn play(&self, bytes: Vec<u8>) -> Result<()> {
-        let decoder =
-            Decoder::new(Cursor::new(bytes)).map_err(|e| eyre!("could not decode audio: {e}"))?;
+        let decoder = decode_audio(bytes)?;
         // Replace any current queue, then append + play the new source. rodio's
         // Player::append converts the decoder's samples into the mixer format.
         self.player.clear();
@@ -71,5 +70,49 @@ impl AudioPlayer {
     /// True once the queued audio has finished (nothing left to play).
     pub fn is_finished(&self) -> bool {
         self.player.empty()
+    }
+}
+
+/// Decode in-memory audio `bytes` (format auto-detected). Pure and device-free:
+/// `play` delegates here, so the decode-error path (empty/garbage/unsupported
+/// bytes -> a clear `Err`) is unit-tested without an output device.
+fn decode_audio(bytes: Vec<u8>) -> Result<Decoder<Cursor<Vec<u8>>>> {
+    Decoder::new(Cursor::new(bytes)).map_err(|e| eyre!("could not decode audio: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decoding_empty_bytes_is_an_error_not_a_panic() {
+        // `Decoder` is not `Debug`, so inspect the error without unwrapping Ok.
+        match decode_audio(Vec::new()) {
+            Err(e) => assert!(
+                e.to_string().contains("could not decode audio"),
+                "error maps to a clear message: {e}"
+            ),
+            Ok(_) => panic!("empty bytes must not decode"),
+        }
+    }
+
+    #[test]
+    fn decoding_garbage_bytes_is_an_error() {
+        let garbage = vec![0x00, 0x01, 0x02, 0x03, 0xff, 0xfe, 0x42, 0x99];
+        assert!(
+            decode_audio(garbage).is_err(),
+            "non-audio bytes must surface a decode error, never a panic"
+        );
+    }
+
+    #[test]
+    fn decoding_a_real_wav_succeeds() {
+        // A valid mono 16-bit WAV built by the recorder's pure encoder decodes.
+        let wav = crate::audio::record::encode_wav_mono16(&[0.0_f32, 0.25, -0.25], 1, 16_000)
+            .expect("encode test wav");
+        assert!(
+            decode_audio(wav).is_ok(),
+            "a well-formed WAV must decode cleanly"
+        );
     }
 }
