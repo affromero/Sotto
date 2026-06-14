@@ -3,7 +3,7 @@ import { loadPrompt } from '@/lib/prompt-loader';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 import { searchTitle, type ReferenceInput, type VerificationCheck, type ReplacementData } from '@/lib/reference-validator';
-import type { ContentDomain } from '@sotto/verification-standard';
+import type { ContentDomain } from 'groundcheck';
 import type { ClaimContext } from './claim-extractor';
 
 export type GroundingReason =

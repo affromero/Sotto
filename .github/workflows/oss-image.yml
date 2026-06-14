@@ -1,7 +1,7 @@
 # Publishes the open-source Sotto images to GHCR.
 #
 # Unlike deploy.yml (which builds on the server), this builds a PUBLIC image:
-# it initializes only the public verification-standard submodule.
+# it initializes only the public groundcheck submodule.
 # The curl|bash installer pulls these images.
 name: Publish OSS image
 
@@ -31,7 +31,7 @@ jobs:
       # Public submodule only (no SSH key needed).
       - name: Init public submodule
         run: |
-          git submodule update --init packages/verification-standard
+          git submodule update --init packages/groundcheck
 
       - uses: docker/setup-buildx-action@v4
 

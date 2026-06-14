@@ -50,7 +50,7 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 | `apps/desktop` | Tauri desktop shell, built outside the npm workspaces |
 | `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
 | `packages/mcp` | MCP integration surface for local agents |
-| `packages/verification-standard` | Reference verification standard package |
+| `packages/groundcheck` | Reference verification standard package |
 | `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
 | `e2e` | Playwright end-to-end tests |
 | `scripts` | Setup, launch, recording, migration, and release automation |
