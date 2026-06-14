@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Sotto API",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "description": "Core /api/v1 surface consumed by the Sotto terminal client. Generated from the Zod contract registry in @sotto/shared."
   },
   "components": {
