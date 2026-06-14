@@ -105,3 +105,6 @@ export {
   handleSchema,
   discoveryMessageSchema,
 } from './validations';
+
+// API contracts (Zod schemas + endpoint registry for OpenAPI/Rust codegen)
+export * from './contracts';

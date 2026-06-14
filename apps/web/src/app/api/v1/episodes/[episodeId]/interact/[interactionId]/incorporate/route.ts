@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -16,15 +16,15 @@ import type { RegenerateSegmentPayload } from '@/lib/queue';
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ episodeId: string; interactionId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   const { episodeId, interactionId } = await params;
-  const session = await auth();
+  const authed = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const userId = session.user.id;
+  const userId = authed.userId;
 
   // Fetch the interaction with episode ownership check
   const interaction = await prisma.interaction.findUnique({

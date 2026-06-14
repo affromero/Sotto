@@ -1,0 +1,2528 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Sotto API",
+    "version": "0.1.0",
+    "description": "Core /api/v1 surface consumed by the Sotto terminal client. Generated from the Zod contract registry in @sotto/shared."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A long-lived Sotto API key (sk_sotto_...) minted via /api/v1/auth/pair/redeem."
+      }
+    },
+    "schemas": {
+      "CefrLevel": {
+        "type": "string",
+        "enum": [
+          "A1",
+          "A2",
+          "B1",
+          "B2",
+          "C1",
+          "C2"
+        ]
+      },
+      "PracticeKind": {
+        "type": "string",
+        "enum": [
+          "GRAMMAR",
+          "READING",
+          "LISTENING",
+          "SPEAKING",
+          "WRITING",
+          "VOCAB"
+        ]
+      },
+      "PracticeStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "COMPLETED"
+        ]
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "USER",
+          "ADMIN"
+        ]
+      },
+      "HealthCheckResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "latencyMs": {
+            "type": "number"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HealthCheckResult"
+            }
+          },
+          "oauth": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "vapid": {
+            "type": "boolean"
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "timestamp"
+        ],
+        "additionalProperties": false
+      },
+      "CourseSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nativeLang": {
+            "type": "string"
+          },
+          "targetLang": {
+            "type": "string"
+          },
+          "currentLevel": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "startLevel": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "activeClassId": {
+            "type": "string",
+            "nullable": true
+          },
+          "curriculum": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          "placement": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "$ref": "#/components/schemas/CefrLevel"
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "level",
+              "createdAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "nativeLang",
+          "targetLang",
+          "currentLevel",
+          "startLevel",
+          "activeClassId",
+          "curriculum",
+          "placement"
+        ],
+        "additionalProperties": false
+      },
+      "CoursesListResponse": {
+        "type": "object",
+        "properties": {
+          "courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseSummary"
+            }
+          }
+        },
+        "required": [
+          "courses"
+        ],
+        "additionalProperties": false
+      },
+      "PracticeRecentSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PracticeKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PracticeStatus"
+          },
+          "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "score",
+          "startedAt",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PracticeOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "due": {
+            "type": "object",
+            "properties": {
+              "vocab": {
+                "type": "number"
+              },
+              "grammar": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "vocab",
+              "grammar"
+            ],
+            "additionalProperties": false
+          },
+          "totalVocab": {
+            "type": "number"
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeRecentSession"
+            }
+          }
+        },
+        "required": [
+          "due",
+          "totalVocab",
+          "recent"
+        ],
+        "additionalProperties": false
+      },
+      "PracticeItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "prompt",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "PracticeSpeakingPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetPhrase": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string"
+          },
+          "referenceTtsUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "targetPhrase",
+          "translation",
+          "referenceTtsUrl"
+        ],
+        "additionalProperties": false
+      },
+      "PracticeWritingPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "guidance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "task",
+          "guidance"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/PracticeKind"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeUnavailable": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "not_enough_vocab",
+              "nothing_due",
+              "no_content"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeReady": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PracticeKind"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeItem"
+            }
+          },
+          "episodeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "kind",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeReadySpeaking": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready_speaking"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeSpeakingPrompt"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "prompts"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeReadyWriting": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready_writing"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeWritingPrompt"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "prompts"
+        ],
+        "additionalProperties": false
+      },
+      "StartPracticeResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StartPracticeUnavailable"
+          },
+          {
+            "$ref": "#/components/schemas/StartPracticeReady"
+          },
+          {
+            "$ref": "#/components/schemas/StartPracticeReadySpeaking"
+          },
+          {
+            "$ref": "#/components/schemas/StartPracticeReadyWriting"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "status",
+          "mapping": {
+            "unavailable": "#/components/schemas/StartPracticeUnavailable",
+            "ready": "#/components/schemas/StartPracticeReady",
+            "ready_speaking": "#/components/schemas/StartPracticeReadySpeaking",
+            "ready_writing": "#/components/schemas/StartPracticeReadyWriting"
+          }
+        }
+      },
+      "SubmitPracticeRequest": {
+        "type": "object",
+        "properties": {
+          "answers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "itemId",
+                "selectedIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitPracticeResponse": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number"
+          },
+          "correct": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "score",
+          "correct",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "EpisodeStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "DISCOVERING",
+          "EXTRACTING",
+          "RESEARCHING",
+          "PLANNING",
+          "SCRIPTING",
+          "COMPILING",
+          "SCRIPT_READY",
+          "GENERATING_AUDIO",
+          "STITCHING",
+          "READY",
+          "UPDATING",
+          "FAILED",
+          "IMPORTING",
+          "TRANSCRIBING"
+        ]
+      },
+      "EpisodeSegment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "speaker": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "startTime": {
+            "type": "number",
+            "nullable": true
+          },
+          "duration": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "speaker",
+          "text",
+          "audioUrl",
+          "order",
+          "startTime",
+          "duration"
+        ],
+        "additionalProperties": {}
+      },
+      "EpisodeDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EpisodeStatus"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration": {
+            "type": "number",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EpisodeSegment"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "audioUrl",
+          "duration",
+          "language",
+          "segments"
+        ],
+        "additionalProperties": {}
+      },
+      "SpeakingGradeStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "GRADING",
+          "SCORED",
+          "FAILED"
+        ]
+      },
+      "SpeakingPollResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/SpeakingGradeStatus"
+          },
+          "overallScore": {
+            "type": "number",
+            "nullable": true
+          },
+          "transcript": {
+            "type": "string",
+            "nullable": true
+          },
+          "feedback": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "overallScore",
+          "transcript",
+          "feedback"
+        ],
+        "additionalProperties": {}
+      },
+      "SkillType": {
+        "type": "string",
+        "enum": [
+          "GRAMMAR",
+          "READING",
+          "LISTENING",
+          "SPEAKING",
+          "WRITING"
+        ]
+      },
+      "ClassStatus": {
+        "type": "string",
+        "enum": [
+          "LOCKED",
+          "GENERATING",
+          "AVAILABLE",
+          "IN_PROGRESS",
+          "SUBMITTED",
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "SectionStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "GENERATING",
+          "READY",
+          "IN_PROGRESS",
+          "SUBMITTED",
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "ClassQuestion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "question": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "passageRef": {
+            "type": "string",
+            "nullable": true
+          },
+          "passageText": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "question",
+          "options",
+          "passageRef",
+          "passageText"
+        ],
+        "additionalProperties": {}
+      },
+      "ClassSpeakingPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "targetPhrase": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string"
+          },
+          "ipa": {
+            "type": "string",
+            "nullable": true
+          },
+          "referenceTtsUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "targetPhrase",
+          "translation",
+          "ipa",
+          "referenceTtsUrl"
+        ],
+        "additionalProperties": false
+      },
+      "ClassWritingPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "task": {
+            "type": "string"
+          },
+          "guidance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "task",
+          "guidance"
+        ],
+        "additionalProperties": {}
+      },
+      "ClassEpisodeRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "audioUrl",
+          "title"
+        ],
+        "additionalProperties": {}
+      },
+      "ClassSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "skill": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SectionStatus"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassQuestion"
+            }
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSpeakingPrompt"
+            }
+          },
+          "writingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassWritingPrompt"
+            }
+          },
+          "episode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassEpisodeRef"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "skill",
+          "status",
+          "questions",
+          "prompts",
+          "writingPrompts",
+          "episode"
+        ],
+        "additionalProperties": {}
+      },
+      "ClassDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClassStatus"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "passThreshold": {
+            "type": "number"
+          },
+          "submitted": {
+            "type": "boolean"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSection"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "order",
+          "passThreshold",
+          "submitted",
+          "sections"
+        ],
+        "additionalProperties": {}
+      },
+      "NextClassCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "classId"
+        ],
+        "additionalProperties": false
+      },
+      "NextClassDoneResponse": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "done"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitClassRequest": {
+        "type": "object",
+        "properties": {
+          "answers": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questionId": {
+                  "type": "string"
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                }
+              },
+              "required": [
+                "questionId",
+                "selectedIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitClassSectionResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "skill": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "score": {
+            "type": "number"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "skill",
+          "score",
+          "passed"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitClassResponse": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "overallScore": {
+            "type": "number"
+          },
+          "passedSections": {
+            "type": "number"
+          },
+          "totalSections": {
+            "type": "number"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubmitClassSectionResult"
+            }
+          }
+        },
+        "required": [
+          "passed",
+          "overallScore",
+          "passedSections",
+          "totalSections",
+          "sections"
+        ],
+        "additionalProperties": false
+      },
+      "MockExamStatus": {
+        "type": "string",
+        "enum": [
+          "GENERATING",
+          "READY",
+          "IN_PROGRESS",
+          "SUBMITTED",
+          "SCORED",
+          "FAILED"
+        ]
+      },
+      "ExamSpeakingPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "targetPhrase": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string"
+          },
+          "referenceTtsUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "targetPhrase",
+          "translation",
+          "referenceTtsUrl"
+        ],
+        "additionalProperties": false
+      },
+      "ExamEpisodeRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "audioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/EpisodeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "audioUrl",
+          "status"
+        ],
+        "additionalProperties": {}
+      },
+      "ExamSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "skill": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "part": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "format": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SectionStatus"
+          },
+          "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "episode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExamEpisodeRef"
+              }
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassQuestion"
+            }
+          },
+          "speakingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamSpeakingPrompt"
+            }
+          },
+          "writingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassWritingPrompt"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "skill",
+          "part",
+          "order",
+          "format",
+          "weight",
+          "status",
+          "score",
+          "episode",
+          "questions",
+          "speakingPrompts",
+          "writingPrompts"
+        ],
+        "additionalProperties": {}
+      },
+      "ExamResult": {
+        "type": "object",
+        "properties": {
+          "overallScore": {
+            "type": "number",
+            "nullable": true
+          },
+          "band": {
+            "type": "string",
+            "nullable": true
+          },
+          "feedback": {
+            "type": "string",
+            "nullable": true
+          },
+          "sectionResults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sectionId": {
+                  "type": "string"
+                },
+                "skill": {
+                  "$ref": "#/components/schemas/SkillType"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "feedback": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "sectionId",
+                "skill",
+                "score",
+                "feedback"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "overallScore",
+          "band",
+          "feedback",
+          "sectionResults"
+        ],
+        "additionalProperties": {}
+      },
+      "ExamDetailResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "institution": {
+            "type": "string"
+          },
+          "institutionLabel": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MockExamStatus"
+          },
+          "examName": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamSection"
+            }
+          },
+          "result": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExamResult"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "institution",
+          "institutionLabel",
+          "level",
+          "status",
+          "examName",
+          "sections",
+          "result"
+        ],
+        "additionalProperties": {}
+      },
+      "StartExamRequest": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          }
+        },
+        "required": [
+          "courseId"
+        ],
+        "additionalProperties": false
+      },
+      "StartExamResponse": {
+        "type": "object",
+        "properties": {
+          "examId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "examId"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitExamRequest": {
+        "type": "object",
+        "properties": {
+          "answers": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questionId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "questionId",
+                "selectedIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "ExamSectionScore": {
+        "type": "object",
+        "properties": {
+          "sectionId": {
+            "type": "string"
+          },
+          "skill": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sectionId",
+          "skill",
+          "weight",
+          "score"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitExamResponse": {
+        "type": "object",
+        "properties": {
+          "overallScore": {
+            "type": "number"
+          },
+          "band": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExamSectionScore"
+            }
+          },
+          "feedback": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "overallScore",
+          "band",
+          "sections",
+          "feedback"
+        ],
+        "additionalProperties": false
+      },
+      "PlacementQuestion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cefr": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "cefr",
+          "skill",
+          "prompt",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "GeneratePlacementResponse": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlacementQuestion"
+            }
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "questions"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitPlacementRequest": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "target": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "answers": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                }
+              },
+              "required": [
+                "id",
+                "selectedIndex"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitPlacementResponse": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "scoreBySkill": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "courseId",
+          "level",
+          "scoreBySkill"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "vocab",
+              "grammar"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "number"
+          },
+          "due": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "strength",
+          "due"
+        ],
+        "additionalProperties": {}
+      },
+      "MemoryEdge": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "type",
+          "weight"
+        ],
+        "additionalProperties": {}
+      },
+      "MemoryGraphResponse": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryEdge"
+            }
+          }
+        },
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "additionalProperties": {}
+      },
+      "OnboardingInfra": {
+        "type": "object",
+        "properties": {
+          "aiProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "aiModel": {
+            "type": "string",
+            "nullable": true
+          },
+          "aiBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sttProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "sttBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sttModel": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttsProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "ttsBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "storageProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "s3Bucket": {
+            "type": "string",
+            "nullable": true
+          },
+          "s3Region": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": {}
+      },
+      "OnboardingConfigResponse": {
+        "type": "object",
+        "properties": {
+          "selfHosted": {
+            "type": "boolean"
+          },
+          "isOwner": {
+            "type": "boolean"
+          },
+          "infra": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingInfra"
+              }
+            ]
+          }
+        },
+        "required": [
+          "selfHosted",
+          "isOwner",
+          "infra"
+        ],
+        "additionalProperties": false
+      },
+      "MeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "handle": {
+            "type": "string",
+            "nullable": true
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": {}
+      },
+      "InteractionStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "ANSWERING",
+          "ANSWERED",
+          "RESOLVED",
+          "INCORPORATING",
+          "INCORPORATED"
+        ]
+      },
+      "AskInteractionRequest": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "timestamp": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "question",
+          "timestamp"
+        ],
+        "additionalProperties": false
+      },
+      "InteractionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InteractionStatus"
+          },
+          "answer": {
+            "type": "string",
+            "nullable": true
+          },
+          "helpful": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "segmentOrder": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "timestamp",
+          "status",
+          "answer",
+          "helpful",
+          "segmentOrder"
+        ],
+        "additionalProperties": {}
+      },
+      "RedeemPairingRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "RedeemPairingResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PairedUser"
+              }
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "PairedUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string",
+            "nullable": true
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "handle",
+          "image",
+          "role"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Liveness and dependency health for the instance.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Degraded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses": {
+      "get": {
+        "operationId": "listCourses",
+        "summary": "List the authenticated learner's courses.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoursesListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/practice": {
+      "get": {
+        "operationId": "getPracticeOverview",
+        "summary": "Due counts per skill, total vocab, and recent practice sessions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PracticeOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "startPractice",
+        "summary": "Start an ungated, single-skill practice session.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartPracticeResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartPracticeResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPracticeRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/{sessionId}/submit": {
+      "post": {
+        "operationId": "submitPractice",
+        "summary": "Grade a practice session and update spaced-repetition state.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPracticeResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPracticeRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/episodes/{episodeId}": {
+      "get": {
+        "operationId": "getEpisode",
+        "summary": "Episode detail with ordered segments and playable audio URLs.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "episodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/{sessionId}/speaking/{promptId}": {
+      "get": {
+        "operationId": "pollSpeaking",
+        "summary": "Poll grading status for an uploaded speaking attempt.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpeakingPollResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}": {
+      "get": {
+        "operationId": "getClass",
+        "summary": "A gated class with its ordered, mixed-skill sections.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/submit": {
+      "post": {
+        "operationId": "submitClass",
+        "summary": "Grade a class submission and release the gate on pass.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitClassResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitClassRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exams": {
+      "post": {
+        "operationId": "startExam",
+        "summary": "Start a full-length mock exam for a course.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartExamResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExamRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exams/{examId}": {
+      "get": {
+        "operationId": "getExam",
+        "summary": "A mock exam with its ordered sections and (once scored) result.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "examId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exams/{examId}/submit": {
+      "post": {
+        "operationId": "submitExam",
+        "summary": "Score a completed mock exam and return the band breakdown.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitExamResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "examId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitExamRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/placement": {
+      "get": {
+        "operationId": "generatePlacement",
+        "summary": "Generate an adaptive placement batch for a native/target pair.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratePlacementResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "native",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "submitPlacement",
+        "summary": "Submit placement answers; assign a CEFR level and create the course.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitPlacementResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPlacementRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/graph": {
+      "get": {
+        "operationId": "getGraph",
+        "summary": "The course's vocabulary/grammar memory graph.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryGraphResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/onboarding/config": {
+      "get": {
+        "operationId": "onboardingConfig",
+        "summary": "Instance + owner config (self-hosted, owner, non-secret infra).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingConfigResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "operationId": "getMe",
+        "summary": "The authenticated learner identity (id, name, email, handle).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/episodes/{episodeId}/interact": {
+      "post": {
+        "operationId": "askInteraction",
+        "summary": "Ask a contextual question about an episode; queues an answer.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "episodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskInteractionRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/episodes/{episodeId}/interact/{interactionId}": {
+      "get": {
+        "operationId": "pollInteraction",
+        "summary": "Poll an interaction until it is ANSWERED with answer text.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "episodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "interactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/pair/redeem": {
+      "post": {
+        "operationId": "redeemPairingToken",
+        "summary": "Exchange a single-use pairing token for a long-lived API key.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedeemPairingResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemPairingRequest"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

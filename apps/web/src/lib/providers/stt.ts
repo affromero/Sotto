@@ -2,6 +2,7 @@ import { logger } from '../logger';
 import { getSttProviderMeta, isValidSttProviderId, type SttProviderId } from './stt-registry';
 import { getAiKey, getByokKey } from '../byok';
 import { infra } from '../server-config';
+import { detectAudioFormat } from '../audio-format';
 
 export type { SttProviderId } from './stt-registry';
 
@@ -90,7 +91,8 @@ class OpenAIWhisperProvider implements SttProvider {
 
     const startTime = Date.now();
     const uint8Array = new Uint8Array(audio);
-    const file = new File([uint8Array], 'audio.mp3', { type: 'audio/mpeg' });
+    const { ext, mime } = detectAudioFormat(audio);
+    const file = new File([uint8Array], `audio.${ext}`, { type: mime });
 
     try {
       const response = await this.client.audio.transcriptions.create({
@@ -195,8 +197,9 @@ class ElevenLabsScribeProvider implements SttProvider {
 
     const formData = new FormData();
     const uint8Array = new Uint8Array(audio);
-    const blob = new Blob([uint8Array], { type: 'audio/mpeg' });
-    formData.append('file', blob, 'audio.mp3');
+    const { ext, mime } = detectAudioFormat(audio);
+    const blob = new Blob([uint8Array], { type: mime });
+    formData.append('file', blob, `audio.${ext}`);
     formData.append('model_id', this.model);
     formData.append('tag_audio_events', 'false');
     formData.append('diarize', 'false');
@@ -341,7 +344,7 @@ class DeepgramProvider implements SttProvider {
       method: 'POST',
       headers: {
         Authorization: `Token ${this.apiKey}`,
-        'Content-Type': 'audio/mpeg',
+        'Content-Type': detectAudioFormat(audio).mime,
       },
       body: new Uint8Array(audio),
     });

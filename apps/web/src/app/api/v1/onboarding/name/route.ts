@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
@@ -18,12 +18,13 @@ const nameSchema = z.object({
  * POST /api/onboarding/name
  * Set the user's display name during onboarding.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return errorResponse('Unauthorized', 401);
     }
+    const userId = authed.userId;
 
     const body = await request.json();
     const validation = nameSchema.safeParse(body);
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { name },
     });
 

@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const userId = session.user.id;
+  const userId = authed.userId;
 
   const [
     user,

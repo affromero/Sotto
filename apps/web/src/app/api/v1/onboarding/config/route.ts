@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { requireAdmin } from '@/lib/auth-guards';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { getSiteConfig } from '@/lib/site-config';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { errorResponse } from '@/lib/api-response';
@@ -13,19 +13,19 @@ import { logger } from '@/lib/logger';
  * signed-in user is the owner (may set server infrastructure), and the current
  * non-secret infra selection so the wizard can prefill it. No secrets returned.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const selfHosted = isSelfHosted();
     if (!selfHosted) {
       return NextResponse.json({ selfHosted: false, isOwner: false, infra: null });
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return errorResponse('Unauthorized', 401);
     }
 
-    const isOwner = (await requireAdmin()) !== null;
+    const isOwner = await isUserAdmin(authed.userId);
 
     const config = await getSiteConfig();
     const infra = isOwner

@@ -91,6 +91,9 @@ const mockEpisode = {
   id: 'episode-123',
   userId: 'owner-123',
   title: 'Test Episode',
+  // UNLISTED so a non-owner (the default authed 'user-123') may still ask a Q&A;
+  // the ownership/visibility guard only blocks non-owners on PRIVATE episodes.
+  visibility: 'UNLISTED',
 };
 
 const mockInteraction = {
@@ -280,5 +283,29 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
       'PROCESS_INTERACTION',
       expect.anything()
     );
+  });
+
+  it('returns 404 and does not create or enqueue when a non-owner asks on a PRIVATE episode', async () => {
+    // user-b is not the owner (user-a) and the episode is PRIVATE.
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-b' });
+    mockEpisodeFindUnique.mockResolvedValue({
+      id: 'episode-123',
+      userId: 'user-a',
+      title: 'Private Episode',
+      visibility: 'PRIVATE',
+    });
+
+    const { request, params } = createRequest('episode-123', {
+      question: 'Trying to peek into a private episode',
+      timestamp: 30,
+    });
+
+    const response = await POST(request, params);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe('Episode not found');
+    expect(mockInteractionCreate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 });

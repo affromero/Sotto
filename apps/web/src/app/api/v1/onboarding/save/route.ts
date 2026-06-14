@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin } from '@/lib/auth-guards';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { onboardingSaveSchema } from '@/lib/validations';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
 import { setCourseNote } from '@/lib/course-notes';
@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ demo: true });
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return errorResponse('Unauthorized', 401);
     }
-    const userId = session.user.id;
+    const userId = authed.userId;
 
     const parsed = onboardingSaveSchema.safeParse(await request.json());
     if (!parsed.success) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Server infrastructure is owner-only. Reject (don't silently drop) a
     // non-owner attempting to set it.
-    const isOwner = (await requireAdmin()) !== null;
+    const isOwner = await isUserAdmin(authed.userId);
     if (infra && !isOwner) {
       return errorResponse('Only the instance owner can set server infrastructure.', 403);
     }

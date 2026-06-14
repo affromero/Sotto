@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { getAutoModelConfig, resolveSttIncludedModels } from '@/lib/auto-model-config';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
@@ -52,14 +52,14 @@ interface SttModelOption {
   tier: string;
 }
 
-export async function GET() {
-  const session = await auth();
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
 
   const configuredProviders: string[] = [];
   let isByok = false;
 
-  if (session?.user?.id) {
-    const userId = session.user.id;
+  if (authed) {
+    const userId = authed.userId;
 
     // Check all provider keys in parallel
     const [openAiKey, elevenLabsKey, togetherKey, deepgramKey, assemblyAiKey, autoConfig, infra] = await Promise.all([

@@ -1,16 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
 const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockGetVoiceCatalog = vi.fn();
 const mockGetByokKey = vi.fn();
 const mockCreateTtsProviderAsync = vi.fn();
-
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -51,15 +46,6 @@ import { POST as POST_PREVIEW } from '@/app/api/v1/voices/preview/route';
 function createRequest(url = 'http://localhost:3000/api/v1/voices', options?: RequestInit): NextRequest {
   return new NextRequest(url, options as ConstructorParameters<typeof NextRequest>[1]);
 }
-
-const mockSession = {
-  user: {
-    id: 'user-1',
-    email: 'test@example.com',
-    name: 'Test User',
-  },
-  expires: '2026-12-31',
-};
 
 describe('GET /api/v1/voices', () => {
   beforeEach(() => {
@@ -180,7 +166,7 @@ describe('POST /api/v1/voices/preview', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await POST_PREVIEW(createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
@@ -193,7 +179,7 @@ describe('POST /api/v1/voices/preview', () => {
   });
 
   it('returns 429 when rate limit is exceeded', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0 });
 
     const response = await POST_PREVIEW(createRequest('http://localhost:3000/api/v1/voices/preview', {
@@ -207,7 +193,7 @@ describe('POST /api/v1/voices/preview', () => {
   });
 
   it('returns 400 when preview request is invalid', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
 
     const response = await POST_PREVIEW(createRequest('http://localhost:3000/api/v1/voices/preview', {
@@ -219,7 +205,7 @@ describe('POST /api/v1/voices/preview', () => {
   });
 
   it('returns 400 when no provider key is available', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     mockGetByokKey.mockResolvedValue(null);
 
@@ -234,7 +220,7 @@ describe('POST /api/v1/voices/preview', () => {
   });
 
   it('generates preset voice preview audio', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     const mockAudioBuffer = Buffer.from('fake-audio-data');
     const generateSpeech = vi.fn().mockResolvedValue(mockAudioBuffer);

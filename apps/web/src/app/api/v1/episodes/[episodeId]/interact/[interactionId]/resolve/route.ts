@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { resolveInteractionSchema } from '@/lib/validations';
 
@@ -8,11 +8,12 @@ type RouteParams = { params: Promise<{ episodeId: string; interactionId: string 
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { interactionId } = await params;
-  const session = await auth();
+  const authed = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
+  const userId = authed.userId;
 
   const body = await request.json().catch(() => ({}));
   const parsed = resolveInteractionSchema.safeParse(body);
@@ -29,7 +30,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Interaction not found', 404);
   }
 
-  if (interaction.userId !== session.user.id) {
+  if (interaction.userId !== userId) {
     return errorResponse('Forbidden', 403);
   }
 
