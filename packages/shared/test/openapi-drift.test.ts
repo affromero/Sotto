@@ -4,6 +4,7 @@ import {
   buildOpenApiDocument,
   OPENAPI_CODEGEN_OUTPUT_PATH,
   OPENAPI_OUTPUT_PATH,
+  OPENAPI_TUI_VENDOR_PATH,
 } from '../scripts/generate-openapi';
 import { endpoints } from '../src/contracts';
 import {
@@ -49,6 +50,15 @@ describe('openapi.json drift guard', () => {
     );
     const regenerated = buildOpenApiDocument({ codegen: true });
     expect(regenerated).toEqual(committed);
+  });
+
+  it('the tui crate vendored codegen spec is byte-for-byte in sync', () => {
+    // `tui/openapi.codegen.json` is the copy the Rust `generate_api!` macro reads
+    // so the crate builds standalone / is publishable. `gen:openapi` writes it
+    // alongside the canonical spec; this guards against an out-of-sync vendor.
+    const canonical = readFileSync(OPENAPI_CODEGEN_OUTPUT_PATH, 'utf8');
+    const vendored = readFileSync(OPENAPI_TUI_VENDOR_PATH, 'utf8');
+    expect(vendored).toBe(canonical);
   });
 
   it('codegen spec excludes operations progenitor cannot generate', () => {

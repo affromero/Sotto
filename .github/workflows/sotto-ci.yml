@@ -1,0 +1,97 @@
+name: sotto TUI CI
+
+# Gates the `sotto` Rust crate (tui/) like the rest of the repo: build, clippy,
+# fmt, and test. Path-isolated so it runs ONLY when the TUI crate, its vendored
+# OpenAPI spec, or the contracts/generator that produces that spec change — never
+# on ordinary web-app changes (those are covered by ci.yml).
+#
+# The crate reads a vendored copy `tui/openapi.codegen.json`, byte-synced to the
+# canonical `packages/shared/openapi.codegen.json` by `npm run gen:openapi`. A
+# @sotto/shared test (`openapi-drift`) asserts that sync. The web CI runs only
+# @sotto/web, so this workflow runs the shared tests itself — otherwise a
+# canonical↔vendored drift could merge undetected.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tui/**'
+      # The whole shared workspace: the contracts/generator that produce the
+      # vendored spec AND the package.json/vitest wiring the vendor-sync job runs.
+      - 'packages/shared/**'
+      - '.github/workflows/sotto-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tui/**'
+      - 'packages/shared/**'
+      - '.github/workflows/sotto-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sotto-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    working-directory: tui
+
+jobs:
+  check:
+    name: Build, clippy, fmt, test
+    runs-on: ubuntu-latest
+    steps:
+      # Only tui/ is read (spec is vendored in-crate); no submodules needed.
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install ALSA dev headers (cpal/rodio link to libasound)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tui
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --locked
+
+      - name: Test
+        run: cargo test
+
+  vendor-sync:
+    name: OpenAPI vendor sync (@sotto/shared drift)
+    runs-on: ubuntu-latest
+    # This job lives at the repo root, not in tui/.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      # No submodules needed: @sotto/shared has no submodule dependencies.
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run @sotto/shared tests (OpenAPI drift + tui vendor sync)
+        # Includes `the tui crate vendored codegen spec is byte-for-byte in sync`,
+        # which fails if tui/openapi.codegen.json drifts from the canonical spec.
+        run: npm test --workspace=@sotto/shared -- --run

@@ -1,14 +1,33 @@
+# The crate is published as `sotto-tui` because the bare `sotto` name is already
+# taken on crates.io. The installed binary is still `sotto` (see `[[bin]]`), so
+# users run `cargo install sotto-tui` and then `sotto`.
 [package]
-name = "sotto"
+name = "sotto-tui"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Sotto terminal client — your course in the terminal"
-license = "MIT"
+description = "Headless terminal client for the Sotto language-learning platform: CEFR courses, vocab SRS, listening/speaking, and native audio in your terminal."
+license = "AGPL-3.0-only"
+repository = "https://github.com/affromero/Sotto"
+homepage = "https://github.com/affromero/Sotto"
+readme = "README.md"
+keywords = ["language-learning", "tui", "cli", "terminal", "learning"]
+categories = ["command-line-utilities", "education"]
+# Files shipped to crates.io. The macro-read spec is vendored in-crate so the
+# build works without the `packages/shared` workspace path (which does not ship).
+include = [
+    "src/**/*.rs",
+    "openapi.codegen.json",
+    "README.md",
+    "Cargo.toml",
+]
 
 [[bin]]
 name = "sotto"
 path = "src/main.rs"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--deny", "warnings"]
 
 [dependencies]
 ratatui = { version = "0.30", features = ["serde"] }
