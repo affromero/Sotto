@@ -2992,6 +2992,25 @@ mod tests {
     }
 
     #[test]
+    fn placement_answer_can_select_the_idk_option() {
+        // The server appends a native-language "I don't know" as a 5th option
+        // (index 4); the count-driven submit must carry that selection unchanged.
+        let resp = placement_response(serde_json::json!({
+            "native": "en", "target": "es",
+            "questions": [
+                { "id": "pq_0", "cefr": "A1", "skill": "grammar", "prompt": "?",
+                  "options": ["a", "b", "c", "d", "No lo sé"] }
+            ]
+        }));
+        let questions = placement_questions(&resp).expect("well-formed");
+        assert_eq!(questions[0].options.len(), 5);
+
+        let answers = build_placement_answers(&questions, &[Some(4)]).expect("valid");
+        assert_eq!(answers.len(), 1);
+        assert_eq!(answers[0].selected_index, 4);
+    }
+
+    #[test]
     fn build_placement_answers_omits_unanswered_questions() {
         let qs = vec![
             PlacementQuestion {
