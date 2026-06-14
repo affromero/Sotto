@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { voicePreviewSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
@@ -22,12 +22,13 @@ function getPlatformPreviewKey(provider: TtsProviderId): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
+  const userId = authed.userId;
 
-  const rateLimit = await checkRateLimit(`voice-preview:${session.user.id}`, 10, 60);
+  const rateLimit = await checkRateLimit(`voice-preview:${userId}`, 10, 60);
   if (!rateLimit.allowed) {
     return errorResponse('Rate limit exceeded. Try again in a minute.', 429);
   }
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   const providerName: TtsProviderId = provider;
 
   try {
-    const byokKey = await getByokKey(session.user.id, providerName);
+    const byokKey = await getByokKey(userId, providerName);
     const apiKey = byokKey || getPlatformPreviewKey(providerName);
 
     if (!apiKey) {
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     category: 'voice_preview',
     inputTokens: text.length,
     totalCost: (text.length / 1000) * meta.platformCostPerKChar,
-    userId: session.user.id,
+    userId,
   });
 
   const uint8 = new Uint8Array(audioBuffer);

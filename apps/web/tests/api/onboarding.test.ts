@@ -1,16 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
 const mockAuthenticateRequest = vi.fn();
 const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
 const mockTagUpsert = vi.fn();
 const mockTransaction = vi.fn();
-
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -177,8 +172,8 @@ describe('POST /api/v1/onboarding/interests', () => {
   });
 });
 
-function createNameRequest(body?: object): Request {
-  return new Request('http://localhost:3000/api/v1/onboarding/name', {
+function createNameRequest(body?: object): NextRequest {
+  return new NextRequest('http://localhost:3000/api/v1/onboarding/name', {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -193,7 +188,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await setName(createNameRequest({ name: 'Alice' }));
     const body = await response.json();
@@ -203,7 +198,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('returns 400 for empty name', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const response = await setName(createNameRequest({ name: '' }));
     const body = await response.json();
@@ -213,7 +208,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('returns 400 for missing name field', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const response = await setName(createNameRequest({}));
 
@@ -221,7 +216,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('returns 400 when validateDisplayName rejects', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockValidateDisplayName.mockReturnValue({ valid: false, reason: 'Please enter a real name' });
 
     const response = await setName(createNameRequest({ name: 'aaaa' }));
@@ -232,7 +227,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('returns 400 when moderateDisplayName rejects', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockModerateDisplayName.mockResolvedValue({ valid: false, reason: 'This name contains inappropriate content' });
 
     const response = await setName(createNameRequest({ name: 'BadWord' }));
@@ -243,7 +238,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('saves name and returns success', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockUserUpdate.mockResolvedValue({ id: 'user-1', name: 'Alice' });
 
     const response = await setName(createNameRequest({ name: 'Alice' }));
@@ -258,7 +253,7 @@ describe('POST /api/v1/onboarding/name', () => {
   });
 
   it('trims whitespace from name before saving', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockUserUpdate.mockResolvedValue({ id: 'user-1', name: 'Alice' });
 
     const response = await setName(createNameRequest({ name: '  Alice  ' }));

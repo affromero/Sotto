@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ episodeId: string; interactionId: string }> };
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   const { episodeId, interactionId } = await params;
-  const session = await auth();
+  const authed = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
+  const userId = authed.userId;
 
   const interaction = await prisma.interaction.findUnique({
     where: { id: interactionId, episodeId },
@@ -34,8 +35,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Interaction not found', 404);
   }
 
-  const isOwner = interaction.userId === session.user.id;
-  const isEpisodeOwner = interaction.episode.userId === session.user.id;
+  const isOwner = interaction.userId === userId;
+  const isEpisodeOwner = interaction.episode.userId === userId;
   const isShared = interaction.episode.visibility === 'UNLISTED';
 
   if (!isOwner && !isEpisodeOwner && !isShared) {

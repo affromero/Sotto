@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
-const mockRequireAdmin = vi.fn();
+const mockIsUserAdmin = vi.fn();
 const mockIsSelfHosted = vi.fn();
 const mockGetOrCreateCurriculum = vi.fn();
 const mockCourseUpsert = vi.fn();
@@ -19,7 +19,7 @@ const mockInvalidate = vi.fn();
 
 vi.mock('@/lib/auth', () => ({ auth: (...a: unknown[]) => mockAuth(...a) }));
 vi.mock('@/lib/auth-guards', () => ({
-  requireAdmin: (...a: unknown[]) => mockRequireAdmin(...a),
+  isUserAdmin: (...a: unknown[]) => mockIsUserAdmin(...a),
 }));
 vi.mock('@/lib/self-hosted', () => ({
   isSelfHosted: (...a: unknown[]) => mockIsSelfHosted(...a),
@@ -67,7 +67,7 @@ describe('POST /api/v1/onboarding/save', () => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { id: 'u1' } });
     mockIsSelfHosted.mockReturnValue(true);
-    mockRequireAdmin.mockResolvedValue(null);
+    mockIsUserAdmin.mockResolvedValue(false);
     mockGetOrCreateCurriculum.mockResolvedValue({ id: 'cur1' });
     mockCourseUpsert.mockResolvedValue({ id: 'course1' });
     mockUserUpdate.mockResolvedValue({});
@@ -115,7 +115,7 @@ describe('POST /api/v1/onboarding/save', () => {
   });
 
   it('rejects a non-owner attempting to set server infra (403)', async () => {
-    mockRequireAdmin.mockResolvedValue(null);
+    mockIsUserAdmin.mockResolvedValue(false);
     const res = await POST(req({ ...BASE, infra: { ttsProvider: 'kokoro' } }));
     expect(res.status).toBe(403);
     expect(mockSetSiteConfig).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe('POST /api/v1/onboarding/save', () => {
   });
 
   it('persists server infra when the caller is the owner', async () => {
-    mockRequireAdmin.mockResolvedValue('u1');
+    mockIsUserAdmin.mockResolvedValue(true);
     const res = await POST(
       req({ ...BASE, infra: { ttsProvider: 'kokoro', ttsBaseUrl: 'http://localhost:8000' } })
     );

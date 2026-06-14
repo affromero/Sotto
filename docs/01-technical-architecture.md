@@ -2,6 +2,8 @@
 
 > **Date**: 2026-06-13
 >
+> **Diagrams**: [06-architecture-diagrams.md](./06-architecture-diagrams.md) renders every flow below as Mermaid.
+>
 > **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
 
 ---
@@ -48,7 +50,8 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 |---|---|
 | `apps/web` | Next.js app, `/api/v1` routes, Prisma schema, workers, tests |
 | `apps/desktop` | Tauri desktop shell, built outside the npm workspaces |
-| `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
+| `tui/` | Rust + ratatui headless terminal client (the `sotto` binary), built outside the npm workspaces; consumes `/api/v1` over HTTP with a progenitor-generated client |
+| `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers; also emits the OpenAPI contract the `tui/` client is generated from |
 | `packages/mcp` | MCP integration surface for local agents |
 | `packages/groundcheck` | Reference verification standard package |
 | `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
@@ -65,7 +68,7 @@ The active data model is learner and course oriented. Important groups:
 
 | Group | Models |
 |---|---|
-| Identity | `User`, `Account`, `Session`, `VerificationToken`, `ApiKey` |
+| Identity | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`) |
 | Curriculum | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle` |
 | Enrollment | `Course`, `CourseNote`, `PlacementResult` |
 | Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer` |
@@ -87,12 +90,14 @@ The active data model is learner and course oriented. Important groups:
 API routes follow the same shape:
 
 ```text
-auth()
+authenticateRequest()        # Bearer sk_sotto_... first, then the local session fallback
   -> validate input with Zod
-  -> check ownership or admin permission
+  -> check ownership or admin permission against the authenticated userId
   -> perform a small database change or enqueue work
   -> return NextResponse.json()
 ```
+
+Most `/api/v1` routes authenticate with `authenticateRequest()`, which accepts a Bearer `sk_sotto_` API key first — used by the `sotto` CLI, local agents, and connected devices — and falls back to the web session. In the single-learner build `auth()` resolves to the local owner without session verification, so the API trusts the local owner by construction: a remotely exposed instance must be gated at the proxy/deploy layer, and admin-only routes resolve the authenticated user's role with `isUserAdmin(userId)` rather than the ambient session.
 
 Routes should not run LLM calls, TTS calls, transcription, video work, or audio stitching directly. They enqueue jobs or call narrow synchronous helpers only when the work is intentionally lightweight, such as scoring a writing response.
 
@@ -134,13 +139,17 @@ Audio statuses remain:
 PENDING
 DISCOVERING
 EXTRACTING
+RESEARCHING
+PLANNING
 SCRIPTING
-VERIFYING_SCRIPT
-VALIDATING_REFERENCES
+COMPILING
 SCRIPT_READY
 GENERATING_AUDIO
 STITCHING
 READY
+UPDATING
+IMPORTING
+TRANSCRIBING
 FAILED
 ```
 
@@ -153,6 +162,8 @@ SpeakingRecording
   -> rubric and phoneme feedback
   -> status SCORED or FAILED
 ```
+
+Speaking uploads carry containerized audio bytes only. `detectAudioFormat()` sniffs the leading magic bytes (WebM, WAV, Ogg, FLAC, MP4, MP3) to set the stored R2 extension, the content type, and the STT filename/MIME — the browser uploads WebM/Opus, the `sotto` CLI uploads WAV. Raw PCM must be wrapped as WAV before upload.
 
 Worker rules:
 
@@ -299,7 +310,7 @@ Storage rules:
 
 Security priorities:
 
-- Session auth for dashboard, learning routes, settings, and admin.
+- Bearer `sk_sotto_` API-key auth for `/api/v1` (CLI, local agents, connected devices), with the web session as fallback; admin-only routes resolve the authenticated user's DB role, not the ambient session.
 - Route-level ownership checks for every course, class, practice session, exam, recording, and memory graph.
 - Encrypted user provider keys.
 - Token-authenticated local-agent and connected-device API flows.

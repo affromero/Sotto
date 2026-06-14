@@ -1,0 +1,69 @@
+# The crate is published as `sotto-tui` because the bare `sotto` name is already
+# taken on crates.io. The installed binary is still `sotto` (see `[[bin]]`), so
+# users run `cargo install sotto-tui` and then `sotto`.
+[package]
+name = "sotto-tui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Headless terminal client for the Sotto language-learning platform: CEFR courses, vocab SRS, listening/speaking, and native audio in your terminal."
+license = "AGPL-3.0-only"
+repository = "https://github.com/affromero/Sotto"
+homepage = "https://github.com/affromero/Sotto"
+readme = "README.md"
+keywords = ["language-learning", "tui", "cli", "terminal", "learning"]
+categories = ["command-line-utilities", "education"]
+# Files shipped to crates.io. The macro-read spec is vendored in-crate so the
+# build works without the `packages/shared` workspace path (which does not ship).
+include = [
+    "src/**/*.rs",
+    "openapi.codegen.json",
+    "README.md",
+    "Cargo.toml",
+]
+
+[[bin]]
+name = "sotto"
+path = "src/main.rs"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--deny", "warnings"]
+
+[dependencies]
+ratatui = { version = "0.30", features = ["serde"] }
+crossterm = { version = "0.29", features = ["event-stream", "serde"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures = "0.3"
+color-eyre = "0.6"
+clap = { version = "4", features = ["derive"] }
+
+# reqwest 0.13 is required because progenitor-client 0.14 depends on
+# reqwest ^0.13.2; the generated client and our wrapper must share the
+# same reqwest major version or the `reqwest::Client` type will not match.
+# In 0.13 the rustls TLS feature is named `rustls` (it bundles the
+# platform verifier), not `rustls-tls` as in 0.12.
+reqwest = { version = "0.13", default-features = false, features = [
+    "json",
+    "multipart",
+    "rustls",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+directories = "6"
+async-trait = "0.1"
+
+# Generated API client + its runtime requirements.
+progenitor = "0.14"
+progenitor-client = "0.14"
+bytes = "1"
+futures-core = "0.3"
+
+# Audio: playback (rodio), capture (cpal), and WAV encoding (hound).
+rodio = "0.22"
+cpal = "0.18"
+hound = "3"
+
+[dev-dependencies]
+tempfile = "3"

@@ -87,8 +87,29 @@ function makePostRequest(
 }
 
 function makeAudioFile(type = 'audio/webm') {
+  // Lead with the WebM/EBML magic bytes so detectAudioFormat() recognizes the
+  // container the browser's MediaRecorder produces (the upload route derives the
+  // R2 key extension + content-type from the bytes, not the declared MIME).
+  const bytes = new Uint8Array(64);
+  bytes.set([0x1a, 0x45, 0xdf, 0xa3], 0);
   return {
-    arrayBuffer: async () => new ArrayBuffer(64),
+    arrayBuffer: async () => bytes.buffer,
+    type,
+  };
+}
+
+function makeEmptyAudioFile(type = 'audio/webm') {
+  return {
+    arrayBuffer: async () => new ArrayBuffer(0),
+    type,
+  };
+}
+
+function makeGarbageAudioFile(type = 'audio/webm') {
+  // Random bytes that match no known audio container magic.
+  const bytes = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]);
+  return {
+    arrayBuffer: async () => bytes.buffer,
     type,
   };
 }
@@ -131,6 +152,26 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     const req = makePostRequest('class-001', 'prompt-001', null);
     const res = await POST(req, routeParams('class-001', 'prompt-001'));
     expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a zero-byte audio upload without storing or queuing', async () => {
+    const req = makePostRequest('class-001', 'prompt-001', makeEmptyAudioFile());
+    const res = await POST(req, routeParams('class-001', 'prompt-001'));
+
+    expect(res.status).toBe(400);
+    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for random non-audio bytes without storing or queuing', async () => {
+    const req = makePostRequest('class-001', 'prompt-001', makeGarbageAudioFile());
+    const res = await POST(req, routeParams('class-001', 'prompt-001'));
+
+    expect(res.status).toBe(400);
+    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('creates a PENDING SpeakingRecording and returns 201', async () => {
