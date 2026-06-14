@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectAudioFormat } from '@/lib/audio-format';
+import { detectAudioFormat, isRecognizedAudio } from '@/lib/audio-format';
 
 function withHeader(...parts: Array<string | number[]>): Buffer {
   const chunks = parts.map((p) =>
@@ -46,5 +46,51 @@ describe('detectAudioFormat', () => {
       ext: 'mp3',
       mime: 'audio/mpeg',
     });
+  });
+});
+
+describe('isRecognizedAudio', () => {
+  it('returns true for a minimal RIFF/WAVE header', () => {
+    expect(isRecognizedAudio(withHeader('RIFF', [0, 0, 0, 0], 'WAVE'))).toBe(true);
+  });
+
+  it('returns true for an EBML/WebM header', () => {
+    expect(isRecognizedAudio(withHeader([0x1a, 0x45, 0xdf, 0xa3]))).toBe(true);
+  });
+
+  it('returns true for an OggS header', () => {
+    expect(isRecognizedAudio(withHeader('OggS'))).toBe(true);
+  });
+
+  it('returns true for a fLaC header', () => {
+    expect(isRecognizedAudio(withHeader('fLaC'))).toBe(true);
+  });
+
+  it('returns true for an ftyp (MP4/M4A) box', () => {
+    expect(isRecognizedAudio(withHeader([0, 0, 0, 0x20], 'ftyp'))).toBe(true);
+  });
+
+  it('returns true for an ID3 tag', () => {
+    expect(isRecognizedAudio(withHeader('ID3'))).toBe(true);
+  });
+
+  it('returns false for a zero-byte buffer', () => {
+    expect(isRecognizedAudio(Buffer.alloc(0))).toBe(false);
+  });
+
+  it('returns false for a too-small (3-byte) garbage buffer', () => {
+    expect(isRecognizedAudio(Buffer.from([0x00, 0x01, 0x02]))).toBe(false);
+  });
+
+  it('returns false for random bytes that match no container', () => {
+    expect(isRecognizedAudio(Buffer.from([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]))).toBe(
+      false
+    );
+  });
+
+  it('detectAudioFormat still falls back to mp3 for the same garbage isRecognizedAudio rejects', () => {
+    const garbage = Buffer.from([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]);
+    expect(isRecognizedAudio(garbage)).toBe(false);
+    expect(detectAudioFormat(garbage)).toEqual({ ext: 'mp3', mime: 'audio/mpeg' });
   });
 });

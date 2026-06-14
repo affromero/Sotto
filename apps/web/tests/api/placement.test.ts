@@ -144,6 +144,16 @@ describe('GET /api/v1/placement', () => {
     expect(mockGeneratePlacement).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when native and target are the same language', async () => {
+    const response = await GET(makeGetRequest({ native: 'en', target: 'en' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/differ/i);
+    expect(mockGeneratePlacement).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
   it('returns 429 when rate limit is exceeded', async () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
 
@@ -251,6 +261,16 @@ describe('POST /api/v1/placement', () => {
     const response = await POST(makePostRequest({ target: 'de', answers }));
 
     expect(response.status).toBe(400);
+    expect(mockCourseUpsert).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when native and target are the same language', async () => {
+    const response = await POST(makePostRequest({ native: 'en', target: 'en', answers }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/differ/i);
+    expect(mockGetOrCreateCurriculum).not.toHaveBeenCalled();
     expect(mockCourseUpsert).not.toHaveBeenCalled();
   });
 

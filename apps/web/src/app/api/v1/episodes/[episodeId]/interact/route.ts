@@ -25,10 +25,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { id: true, userId: true, title: true },
+    select: { id: true, userId: true, title: true, visibility: true },
   });
 
   if (!episode) {
+    return errorResponse('Episode not found', 404);
+  }
+
+  // Ownership/visibility guard mirrors the GET poll route: a non-owner may only
+  // interact with a shared (UNLISTED) episode. Use 404 to avoid leaking the
+  // existence of another learner's PRIVATE episode.
+  const isEpisodeOwner = episode.userId === authResult.userId;
+  const isShared = episode.visibility === 'UNLISTED';
+  if (!isEpisodeOwner && !isShared) {
     return errorResponse('Episode not found', 404);
   }
 
