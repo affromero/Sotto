@@ -50,7 +50,8 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 |---|---|
 | `apps/web` | Next.js app, `/api/v1` routes, Prisma schema, workers, tests |
 | `apps/desktop` | Tauri desktop shell, built outside the npm workspaces |
-| `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
+| `tui/` | Rust + ratatui headless terminal client (the `sotto` binary), built outside the npm workspaces; consumes `/api/v1` over HTTP with a progenitor-generated client |
+| `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers; also emits the OpenAPI contract the `tui/` client is generated from |
 | `packages/mcp` | MCP integration surface for local agents |
 | `packages/groundcheck` | Reference verification standard package |
 | `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |

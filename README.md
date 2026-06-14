@@ -271,9 +271,29 @@ The product is self-hosted: you run it, then reach it from anywhere.
 
 - **Desktop.** _Sotto Host_ (a tiny [Tauri](https://tauri.app) launcher in `apps/desktop/`, from **[sotto.fm/download](https://sotto.fm/download)**) runs the whole stack on your computer with no terminal. Open it, click **Start**, and it brings up the containers and opens the app.
 - **Web and PWA.** Installable from any browser — add to home screen on a phone, tablet, or laptop for full-screen, offline-capable access against _your_ server.
+- **Terminal.** `sotto` is a headless Rust + ratatui client — learn from a tmux pane while you code, with native audio playback and mic recording. See [Terminal client](#terminal-client-sotto) below.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
 **One learner, no login.** A self-hosted instance is yours alone — open it and you are in, with no sign-up, accounts, or passwords to manage. Your courses, progress, vocabulary graph, and keys live entirely on your own stack.
+
+---
+
+## Terminal client (`sotto`)
+
+A premium headless client in `tui/` — the whole platform from a terminal, so you can learn from a tmux split while you code. Pure Rust ([ratatui](https://ratatui.rs)), it talks only to your server's `/api/v1` over HTTP and ships no business logic of its own.
+
+```bash
+cargo install --path tui      # builds the `sotto` binary
+sotto login                   # redeem a pairing code from Settings -> Devices
+sotto                         # launch the TUI against your server
+```
+
+- **Everything the web app does** — courses, mastery-gated classes across all five skills, ungated practice, the vocabulary spaced-repetition loop, mock exams, and adaptive listening.
+- **Audio in the terminal** — segment playback (rodio) and microphone capture for speaking attempts (cpal -> WAV), uploaded for the same async grading the web app uses.
+- **Contextual Q&A** — pause a listening segment and ask a question; the answer streams back inline.
+- **Accounts** — `sotto accounts`, `sotto switch`, `sotto logout`, and `sotto whoami` manage multiple servers/profiles (stored in `~/.config/sotto`), plus an in-TUI switcher.
+
+The typed client is generated from the same Zod schemas the web app uses (`packages/shared` -> OpenAPI -> [progenitor](https://github.com/oxidecomputer/progenitor)), so the contract never drifts. See [`tui/CLAUDE.md`](tui/CLAUDE.md) and [§9 of the architecture diagrams](docs/06-architecture-diagrams.md).
 
 ---
 
@@ -302,6 +322,7 @@ The full learning loop is shipped and self-hostable today:
 - **Live conversation** — real-time spoken translation (Gemini Live) on your own Google key; new vocabulary feeds the memory graph.
 - **Runs 100% offline** — keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
 - **Households + your devices** — first account becomes owner, invite your family, fully isolated per-learner accounts; desktop launcher (Sotto Host), installable PWA on any device, one-command secure tunnel.
+- **Terminal client** — `sotto`, a Rust + ratatui headless client with in-terminal audio playback and recording; the full learning loop over `/api/v1`.
 - **Worksheets** — print/PDF worksheets for any class; the whole flow runs on the web app and installable PWA.
 
 **Planned (optional managed offering):** hosted infrastructure for non-technical learners — workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and self-hostable.
