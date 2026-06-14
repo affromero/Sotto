@@ -237,6 +237,27 @@ impl App {
                     SectionAdvance::None
                 }
             }
+            Some(SectionProgress::Writing {
+                index,
+                prompts,
+                phase,
+                ..
+            }) => {
+                // Graded/Failed writing advances on enter (after the learner has
+                // read the feedback); other phases stay put.
+                if matches!(
+                    phase,
+                    WritingPhase::Graded { .. } | WritingPhase::Failed { .. }
+                ) {
+                    if *index + 1 < prompts.len() {
+                        SectionAdvance::NextWritingPrompt
+                    } else {
+                        SectionAdvance::NextSection
+                    }
+                } else {
+                    SectionAdvance::None
+                }
+            }
             Some(SectionProgress::Listening { .. }) | Some(SectionProgress::Mc { .. }) => {
                 SectionAdvance::NextSection
             }
@@ -252,6 +273,23 @@ impl App {
                 {
                     *index += 1;
                     *phase = SpeakingPhase::Idle;
+                }
+                self.render();
+            }
+            SectionAdvance::NextWritingPrompt => {
+                // Advance to the next writing prompt with a fresh editor, now that
+                // the learner has seen the previous prompt's feedback.
+                if let Some(section) = self.current_section_mut()
+                    && let SectionProgress::Writing {
+                        index,
+                        input,
+                        phase,
+                        ..
+                    } = &mut section.progress
+                {
+                    *index += 1;
+                    *input = WritingInput::new();
+                    *phase = WritingPhase::Editing;
                 }
                 self.render();
             }
@@ -871,33 +909,17 @@ impl App {
         match result.as_ref() {
             Ok(resp) => {
                 let score = (resp.overall_score.clamp(0.0, 1.0) * 100.0).round() as u32;
-                let advance = if let Some(section) = self.current_section_mut()
-                    && let SectionProgress::Writing {
-                        prompts,
-                        index,
-                        input,
-                        phase,
-                    } = &mut section.progress
+                // Show the graded score + feedback and STOP. The learner reads it
+                // and presses enter to advance (handled in `class_advance_after_select`),
+                // so a multi-prompt section never auto-advances past a prompt's
+                // feedback before it can be seen.
+                if let Some(section) = self.current_section_mut()
+                    && let SectionProgress::Writing { phase, .. } = &mut section.progress
                 {
                     *phase = WritingPhase::Graded {
                         score,
                         feedback: resp.feedback.clone(),
                     };
-                    // Advance to the next writing prompt (fresh editor), else the
-                    // section is done.
-                    if *index + 1 < prompts.len() {
-                        *index += 1;
-                        *input = WritingInput::new();
-                        *phase = WritingPhase::Editing;
-                        false
-                    } else {
-                        true
-                    }
-                } else {
-                    false
-                };
-                if advance {
-                    self.class_next_section();
                 }
             }
             Err(message) => {
@@ -1000,6 +1022,7 @@ impl App {
 enum SectionAdvance {
     None,
     NextSpeakingPrompt,
+    NextWritingPrompt,
     NextSection,
 }
 
