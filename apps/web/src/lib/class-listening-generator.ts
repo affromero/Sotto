@@ -150,10 +150,10 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       }
     });
 
-    // Step 4b: persist references, then enqueue the verify-ONLY worker. We do
-    // NOT enqueue the reference-validation worker: for non-WEB/IMPORT sources it
-    // re-runs createSegmentsAndQueueAudio (segment-creator is not idempotent),
-    // which would double-create segments + double-queue audio.
+    // Step 4b: persist references, then enqueue the verify-only worker
+    // (verify-class-references). It writes reference verdicts but never runs
+    // createSegmentsAndQueueAudio (segment-creator is not idempotent), which
+    // would double-create segments and double-queue audio.
     await persistGeneratedReferences(episodeId, result.references);
     if (result.references.length > 0) {
       await addJob(verifyClassReferencesQueue, JobType.VERIFY_CLASS_REFERENCES, { episodeId });

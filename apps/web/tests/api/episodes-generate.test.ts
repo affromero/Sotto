@@ -67,16 +67,12 @@ const mockAddJob = vi.fn();
 vi.mock('@/lib/queue', () => ({
   contentExtractionQueue: { name: 'content-extraction' },
   scriptGenerationQueue: { name: 'script-generation' },
-  scriptVerificationQueue: { name: 'script-verification' },
-  referenceValidationQueue: { name: 'reference-validation' },
   audioGenerationQueue: { name: 'audio-generation' },
   audioStitchingQueue: { name: 'audio-stitching' },
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
     EXTRACT_CONTENT: 'extract_content',
     GENERATE_SCRIPT: 'generate_script',
-    VERIFY_SCRIPT: 'verify_script',
-    VALIDATE_REFERENCES: 'validate_references',
     GENERATE_AUDIO: 'generate_audio',
     STITCH_AUDIO: 'stitch_audio',
   },

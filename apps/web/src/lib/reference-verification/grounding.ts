@@ -304,9 +304,9 @@ async function aiGroundingSearch(
  * 1. OpenAlex claim search (fast, free) for ACADEMIC/EDUCATIONAL/GENERAL
  * 2. AI web search for remaining ungrounded refs
  *
- * Works for both:
- * - reference-validation pipeline (all checks failed → reason: 'all_checks_failed')
- * - script-verification retry loop (unreliable source → reason: 'unreliable_source')
+ * Handles both grounding reasons:
+ * - all checks failed (reason: 'all_checks_failed')
+ * - unreliable source (reason: 'unreliable_source')
  *
  * Callers should cap input size if needed (e.g. verification loop caps at 5).
  */
@@ -363,7 +363,7 @@ export async function groundReferenceCandidates(
 }
 
 /**
- * Legacy entry point for reference-validation pipeline.
+ * Entry point for the reference verification pipeline.
  * Filters to refs where all checks failed, then delegates to groundReferenceCandidates.
  */
 export async function groundFailedReferences(
