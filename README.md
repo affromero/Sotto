@@ -15,7 +15,6 @@ Open-source, self-hostable language-learning infrastructure — a full **[CEFR](
 [![BYOK](https://img.shields.io/badge/BYOK-bring%20your%20own%20keys-D97706)](#bring-your-own-claude--codex)
 [![Bring your own agent](https://img.shields.io/badge/agent-Claude%20Code%20%2F%20Codex-3F4FB0)](#bring-your-own-claude--codex)
 [![Runs 100% offline](https://img.shields.io/badge/runs-100%25%20offline-1F8A5B)](#run-it-100-offline)
-[![No social layer](https://img.shields.io/badge/social%20layer-none-565B68)](#why-sotto)
 [![CI](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/ci.yml?branch=main&label=CI)](https://github.com/affromero/Sotto/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/codeql.yml?branch=main&label=CodeQL)](https://github.com/affromero/Sotto/actions/workflows/codeql.yml)
 [![gitleaks](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/gitleaks.yml?branch=main&label=gitleaks)](https://github.com/affromero/Sotto/actions/workflows/gitleaks.yml)
@@ -69,7 +68,7 @@ Every serious language app is closed, hosted, and subscription-funded. Your prog
 >
 > - **Taught in your own context** — connect your agent and grant the context you choose (notes, goals, what you're working on); lessons, readings, and listening are drawn from _that_, not generic content.
 > - **You own the learning stack** — self-host with your keys, your database, your files. No Sotto account holds your progress hostage.
-> - **Pedagogy over gamification** — mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect); adaptive listening is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's _i+1_); the memory graph is [SM-2](https://super-memory.com/english/ol/sm2.htm) [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition). No streaks, no leaderboards — **there is no social layer at all.**
+> - **Pedagogy over gamification** — mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect); adaptive listening is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's _i+1_); the memory graph is [SM-2](https://super-memory.com/english/ol/sm2.htm) [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition). Progress is measured by demonstrated mastery, not streaks.
 > - **Bring your own everything** — LLM, TTS, STT via explicit provider selection, BYOK, or a keyless local agent. You pay your providers directly; nothing is billed through the self-hosted build.
 
 ---
@@ -140,7 +139,6 @@ The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLi
 | Institutional-style practice exams (Goethe / DELE / Cambridge format)                                                                   |                 ✅                 |                         ❌                          |                  〰️                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
 | Live spoken translation practice                                                                                                        |                 ✅                 |                         ❌                          |                  ❌                  |               〰️               |               〰️                |              〰️               |                  ❌                  |
 | Rubric pronunciation scoring                                                                                                            |                 ✅                 |                         〰️                          |                  〰️                  |               ✅               |               ✅                |              ✅               |                  ❌                  |
-| No social layer / dark patterns                                                                                                         |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ✅                  |
 | Price                                                                                                                                   | Self-host (pay providers directly) |                     Free (MIT)                      |            Freemium + sub            |              Sub               |               Sub               |              Sub              |                 Sub                  |
 
 <sub>✅ yes · 〰️ partial · ❌ no. Values reflect each project's public repo/site (June 2026). OpenLingo: verified against [`pretzelai/openlingo`](https://github.com/pretzelai/openlingo) — it has STT speaking feedback (Whisper) and SM-2 SRS, but no rubric pronunciation score, mastery gates, or memory-graph. _Offline:_ OpenLingo's BYO-LLM can point at a local model, but its speaking feedback uses cloud Whisper — so it earns 〰️; Sotto runs LLM **and** STT **and** TTS locally for a true no-cloud-key stack. The closed apps are hosted-only and subscription-funded. Sotto values reflect the self-hosted OSS build; corrections welcome via PR.</sub>
@@ -275,7 +273,7 @@ The product is self-hosted: you run it, then reach it from anywhere.
 - **Web and PWA.** Installable from any browser — add to home screen on a phone, tablet, or laptop for full-screen, offline-capable access against _your_ server.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
-**One learner, no login.** A self-hosted instance is yours alone — open it and you are in, with no sign-up, accounts, or passwords to manage. Your courses, progress, vocabulary graph, and keys live entirely on your own stack, and there is no social layer.
+**One learner, no login.** A self-hosted instance is yours alone — open it and you are in, with no sign-up, accounts, or passwords to manage. Your courses, progress, vocabulary graph, and keys live entirely on your own stack.
 
 ---
 
@@ -293,7 +291,7 @@ Sotto is built around BYOK from the start, surfaced three ways:
 
 The full learning loop is shipped and self-hostable today:
 
-- **Clean OSS core** — AGPL-3.0; `.env.oss.example`, `npm run setup`, local-storage default, payments disabled; no social/news/briefing surfaces.
+- **Clean OSS core** — AGPL-3.0; `.env.oss.example`, `npm run setup`, local-storage default.
 - **BYOK / own agent** — keyless `claude-code`/`codex`, encrypted per-account keys, MCP ingestion.
 - **Placement → any-language courses** — CEFR placement assigns a level and creates a directed course for any native→target pair.
 - **Mastery-gated classes** across all five skills, with similar-but-not-identical regeneration on failure.

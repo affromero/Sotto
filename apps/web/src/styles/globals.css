@@ -270,7 +270,6 @@ body::before {
   --topbar-height: 64px;
   --mini-player-height: 72px;
   --max-content-width: 1200px;
-  --impersonation-banner-height: 0px;
 
   /* Landing page — section padding + atmospheric gradients */
   --section-pad-y: clamp(80px, 12vh, 160px);

@@ -12,9 +12,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
-COPY packages/video/package.json ./packages/video/
-COPY packages/verification-standard/package.json ./packages/verification-standard/
-COPY packages/maps/package.json ./packages/maps/
+COPY packages/groundcheck/package.json ./packages/groundcheck/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
@@ -52,9 +50,7 @@ COPY --chown=sotto:sotto apps/web/tsconfig.json ./apps/web/
 COPY --chown=sotto:sotto tsconfig.base.json ./
 COPY --chown=sotto:sotto apps/web/prisma ./apps/web/prisma/
 COPY --chown=sotto:sotto packages/shared ./packages/shared/
-COPY --chown=sotto:sotto packages/video ./packages/video/
-COPY --chown=sotto:sotto packages/verification-standard ./packages/verification-standard/
-COPY --chown=sotto:sotto packages/maps ./packages/maps/
+COPY --chown=sotto:sotto packages/groundcheck ./packages/groundcheck/
 COPY --chown=sotto:sotto apps/web/src ./apps/web/src/
 # The host copy above omits the gitignored Prisma 7 generated client; bring it
 # from the deps stage (where `prisma generate` ran) so tsx can resolve it.

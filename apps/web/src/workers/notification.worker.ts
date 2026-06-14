@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import type { NotificationType } from '@/generated/prisma/client';
 import { SendNotificationPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { sendPushNotification, sendExpoPushNotification } from '@/lib/push-notifications';
+import { sendPushNotification } from '@/lib/push-notifications';
 import { publishNotification } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
@@ -44,12 +44,10 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
     });
   });
 
-  // Send push notifications (web + mobile) only if user has opted in
-  // Use allSettled so a failure in one channel doesn't abort the other or retry the in-app notification
+  // Send web push notifications only if the user has opted in.
   if (user?.pushNotifications) {
     const pushResults = await Promise.allSettled([
       sendPushNotification({ userId, title, body: message, data }),
-      sendExpoPushNotification({ userId, title, body: message, data }),
     ]);
 
     const anyPushSucceeded = pushResults.some((r) => r.status === 'fulfilled');

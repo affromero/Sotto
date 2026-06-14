@@ -3,7 +3,7 @@ import {
   computeBayesianScore,
   type ContentDomain,
   type LayerResult,
-} from '@sotto/verification-standard';
+} from 'groundcheck';
 import {
   verifyUrl,
   verifyDoi,

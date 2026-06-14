@@ -52,7 +52,7 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 | `apps/desktop` | Tauri desktop shell, built outside the npm workspaces |
 | `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
 | `packages/mcp` | MCP integration surface for local agents |
-| `packages/verification-standard` | Reference verification standard package |
+| `packages/groundcheck` | Reference verification standard package |
 | `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
 | `e2e` | Playwright end-to-end tests |
 | `scripts` | Setup, launch, recording, migration, and release automation |
@@ -70,7 +70,7 @@ The active data model is learner and course oriented. Important groups:
 | Identity | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`) |
 | Curriculum | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle` |
 | Enrollment | `Course`, `CourseNote`, `PlacementResult` |
-| Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`, `ClassInkLayer` |
+| Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer` |
 | Speaking | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus` |
 | Writing | `WritingPrompt`, `WritingResponse` |
 | Practice | `PracticeSession`, `PracticeKind`, `PracticeStatus` |
@@ -271,7 +271,6 @@ The current learning API surface is under `/api/v1`:
 | `/api/v1/classes/[classId]/speaking/[promptId]` | Upload a class speaking recording |
 | `/api/v1/classes/[classId]/writing/[promptId]` | Submit and score class writing |
 | `/api/v1/classes/[classId]/worksheet` | Fetch or generate worksheet PDF |
-| `/api/v1/classes/[classId]/ink` | Get/save PencilKit worksheet ink |
 | `/api/v1/practice/[sessionId]/submit` | Submit ungated practice and update SRS |
 | `/api/v1/practice/[sessionId]/speaking/[promptId]` | Upload/poll practice speaking |
 | `/api/v1/practice/[sessionId]/writing/[promptId]` | Submit and score practice writing |

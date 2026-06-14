@@ -247,16 +247,9 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps root and e2e commands env-file driven without hosted secret tooling', () => {
     const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
     const envRunner = readFileSync(resolve(repoRoot, 'scripts/run-with-env.sh'), 'utf8');
-    const e2eSources = [
-      'e2e/playwright/playwright.config.ts',
-      'e2e/playwright/fixtures/auth.ts',
-      'e2e/playwright/helpers/seed.ts',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
     const agentDocs = readFileSync(resolve(repoRoot, 'AGENTS.md'), 'utf8');
     const rootClaude = readFileSync(resolve(repoRoot, 'CLAUDE.md'), 'utf8');
-    const commandSources = [packageJson, envRunner, e2eSources].join('\n');
+    const commandSources = [packageJson, envRunner].join('\n');
 
     expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
     expect(packageJson).not.toContain('"record": "scripts/run-with-env.sh');
@@ -264,9 +257,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(packageJson).not.toContain('"db:sync"');
     expect(existsSync(resolve(repoRoot, 'scripts/sync-prod-db.sh'))).toBe(false);
     expect(envRunner).toContain('SOTTO_ENV_FILE');
-    expect(e2eSources).toContain('scripts/run-with-env.sh');
-    expect(e2eSources).toContain('test-e2e@example.com');
-    expect(e2eSources).toContain('https://media.example.com/e2e/test-audio.mp3');
     expect(commandSources).not.toContain('doppler run');
     expect(commandSources).not.toContain(':doppler');
     expect(commandSources).not.toContain('@sotto.fm');
@@ -336,9 +326,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'accounting/ledger/main.beancount',
       'accounting/ledger/opening.beancount',
       'accounting/ledger/2026/02-february.beancount',
-      'packages/verification-standard/package.json',
-      'packages/verification-standard/README.md',
-      'packages/verification-standard/CONTRIBUTING.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -367,7 +354,6 @@ describe('open-source language-learning OSS surfaces', () => {
       '.env.oss.example',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
-      'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
       'apps/web/src/components/layout/Footer.tsx',
@@ -411,8 +397,8 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(publicLinkSources).not.toContain('https://discord.gg/sotto');
   });
 
-  it('uses the neutral verification workspace namespace', () => {
-    const verificationNamespaceSources = [
+  it('vendors the renamed groundcheck library, free of legacy @sotto and SottoFM names', () => {
+    const namespaceFiles = [
       'apps/web/package.json',
       'apps/web/next.config.js',
       'apps/web/src/lib/CLAUDE.md',
@@ -421,21 +407,27 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/reference-verification/pipeline.ts',
       'CLAUDE.md',
       'package-lock.json',
-      'packages/verification-standard/package.json',
-      'packages/verification-standard/package-lock.json',
-      'packages/verification-standard/.github/workflows/release.yml',
-      'packages/verification-standard/README.md',
-      'packages/verification-standard/CONTRIBUTING.md',
-      'packages/verification-standard/CHANGELOG.md',
-      'packages/verification-standard/LICENSE',
-    ]
+      'packages/groundcheck/package.json',
+      'packages/groundcheck/package-lock.json',
+      'packages/groundcheck/.github/workflows/release.yml',
+      'packages/groundcheck/README.md',
+      'packages/groundcheck/CONTRIBUTING.md',
+      'packages/groundcheck/CHANGELOG.md',
+      'packages/groundcheck/LICENSE',
+    ];
+
+    const verificationSources = namespaceFiles
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(verificationNamespaceSources).toContain('@sotto/verification-standard');
-    expect(verificationNamespaceSources).not.toContain('@sottofm/verification-standard');
-    expect(verificationNamespaceSources).not.toContain('github.com/SottoFM');
-    expect(verificationNamespaceSources).not.toContain('SottoFM');
+    // The library was renamed to the unscoped `groundcheck` package and moved to
+    // affromero/groundcheck. The legacy @sotto / @sottofm package names and the
+    // former SottoFM org must not linger anywhere, including the vendored copy.
+    expect(verificationSources).toContain('groundcheck');
+    expect(verificationSources).not.toContain('@sotto/verification-standard');
+    expect(verificationSources).not.toContain('@sottofm/verification-standard');
+    expect(verificationSources).not.toContain('github.com/SottoFM');
+    expect(verificationSources).not.toContain('SottoFM');
   });
 
   it('keeps security and operations guidance self-host neutral', () => {
@@ -526,7 +518,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
       'apps/web/src/lib/CLAUDE.md',
-      'CHANGELOG.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -595,7 +586,6 @@ describe('open-source language-learning OSS surfaces', () => {
         readFileSync(resolve(repoRoot, 'packages/shared/src/types/enums.ts'), 'utf8'),
         readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'),
         readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8'),
-        readFileSync(resolve(repoRoot, 'e2e/playwright/helpers/seed.ts'), 'utf8'),
       ])
       .join('\n');
     const removedTests = [
@@ -620,9 +610,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps automation harnesses private-first', () => {
     const harnessSources = [
-      'e2e/llmock/setup.ts',
-      'e2e/playwright/tests/episode-player.spec.ts',
-      'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/auth-guards.ts',
@@ -909,7 +896,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const seedSources = [
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
-      'e2e/playwright/helpers/seed.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');

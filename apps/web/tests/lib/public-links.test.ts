@@ -21,13 +21,13 @@ describe('public links', () => {
     vi.stubEnv('NEXT_PUBLIC_DISCORD_URL', 'https://discord.gg/example');
     vi.stubEnv(
       'NEXT_PUBLIC_VERIFICATION_STANDARD_URL',
-      'https://github.com/example/reference-verification-standard',
+      'https://github.com/example/groundcheck',
     );
 
     expect(getPublicGithubUrl()).toBe('https://github.com/example/private-episodes');
     expect(getPublicDiscordUrl()).toBe('https://discord.gg/example');
     expect(getVerificationStandardUrl()).toBe(
-      'https://github.com/example/reference-verification-standard',
+      'https://github.com/example/groundcheck',
     );
   });
 
