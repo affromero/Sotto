@@ -38,6 +38,8 @@ npm workspaces:
 - `@sotto/mcp` in `packages/mcp/`
 - `groundcheck` in `packages/groundcheck/`
 
+`tui/` is the `sotto` terminal client — a standalone Rust + ratatui crate (the `sotto` binary), **outside** the npm workspaces. It consumes `/api/v1` over HTTP via a progenitor-generated client built from the OpenAPI spec `@sotto/shared` emits. Build/test it with `cargo` (`cd tui && cargo test`), not npm. See `tui/CLAUDE.md`.
+
 Root `package.json` proxies the main web commands to `@sotto/web`. Each major directory has its own `CLAUDE.md`; follow the closest applicable file.
 
 ## Build Commands
@@ -67,6 +69,7 @@ npm run ci                     # lint + type-check + test + build
 | `apps/web/src/styles/` | Design system tokens |
 | `apps/web/prisma/` | Prisma schema and database rules |
 | `packages/` | Shared package boundaries |
+| `tui/` | Rust `sotto` terminal client: API/audio/contract-codegen conventions |
 
 ## Design System
 

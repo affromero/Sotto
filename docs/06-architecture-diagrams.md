@@ -3,7 +3,7 @@
 > Visual companion to [01-technical-architecture.md](./01-technical-architecture.md).
 > Every diagram below is Mermaid; GitHub and most editors render it inline.
 > Kept in sync as each piece lands — see the "sotto terminal client" section for
-> the in-progress headless client.
+> the headless `sotto` client.
 
 ## 1. System context
 
@@ -116,10 +116,10 @@ sequenceDiagram
 flowchart LR
     shared["packages/shared - types, Zod, brand, tokens"]
     mcp["packages/mcp"]
-    verif["packages/verification-standard"]
+    verif["packages/groundcheck"]
     web["apps/web - Next.js, workers, Prisma"]
     desktop["apps/desktop - Tauri shell"]
-    tui["tui/ - Rust + ratatui (planned)"]
+    tui["tui/ - Rust + ratatui (sotto)"]
 
     shared --> web
     shared --> mcp
@@ -256,14 +256,11 @@ flowchart TD
 
 No worker silently routes to a different provider because another key exists.
 
-## 9. sotto terminal client (in progress)
+## 9. sotto terminal client
 
-Premium Rust + ratatui client. HTTP-only against `/api/v1`; native audio playback
-and recording; types generated from the Zod-backed OpenAPI spec.
-
-> **Status: planned.** The `tui/` crate and generated client are not in the repo
-> yet — they land across phases P2–P8. The diagrams in this section are the
-> target design.
+Premium Rust + ratatui client (the `sotto` binary). HTTP-only against `/api/v1`;
+native audio playback and recording; types generated from the Zod-backed OpenAPI
+spec. Lives in `tui/`; see `tui/CLAUDE.md` for the crate-level guide.
 
 ```mermaid
 flowchart TD
@@ -288,8 +285,8 @@ flowchart TD
 
     subgraph contract[Contract sync - CI]
         zod["Zod schemas in packages/shared"] --> jsons["z.toJSONSchema"]
-        jsons --> oas["OpenAPI 3.1"]
-        oas --> gen["progenitor to tui/src/generated"]
+        jsons --> oas["OpenAPI 3.0 (codegen subset)"]
+        oas --> gen["progenitor to tui/src generated module"]
         gen -. drift check .-> client
     end
 ```
