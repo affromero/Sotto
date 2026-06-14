@@ -227,6 +227,8 @@ describe('POST /api/v1/placement', () => {
     mockCacheGet.mockResolvedValue(SAMPLE_QUESTIONS);
     mockGetOrCreateCurriculum.mockResolvedValue({ id: 'c1' });
     mockScorePlacement.mockReturnValue(scoreOutcome);
+    // Default: no existing course (first placement). Re-take tests override this.
+    mockCourseFindUnique.mockResolvedValue(null);
     mockCourseUpsert.mockResolvedValue({ id: 'course-1', nativeLang: 'en', targetLang: 'de', currentLevel: 'B1' });
     mockPlacementResultUpsert.mockResolvedValue({ courseId: 'course-1', level: 'B1' });
     mockCacheDelete.mockResolvedValue(undefined);
@@ -303,7 +305,9 @@ describe('POST /api/v1/placement', () => {
     expect(mockScorePlacement).toHaveBeenCalledWith(SAMPLE_QUESTIONS, answers);
   });
 
-  it('upserts course with the scored CEFR level using userId_nativeLang_targetLang', async () => {
+  it('first placement creates the course with start + current set to the scored level', async () => {
+    mockCourseFindUnique.mockResolvedValue(null);
+
     await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
     expect(mockCourseUpsert).toHaveBeenCalledWith({
@@ -316,11 +320,32 @@ describe('POST /api/v1/placement', () => {
         currentLevel: 'B1',
         startLevel: 'B1',
       }),
-      update: expect.objectContaining({
-        currentLevel: 'B1',
-        startLevel: 'B1',
-      }),
+      update: { currentLevel: 'B1' },
     });
+    // The update branch must NOT reset startLevel on a re-take.
+    expect(mockCourseUpsert.mock.calls[0][0].update).not.toHaveProperty('startLevel');
+  });
+
+  it('re-taking placement keeps startLevel and never lowers currentLevel', async () => {
+    // Learner already progressed to B2; a new (lower) result of A2 must not
+    // move them backward, and startLevel is never rewritten.
+    mockCourseFindUnique.mockResolvedValue({ currentLevel: 'B2' });
+    mockScorePlacement.mockReturnValue({ ...scoreOutcome, level: 'A2' });
+
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
+
+    const call = mockCourseUpsert.mock.calls[0][0];
+    expect(call.update).toEqual({ currentLevel: 'B2' });
+    expect(call.update).not.toHaveProperty('startLevel');
+  });
+
+  it('re-taking placement raises currentLevel when the new result is higher', async () => {
+    mockCourseFindUnique.mockResolvedValue({ currentLevel: 'A1' });
+    mockScorePlacement.mockReturnValue({ ...scoreOutcome, level: 'B1' });
+
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
+
+    expect(mockCourseUpsert.mock.calls[0][0].update).toEqual({ currentLevel: 'B1' });
   });
 
   it('upserts placement result for the course', async () => {

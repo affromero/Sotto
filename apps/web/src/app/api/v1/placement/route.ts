@@ -13,6 +13,7 @@ import {
 } from '@/lib/placement-test';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
 import { getCourseNote } from '@/lib/course-notes';
+import { higherLevel } from '@/lib/cefr-levels';
 
 const langCode = z.string().trim().toLowerCase().length(2);
 const submitSchema = z.object({
@@ -87,6 +88,15 @@ export async function POST(request: NextRequest) {
     const curriculum = await getOrCreateCurriculum(userId, native, target);
     const outcome = scorePlacement(questions, answers);
 
+    // Safe re-take: when a learner re-takes placement for a pair they already
+    // have, keep the original startLevel and never lower currentLevel (only
+    // raise), so re-testing can never discard progress made through classes.
+    const existing = await prisma.course.findUnique({
+      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
+      select: { currentLevel: true },
+    });
+    const nextCurrentLevel = existing ? higherLevel(existing.currentLevel, outcome.level) : outcome.level;
+
     const course = await prisma.course.upsert({
       where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
       create: {
@@ -97,7 +107,9 @@ export async function POST(request: NextRequest) {
         currentLevel: outcome.level,
         startLevel: outcome.level,
       },
-      update: { currentLevel: outcome.level, startLevel: outcome.level },
+      // startLevel is intentionally not updated — it is the immutable first
+      // placement. currentLevel only moves up.
+      update: { currentLevel: nextCurrentLevel },
     });
 
     await prisma.placementResult.upsert({
