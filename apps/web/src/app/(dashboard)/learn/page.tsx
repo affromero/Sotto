@@ -58,6 +58,7 @@ export default async function LearnPage() {
     where: { userId },
     select: {
       id: true,
+      nativeLang: true,
       targetLang: true,
       currentLevel: true,
       activeClassId: true,
@@ -171,6 +172,13 @@ export default async function LearnPage() {
                     aria-label={`Practice exam for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
                   >
                     Exam
+                  </Link>
+                  <Link
+                    href={`/learn/placement?native=${course.nativeLang}&target=${course.targetLang}`}
+                    className={styles.practiceLink}
+                    aria-label={`Retake the placement test for ${course.curriculum?.title ?? langLabel(course.targetLang)} (your level is never lowered)`}
+                  >
+                    Retake placement
                   </Link>
                   <StartNextClass
                     courseId={course.id}
