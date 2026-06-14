@@ -15,6 +15,47 @@ export const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
 const PASS_THRESHOLD = 0.7;
 const PER_BAND = 4;
 
+// "I don't know" in the learner's native language, so even an absolute beginner
+// can opt out of guessing. Appended as the last option of every placement
+// question; choosing it scores as not-mastered (it is never the correct index).
+const IDK_LABELS: Record<string, string> = {
+  en: "I don't know",
+  es: 'No lo sé',
+  fr: 'Je ne sais pas',
+  de: 'Ich weiß nicht',
+  pt: 'Não sei',
+  it: 'Non lo so',
+  ja: 'わかりません',
+  ko: '모르겠어요',
+  zh: '我不知道',
+  ar: 'لا أعرف',
+  hi: 'मुझे नहीं पता',
+  ru: 'Я не знаю',
+  nl: 'Ik weet het niet',
+  sv: 'Jag vet inte',
+  pl: 'Nie wiem',
+  tr: 'Bilmiyorum',
+  da: 'Det ved jeg ikke',
+  fi: 'En tiedä',
+  no: 'Jeg vet ikke',
+  cs: 'Nevím',
+  ro: 'Nu știu',
+  hu: 'Nem tudom',
+  el: 'Δεν ξέρω',
+  he: 'אני לא יודע',
+  th: 'ฉันไม่รู้',
+  vi: 'Tôi không biết',
+  id: 'Saya tidak tahu',
+  ms: 'Saya tidak tahu',
+  uk: 'Я не знаю',
+  ca: 'No ho sé',
+};
+
+/** The native-language "I don't know" label, falling back to English. */
+export function idkLabel(nativeLang: string): string {
+  return IDK_LABELS[nativeLang.trim().toLowerCase()] ?? IDK_LABELS.en;
+}
+
 export type PlacementSkill = (typeof PLACEMENT_SKILLS)[number];
 
 export interface PlacementQuestion {
@@ -92,7 +133,10 @@ export async function generatePlacement(
       cefr: q.cefr as CefrLevel,
       skill: (PLACEMENT_SKILLS.includes(q.skill as PlacementSkill) ? q.skill : 'grammar') as PlacementSkill,
       prompt: q.prompt as string,
-      options: (q.options as string[]).slice(0, 4),
+      // The LLM returns 4 content options; append a native-language "I don't
+      // know" as the 5th (index 4). correctIndex stays 0..3, so picking it is
+      // always scored as not-mastered.
+      options: [...(q.options as string[]).slice(0, 4), idkLabel(nativeLang)],
       correctIndex: Math.max(0, Math.min(3, q.correctIndex as number)),
       explanation: q.explanation ?? '',
     }));

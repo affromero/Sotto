@@ -19,7 +19,8 @@ const submitSchema = z.object({
   native: langCode,
   target: langCode,
   answers: z
-    .array(z.object({ id: z.string(), selectedIndex: z.number().int().min(0).max(3) }))
+    // selectedIndex 0..3 = a content option; 4 = the "I don't know" option.
+    .array(z.object({ id: z.string(), selectedIndex: z.number().int().min(0).max(4) }))
     .min(1),
 });
 
