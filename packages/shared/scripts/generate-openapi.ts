@@ -422,6 +422,17 @@ export const OPENAPI_CODEGEN_OUTPUT_PATH = resolve(
   sharedRoot,
   'openapi.codegen.json',
 );
+// A vendored copy of the codegen spec that lives INSIDE the `tui/` crate so the
+// Rust `generate_api!` macro can read it from within the crate. This makes the
+// crate build standalone (and publishable to crates.io, where the workspace
+// path `packages/shared` does not ship). `gen:openapi` writes both copies, so
+// the vendored one can never drift; a sync check guards it in CI.
+const repoRoot = resolve(sharedRoot, '..', '..');
+export const OPENAPI_TUI_VENDOR_PATH = resolve(
+  repoRoot,
+  'tui',
+  'openapi.codegen.json',
+);
 
 function main(): void {
   const doc = buildOpenApiDocument();
@@ -429,12 +440,13 @@ function main(): void {
   process.stdout.write(`Wrote ${OPENAPI_OUTPUT_PATH}\n`);
 
   const codegenDoc = buildOpenApiDocument({ codegen: true });
-  writeFileSync(
-    OPENAPI_CODEGEN_OUTPUT_PATH,
-    `${JSON.stringify(codegenDoc, null, 2)}\n`,
-    'utf8',
-  );
+  const codegenJson = `${JSON.stringify(codegenDoc, null, 2)}\n`;
+  writeFileSync(OPENAPI_CODEGEN_OUTPUT_PATH, codegenJson, 'utf8');
   process.stdout.write(`Wrote ${OPENAPI_CODEGEN_OUTPUT_PATH}\n`);
+
+  // Keep the vendored copy inside the tui crate byte-for-byte in sync.
+  writeFileSync(OPENAPI_TUI_VENDOR_PATH, codegenJson, 'utf8');
+  process.stdout.write(`Wrote ${OPENAPI_TUI_VENDOR_PATH}\n`);
 }
 
 const invokedDirectly =

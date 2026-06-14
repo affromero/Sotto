@@ -3073,7 +3073,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sotto"
+name = "sotto-tui"
 version = "0.1.0"
 dependencies = [
  "async-trait",

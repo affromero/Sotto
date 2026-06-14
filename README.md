@@ -171,9 +171,12 @@ A quick map of the nouns you'll meet in the app and the code:
 ```
 apps/web          Next.js 16 App Router — web UI, API routes, Prisma schema, Vitest tests
 apps/desktop      Tauri launcher — runs the whole self-hosted stack on your machine, no terminal
+tui               sotto — a headless terminal client (Rust): learn from your terminal, tmux-friendly
 packages/shared   Shared types, Zod schemas, brand copy
 packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex locally
 ```
+
+> **Prefer the terminal?** `sotto` ([`tui/`](tui/README.md)) is a keyboard-driven TUI client — vocab SRS, listening/speaking, classes, exams, and native audio in a single pane. `cargo install sotto-tui` (the installed command is `sotto`), then `sotto login` with a token from the web app's `/settings/devices`.
 
 <details>
 <summary><b>Runtime stack</b></summary>
@@ -210,8 +213,8 @@ During install you choose how Sotto reaches your AI:
 Prerequisites: [Node.js](https://nodejs.org/) 22+, [Docker](https://www.docker.com/), [FFmpeg](https://ffmpeg.org/).
 
 ```bash
-git clone https://github.com/SottoFM/sotto.git
-cd sotto
+git clone https://github.com/affromero/Sotto.git
+cd Sotto
 npm run setup     # deps, .env.local (BYOK_ENCRYPTION_KEY), Postgres + Redis, schema, seed
 npm run dev
 ```

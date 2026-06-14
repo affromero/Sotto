@@ -15,18 +15,23 @@ use color_eyre::{Result, eyre::eyre};
 use serde::Deserialize;
 
 /// Generated client + models. The spec path is resolved relative to
-/// `CARGO_MANIFEST_DIR` (the `tui/` crate root), so it points at the
-/// repo-committed contract in `packages/shared/`.
+/// `CARGO_MANIFEST_DIR` (the `tui/` crate root), so the macro reads the
+/// crate-local **vendored** copy `tui/openapi.codegen.json`. That vendored file
+/// is written by `npm run gen:openapi` alongside the canonical
+/// `packages/shared/openapi.codegen.json` (byte-for-byte identical), so the
+/// crate builds standalone and is publishable to crates.io — where the
+/// `packages/shared` workspace path does not ship. A CI sync check fails if the
+/// vendored copy drifts from the canonical spec.
 ///
 /// We feed progenitor the `openapi.codegen.json` view — the truthful
 /// `openapi.json` minus operations progenitor cannot generate (currently only
 /// `next-class`, whose 200 and 201 carry different bodies). Those excluded
-/// operations are hand-rolled below in [`SottoClient`]. The two specs are
-/// generated together by `npm run gen:openapi` and both are drift-tested.
+/// operations are hand-rolled below in [`SottoClient`]. Both specs are
+/// generated together by `npm run gen:openapi` and drift-tested.
 mod generated {
     #![allow(clippy::all)]
     #![allow(dead_code)]
-    progenitor::generate_api!("../packages/shared/openapi.codegen.json");
+    progenitor::generate_api!("openapi.codegen.json");
 }
 
 pub(crate) use generated::Client as GeneratedClient;
