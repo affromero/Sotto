@@ -18,8 +18,8 @@ use crate::api::types;
 use super::App;
 use super::state::{
     ConfigView, LANGUAGES, LangColumn, PlacementOutcome, View, answer_current_choice,
-    build_placement_answers, cursor_down, cursor_up, list_down, list_up, memory_items,
-    placement_questions,
+    build_placement_answers, course_title, cursor_down, cursor_up, list_down, list_up,
+    memory_items, placement_questions,
 };
 
 impl App {
@@ -258,8 +258,17 @@ impl App {
         }
         match result.as_ref() {
             Ok(resp) => {
+                // Carry the submitted languages into the outcome so the course we
+                // land in shows real native/target, not blanks. They live on the
+                // PlacementReview view we are still on when the result lands.
+                let (native, target) = match &self.view {
+                    View::PlacementReview { native, target, .. } => {
+                        (native.clone(), target.clone())
+                    }
+                    _ => (String::new(), String::new()),
+                };
                 self.view = View::PlacementResult {
-                    outcome: PlacementOutcome::from(resp),
+                    outcome: PlacementOutcome::from_response(resp, native, target),
                 };
             }
             Err(message) => {
@@ -272,19 +281,18 @@ impl App {
         self.render();
     }
 
-    /// Dismiss the placement result and land in the created course. Refetches
-    /// the course list (the new course is now present) and opens its home.
+    /// Dismiss the placement result and land in the created course. The course
+    /// carries the real native/target the learner submitted (and the assessed
+    /// level), so the course home/list rows show real metadata, not blanks. The
+    /// course home refetches due counts.
     pub(super) fn placement_result_continue(&mut self) {
         if let View::PlacementResult { outcome } = &self.view {
-            // Build a minimal Course to drop into; the course home refetches due
-            // counts. native/target are unknown here, so synthesize a label from
-            // the assessed level — the course list refresh would carry the real
-            // metadata, but landing directly avoids a round trip.
+            let title = course_title(&outcome.native, &outcome.target);
             let course = super::state::Course {
                 id: outcome.course_id.clone(),
-                title: "Your course".to_string(),
-                native_lang: String::new(),
-                target_lang: String::new(),
+                title,
+                native_lang: outcome.native.clone(),
+                target_lang: outcome.target.clone(),
                 current_level: outcome.level.clone(),
             };
             self.enter_course_home(course);

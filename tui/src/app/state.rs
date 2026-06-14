@@ -903,6 +903,26 @@ pub(crate) const LANGUAGES: &[(&str, &str)] = &[
     ("id", "Indonesian"),
 ];
 
+/// The display name for a language code (e.g. "en" -> "English"); falls back to
+/// the uppercased code for an unknown one.
+pub(crate) fn language_name(code: &str) -> String {
+    LANGUAGES
+        .iter()
+        .find(|(c, _)| *c == code)
+        .map(|(_, name)| (*name).to_string())
+        .unwrap_or_else(|| code.to_uppercase())
+}
+
+/// A readable course title from native + target codes, e.g.
+/// "English → Spanish". Falls back to "Your course" when codes are missing.
+pub(crate) fn course_title(native: &str, target: &str) -> String {
+    if native.is_empty() || target.is_empty() {
+        "Your course".to_string()
+    } else {
+        format!("{} → {}", language_name(native), language_name(target))
+    }
+}
+
 /// Which column of the placement language picker is focused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LangColumn {
@@ -975,10 +995,21 @@ pub(crate) struct PlacementOutcome {
     pub course_id: String,
     pub level: String,
     pub score_by_skill: Vec<(String, u32)>,
+    /// The languages the learner submitted placement for; carried so the course
+    /// the learner lands in shows real native/target metadata, not blanks.
+    pub native: String,
+    pub target: String,
 }
 
-impl From<&types::SubmitPlacementResponse> for PlacementOutcome {
-    fn from(r: &types::SubmitPlacementResponse) -> Self {
+impl PlacementOutcome {
+    /// Build the outcome from the response plus the `native`/`target` the learner
+    /// submitted (the response carries the assessed level + course id, but not
+    /// the languages — those come from the submitted request).
+    pub fn from_response(
+        r: &types::SubmitPlacementResponse,
+        native: String,
+        target: String,
+    ) -> Self {
         let mut score_by_skill: Vec<(String, u32)> = r
             .score_by_skill
             .iter()
@@ -989,6 +1020,8 @@ impl From<&types::SubmitPlacementResponse> for PlacementOutcome {
             course_id: r.course_id.clone(),
             level: r.level.to_string(),
             score_by_skill,
+            native,
+            target,
         }
     }
 }
@@ -1435,9 +1468,22 @@ fn section_complete(section: &ClassSection) -> bool {
         SectionProgress::Mc { selected, .. } | SectionProgress::Listening { selected, .. } => {
             selected.iter().all(Option::is_some)
         }
-        // Speaking/writing are graded via their own endpoints during the
-        // section; they never gate the MC class submit.
-        SectionProgress::Speaking { .. } | SectionProgress::Writing { .. } => true,
+        // Speaking/writing are submittable only once their phase is terminal
+        // (Graded or Failed). In-flight phases (Idle/Recording/Uploading/
+        // Polling/Submitting/Editing) are NOT ready, so the class/exam can't be
+        // submitted while a prompt is still being worked on.
+        SectionProgress::Speaking { phase, .. } => {
+            matches!(
+                phase,
+                SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. }
+            )
+        }
+        SectionProgress::Writing { phase, .. } => {
+            matches!(
+                phase,
+                WritingPhase::Graded { .. } | WritingPhase::Failed { .. }
+            )
+        }
     }
 }
 
@@ -2564,12 +2610,8 @@ mod tests {
         assert_eq!(by_id.get("l0"), Some(&1));
     }
 
-    #[test]
-    fn class_ready_to_submit_requires_all_mc_answered() {
-        let mut sections = class_sections(&mixed_class()).expect("well-formed");
-        // Unanswered MC -> not ready.
-        assert!(!class_ready_to_submit(&sections));
-        // Answer every MC/listening question; speaking/writing never gate.
+    /// Answer every MC/listening question in `sections` (drive them to complete).
+    fn answer_all_mc(sections: &mut [ClassSection]) {
         for s in sections.iter_mut() {
             match &mut s.progress {
                 SectionProgress::Mc { selected, .. }
@@ -2581,7 +2623,146 @@ mod tests {
                 _ => {}
             }
         }
-        assert!(class_ready_to_submit(&sections));
+    }
+
+    #[test]
+    fn class_ready_to_submit_requires_every_section_terminal() {
+        let mut sections = class_sections(&mixed_class()).expect("well-formed");
+        // Unanswered MC -> not ready.
+        assert!(!class_ready_to_submit(&sections));
+
+        // Answer every MC/listening question. Speaking/writing are still in
+        // their initial (Idle/Editing) phases, so the class is NOT yet ready —
+        // the learner must work each prompt to a graded/failed state first.
+        answer_all_mc(&mut sections);
+        assert!(
+            !class_ready_to_submit(&sections),
+            "MC answered but speaking/writing still in flight -> not ready"
+        );
+
+        // Drive speaking + writing to a terminal phase.
+        for s in sections.iter_mut() {
+            match &mut s.progress {
+                SectionProgress::Speaking { phase, .. } => {
+                    *phase = SpeakingPhase::Graded {
+                        score: Some(80),
+                        transcript: Some("ok".into()),
+                        feedback: Some("good".into()),
+                    };
+                }
+                SectionProgress::Writing { phase, .. } => {
+                    *phase = WritingPhase::Graded {
+                        score: 75,
+                        feedback: "nice".into(),
+                    };
+                }
+                _ => {}
+            }
+        }
+        assert!(
+            class_ready_to_submit(&sections),
+            "every section terminal -> ready"
+        );
+    }
+
+    #[test]
+    fn speaking_section_is_not_ready_until_terminal() {
+        // A class with a speaking section: in-flight phases are not submittable;
+        // only Graded/Failed are.
+        let mut sections = class_sections(&mixed_class()).expect("well-formed");
+        answer_all_mc(&mut sections);
+        // Drive writing terminal so only the speaking phase is under test.
+        for s in sections.iter_mut() {
+            if let SectionProgress::Writing { phase, .. } = &mut s.progress {
+                *phase = WritingPhase::Failed {
+                    message: "x".into(),
+                };
+            }
+        }
+
+        let set_speaking = |sections: &mut [ClassSection], p: SpeakingPhase| {
+            for s in sections.iter_mut() {
+                if let SectionProgress::Speaking { phase, .. } = &mut s.progress {
+                    *phase = p.clone();
+                }
+            }
+        };
+
+        for not_ready in [
+            SpeakingPhase::Idle,
+            SpeakingPhase::Recording,
+            SpeakingPhase::Uploading,
+            SpeakingPhase::Polling {
+                recording_id: "r".into(),
+            },
+        ] {
+            set_speaking(&mut sections, not_ready.clone());
+            assert!(
+                !class_ready_to_submit(&sections),
+                "speaking phase {not_ready:?} must not be submittable",
+            );
+        }
+        for ready in [
+            SpeakingPhase::Graded {
+                score: Some(90),
+                transcript: Some("t".into()),
+                feedback: Some("f".into()),
+            },
+            SpeakingPhase::Failed {
+                message: "m".into(),
+            },
+        ] {
+            set_speaking(&mut sections, ready.clone());
+            assert!(
+                class_ready_to_submit(&sections),
+                "speaking phase {ready:?} is terminal -> submittable",
+            );
+        }
+    }
+
+    #[test]
+    fn writing_section_is_not_ready_until_terminal() {
+        let mut sections = class_sections(&mixed_class()).expect("well-formed");
+        answer_all_mc(&mut sections);
+        // Drive speaking terminal so only the writing phase is under test.
+        for s in sections.iter_mut() {
+            if let SectionProgress::Speaking { phase, .. } = &mut s.progress {
+                *phase = SpeakingPhase::Failed {
+                    message: "x".into(),
+                };
+            }
+        }
+
+        let set_writing = |sections: &mut [ClassSection], p: WritingPhase| {
+            for s in sections.iter_mut() {
+                if let SectionProgress::Writing { phase, .. } = &mut s.progress {
+                    *phase = p.clone();
+                }
+            }
+        };
+
+        for not_ready in [WritingPhase::Editing, WritingPhase::Submitting] {
+            set_writing(&mut sections, not_ready.clone());
+            assert!(
+                !class_ready_to_submit(&sections),
+                "writing phase {not_ready:?} must not be submittable",
+            );
+        }
+        for ready in [
+            WritingPhase::Graded {
+                score: 70,
+                feedback: "f".into(),
+            },
+            WritingPhase::Failed {
+                message: "m".into(),
+            },
+        ] {
+            set_writing(&mut sections, ready.clone());
+            assert!(
+                class_ready_to_submit(&sections),
+                "writing phase {ready:?} is terminal -> submittable",
+            );
+        }
     }
 
     #[test]
@@ -2838,9 +3019,12 @@ mod tests {
             "scoreBySkill": { "vocab": 0.4, "grammar": 0.8, "reading": 0.6 }
         }))
         .expect("valid");
-        let outcome = PlacementOutcome::from(&resp);
+        let outcome = PlacementOutcome::from_response(&resp, "en".into(), "es".into());
         assert_eq!(outcome.course_id, "c-new");
         assert_eq!(outcome.level, "B1");
+        // The submitted languages are carried onto the outcome.
+        assert_eq!(outcome.native, "en");
+        assert_eq!(outcome.target, "es");
         // Sorted by skill name: grammar, reading, vocab.
         assert_eq!(
             outcome.score_by_skill,
@@ -2850,6 +3034,15 @@ mod tests {
                 ("vocab".to_string(), 40),
             ]
         );
+    }
+
+    #[test]
+    fn course_title_from_codes_is_human_readable_with_fallbacks() {
+        assert_eq!(course_title("en", "es"), "English → Spanish");
+        // An unknown code falls back to its uppercase form.
+        assert_eq!(course_title("en", "xx"), "English → XX");
+        // Missing codes fall back to a generic title (never blank).
+        assert_eq!(course_title("", "es"), "Your course");
     }
 
     #[test]

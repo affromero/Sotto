@@ -2435,6 +2435,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn multi_prompt_writing_keeps_each_grade_visible_until_explicit_advance() {
+        // A WRITING section with two prompts. After grading the first, its score +
+        // feedback must stay visible (phase Graded, index still 0) until the
+        // learner presses enter to advance — it must NOT auto-advance to a fresh
+        // editor for the second prompt and silently discard the first feedback.
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "sec-w", "skill": "WRITING", "status": "READY", "episode": null,
+              "questions": [], "prompts": [],
+              "writingPrompts": [
+                { "id": "w0", "order": 0, "task": "Write one", "guidance": null, "response": null },
+                { "id": "w1", "order": 1, "task": "Write two", "guidance": null, "response": null }
+              ] }
+        ]));
+
+        // Compose + submit the first prompt.
+        for c in "first answer".chars() {
+            app.on_writing_input(c);
+        }
+        app.on_writing_submit();
+        let req_gen = app.request_gen;
+
+        // The first prompt grades.
+        let graded: ApiResult<crate::api::WritingGradeResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "overallScore": 0.8, "feedback": "Good use of past tense."
+            }))
+            .expect("valid grade")));
+        app.on_class_writing_graded(req_gen, graded);
+
+        // The grade is visible and we are STILL on the first prompt (index 0).
+        match app.current_section().map(|s| &s.progress) {
+            Some(SectionProgress::Writing { phase, index, .. }) => {
+                assert_eq!(*index, 0, "must not auto-advance past the first prompt");
+                match phase {
+                    WritingPhase::Graded { score, feedback } => {
+                        assert_eq!(*score, 80);
+                        assert_eq!(feedback, "Good use of past tense.");
+                    }
+                    other => panic!("expected the first prompt's Graded feedback, got {other:?}"),
+                }
+            }
+            other => panic!("expected a Writing section, got {other:?}"),
+        }
+
+        // Explicit advance (enter) -> fresh editor for the SECOND prompt.
+        app.on_select();
+        match app.current_section().map(|s| &s.progress) {
+            Some(SectionProgress::Writing {
+                phase,
+                index,
+                input,
+                ..
+            }) => {
+                assert_eq!(*index, 1, "enter advances to the second prompt");
+                assert_eq!(
+                    *phase,
+                    WritingPhase::Editing,
+                    "second prompt opens a fresh editor"
+                );
+                assert!(input.is_empty(), "the second prompt's editor starts empty");
+            }
+            other => panic!("expected the second Writing prompt, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn stale_episode_for_a_previous_section_is_ignored() {
         // Section 0 listening, section 1 listening: advancing bumps the gen, so a
         // late episode load for section 0 must not attach to section 1.
@@ -2813,14 +2880,24 @@ mod tests {
             View::PlacementResult { outcome } => {
                 assert_eq!(outcome.course_id, "course-new");
                 assert_eq!(outcome.level, "B1");
+                // The submitted languages are carried onto the outcome.
+                assert_eq!(outcome.native, "en");
+                assert_eq!(outcome.target, "es");
             }
             other => panic!("expected PlacementResult, got {other:?}"),
         }
 
-        // Continue -> land in the created course's home.
+        // Continue -> land in the created course's home, with REAL language
+        // metadata + a readable title (not blank "Your course").
         app.placement_result_continue();
         match &app.view {
-            View::CourseHome { course, .. } => assert_eq!(course.id, "course-new"),
+            View::CourseHome { course, .. } => {
+                assert_eq!(course.id, "course-new");
+                assert_eq!(course.native_lang, "en");
+                assert_eq!(course.target_lang, "es");
+                assert_eq!(course.current_level, "B1");
+                assert_eq!(course.title, "English → Spanish");
+            }
             other => panic!("expected CourseHome, got {other:?}"),
         }
     }
@@ -3157,6 +3234,60 @@ mod tests {
         assert!(
             matches!(app.view, View::CourseHome { .. }),
             "a stale answer must not resurrect the ask overlay"
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelling_the_ask_overlay_drops_in_flight_results_and_stops_polling() {
+        let mut app = listening_app();
+        type_question(&mut app, "what does casa mean?");
+        app.on_ask_submit(); // -> Asking, dispatched under `asked_gen`
+        let asked_gen = app.request_gen;
+
+        // The learner presses Esc / `a` to close the overlay while the ask is in
+        // flight. Cancel must invalidate the in-flight generation.
+        app.on_toggle_ask();
+        assert!(!app.ask_overlay_open(), "overlay is closed by cancel");
+        assert!(
+            app.request_gen > asked_gen,
+            "cancel bumps the generation to invalidate in-flight work"
+        );
+        let gen_after_cancel = app.request_gen;
+
+        // A late InteractionAsked for the cancelled ask (old gen) must be dropped:
+        // no phase change, no reschedule (no further gen bump).
+        app.on_interaction_asked(
+            asked_gen,
+            interaction(serde_json::json!({
+                "id": "int-X", "question": "?", "timestamp": 0,
+                "status": "PENDING", "answer": null, "helpful": null, "segmentOrder": null
+            })),
+        );
+        // And a late InteractionPolled (old gen) is likewise dropped.
+        app.on_interaction_polled(
+            asked_gen,
+            interaction(serde_json::json!({
+                "id": "int-X", "question": "?", "timestamp": 0,
+                "status": "ANSWERED", "answer": "late answer", "helpful": true, "segmentOrder": 1
+            })),
+        );
+
+        // The overlay stayed closed (Editing/closed), never showed an answer or
+        // error, and nothing re-bumped the generation (no poll was scheduled).
+        match &app.view {
+            View::ListeningReview { ask, .. } => {
+                assert!(!ask.open, "the cancelled overlay must stay closed");
+                assert_eq!(
+                    ask.phase,
+                    state::AskPhase::Editing,
+                    "a dropped result must not move the phase to Answered/Failed",
+                );
+            }
+            other => panic!("expected ListeningReview, got {other:?}"),
+        }
+        assert_eq!(
+            app.request_gen, gen_after_cancel,
+            "a dropped result must not reschedule a poll (no further gen bump)",
         );
     }
 

@@ -102,16 +102,28 @@ impl App {
 
     // --- Overlay open/close + text input -----------------------------------
 
-    /// Toggle the ask overlay (`a`). Opening starts a fresh question.
+    /// Toggle the ask overlay (`a`). Opening starts a fresh question; closing
+    /// (cancel) bumps the request generation so any in-flight ask/poll result
+    /// for the now-closed overlay is dropped (stale) and no further poll is
+    /// scheduled — otherwise a late `InteractionAsked`/`InteractionPolled` would
+    /// mutate the closed state and reschedule polls against a dead overlay.
     pub(super) fn on_toggle_ask(&mut self) {
-        if let Some(ask) = self.current_ask_mut() {
-            if ask.open {
-                *ask = AskState::closed();
-            } else {
-                *ask = AskState::opened();
-            }
-            self.render();
+        let is_open = match self.current_ask() {
+            Some(ask) => ask.open,
+            None => return,
+        };
+        if is_open {
+            // Invalidate in-flight ask/poll work before closing.
+            self.bump_gen();
         }
+        if let Some(ask) = self.current_ask_mut() {
+            *ask = if is_open {
+                AskState::closed()
+            } else {
+                AskState::opened()
+            };
+        }
+        self.render();
     }
 
     pub(super) fn ask_input_char(&mut self, c: char) {
