@@ -591,7 +591,8 @@ export const generatePlacementResponseSchema = z.object({
 });
 
 // POST body: the answered questions for the (native, target) pair. selectedIndex
-// is 0..3 per the route; at least one answer is required (`.min(1)`).
+// is 0..3 for a content option and 4 for the "I don't know" option; at least one
+// answer is required (`.min(1)`).
 export const submitPlacementRequestSchema = z.object({
   native: z.string().length(2),
   target: z.string().length(2),
@@ -599,7 +600,7 @@ export const submitPlacementRequestSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        selectedIndex: z.number().int().min(0).max(3),
+        selectedIndex: z.number().int().min(0).max(4),
       }),
     )
     .min(1),
