@@ -1,5 +1,28 @@
-import { describe, it, expect } from 'vitest';
-import { scorePlacement, type PlacementQuestion } from '@/lib/placement-test';
+import { describe, it, expect, vi } from 'vitest';
+
+// generatePlacement reaches out to the resolved AI provider; mock the seams so
+// the test stays hermetic and asserts only our option-shaping behavior.
+vi.mock('@/lib/learning-ai', () => ({
+  resolveLearningAi: vi.fn().mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
+}));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: vi.fn(() => ({
+    generateResponse: vi.fn().mockResolvedValue({
+      content: JSON.stringify([
+        { cefr: 'A1', skill: 'grammar', prompt: 'q1', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: '' },
+        { cefr: 'B1', skill: 'reading', prompt: 'q2', options: ['w', 'x', 'y', 'z'], correctIndex: 2, explanation: '' },
+      ]),
+      model: 'test-model',
+      inputTokens: 0,
+      outputTokens: 0,
+    }),
+  })),
+}));
+vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: vi.fn(() => '') }));
+vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+vi.mock('@/lib/course-notes', () => ({ formatNotesForPrompt: vi.fn(() => '') }));
+
+import { scorePlacement, idkLabel, generatePlacement, type PlacementQuestion } from '@/lib/placement-test';
 
 function q(id: string, cefr: string, skill: string): PlacementQuestion {
   return {
@@ -7,7 +30,7 @@ function q(id: string, cefr: string, skill: string): PlacementQuestion {
     cefr: cefr as PlacementQuestion['cefr'],
     skill: skill as PlacementQuestion['skill'],
     prompt: id,
-    options: ['a', 'b', 'c', 'd'],
+    options: ['a', 'b', 'c', 'd', "I don't know"],
     correctIndex: 0,
     explanation: '',
   };
@@ -26,6 +49,7 @@ const questions: PlacementQuestion[] = [
 ];
 const allCorrect = questions.map((x) => ({ id: x.id, selectedIndex: 0 }));
 
+const IDK_INDEX = 4;
 
 describe('scorePlacement staircase', () => {
   it('assigns the highest fully-passed band', () => {
@@ -47,5 +71,43 @@ describe('scorePlacement staircase', () => {
     expect(out.scoreBySkill.grammar).toBe(1);
     expect(out.responses).toHaveLength(questions.length);
     expect(out.responses.every((r) => r.correct)).toBe(true);
+  });
+
+  it('scores the "I don\'t know" option as not mastered', () => {
+    // Choosing index 4 (the appended IDK option) is never the correct index, so
+    // every band fails and the learner floors at A1.
+    const idkEverywhere = questions.map((x) => ({ id: x.id, selectedIndex: IDK_INDEX }));
+    const out = scorePlacement(questions, idkEverywhere);
+    expect(out.level).toBe('A1');
+    expect(out.responses.every((r) => !r.correct)).toBe(true);
+  });
+});
+
+describe('idkLabel', () => {
+  it('returns the native-language phrase for supported languages', () => {
+    expect(idkLabel('en')).toBe("I don't know");
+    expect(idkLabel('es')).toBe('No lo sé');
+    expect(idkLabel('de')).toBe('Ich weiß nicht');
+  });
+
+  it('normalizes case/whitespace', () => {
+    expect(idkLabel(' ES ')).toBe('No lo sé');
+  });
+
+  it('falls back to English for unknown codes', () => {
+    expect(idkLabel('xx')).toBe("I don't know");
+  });
+});
+
+describe('generatePlacement option shaping', () => {
+  it('appends the native-language "I don\'t know" as the last option', async () => {
+    const { questions: out } = await generatePlacement('user-1', 'es', 'en');
+    expect(out.length).toBeGreaterThan(0);
+    for (const question of out) {
+      expect(question.options).toHaveLength(5);
+      expect(question.options[4]).toBe('No lo sé');
+      // correctIndex always points at a content option, never the IDK option.
+      expect(question.correctIndex).toBeLessThan(4);
+    }
   });
 });

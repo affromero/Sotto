@@ -93,7 +93,8 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
     })();
   }, [loadQuestions]);
 
-  // Keyboard shortcut: 1-4 selects option, Enter advances
+  // Keyboard shortcut: number keys select an option (incl. the "I don't know"
+  // option, which is always last), Enter advances.
   useEffect(() => {
     if (phase !== 'testing') return;
     const q = questions[currentIndex];
@@ -101,7 +102,7 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
 
     function onKey(e: KeyboardEvent) {
       const idx = parseInt(e.key) - 1;
-      if (idx >= 0 && idx <= 3 && idx < q.options.length) {
+      if (idx >= 0 && idx < q.options.length) {
         e.preventDefault();
         setAnswers((prev) => ({ ...prev, [q.id]: idx }));
         return;
@@ -360,7 +361,7 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
       </nav>
 
       <p className={styles.hint} aria-hidden="true">
-        Tip: press <kbd>1</kbd>–<kbd>4</kbd> to select, <kbd>Enter</kbd> to advance
+        Tip: press <kbd>1</kbd> to <kbd>{q.options.length}</kbd> to select, <kbd>Enter</kbd> to advance
       </p>
     </div>
   );
