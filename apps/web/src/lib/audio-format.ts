@@ -19,7 +19,12 @@ export interface AudioFormat {
  * Falls back to mp3 for unrecognized input (the prior behavior), which keeps
  * byte-sniffing providers working.
  */
-export function detectAudioFormat(buffer: Buffer): AudioFormat {
+/**
+ * Match the leading magic bytes against a known audio container and return its
+ * format, or `null` when nothing is recognized. This is the single source of
+ * truth shared by {@link detectAudioFormat} and {@link isRecognizedAudio}.
+ */
+function matchAudioFormat(buffer: Buffer): AudioFormat | null {
   // RIFF....WAVE (WAV)
   if (
     buffer.length >= 12 &&
@@ -63,5 +68,19 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
     return { ext: 'mp3', mime: 'audio/mpeg' };
   }
 
-  return { ext: 'mp3', mime: 'audio/mpeg' };
+  return null;
+}
+
+export function detectAudioFormat(buffer: Buffer): AudioFormat {
+  return matchAudioFormat(buffer) ?? { ext: 'mp3', mime: 'audio/mpeg' };
+}
+
+/**
+ * Whether the buffer's leading bytes match a known audio container (WAV, WebM,
+ * Ogg, FLAC, MP4/M4A, or MP3). Unlike {@link detectAudioFormat}, this does NOT
+ * fall back to mp3, so zero-byte, too-small, or random-byte uploads return
+ * false. Use it to reject empty/garbage audio before storing or grading it.
+ */
+export function isRecognizedAudio(buffer: Buffer): boolean {
+  return matchAudioFormat(buffer) !== null;
 }

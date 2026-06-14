@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     }
     const native = nativeParse.data;
     const target = targetParse.data;
+    if (native === target) return errorResponse('native and target must differ', 400);
 
     const rate = await checkRateLimit(`placement:${userId}`, 10, 3600);
     if (!rate.allowed) {
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
     const parsed = submitSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
     const { native, target, answers } = parsed.data;
+    if (native === target) return errorResponse('native and target must differ', 400);
 
     const questions = await cache.get<PlacementQuestion[]>(cacheKey(userId, native, target));
     if (!questions) return errorResponse('Placement session expired. Start the test again.', 409);
