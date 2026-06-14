@@ -3,7 +3,8 @@ import { addJob, JobType, audioGenerationQueue } from './queue';
 
 /**
  * Create Segment records from script turns and queue audio generation jobs.
- * Shared by script-verification (no-refs path), reference-validation, and script approve endpoint.
+ * Shared by the compile-script worker, the class listening generator, and the
+ * script approve endpoint.
  */
 export async function createSegmentsAndQueueAudio(
   episodeId: string,

@@ -34,14 +34,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates 2-voice conversational episode scripts via LLM',
     stage: 'Content Pipeline',
   },
-  'script-verification': {
-    description: 'Fact-checks script claims and enforces duration limits',
-    stage: 'Content Pipeline',
-  },
-  'reference-validation': {
-    description: 'Validates source URLs and citation quality',
-    stage: 'Content Pipeline',
-  },
   'verify-class-references': {
     description: 'Verify-only reference check for sourced classes (writes verdicts, never creates segments)',
     stage: 'Content Pipeline',

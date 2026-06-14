@@ -586,7 +586,6 @@ export async function generateScript(params: {
 
 /**
  * Regenerate a script incorporating verification feedback.
- * Used by the script-verification worker when the "teacher" agent rejects a script.
  */
 export async function generateScriptWithFeedback(params: {
   topic: string;
