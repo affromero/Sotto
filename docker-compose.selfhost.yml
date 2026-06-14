@@ -3,8 +3,8 @@
 #
 #   docker compose -f docker-compose.selfhost.yml up -d
 #
-# Images are published by .github/workflows/oss-image.yml. Postgres, Redis, and
-# the Remotion sidecar are pulled from public registries.
+# Images are published by .github/workflows/oss-image.yml. Postgres and Redis
+# are pulled from public registries.
 name: sotto
 
 services:
