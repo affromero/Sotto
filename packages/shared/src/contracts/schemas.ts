@@ -680,6 +680,23 @@ export const onboardingConfigResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/v1/users/me  (auth: bearer) — the authenticated learner's identity.
+// `.loose()`: the route returns a richer row (episodeCount, voicePreferences,
+// preferred*, createdAt, ...); the CLI reads only the identity subset and
+// tolerates the extra fields. `id` is always present; the rest are nullable.
+// Used by `sotto whoami` and the account switcher to show who a profile is.
+// ---------------------------------------------------------------------------
+export const meResponseSchema = z
+  .object({
+    id: z.string(),
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    handle: z.string().nullable().optional(),
+    image: z.string().nullable().optional(),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
 // ADAPTIVE-LISTENING Q&A — ask a contextual question during a listening lesson.
 //   POST /api/v1/episodes/{episodeId}/interact                  -> 201 Interaction
 //   GET  /api/v1/episodes/{episodeId}/interact/{interactionId}  -> 200 Interaction

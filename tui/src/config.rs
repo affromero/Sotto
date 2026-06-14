@@ -1,6 +1,7 @@
 use color_eyre::{Result, eyre::eyre};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 const QUALIFIER: &str = "fm";
@@ -8,18 +9,108 @@ const ORGANIZATION: &str = "Sotto";
 const APPLICATION: &str = "sotto";
 const CONFIG_FILE: &str = "config.toml";
 
-/// Persisted Sotto CLI session: the server to talk to and the long-lived API
-/// key minted via `/api/v1/auth/pair/redeem`. Stored as TOML at the platform
-/// config dir (e.g. `~/.config/sotto/config.toml` on Linux/macOS).
+/// The default profile name used when none is given (and the name a migrated
+/// legacy single-credential config lands under).
+pub(crate) const DEFAULT_PROFILE: &str = "default";
+
+/// One named connection: a Sotto server and the API key paired with it. Each
+/// Sotto instance is single-learner, so a profile identifies an instance the
+/// learner can switch between (their self-host, a colleague's server, a managed
+/// instance). `name` caches the learner identity captured at login.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Config {
+pub(crate) struct Profile {
     pub server_url: String,
     pub api_key: String,
-    /// The persisted theme choice. `#[serde(default)]` so a legacy config that
-    /// predates theming (only `server_url` + `api_key`, no `[theme]` table)
-    /// still loads — the absent table resolves to [`ThemeChoice::default`].
+    /// Cached display name/email from the redeem response, shown in the account
+    /// list and as a `whoami` fallback. `None` if the server returned no user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl Profile {
+    /// True when this profile has no usable credential.
+    pub fn is_empty(&self) -> bool {
+        self.api_key.trim().is_empty()
+    }
+}
+
+/// Persisted Sotto CLI config: a set of named [`Profile`]s plus the active one,
+/// and a global theme shared across profiles. Stored as TOML at the platform
+/// config dir (e.g. `~/.config/sotto/config.toml` on Linux/macOS).
+///
+/// Field order matters for TOML: `toml` emits scalar values before tables, so
+/// the scalar `active` is declared first, then the `[theme]` table, then the
+/// `[profiles.*]` tables last.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Config {
+    /// The name of the active profile (the one the TUI connects through).
+    #[serde(default)]
+    pub active: String,
+    /// The persisted theme choice. Global (shared across profiles), and
+    /// `#[serde(default)]` so a config without a `[theme]` table still loads.
     #[serde(default)]
     pub theme: ThemeChoice,
+    /// All known profiles, keyed by name. A `BTreeMap` keeps serialization order
+    /// stable.
+    #[serde(default)]
+    pub profiles: BTreeMap<String, Profile>,
+}
+
+/// A permissive view used only to detect/migrate a legacy single-credential
+/// config (top-level `server_url`/`api_key`, no `[profiles]`). Every field is
+/// optional so both the legacy and current shapes deserialize without error.
+#[derive(Debug, Default, Deserialize)]
+struct RawConfig {
+    active: Option<String>,
+    #[serde(default)]
+    theme: Option<ThemeChoice>,
+    // Legacy top-level credentials.
+    server_url: Option<String>,
+    api_key: Option<String>,
+    profiles: Option<BTreeMap<String, Profile>>,
+}
+
+impl RawConfig {
+    /// Resolve into the current [`Config`], migrating a legacy single-credential
+    /// file into a `default` profile. The theme is preserved across migration.
+    fn into_config(self) -> Config {
+        let theme = self.theme.unwrap_or_default();
+        if let Some(profiles) = self.profiles {
+            // Already the current shape.
+            let active = self.active.unwrap_or_default();
+            return Config {
+                active,
+                theme,
+                profiles,
+            };
+        }
+        // Legacy: fold the single top-level credential into `profiles.default`.
+        match (self.server_url, self.api_key) {
+            (Some(server_url), Some(api_key)) => {
+                let mut profiles = BTreeMap::new();
+                profiles.insert(
+                    DEFAULT_PROFILE.to_string(),
+                    Profile {
+                        server_url,
+                        api_key,
+                        name: None,
+                    },
+                );
+                Config {
+                    active: DEFAULT_PROFILE.to_string(),
+                    theme,
+                    profiles,
+                }
+            }
+            // No credentials at all (and no profiles): an empty session that
+            // still carries any theme it had.
+            _ => Config {
+                active: String::new(),
+                theme,
+                profiles: BTreeMap::new(),
+            },
+        }
+    }
 }
 
 /// The serialized theme choice (mode + light palette + accent), persisted as a
@@ -97,8 +188,11 @@ impl Config {
                 return Ok(Some(Config::default()));
             }
         };
-        match toml::from_str::<Config>(&contents) {
-            Ok(config) => Ok(Some(config)),
+        // Parse through the permissive `RawConfig` so a legacy single-credential
+        // file (top-level `server_url`/`api_key`, no `[profiles]`) migrates into
+        // a `default` profile instead of failing to load.
+        match toml::from_str::<RawConfig>(&contents) {
+            Ok(raw) => Ok(Some(raw.into_config())),
             Err(e) => {
                 eprintln!(
                     "warning: {} is not valid config ({e}); continuing with defaults",
@@ -119,9 +213,56 @@ impl Config {
         Ok(())
     }
 
-    /// True when there is no usable session (no key configured).
+    /// True when there is no usable session: no active profile, or the active
+    /// profile has no key.
     pub fn is_empty(&self) -> bool {
-        self.api_key.trim().is_empty()
+        self.active_profile().is_none_or(Profile::is_empty)
+    }
+
+    // --- Profile management -------------------------------------------------
+
+    /// The active profile, if `active` names an existing one.
+    pub fn active_profile(&self) -> Option<&Profile> {
+        self.profiles.get(&self.active)
+    }
+
+    /// Profile names in stable (sorted) order.
+    pub fn profile_names(&self) -> Vec<String> {
+        self.profiles.keys().cloned().collect()
+    }
+
+    /// Insert or replace the profile named `name`.
+    pub fn upsert_profile(&mut self, name: &str, profile: Profile) {
+        self.profiles.insert(name.to_string(), profile);
+    }
+
+    /// Set the active profile. Errors (listing the available names) when `name`
+    /// is not a known profile, so a typo never silently clears the session.
+    pub fn set_active(&mut self, name: &str) -> Result<()> {
+        if !self.profiles.contains_key(name) {
+            let available = self.profile_names().join(", ");
+            return Err(eyre!(
+                "no profile named '{name}'. Available: {}",
+                if available.is_empty() {
+                    "(none)".to_string()
+                } else {
+                    available
+                }
+            ));
+        }
+        self.active = name.to_string();
+        Ok(())
+    }
+
+    /// Remove the profile named `name`. If it was the active one, the active
+    /// pointer moves to another remaining profile (or clears when none remain).
+    /// Returns `true` if a profile was removed.
+    pub fn remove_profile(&mut self, name: &str) -> bool {
+        let removed = self.profiles.remove(name).is_some();
+        if removed && self.active == name {
+            self.active = self.profiles.keys().next().cloned().unwrap_or_default();
+        }
+        removed
     }
 }
 
@@ -143,30 +284,81 @@ fn set_owner_only_permissions(_path: &std::path::Path) -> Result<()> {
 mod tests {
     use super::*;
 
+    /// A config with a single active profile (the common shape after login).
+    fn single_profile(name: &str, server: &str, key: &str, theme: ThemeChoice) -> Config {
+        let mut profiles = BTreeMap::new();
+        profiles.insert(
+            name.to_string(),
+            Profile {
+                server_url: server.into(),
+                api_key: key.into(),
+                name: None,
+            },
+        );
+        Config {
+            active: name.to_string(),
+            theme,
+            profiles,
+        }
+    }
+
     #[test]
-    fn save_then_load_roundtrips() {
+    fn save_then_load_roundtrips_multiple_profiles() {
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("nested").join("config.toml");
 
-        // A non-default theme so the round trip actually exercises the new table.
-        let config = Config {
-            server_url: "http://localhost:3000".into(),
-            api_key: "sk_sotto_example_key".into(),
-            theme: ThemeChoice {
+        // A non-default theme + two profiles so the round trip exercises both the
+        // scalar/table ordering and the cached identity field.
+        let mut config = single_profile(
+            "home",
+            "http://localhost:3000",
+            "sk_home",
+            ThemeChoice {
                 mode: "dark".into(),
                 light_palette: "paper".into(),
                 accent: "#1C7A6B".into(),
             },
-        };
+        );
+        config.upsert_profile(
+            "work",
+            Profile {
+                server_url: "https://work.example".into(),
+                api_key: "sk_work".into(),
+                name: Some("Ada".into()),
+            },
+        );
         config.save_to(&path).unwrap();
 
         let loaded = Config::load_from(&path).unwrap().expect("config present");
-        assert_eq!(loaded, config);
+        assert_eq!(loaded, config, "two-profile config round-trips exactly");
     }
 
     #[test]
-    fn legacy_config_without_theme_loads_with_default_theme() {
-        // A config written before theming existed: only the two original keys.
+    fn legacy_single_credential_migrates_into_default_profile() {
+        // A pre-profiles config: top-level server_url/api_key + a [theme] table.
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "server_url = \"http://localhost:3000\"\napi_key = \"sk_sotto_old\"\n\n[theme]\nmode = \"dark\"\nlight_palette = \"paper\"\naccent = \"#80487F\"\n",
+        )
+        .unwrap();
+
+        let loaded = Config::load_from(&path).unwrap().expect("config present");
+        // Migrated into `profiles.default`, active = default.
+        assert_eq!(loaded.active, "default");
+        let p = loaded.active_profile().expect("default profile present");
+        assert_eq!(p.server_url, "http://localhost:3000");
+        assert_eq!(p.api_key, "sk_sotto_old");
+        // The theme is preserved across migration.
+        assert_eq!(loaded.theme.mode, "dark");
+        assert_eq!(loaded.theme.accent, "#80487F");
+        // A migrated logged-in config is NOT an empty session.
+        assert!(!loaded.is_empty(), "migration keeps the user logged in");
+    }
+
+    #[test]
+    fn legacy_config_without_theme_migrates_with_default_theme() {
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("config.toml");
         std::fs::write(
@@ -176,8 +368,7 @@ mod tests {
         .unwrap();
 
         let loaded = Config::load_from(&path).unwrap().expect("config present");
-        assert_eq!(loaded.server_url, "http://localhost:3000");
-        assert_eq!(loaded.api_key, "sk_sotto_old");
+        assert_eq!(loaded.active_profile().unwrap().api_key, "sk_sotto_old");
         assert_eq!(loaded.theme, ThemeChoice::default());
     }
 
@@ -207,7 +398,7 @@ mod tests {
         let path = tmp.path().join("config.toml");
         std::fs::write(
             &path,
-            "server_url = \"s\"\napi_key = \"k\"\n\n[theme]\nmode = \"chartreuse\"\nlight_palette = \"plaid\"\naccent = \"#ZZZZZZ\"\n",
+            "active = \"default\"\n\n[theme]\nmode = \"chartreuse\"\nlight_palette = \"plaid\"\naccent = \"#ZZZZZZ\"\n\n[profiles.default]\nserver_url = \"s\"\napi_key = \"k\"\n",
         )
         .unwrap();
 
@@ -221,44 +412,13 @@ mod tests {
     }
 
     #[test]
-    fn login_preserves_an_existing_valid_theme() {
-        // Simulate the login merge: a valid prior config has a non-default theme;
-        // re-login overwrites only the credentials and keeps the theme block.
-        let tmp = tempfile::TempDir::new().unwrap();
-        let path = tmp.path().join("config.toml");
-        let prior = Config {
-            server_url: "http://old".into(),
-            api_key: "sk_old".into(),
-            theme: ThemeChoice {
-                mode: "dark".into(),
-                light_palette: "paper".into(),
-                accent: "#80487F".into(),
-            },
-        };
-        prior.save_to(&path).unwrap();
-
-        // The login flow reads the prior config and reuses its theme.
-        let existing = Config::load_from(&path).unwrap().expect("present");
-        let after_login = Config {
-            server_url: "http://new".into(),
-            api_key: "sk_new".into(),
-            theme: existing.theme.clone(),
-        };
-        assert_eq!(
-            after_login.theme, prior.theme,
-            "theme preserved across login"
-        );
-        assert_eq!(after_login.api_key, "sk_new", "credentials updated");
-    }
-
-    #[test]
     fn partial_theme_table_fills_missing_fields_from_defaults() {
         // Only `mode` set; light_palette + accent must default, not error.
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("config.toml");
         std::fs::write(
             &path,
-            "server_url = \"s\"\napi_key = \"k\"\n\n[theme]\nmode = \"dark\"\n",
+            "active = \"default\"\n\n[theme]\nmode = \"dark\"\n\n[profiles.default]\nserver_url = \"s\"\napi_key = \"k\"\n",
         )
         .unwrap();
 
@@ -266,6 +426,74 @@ mod tests {
         assert_eq!(loaded.theme.mode, "dark");
         assert_eq!(loaded.theme.light_palette, "aula");
         assert_eq!(loaded.theme.accent, "#3F4FB0");
+    }
+
+    #[test]
+    fn upsert_set_active_and_remove_profile_logic() {
+        let mut config = single_profile("home", "http://home", "sk_home", ThemeChoice::default());
+        config.upsert_profile(
+            "work",
+            Profile {
+                server_url: "http://work".into(),
+                api_key: "sk_work".into(),
+                name: None,
+            },
+        );
+        assert_eq!(config.profile_names(), vec!["home", "work"]);
+
+        // Switch to a known profile; unknown errors and does not change active.
+        config.set_active("work").expect("known profile");
+        assert_eq!(config.active, "work");
+        assert!(config.set_active("nope").is_err());
+        assert_eq!(
+            config.active, "work",
+            "a failed switch leaves active intact"
+        );
+
+        // Removing the active profile moves active to a remaining one.
+        assert!(config.remove_profile("work"));
+        assert_eq!(config.active, "home", "active moves to a remaining profile");
+
+        // Removing the last profile clears active -> empty session.
+        assert!(config.remove_profile("home"));
+        assert_eq!(config.active, "");
+        assert!(config.is_empty());
+        // Removing a missing profile is a no-op.
+        assert!(!config.remove_profile("ghost"));
+    }
+
+    #[test]
+    fn is_empty_tracks_the_active_profile_key() {
+        // No profiles -> empty.
+        let mut config = Config::default();
+        assert!(config.is_empty());
+
+        // Active points at a keyless profile -> still empty.
+        config.upsert_profile(
+            "default",
+            Profile {
+                server_url: "http://s".into(),
+                api_key: String::new(),
+                name: None,
+            },
+        );
+        config.active = "default".into();
+        assert!(config.is_empty());
+
+        // A real key -> not empty.
+        config.upsert_profile(
+            "default",
+            Profile {
+                server_url: "http://s".into(),
+                api_key: "sk_x".into(),
+                name: None,
+            },
+        );
+        assert!(!config.is_empty());
+
+        // Active naming a missing profile -> empty.
+        config.active = "ghost".into();
+        assert!(config.is_empty());
     }
 
     #[test]
@@ -282,27 +510,16 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         let path = tmp.path().join("config.toml");
 
-        Config {
-            server_url: "http://localhost:3000".into(),
-            api_key: "sk_sotto_secret".into(),
-            theme: ThemeChoice::default(),
-        }
+        single_profile(
+            "default",
+            "http://localhost:3000",
+            "sk_sotto_secret",
+            ThemeChoice::default(),
+        )
         .save_to(&path)
         .unwrap();
 
         let mode = std::fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
-    }
-
-    #[test]
-    fn is_empty_tracks_api_key() {
-        let mut config = Config {
-            server_url: "http://localhost:3000".into(),
-            api_key: String::new(),
-            theme: ThemeChoice::default(),
-        };
-        assert!(config.is_empty());
-        config.api_key = "sk_sotto_x".into();
-        assert!(!config.is_empty());
     }
 }

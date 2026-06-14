@@ -203,6 +203,8 @@ pub(crate) trait Api: Send + Sync {
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse>;
     /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
     async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse>;
+    /// Fetch the authenticated learner's identity (id, name, email, handle).
+    async fn me(&self) -> Result<types::MeResponse>;
 
     // --- Adaptive-listening Q&A (P6e) ---
     /// Ask a contextual question about an episode at `timestamp` seconds; the
@@ -736,6 +738,16 @@ impl SottoClient {
         Ok(resp.into_inner())
     }
 
+    /// Fetch the authenticated learner's identity.
+    pub async fn me(&self) -> Result<types::MeResponse> {
+        let resp = self
+            .inner
+            .get_me()
+            .await
+            .map_err(|e| eyre!("failed to load user: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
     // --- Adaptive-listening Q&A -------------------------------------------
 
     /// Ask a contextual question about an episode; returns a PENDING interaction.
@@ -941,6 +953,10 @@ impl Api for SottoClient {
 
     async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse> {
         SottoClient::onboarding_config(self).await
+    }
+
+    async fn me(&self) -> Result<types::MeResponse> {
+        SottoClient::me(self).await
     }
 
     async fn ask_interaction(

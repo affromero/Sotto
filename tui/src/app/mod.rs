@@ -24,12 +24,12 @@ use crate::api::{Api, SottoClient, SpeakingUploadResponse, types};
 use crate::audio::{AudioPlayer, Recorder};
 use crate::components::Component;
 use crate::components::status_bar::StatusBar;
-use crate::config::Config;
+use crate::config::{Config, Profile};
 use crate::event::Event;
 use crate::theme::Theme;
 use crate::tui::Tui;
 
-use overlay::ThemePicker;
+use overlay::{AccountsOverlay, ThemePicker};
 
 use state::{
     AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SectionProgress,
@@ -45,6 +45,11 @@ use state::{
 pub(crate) struct App {
     config: Config,
     client: Arc<dyn Api>,
+    /// Builds an [`Api`] client for a given profile. Production uses a real
+    /// [`SottoClient`]; tests inject a stub. Stored so the account switcher can
+    /// rebuild the client against a different profile at runtime. Returns
+    /// `Result` because a real client build can fail (e.g. a bad key header).
+    client_factory: ClientFactory,
     view: View,
     should_quit: bool,
     status_bar: StatusBar,
@@ -71,26 +76,55 @@ pub(crate) struct App {
     theme_picker: ThemePicker,
     /// The key-help overlay (`?`) — modal; shows the current screen's keys.
     help_open: bool,
+    /// The account switcher overlay (`A`) — modal; lists profiles to switch to.
+    accounts: AccountsOverlay,
 }
 
+/// Builds an [`Api`] client for a profile (server + key). Boxed so production
+/// (real client) and tests (stub) share one runtime-swappable path.
+type ClientFactory = Arc<dyn Fn(&Profile) -> Result<Arc<dyn Api>> + Send + Sync>;
+
 impl App {
-    /// Build the production app: a real [`SottoClient`] against the configured
-    /// server.
+    /// Build the production app: a real [`SottoClient`] for the active profile,
+    /// with a factory that rebuilds one when the learner switches accounts.
     pub fn new(config: Config) -> Result<Self> {
-        let client = Arc::new(SottoClient::new(&config.server_url, &config.api_key)?);
-        Ok(Self::with_client(config, client))
+        let factory: ClientFactory = Arc::new(|profile: &Profile| {
+            let client: Arc<dyn Api> =
+                Arc::new(SottoClient::new(&profile.server_url, &profile.api_key)?);
+            Ok(client)
+        });
+        Self::with_factory(config, factory)
     }
 
-    /// Build an app around an injected [`Api`] implementation. Production calls
-    /// this through [`App::new`]; tests pass a stub so dispatch and reducers run
-    /// with zero network.
-    fn with_client(config: Config, client: Arc<dyn Api>) -> Self {
+    /// Build an app around a [`ClientFactory`]. Production passes the real
+    /// client builder; tests pass a stub factory so dispatch and reducers run
+    /// with zero network. The initial client is built for the active profile.
+    fn with_factory(config: Config, client_factory: ClientFactory) -> Result<Self> {
+        // Build the initial client for the active profile (or an empty stand-in
+        // profile when there is none, so the app can still render the switcher).
+        let profile = config.active_profile().cloned().unwrap_or_default();
+        let client = client_factory(&profile)?;
+        Ok(Self::assemble(config, client_factory, client))
+    }
+
+    /// Assemble the App from its already-built pieces. Shared by the factory
+    /// path and the test stub-injection path.
+    fn assemble(config: Config, client_factory: ClientFactory, client: Arc<dyn Api>) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let status_bar = StatusBar::new(config.server_url.clone(), "(owner)".to_string());
+        let server = config
+            .active_profile()
+            .map(|p| p.server_url.clone())
+            .unwrap_or_default();
+        let user = config
+            .active_profile()
+            .and_then(|p| p.name.clone())
+            .unwrap_or_else(|| "(owner)".to_string());
+        let status_bar = StatusBar::new(server, user);
         let theme = Theme::from_choice(&config.theme);
         Self {
             config,
             client,
+            client_factory,
             view: View::Loading,
             should_quit: false,
             status_bar,
@@ -103,6 +137,7 @@ impl App {
             theme,
             theme_picker: ThemePicker::closed(),
             help_open: false,
+            accounts: AccountsOverlay::closed(),
         }
     }
 
@@ -247,6 +282,8 @@ impl App {
             Action::ToggleThemePicker => self.on_toggle_theme_picker(),
             Action::ToggleHelp => self.on_toggle_help(),
             Action::CycleThemeValue => self.on_cycle_theme_value(),
+            Action::ToggleAccounts => self.on_toggle_accounts(),
+            Action::SwitchAccount => self.on_switch_account(),
         }
         Ok(())
     }
@@ -293,6 +330,19 @@ impl App {
         if self.help_open {
             return match key.code {
                 KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') => Some(Action::ToggleHelp),
+                _ => None,
+            };
+        }
+        // Account switcher (`A`) is a top-level MODAL: ↑/↓ move, Enter switches,
+        // `A`/Esc close; everything else is swallowed.
+        if self.accounts.open {
+            return match key.code {
+                KeyCode::Up | KeyCode::Char('k') => Some(Action::Up),
+                KeyCode::Down | KeyCode::Char('j') => Some(Action::Down),
+                KeyCode::Enter => Some(Action::SwitchAccount),
+                KeyCode::Char('A') | KeyCode::Esc | KeyCode::Char('q') => {
+                    Some(Action::ToggleAccounts)
+                }
                 _ => None,
             };
         }
@@ -368,11 +418,12 @@ impl App {
         }
 
         // Global polish keys (reached only when no text-entry/ask overlay is
-        // active — those modes return above, so `t`/`?` never disturb typing):
-        // `t` opens the theme picker, `?` opens the key-help overlay.
+        // active — those modes return above, so these never disturb typing):
+        // `t` theme picker, `?` key-help, `A` (shift+a) account switcher.
         match key.code {
             KeyCode::Char('t') => return Some(Action::ToggleThemePicker),
             KeyCode::Char('?') => return Some(Action::ToggleHelp),
+            KeyCode::Char('A') => return Some(Action::ToggleAccounts),
             _ => {}
         }
 
@@ -534,6 +585,12 @@ impl App {
             self.render();
             return;
         }
+        // The account switcher owns ↑/↓ when open (profile selection).
+        if self.accounts.open {
+            self.accounts.move_cursor(false, self.config.profiles.len());
+            self.render();
+            return;
+        }
         if self.in_section_walk() {
             self.class_cursor_move(true);
             return;
@@ -565,6 +622,11 @@ impl App {
     fn on_down(&mut self) {
         if self.theme_picker.open {
             self.theme_picker.move_row(true);
+            self.render();
+            return;
+        }
+        if self.accounts.open {
+            self.accounts.move_cursor(true, self.config.profiles.len());
             self.render();
             return;
         }
@@ -639,8 +701,9 @@ impl App {
             self.theme_picker = ThemePicker::closed();
             self.persist_theme();
         } else {
-            // Opening the picker dismisses help (one modal at a time).
+            // Opening the picker dismisses the other modals (one at a time).
             self.help_open = false;
+            self.accounts = AccountsOverlay::closed();
             self.theme_picker = ThemePicker::opened();
         }
         self.render();
@@ -651,6 +714,7 @@ impl App {
         self.help_open = !self.help_open;
         if self.help_open {
             self.theme_picker = ThemePicker::closed();
+            self.accounts = AccountsOverlay::closed();
         }
         self.render();
     }
@@ -672,6 +736,85 @@ impl App {
             self.status_bar
                 .set_error(format!("could not save theme: {e}"));
         }
+    }
+
+    // --- Account management (P9) -------------------------------------------
+
+    /// Toggle the account switcher overlay (`A`). Opens with the cursor on the
+    /// active profile so Enter on it is a no-op switch.
+    fn on_toggle_accounts(&mut self) {
+        if self.accounts.open {
+            self.accounts = AccountsOverlay::closed();
+        } else {
+            self.theme_picker = ThemePicker::closed();
+            self.help_open = false;
+            let active_idx = self
+                .config
+                .profile_names()
+                .iter()
+                .position(|n| n == &self.config.active)
+                .unwrap_or(0);
+            self.accounts = AccountsOverlay::opened(active_idx);
+        }
+        self.render();
+    }
+
+    /// Switch to the profile under the switcher cursor.
+    ///
+    /// A successful client build is the GATE for the rest of the switch: we build
+    /// the new profile's client FIRST, and only then swap it in, set the profile
+    /// active, persist, and reload. If the build fails we change nothing — the
+    /// previously-active profile and its client stay in place — so a fetch is
+    /// never dispatched through a client that does not belong to the now-active
+    /// profile (which would otherwise load the old account's data under the new
+    /// one). The error surfaces in the status bar.
+    fn on_switch_account(&mut self) {
+        let names = self.config.profile_names();
+        let Some(name) = names.get(self.accounts.cursor).cloned() else {
+            self.accounts = AccountsOverlay::closed();
+            return;
+        };
+        self.accounts = AccountsOverlay::closed();
+
+        // No-op when already active (still close the overlay).
+        if name == self.config.active {
+            self.render();
+            return;
+        }
+
+        // Build the target profile's client BEFORE mutating any state.
+        let Some(profile) = self.config.profiles.get(&name).cloned() else {
+            self.status_bar
+                .set_error(format!("no profile named '{name}'"));
+            self.render();
+            return;
+        };
+        let client = match (self.client_factory)(&profile) {
+            Ok(client) => client,
+            Err(e) => {
+                // Build failed: keep the previously-active profile + client. Do
+                // NOT set active, persist, or fetch through the stale client.
+                self.status_bar
+                    .set_error(format!("could not connect with '{name}': {e}"));
+                self.render();
+                return;
+            }
+        };
+
+        // The client is good — commit the switch.
+        self.client = client;
+        let user = profile
+            .name
+            .clone()
+            .unwrap_or_else(|| "(owner)".to_string());
+        self.status_bar.set_session(profile.server_url, user);
+        // `set_active` cannot fail here: `name` came from `profile_names()`.
+        let _ = self.config.set_active(&name);
+        if let Err(e) = self.config.save() {
+            self.status_bar.set_error(format!("could not save: {e}"));
+        }
+        // Reload courses against the NEW client (bumps gen, sets Loading).
+        self.fetch_courses();
     }
 
     fn on_select(&mut self) {
@@ -1518,6 +1661,21 @@ impl App {
             );
         } else if self.help_open {
             overlay::draw_help(frame, chunks[0], &self.view, &palette);
+        } else if self.accounts.open {
+            let profiles: Vec<(String, Profile)> = self
+                .config
+                .profiles
+                .iter()
+                .map(|(name, p)| (name.clone(), p.clone()))
+                .collect();
+            overlay::draw_accounts(
+                frame,
+                chunks[0],
+                &profiles,
+                &self.config.active,
+                self.accounts.cursor,
+                &palette,
+            );
         }
         Ok(())
     }
@@ -1793,6 +1951,14 @@ mod tests {
             .expect("valid config JSON"))
         }
 
+        async fn me(&self) -> Result<types::MeResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "id": "u_stub", "name": "Stub Learner", "email": null,
+                "handle": null, "image": null
+            }))
+            .expect("valid me JSON"))
+        }
+
         async fn ask_interaction(
             &self,
             _episode_id: &str,
@@ -1819,15 +1985,39 @@ mod tests {
         }
     }
 
+    /// A config with a single active `default` profile pointing at the stub.
+    fn stub_config() -> Config {
+        let mut config = Config::default();
+        config.upsert_profile(
+            "default",
+            crate::config::Profile {
+                server_url: "stub://test".into(),
+                api_key: "test-key".into(),
+                name: None,
+            },
+        );
+        config.active = "default".into();
+        config
+    }
+
+    /// A [`ClientFactory`] that hands out a fresh [`StubApi`] for any profile and
+    /// records the server_url it was last asked to build, so a switch test can
+    /// assert the client was rebuilt for the new profile.
+    fn recording_factory() -> (ClientFactory, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        let built = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = std::sync::Arc::clone(&built);
+        let factory: ClientFactory = Arc::new(move |profile: &crate::config::Profile| {
+            sink.lock().unwrap().push(profile.server_url.clone());
+            Ok(Arc::new(StubApi) as Arc<dyn Api>)
+        });
+        (factory, built)
+    }
+
     /// Build an `App` around a [`StubApi`]. No terminal is created and no
     /// network is possible: the only [`Api`] impl is the stub.
     fn test_app() -> App {
-        let config = Config {
-            server_url: "stub://test".into(),
-            api_key: "test-key".into(),
-            ..Default::default()
-        };
-        App::with_client(config, Arc::new(StubApi))
+        let (factory, _) = recording_factory();
+        App::with_factory(stub_config(), factory).expect("stub app builds")
     }
 
     fn course(id: &str) -> Course {
@@ -3413,6 +3603,7 @@ mod tests {
         match token {
             "?" => vec![key(KeyCode::Char('?'))],
             "t" => vec![key(KeyCode::Char('t'))],
+            "A" => vec![key(KeyCode::Char('A'))],
             "q / esc" => vec![key(KeyCode::Char('q')), key(KeyCode::Esc)],
             "Ctrl-C" => vec![KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)],
             other => panic!("unhandled global token {other:?} — add it to global_probe_keys"),
@@ -3585,6 +3776,218 @@ mod tests {
         // theme is applied end-to-end (not merely stored).
         app.theme.mode = crate::theme::Mode::Dark;
         assert_eq!(bg_of(&mut app), Color::Rgb(0x12, 0x13, 0x10));
+    }
+
+    // --- P9: account management --------------------------------------------
+
+    /// An app with two profiles (active = "home") around a recording factory, so
+    /// a switch test can assert which profile the client was rebuilt for.
+    fn two_profile_app() -> (App, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        let mut config = stub_config();
+        // stub_config sets a single "default" profile; replace with home+work.
+        config.profiles.clear();
+        config.upsert_profile(
+            "home",
+            crate::config::Profile {
+                server_url: "stub://home".into(),
+                api_key: "sk_home".into(),
+                name: Some("Home Learner".into()),
+            },
+        );
+        config.upsert_profile(
+            "work",
+            crate::config::Profile {
+                server_url: "stub://work".into(),
+                api_key: "sk_work".into(),
+                name: Some("Work Learner".into()),
+            },
+        );
+        config.active = "home".into();
+        let (factory, built) = recording_factory();
+        let app = App::with_factory(config, factory).expect("two-profile app builds");
+        (app, built)
+    }
+
+    #[test]
+    fn a_opens_the_account_switcher_and_a_closes_it() {
+        let mut app = test_app();
+        app.view = View::courses(&[]);
+        assert!(!app.accounts.open);
+
+        // `A` (shift+a) opens it; lowercase `a` does NOT (no audio screen here).
+        assert!(matches!(
+            app.map_key(key(KeyCode::Char('A'))),
+            Some(Action::ToggleAccounts)
+        ));
+        app.on_toggle_accounts();
+        assert!(app.accounts.open);
+
+        app.on_toggle_accounts();
+        assert!(!app.accounts.open);
+    }
+
+    #[test]
+    fn switcher_is_modal_and_swallows_screen_keys() {
+        let (mut app, _) = two_profile_app();
+        app.view = View::courses(&[course_summary("c0")]);
+        app.on_toggle_accounts();
+
+        // Enter switches; arrows move; a number key is swallowed (no Choose leaks).
+        assert!(matches!(
+            app.map_key(key(KeyCode::Enter)),
+            Some(Action::SwitchAccount)
+        ));
+        assert!(matches!(app.map_key(key(KeyCode::Up)), Some(Action::Up)));
+        assert!(app.map_key(key(KeyCode::Char('2'))).is_none());
+        // Still on Courses; nothing navigated behind the overlay.
+        assert!(matches!(app.view, View::Courses { .. }));
+    }
+
+    #[tokio::test]
+    async fn switching_account_rebuilds_the_client_for_the_new_profile_and_reloads() {
+        let (mut app, built) = two_profile_app();
+        // The factory built the initial client for the active "home" profile.
+        assert_eq!(*built.lock().unwrap(), vec!["stub://home".to_string()]);
+
+        // Open the switcher; cursor starts on the active profile ("home", index 0
+        // since BTreeMap orders home<work). Move to "work" and switch.
+        app.on_toggle_accounts();
+        app.on_down(); // -> work (index 1)
+        let gen_before = app.request_gen;
+        app.on_switch_account();
+
+        // Active profile changed, overlay closed, gen bumped (reload dispatched).
+        assert_eq!(app.config.active, "work");
+        assert!(!app.accounts.open);
+        assert!(app.request_gen > gen_before, "switch reloads (bumps gen)");
+        // The client was rebuilt for the new profile's server.
+        assert_eq!(
+            *built.lock().unwrap(),
+            vec!["stub://home".to_string(), "stub://work".to_string()],
+            "the client is rebuilt for the switched-to profile",
+        );
+    }
+
+    #[test]
+    fn switching_to_the_already_active_profile_is_a_noop_switch() {
+        let (mut app, built) = two_profile_app();
+        app.on_toggle_accounts();
+        // Cursor is on the active "home"; Enter should not rebuild or reload.
+        let gen_before = app.request_gen;
+        app.on_switch_account();
+        assert_eq!(app.config.active, "home");
+        assert_eq!(app.request_gen, gen_before, "no reload for a no-op switch");
+        assert_eq!(
+            built.lock().unwrap().len(),
+            1,
+            "no client rebuild for the active profile",
+        );
+    }
+
+    /// A two-profile app whose factory FAILS to build a client for the profile
+    /// at `fail_server`. The "home" profile (active, built at startup) succeeds.
+    fn app_with_failing_factory_for(
+        fail_server: &'static str,
+    ) -> (App, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        let mut config = stub_config();
+        config.profiles.clear();
+        config.upsert_profile(
+            "home",
+            crate::config::Profile {
+                server_url: "stub://home".into(),
+                api_key: "sk_home".into(),
+                name: Some("Home Learner".into()),
+            },
+        );
+        config.upsert_profile(
+            "work",
+            crate::config::Profile {
+                server_url: "stub://work".into(),
+                api_key: "sk_work".into(),
+                name: Some("Work Learner".into()),
+            },
+        );
+        config.active = "home".into();
+
+        let built = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = std::sync::Arc::clone(&built);
+        let factory: ClientFactory = Arc::new(move |profile: &crate::config::Profile| {
+            sink.lock().unwrap().push(profile.server_url.clone());
+            if profile.server_url == fail_server {
+                Err(color_eyre::eyre::eyre!(
+                    "bad key for {}",
+                    profile.server_url
+                ))
+            } else {
+                Ok(Arc::new(StubApi) as Arc<dyn Api>)
+            }
+        });
+        let app = App::with_factory(config, factory).expect("home profile builds");
+        (app, built)
+    }
+
+    #[tokio::test]
+    async fn switching_to_a_profile_with_an_unbuildable_client_changes_nothing() {
+        // "work" cannot build a client. Switching to it must NOT set active, must
+        // NOT dispatch a fetch (which would load home's data under work), and must
+        // surface the error while leaving "home" active and its view intact.
+        let (mut app, built) = app_with_failing_factory_for("stub://work");
+        // Put the app in a recognizable home state (not Loading).
+        app.view = View::courses(&[course_summary("home-course")]);
+        let gen_before = app.request_gen;
+
+        app.on_toggle_accounts();
+        app.on_down(); // cursor -> "work" (the bad profile)
+        app.on_switch_account();
+
+        // The switch was rejected: active stays "home".
+        assert_eq!(
+            app.config.active, "home",
+            "a failed client build must not change the active profile",
+        );
+        // No fetch was dispatched: the generation did not advance and the view is
+        // NOT reset to Loading (so no old-account data loads under a new profile).
+        assert_eq!(
+            app.request_gen, gen_before,
+            "no courses fetch is dispatched when the new client cannot be built",
+        );
+        match &app.view {
+            View::Courses { courses, .. } => {
+                assert_eq!(courses.len(), 1, "the home view is left intact");
+            }
+            other => panic!("expected the home Courses view to remain, got {other:?}"),
+        }
+        // The factory was asked to build "work" (and it failed); the live client
+        // is still home's (built once at startup). Builds: home (startup), work (failed).
+        assert_eq!(
+            *built.lock().unwrap(),
+            vec!["stub://home".to_string(), "stub://work".to_string()],
+        );
+        // The overlay is closed and an error is shown.
+        assert!(!app.accounts.open);
+    }
+
+    #[tokio::test]
+    async fn whoami_reads_the_live_identity_through_the_api_seam() {
+        // `sotto whoami` prefers a live `me()` call; the StubApi returns a known
+        // identity, proving the contract + Api method are wired end-to-end.
+        let api: Arc<dyn Api> = Arc::new(StubApi);
+        let me = api.me().await.expect("stub me");
+        assert_eq!(me.id, "u_stub");
+        assert_eq!(me.name.as_deref(), Some("Stub Learner"));
+    }
+
+    #[test]
+    fn opening_accounts_dismisses_the_other_modals() {
+        let mut app = test_app();
+        app.view = View::courses(&[]);
+        app.on_toggle_help();
+        assert!(app.help_open);
+        app.on_toggle_accounts();
+        assert!(app.accounts.open && !app.help_open);
+        // Opening the theme picker dismisses accounts.
+        app.on_toggle_theme_picker();
+        assert!(app.theme_picker.open && !app.accounts.open);
     }
 
     fn course_summary(id: &str) -> types::CourseSummary {

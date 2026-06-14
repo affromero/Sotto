@@ -143,6 +143,13 @@ pub(crate) enum Action {
     ToggleHelp,
     /// Cycle the value of the theme picker's focused row (Enter / → / space).
     CycleThemeValue,
+
+    // --- Account management (P9) ---
+    /// Toggle the account switcher overlay (`A`).
+    ToggleAccounts,
+    /// Switch to the profile under the switcher cursor (Enter): rebuild the Api
+    /// client for that profile, persist active, and reload.
+    SwitchAccount,
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries

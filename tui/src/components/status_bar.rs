@@ -38,6 +38,12 @@ impl StatusBar {
         self.palette = palette;
     }
 
+    /// Update the displayed server + learner after an account switch.
+    pub fn set_session(&mut self, server: String, user: String) {
+        self.server = server;
+        self.user = user;
+    }
+
     /// Show a transient error in the bar for a few seconds.
     pub fn set_error(&mut self, message: String) {
         self.error = Some((message, Instant::now()));

@@ -12,6 +12,7 @@ import {
   generatePlacementResponseSchema,
   healthResponseSchema,
   interactionResponseSchema,
+  meResponseSchema,
   memoryGraphResponseSchema,
   nextClassCreatedResponseSchema,
   nextClassDoneResponseSchema,
@@ -243,6 +244,15 @@ export const endpoints: EndpointDef[] = [
     summary: 'Instance + owner config (self-hosted, owner, non-secret infra).',
     auth: 'bearer',
     response: onboardingConfigResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'getMe',
+    method: 'GET',
+    path: '/api/v1/users/me',
+    summary: 'The authenticated learner identity (id, name, email, handle).',
+    auth: 'bearer',
+    response: meResponseSchema,
     successStatuses: [200],
   },
   {
