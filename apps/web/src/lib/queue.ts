@@ -18,8 +18,6 @@ export enum JobType {
   WRITE_SCRIPT = 'write_script',
   COMPILE_SCRIPT = 'compile_script',
   GENERATE_SCRIPT = 'generate_script',
-  VERIFY_SCRIPT = 'verify_script',
-  VALIDATE_REFERENCES = 'validate_references',
   GENERATE_AUDIO = 'generate_audio',
   STITCH_AUDIO = 'stitch_audio',
   PROCESS_INTERACTION = 'process_interaction',
@@ -146,13 +144,6 @@ export interface CompileScriptPayload {
   userId: string;
 }
 
-export interface VerifyScriptPayload {
-  episodeId: string;
-  userId: string;
-  discoveryId: string;
-  useAdminCredits?: boolean;
-}
-
 export interface GeneratePdfPayload {
   episodeId: string;
   userId: string;
@@ -195,8 +186,6 @@ const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
 const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'content-extraction': { attempts: 3 },
   'script-generation': { attempts: 3 },
-  'script-verification': { attempts: 2 },
-  'reference-validation': { attempts: 2 },
   'audio-generation': { attempts: 3 },
   'audio-stitching': { attempts: 2 },
   interactions: { attempts: 3 },
@@ -330,7 +319,7 @@ async function handleWorkerFailure(
     const ownerLabel = episode.user?.name || episode.user?.email || episode.userId;
 
     const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
-    const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
+    const AI_QUEUES = ['script-generation'];
 
     if (queueName === 'interactions') {
       if (isKeyInvalidationError(errorKind)) {
@@ -370,8 +359,6 @@ async function handleWorkerFailure(
     const STAGE_LABELS: Record<string, string> = {
       'content-extraction': 'Content extraction',
       'script-generation': 'Script generation',
-      'script-verification': 'Script verification',
-      'reference-validation': 'Reference validation',
       'audio-generation': 'Audio generation',
       'audio-stitching': 'Audio stitching',
       'segment-regeneration': 'Segment regeneration',
@@ -580,9 +567,7 @@ export const audioStitchingQueue = createQueueReference('audio-stitching');
 export const interactionQueue = createQueueReference('interactions');
 export const segmentRegenerationQueue = createQueueReference('segment-regeneration');
 export const notificationQueue = createQueueReference('notifications');
-export const referenceValidationQueue = createQueueReference('reference-validation');
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
-export const scriptVerificationQueue = createQueueReference('script-verification');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
 

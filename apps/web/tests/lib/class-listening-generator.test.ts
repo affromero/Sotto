@@ -91,8 +91,7 @@ vi.mock('@/lib/references', () => ({
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
   verifyClassReferencesQueue: { name: 'verify-class-references' },
-  referenceValidationQueue: { name: 'reference-validation' },
-  JobType: { VERIFY_CLASS_REFERENCES: 'verify_class_references', VALIDATE_REFERENCES: 'validate_references' },
+  JobType: { VERIFY_CLASS_REFERENCES: 'verify_class_references' },
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -617,20 +616,6 @@ describe('composeListeningContent', () => {
         'verify_class_references',
         { episodeId: 'episode-1' },
       );
-    });
-
-    it('NEVER enqueues the reference-validation / VALIDATE_REFERENCES job for a class', async () => {
-      setupHappyPath();
-      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
-
-      await composeListeningContent(SOURCED_PARAMS);
-
-      // Only the verify-only job is enqueued — assert no call used VALIDATE_REFERENCES
-      // nor targeted the reference-validation queue.
-      for (const call of mockAddJob.mock.calls) {
-        expect(call[1]).not.toBe('validate_references');
-        expect((call[0] as { name?: string })?.name).not.toBe('reference-validation');
-      }
     });
 
     it('still creates segments exactly once (no double-queue)', async () => {

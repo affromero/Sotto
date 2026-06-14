@@ -1,10 +1,9 @@
 // Verify-only worker for sourced-class episodes.
 //
 // ⚠️ A class episode ALREADY created its segments and queued audio in
-// `composeListeningContent` (via `createSegmentsAndQueueAudio`). The normal
-// `reference-validation` worker is NOT idempotent for that step: for any
-// non-WEB/IMPORT source it auto-approves and calls `createSegmentsAndQueueAudio`
-// again, double-creating segments and double-queuing audio.
+// `composeListeningContent` (via `createSegmentsAndQueueAudio`). Re-running
+// `createSegmentsAndQueueAudio` is NOT idempotent: it would double-create
+// segments and double-queue audio.
 //
 // This worker therefore verifies references and writes the per-reference
 // verdicts back ONLY. It never mutates the script, never renumbers citations,
