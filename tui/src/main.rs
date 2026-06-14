@@ -6,6 +6,7 @@ mod auth;
 mod components;
 mod config;
 mod event;
+mod theme;
 mod tui;
 
 use clap::{Parser, Subcommand};

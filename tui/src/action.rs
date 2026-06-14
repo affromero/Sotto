@@ -135,6 +135,14 @@ pub(crate) enum Action {
     InteractionPolled(u64, ApiResult<types::InteractionResponse>),
     /// Answer-audio bytes downloaded (or failed) for spoken-clarification playback.
     AnswerAudioDownloaded(u64, ApiResult<Vec<u8>>),
+
+    // --- Theme & polish (P7) ---
+    /// Toggle the theme picker overlay (`t`).
+    ToggleThemePicker,
+    /// Toggle the key-help overlay (`?`).
+    ToggleHelp,
+    /// Cycle the value of the theme picker's focused row (Enter / → / space).
+    CycleThemeValue,
 }
 
 /// Result of an async API call, shareable across cloned actions. `Ok` carries

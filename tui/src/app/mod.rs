@@ -2,6 +2,7 @@ mod ask;
 mod class;
 mod exam;
 mod onboard;
+mod overlay;
 mod state;
 mod ui;
 
@@ -12,6 +13,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
+    style::Style,
+    text::{Line, Span, Text},
+    widgets::{Paragraph, Wrap},
 };
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
@@ -22,7 +26,10 @@ use crate::components::Component;
 use crate::components::status_bar::StatusBar;
 use crate::config::Config;
 use crate::event::Event;
+use crate::theme::Theme;
 use crate::tui::Tui;
+
+use overlay::ThemePicker;
 
 use state::{
     AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SectionProgress,
@@ -57,6 +64,13 @@ pub(crate) struct App {
     /// The course carried across the `next-class` round trip, so the resolved
     /// class (or the done screen) can keep offering "next class".
     pending_course: Option<Course>,
+    /// The active theme, resolved from `config.theme` at startup and mutated
+    /// live by the theme picker. Its [`Palette`] is threaded into rendering.
+    theme: Theme,
+    /// The theme picker overlay (`t`) — a modal sub-mode like the ask overlay.
+    theme_picker: ThemePicker,
+    /// The key-help overlay (`?`) — modal; shows the current screen's keys.
+    help_open: bool,
 }
 
 impl App {
@@ -73,6 +87,7 @@ impl App {
     fn with_client(config: Config, client: Arc<dyn Api>) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let status_bar = StatusBar::new(config.server_url.clone(), "(owner)".to_string());
+        let theme = Theme::from_choice(&config.theme);
         Self {
             config,
             client,
@@ -85,6 +100,9 @@ impl App {
             player: None,
             recorder: Recorder::new(),
             pending_course: None,
+            theme,
+            theme_picker: ThemePicker::closed(),
+            help_open: false,
         }
     }
 
@@ -226,6 +244,9 @@ impl App {
             Action::AnswerAudioDownloaded(req_gen, result) => {
                 self.on_answer_audio_downloaded(req_gen, result)
             }
+            Action::ToggleThemePicker => self.on_toggle_theme_picker(),
+            Action::ToggleHelp => self.on_toggle_help(),
+            Action::CycleThemeValue => self.on_cycle_theme_value(),
         }
         Ok(())
     }
@@ -251,6 +272,29 @@ impl App {
     fn map_key(&self, key: KeyEvent) -> Option<Action> {
         if key.modifiers.contains(KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('c')) {
             return Some(Action::Quit);
+        }
+
+        // Theme picker (`t`) is a top-level MODAL: while open it owns input and
+        // swallows everything else, so no key leaks to the screen behind it.
+        if self.theme_picker.open {
+            return match key.code {
+                KeyCode::Up | KeyCode::Char('k') => Some(Action::Up),
+                KeyCode::Down | KeyCode::Char('j') => Some(Action::Down),
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char(' ') => {
+                    Some(Action::CycleThemeValue)
+                }
+                KeyCode::Char('t') | KeyCode::Esc | KeyCode::Char('q') => {
+                    Some(Action::ToggleThemePicker)
+                }
+                _ => None,
+            };
+        }
+        // Key-help (`?`) is a top-level MODAL: dismiss on `?`/Esc, swallow else.
+        if self.help_open {
+            return match key.code {
+                KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') => Some(Action::ToggleHelp),
+                _ => None,
+            };
         }
 
         // Ask-a-question overlay (listening Q&A) is fully MODAL: while it is open
@@ -321,6 +365,15 @@ impl App {
                     && key.modifiers.contains(KeyModifiers::CONTROL)))
         {
             return Some(Action::SubmitText);
+        }
+
+        // Global polish keys (reached only when no text-entry/ask overlay is
+        // active — those modes return above, so `t`/`?` never disturb typing):
+        // `t` opens the theme picker, `?` opens the key-help overlay.
+        match key.code {
+            KeyCode::Char('t') => return Some(Action::ToggleThemePicker),
+            KeyCode::Char('?') => return Some(Action::ToggleHelp),
+            _ => {}
         }
 
         // Screen-specific keys take priority over the generic mapping below.
@@ -475,6 +528,12 @@ impl App {
     // --- Input handlers ----------------------------------------------------
 
     fn on_up(&mut self) {
+        // The theme picker owns ↑/↓ when open (row focus).
+        if self.theme_picker.open {
+            self.theme_picker.move_row(false);
+            self.render();
+            return;
+        }
         if self.in_section_walk() {
             self.class_cursor_move(true);
             return;
@@ -504,6 +563,11 @@ impl App {
     }
 
     fn on_down(&mut self) {
+        if self.theme_picker.open {
+            self.theme_picker.move_row(true);
+            self.render();
+            return;
+        }
         if self.in_section_walk() {
             self.class_cursor_move(false);
             return;
@@ -564,6 +628,49 @@ impl App {
             View::PlacementReview { .. } => self.placement_scroll(down),
             View::Memory { .. } => self.memory_scroll(down),
             _ => {}
+        }
+    }
+
+    // --- Theme & polish (P7) -----------------------------------------------
+
+    /// Toggle the theme picker overlay (`t`). Closing it persists the choice.
+    fn on_toggle_theme_picker(&mut self) {
+        if self.theme_picker.open {
+            self.theme_picker = ThemePicker::closed();
+            self.persist_theme();
+        } else {
+            // Opening the picker dismisses help (one modal at a time).
+            self.help_open = false;
+            self.theme_picker = ThemePicker::opened();
+        }
+        self.render();
+    }
+
+    /// Toggle the key-help overlay (`?`).
+    fn on_toggle_help(&mut self) {
+        self.help_open = !self.help_open;
+        if self.help_open {
+            self.theme_picker = ThemePicker::closed();
+        }
+        self.render();
+    }
+
+    /// Cycle the value of the picker's focused row and apply it live. The choice
+    /// is persisted when the picker closes (not on every keystroke).
+    fn on_cycle_theme_value(&mut self) {
+        if self.theme_picker.open {
+            overlay::cycle_focused(&mut self.theme, self.theme_picker.row);
+            self.render();
+        }
+    }
+
+    /// Write the active theme into `config` and persist it. A save failure is
+    /// surfaced in the status bar rather than crashing the UI loop.
+    fn persist_theme(&mut self) {
+        self.config.theme = self.theme.to_choice();
+        if let Err(e) = self.config.save() {
+            self.status_bar
+                .set_error(format!("could not save theme: {e}"));
         }
     }
 
@@ -1352,11 +1459,66 @@ impl App {
         let _ = self.action_tx.send(Action::Render);
     }
 
+    /// Hard floor below which no screen can render legibly; show a minimal
+    /// notice instead of clipping content. Chosen so every screen's fixed-height
+    /// header/footer splits still leave a usable body.
+    const MIN_COLS: u16 = 40;
+    const MIN_ROWS: u16 = 10;
+
     fn draw(&mut self, frame: &mut Frame) -> Result<()> {
-        let chunks =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(frame.area());
-        ui::draw_view(frame, chunks[0], &self.view, &self.config);
+        let palette = self.theme.palette();
+        let area = frame.area();
+
+        // Paint the themed background across the whole frame first.
+        frame.render_widget(
+            ratatui::widgets::Block::default().style(Style::default().bg(palette.bg)),
+            area,
+        );
+
+        // Below the hard floor, render only a centered "too small" message — the
+        // fixed header/footer splits would otherwise clip the body to nothing.
+        if area.width < Self::MIN_COLS || area.height < Self::MIN_ROWS {
+            let msg = Paragraph::new(Text::from(vec![
+                Line::from(Span::styled(
+                    "Terminal too small",
+                    Style::default()
+                        .fg(palette.primary)
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                )),
+                Line::from(Span::styled(
+                    format!(
+                        "need ≥ {}×{} (now {}×{})",
+                        Self::MIN_COLS,
+                        Self::MIN_ROWS,
+                        area.width,
+                        area.height
+                    ),
+                    Style::default().fg(palette.ink_soft),
+                )),
+            ]))
+            .alignment(ratatui::layout::Alignment::Center)
+            .wrap(Wrap { trim: true });
+            frame.render_widget(msg, area);
+            return Ok(());
+        }
+
+        let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(area);
+        ui::draw_view(frame, chunks[0], &self.view, &self.config, &palette);
+        self.status_bar.set_palette(palette);
         self.status_bar.draw(frame, chunks[1])?;
+
+        // Modal overlays float on top of the screen behind them.
+        if self.theme_picker.open {
+            overlay::draw_theme_picker(
+                frame,
+                chunks[0],
+                &self.theme,
+                self.theme_picker.row,
+                &palette,
+            );
+        } else if self.help_open {
+            overlay::draw_help(frame, chunks[0], &self.view, &palette);
+        }
         Ok(())
     }
 }
@@ -1663,6 +1825,7 @@ mod tests {
         let config = Config {
             server_url: "stub://test".into(),
             api_key: "test-key".into(),
+            ..Default::default()
         };
         App::with_client(config, Arc::new(StubApi))
     }
@@ -2949,5 +3112,563 @@ mod tests {
             Some(SectionProgress::Listening { ask, .. }) => ask.phase.clone(),
             _ => panic!("expected a current Listening section with an ask state"),
         }
+    }
+
+    // --- P7: theme picker, help overlay, responsive ------------------------
+
+    use crate::theme::{LightPalette, Mode};
+
+    #[test]
+    fn t_opens_the_theme_picker_and_t_closes_it() {
+        let mut app = test_app();
+        app.view = View::courses(&[]);
+        assert!(!app.theme_picker.open);
+
+        assert!(matches!(
+            app.map_key(key(KeyCode::Char('t'))),
+            Some(Action::ToggleThemePicker)
+        ));
+        app.on_toggle_theme_picker();
+        assert!(app.theme_picker.open);
+
+        app.on_toggle_theme_picker();
+        assert!(!app.theme_picker.open);
+    }
+
+    #[test]
+    fn picker_cycles_each_row_and_applies_live() {
+        let mut app = test_app();
+        app.on_toggle_theme_picker();
+        // Row 0 = Mode. Cycling flips light -> dark on the live theme.
+        assert_eq!(app.theme.mode, Mode::Light);
+        app.on_cycle_theme_value();
+        assert_eq!(app.theme.mode, Mode::Dark, "mode applies live");
+
+        // Move to the light-palette row and cycle.
+        app.on_down();
+        assert_eq!(app.theme.light_palette, LightPalette::AulaCool);
+        app.on_cycle_theme_value();
+        assert_eq!(app.theme.light_palette, LightPalette::PaperWarm);
+
+        // Move to the accent row and cycle to the next swatch.
+        app.on_down();
+        let before = app.theme.accent;
+        app.on_cycle_theme_value();
+        assert_ne!(app.theme.accent, before, "accent cycles to a new swatch");
+    }
+
+    #[test]
+    fn closing_the_picker_persists_the_choice_to_config() {
+        let mut app = test_app();
+        app.on_toggle_theme_picker();
+        app.on_cycle_theme_value(); // mode -> dark
+        // The persisted config still reflects the default until the picker closes.
+        assert_eq!(app.config.theme, crate::config::ThemeChoice::default());
+
+        app.on_toggle_theme_picker(); // close -> persist
+        assert_eq!(app.config.theme.mode, "dark");
+        // The in-memory theme and the persisted choice now agree.
+        assert_eq!(app.config.theme, app.theme.to_choice());
+    }
+
+    #[test]
+    fn picker_is_modal_and_swallows_screen_keys() {
+        // Open the picker over Courses; a number/enter must NOT select a course.
+        let mut app = test_app();
+        app.view = View::courses(&[course_summary("c0"), course_summary("c1")]);
+        app.on_toggle_theme_picker();
+
+        // Enter is the picker's "cycle value", never a course selection.
+        assert!(matches!(
+            app.map_key(key(KeyCode::Enter)),
+            Some(Action::CycleThemeValue)
+        ));
+        // A number key is swallowed entirely (no Choose leaks to the list).
+        assert!(app.map_key(key(KeyCode::Char('2'))).is_none());
+        // `a` (would open ask on a listening screen) is also swallowed.
+        assert!(app.map_key(key(KeyCode::Char('a'))).is_none());
+
+        // We are still on Courses; nothing navigated.
+        assert!(matches!(app.view, View::Courses { .. }));
+    }
+
+    #[test]
+    fn help_overlay_opens_modal_and_dismisses() {
+        let mut app = test_app();
+        app.view = View::courses(&[]);
+        assert!(matches!(
+            app.map_key(key(KeyCode::Char('?'))),
+            Some(Action::ToggleHelp)
+        ));
+        app.on_toggle_help();
+        assert!(app.help_open);
+
+        // While open it is modal: arbitrary keys are swallowed, only `?`/Esc act.
+        assert!(app.map_key(key(KeyCode::Char('x'))).is_none());
+        assert!(app.map_key(key(KeyCode::Enter)).is_none());
+        assert!(matches!(
+            app.map_key(key(KeyCode::Esc)),
+            Some(Action::ToggleHelp)
+        ));
+        app.on_toggle_help();
+        assert!(!app.help_open);
+    }
+
+    #[test]
+    fn opening_one_overlay_closes_the_other() {
+        let mut app = test_app();
+        app.view = View::courses(&[]);
+        app.on_toggle_help();
+        assert!(app.help_open);
+        // Opening the picker dismisses help (one modal at a time).
+        app.on_toggle_theme_picker();
+        assert!(app.theme_picker.open && !app.help_open);
+        // Opening help again dismisses the picker.
+        app.on_toggle_help();
+        assert!(app.help_open && !app.theme_picker.open);
+    }
+
+    #[test]
+    fn help_does_not_open_while_typing_a_question() {
+        // In ask-editing mode, `?` and `t` are literal characters, not openers.
+        let mut app = listening_app();
+        app.on_toggle_ask(); // -> Editing
+        assert!(matches!(
+            app.map_key(key(KeyCode::Char('?'))),
+            Some(Action::Input('?'))
+        ));
+        assert!(matches!(
+            app.map_key(key(KeyCode::Char('t'))),
+            Some(Action::Input('t'))
+        ));
+    }
+
+    /// Parse the leading concrete key out of a help-display token into the
+    /// `KeyEvent` the keymap would receive. Multi-key tokens ("↑/↓ j/k",
+    /// "1-9 / enter") probe their first concrete key — enough to catch a listed
+    /// key that the keymap no longer produces an action for. Returns `None` for
+    /// global tokens (`?`, `t`, `q / esc`, `Ctrl-C`), which are tested separately.
+    fn probe_key_for(token: &str) -> Option<KeyEvent> {
+        // Globals are validated on their own; skip here.
+        if matches!(token, "?" | "t" | "q / esc" | "Ctrl-C") {
+            return None;
+        }
+        if token.starts_with("↑/↓") {
+            return Some(key(KeyCode::Up));
+        }
+        if token.starts_with("1-9") {
+            return Some(key(KeyCode::Char('1')));
+        }
+        if token.starts_with("PgUp") {
+            return Some(key(KeyCode::PageUp));
+        }
+        Some(match token {
+            "enter" => key(KeyCode::Enter),
+            "space" => key(KeyCode::Char(' ')),
+            "tab" => key(KeyCode::Tab),
+            "Ctrl-D" => KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL),
+            // Single-letter shortcuts: a, c, e, m, n, r, s.
+            s if s.chars().count() == 1 => key(KeyCode::Char(s.chars().next().unwrap())),
+            other => panic!("unhandled help token {other:?} — add it to probe_key_for"),
+        })
+    }
+
+    /// True when `action` is a real keyboard SHORTCUT, not raw text capture. A
+    /// writing/ask editor turns every `Char(c)` into `Input(c)`, so text-capture
+    /// must NOT count as a help key being "live" — otherwise any single letter
+    /// would falsely look like a valid shortcut on an editing screen.
+    fn is_shortcut_action(action: &Action) -> bool {
+        !matches!(
+            action,
+            Action::Input(_) | Action::InputNewline | Action::InputBackspace
+        )
+    }
+
+    /// Probe `key` against `app` and return true iff it yields a real shortcut
+    /// action (not text capture, not a dead key).
+    fn maps_to_shortcut(app: &App, k: KeyEvent) -> bool {
+        app.map_key(k).as_ref().is_some_and(is_shortcut_action)
+    }
+
+    /// Assert every key listed in `help_rows(app.view)` actually produces a
+    /// shortcut action via `map_key` for that view (so the help can't list a
+    /// dead key). Used for single-mode screens, where every listed key is live
+    /// on the view itself.
+    fn assert_help_keys_live(app: &App) {
+        for (token, _desc) in overlay::help_rows(&app.view) {
+            if let Some(k) = probe_key_for(token) {
+                assert!(
+                    maps_to_shortcut(app, k),
+                    "help lists {token:?} on {:?}, but the keymap produces no shortcut for it",
+                    std::mem::discriminant(&app.view),
+                );
+            }
+        }
+    }
+
+    /// The five section-type flows a Class/Exam help line can apply to. Each
+    /// representative parks the flow on a single section of that skill, so the
+    /// section's keys are live there.
+    const SECTION_SKILLS: [&str; 4] = ["LISTENING", "SPEAKING", "GRAMMAR", "WRITING"];
+
+    /// Assert every key listed in a Class/Exam's `help_rows` is live on AT LEAST
+    /// ONE section type — so no listed key (space/r/↑↓/1-9/a/Ctrl-D) is dead.
+    /// `make` builds the flow (class or exam) parked on the given section skill.
+    fn assert_section_walk_help_keys_live(make: impl Fn(&str) -> App, label: &str) {
+        // Help rows are identical across section skills (keyed on the View
+        // discriminant), so read them from any representative.
+        let sample = make("LISTENING");
+        for (token, _desc) in overlay::help_rows(&sample.view) {
+            let Some(k) = probe_key_for(token) else {
+                continue; // globals are validated separately
+            };
+            // A key counts only if SOME section type makes it a real shortcut —
+            // text capture on a writing/ask editor does not qualify.
+            let live_on_some = SECTION_SKILLS
+                .iter()
+                .any(|skill| maps_to_shortcut(&make(skill), k));
+            assert!(
+                live_on_some,
+                "{label} help lists {token:?}, but no section type makes it a shortcut",
+            );
+        }
+    }
+
+    /// The help overlay lists the REAL screen keys: every key it shows for a
+    /// screen must map to a live action. This keeps the hand-maintained help
+    /// source from drifting from `map_key`. Covers EVERY view (single-mode views
+    /// directly; Class/Exam via their section-type representatives).
+    #[test]
+    fn help_rows_match_the_real_keymap_for_each_screen() {
+        for view in representative_views() {
+            // Help stays concise on every screen.
+            let rows = overlay::help_rows(&view);
+            assert!(rows.len() <= 8, "help stays concise: {} rows", rows.len());
+
+            // Class/Exam span section types: every listed key must be live on at
+            // least one section type (not necessarily the parked one). Single-mode
+            // views must have every listed key live on the view itself.
+            match &view {
+                View::Class { .. } => {
+                    assert_section_walk_help_keys_live(class_app_with_section, "Class");
+                }
+                View::Exam { .. } => {
+                    assert_section_walk_help_keys_live(exam_app_with_section, "Exam");
+                }
+                _ => {
+                    let mut app = test_app();
+                    app.view = view;
+                    assert_help_keys_live(&app);
+                }
+            }
+        }
+    }
+
+    /// Spot-check the canonical section-type keys are live on BOTH class and exam
+    /// (a direct, readable assertion alongside the exhaustive coverage above).
+    #[test]
+    fn class_and_exam_section_keys_are_live_on_their_section_type() {
+        for make in [
+            class_app_with_section as fn(&str) -> App,
+            exam_app_with_section as fn(&str) -> App,
+        ] {
+            // Listening: space (play) + `a` (ask).
+            assert!(make("LISTENING").map_key(key(KeyCode::Char(' '))).is_some());
+            assert!(make("LISTENING").map_key(key(KeyCode::Char('a'))).is_some());
+            // Speaking: `r` (record).
+            assert!(make("SPEAKING").map_key(key(KeyCode::Char('r'))).is_some());
+            // MC/grammar: ↑/↓ + 1-9.
+            assert!(make("GRAMMAR").map_key(key(KeyCode::Up)).is_some());
+            assert!(make("GRAMMAR").map_key(key(KeyCode::Char('1'))).is_some());
+            // Writing (editing phase): Ctrl-D submits.
+            assert!(
+                make("WRITING")
+                    .map_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL))
+                    .is_some(),
+                "Ctrl-D must submit on a writing section",
+            );
+        }
+    }
+
+    /// Every key listed in `global_rows` maps to a real action on a normal
+    /// screen — no global help entry is dead.
+    #[test]
+    fn every_global_help_key_is_live() {
+        let mut app = test_app();
+        app.view = View::courses(&[course_summary("c0")]);
+        for (token, _desc) in overlay::global_rows() {
+            for k in global_probe_keys(token) {
+                assert!(
+                    app.map_key(k).is_some(),
+                    "global help lists {token:?} ({k:?}), but the keymap is silent for it",
+                );
+            }
+        }
+    }
+
+    /// Parse a GLOBAL help token into the concrete key events it advertises. The
+    /// per-screen [`probe_key_for`] returns `None` for these (they are validated
+    /// here): `?`, `t`, `q / esc` (two keys), `Ctrl-C`.
+    fn global_probe_keys(token: &str) -> Vec<KeyEvent> {
+        match token {
+            "?" => vec![key(KeyCode::Char('?'))],
+            "t" => vec![key(KeyCode::Char('t'))],
+            "q / esc" => vec![key(KeyCode::Char('q')), key(KeyCode::Esc)],
+            "Ctrl-C" => vec![KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)],
+            other => panic!("unhandled global token {other:?} — add it to global_probe_keys"),
+        }
+    }
+
+    /// A `Class` parked on a single section of the given skill, with that section
+    /// the current one — so the section's keys are live.
+    fn class_app_with_section(skill: &str) -> App {
+        let mut app = test_app();
+        app.view = class_with_sections(section_json(skill));
+        app
+    }
+
+    /// An `Exam` parked on a single section of the given skill.
+    fn exam_app_with_section(skill: &str) -> App {
+        let mut app = test_app();
+        let exam: types::ExamDetailResponse = serde_json::from_value(serde_json::json!({
+            "id": "exam1", "institution": "CEFR_GENERIC", "institutionLabel": "CEFR",
+            "level": "B1", "status": "IN_PROGRESS", "examName": "Mock B1", "result": null,
+            "sections": exam_section_json(skill)
+        }))
+        .expect("valid exam");
+        let sections = state::exam_sections(&exam).expect("well-formed exam sections");
+        app.view = View::Exam {
+            course: course("A"),
+            exam_id: Some("exam1".into()),
+            sections: Some(sections),
+            cursor: 0,
+            submitting: false,
+        };
+        app
+    }
+
+    /// One CLASS section of the given skill, as the class-route JSON the section
+    /// builder parses (speaking uses `prompts`).
+    fn section_json(skill: &str) -> serde_json::Value {
+        let episode = if skill == "LISTENING" {
+            serde_json::json!({ "id": "ep", "audioUrl": null, "title": "L", "references": [] })
+        } else {
+            serde_json::Value::Null
+        };
+        let questions = if skill == "GRAMMAR" {
+            serde_json::json!([{ "id": "q", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }])
+        } else {
+            serde_json::json!([])
+        };
+        let prompts = if skill == "SPEAKING" {
+            serde_json::json!([{ "id": "p", "order": 0, "targetPhrase": "hola", "translation": "hi", "ipa": null, "referenceTtsUrl": null }])
+        } else {
+            serde_json::json!([])
+        };
+        let writing = if skill == "WRITING" {
+            serde_json::json!([{ "id": "w", "order": 0, "task": "Write", "guidance": null, "response": null }])
+        } else {
+            serde_json::json!([])
+        };
+        serde_json::json!([
+            { "id": "sec", "skill": skill, "status": "READY", "episode": episode,
+              "prompts": prompts, "writingPrompts": writing, "questions": questions }
+        ])
+    }
+
+    /// One EXAM section of the given skill, as the exam-route JSON the exam
+    /// section builder parses (speaking uses `speakingPrompts`; extra metadata).
+    fn exam_section_json(skill: &str) -> serde_json::Value {
+        let episode = if skill == "LISTENING" {
+            serde_json::json!({ "id": "ep", "audioUrl": null, "status": "READY" })
+        } else {
+            serde_json::Value::Null
+        };
+        let questions = if skill == "GRAMMAR" {
+            serde_json::json!([{ "id": "q", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }])
+        } else {
+            serde_json::json!([])
+        };
+        let speaking = if skill == "SPEAKING" {
+            serde_json::json!([{ "id": "p", "order": 0, "targetPhrase": "hola", "translation": "hi", "referenceTtsUrl": null }])
+        } else {
+            serde_json::json!([])
+        };
+        let writing = if skill == "WRITING" {
+            serde_json::json!([{ "id": "w", "order": 0, "task": "Write", "guidance": null }])
+        } else {
+            serde_json::json!([])
+        };
+        serde_json::json!([
+            { "id": "sec", "skill": skill, "part": "P1", "order": 0, "format": "mc",
+              "weight": 1.0, "status": "READY", "score": null, "episode": episode,
+              "speakingPrompts": speaking, "writingPrompts": writing, "questions": questions }
+        ])
+    }
+
+    // --- Responsive: tiny-size render smoke --------------------------------
+
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    /// Render `app` into a `w`×`h` test backend; returns Ok if no panic.
+    fn render_at(app: &mut App, w: u16, h: u16) {
+        let backend = TestBackend::new(w, h);
+        let mut terminal = Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| {
+                let _ = app.draw(frame);
+            })
+            .expect("draw must not fail");
+    }
+
+    #[test]
+    fn every_main_screen_renders_at_tiny_sizes_without_panicking() {
+        // 40x15 (just above the floor), 40x10 (the floor), and 20x6 (below the
+        // floor -> the "too small" notice). None may panic.
+        for view in representative_views() {
+            let mut app = test_app();
+            app.view = view;
+            render_at(&mut app, 40, 15);
+            render_at(&mut app, 40, 10);
+            render_at(&mut app, 20, 6);
+            // And with each overlay open, at a tiny size.
+            app.theme_picker = overlay::ThemePicker::opened();
+            render_at(&mut app, 40, 12);
+            app.theme_picker = overlay::ThemePicker::closed();
+            app.help_open = true;
+            render_at(&mut app, 40, 12);
+        }
+    }
+
+    #[test]
+    fn below_floor_shows_the_too_small_notice_only() {
+        let mut app = test_app();
+        app.view = View::courses(&[course_summary("c0")]);
+        let backend = TestBackend::new(20, 6);
+        let mut terminal = Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| {
+                let _ = app.draw(frame);
+            })
+            .expect("draw");
+        let buf = terminal.backend().buffer().clone();
+        let rendered: String = buf.content().iter().map(|c| c.symbol()).collect();
+        assert!(
+            rendered.contains("too small") || rendered.contains("small"),
+            "below the floor the notice must be shown",
+        );
+    }
+
+    #[test]
+    fn the_active_theme_actually_reaches_the_rendered_buffer() {
+        use ratatui::style::Color;
+
+        let bg_of = |app: &mut App| -> Color {
+            let backend = TestBackend::new(60, 20);
+            let mut terminal = Terminal::new(backend).expect("test terminal");
+            terminal
+                .draw(|frame| {
+                    let _ = app.draw(frame);
+                })
+                .expect("draw");
+            // The top-left cell's background is the themed window background.
+            terminal.backend().buffer()[(0, 0)].bg
+        };
+
+        let mut app = test_app();
+        app.view = View::courses(&[course_summary("c0")]);
+        // Light (default) paints the aula paper background...
+        assert_eq!(bg_of(&mut app), Color::Rgb(0xF5, 0xF4, 0xF0));
+
+        // ...switching to dark repaints with the terminal background, proving the
+        // theme is applied end-to-end (not merely stored).
+        app.theme.mode = crate::theme::Mode::Dark;
+        assert_eq!(bg_of(&mut app), Color::Rgb(0x12, 0x13, 0x10));
+    }
+
+    fn course_summary(id: &str) -> types::CourseSummary {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "nativeLang": "en", "targetLang": "es",
+            "currentLevel": "A1", "startLevel": "A1", "activeClassId": null,
+            "curriculum": { "title": format!("Course {id}") },
+            "placement": null
+        }))
+        .expect("valid course summary")
+    }
+
+    /// One representative instance of each main screen for the render + keymap
+    /// smoke tests.
+    fn representative_views() -> Vec<View> {
+        vec![
+            View::Loading,
+            View::Error {
+                message: "boom".into(),
+                retry: state::RetryKind::Courses,
+            },
+            View::courses(&[course_summary("c0")]),
+            View::CourseHome {
+                course: course("A"),
+                due: DueCounts {
+                    vocab: 3,
+                    grammar: 1,
+                    total_vocab: 20,
+                },
+                menu_cursor: 0,
+                notice: None,
+                starting: false,
+            },
+            View::start_items(
+                course("A"),
+                state::ReviewKind::Vocab,
+                "s".into(),
+                vec![state::VocabItem {
+                    id: "v".into(),
+                    prompt: "casa".into(),
+                    options: vec!["house".into(), "dog".into()],
+                }],
+            ),
+            View::start_listening(
+                course("A"),
+                "s".into(),
+                "ep".into(),
+                vec![state::VocabItem {
+                    id: "v".into(),
+                    prompt: "q".into(),
+                    options: vec!["a".into(), "b".into()],
+                }],
+            ),
+            View::start_speaking(
+                course("A"),
+                "s".into(),
+                vec![state::SpeakingPrompt {
+                    id: "p".into(),
+                    target_phrase: "hola".into(),
+                    translation: "hi".into(),
+                }],
+            ),
+            class_with_sections(serde_json::json!([
+                { "id": "sec", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                  "prompts": [], "writingPrompts": [],
+                  "questions": [{ "id": "q", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
+            ])),
+            exam_app_with_section("LISTENING").view,
+            View::placement_lang(),
+            View::placement_review(
+                "en".into(),
+                "es".into(),
+                vec![state::PlacementQuestion {
+                    id: "pq".into(),
+                    prompt: "?".into(),
+                    options: vec!["a".into(), "b".into()],
+                }],
+            ),
+            View::Memory {
+                course: course("A"),
+                items: Some(vec![]),
+                scroll: 0,
+            },
+            View::Settings { config: None },
+        ]
     }
 }
