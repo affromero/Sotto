@@ -73,9 +73,20 @@ pub(crate) async fn login(server: &str, token: &str) -> Result<Config> {
 
     println!("Logged in to {server} as {who}");
 
+    // Re-login overwrites only the credential fields and PRESERVES the existing
+    // theme block. `Config::load` is resilient (a corrupt/unreadable file yields
+    // defaults, never an error), so a valid prior theme is kept and only a truly
+    // missing/corrupt config falls back to the default appearance.
+    let theme = Config::load()
+        .ok()
+        .flatten()
+        .map(|c| c.theme)
+        .unwrap_or_default();
+
     Ok(Config {
         server_url: server.to_string(),
         api_key: redeemed.token,
+        theme,
     })
 }
 
