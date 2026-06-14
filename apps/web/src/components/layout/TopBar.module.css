@@ -7,7 +7,7 @@
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
-  top: calc(var(--impersonation-banner-height, 0px) + env(safe-area-inset-top, 0px));
+  top: calc(0px + env(safe-area-inset-top, 0px));
   z-index: var(--z-sticky);
   view-transition-name: topbar;
 }

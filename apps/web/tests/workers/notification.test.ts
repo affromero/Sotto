@@ -20,11 +20,9 @@ vi.mock('@/lib/prisma', () => {
 });
 
 const mockSendPushNotification = vi.fn().mockResolvedValue(undefined);
-const mockSendExpoPushNotification = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/push-notifications', () => ({
   sendPushNotification: (...args: unknown[]) => mockSendPushNotification(...args),
-  sendExpoPushNotification: (...args: unknown[]) => mockSendExpoPushNotification(...args),
 }));
 
 const mockPublishNotification = vi.fn().mockResolvedValue(undefined);
@@ -79,7 +77,6 @@ describe('processNotification', () => {
     });
     mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: true });
     mockSendPushNotification.mockResolvedValue(undefined);
-    mockSendExpoPushNotification.mockResolvedValue(undefined);
     mockPublishNotification.mockResolvedValue(undefined);
   });
 
@@ -207,7 +204,6 @@ describe('processNotification', () => {
       await processNotification(job);
 
       expect(mockSendPushNotification).toHaveBeenCalled();
-      expect(mockSendExpoPushNotification).toHaveBeenCalled();
     });
 
     it('marks notification as pushed when push delivery succeeds', async () => {
@@ -235,7 +231,6 @@ describe('processNotification', () => {
       await processNotification(job);
 
       expect(mockSendPushNotification).not.toHaveBeenCalled();
-      expect(mockSendExpoPushNotification).not.toHaveBeenCalled();
     });
 
     it('still creates in-app notification even when pushNotifications is disabled', async () => {

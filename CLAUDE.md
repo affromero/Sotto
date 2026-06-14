@@ -20,8 +20,8 @@ Sotto is fully free and self-hosted: every learner gets full access on infrastru
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 14+ App Router, TypeScript, CSS Modules |
-| Database | PostgreSQL 16 + Prisma ORM |
+| Frontend | Next.js 16 App Router, TypeScript, CSS Modules |
+| Database | PostgreSQL 17 + Prisma 7 |
 | Auth | None — single-learner self-hosted instance with no login |
 | Queue | Redis 7 + BullMQ worker pool |
 | AI | Provider-resolved LLM generation through configured model settings |
@@ -36,7 +36,7 @@ npm workspaces:
 - `@sotto/web` in `apps/web/`
 - `@sotto/shared` in `packages/shared/`
 - `@sotto/mcp` in `packages/mcp/`
-- `@sotto/verification-standard` in `packages/verification-standard/`
+- `groundcheck` in `packages/groundcheck/`
 
 Root `package.json` proxies the main web commands to `@sotto/web`. Each major directory has its own `CLAUDE.md`; follow the closest applicable file.
 

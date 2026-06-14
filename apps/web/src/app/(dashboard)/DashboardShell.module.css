@@ -9,7 +9,7 @@
   min-height: var(--full-height);
   display: flex;
   flex-direction: column;
-  padding-top: var(--impersonation-banner-height, 0px);
+  padding-top: 0px;
 }
 
 .topBar {

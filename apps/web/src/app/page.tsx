@@ -482,8 +482,8 @@ export default function LandingPage() {
               Your keys, your data, <em>your stack</em>.
             </h2>
             <p className={styles.sectionLede}>
-              There is no social layer here. No feeds, no follows, no likes. Just a learning stack
-              you fully control.
+              A learning stack you fully control — your courses, progress, and keys live on
+              infrastructure you own.
             </p>
           </header>
 
