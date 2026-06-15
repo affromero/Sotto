@@ -15,6 +15,7 @@ const HOSTED_MOCK_ROUTES = [
   '/learn',
   '/memory',
   '/profile',
+  '/profiles',
   '/ref',
   '/settings',
   '/voices',
