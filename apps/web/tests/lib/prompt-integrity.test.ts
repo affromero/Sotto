@@ -38,6 +38,7 @@ const EXPECTED_FILES = [
   'shared/bias-guidance.md',
   'topic-assessor.md',
   'placement/placement-probe.md',
+  'placement/deduce-from-notes.md',
   'class/generate-listening-quiz.md',
   'class/generate-section-quiz.md',
   'class/level-source.md',
@@ -151,6 +152,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'placement/placement-probe.md': [
     'COUNT', 'LEVELS', 'NATIVE', 'NOTES', 'PER_BAND', 'SKILLS', 'TARGET',
   ].sort(),
+  'placement/deduce-from-notes.md': ['CONTENT', 'NATIVE', 'TARGET'].sort(),
   'class/generate-listening-quiz.md': [
     'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'TARGET', 'TRANSCRIPT',
   ].sort(),
