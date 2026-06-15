@@ -16,8 +16,14 @@ const mockUserUpdate = vi.fn();
 const mockSetCourseNote = vi.fn();
 const mockSetSiteConfig = vi.fn();
 const mockInvalidate = vi.fn();
+const mockGetAutoModelConfig = vi.fn().mockResolvedValue({});
+const mockSetAutoModelConfig = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/auth', () => ({ auth: (...a: unknown[]) => mockAuth(...a) }));
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...a: unknown[]) => mockGetAutoModelConfig(...a),
+  setAutoModelConfig: (...a: unknown[]) => mockSetAutoModelConfig(...a),
+}));
 vi.mock('@/lib/auth-guards', () => ({
   isUserAdmin: (...a: unknown[]) => mockIsUserAdmin(...a),
 }));
@@ -133,6 +139,58 @@ describe('POST /api/v1/onboarding/save', () => {
       'u1'
     );
     expect(mockInvalidate).toHaveBeenCalled();
+  });
+
+  it('mirrors the owner\'s registry-valid model picks into AutoModelConfig', async () => {
+    mockIsUserAdmin.mockResolvedValue(true);
+    const res = await POST(
+      req({
+        ...BASE,
+        preferred: {
+          language: 'de',
+          aiProvider: 'anthropic',
+          aiModel: 'claude-haiku-4-5-20251001',
+          ttsProvider: 'cartesia',
+          ttsModel: 'sonic-3.5',
+          sttProvider: 'openai',
+          sttModel: 'whisper-1',
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        model: {
+          aiProvider: 'anthropic',
+          aiModel: 'claude-haiku-4-5-20251001',
+          ttsProvider: 'cartesia',
+          ttsModel: 'sonic-3.5',
+          sttProvider: 'openai',
+          sttModel: 'whisper-1',
+        },
+      },
+      'u1'
+    );
+  });
+
+  it('skips AutoModelConfig for keyless/local AI selections (e.g. local:qwen3)', async () => {
+    mockIsUserAdmin.mockResolvedValue(true);
+    // BASE.preferred is { aiProvider: 'local', aiModel: 'local:qwen3' } — not a registry pair.
+    const res = await POST(req(BASE));
+    expect(res.status).toBe(200);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+  });
+
+  it('does not write AutoModelConfig for a non-owner', async () => {
+    mockIsUserAdmin.mockResolvedValue(false);
+    const res = await POST(
+      req({
+        ...BASE,
+        preferred: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001' },
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 
   it('rejects identical native and target languages', async () => {

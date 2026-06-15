@@ -489,6 +489,8 @@ export const onboardingSaveSchema = z.object({
       aiModel: z.string().trim().max(128).optional(),
       ttsProvider: z.string().trim().max(64).optional(),
       ttsModel: z.string().trim().max(128).optional(),
+      sttProvider: z.string().trim().max(64).optional(),
+      sttModel: z.string().trim().max(128).optional(),
     })
     .optional(),
   infra: serverInfraSchema.optional(),
