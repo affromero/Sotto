@@ -148,7 +148,7 @@ impl Default for ThemeChoice {
 }
 
 /// Resolve the config file path: `<config_dir>/config.toml`.
-fn config_path() -> Result<PathBuf> {
+pub(crate) fn config_path() -> Result<PathBuf> {
     let dirs = ProjectDirs::from(QUALIFIER, ORGANIZATION, APPLICATION)
         .ok_or_else(|| eyre!("could not determine a config directory for this platform"))?;
     Ok(dirs.config_dir().join(CONFIG_FILE))
@@ -203,7 +203,7 @@ impl Config {
         }
     }
 
-    fn save_to(&self, path: &std::path::Path) -> Result<()> {
+    pub(crate) fn save_to(&self, path: &std::path::Path) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
