@@ -129,6 +129,46 @@
   pointer-events: none;
 }
 
+/* Preset animal avatar picker */
+
+.animalPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.animalTile {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid transparent;
+  background: var(--color-surface-nested);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.animalTile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--color-border-hover);
+}
+
+.animalTile:disabled {
+  cursor: not-allowed;
+}
+
+.animalTileSelected {
+  border-color: var(--color-primary);
+}
+
+.animalTile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Handle Input */
 
 .handleInputWrap {

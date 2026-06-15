@@ -24,7 +24,13 @@ const updateUserSchema = z
       .transform((val) => val.trim())
       .pipe(z.string().min(1).max(100))
       .optional(),
-    image: z.string().url().optional(),
+    image: z
+      .string()
+      .refine(
+        (v) => /^https?:\/\//.test(v) || /^\/avatars\/[a-z]+\.png$/.test(v),
+        'Image must be a URL or a preset avatar'
+      )
+      .optional(),
     handle: handleSchema.optional(),
     voicePreferences: z
       .array(

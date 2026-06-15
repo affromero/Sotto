@@ -1,10 +1,12 @@
 /**
- * Preset profile avatars for the local sign-in: cute animals from the Colombian
- * tropics. Each has a generated illustration at /avatars/{slug}.png (aula-styled
- * background). Until the images are generated, the picker falls back to the emoji
- * on an aula gradient tile, so the feature works fully offline with no assets.
+ * Preset profile avatars for the household profiles: cute animals from the
+ * Colombian tropics. Each has a generated illustration at /avatars/{slug}.png
+ * (aula-styled background), shipped in public/avatars. The "Who's learning?"
+ * picker (ProfilePicker), the header AvatarMenu, the sidebar AccountSwitcher,
+ * and the settings avatar grid all draw from these via resolveProfileAvatar().
+ * The emoji + hue remain an offline fallback tile.
  *
- * To generate the real images, run scripts/generate-avatars.mjs with a Gemini key
+ * To regenerate the images, run scripts/generate-avatars.mjs with a Gemini key
  * (model gemini-2.5-flash-image). The prompt and slugs live there.
  */
 

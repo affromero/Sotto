@@ -351,4 +351,22 @@ describe('PATCH /api/v1/users/me', () => {
     expect(response.status).toBe(400);
   });
 
+  it('accepts a preset animal avatar path for image', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({ ...mockUser, image: '/avatars/jaguar.png' });
+
+    const response = await PATCH(createPatchRequest({ image: '/avatars/jaguar.png' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.image).toBe('/avatars/jaguar.png');
+  });
+
+  it('rejects an image that is neither a URL nor a preset avatar', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await PATCH(createPatchRequest({ image: 'not-an-image' }));
+    expect(response.status).toBe(400);
+  });
+
 });
