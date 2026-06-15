@@ -8,7 +8,14 @@ import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { errorResponse } from '@/lib/api-response';
+import {
+  THEME_PREFS_COOKIE,
+  serializeThemePrefs,
+  themePrefsFromUser,
+} from '@/lib/theme-prefs';
 import { z } from 'zod';
+
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 const updateUserSchema = z
   .object({
@@ -17,7 +24,13 @@ const updateUserSchema = z
       .transform((val) => val.trim())
       .pipe(z.string().min(1).max(100))
       .optional(),
-    image: z.string().url().optional(),
+    image: z
+      .string()
+      .refine(
+        (v) => /^https?:\/\//.test(v) || /^\/avatars\/[a-z]+\.png$/.test(v),
+        'Image must be a URL or a preset avatar'
+      )
+      .optional(),
     handle: handleSchema.optional(),
     voicePreferences: z
       .array(
@@ -33,6 +46,15 @@ const updateUserSchema = z
     pushNotifications: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
+    // Per-profile appearance (persisted by the ThemeProvider for the active profile)
+    themeMode: z.enum(['system', 'light', 'dark']).optional(),
+    themePalette: z.enum(['aula', 'paper']).optional(),
+    themeAccent: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .nullable()
+      .optional(),
+    reducedMotion: z.boolean().optional(),
   })
   .strict();
 
@@ -64,6 +86,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       handle: user.handle,
       image: user.image,
+      role: user.role,
       episodeCount,
       createdAt: user.createdAt.toISOString(),
       voicePreferences: user.voicePreferences,
@@ -232,7 +255,7 @@ export async function PATCH(request: NextRequest) {
       return user;
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
@@ -243,6 +266,17 @@ export async function PATCH(request: NextRequest) {
       preferredLanguage: updatedUser.preferredLanguage,
       preferredAiModel: updatedUser.preferredAiModel,
     });
+
+    // Keep the active profile's appearance cookie in sync so the next load applies
+    // it flash-free (the cookie is the only client-readable source the init script
+    // sees; it never holds secrets).
+    response.cookies.set(THEME_PREFS_COOKIE, serializeThemePrefs(themePrefsFromUser(updatedUser)), {
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ONE_YEAR_SECONDS,
+      secure: process.env.NODE_ENV === 'production',
+    });
+    return response;
   } catch (error: unknown) {
     logger.error('Failed to update user', {
       error: error instanceof Error ? error.message : String(error),

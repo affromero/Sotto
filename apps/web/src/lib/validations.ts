@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isAnimalSlug } from './avatars';
 
 /**
  * Discovery chat message validation
@@ -102,9 +103,37 @@ export const updateEpisodeSchema = z
 /**
  * User profile update validation
  */
-export const updateProfileSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-});
+/**
+ * Household profile schemas. A profile name reuses the User.name trim/length
+ * rules; the avatar is one of the preset animal slugs (validated against the
+ * registry, never a free string).
+ */
+const profileNameSchema = z
+  .string()
+  .transform((val) => val.trim())
+  .pipe(z.string().min(1).max(100));
+
+const avatarSlugSchema = z.string().refine(isAnimalSlug, 'Unknown avatar');
+
+export const createProfileSchema = z
+  .object({
+    name: profileNameSchema,
+    avatarSlug: avatarSlugSchema.optional(),
+  })
+  .strict();
+
+export const updateProfileSchema = z
+  .object({
+    name: profileNameSchema.optional(),
+    avatarSlug: avatarSlugSchema.optional(),
+  })
+  .strict();
+
+export const switchProfileSchema = z
+  .object({
+    profileId: z.string().min(1),
+  })
+  .strict();
 
 /**
  * Pagination query validation

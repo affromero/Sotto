@@ -6,22 +6,11 @@ import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import { PedagogySelector } from '@/components/learn/PedagogySelector';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
+import { langLabel } from '@/lib/languages';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Learn' };
-
-const LANG_LABELS: Record<string, string> = {
-  en: 'English',
-  de: 'German',
-  es: 'Spanish',
-  fr: 'French',
-  pt: 'Portuguese',
-  it: 'Italian',
-  ja: 'Japanese',
-  zh: 'Chinese',
-  ko: 'Korean',
-};
 
 const LEVEL_LABELS: Record<string, string> = {
   A1: 'Beginner',
@@ -33,10 +22,6 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-
-function langLabel(code: string): string {
-  return LANG_LABELS[code.toLowerCase()] ?? code.toUpperCase();
-}
 
 function levelLabel(level: string): string {
   return LEVEL_LABELS[level] ?? level;
