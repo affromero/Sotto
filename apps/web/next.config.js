@@ -52,16 +52,7 @@ const nextConfig = {
     return [];
   },
   async rewrites() {
-    return [
-      {
-        source: '/@:handle/:slug/embed',
-        destination: '/episode/by-slug/:handle/:slug/embed',
-      },
-      {
-        source: '/@:handle/:slug',
-        destination: '/episode/by-slug/:handle/:slug',
-      },
-    ];
+    return [];
   },
   async headers() {
     // React/Next dev mode requires eval() (source maps, fast refresh, error
@@ -130,15 +121,6 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: permissionsPolicy },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-        ],
-      },
-      {
-        source: '/@:handle/:slug/embed',
-        headers: [
-          { key: 'Content-Security-Policy', value: embedCsp },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: permissionsPolicy },
         ],
       },
       {

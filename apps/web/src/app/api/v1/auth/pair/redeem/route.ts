@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: redeemed.userId },
-    select: { id: true, name: true, email: true, handle: true, image: true, role: true },
+    select: { id: true, name: true, email: true, image: true, role: true },
   });
 
   return NextResponse.json({ token: key, user });

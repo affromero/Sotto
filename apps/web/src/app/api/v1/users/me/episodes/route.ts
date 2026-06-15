@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     where: { userId: authed.userId },
     orderBy: { createdAt: 'desc' },
     include: {
-      user: { select: { id: true, name: true, handle: true, image: true } },
+      user: { select: { id: true, name: true, image: true } },
       tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
     },
   });

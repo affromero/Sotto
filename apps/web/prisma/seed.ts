@@ -294,67 +294,6 @@ async function main() {
   }
 
   console.warn(`✅ Created ${taxonomyCategories.length} taxonomy categories with ${taxonomyTagCount} tags`);
-
-  // Seed reserved handles
-  const reservedHandles = [
-    'admin',
-    'support',
-    'help',
-    'official',
-    'system',
-    'api',
-    'feed',
-    'create',
-    'settings',
-    'dashboard',
-    'billing',
-    'pricing',
-    'auth',
-    'login',
-    'signup',
-    'onboarding',
-    'episode',
-    'profile',
-    'team',
-    'notifications',
-    'analytics',
-    'explore',
-    'search',
-    'trending',
-    'home',
-    'about',
-    'contact',
-    'terms',
-    'privacy',
-  ];
-
-  for (const handle of reservedHandles) {
-    await prisma.reservedHandle.upsert({
-      where: { handle },
-      update: {},
-      create: {
-        handle,
-        reason: 'System reserved',
-      },
-    });
-  }
-
-  console.warn(`✅ Reserved ${reservedHandles.length} handles`);
-
-  // Set handle for known admin (no-op if user hasn't signed up yet)
-  const adminHandles: Record<string, string> = {
-    'andres2912@gmail.com': 'andres',
-  };
-
-  for (const [email, handle] of Object.entries(adminHandles)) {
-    const updated = await prisma.user.updateMany({
-      where: { email, handle: null },
-      data: { handle },
-    });
-    if (updated.count > 0) {
-      console.warn(`✅ Set handle @${handle} for ${email}`);
-    }
-  }
 }
 
 main()

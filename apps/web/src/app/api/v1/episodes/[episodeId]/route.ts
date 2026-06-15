@@ -139,7 +139,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     },
     select: {
       ...EPISODE_PUBLIC_SELECT,
-      user: { select: { id: true, name: true, handle: true, image: true } },
+      user: { select: { id: true, name: true, image: true } },
       tags: { include: { tag: true } },
     },
   });
