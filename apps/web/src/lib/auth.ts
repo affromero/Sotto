@@ -2,7 +2,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import type { UserRole } from '@/generated/prisma/client';
 import { prisma } from './prisma';
-import { LOCAL_USER_ID, ensureLocalUser } from './local-user';
+import { LOCAL_USER_ID, ACTIVE_PROFILE_COOKIE, ensureLocalUser } from './local-user';
 
 export interface AuthUser {
   id: string;
@@ -17,28 +17,40 @@ export interface AuthSession {
 }
 
 /**
- * Sotto is fully self-hosted for a single learner — there is no login. Every
- * request resolves to one implicit local user, which is always the owner
- * (ADMIN). The result is memoized per request via React `cache()`.
+ * Resolve the current request's profile. Sotto is self-hosted for a household
+ * with no login: the active profile is whichever one the `sotto_profile` cookie
+ * points at, set by the passwordless picker. With no (or a stale) cookie we fall
+ * back to the owner, so a fresh install and a single-profile household behave
+ * exactly as before. The resolved role is the profile's real DB role — the owner
+ * is ADMIN, learners added later are USER — which is what gates the admin area.
+ *
+ * Exported (un-memoized) for unit tests; request code should use `auth()`, which
+ * memoizes this per request via React `cache()`. Cookies are only ever READ
+ * here; switching profiles sets the cookie from the switch route handler.
  *
  * The signature stays `Promise<AuthSession | null>` so existing route guards
- * (`if (!session?.user?.id) return 401`) keep compiling and the tests that mock
- * this to `null` keep passing; at runtime the local user is always present.
+ * (`if (!session?.user?.id) return 401`) keep compiling and tests that mock this
+ * to `null` keep passing; at runtime a profile is always present.
  */
-export const auth = cache(async (): Promise<AuthSession | null> => {
-  // Touch a request-scoped API so every page/route that resolves the current
-  // user renders dynamically (these are per-instance data pages, never static).
-  // This keeps the production build from querying Prisma when there is no database.
-  await cookies();
-  let user = await prisma.user.findUnique({ where: { id: LOCAL_USER_ID } });
+export async function resolveSession(): Promise<AuthSession | null> {
+  const cookieStore = await cookies();
+  const activeId = cookieStore.get(ACTIVE_PROFILE_COOKIE)?.value;
+
+  let user = activeId
+    ? await prisma.user.findUnique({ where: { id: activeId } })
+    : null;
+  if (!user) user = await prisma.user.findUnique({ where: { id: LOCAL_USER_ID } });
   if (!user) user = await ensureLocalUser();
+
   return {
     user: {
       id: user.id,
       name: user.name,
       email: user.email,
       image: user.image,
-      role: 'ADMIN',
+      role: user.role,
     },
   };
-});
+}
+
+export const auth = cache(resolveSession);

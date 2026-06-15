@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       handle: user.handle,
       image: user.image,
+      role: user.role,
       episodeCount,
       createdAt: user.createdAt.toISOString(),
       voicePreferences: user.voicePreferences,

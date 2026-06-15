@@ -77,6 +77,7 @@ const mockUser = {
   name: 'Alice Johnson',
   email: 'alice@example.com',
   image: 'https://example.com/alice.jpg',
+  role: 'ADMIN',
   createdAt: new Date('2025-01-10T10:00:00Z'),
   preferredHostVoiceId: 'voice-host-1',
   preferredExpertVoiceId: 'voice-expert-1',
@@ -87,6 +88,7 @@ const mockUserMinimal = {
   name: 'Bob Smith',
   email: 'bob@example.com',
   image: null,
+  role: 'USER',
   createdAt: new Date('2025-01-15T10:00:00Z'),
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
@@ -122,6 +124,19 @@ describe('GET /api/v1/users/me', () => {
     expect(body.id).toBe('user-1');
     expect(body.name).toBe('Alice Johnson');
     expect(body.email).toBe('alice@example.com');
+    expect(body.role).toBe('ADMIN');
+  });
+
+  it('returns the real role for a non-owner learner profile', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
+    mockPrisma.user.findUnique.mockResolvedValue(mockUserMinimal);
+
+    const request = createGetRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.role).toBe('USER');
   });
 
   it('handles user with null optional fields', async () => {
