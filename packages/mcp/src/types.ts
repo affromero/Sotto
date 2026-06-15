@@ -40,7 +40,6 @@ export interface UserProfile {
   id: string;
   name: string | null;
   email: string | null;
-  handle: string | null;
   image: string | null;
   episodeCount: number;
   createdAt: string;

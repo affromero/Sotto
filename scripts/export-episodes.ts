@@ -83,7 +83,6 @@ async function main() {
     id: user.id,
     email: user.email,
     name: user.name,
-    handle: user.handle,
     image: user.image,
     bio: user.bio,
     role: user.role,

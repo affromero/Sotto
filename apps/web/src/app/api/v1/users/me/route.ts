@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
-import { isHandleAvailable } from '@/lib/handles';
-import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/validations';
+import { customTagSchema, deleteAccountSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
 import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
@@ -31,7 +30,6 @@ const updateUserSchema = z
         'Image must be a URL or a preset avatar'
       )
       .optional(),
-    handle: handleSchema.optional(),
     voicePreferences: z
       .array(
         z.object({
@@ -84,7 +82,6 @@ export async function GET(request: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
-      handle: user.handle,
       image: user.image,
       role: user.role,
       episodeCount,
@@ -118,7 +115,6 @@ export async function PATCH(request: NextRequest) {
     const {
       interests,
       customTags,
-      handle,
       voicePreferences,
       preferredAiModel,
       ...data
@@ -142,26 +138,10 @@ export async function PATCH(request: NextRequest) {
         : null;
     }
 
-    // Validate handle availability if changing it
-    if (handle !== undefined) {
-      const currentUser = await prisma.user.findUnique({
-        where: { id: authResult.userId },
-        select: { handle: true },
-      });
-      if (currentUser?.handle !== handle) {
-        const availability = await isHandleAvailable(handle);
-        if (!availability.available) {
-          return errorResponse(availability.reason || 'Handle is not available', 409);
-        }
-      }
-    }
-
     const updatedUser = await prisma.$transaction(async (tx) => {
-      // Update user profile fields (including handle if provided)
-      const updateData = handle !== undefined ? { ...data, handle } : data;
       const user = await tx.user.update({
         where: { id: authResult.userId },
-        data: updateData,
+        data,
         include: {
           voicePreferences: { select: { speaker: true, voiceId: true, sortOrder: true } },
         },
@@ -259,7 +239,6 @@ export async function PATCH(request: NextRequest) {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
-      handle: updatedUser.handle,
       image: updatedUser.image,
       createdAt: updatedUser.createdAt.toISOString(),
       voicePreferences: updatedUser.voicePreferences,

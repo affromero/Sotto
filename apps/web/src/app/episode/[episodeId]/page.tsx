@@ -19,11 +19,7 @@ export async function generateMetadata({ params }: EpisodePageProps): Promise<Me
   if (!episode) return { title: 'Lesson Not Found' };
 
   const appUrl = getAppBaseUrl();
-  const episodeUrl = absoluteEpisodeUrl(
-    { id: episode.id, slug: episode.slug },
-    episode.user.handle,
-    appUrl
-  );
+  const episodeUrl = absoluteEpisodeUrl({ id: episode.id }, appUrl);
   const creatorName = episode.user.name || 'Anonymous';
 
   return {

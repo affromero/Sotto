@@ -724,7 +724,6 @@ export const meResponseSchema = z
     id: z.string(),
     name: z.string().nullable().optional(),
     email: z.string().nullable().optional(),
-    handle: z.string().nullable().optional(),
     image: z.string().nullable().optional(),
   })
   .loose();
@@ -790,7 +789,6 @@ export const pairedUserSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
   email: z.string(),
-  handle: z.string().nullable(),
   image: z.string().nullable(),
   role: userRoleSchema,
 });
