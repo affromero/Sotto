@@ -53,6 +53,22 @@ pub(crate) enum Action {
     InputBackspace,
     /// Submit the writing editor's text (Ctrl-D).
     SubmitText,
+    /// Start notes-based placement from the language picker (`m`).
+    NotesStart,
+    /// A typed character for the notes-placement materials editor.
+    NotesInput(char),
+    /// Newline in the notes-placement materials editor (Enter).
+    NotesInputNewline,
+    /// Backspace in the notes-placement materials editor.
+    NotesInputBackspace,
+    /// Submit the pasted materials for level deduction (Ctrl-D).
+    NotesSubmit,
+    /// Accept the deduced level and create the course ("start here").
+    NotesConfirm,
+    /// Take the MC test instead of accepting the deduced level (`t`).
+    NotesTakeTest,
+    /// Back out of notes placement (Esc).
+    NotesCancel,
     /// Continue the course / advance to the next class.
     NextClass,
 
@@ -121,6 +137,10 @@ pub(crate) enum Action {
     PlacementLoaded(u64, ApiResult<types::GeneratePlacementResponse>),
     /// `POST /placement` returned (or failed) — the assessed level + course id.
     PlacementSubmitted(u64, ApiResult<types::SubmitPlacementResponse>),
+    /// `POST /placement/from-notes` returned (or failed) — the deduced level.
+    NotesDeduced(u64, ApiResult<types::DeduceFromNotesResponse>),
+    /// `POST /placement/from-notes/confirm` returned (or failed) — created course.
+    NotesConfirmed(u64, ApiResult<types::ConfirmFromNotesResponse>),
     /// `GET /courses/{id}/graph` returned (or failed) — the memory graph.
     GraphLoaded(u64, ApiResult<types::MemoryGraphResponse>),
     /// `GET /onboarding/config` returned (or failed).

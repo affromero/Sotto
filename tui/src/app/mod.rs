@@ -33,9 +33,10 @@ use crate::tui::Tui;
 use overlay::{AccountsOverlay, ThemePicker};
 
 use state::{
-    AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SectionProgress,
-    SkillChoice, SpeakingPhase, View, WritingPhase, answer_current, can_review_vocab, cursor_down,
-    cursor_up, list_down, list_up, poll_is_terminal, reduce_speaking_poll, reduce_start,
+    AnswerStep, Course, DueCounts, EpisodeDetail, NotesPhase, PracticeResult, RetryKind,
+    SectionProgress, SkillChoice, SpeakingPhase, View, WritingPhase, answer_current,
+    can_review_vocab, cursor_down, cursor_up, list_down, list_up, poll_is_terminal,
+    reduce_speaking_poll, reduce_start,
 };
 
 /// The interactive Sotto client. Owns the session [`Config`], the [`Api`] seam
@@ -291,6 +292,16 @@ impl App {
             Action::PlacementSubmitted(req_gen, result) => {
                 self.on_placement_submitted(req_gen, result)
             }
+            Action::NotesDeduced(req_gen, result) => self.on_notes_deduced(req_gen, result),
+            Action::NotesConfirmed(req_gen, result) => self.on_notes_confirmed(req_gen, result),
+            Action::NotesStart => self.start_notes_placement(),
+            Action::NotesInput(c) => self.notes_input_char(c),
+            Action::NotesInputNewline => self.notes_input_newline(),
+            Action::NotesInputBackspace => self.notes_input_backspace(),
+            Action::NotesSubmit => self.notes_submit(),
+            Action::NotesConfirm => self.notes_confirm(),
+            Action::NotesTakeTest => self.notes_take_test(),
+            Action::NotesCancel => self.notes_cancel(),
             Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),
             Action::ConfigLoaded(req_gen, result) => self.on_config_loaded(req_gen, result),
             Action::ToggleAsk => self.on_toggle_ask(),
@@ -439,6 +450,32 @@ impl App {
             return Some(Action::SubmitText);
         }
 
+        // Notes-based placement owns input in its own phases: a text editor while
+        // typing materials, then a two-choice result. Returns above the global
+        // polish keys so `t`/`?` are typed into the materials, not intercepted.
+        if let View::NotesPlacement { phase, .. } = &self.view {
+            let ctrl_d = matches!(key.code, KeyCode::Char('d'))
+                && key.modifiers.contains(KeyModifiers::CONTROL);
+            return match phase {
+                NotesPhase::Entry => match key.code {
+                    _ if ctrl_d => Some(Action::NotesSubmit),
+                    KeyCode::Esc => Some(Action::NotesCancel),
+                    KeyCode::Enter => Some(Action::NotesInputNewline),
+                    KeyCode::Backspace => Some(Action::NotesInputBackspace),
+                    KeyCode::Char(c) => Some(Action::NotesInput(c)),
+                    _ => None,
+                },
+                NotesPhase::Result { .. } => match key.code {
+                    KeyCode::Enter => Some(Action::NotesConfirm),
+                    KeyCode::Char('t') => Some(Action::NotesTakeTest),
+                    KeyCode::Esc => Some(Action::NotesCancel),
+                    _ => None,
+                },
+                // Deducing / Confirming: a request is in flight; swallow keys.
+                NotesPhase::Deducing | NotesPhase::Confirming => None,
+            };
+        }
+
         // Global polish keys (reached only when no text-entry/ask overlay is
         // active — those modes return above, so these never disturb typing):
         // `t` theme picker, `?` key-help, `A` (shift+a) account switcher.
@@ -454,6 +491,10 @@ impl App {
             // Persistent error screen: `r` retries the failed action.
             View::Error { .. } if matches!(key.code, KeyCode::Char('r')) => {
                 return Some(Action::Retry);
+            }
+            // PlacementLang: `m` opens the "paste materials" placement path.
+            View::PlacementLang { .. } if matches!(key.code, KeyCode::Char('m')) => {
+                return Some(Action::NotesStart);
             }
             // Listening (standalone or class section): space toggles playback.
             _ if self.audio_screen() && matches!(key.code, KeyCode::Char(' ')) => {
@@ -855,6 +896,8 @@ impl App {
                     self.enter_course_home(course);
                 }
             }
+            // Enter is handled in map_key for notes placement (submit / confirm).
+            View::NotesPlacement { .. } => {}
             View::CourseHome {
                 course,
                 due,
@@ -989,6 +1032,8 @@ impl App {
                 self.fetch_courses();
                 self.render();
             }
+            // Esc is handled in map_key for notes placement (NotesCancel).
+            View::NotesPlacement { .. } => {}
             View::ItemReview { course, .. }
             | View::ListeningReview { course, .. }
             | View::SpeakingReview { course, .. }
@@ -1968,6 +2013,30 @@ mod tests {
             .expect("valid submit-placement JSON"))
         }
 
+        async fn deduce_from_notes(
+            &self,
+            _native: &str,
+            _target: &str,
+            _content: &str,
+        ) -> Result<types::DeduceFromNotesResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "native": "en", "target": "es",
+                "deducedLevel": "B1", "rationale": "Uses past tense.", "confidence": 0.8
+            }))
+            .expect("valid deduce-from-notes JSON"))
+        }
+
+        async fn confirm_from_notes(
+            &self,
+            _native: &str,
+            _target: &str,
+        ) -> Result<types::ConfirmFromNotesResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-stub", "level": "B1", "addedVocabulary": 5
+            }))
+            .expect("valid confirm-from-notes JSON"))
+        }
+
         async fn graph(&self, _course_id: &str) -> Result<types::MemoryGraphResponse> {
             Ok(
                 serde_json::from_value(serde_json::json!({ "nodes": [], "edges": [] }))
@@ -2193,6 +2262,121 @@ mod tests {
             app.request_gen, after_first,
             "a second Select while starting must not dispatch again"
         );
+    }
+
+    // --- Notes-based placement (P5) ----------------------------------------
+
+    fn deduce_resp(level: &str, confidence: f64) -> ApiResult<types::DeduceFromNotesResponse> {
+        Arc::new(Ok(serde_json::from_value(serde_json::json!({
+            "native": "en", "target": "es",
+            "deducedLevel": level, "rationale": "Uses past tense.", "confidence": confidence
+        }))
+        .expect("valid deduce JSON")))
+    }
+
+    #[test]
+    fn materials_path_opens_the_editor_from_the_language_picker() {
+        let mut app = test_app();
+        app.view = View::placement_lang();
+        app.start_notes_placement();
+        assert!(matches!(
+            app.view,
+            View::NotesPlacement {
+                phase: NotesPhase::Entry,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn typing_then_submitting_materials_deduces_a_level() {
+        let mut app = test_app();
+        app.view = View::placement_lang();
+        app.start_notes_placement();
+        for c in "hola mundo".chars() {
+            app.notes_input_char(c);
+        }
+        match &app.view {
+            View::NotesPlacement { input, .. } => assert_eq!(input, "hola mundo"),
+            other => panic!("expected NotesPlacement, got {other:?}"),
+        }
+
+        // Submit dispatches deduction; deliver the result with the current gen.
+        app.notes_submit();
+        let req_gen = app.request_gen;
+        app.on_notes_deduced(req_gen, deduce_resp("B1", 0.8));
+
+        match &app.view {
+            View::NotesPlacement {
+                phase:
+                    NotesPhase::Result {
+                        level, confidence, ..
+                    },
+                ..
+            } => {
+                assert_eq!(level, "B1");
+                assert_eq!(*confidence, 80);
+            }
+            other => panic!("expected Result phase, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn starting_here_creates_the_course_and_lands_in_it() {
+        let mut app = test_app();
+        app.view = View::NotesPlacement {
+            native: "en".into(),
+            target: "es".into(),
+            input: String::new(),
+            phase: NotesPhase::Result {
+                level: "B1".into(),
+                rationale: "r".into(),
+                confidence: 80,
+            },
+        };
+        app.notes_confirm();
+        let req_gen = app.request_gen;
+        let resp: ApiResult<types::ConfirmFromNotesResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-9", "level": "B1", "addedVocabulary": 4
+            }))
+            .expect("valid confirm JSON")));
+        app.on_notes_confirmed(req_gen, resp);
+
+        match &app.view {
+            View::CourseHome { course, .. } => {
+                assert_eq!(course.id, "course-9");
+                assert_eq!(course.current_level, "B1");
+                assert_eq!(course.native_lang, "en");
+                assert_eq!(course.target_lang, "es");
+            }
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn esc_steps_back_from_result_to_editing_then_to_the_picker() {
+        let mut app = test_app();
+        app.view = View::NotesPlacement {
+            native: "en".into(),
+            target: "es".into(),
+            input: "notes".into(),
+            phase: NotesPhase::Result {
+                level: "B1".into(),
+                rationale: "r".into(),
+                confidence: 80,
+            },
+        };
+        app.notes_cancel();
+        assert!(matches!(
+            app.view,
+            View::NotesPlacement {
+                phase: NotesPhase::Entry,
+                ..
+            }
+        ));
+        app.notes_cancel();
+        assert!(matches!(app.view, View::PlacementLang { .. }));
     }
 
     #[tokio::test]
