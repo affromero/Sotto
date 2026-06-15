@@ -81,16 +81,20 @@ export async function generatePlacement(
   nativeLang: string,
   targetLang: string,
   note = '',
+  // Questions per CEFR band. Defaults to the full test; the "verify with a few
+  // questions" path passes a smaller value for a shorter run. Clamped 1..PER_BAND.
+  perBand: number = PER_BAND,
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
   const ai = await resolveLearningAi(userId);
-  const count = PLACEMENT_LEVELS.length * PER_BAND;
+  const bandCount = Math.max(1, Math.min(PER_BAND, Math.round(perBand)));
+  const count = PLACEMENT_LEVELS.length * bandCount;
 
   const systemPrompt = loadAndRender('placement/placement-probe.md', {
     NATIVE: nativeLang,
     TARGET: targetLang,
     LEVELS: PLACEMENT_LEVELS.join(', '),
     SKILLS: PLACEMENT_SKILLS.join(', '),
-    PER_BAND: String(PER_BAND),
+    PER_BAND: String(bandCount),
     COUNT: String(count),
     NOTES: formatNotesForPrompt(note),
   });
@@ -98,7 +102,7 @@ export async function generatePlacement(
   const provider = createAIProvider(ai.provider);
   const response = await provider.generateResponse(
     systemPrompt,
-    [{ role: 'user', content: `Generate exactly ${count} placement questions (${PER_BAND} per CEFR level).` }],
+    [{ role: 'user', content: `Generate exactly ${count} placement questions (${bandCount} per CEFR level).` }],
     { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 6000, temperature: 0.7 },
   );
 

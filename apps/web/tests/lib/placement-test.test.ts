@@ -124,6 +124,14 @@ describe('generatePlacement option shaping', () => {
       expect(question.correctIndex).toBeLessThan(4);
     }
   });
+
+  it('honors a smaller perBand for a shorter verification run', async () => {
+    await generatePlacement('user-1', 'en', 'es', '', 2);
+    const messages = mockGenerateResponse.mock.calls.at(-1)?.[1] as Array<{ content: string }>;
+    // 4 CEFR bands * 2 per band = 8 questions.
+    expect(messages[0].content).toContain('2 per CEFR level');
+    expect(messages[0].content).toContain('8');
+  });
 });
 
 describe('deduceLevelFromNotes', () => {
