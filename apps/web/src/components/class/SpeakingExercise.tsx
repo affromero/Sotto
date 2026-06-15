@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import styles from './SpeakingExercise.module.css';
 
 // ---- Types ----
@@ -280,12 +282,25 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
           {index + 1}
         </div>
         <div className={styles.phraseContent}>
-          <p className={styles.targetPhrase} lang="auto">
+          <p
+            className={`${styles.targetPhrase} ${guardStyles.guarded}`}
+            lang="auto"
+            {...learningTextGuardProps<HTMLParagraphElement>()}
+          >
             {prompt.targetPhrase}
           </p>
-          <p className={styles.translation}>{prompt.translation}</p>
+          <p
+            className={`${styles.translation} ${guardStyles.guarded}`}
+            {...learningTextGuardProps<HTMLParagraphElement>()}
+          >
+            {prompt.translation}
+          </p>
           {prompt.ipa && (
-            <p className={styles.ipa} aria-label={`Pronunciation: ${prompt.ipa}`}>
+            <p
+              className={`${styles.ipa} ${guardStyles.guarded}`}
+              aria-label={`Pronunciation: ${prompt.ipa}`}
+              {...learningTextGuardProps<HTMLParagraphElement>()}
+            >
               {prompt.ipa}
             </p>
           )}
