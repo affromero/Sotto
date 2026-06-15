@@ -94,7 +94,7 @@ A complete CEFR course across **five graded skills**, on a stack you control:
 - **Live conversation** — speak and hear the real-time translation (either direction) through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live); new words you hit feed straight into your memory graph. Runs on your own Google key (added in Settings), and stays hidden until you add one.
 - **Practice exams** — full, multi-section mock exams modeled on each language's flagship ([Goethe-Zertifikat](https://www.goethe.de/en/spr/kup/prf.html), [DELE](https://examenes.cervantes.es/), [Cambridge English](https://www.cambridgeenglish.org/), or a generic CEFR mock), with a mock band and section-by-section feedback. Practice only — never an official score, and never changes your level.
 - **Notes that personalize everything** — tell Sotto your goals and background once; it threads through placement, classes, and practice.
-- **Any language pair** — German/English/Spanish ship as hand-authored reference curricula; any other native→target pair is composed by your connected agent on demand.
+- **Flexible language pairs** — English→German, English→Spanish, and Spanish→English ship as hand-authored reference curricula; other selected native→target pairs are composed by your configured AI/agent on demand and cached per pair.
 - **iPad workbooks** — a Pencil-first PDF workbook for any class: cover, class map, full-page reading/writing/speaking space, QR/deep links back to the web class, and a server-rendered PDF that feels closer to GoodNotes than a handout.
 
 ---
@@ -157,7 +157,7 @@ A quick map of the nouns you'll meet in the app and the code:
 | **Class** | A mastery-gated unit of study, roughly an hour's work, built from the five skill **sections**. You can't advance until you pass, and a failed section regenerates in a similar-but-not-identical form. |
 | **Section** | One skill inside a class: grammar, reading, listening, speaking, or writing. The listening section plays an Episode; the rest are drills, passages, recordings, or writing tasks. |
 | **Episode** | The generated, narrated **audio** a listening section plays: a short script written for your level, seeded with your due vocabulary, and voiced by your TTS. It is the audio unit (the same engine powers any audio Sotto makes), private to you. |
-| **Lesson** | A node in the fixed CEFR **curriculum** that sets what a class is about (its grammar points, vocabulary themes, can-do goal). Hand-authored for German/English/Spanish; composed by your agent for any other pair. |
+| **Lesson** | A node in the fixed CEFR **curriculum** that sets what a class is about (its grammar points, vocabulary themes, can-do goal). Hand-authored references currently cover English→German, English→Spanish, and Spanish→English; other selected pairs are composed by your configured AI/agent on demand. |
 | **Practice** | Ungated, single-skill drilling on your own time, driven by spaced repetition. Separate from the graded classes, and it never gates progress. |
 | **Exam** | A full, multi-section **mock exam** modeled on a flagship's format (Goethe / DELE / Cambridge, or a generic CEFR mock). Practice only: a mock band plus feedback, never an official score, and it never changes your level. |
 | **Memory graph** | Your per-course vocabulary and grammar with SM-2 spaced repetition. It decides what's due, seeds the next listening Episode, and renders as an interactive graph. |
