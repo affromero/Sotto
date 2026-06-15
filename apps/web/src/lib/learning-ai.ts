@@ -5,8 +5,10 @@
 // (AI_PROVIDER=local: Ollama / vLLM / LM Studio). Both are the "no cloud key"
 // path and return no apiKey (the CLI / local server authenticates itself).
 import { getAiKey } from './byok';
-import { getAiProviderMeta } from './providers/ai-registry';
+import { getAiProviderMeta, getProviderForModel } from './providers/ai-registry';
+import { getAutoModelConfig } from './auto-model-config';
 import { getServerInfra, infra } from './server-config';
+import { logger } from './logger';
 
 export interface ResolvedLearningAi {
   provider: string;
@@ -15,10 +17,37 @@ export interface ResolvedLearningAi {
   apiKey?: string;
 }
 
+/**
+ * The owner-configured default model for `provider` (from the onboarding wizard
+ * or /admin/providers), or null if none is configured for this provider, the
+ * configured model belongs to a different provider, or the config can't be read.
+ */
+async function configuredModelFor(provider: string): Promise<string | null> {
+  try {
+    const cfg = await getAutoModelConfig();
+    if (cfg.model.aiProvider === provider && getProviderForModel(cfg.model.aiModel) === provider) {
+      return cfg.model.aiModel;
+    }
+    return null;
+  } catch (error) {
+    logger.warn('Could not read configured AI model; using provider default', {
+      provider,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 export async function resolveLearningAi(userId: string): Promise<ResolvedLearningAi> {
   const aiKey = await getAiKey(userId);
   if (aiKey) {
-    const model = getAiProviderMeta(aiKey.provider).defaultModel;
+    // Prefer the owner-configured model for this provider (set via the onboarding
+    // wizard or /admin/providers) so a chosen model actually drives generation.
+    // If the config can't be read (e.g. DB unavailable), fall back to the
+    // provider's registry default — a same-provider model fallback, never a
+    // silent provider switch.
+    const configured = await configuredModelFor(aiKey.provider);
+    const model = configured ?? getAiProviderMeta(aiKey.provider).defaultModel;
     if (!model) throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
     return { provider: aiKey.provider, model, apiKey: aiKey.apiKey };
   }

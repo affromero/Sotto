@@ -1,6 +1,7 @@
 import { logger } from '../logger';
 import { getSttProviderMeta, isValidSttProviderId, type SttProviderId } from './stt-registry';
 import { getAiKey, getByokKey } from '../byok';
+import { getAutoModelConfig } from '../auto-model-config';
 import { infra } from '../server-config';
 import { detectAudioFormat } from '../audio-format';
 
@@ -675,7 +676,23 @@ export async function resolveSttProvider(context: {
     );
   }
 
-  const model = requestedModel ?? getSttProviderMeta(requestedProvider).defaultModel;
+  // No explicit request → use the owner-configured model for this provider (set
+  // via the onboarding wizard or /admin/providers) so a chosen model actually
+  // drives transcription; fall back to the provider's registry default. If the
+  // config can't be read, degrade to the registry default (never throws here).
+  let model = requestedModel;
+  if (!model) {
+    model = getSttProviderMeta(requestedProvider).defaultModel;
+    try {
+      const cfg = await getAutoModelConfig();
+      if (cfg.model.sttProvider === requestedProvider) model = cfg.model.sttModel;
+    } catch (error) {
+      logger.warn('Could not read configured STT model; using provider default', {
+        provider: requestedProvider,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
   return {
     providerId: requestedProvider,
     apiKey: key,

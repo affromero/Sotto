@@ -38,16 +38,22 @@ export interface AutoModelConfigUpdate {
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 
 // Seed values for fresh installs — derived from registry, not hardcoded.
-const SEEDS = {
-  aiProvider: 'anthropic' as const,
-  aiModel: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')?.id ?? getAiProviderMeta('anthropic').defaultModel,
-  ttsProvider: 'openai' as const,
-  ttsModel: getProviderMeta('openai').defaultModel,
-  sttProvider: 'openai' as const,
-  sttModel: getSttProviderMeta('openai').defaultModel,
-  platformAiProvider: 'anthropic' as const,
-  platformAiModel: getAiProviderMeta('anthropic').defaultModel,
-};
+// Computed lazily (not at module load) so simply importing this module — now a
+// transitive dependency of learning-ai/stt — never touches the registry; only
+// creating the singleton does. Keeps tests that mock the registry from breaking
+// on import.
+function seeds() {
+  return {
+    aiProvider: 'anthropic' as const,
+    aiModel: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')?.id ?? getAiProviderMeta('anthropic').defaultModel,
+    ttsProvider: 'openai' as const,
+    ttsModel: getProviderMeta('openai').defaultModel,
+    sttProvider: 'openai' as const,
+    sttModel: getSttProviderMeta('openai').defaultModel,
+    platformAiProvider: 'anthropic' as const,
+    platformAiModel: getAiProviderMeta('anthropic').defaultModel,
+  };
+}
 
 /**
  * Get the current auto model configuration.
@@ -61,7 +67,7 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
   if (!row) {
     try {
       row = await prisma.autoModelConfig.create({
-        data: { id: 'singleton', ...SEEDS },
+        data: { id: 'singleton', ...seeds() },
       });
     } catch {
       row = await prisma.autoModelConfig.findUnique({ where: { id: 'singleton' } });
@@ -122,9 +128,37 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
 }
 
 /**
+ * Validate that every provided model belongs to its paired provider before
+ * persisting. `setAutoModelConfig` is written by both the admin providers page
+ * and the onboarding wizard; without this guard a mismatched AI pair would be
+ * silently self-healed away on the next read, and a mismatched TTS/STT pair
+ * would persist but never apply (the resolvers only use the model when the
+ * provider matches). Only checks pairs where both provider and a non-empty
+ * model are supplied — partial updates and keyless/STT-only providers are skipped.
+ */
+function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
+  const m = data.model;
+  if (m?.aiProvider && m.aiModel && getProviderForModel(m.aiModel) !== m.aiProvider) {
+    throw new Error(`AI model "${m.aiModel}" does not belong to provider "${m.aiProvider}".`);
+  }
+  if (m?.ttsProvider && m.ttsModel && !getProviderMeta(m.ttsProvider).models.some((x) => x.id === m.ttsModel)) {
+    throw new Error(`TTS model "${m.ttsModel}" is not a model of provider "${m.ttsProvider}".`);
+  }
+  if (m?.sttProvider && m.sttModel && !getSttProviderMeta(m.sttProvider).models.some((x) => x.id === m.sttModel)) {
+    throw new Error(`STT model "${m.sttModel}" is not a model of provider "${m.sttProvider}".`);
+  }
+  const p = data.platform;
+  if (p?.aiProvider && p.aiModel && getProviderForModel(p.aiModel) !== p.aiProvider) {
+    throw new Error(`Platform AI model "${p.aiModel}" does not belong to provider "${p.aiProvider}".`);
+  }
+}
+
+/**
  * Update the auto model configuration (admin only).
  */
 export async function setAutoModelConfig(data: AutoModelConfigUpdate, adminId: string): Promise<void> {
+  assertModelProviderPairs(data);
+
   const update: Record<string, string | string[] | null> = { updatedBy: adminId };
 
   if (data.model) {
