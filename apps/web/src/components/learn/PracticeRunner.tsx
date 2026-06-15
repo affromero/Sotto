@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ScoreDial } from './ClassWidgets';
 import { WritingSection } from './WritingSection';
 import type { WritingPromptData } from './classTypes';
@@ -155,7 +157,12 @@ function McRunner({ start, onDone }: { start: Extract<PracticeStart, { status: '
                     {qi + 1} of {start.items.length}
                   </span>
                 </div>
-                <p className={styles.questionText}>{it.prompt}</p>
+                <p
+                  className={`${styles.questionText} ${guardStyles.guarded}`}
+                  {...learningTextGuardProps<HTMLParagraphElement>()}
+                >
+                  {it.prompt}
+                </p>
                 <div className={styles.options} role="group" aria-label={`Options for: ${it.prompt}`}>
                   {it.options.map((opt, idx) => {
                     const isSelected = selected === idx;
@@ -163,7 +170,8 @@ function McRunner({ start, onDone }: { start: Extract<PracticeStart, { status: '
                       <button
                         key={idx}
                         type="button"
-                        className={`${styles.option} ${isSelected ? styles.optionSelected : ''}`}
+                        className={`${styles.option} ${isSelected ? styles.optionSelected : ''} ${guardStyles.guarded}`}
+                        {...learningTextGuardProps<HTMLButtonElement>()}
                         onClick={() => setAnswers((prev) => ({ ...prev, [it.id]: idx }))}
                         aria-pressed={isSelected}
                         aria-label={`Option ${idx + 1}: ${opt}`}

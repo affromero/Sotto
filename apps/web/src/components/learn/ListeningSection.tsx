@@ -11,6 +11,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, MasteryMeter } from './ClassWidgets';
 import { fmtClock, type ClassQuestion, type ClassSectionEpisode } from './classTypes';
@@ -190,7 +192,12 @@ export function ListeningSection({
             const sel = picked[q.id];
             return (
               <div className={styles.lq} key={q.id}>
-                <div className={styles.lqQ}>{q.question}</div>
+                <div
+                  className={`${styles.lqQ} ${guardStyles.guarded}`}
+                  {...learningTextGuardProps<HTMLDivElement>()}
+                >
+                  {q.question}
+                </div>
                 <div
                   className={styles.lqOpts}
                   role="group"
@@ -215,7 +222,8 @@ export function ListeningSection({
                       <button
                         key={oi}
                         type="button"
-                        className={cls}
+                        className={`${cls} ${guardStyles.guarded}`}
+                        {...learningTextGuardProps<HTMLButtonElement>()}
                         disabled={sel !== undefined}
                         aria-pressed={sel === oi}
                         aria-label={`Option ${oi + 1}: ${opt}`}
