@@ -15,7 +15,6 @@ describe('open-source language-learning OSS surfaces', () => {
   const primarySurfaceFiles = [
     'src/components/layout/Sidebar.tsx',
     'src/components/layout/MobileNav.tsx',
-    'src/components/layout/TopBar.tsx',
     'src/components/layout/PublicNav.tsx',
     'src/components/layout/Footer.tsx',
     'src/components/landing/LandingHeader.tsx',

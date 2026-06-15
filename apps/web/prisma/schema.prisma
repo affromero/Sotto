@@ -42,6 +42,12 @@ model User {
   emailNotifications Boolean @default(true)
   pushNotifications  Boolean @default(true)
 
+  // Per-profile appearance — applied when this profile is active (re-themes on switch)
+  themeMode     String  @default("system") // system | light | dark
+  themePalette  String  @default("aula")   // aula | paper
+  themeAccent   String? // hex; null = brand default
+  reducedMotion Boolean @default(false)
+
   // Relations
   episodes            Episode[]
   discoveries         Discovery[]

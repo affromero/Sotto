@@ -1,0 +1,298 @@
+/* Header avatar + dropdown. Ported from SottoDesign3/sotto-avatar.jsx to app
+   tokens. The trigger sits inline in the header (not fixed); the menu anchors
+   to it. */
+
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  cursor: pointer;
+  background: color-mix(in oklab, var(--color-surface) 70%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  border-radius: 30px;
+  padding: 4px 7px 4px 12px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  font-family: var(--font-body);
+}
+
+.trigger:hover,
+.trigger.open {
+  border-color: var(--color-border-hover);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.who b {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.who span {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: none;
+}
+
+.avatar :global(img),
+.headAvatar :global(img),
+.face :global(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.chev {
+  color: var(--color-text-tertiary);
+  transition: transform 0.2s ease;
+}
+
+.open .chev {
+  transform: rotate(180deg);
+}
+
+/* Compact header on small screens: avatar + chevron only. */
+@media (max-width: 600px) {
+  .who {
+    display: none;
+  }
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 95;
+  width: 290px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-hover);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  animation: menuIn 0.18s ease both;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  overflow: hidden;
+  flex: none;
+}
+
+.headName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.headMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.ownerBadge {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  border: 1px solid color-mix(in oklab, var(--color-primary) 42%, transparent);
+  border-radius: 20px;
+  padding: 3px 8px;
+}
+
+.switch {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.switchLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  padding: 2px 4px 8px;
+}
+
+.faces {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.face {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.15s ease, transform 0.15s ease;
+}
+
+.face:hover {
+  transform: translateY(-2px);
+  outline-color: var(--color-primary);
+}
+
+.list {
+  padding: 7px;
+}
+
+.modeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 11px 9px;
+}
+
+.modeLabel {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.modeLabel svg {
+  color: var(--color-primary);
+}
+
+.modeSwitch {
+  width: 48px;
+  height: 27px;
+  border-radius: 20px;
+  border: 0;
+  cursor: pointer;
+  position: relative;
+  flex: none;
+  background: linear-gradient(90deg, #f0c24e, #e89b2e);
+  transition: background 0.3s ease;
+}
+
+.modeSwitchDark {
+  background: linear-gradient(90deg, #2a3050, #4453c0);
+}
+
+.modeSwitch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.28s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.modeSwitchDark i {
+  transform: translateX(21px);
+}
+
+.sep {
+  height: 1px;
+  background: var(--color-border);
+  margin: 6px 8px;
+}
+
+.item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  text-align: left;
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  border-radius: 7px;
+  padding: 10px 11px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  transition: background 0.15s ease;
+}
+
+.item:hover {
+  background: var(--color-surface-hover);
+}
+
+.item svg {
+  color: var(--color-text-tertiary);
+  flex: none;
+}
+
+.item:hover svg {
+  color: var(--color-primary);
+}
+
+.foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  display: flex;
+  justify-content: space-between;
+}

@@ -77,6 +77,7 @@ const mockUser = {
   name: 'Alice Johnson',
   email: 'alice@example.com',
   image: 'https://example.com/alice.jpg',
+  role: 'ADMIN',
   createdAt: new Date('2025-01-10T10:00:00Z'),
   preferredHostVoiceId: 'voice-host-1',
   preferredExpertVoiceId: 'voice-expert-1',
@@ -87,6 +88,7 @@ const mockUserMinimal = {
   name: 'Bob Smith',
   email: 'bob@example.com',
   image: null,
+  role: 'USER',
   createdAt: new Date('2025-01-15T10:00:00Z'),
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
@@ -122,6 +124,19 @@ describe('GET /api/v1/users/me', () => {
     expect(body.id).toBe('user-1');
     expect(body.name).toBe('Alice Johnson');
     expect(body.email).toBe('alice@example.com');
+    expect(body.role).toBe('ADMIN');
+  });
+
+  it('returns the real role for a non-owner learner profile', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
+    mockPrisma.user.findUnique.mockResolvedValue(mockUserMinimal);
+
+    const request = createGetRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.role).toBe('USER');
   });
 
   it('handles user with null optional fields', async () => {
@@ -310,6 +325,48 @@ describe('PATCH /api/v1/users/me', () => {
 
     expect(response.status).toBe(200);
     expect(body.preferredAiModel).toBeNull();
+  });
+
+  it('accepts per-profile appearance prefs and refreshes the theme cookie', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      themeMode: 'dark',
+      themePalette: 'aula',
+      themeAccent: null,
+      reducedMotion: true,
+    });
+
+    const request = createPatchRequest({ themeMode: 'dark', reducedMotion: true });
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie().some((c) => c.startsWith('sotto_theme='))).toBe(true);
+  });
+
+  it('rejects an invalid accent color', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await PATCH(createPatchRequest({ themeAccent: 'blue' }));
+    expect(response.status).toBe(400);
+  });
+
+  it('accepts a preset animal avatar path for image', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({ ...mockUser, image: '/avatars/jaguar.png' });
+
+    const response = await PATCH(createPatchRequest({ image: '/avatars/jaguar.png' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.image).toBe('/avatars/jaguar.png');
+  });
+
+  it('rejects an image that is neither a URL nor a preset avatar', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await PATCH(createPatchRequest({ image: 'not-an-image' }));
+    expect(response.status).toBe(400);
   });
 
 });
