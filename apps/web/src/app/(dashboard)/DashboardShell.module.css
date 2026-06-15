@@ -47,8 +47,11 @@
   color: var(--color-primary);
 }
 
-.bellWrapper {
+.headerRight {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 .content {
