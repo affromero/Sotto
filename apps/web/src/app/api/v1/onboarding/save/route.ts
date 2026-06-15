@@ -10,6 +10,58 @@ import { invalidateServerInfra } from '@/lib/server-config';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
+import {
+  getAutoModelConfig,
+  setAutoModelConfig,
+  type ModelConfig,
+} from '@/lib/auto-model-config';
+import { isValidAiProviderId, getProviderForModel } from '@/lib/providers/ai-registry';
+import { isValidProviderId, getProviderMeta } from '@/lib/providers/tts-registry';
+import { isValidSttProviderId, getSttProviderMeta } from '@/lib/providers/stt-registry';
+
+type PreferredInput = NonNullable<
+  ReturnType<typeof onboardingSaveSchema.parse>['preferred']
+>;
+
+/**
+ * Build the AutoModelConfig default-model update from the wizard's preferred
+ * selections, including ONLY registry-valid provider+model pairs. This excludes
+ * keyless/local AI (e.g. "local:qwen3") and any mismatched pair, so generation
+ * reads exactly what the learner chose and setAutoModelConfig never rejects it.
+ */
+function buildModelUpdate(preferred: PreferredInput): Partial<ModelConfig> {
+  const update: Partial<ModelConfig> = {};
+  const { aiProvider, aiModel, ttsProvider, ttsModel, sttProvider, sttModel } = preferred;
+
+  if (
+    aiProvider &&
+    aiModel &&
+    isValidAiProviderId(aiProvider) &&
+    getProviderForModel(aiModel) === aiProvider
+  ) {
+    update.aiProvider = aiProvider;
+    update.aiModel = aiModel;
+  }
+  if (
+    ttsProvider &&
+    ttsModel &&
+    isValidProviderId(ttsProvider) &&
+    getProviderMeta(ttsProvider).models.some((m) => m.id === ttsModel)
+  ) {
+    update.ttsProvider = ttsProvider;
+    update.ttsModel = ttsModel;
+  }
+  if (
+    sttProvider &&
+    sttModel &&
+    isValidSttProviderId(sttProvider) &&
+    getSttProviderMeta(sttProvider).models.some((m) => m.id === sttModel)
+  ) {
+    update.sttProvider = sttProvider;
+    update.sttModel = sttModel;
+  }
+  return update;
+}
 
 /**
  * POST /api/onboarding/save
@@ -95,6 +147,24 @@ export async function POST(request: NextRequest) {
     if (infra && isOwner) {
       await setSiteConfig(infra, userId);
       invalidateServerInfra();
+    }
+
+    // Owner: mirror the chosen provider+model into AutoModelConfig — the store the
+    // admin providers page edits and generation reads — so the wizard's model
+    // choice actually drives generation (and stays editable later in admin). Best
+    // effort: never fail onboarding over it (the keys/course are already saved).
+    if (isOwner && preferred) {
+      const modelUpdate = buildModelUpdate(preferred);
+      if (Object.keys(modelUpdate).length > 0) {
+        try {
+          await getAutoModelConfig(); // ensure the singleton exists with full seeds first
+          await setAutoModelConfig({ model: modelUpdate }, userId);
+        } catch (error) {
+          logger.warn('Could not persist wizard model selection to AutoModelConfig', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
     }
 
     await prisma.user.update({

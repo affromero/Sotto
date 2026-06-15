@@ -8,6 +8,8 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_LOCAL_STT_BASE_URL,
   DEFAULT_LOCAL_TTS_BASE_URL,
+  aiModelProviderId,
+  sttModelProviderId,
   resolveAi,
   resolveLiveTranslateKey,
   resolveTts,
@@ -26,6 +28,17 @@ describe('resolveAi', () => {
     const r = resolveAi('codex', 'key', 'sk-xxx', '');
     expect(r.keyPost).toEqual({ endpoint: 'ai-keys', provider: 'openai', apiKey: 'sk-xxx' });
     expect(r.preferredAiProvider).toBe('openai');
+  });
+
+  it('carries the picked model as a bare preferredAiModel for the key method', () => {
+    const r = resolveAi('claude', 'key', 'sk-ant-xxx', 'claude-sonnet-4-6');
+    expect(r.preferredAiModel).toBe('claude-sonnet-4-6');
+    // No "local:" prefix on the key path (that prefix is only for url/local).
+    expect(r.preferredAiModel).not.toContain('local:');
+  });
+
+  it('leaves preferredAiModel null on the key method when no model is picked', () => {
+    expect(resolveAi('codex', 'key', 'sk-xxx', '').preferredAiModel).toBeNull();
   });
 
   it('maps google + key to a BYOK google key (unlocks live translation)', () => {
@@ -113,6 +126,15 @@ describe('resolveTts', () => {
     expect(r.keyPost).toBeNull();
     expect(r.preferredTtsProvider).toBe('cartesia');
   });
+
+  it('carries the picked TTS model', () => {
+    const r = resolveTts('cartesia', 'sk_car_x', '', 'sonic-3.5');
+    expect(r.preferredTtsModel).toBe('sonic-3.5');
+  });
+
+  it('leaves preferredTtsModel null for keyless local providers', () => {
+    expect(resolveTts('kokoro', '', '').preferredTtsModel).toBeNull();
+  });
 });
 
 describe('resolveStt', () => {
@@ -156,5 +178,33 @@ describe('resolveStt', () => {
       provider: 'openai',
       apiKey: 'sk-k',
     });
+  });
+
+  it('carries the picked STT model and the resolved provider', () => {
+    const r = resolveStt('assembly', 'aai_key', '', 'universal-3-pro');
+    expect(r.preferredSttProvider).toBe('assemblyai');
+    expect(r.preferredSttModel).toBe('universal-3-pro');
+  });
+
+  it('leaves preferredSttModel null for the keyless local STT server', () => {
+    const r = resolveStt('whisper', '', '');
+    expect(r.preferredSttProvider).toBe('local');
+    expect(r.preferredSttModel).toBeNull();
+  });
+});
+
+describe('model provider id helpers', () => {
+  it('maps wizard AI ids to their registry provider for the key method', () => {
+    expect(aiModelProviderId('claude')).toBe('anthropic');
+    expect(aiModelProviderId('codex')).toBe('openai');
+    expect(aiModelProviderId('local')).toBeNull();
+    expect(aiModelProviderId('custom')).toBeNull();
+  });
+
+  it('maps wizard STT ids to their registry provider', () => {
+    expect(sttModelProviderId('whisper')).toBe('local');
+    expect(sttModelProviderId('assembly')).toBe('assemblyai');
+    expect(sttModelProviderId('deepgram')).toBe('deepgram');
+    expect(sttModelProviderId('elevenlabs')).toBe('elevenlabs');
   });
 });

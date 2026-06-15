@@ -14,6 +14,11 @@ vi.mock('@/lib/byok', () => ({
   getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
 }));
 
+const mockGetAutoModelConfig = vi.fn();
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {},
 }));
@@ -402,6 +407,12 @@ describe('resolveSttProvider', () => {
     vi.unstubAllEnvs();
     mockGetAiKey.mockReset();
     mockGetByokKey.mockReset();
+    // Default configured STT = openai/whisper-1, matching the seed default so the
+    // existing assertions (provider 'openai' → 'whisper-1') stay valid. Provider
+    // mismatches fall back to the requested provider's registry default.
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: { sttProvider: 'openai', sttModel: 'whisper-1' },
+    });
   });
 
   afterEach(() => {
@@ -455,6 +466,35 @@ describe('resolveSttProvider', () => {
     });
 
     expect(result.model).toBe('gpt-4o-transcribe');
+  });
+
+  it('uses the owner-configured model when no model is requested and the provider matches', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-key', provider: 'openai' });
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: { sttProvider: 'openai', sttModel: 'gpt-4o-transcribe' },
+    });
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'openai',
+    });
+
+    expect(result.model).toBe('gpt-4o-transcribe');
+  });
+
+  it('falls back to the provider default when the configured STT provider differs', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'dg-key', provider: 'deepgram' });
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: { sttProvider: 'openai', sttModel: 'gpt-4o-transcribe' },
+    });
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'deepgram',
+    });
+
+    // deepgram's registry default, NOT the configured openai model.
+    expect(result.model).toBe('nova-3');
   });
 
   it('rejects missing provider instead of resolving from DB config', async () => {

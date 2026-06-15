@@ -20,6 +20,7 @@ import {
   resolveLiveTranslateKey,
   resolveTts,
   resolveStt,
+  sttModelProviderId,
   type KeyPost,
 } from '../providerMap';
 import { Glyph } from '../Glyph';
@@ -127,8 +128,18 @@ export function StepReady({
     // Translate the wizard's selections to real backend providers + infra.
     const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
     const liveTranslateKey = resolveLiveTranslateKey(agent.liveTranslationKey ?? '');
-    const tts = resolveTts(voice.tts, voice.keys[voice.tts] ?? '', voice.baseUrls[voice.tts] ?? '');
-    const stt = resolveStt(voice.stt, voice.keys[voice.stt] ?? '', voice.baseUrls[voice.stt] ?? '');
+    const tts = resolveTts(
+      voice.tts,
+      voice.keys[voice.tts] ?? '',
+      voice.baseUrls[voice.tts] ?? '',
+      voice.ttsModel[voice.tts] ?? ''
+    );
+    const stt = resolveStt(
+      voice.stt,
+      voice.keys[voice.stt] ?? '',
+      voice.baseUrls[voice.stt] ?? '',
+      voice.sttModel[sttModelProviderId(voice.stt)] ?? ''
+    );
 
     // BYOK keys → the validated settings routes. Surface failures (don't swallow)
     // but don't block onboarding — keys are editable later in Settings.
@@ -165,6 +176,9 @@ export function StepReady({
             ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),
             ...(ai.preferredAiModel && { aiModel: ai.preferredAiModel }),
             ...(tts.preferredTtsProvider && { ttsProvider: tts.preferredTtsProvider }),
+            ...(tts.preferredTtsModel && { ttsModel: tts.preferredTtsModel }),
+            ...(stt.preferredSttProvider && { sttProvider: stt.preferredSttProvider }),
+            ...(stt.preferredSttModel && { sttModel: stt.preferredSttModel }),
           },
           ...(infra && Object.keys(infra).length > 0 && { infra }),
         }),

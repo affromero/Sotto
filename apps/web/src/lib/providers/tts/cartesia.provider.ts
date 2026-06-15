@@ -1,5 +1,5 @@
 /**
- * Cartesia TTS provider — premium voice generation via Sonic 3.
+ * Cartesia TTS provider — premium voice generation via Sonic 3.5 (default).
  *
  * Expression support:
  *   - generation_config.emotion: 60 emotion values (excited, calm, sarcastic, etc.)
@@ -9,7 +9,8 @@
  *   - Emotion is guidance, not strict — works best when text aligns with emotion
  *
  * API docs: https://docs.cartesia.ai/api-reference/tts/bytes
- * @tts-research-date 2026-02-27 — Sonic 3 generation_config, SSML tags, [laughter]
+ * @tts-research-date 2026-06-15 — Sonic 3.5 is a drop-in model_id on /tts/bytes (42 langs);
+ *   the Cartesia-Version header is the API-contract version (model-agnostic), unchanged.
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
@@ -33,7 +34,7 @@ export class CartesiaProvider implements TtsProvider {
     const key = apiKey || process.env.CARTESIA_API_KEY;
     if (!key) throw new Error('Cartesia requires an API key (BYOK or CARTESIA_API_KEY env var)');
     this.apiKey = key;
-    this.model = model ?? 'sonic-3';
+    this.model = model ?? 'sonic-3.5';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
