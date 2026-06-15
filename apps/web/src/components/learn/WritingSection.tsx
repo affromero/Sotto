@@ -18,6 +18,8 @@
  */
 
 import { useId, useState } from 'react';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, ScoreDial } from './ClassWidgets';
 import type { WritingCorrection, WritingPromptData, WritingResponse } from './classTypes';
@@ -183,8 +185,20 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
     <article className={styles.card} aria-label={`Writing prompt ${index + 1} of ${total}`}>
       <div className={styles.writePrompt}>
         <div className={styles.writeFrom}>Prompt {index + 1}</div>
-        <div className={styles.writeBubble}>{prompt.task}</div>
-        {prompt.guidance && <div className={styles.writeTask}>{prompt.guidance}</div>}
+        <div
+          className={`${styles.writeBubble} ${guardStyles.guarded}`}
+          {...learningTextGuardProps<HTMLDivElement>()}
+        >
+          {prompt.task}
+        </div>
+        {prompt.guidance && (
+          <div
+            className={`${styles.writeTask} ${guardStyles.guarded}`}
+            {...learningTextGuardProps<HTMLDivElement>()}
+          >
+            {prompt.guidance}
+          </div>
+        )}
       </div>
 
       {showEditor ? (

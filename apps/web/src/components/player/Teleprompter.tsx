@@ -8,6 +8,8 @@ import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/
 import { findActiveIndex, findActiveWordIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import type { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 import type { VocabularyEntryData } from '@/types/vocabulary';
@@ -100,7 +102,10 @@ function SegmentBlock({
       <span className={styles.speaker} data-speaker-index={idx}>
         {segment.speaker}
       </span>
-      <p className={styles.text}>
+      <p
+        className={`${styles.text} ${guardStyles.guarded}`}
+        {...learningTextGuardProps<HTMLParagraphElement>()}
+      >
         {content}
       </p>
     </div>

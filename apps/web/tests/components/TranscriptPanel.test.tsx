@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, createEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { SegmentData } from '@/types/episode';
@@ -64,6 +64,17 @@ describe('TranscriptPanel', () => {
       screen.getByText('Thank you for having me. Let me explain quantum entanglement.')
     ).toBeInTheDocument();
     expect(screen.getByText('That sounds fascinating. Can you elaborate?')).toBeInTheDocument();
+  });
+
+  it('prevents clipboard copy from rendered transcript text', () => {
+    render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
+    const text = screen.getByText('Welcome to the episode about quantum physics.');
+    const guarded = text.closest('[data-learning-text-guard="true"]');
+    expect(guarded).toBeInTheDocument();
+
+    const event = createEvent.copy(guarded!);
+    fireEvent(guarded!, event);
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('renders speaker labels matching segment data', () => {

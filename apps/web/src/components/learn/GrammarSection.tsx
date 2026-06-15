@@ -10,6 +10,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import type { ReferenceData } from '@/types/reference';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, DotRail, MasteryMeter, type DotState } from './ClassWidgets';
@@ -121,11 +123,21 @@ export function GrammarSection({
         {!done && cur ? (
           <div className={styles.drillCard} key={cur.id}>
             {cur.passageText ? (
-              <blockquote className={styles.passage}>
+              <blockquote
+                className={`${styles.passage} ${guardStyles.guarded}`}
+                {...learningTextGuardProps<HTMLQuoteElement>()}
+              >
                 {parseTextWithCitations(cur.passageText, references)}
               </blockquote>
             ) : (
-              cur.passageRef && <blockquote className={styles.passage}>{cur.passageRef}</blockquote>
+              cur.passageRef && (
+                <blockquote
+                  className={`${styles.passage} ${guardStyles.guarded}`}
+                  {...learningTextGuardProps<HTMLQuoteElement>()}
+                >
+                  {cur.passageRef}
+                </blockquote>
+              )
             )}
 
             <div className={styles.drillMeta}>
@@ -135,7 +147,12 @@ export function GrammarSection({
               </span>
             </div>
 
-            <p className={styles.drillPrompt}>{cur.question}</p>
+            <p
+              className={`${styles.drillPrompt} ${guardStyles.guarded}`}
+              {...learningTextGuardProps<HTMLParagraphElement>()}
+            >
+              {cur.question}
+            </p>
 
             <div
               className={styles.optRow}
@@ -153,7 +170,8 @@ export function GrammarSection({
                   <button
                     key={idx}
                     type="button"
-                    className={optClass}
+                    className={`${optClass} ${guardStyles.guarded}`}
+                    {...learningTextGuardProps<HTMLButtonElement>()}
                     disabled={curPicked !== undefined}
                     aria-pressed={curPicked === idx}
                     aria-label={`Option ${idx + 1}: ${opt}`}

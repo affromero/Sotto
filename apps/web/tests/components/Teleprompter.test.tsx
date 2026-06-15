@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, createEvent } from '@testing-library/react';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import type { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
@@ -83,6 +83,23 @@ describe('Teleprompter', () => {
     expect(screen.getByText('Welcome to the show!')).toBeInTheDocument();
     expect(screen.getByText(/Thanks for having me/)).toBeInTheDocument();
     expect(screen.getByText('That is fascinating!')).toBeInTheDocument();
+  });
+
+  it('prevents clipboard copy from rendered teleprompter text', () => {
+    render(
+      <Teleprompter
+        segments={mockSegments}
+        references={[]}
+        currentTime={0}
+      />
+    );
+    const text = screen.getByText('Welcome to the show!');
+    const guarded = text.closest('[data-learning-text-guard="true"]');
+    expect(guarded).toBeInTheDocument();
+
+    const event = createEvent.copy(guarded!);
+    fireEvent(guarded!, event);
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('handles first segment (no previous)', () => {

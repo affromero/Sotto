@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ExamDisclaimer } from './ExamDisclaimer';
 import { CefrDisclaimer } from './CefrDisclaimer';
 import styles from './ExamRunner.module.css';
@@ -199,9 +201,21 @@ export function ExamRunner({ exam: initialExam }: Props) {
               <ol className={styles.questions}>
                 {section.questions.map((q) => (
                   <li key={q.id} className={styles.question}>
-                    {q.passageText && <p className={styles.passage}>{q.passageText}</p>}
+                    {q.passageText && (
+                      <p
+                        className={`${styles.passage} ${guardStyles.guarded}`}
+                        {...learningTextGuardProps<HTMLParagraphElement>()}
+                      >
+                        {q.passageText}
+                      </p>
+                    )}
                     <fieldset className={styles.field}>
-                      <legend className={styles.prompt}>{q.question}</legend>
+                      <legend
+                        className={`${styles.prompt} ${guardStyles.guarded}`}
+                        {...learningTextGuardProps<HTMLLegendElement>()}
+                      >
+                        {q.question}
+                      </legend>
                       {q.options.map((opt, i) => {
                         const chosen = answers[q.id] === i;
                         const isCorrect = scored && q.correctIndex === i;
@@ -209,9 +223,10 @@ export function ExamRunner({ exam: initialExam }: Props) {
                         return (
                           <label
                             key={i}
-                            className={`${styles.option} ${isCorrect ? styles.optionCorrect : ''} ${
+                            className={`${styles.option} ${guardStyles.guarded} ${isCorrect ? styles.optionCorrect : ''} ${
                               isWrongChoice ? styles.optionWrong : ''
                             }`}
+                            {...learningTextGuardProps<HTMLLabelElement>()}
                           >
                             <input
                               type="radio"
@@ -298,8 +313,20 @@ function ExamWritingPrompt({ examId, prompt, disabled }: { examId: string; promp
 
   return (
     <div className={styles.writingPrompt}>
-      <p className={styles.writingTask}>{prompt.task}</p>
-      {prompt.guidance && <p className={styles.writingGuidance}>{prompt.guidance}</p>}
+      <p
+        className={`${styles.writingTask} ${guardStyles.guarded}`}
+        {...learningTextGuardProps<HTMLParagraphElement>()}
+      >
+        {prompt.task}
+      </p>
+      {prompt.guidance && (
+        <p
+          className={`${styles.writingGuidance} ${guardStyles.guarded}`}
+          {...learningTextGuardProps<HTMLParagraphElement>()}
+        >
+          {prompt.guidance}
+        </p>
+      )}
       <textarea
         className={styles.writingInput}
         value={text}

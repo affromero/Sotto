@@ -1,0 +1,13 @@
+.guarded {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.guarded :global(input),
+.guarded :global(textarea),
+.guarded :global([contenteditable='true']) {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
