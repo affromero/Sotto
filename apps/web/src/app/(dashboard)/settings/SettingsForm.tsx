@@ -13,6 +13,7 @@ import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { AppearanceControls } from '@/components/settings/AppearanceControls';
+import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
 
@@ -250,6 +251,28 @@ export function SettingsForm({
     }
   };
 
+  const chooseAnimal = async (slug: string) => {
+    setUploading(true);
+    try {
+      const response = await fetch('/api/v1/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: `/avatars/${slug}.png` }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAvatarUrl(data.image);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || 'Failed to set avatar');
+      }
+    } catch {
+      alert('Failed to set avatar');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const initials = (name || email || 'U').charAt(0).toUpperCase();
 
   return (
@@ -310,6 +333,28 @@ export function SettingsForm({
                 {uploading ? 'Uploading...' : 'Change Avatar'}
               </button>
             </div>
+          </div>
+
+          <div className={styles.animalPicker} role="radiogroup" aria-label="Choose a preset avatar">
+            {ANIMAL_AVATARS.map((a) => {
+              const src = `/avatars/${a.slug}.png`;
+              const selected = avatarUrl === src;
+              return (
+                <button
+                  key={a.slug}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={a.name}
+                  title={a.name}
+                  className={`${styles.animalTile} ${selected ? styles.animalTileSelected : ''}`}
+                  onClick={() => chooseAnimal(a.slug)}
+                  disabled={uploading}
+                >
+                  <Image src={src} alt="" width={48} height={48} />
+                </button>
+              );
+            })}
           </div>
 
           <Input
