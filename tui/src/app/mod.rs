@@ -6,6 +6,7 @@ mod overlay;
 mod state;
 mod ui;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::Result;
@@ -44,6 +45,10 @@ use state::{
 /// `action_tx`, so the render loop never blocks on the network.
 pub(crate) struct App {
     config: Config,
+    /// Where `config` is persisted. `Some(path)` in production (the real
+    /// platform config file); `None` in tests so saving is a no-op and the
+    /// suite never clobbers the developer's real `~/.config` config.
+    config_path: Option<PathBuf>,
     client: Arc<dyn Api>,
     /// Builds an [`Api`] client for a given profile. Production uses a real
     /// [`SottoClient`]; tests inject a stub. Stored so the account switcher can
@@ -96,20 +101,36 @@ impl App {
         Self::with_factory(config, factory)
     }
 
-    /// Build an app around a [`ClientFactory`]. Production passes the real
-    /// client builder; tests pass a stub factory so dispatch and reducers run
-    /// with zero network. The initial client is built for the active profile.
+    /// Build an app around a [`ClientFactory`], persisting to the real platform
+    /// config path. Used by [`App::new`]; tests use [`App::with_factory_at`].
     fn with_factory(config: Config, client_factory: ClientFactory) -> Result<Self> {
+        Self::with_factory_at(config, client_factory, Some(crate::config::config_path()?))
+    }
+
+    /// Build an app around a [`ClientFactory`] that persists `config` to
+    /// `config_path` (`None` = do not persist). Tests inject a stub factory and
+    /// `None`/a temp path so dispatch and reducers run with zero network and the
+    /// suite never writes the developer's real config file.
+    fn with_factory_at(
+        config: Config,
+        client_factory: ClientFactory,
+        config_path: Option<PathBuf>,
+    ) -> Result<Self> {
         // Build the initial client for the active profile (or an empty stand-in
         // profile when there is none, so the app can still render the switcher).
         let profile = config.active_profile().cloned().unwrap_or_default();
         let client = client_factory(&profile)?;
-        Ok(Self::assemble(config, client_factory, client))
+        Ok(Self::assemble(config, config_path, client_factory, client))
     }
 
     /// Assemble the App from its already-built pieces. Shared by the factory
     /// path and the test stub-injection path.
-    fn assemble(config: Config, client_factory: ClientFactory, client: Arc<dyn Api>) -> Self {
+    fn assemble(
+        config: Config,
+        config_path: Option<PathBuf>,
+        client_factory: ClientFactory,
+        client: Arc<dyn Api>,
+    ) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let server = config
             .active_profile()
@@ -123,6 +144,7 @@ impl App {
         let theme = Theme::from_choice(&config.theme);
         Self {
             config,
+            config_path,
             client,
             client_factory,
             view: View::Loading,
@@ -728,11 +750,20 @@ impl App {
         }
     }
 
+    /// Persist `config` to its configured path. A no-op when `config_path` is
+    /// `None` (tests), so the suite never writes the developer's real config.
+    fn persist_config(&self) -> Result<()> {
+        match &self.config_path {
+            Some(path) => self.config.save_to(path),
+            None => Ok(()),
+        }
+    }
+
     /// Write the active theme into `config` and persist it. A save failure is
     /// surfaced in the status bar rather than crashing the UI loop.
     fn persist_theme(&mut self) {
         self.config.theme = self.theme.to_choice();
-        if let Err(e) = self.config.save() {
+        if let Err(e) = self.persist_config() {
             self.status_bar
                 .set_error(format!("could not save theme: {e}"));
         }
@@ -810,7 +841,7 @@ impl App {
         self.status_bar.set_session(profile.server_url, user);
         // `set_active` cannot fail here: `name` came from `profile_names()`.
         let _ = self.config.set_active(&name);
-        if let Err(e) = self.config.save() {
+        if let Err(e) = self.persist_config() {
             self.status_bar.set_error(format!("could not save: {e}"));
         }
         // Reload courses against the NEW client (bumps gen, sets Loading).
@@ -2017,7 +2048,29 @@ mod tests {
     /// network is possible: the only [`Api`] impl is the stub.
     fn test_app() -> App {
         let (factory, _) = recording_factory();
-        App::with_factory(stub_config(), factory).expect("stub app builds")
+        // `None` config path: tests must never persist to the real config file.
+        App::with_factory_at(stub_config(), factory, None).expect("stub app builds")
+    }
+
+    #[test]
+    fn config_persists_to_the_injected_path_only() {
+        // Regression: the App must write to its injected config_path, never the
+        // real platform path, or running `cargo test` clobbers the developer's
+        // own ~/.config/sotto/config.toml.
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("config.toml");
+        let (factory, _) = recording_factory();
+        let mut app =
+            App::with_factory_at(stub_config(), factory, Some(path.clone())).expect("app builds");
+
+        assert!(!path.exists(), "nothing is written before a save");
+        app.persist_theme();
+        assert!(path.exists(), "persist_theme writes to the injected path");
+
+        // A None-path app persists nowhere and must not panic.
+        let (factory2, _) = recording_factory();
+        let mut noop = App::with_factory_at(stub_config(), factory2, None).expect("app builds");
+        noop.persist_theme();
     }
 
     fn course(id: &str) -> Course {
@@ -3935,7 +3988,7 @@ mod tests {
         );
         config.active = "home".into();
         let (factory, built) = recording_factory();
-        let app = App::with_factory(config, factory).expect("two-profile app builds");
+        let app = App::with_factory_at(config, factory, None).expect("two-profile app builds");
         (app, built)
     }
 
@@ -4053,7 +4106,7 @@ mod tests {
                 Ok(Arc::new(StubApi) as Arc<dyn Api>)
             }
         });
-        let app = App::with_factory(config, factory).expect("home profile builds");
+        let app = App::with_factory_at(config, factory, None).expect("home profile builds");
         (app, built)
     }
 
