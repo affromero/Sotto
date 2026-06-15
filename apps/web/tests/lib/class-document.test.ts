@@ -16,15 +16,24 @@ const INPUT: BuildClassDocumentInput = {
       id: 'sec-grammar',
       skill: 'GRAMMAR',
       questions: [
-        { id: 'q1', order: 1, question: 'Wie ___ du?', options: ['heißt', 'heißen', 'heiße', 'heißis'], passageRef: null, correctIndex: 0, explanation: 'du -> heißt' },
+        { id: 'q1', order: 1, question: 'Wie ___ du?', options: ['heißt', 'heißen', 'heiße', 'heißis'], passageRef: null, passageText: null, correctIndex: 0, explanation: 'du -> heißt' },
       ],
       prompts: [],
+      writingPrompts: [],
     },
     {
       id: 'sec-speaking',
       skill: 'SPEAKING',
       questions: [],
       prompts: [{ id: 'p1', order: 1, targetPhrase: 'Guten Tag', translation: 'Good day', ipa: 'ˈɡuːtn̩ taːk' }],
+      writingPrompts: [],
+    },
+    {
+      id: 'sec-writing',
+      skill: 'WRITING',
+      questions: [],
+      prompts: [],
+      writingPrompts: [{ id: 'w1', order: 1, task: 'Write a short greeting.', guidance: 'Use two complete sentences.' }],
     },
   ],
 };
@@ -38,6 +47,7 @@ describe('buildClassDocument', () => {
     expect(q).not.toHaveProperty('correctIndex');
     expect(q).not.toHaveProperty('explanation');
     expect(q.options).toHaveLength(4);
+    expect(q.passageText).toBeNull();
   });
 
   it('keeps correctIndex/explanation in the answer-key variant', async () => {
@@ -49,13 +59,18 @@ describe('buildClassDocument', () => {
     expect(q.explanation).toBe('du -> heißt');
   });
 
-  it('builds a deep link + QR for app-linked skills (speaking/listening)', async () => {
+  it('builds a deep link + QR for app-linked skills (listening/speaking/writing)', async () => {
     const doc = await buildClassDocument(INPUT, { isAnswerKey: false, appBaseUrl: 'https://app' });
 
     const speaking = doc.sections.find((s) => s.skill === 'SPEAKING')!;
-    expect(speaking.appLink).toBe('https://app/classes/class-1?section=sec-speaking');
-    expect(speaking.qrDataUrl).toContain('QR(https://app/classes/class-1?section=sec-speaking)');
+    expect(speaking.appLink).toBe('https://app/learn/class/class-1?section=sec-speaking');
+    expect(speaking.qrDataUrl).toContain('QR(https://app/learn/class/class-1?section=sec-speaking)');
     expect(speaking.prompts[0].targetPhrase).toBe('Guten Tag');
+
+    const writing = doc.sections.find((s) => s.skill === 'WRITING')!;
+    expect(writing.appLink).toBe('https://app/learn/class/class-1?section=sec-writing');
+    expect(writing.qrDataUrl).toContain('QR(https://app/learn/class/class-1?section=sec-writing)');
+    expect(writing.writingPrompts[0].task).toBe('Write a short greeting.');
   });
 
   it('does not build a QR for non-app skills (grammar)', async () => {
@@ -80,5 +95,6 @@ describe('buildClassDocument', () => {
     expect(doc.targetLang).toBe('de');
     expect(doc.sections.find((s) => s.skill === 'GRAMMAR')!.title).toBe('Grammar');
     expect(doc.sections.find((s) => s.skill === 'SPEAKING')!.title).toBe('Speaking');
+    expect(doc.sections.find((s) => s.skill === 'WRITING')!.title).toBe('Writing');
   });
 });

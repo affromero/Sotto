@@ -22,6 +22,7 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
         include: {
           questions: { orderBy: { order: 'asc' } },
           prompts: { orderBy: { order: 'asc' } },
+          writingPrompts: { orderBy: { order: 'asc' } },
         },
       },
     },
@@ -51,6 +52,7 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
         question: q.question,
         options: q.options,
         passageRef: q.passageRef,
+        passageText: q.passageText,
         correctIndex: q.correctIndex,
         explanation: q.explanation ?? '',
       })),
@@ -60,6 +62,12 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
         targetPhrase: p.targetPhrase,
         translation: p.translation,
         ipa: p.ipa,
+      })),
+      writingPrompts: s.writingPrompts.map((p) => ({
+        id: p.id,
+        order: p.order,
+        task: p.task,
+        guidance: p.guidance,
       })),
     })),
   };

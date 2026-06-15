@@ -16,14 +16,14 @@ interface WorksheetPageProps {
 export async function generateMetadata({ params }: WorksheetPageProps) {
   const { classId } = await params;
   const session = await auth();
-  if (!session?.user?.id) return { title: 'Worksheet' };
+  if (!session?.user?.id) return { title: 'iPad Workbook' };
 
   const cls = await prisma.courseClass.findFirst({
     where: { id: classId, course: { userId: session.user.id } },
     select: { lesson: { select: { title: true } } },
   });
 
-  return { title: cls ? `${cls.lesson.title} — Worksheet` : 'Worksheet' };
+  return { title: cls ? `${cls.lesson.title} — iPad Workbook` : 'iPad Workbook' };
 }
 
 // Letter labels for MC options
@@ -49,10 +49,13 @@ function QuestionBlock({ question, index }: {
 }) {
   return (
     <li className={styles.questionItem} aria-label={`Question ${index + 1}`}>
-      {question.passageRef && (
-        <blockquote className={styles.passageRef}>
-          {question.passageRef}
+      {question.passageText ? (
+        <blockquote className={styles.passageBlock}>
+          {question.passageRef && <cite className={styles.passageLabel}>{question.passageRef}</cite>}
+          <span>{question.passageText}</span>
         </blockquote>
+      ) : question.passageRef && (
+        <p className={styles.passageRef}>{question.passageRef}</p>
       )}
       <p className={styles.questionText}>
         <span className={styles.questionNumber} aria-hidden="true">{index + 1}.</span>
@@ -73,6 +76,11 @@ function QuestionBlock({ question, index }: {
           ))}
         </ol>
       )}
+      <div className={styles.pencilLines} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
     </li>
   );
 }
@@ -90,6 +98,30 @@ function PromptBlock({ prompt, index }: {
           <p className={styles.ipa} aria-label="Pronunciation">{prompt.ipa}</p>
         )}
         <p className={styles.translation}>{prompt.translation}</p>
+        <div className={styles.pencilLinesCompact} aria-hidden="true">
+          <span />
+          <span />
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function WritingPromptBlock({ prompt, index }: {
+  prompt: ClassDocumentSection['writingPrompts'][number];
+  index: number;
+}) {
+  return (
+    <li className={styles.writingItem} aria-label={`Writing prompt ${index + 1}`}>
+      <p className={styles.writingTask}>
+        <span className={styles.questionNumber} aria-hidden="true">{index + 1}.</span>
+        {prompt.task}
+      </p>
+      {prompt.guidance && <p className={styles.writingGuidance}>{prompt.guidance}</p>}
+      <div className={styles.writingLines} aria-hidden="true">
+        {Array.from({ length: 10 }).map((_, lineIndex) => (
+          <span key={lineIndex} />
+        ))}
       </div>
     </li>
   );
@@ -115,7 +147,7 @@ function SectionBlock({ section }: { section: ClassDocumentSection }) {
               width={80}
               height={80}
             />
-            <p className={styles.qrCaption}>Scan to open</p>
+            <p className={styles.qrCaption}>Open web class</p>
           </div>
         )}
       </header>
@@ -139,6 +171,14 @@ function SectionBlock({ section }: { section: ClassDocumentSection }) {
           ))}
         </ol>
       )}
+
+      {section.writingPrompts.length > 0 && (
+        <ol className={styles.writingList} aria-label={`${section.title} writing prompts`}>
+          {section.writingPrompts.map((p, i) => (
+            <WritingPromptBlock key={p.id} prompt={p} index={i} />
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
@@ -157,6 +197,7 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
         include: {
           questions: { orderBy: { order: 'asc' } },
           prompts: { orderBy: { order: 'asc' } },
+          writingPrompts: { orderBy: { order: 'asc' } },
         },
       },
     },
@@ -182,6 +223,7 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
         question: q.question,
         options: q.options,
         passageRef: q.passageRef,
+        passageText: q.passageText,
         correctIndex: q.correctIndex,
         explanation: q.explanation,
       })),
@@ -191,6 +233,12 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
         targetPhrase: p.targetPhrase,
         translation: p.translation,
         ipa: p.ipa,
+      })),
+      writingPrompts: s.writingPrompts.map((p) => ({
+        id: p.id,
+        order: p.order,
+        task: p.task,
+        guidance: p.guidance,
       })),
     })),
   };
@@ -203,7 +251,7 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
   return (
     <div className={styles.root}>
       {/* Screen-only toolbar */}
-      <div className={styles.toolbar} aria-label="Worksheet controls">
+      <div className={styles.toolbar} aria-label="Workbook controls">
         <nav className={styles.breadcrumb} aria-label="Breadcrumb">
           <a href="/learn" className={styles.breadcrumbLink}>Learn</a>
           <span aria-hidden="true" className={styles.breadcrumbSep}>/</span>
@@ -212,8 +260,8 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
         <PrintButton />
       </div>
 
-      {/* Printable worksheet */}
-      <main className={styles.worksheet} aria-label="Worksheet">
+      {/* Printable iPad workbook */}
+      <main className={styles.worksheet} aria-label="iPad workbook">
         <header className={styles.worksheetHeader}>
           <div className={styles.worksheetBrand}>
             <Image
@@ -227,6 +275,7 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
           </div>
 
           <div className={styles.worksheetMeta}>
+            <p className={styles.workbookKicker}>iPad workbook</p>
             <h1 className={styles.worksheetTitle}>{doc.title}</h1>
             <div className={styles.worksheetDetails}>
               <span className={styles.worksheetLevel}>{doc.level}</span>
@@ -256,7 +305,7 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
 
         <footer className={styles.worksheetFooter}>
           <p className={styles.footerText}>
-            Printed from Sotto — open-source language learning.
+            Pencil-first workbook. Use the web class for audio, recording, and grading.
           </p>
         </footer>
       </main>

@@ -37,6 +37,7 @@ type View = 'loading' | 'error' | 'hub' | 'hour' | 'submitting' | 'summary';
 
 interface ClassShellProps {
   classId: string;
+  initialSectionId?: string;
 }
 
 /** Order the sections so the hour runs grammar → reading → listening → speaking → writing. */
@@ -54,7 +55,7 @@ function orderSections(sections: ClassSection[]): ClassSection[] {
   );
 }
 
-export function ClassShell({ classId }: ClassShellProps) {
+export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   const [view, setView] = useState<View>('loading');
   const [cls, setCls] = useState<ClassData | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -100,9 +101,9 @@ export function ClassShell({ classId }: ClassShellProps) {
       }
       const data = (await res.json()) as ClassData;
       setCls(data);
+      const ordered = orderSections(data.sections);
 
       if (data.submitted && data.submission) {
-        const ordered = orderSections(data.sections);
         setResult({
           passed: data.submission.passed,
           overallScore: data.submission.overallScore,
@@ -117,13 +118,22 @@ export function ClassShell({ classId }: ClassShellProps) {
         });
         setView('summary');
       } else {
+        if (initialSectionId) {
+          const initialIndex = ordered.findIndex((s) => s.id === initialSectionId);
+          if (initialIndex >= 0) {
+            setSegIdx(initialIndex);
+            setCurScore(0);
+            setView('hour');
+            return;
+          }
+        }
         setView('hub');
       }
     } catch {
       setErrorMessage('Network error. Please refresh.');
       setView('error');
     }
-  }, [classId]);
+  }, [classId, initialSectionId]);
 
   useEffect(() => {
     void (async () => {
@@ -268,6 +278,7 @@ export function ClassShell({ classId }: ClassShellProps) {
     stage = (
       <>
         <ClassHub
+          classId={classId}
           lesson={cls.lesson}
           order={cls.order}
           sections={sections}

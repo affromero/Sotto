@@ -1,7 +1,7 @@
-// Builds the ClassDocument render contract from a loaded class. Both the web
-// worksheet page and the iPad ClassWorksheet render this single shape. The
-// learner variant strips answer-key fields (correctIndex/explanation); the
-// answer-key variant keeps them so a teacher/self-hoster can print a key.
+// Builds the ClassDocument render contract from a loaded class. The web
+// worksheet page and PDF worker render this single shape. The learner variant
+// strips answer-key fields (correctIndex/explanation); the answer-key variant
+// keeps them so a teacher/self-hoster can print a key.
 import type { ClassDocument, ClassDocumentSection } from '@sotto/shared';
 import { generateQrDataUrl } from './qr';
 
@@ -10,10 +10,11 @@ const SKILL_META: Record<string, { title: string; instructions: string }> = {
   READING: { title: 'Reading', instructions: 'Read the passage, then choose the best answer for each item.' },
   LISTENING: { title: 'Listening', instructions: 'Scan the code to play the audio, then choose the best answer.' },
   SPEAKING: { title: 'Speaking', instructions: 'Scan the code to record. Say each phrase aloud and check your pronunciation.' },
+  WRITING: { title: 'Writing', instructions: 'Draft your response with Apple Pencil, then scan to submit and get feedback.' },
 };
 
 // Sections that have an in-app counterpart worth deep-linking from print.
-const APP_LINKED_SKILLS = new Set(['LISTENING', 'SPEAKING']);
+const APP_LINKED_SKILLS = new Set(['LISTENING', 'SPEAKING', 'WRITING']);
 
 export interface BuildClassDocumentInput {
   id: string;
@@ -29,6 +30,7 @@ export interface BuildClassDocumentInput {
       question: string;
       options: unknown;
       passageRef: string | null;
+      passageText?: string | null;
       correctIndex: number;
       explanation: string;
     }>;
@@ -38,6 +40,12 @@ export interface BuildClassDocumentInput {
       targetPhrase: string;
       translation: string;
       ipa: string | null;
+    }>;
+    writingPrompts: Array<{
+      id: string;
+      order: number;
+      task: string;
+      guidance: string | null;
     }>;
   }>;
 }
@@ -57,7 +65,7 @@ export async function buildClassDocument(
       const meta = SKILL_META[s.skill] ?? { title: s.skill, instructions: '' };
       const appLink =
         APP_LINKED_SKILLS.has(s.skill) && opts.appBaseUrl
-          ? `${opts.appBaseUrl}/classes/${cls.id}?section=${s.id}`
+          ? buildClassDeepLink(opts.appBaseUrl, cls.id, s.id)
           : null;
       const qrDataUrl = appLink ? await generateQrDataUrl(appLink) : null;
 
@@ -72,6 +80,7 @@ export async function buildClassDocument(
           question: q.question,
           options: Array.isArray(q.options) ? (q.options as string[]) : [],
           passageRef: q.passageRef,
+          passageText: q.passageText ?? null,
           ...(opts.isAnswerKey ? { correctIndex: q.correctIndex, explanation: q.explanation } : {}),
         })),
         prompts: s.prompts.map((p) => ({
@@ -80,6 +89,12 @@ export async function buildClassDocument(
           targetPhrase: p.targetPhrase,
           translation: p.translation,
           ipa: p.ipa,
+        })),
+        writingPrompts: s.writingPrompts.map((p) => ({
+          id: p.id,
+          order: p.order,
+          task: p.task,
+          guidance: p.guidance,
         })),
         appLink,
         qrDataUrl,
@@ -97,4 +112,9 @@ export async function buildClassDocument(
     isAnswerKey: opts.isAnswerKey,
     sections,
   };
+}
+
+function buildClassDeepLink(appBaseUrl: string, classId: string, sectionId: string): string {
+  const base = appBaseUrl.replace(/\/+$/, '');
+  return `${base}/learn/class/${encodeURIComponent(classId)}?section=${encodeURIComponent(sectionId)}`;
 }

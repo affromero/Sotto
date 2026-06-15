@@ -16,6 +16,7 @@ import { SKILL_GLYPH, skillLabel, type ClassSection } from './classTypes';
 import styles from './ClassHub.module.css';
 
 interface ClassHubProps {
+  classId: string;
   lesson: { title: string; level: string; objective: string };
   order: number;
   sections: ClassSection[];
@@ -25,7 +26,7 @@ interface ClassHubProps {
   onBegin: () => void;
 }
 
-export function ClassHub({ lesson, order, sections, scores, started, onBegin }: ClassHubProps) {
+export function ClassHub({ classId, lesson, order, sections, scores, started, onBegin }: ClassHubProps) {
   const doneCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
   const totalSkills = sections.length;
 
@@ -81,6 +82,9 @@ export function ClassHub({ lesson, order, sections, scores, started, onBegin }: 
             <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={onBegin}>
               {started ? 'Resume the class' : 'Begin the class'} <ClassGlyph name="arrow" size={17} />
             </button>
+            <a className={`${styles.btn} ${styles.btnSecondary}`} href={`/classes/${classId}/worksheet`}>
+              <ClassGlyph name="pen" size={17} /> iPad workbook
+            </a>
           </div>
         </div>
 
@@ -91,6 +95,7 @@ export function ClassHub({ lesson, order, sections, scores, started, onBegin }: 
         <div className={styles.practiceGrid}>
           {sections.map((s) => {
             const sc = scores[s.id] ?? 0;
+            const itemCount = s.questions.length || s.prompts.length || s.writingPrompts.length;
             return (
               <div className={styles.practiceTile} key={s.id}>
                 <span className={styles.ptIco}>
@@ -98,7 +103,7 @@ export function ClassHub({ lesson, order, sections, scores, started, onBegin }: 
                 </span>
                 <div>
                   <div className={styles.ptName}>{skillLabel(s.skill)}</div>
-                  <div className={styles.ptSub}>{s.questions.length || s.prompts.length} items</div>
+                  <div className={styles.ptSub}>{itemCount} items</div>
                 </div>
                 <span className={`${styles.ptScore} ${sc ? styles.ptScoreHas : ''}`}>
                   {sc ? `${sc}%` : '—'}

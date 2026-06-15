@@ -315,6 +315,7 @@
   align-items: center;
   gap: 10px;
   min-height: 44px;
+  text-decoration: none;
   transition:
     transform 0.15s var(--ease),
     filter 0.2s;
@@ -331,6 +332,16 @@
 
 .btnPrimary:hover {
   filter: brightness(1.06);
+}
+
+.btnSecondary {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.btnSecondary:hover {
+  filter: brightness(0.98);
 }
 
 @media (prefers-reduced-motion: reduce) {
