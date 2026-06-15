@@ -58,12 +58,6 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-export const handleSchema = z
-  .string()
-  .min(3, 'Handle must be at least 3 characters')
-  .max(30, 'Handle must be at most 30 characters')
-  .regex(/^[a-z0-9_]+$/, 'Handle can only contain lowercase letters, numbers, and underscores');
-
 export const discoveryMessageSchema = z.object({
   content: z.string().min(1).max(5000),
   episodeId: z.string().optional(),

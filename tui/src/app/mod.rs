@@ -2054,7 +2054,7 @@ mod tests {
         async fn me(&self) -> Result<types::MeResponse> {
             Ok(serde_json::from_value(serde_json::json!({
                 "id": "u_stub", "name": "Stub Learner", "email": null,
-                "handle": null, "image": null
+                "image": null
             }))
             .expect("valid me JSON"))
         }

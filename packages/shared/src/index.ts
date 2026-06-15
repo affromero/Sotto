@@ -103,7 +103,6 @@ export {
   interactionSchema,
   updateProfileSchema,
   paginationSchema,
-  handleSchema,
   discoveryMessageSchema,
 } from './validations';
 

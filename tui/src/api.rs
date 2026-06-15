@@ -216,7 +216,7 @@ pub(crate) trait Api: Send + Sync {
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse>;
     /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
     async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse>;
-    /// Fetch the authenticated learner's identity (id, name, email, handle).
+    /// Fetch the authenticated learner's identity (id, name, email).
     async fn me(&self) -> Result<types::MeResponse>;
 
     // --- Adaptive-listening Q&A (P6e) ---
@@ -1412,7 +1412,7 @@ mod tests {
         let server = tokio::spawn(capture_with_response(
             listener,
             "200 OK",
-            r#"{"id":"u_1","name":"Ada","email":"ada@example.com","handle":"ada","image":null,"episodeCount":3}"#,
+            r#"{"id":"u_1","name":"Ada","email":"ada@example.com","image":null,"episodeCount":3}"#,
         ));
 
         let client = SottoClient::new(&format!("http://{addr}"), "test-key").expect("client");

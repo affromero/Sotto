@@ -65,7 +65,6 @@ export function formatEpisodeList(episodes: Episode[]): string {
 export function formatProfile(u: UserProfile): string {
   const lines = [
     `**${u.name || 'Anonymous'}**`,
-    u.handle ? `@${u.handle}` : null,
     `Episodes: ${u.episodeCount}`,
     `Member since: ${u.createdAt}`,
   ];

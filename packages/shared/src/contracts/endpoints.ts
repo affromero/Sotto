@@ -274,7 +274,7 @@ export const endpoints: EndpointDef[] = [
     id: 'getMe',
     method: 'GET',
     path: '/api/v1/users/me',
-    summary: 'The authenticated learner identity (id, name, email, handle).',
+    summary: 'The authenticated learner identity (id, name, email).',
     auth: 'bearer',
     response: meResponseSchema,
     successStatuses: [200],
