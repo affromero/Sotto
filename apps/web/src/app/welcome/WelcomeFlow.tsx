@@ -32,7 +32,31 @@ export interface VoiceState {
   keys: Record<string, string>;
   /** Optional base URLs for keyless local providers (kokoro/local TTS, whisper/local STT). */
   baseUrls: Record<string, string>;
+  /** Selected model per TTS provider id (cloud/key-based providers only). */
+  ttsModel: Record<string, string>;
+  /** Selected model per STT registry provider id (cloud/key-based providers only). */
+  sttModel: Record<string, string>;
 }
+
+/** One selectable model option surfaced in the wizard. */
+export interface ModelOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * Registry model lists for the wizard's model pickers, keyed by backend provider
+ * id (AI: anthropic/openai; TTS: elevenlabs/openai/cartesia/hume; STT: openai/
+ * deepgram/assemblyai/elevenlabs). Sourced server-side from the provider
+ * registries in welcome/page.tsx — never hardcoded.
+ */
+export interface ModelMeta {
+  ai: Record<string, ModelOption[]>;
+  tts: Record<string, ModelOption[]>;
+  stt: Record<string, ModelOption[]>;
+}
+
+const EMPTY_MODEL_META: ModelMeta = { ai: {}, tts: {}, stt: {} };
 
 export type ContextItemKind = 'link' | 'text' | 'file';
 
@@ -56,6 +80,7 @@ export interface OnboardingConfig {
 
 interface WelcomeFlowProps {
   initialConfig?: OnboardingConfig;
+  modelMeta?: ModelMeta;
 }
 
 const SAVE_KEY = 'sotto.onboarding.v1';
@@ -74,6 +99,8 @@ const DEFAULT_VOICE: VoiceState = {
   stt: 'whisper',
   keys: {},
   baseUrls: {},
+  ttsModel: {},
+  sttModel: {},
 };
 
 interface WelcomeSnapshot {
@@ -133,24 +160,25 @@ function parseAgent(value: unknown): AgentState {
   };
 }
 
+function stringRecord(value: unknown): Record<string, string> {
+  const record = asRecord(value) ?? {};
+  return Object.fromEntries(
+    Object.entries(record).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string'
+    )
+  );
+}
+
 function parseVoice(value: unknown): VoiceState {
   const record = asRecord(value);
-  const keys = asRecord(record?.keys) ?? {};
-  const baseUrls = asRecord(record?.baseUrls) ?? {};
 
   return {
     tts: typeof record?.tts === 'string' ? record.tts : DEFAULT_VOICE.tts,
     stt: typeof record?.stt === 'string' ? record.stt : DEFAULT_VOICE.stt,
-    keys: Object.fromEntries(
-      Object.entries(keys).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string'
-      )
-    ),
-    baseUrls: Object.fromEntries(
-      Object.entries(baseUrls).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string'
-      )
-    ),
+    keys: stringRecord(record?.keys),
+    baseUrls: stringRecord(record?.baseUrls),
+    ttsModel: stringRecord(record?.ttsModel),
+    sttModel: stringRecord(record?.sttModel),
   };
 }
 
@@ -231,7 +259,7 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
   };
 }
 
-export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
+export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: WelcomeFlowProps) {
   const [step, setStep] = useState(0);
   const [baseLang, setBaseLang] = useState('en');
   const [language, setLanguage] = useState('');
@@ -443,6 +471,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
         <StepAgent
           agent={agent}
           demoMode={demoMode}
+          aiModels={modelMeta.ai}
           setAgent={(updater) => setAgent((prev) => updater(prev))}
           onNext={() => go(2)}
           onBack={() => go(0)}
@@ -454,6 +483,8 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
         <StepVoice
           voice={voice}
           demoMode={demoMode}
+          ttsModels={modelMeta.tts}
+          sttModels={modelMeta.stt}
           setVoice={(updater) => setVoice((prev) => updater(prev))}
           onNext={() => go(3)}
           onBack={() => go(1)}

@@ -33,11 +33,14 @@ export interface AiResolution {
 export interface TtsResolution {
   keyPost: KeyPost | null;
   preferredTtsProvider: string | null;
+  preferredTtsModel: string | null;
   infra: { ttsProvider?: string; ttsBaseUrl?: string };
 }
 
 export interface SttResolution {
   keyPost: KeyPost | null;
+  preferredSttProvider: string | null;
+  preferredSttModel: string | null;
   infra: { sttProvider?: string; sttBaseUrl?: string };
 }
 
@@ -46,6 +49,23 @@ export const DEFAULT_LOCAL_STT_BASE_URL = 'http://localhost:8001/v1';
 
 function clean(v: string | undefined | null): string {
   return (v ?? '').trim();
+}
+
+/**
+ * The AI registry provider whose models back a key-method selection for a wizard
+ * provider id (claude → anthropic, codex → openai). null for CLI/local/custom,
+ * which don't pick from the registry model list. Mirrors the mapping in resolveAi.
+ */
+export function aiModelProviderId(wizardId: string): string | null {
+  if (wizardId === 'claude') return 'anthropic';
+  if (wizardId === 'codex') return 'openai';
+  if (wizardId === 'google') return 'google';
+  return null;
+}
+
+/** The STT registry provider id for a wizard STT id (whisper → local, assembly → assemblyai). */
+export function sttModelProviderId(wizardId: string): string {
+  return wizardId === 'whisper' ? 'local' : wizardId === 'assembly' ? 'assemblyai' : wizardId;
 }
 
 /**
@@ -69,7 +89,9 @@ export function resolveAi(
     return {
       keyPost: { endpoint: 'ai-keys', provider: byokProvider, apiKey: v },
       preferredAiProvider: byokProvider,
-      preferredAiModel: null,
+      // Bare registry model id picked in the wizard (no "local:" prefix). Drives
+      // generation via AutoModelConfig once persisted; null falls back to default.
+      preferredAiModel: m || null,
       infra: {},
     };
   }
@@ -105,12 +127,18 @@ export function resolveLiveTranslateKey(apiKey: string): KeyPost | null {
  * TTS → backend. The welcome TTS IDs already match TtsProviderId. Kokoro and
  * local are keyless local providers (infra + base URL); the rest take a BYOK key.
  */
-export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsResolution {
+export function resolveTts(
+  ttsId: string,
+  apiKey: string,
+  baseUrl: string,
+  model?: string
+): TtsResolution {
   if (ttsId === 'kokoro' || ttsId === 'local') {
     const u = clean(baseUrl) || DEFAULT_LOCAL_TTS_BASE_URL;
     return {
       keyPost: null,
       preferredTtsProvider: ttsId,
+      preferredTtsModel: null,
       infra: { ttsProvider: ttsId, ...(u && { ttsBaseUrl: u }) },
     };
   }
@@ -119,6 +147,7 @@ export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsR
   return {
     keyPost: key ? { endpoint: 'byok', provider: ttsId, apiKey: key } : null,
     preferredTtsProvider: ttsId,
+    preferredTtsModel: clean(model) || null,
     infra: { ttsProvider: ttsId },
   };
 }
@@ -128,18 +157,30 @@ export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsR
  * "assembly" → assemblyai. ElevenLabs keys live in the TTS/BYOK store; every
  * other cloud STT key lives in the AI-key store (matching resolveSttProvider).
  */
-export function resolveStt(sttId: string, apiKey: string, baseUrl: string): SttResolution {
-  const resolvedId = sttId === 'whisper' ? 'local' : sttId === 'assembly' ? 'assemblyai' : sttId;
+export function resolveStt(
+  sttId: string,
+  apiKey: string,
+  baseUrl: string,
+  model?: string
+): SttResolution {
+  const resolvedId = sttModelProviderId(sttId);
 
   if (resolvedId === 'local') {
     const u = clean(baseUrl) || DEFAULT_LOCAL_STT_BASE_URL;
-    return { keyPost: null, infra: { sttProvider: 'local', ...(u && { sttBaseUrl: u }) } };
+    return {
+      keyPost: null,
+      preferredSttProvider: 'local',
+      preferredSttModel: null,
+      infra: { sttProvider: 'local', ...(u && { sttBaseUrl: u }) },
+    };
   }
 
   const key = clean(apiKey);
   const endpoint = resolvedId === 'elevenlabs' ? 'byok' : 'ai-keys';
   return {
     keyPost: key ? { endpoint, provider: resolvedId, apiKey: key } : null,
+    preferredSttProvider: resolvedId,
+    preferredSttModel: clean(model) || null,
     infra: { sttProvider: resolvedId },
   };
 }

@@ -31,6 +31,22 @@ vi.mock('@/lib/byok', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'claude-haiku-4-5-20251001' }),
+  getProviderForModel: (id: string) => (id?.startsWith('claude') ? 'anthropic' : null),
+}));
+
+// ---- Auto model config mock (resolveLearningAi reads the configured AI model) ----
+
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    model: {
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
+  }),
 }));
 
 // ---- STT mock ----

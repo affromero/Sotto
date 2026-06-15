@@ -48,16 +48,16 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/providers/tts-registry', () => ({
   getProviderMeta: (id: string) => {
-    if (id === 'openai') return { defaultModel: 'tts-1-hd' };
-    if (id === 'elevenlabs') return { defaultModel: 'eleven_v3' };
-    return { defaultModel: '' };
+    if (id === 'openai') return { defaultModel: 'tts-1-hd', models: [{ id: 'tts-1-hd' }, { id: 'tts-1' }] };
+    if (id === 'elevenlabs') return { defaultModel: 'eleven_v3', models: [{ id: 'eleven_v3' }] };
+    return { defaultModel: '', models: [] };
   },
 }));
 
 vi.mock('@/lib/providers/stt-registry', () => ({
   getSttProviderMeta: (id: string) => {
-    if (id === 'openai') return { defaultModel: 'whisper-1' };
-    return { defaultModel: '' };
+    if (id === 'openai') return { defaultModel: 'whisper-1', models: [{ id: 'whisper-1' }, { id: 'gpt-4o-transcribe' }] };
+    return { defaultModel: '', models: [] };
   },
 }));
 
@@ -176,6 +176,23 @@ describe('setAutoModelConfig', () => {
       ttsProvider: 'elevenlabs',
       includedModels: ['gpt-5'],
     });
+  });
+
+  it('rejects an AI model that does not belong to its paired provider', async () => {
+    await expect(
+      setAutoModelConfig({ model: { aiProvider: 'anthropic', aiModel: 'gpt-5' } }, 'admin-1'),
+    ).rejects.toThrow(/does not belong to provider "anthropic"/);
+    expect(mockAutoModelConfigUpsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects an STT model that is not a model of its paired provider', async () => {
+    await expect(
+      setAutoModelConfig(
+        { model: { sttProvider: 'openai', sttModel: 'not-a-real-model' } },
+        'admin-1',
+      ),
+    ).rejects.toThrow(/is not a model of provider "openai"/);
+    expect(mockAutoModelConfigUpsert).not.toHaveBeenCalled();
   });
 
   it('persists included lists for each model category', async () => {
