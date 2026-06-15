@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 interface ClassPageProps {
   params: Promise<{ classId: string }>;
+  searchParams?: Promise<{ section?: string }>;
 }
 
 export async function generateMetadata({ params }: ClassPageProps) {
@@ -12,11 +13,12 @@ export async function generateMetadata({ params }: ClassPageProps) {
   return { title: 'Class' };
 }
 
-export default async function ClassPage({ params }: ClassPageProps) {
+export default async function ClassPage({ params, searchParams }: ClassPageProps) {
   const session = await auth();
   if (!session?.user?.id) return null;
 
   const { classId } = await params;
+  const query = await searchParams;
 
-  return <ClassShell classId={classId} />;
+  return <ClassShell classId={classId} initialSectionId={query?.section} />;
 }
