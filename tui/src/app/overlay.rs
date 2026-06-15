@@ -17,7 +17,7 @@ use ratatui::{
 use crate::config::Profile;
 use crate::theme::{Palette, Theme};
 
-use super::state::View;
+use super::state::{NotesPhase, View};
 
 /// Which row of the theme picker is focused. The picker has three rows (mode,
 /// light palette, accent); the focused row is changed with ↑/↓ and its value is
@@ -418,9 +418,21 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             ("↑/↓", "move"),
             ("tab", "switch column"),
             ("enter", "start placement"),
+            ("m", "use my materials"),
         ],
         View::PlacementReview { .. } => vec![("↑/↓ 1-9", "answer"), ("PgUp/PgDn", "scroll")],
         View::PlacementResult { .. } => vec![("enter", "start course")],
+        View::NotesPlacement { phase, .. } => match phase {
+            NotesPhase::Entry => vec![("ctrl-d", "find my level"), ("esc", "back")],
+            NotesPhase::Result { .. } => {
+                vec![
+                    ("enter", "start here"),
+                    ("t", "take the test"),
+                    ("esc", "back"),
+                ]
+            }
+            NotesPhase::Deducing | NotesPhase::Confirming => vec![],
+        },
         View::Memory { .. } => vec![("↑/↓", "scroll")],
         View::Settings { .. } => vec![],
     }

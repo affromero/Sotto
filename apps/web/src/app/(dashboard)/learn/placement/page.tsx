@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { PlacementTest } from '@/components/placement/PlacementTest';
+import { PlacementEntry } from '@/components/placement/PlacementEntry';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -37,7 +37,7 @@ export default async function PlacementPage({ searchParams }: PlacementPageProps
       </header>
 
       <div className={styles.content}>
-        <PlacementTest native={native} target={target} />
+        <PlacementEntry native={native} target={target} />
       </div>
     </main>
   );

@@ -1101,6 +1101,24 @@ impl From<&types::OnboardingConfigResponse> for ConfigView {
     }
 }
 
+/// Phases of the notes-based placement flow.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum NotesPhase {
+    /// Typing or pasting the materials.
+    Entry,
+    /// The deduction request is in flight.
+    Deducing,
+    /// The deduced level, awaiting "start here" or "verify with the test".
+    Result {
+        level: String,
+        rationale: String,
+        /// Confidence as a whole percentage (0..100).
+        confidence: u8,
+    },
+    /// The confirm (course creation) request is in flight.
+    Confirming,
+}
+
 /// The active screen and its state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum View {
@@ -1233,6 +1251,14 @@ pub(crate) enum View {
     },
     /// The assessed CEFR level + created course, before landing in the course.
     PlacementResult { outcome: PlacementOutcome },
+    /// Notes-based placement: paste materials, deduce a level, then confirm
+    /// ("start here") or hand off to the MC test to verify.
+    NotesPlacement {
+        native: String,
+        target: String,
+        input: String,
+        phase: NotesPhase,
+    },
     /// Read-only memory graph (vocab + grammar) for a course.
     Memory {
         course: Course,

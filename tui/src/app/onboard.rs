@@ -17,7 +17,7 @@ use crate::api::types;
 
 use super::App;
 use super::state::{
-    ConfigView, LANGUAGES, LangColumn, PlacementOutcome, View, answer_current_choice,
+    ConfigView, LANGUAGES, LangColumn, NotesPhase, PlacementOutcome, View, answer_current_choice,
     build_placement_answers, course_title, cursor_down, cursor_up, list_down, list_up,
     memory_items, placement_questions,
 };
@@ -296,6 +296,239 @@ impl App {
                 current_level: outcome.level.clone(),
             };
             self.enter_course_home(course);
+        }
+    }
+
+    // --- Notes-based placement ---------------------------------------------
+
+    /// Enter notes-based placement for the languages picked in PlacementLang.
+    pub(super) fn start_notes_placement(&mut self) {
+        if let View::PlacementLang {
+            native_cursor,
+            target_cursor,
+            loading,
+            ..
+        } = &self.view
+        {
+            if *loading {
+                return;
+            }
+            let last = LANGUAGES.len() - 1;
+            let native = LANGUAGES[(*native_cursor).min(last)].0.to_string();
+            let target = LANGUAGES[(*target_cursor).min(last)].0.to_string();
+            if native == target {
+                self.status_bar
+                    .set_error("Native and target languages must differ.".to_string());
+                self.render();
+                return;
+            }
+            self.view = View::NotesPlacement {
+                native,
+                target,
+                input: String::new(),
+                phase: NotesPhase::Entry,
+            };
+            self.render();
+        }
+    }
+
+    /// Append a typed character to the materials (Entry phase only).
+    pub(super) fn notes_input_char(&mut self, c: char) {
+        if let View::NotesPlacement {
+            input,
+            phase: NotesPhase::Entry,
+            ..
+        } = &mut self.view
+        {
+            input.push(c);
+            self.render();
+        }
+    }
+
+    /// Insert a newline into the materials (Entry phase only).
+    pub(super) fn notes_input_newline(&mut self) {
+        if let View::NotesPlacement {
+            input,
+            phase: NotesPhase::Entry,
+            ..
+        } = &mut self.view
+        {
+            input.push('\n');
+            self.render();
+        }
+    }
+
+    /// Delete the last character of the materials (Entry phase only).
+    pub(super) fn notes_input_backspace(&mut self) {
+        if let View::NotesPlacement {
+            input,
+            phase: NotesPhase::Entry,
+            ..
+        } = &mut self.view
+        {
+            input.pop();
+            self.render();
+        }
+    }
+
+    /// Submit the pasted materials for level deduction.
+    pub(super) fn notes_submit(&mut self) {
+        let (native, target, content) = match &self.view {
+            View::NotesPlacement {
+                native,
+                target,
+                input,
+                phase: NotesPhase::Entry,
+            } => {
+                if input.trim().is_empty() {
+                    self.status_bar
+                        .set_error("Paste some material first.".to_string());
+                    self.render();
+                    return;
+                }
+                (native.clone(), target.clone(), input.trim().to_string())
+            }
+            _ => return,
+        };
+        let req_gen = self.bump_gen();
+        if let View::NotesPlacement { phase, .. } = &mut self.view {
+            *phase = NotesPhase::Deducing;
+        }
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.deduce_from_notes(&native, &target, &content).await },
+            Action::NotesDeduced,
+        );
+        self.render();
+    }
+
+    pub(super) fn on_notes_deduced(
+        &mut self,
+        req_gen: u64,
+        result: ApiResult<types::DeduceFromNotesResponse>,
+    ) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(resp) => {
+                let confidence = (resp.confidence * 100.0).round().clamp(0.0, 100.0) as u8;
+                if let View::NotesPlacement { phase, .. } = &mut self.view {
+                    *phase = NotesPhase::Result {
+                        level: resp.deduced_level.to_string(),
+                        rationale: resp.rationale.clone(),
+                        confidence,
+                    };
+                }
+            }
+            Err(message) => {
+                if let View::NotesPlacement { phase, .. } = &mut self.view {
+                    *phase = NotesPhase::Entry;
+                }
+                self.status_bar.set_error(message.clone());
+            }
+        }
+        self.render();
+    }
+
+    /// "Start here": confirm the deduced level and create the course.
+    pub(super) fn notes_confirm(&mut self) {
+        let (native, target) = match &self.view {
+            View::NotesPlacement {
+                native,
+                target,
+                phase: NotesPhase::Result { .. },
+                ..
+            } => (native.clone(), target.clone()),
+            _ => return,
+        };
+        let req_gen = self.bump_gen();
+        if let View::NotesPlacement { phase, .. } = &mut self.view {
+            *phase = NotesPhase::Confirming;
+        }
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.confirm_from_notes(&native, &target).await },
+            Action::NotesConfirmed,
+        );
+        self.render();
+    }
+
+    pub(super) fn on_notes_confirmed(
+        &mut self,
+        req_gen: u64,
+        result: ApiResult<types::ConfirmFromNotesResponse>,
+    ) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(resp) => {
+                let (native, target) = match &self.view {
+                    View::NotesPlacement { native, target, .. } => (native.clone(), target.clone()),
+                    _ => (String::new(), String::new()),
+                };
+                let course = super::state::Course {
+                    id: resp.course_id.clone(),
+                    title: course_title(&native, &target),
+                    native_lang: native,
+                    target_lang: target,
+                    current_level: resp.level.to_string(),
+                };
+                self.enter_course_home(course);
+            }
+            Err(message) => {
+                // The deduction stays cached server-side; drop to entry so the
+                // learner can retry the confirm or take the test instead.
+                if let View::NotesPlacement { phase, .. } = &mut self.view {
+                    *phase = NotesPhase::Entry;
+                }
+                self.status_bar.set_error(message.clone());
+                self.render();
+            }
+        }
+    }
+
+    /// From the deduced-level result, take the MC test instead. The backend
+    /// seeds the cached materials onto the course when this test is submitted.
+    pub(super) fn notes_take_test(&mut self) {
+        let (native, target) = match &self.view {
+            View::NotesPlacement {
+                native,
+                target,
+                phase: NotesPhase::Result { .. },
+                ..
+            } => (native.clone(), target.clone()),
+            _ => return,
+        };
+        let req_gen = self.bump_gen();
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.generate_placement(&native, &target).await },
+            Action::PlacementLoaded,
+        );
+        self.render();
+    }
+
+    /// Esc in notes placement: from the result, return to editing; from editing,
+    /// return to the language picker.
+    pub(super) fn notes_cancel(&mut self) {
+        match &mut self.view {
+            View::NotesPlacement {
+                phase: phase @ NotesPhase::Result { .. },
+                ..
+            } => {
+                *phase = NotesPhase::Entry;
+                self.render();
+            }
+            View::NotesPlacement { .. } => {
+                self.view = View::placement_lang();
+                self.render();
+            }
+            _ => {}
         }
     }
 

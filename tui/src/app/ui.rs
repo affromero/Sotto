@@ -14,7 +14,7 @@ use crate::theme::Palette;
 
 use super::state::{
     AskPhase, AskState, ClassResult, ClassSection, ConfigView, Course, DueCounts, ExamResult,
-    LANGUAGES, LangColumn, MemoryItem, PlacementOutcome, PracticeResult, ReviewKind,
+    LANGUAGES, LangColumn, MemoryItem, NotesPhase, PlacementOutcome, PracticeResult, ReviewKind,
     SectionProgress, SkillChoice, SpeakingPhase, Unavailable, View, WritingPhase, can_review_vocab,
 };
 use crate::api::types::SkillType;
@@ -82,6 +82,9 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
         View::PlacementLang { .. } => draw_placement_lang(frame, area, view, p),
         View::PlacementReview { .. } => draw_placement_review(frame, area, view, p),
         View::PlacementResult { outcome } => draw_placement_result(frame, area, outcome, p),
+        View::NotesPlacement { input, phase, .. } => {
+            draw_notes_placement(frame, area, input, phase, p)
+        }
         View::Memory { .. } => draw_memory(frame, area, view, p),
         View::Settings { config } => draw_settings(frame, area, config.as_ref(), p),
     }
@@ -1405,6 +1408,98 @@ fn draw_placement_result(frame: &mut Frame, area: Rect, outcome: &PlacementOutco
         Paragraph::new(hint_line(&["enter start course", "q back"], p)),
         chunks[1],
     );
+}
+
+fn draw_notes_placement(
+    frame: &mut Frame,
+    area: Rect,
+    input: &str,
+    phase: &NotesPhase,
+    p: &Palette,
+) {
+    let inner = panel(frame, area, "Place me from my materials", p);
+    let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+
+    let (body, hints, align): (Text, &[&str], Alignment) = match phase {
+        NotesPhase::Entry => {
+            let mut lines = vec![
+                Line::from(Span::styled(
+                    "Paste notes, a lesson, or your own writing in your target language:",
+                    Style::default().fg(p.ink_soft),
+                )),
+                Line::default(),
+            ];
+            for line in input.split('\n') {
+                lines.push(Line::from(Span::styled(
+                    line.to_string(),
+                    Style::default().fg(p.ink),
+                )));
+            }
+            // A block cursor so the editor reads as a live text field.
+            lines.push(Line::from(Span::styled(
+                "\u{2588}",
+                Style::default().fg(p.primary),
+            )));
+            (
+                Text::from(lines),
+                &["ctrl-d find my level", "esc back"][..],
+                Alignment::Left,
+            )
+        }
+        NotesPhase::Deducing => (
+            Text::from("Reading your materials..."),
+            &[][..],
+            Alignment::Center,
+        ),
+        NotesPhase::Result {
+            level,
+            rationale,
+            confidence,
+        } => {
+            let lines = vec![
+                Line::from(Span::styled(
+                    "Estimated level",
+                    Style::default().fg(p.ink_soft),
+                )),
+                Line::from(Span::styled(
+                    level.clone(),
+                    Style::default().fg(p.primary).add_modifier(Modifier::BOLD),
+                )),
+                Line::default(),
+                Line::from(Span::styled(rationale.clone(), Style::default().fg(p.ink))),
+                Line::default(),
+                Line::from(Span::styled(
+                    format!("Confidence: {confidence}%"),
+                    Style::default().fg(p.ink_soft),
+                )),
+                Line::default(),
+                Line::from(Span::styled(
+                    "Starting here never lowers a level you have already reached.",
+                    Style::default().fg(p.ink_soft),
+                )),
+            ];
+            (
+                Text::from(lines),
+                &["enter start here", "t take the test", "esc back"][..],
+                Alignment::Center,
+            )
+        }
+        NotesPhase::Confirming => (
+            Text::from("Setting up your course..."),
+            &[][..],
+            Alignment::Center,
+        ),
+    };
+
+    frame.render_widget(
+        Paragraph::new(body)
+            .alignment(align)
+            .wrap(Wrap { trim: false }),
+        chunks[0],
+    );
+    if !hints.is_empty() {
+        frame.render_widget(Paragraph::new(hint_line(hints, p)), chunks[1]);
+    }
 }
 
 fn draw_memory(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {

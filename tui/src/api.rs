@@ -199,6 +199,19 @@ pub(crate) trait Api: Send + Sync {
         target: &str,
         answers: Vec<types::SubmitPlacementRequestAnswersItem>,
     ) -> Result<types::SubmitPlacementResponse>;
+    /// Deduce a CEFR level from pasted materials (creates no course).
+    async fn deduce_from_notes(
+        &self,
+        native: &str,
+        target: &str,
+        content: &str,
+    ) -> Result<types::DeduceFromNotesResponse>;
+    /// Accept a deduced level: create the course and seed note + vocabulary.
+    async fn confirm_from_notes(
+        &self,
+        native: &str,
+        target: &str,
+    ) -> Result<types::ConfirmFromNotesResponse>;
     /// Fetch the course's vocabulary/grammar memory graph.
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse>;
     /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
@@ -718,6 +731,49 @@ impl SottoClient {
         Ok(resp.into_inner())
     }
 
+    /// Deduce a CEFR level from pasted materials; creates no course.
+    pub async fn deduce_from_notes(
+        &self,
+        native: &str,
+        target: &str,
+        content: &str,
+    ) -> Result<types::DeduceFromNotesResponse> {
+        let body = types::DeduceFromNotesRequest {
+            native: types::DeduceFromNotesRequestNative::try_from(native.to_string())
+                .map_err(|e| eyre!("invalid native language code: {e}"))?,
+            target: types::DeduceFromNotesRequestTarget::try_from(target.to_string())
+                .map_err(|e| eyre!("invalid target language code: {e}"))?,
+            content: types::DeduceFromNotesRequestContent::try_from(content.to_string())
+                .map_err(|e| eyre!("materials cannot be empty: {e}"))?,
+        };
+        let resp = self
+            .inner
+            .deduce_placement_from_notes(&body)
+            .await
+            .map_err(|e| eyre!("failed to deduce level from notes: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Confirm a deduced level: create the course and seed note + vocabulary.
+    pub async fn confirm_from_notes(
+        &self,
+        native: &str,
+        target: &str,
+    ) -> Result<types::ConfirmFromNotesResponse> {
+        let body = types::ConfirmFromNotesRequest {
+            native: types::ConfirmFromNotesRequestNative::try_from(native.to_string())
+                .map_err(|e| eyre!("invalid native language code: {e}"))?,
+            target: types::ConfirmFromNotesRequestTarget::try_from(target.to_string())
+                .map_err(|e| eyre!("invalid target language code: {e}"))?,
+        };
+        let resp = self
+            .inner
+            .confirm_placement_from_notes(&body)
+            .await
+            .map_err(|e| eyre!("failed to confirm placement from notes: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
     /// Fetch the course's memory graph (vocab/grammar nodes + edges).
     pub async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse> {
         let resp = self
@@ -945,6 +1001,23 @@ impl Api for SottoClient {
         answers: Vec<types::SubmitPlacementRequestAnswersItem>,
     ) -> Result<types::SubmitPlacementResponse> {
         SottoClient::submit_placement(self, native, target, answers).await
+    }
+
+    async fn deduce_from_notes(
+        &self,
+        native: &str,
+        target: &str,
+        content: &str,
+    ) -> Result<types::DeduceFromNotesResponse> {
+        SottoClient::deduce_from_notes(self, native, target, content).await
+    }
+
+    async fn confirm_from_notes(
+        &self,
+        native: &str,
+        target: &str,
+    ) -> Result<types::ConfirmFromNotesResponse> {
+        SottoClient::confirm_from_notes(self, native, target).await
     }
 
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse> {
