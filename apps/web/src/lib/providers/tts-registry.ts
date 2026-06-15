@@ -169,8 +169,9 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 5000,
-    defaultModel: 'sonic-3',
+    defaultModel: 'sonic-3.5',
     models: [
+      { id: 'sonic-3.5', displayName: 'Sonic 3.5', tier: 'premium', supportedLanguages: LANG_ALL },
       { id: 'sonic-3', displayName: 'Sonic 3', tier: 'premium', supportedLanguages: LANG_CARTESIA_3 },
       { id: 'sonic-turbo', displayName: 'Sonic Turbo', tier: 'standard', supportedLanguages: LANG_CARTESIA_TURBO },
       { id: 'sonic-2', displayName: 'Sonic 2 (Legacy)', tier: 'premium', supportedLanguages: LANG_CARTESIA_TURBO },
