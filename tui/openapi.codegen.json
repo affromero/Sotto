@@ -28,6 +28,7 @@
       "PracticeKind": {
         "type": "string",
         "enum": [
+          "FULL",
           "GRAMMAR",
           "READING",
           "LISTENING",
@@ -451,6 +452,56 @@
         ],
         "additionalProperties": false
       },
+      "StartPracticeReadyFull": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready_full"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FULL"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeItem"
+            }
+          },
+          "episodeId": {
+            "type": "string"
+          },
+          "speakingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeSpeakingPrompt"
+            }
+          },
+          "writingPrompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeWritingPrompt"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sessionId",
+          "kind",
+          "items",
+          "speakingPrompts",
+          "writingPrompts"
+        ],
+        "additionalProperties": false
+      },
       "StartPracticeResponse": {
         "oneOf": [
           {
@@ -464,6 +515,9 @@
           },
           {
             "$ref": "#/components/schemas/StartPracticeReadyWriting"
+          },
+          {
+            "$ref": "#/components/schemas/StartPracticeReadyFull"
           }
         ],
         "discriminator": {
@@ -472,7 +526,8 @@
             "unavailable": "#/components/schemas/StartPracticeUnavailable",
             "ready": "#/components/schemas/StartPracticeReady",
             "ready_speaking": "#/components/schemas/StartPracticeReadySpeaking",
-            "ready_writing": "#/components/schemas/StartPracticeReadyWriting"
+            "ready_writing": "#/components/schemas/StartPracticeReadyWriting",
+            "ready_full": "#/components/schemas/StartPracticeReadyFull"
           }
         }
       },

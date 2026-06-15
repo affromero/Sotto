@@ -20,6 +20,12 @@
   padding: 8px 0;
 }
 
+.fullSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .questionList {
   display: flex;
   flex-direction: column;
@@ -84,7 +90,10 @@
   border: 1px solid var(--line);
   border-radius: var(--r);
   cursor: pointer;
-  transition: border-color 0.18s var(--ease), background 0.18s var(--ease), transform 0.18s var(--ease);
+  transition:
+    border-color 0.18s var(--ease),
+    background 0.18s var(--ease),
+    transform 0.18s var(--ease);
 }
 
 .option:hover {

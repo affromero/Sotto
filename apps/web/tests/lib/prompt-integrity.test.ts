@@ -73,6 +73,7 @@ const EXPECTED_FILES = [
   'writing/grade-writing.md',
   'curriculum/generate-curriculum.md',
   'live/extract-vocab.md',
+  'live/extract-learning-targets.md',
   'exams/exam-feedback.md',
 ];
 
@@ -82,6 +83,7 @@ const EXPECTED_FILES = [
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'live/extract-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
+  'live/extract-learning-targets.md': ['LEVEL', 'MAX_GRAMMAR', 'MAX_VOCAB', 'NATIVE', 'TARGET'],
   'exams/exam-feedback.md': ['EXAM_NAME', 'LEVEL', 'OVERALL', 'SECTIONS'],
   'generation/script-generator.md': [
     'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
@@ -301,4 +303,3 @@ describe('verification templates', () => {
     expect(content).toContain('{{UNCHANGED_INDICES}}');
   });
 });
-

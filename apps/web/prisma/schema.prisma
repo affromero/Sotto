@@ -1080,6 +1080,7 @@ enum SectionStatus {
 // Single-skill practice. VOCAB is first-class here (spaced-repetition recall)
 // and is deliberately NOT in SkillType, which gates the four class sections.
 enum PracticeKind {
+  FULL
   GRAMMAR
   READING
   LISTENING

@@ -9,7 +9,7 @@ import { startPractice, PracticeCourseNotFoundError } from '@/lib/practice-servi
 type RouteParams = { params: Promise<{ courseId: string }> };
 
 const startSchema = z.object({
-  kind: z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'VOCAB']),
+  kind: z.enum(['FULL', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'VOCAB']),
 });
 
 /** POST /api/courses/[courseId]/practice — start an ungated practice session. */
@@ -58,7 +58,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         where: { courseId },
         orderBy: { startedAt: 'desc' },
         take: 10,
-        select: { id: true, kind: true, status: true, score: true, startedAt: true, completedAt: true },
+        select: {
+          id: true,
+          kind: true,
+          status: true,
+          score: true,
+          startedAt: true,
+          completedAt: true,
+        },
       }),
     ]);
 

@@ -1,3 +1,6 @@
 [submodule "packages/groundcheck"]
 	path = packages/groundcheck
 	url = https://github.com/affromero/groundcheck.git
+[submodule "packages/learning-model"]
+	path = packages/learning-model
+	url = https://github.com/SottoFM/learning-model.git

@@ -1,5 +1,7 @@
 // SM-2-style spaced repetition. Pure functions over a card's SRS state so the
 // scheduling math is unit-testable in isolation.
+import { updateMasteryPosterior } from '@sotto/learning-model';
+
 export interface SrsState {
   ease: number;
   intervalDays: number;
@@ -33,13 +35,13 @@ export function reviewCard(state: SrsState, quality: number, now: Date): SrsUpda
     // SM-2 ease update, mapping quality 0..1 onto SM-2's q in 3..5.
     const sm2q = 3 + q * 2;
     ease = Math.max(MIN_EASE, ease + (0.1 - (5 - sm2q) * (0.08 + (5 - sm2q) * 0.02)));
-    mastery = Math.min(1, mastery + (1 - mastery) * 0.3 * q + 0.05);
+    mastery = updateMasteryPosterior(mastery, { quality: q });
   } else {
     reps = 0;
     lapses += 1;
     intervalDays = 0;
     ease = Math.max(MIN_EASE, ease - 0.2);
-    mastery = Math.max(0, mastery * 0.5);
+    mastery = updateMasteryPosterior(mastery, { quality: q });
   }
 
   const dueAt = new Date(now.getTime() + Math.max(0, intervalDays) * DAY_MS);

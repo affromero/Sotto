@@ -3,6 +3,7 @@
 // due/weak items that drive the next class's adaptive content and the graph viz.
 import { prisma } from './prisma';
 import { reviewCard } from './srs';
+import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel } from '@sotto/shared';
 
 export interface VocabItem {
@@ -10,6 +11,11 @@ export interface VocabItem {
   gloss: string;
   pos?: string;
   pronunciation?: string;
+}
+
+export interface GrammarItem {
+  key: string;
+  title?: string;
 }
 
 function humanizeKey(key: string): string {
@@ -93,6 +99,45 @@ export async function upsertLiveVocab(
   return added;
 }
 
+/**
+ * Add grammar targets surfaced from course notes or other private learner
+ * context. Existing topics keep their SRS state; new ones enter with low
+ * mastery so catch-up practice can rank and test them.
+ */
+export async function upsertCourseGrammar(
+  courseId: string,
+  items: GrammarItem[],
+  level?: CefrLevel,
+): Promise<number> {
+  const keys = items.map((i) => i.key).filter(Boolean);
+  if (keys.length === 0) return 0;
+  const existing = new Set(
+    (
+      await prisma.learnerGrammar.findMany({
+        where: { courseId, topicKey: { in: keys } },
+        select: { topicKey: true },
+      })
+    ).map((r) => r.topicKey),
+  );
+
+  let added = 0;
+  for (const item of items) {
+    if (!item.key) continue;
+    await prisma.learnerGrammar.upsert({
+      where: { courseId_topicKey: { courseId, topicKey: item.key } },
+      create: {
+        courseId,
+        topicKey: item.key,
+        title: item.title?.trim() || humanizeKey(item.key),
+        cefrLevel: level ?? null,
+      },
+      update: {},
+    });
+    if (!existing.has(item.key)) added++;
+  }
+  return added;
+}
+
 /** Update SRS for a lesson's vocab + grammar from per-section scores (0..1). */
 export async function applyReviewOutcome(
   courseId: string,
@@ -128,25 +173,51 @@ export interface DueItems {
   grammar: Array<{ id: string; topicKey: string; title: string; mastery: number }>;
 }
 
-/** Due-or-weak items, used to seed adaptive class content + the listening episode. */
+/** Adaptive due-or-weak items, used to seed practice, classes, and listening. */
 export async function getDueItems(courseId: string, limit = 8): Promise<DueItems> {
   const now = new Date();
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
+  const candidateLimit = Math.max(limit, limit * 4);
   const [vocab, grammar] = await Promise.all([
     prisma.learnerVocab.findMany({
       where: { courseId, ...dueOrWeak },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
-      take: limit,
-      select: { id: true, lemma: true, translation: true, mastery: true },
+      take: candidateLimit,
+      select: {
+        id: true,
+        lemma: true,
+        translation: true,
+        mastery: true,
+        reps: true,
+        lapses: true,
+        dueAt: true,
+        lastReviewed: true,
+      },
     }),
     prisma.learnerGrammar.findMany({
       where: { courseId, ...dueOrWeak },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
-      take: limit,
-      select: { id: true, topicKey: true, title: true, mastery: true },
+      take: candidateLimit,
+      select: {
+        id: true,
+        topicKey: true,
+        title: true,
+        mastery: true,
+        reps: true,
+        lapses: true,
+        dueAt: true,
+        lastReviewed: true,
+      },
     }),
   ]);
-  return { vocab, grammar };
+  return {
+    vocab: rankLearningTargets(vocab, now)
+      .slice(0, limit)
+      .map(({ id, lemma, translation, mastery }) => ({ id, lemma, translation, mastery })),
+    grammar: rankLearningTargets(grammar, now)
+      .slice(0, limit)
+      .map(({ id, topicKey, title, mastery }) => ({ id, topicKey, title, mastery })),
+  };
 }
 
 export interface MemoryGraph {
