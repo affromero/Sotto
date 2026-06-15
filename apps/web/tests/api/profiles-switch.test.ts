@@ -53,8 +53,8 @@ describe('POST /api/v1/profiles/switch', () => {
 
     expect(res.status).toBe(200);
     expect(body).toMatchObject({ ok: true, profileId: 'member-1' });
-    const setCookie = res.headers.get('set-cookie');
-    expect(setCookie).toContain('sotto_profile=member-1');
-    expect(setCookie).toContain('HttpOnly');
+    const cookies = res.headers.getSetCookie();
+    expect(cookies.some((c) => c.startsWith('sotto_profile=member-1') && c.includes('HttpOnly'))).toBe(true);
+    expect(cookies.some((c) => c.startsWith('sotto_theme='))).toBe(true);
   });
 });

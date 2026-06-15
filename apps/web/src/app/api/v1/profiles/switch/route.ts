@@ -3,6 +3,11 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/local-user';
 import { switchProfileSchema } from '@/lib/validations';
+import {
+  THEME_PREFS_COOKIE,
+  serializeThemePrefs,
+  themePrefsFromUser,
+} from '@/lib/theme-prefs';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 
@@ -27,13 +32,27 @@ export async function POST(request: NextRequest) {
 
     const target = await prisma.user.findUnique({
       where: { id: validation.data.profileId },
-      select: { id: true },
+      select: {
+        id: true,
+        themeMode: true,
+        themePalette: true,
+        themeAccent: true,
+        reducedMotion: true,
+      },
     });
     if (!target) return errorResponse('Profile not found', 404);
 
     const response = NextResponse.json({ ok: true, profileId: target.id });
     response.cookies.set(ACTIVE_PROFILE_COOKIE, target.id, {
       httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ONE_YEAR_SECONDS,
+      secure: process.env.NODE_ENV === 'production',
+    });
+    // Seed the readable appearance cookie so the picked profile's theme applies
+    // before first paint on the next navigation.
+    response.cookies.set(THEME_PREFS_COOKIE, serializeThemePrefs(themePrefsFromUser(target)), {
       sameSite: 'lax',
       path: '/',
       maxAge: ONE_YEAR_SECONDS,
