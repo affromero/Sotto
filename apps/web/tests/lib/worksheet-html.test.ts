@@ -24,9 +24,11 @@ function makeDoc(overrides: Partial<ClassDocument> = {}): ClassDocument {
             question: 'Which is correct?',
             options: ['Ich bin', 'Ich bist', 'Ich ist'],
             passageRef: null,
+            passageText: null,
           },
         ],
         prompts: [],
+        writingPrompts: [],
         appLink: null,
         qrDataUrl: null,
       },
@@ -78,11 +80,13 @@ describe('renderWorksheetHtml', () => {
               question: 'Which is correct?',
               options: ['Ich bin', 'Ich bist', 'Ich ist'],
               passageRef: null,
+              passageText: null,
               correctIndex: 0,
               explanation: 'Ich bin is first person singular.',
             },
           ],
           prompts: [],
+          writingPrompts: [],
           appLink: null,
           qrDataUrl: null,
         },
@@ -112,6 +116,7 @@ describe('renderWorksheetHtml', () => {
           instructions: 'Listen and answer.',
           questions: [],
           prompts: [],
+          writingPrompts: [],
           appLink: 'https://example.com/classes/class-1?section=section-1',
           qrDataUrl,
         },
@@ -124,8 +129,7 @@ describe('renderWorksheetHtml', () => {
 
   it('does NOT include <img> when qrDataUrl is null', () => {
     const html = renderWorksheetHtml(makeDoc());
-    // The <div class="qr-block"> element is only emitted when qrDataUrl is set
-    expect(html).not.toContain('<div class="qr-block">');
+    expect(html).not.toContain('class="qr-card"');
   });
 
   it('renders speaking prompts with targetPhrase and translation', () => {
@@ -146,6 +150,7 @@ describe('renderWorksheetHtml', () => {
               ipa: 'ˈɡuːtən ˈmɔʁɡən',
             },
           ],
+          writingPrompts: [],
           appLink: null,
           qrDataUrl: null,
         },
@@ -157,10 +162,65 @@ describe('renderWorksheetHtml', () => {
     expect(html).toContain('ˈɡuːtən ˈmɔʁɡən');
   });
 
+  it('renders reading passage text for Pencil annotation', () => {
+    const doc = makeDoc({
+      sections: [
+        {
+          id: 'section-reading',
+          skill: 'READING',
+          title: 'Reading',
+          instructions: 'Read and answer.',
+          questions: [
+            {
+              id: 'q-reading',
+              order: 1,
+              question: 'What does the speaker want?',
+              options: ['Coffee', 'Tea'],
+              passageRef: 'Passage 1',
+              passageText: 'Ich mochte einen Kaffee.\nDanke schon.',
+            },
+          ],
+          prompts: [],
+          writingPrompts: [],
+          appLink: null,
+          qrDataUrl: null,
+        },
+      ],
+    });
+    const html = renderWorksheetHtml(doc);
+    expect(html).toContain('Passage 1');
+    expect(html).toContain('Ich mochte einen Kaffee.<br />Danke schon.');
+  });
+
+  it('renders writing prompts with ruled writing space', () => {
+    const doc = makeDoc({
+      sections: [
+        {
+          id: 'section-writing',
+          skill: 'WRITING',
+          title: 'Writing',
+          instructions: 'Write a response.',
+          questions: [],
+          prompts: [],
+          writingPrompts: [
+            { id: 'w-1', order: 1, task: 'Write a greeting.', guidance: 'Use two sentences.' },
+          ],
+          appLink: null,
+          qrDataUrl: null,
+        },
+      ],
+    });
+    const html = renderWorksheetHtml(doc);
+    expect(html).toContain('Write a greeting.');
+    expect(html).toContain('Use two sentences.');
+    expect(html).toContain('class="writing-space"');
+  });
+
   it('returns a valid HTML document with DOCTYPE', () => {
     const html = renderWorksheetHtml(makeDoc());
     expect(html.trimStart()).toMatch(/^<!DOCTYPE html>/i);
     expect(html).toContain('</html>');
+    expect(html).toContain('iPad Workbook');
   });
 
   it('escapes HTML special characters in title', () => {

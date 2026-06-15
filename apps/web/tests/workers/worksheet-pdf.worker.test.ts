@@ -65,11 +65,20 @@ function makeFakeClass() {
             question: 'Pick one',
             options: ['A', 'B'],
             passageRef: null,
+            passageText: null,
             correctIndex: 0,
             explanation: null,
           },
         ],
         prompts: [],
+        writingPrompts: [
+          {
+            id: 'w-1',
+            order: 1,
+            task: 'Write a greeting.',
+            guidance: 'Use two sentences.',
+          },
+        ],
       },
     ],
   };
@@ -174,6 +183,27 @@ describe('processWorksheetPdf', () => {
     expect(mockBuildClassDocument).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ appBaseUrl: 'https://app.example.com', isAnswerKey: false }),
+    );
+  });
+
+  it('passes workbook writing prompts to buildClassDocument', async () => {
+    const { processWorksheetPdf } = await import('@/workers/worksheet-pdf.worker');
+    await processWorksheetPdf(makeFakeJob() as never);
+
+    expect(mockBuildClassDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sections: [
+          expect.objectContaining({
+            writingPrompts: [
+              expect.objectContaining({
+                task: 'Write a greeting.',
+                guidance: 'Use two sentences.',
+              }),
+            ],
+          }),
+        ],
+      }),
+      expect.any(Object),
     );
   });
 
