@@ -11,9 +11,8 @@ import {
   toPublic,
   type PlacementQuestion,
 } from '@/lib/placement-test';
-import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { createOrRaiseCourse } from '@/lib/placement-course';
 import { getCourseNote } from '@/lib/course-notes';
-import { higherLevel } from '@/lib/cefr-levels';
 
 const langCode = z.string().trim().toLowerCase().length(2);
 const submitSchema = z.object({
@@ -85,32 +84,11 @@ export async function POST(request: NextRequest) {
     const questions = await cache.get<PlacementQuestion[]>(cacheKey(userId, native, target));
     if (!questions) return errorResponse('Placement session expired. Start the test again.', 409);
 
-    const curriculum = await getOrCreateCurriculum(userId, native, target);
     const outcome = scorePlacement(questions, answers);
 
-    // Safe re-take: when a learner re-takes placement for a pair they already
-    // have, keep the original startLevel and never lower currentLevel (only
-    // raise), so re-testing can never discard progress made through classes.
-    const existing = await prisma.course.findUnique({
-      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
-      select: { currentLevel: true },
-    });
-    const nextCurrentLevel = existing ? higherLevel(existing.currentLevel, outcome.level) : outcome.level;
-
-    const course = await prisma.course.upsert({
-      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
-      create: {
-        userId,
-        nativeLang: native,
-        targetLang: target,
-        curriculumId: curriculum.id,
-        currentLevel: outcome.level,
-        startLevel: outcome.level,
-      },
-      // startLevel is intentionally not updated — it is the immutable first
-      // placement. currentLevel only moves up.
-      update: { currentLevel: nextCurrentLevel },
-    });
+    // Safe re-take lives in createOrRaiseCourse: keep startLevel, only raise
+    // currentLevel, so re-testing never discards progress made through classes.
+    const course = await createOrRaiseCourse(userId, native, target, outcome.level);
 
     await prisma.placementResult.upsert({
       where: { courseId: course.id },
