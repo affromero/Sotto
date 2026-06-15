@@ -39,9 +39,11 @@ const LEVEL_DESCRIPTIONS: Record<string, string> = {
 interface PlacementTestProps {
   native: string;
   target: string;
+  /** When set, runs a shorter test focused on this level (notes "verify"). */
+  focusLevel?: string;
 }
 
-export function PlacementTest({ native, target }: PlacementTestProps) {
+export function PlacementTest({ native, target, focusLevel }: PlacementTestProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [questions, setQuestions] = useState<PlacementQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -52,8 +54,9 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
 
   const loadQuestions = useCallback(async () => {
     try {
+      const focusParam = focusLevel ? `&focusLevel=${encodeURIComponent(focusLevel)}` : '';
       const res = await fetch(
-        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}`,
+        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}${focusParam}`,
       );
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
@@ -85,7 +88,7 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
       setErrorMessage('A network error occurred. Please check your connection and try again.');
       setPhase('error');
     }
-  }, [native, target]);
+  }, [native, target, focusLevel]);
 
   useEffect(() => {
     void (async () => {
