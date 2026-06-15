@@ -1,5 +1,5 @@
-// The render contract for a class worksheet, consumed by the web
-// print-optimized worksheet page. The learner variant omits answer-key fields;
+// The render contract for a class workbook, consumed by the web
+// print-optimized iPad/PDF page. The learner variant omits answer-key fields;
 // the answer-key variant keeps them.
 import type { SkillType } from './enums';
 
@@ -9,6 +9,7 @@ export interface ClassDocumentQuestion {
   question: string;
   options: string[];
   passageRef?: string | null;
+  passageText?: string | null;
   // Answer-key-only — present only when the document is built as an answer key.
   correctIndex?: number;
   explanation?: string;
@@ -22,6 +23,13 @@ export interface ClassDocumentPrompt {
   ipa?: string | null;
 }
 
+export interface ClassDocumentWritingPrompt {
+  id: string;
+  order: number;
+  task: string;
+  guidance?: string | null;
+}
+
 export interface ClassDocumentSection {
   id: string;
   skill: SkillType;
@@ -29,8 +37,10 @@ export interface ClassDocumentSection {
   instructions: string;
   questions: ClassDocumentQuestion[];
   prompts: ClassDocumentPrompt[];
+  writingPrompts: ClassDocumentWritingPrompt[];
   // Deep link + QR that take the printed sheet back into the app (listening
-  // playback / speaking recording). Null when there is no in-app counterpart.
+  // playback / speaking recording / writing grading). Null when there is no
+  // in-app counterpart.
   appLink: string | null;
   qrDataUrl: string | null;
 }

@@ -48,6 +48,7 @@ export type {
   ClassDocumentSection,
   ClassDocumentQuestion,
   ClassDocumentPrompt,
+  ClassDocumentWritingPrompt,
 } from './types/class-document';
 
 export type { VerificationMode } from './types/discovery';
