@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { PROVIDERS } from '../data';
-import type { AgentState } from '../WelcomeFlow';
+import type { AgentState, ModelOption } from '../WelcomeFlow';
+import { aiModelProviderId } from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.module.css';
@@ -9,14 +11,28 @@ import c from '../components.module.css';
 interface Props {
   agent: AgentState;
   demoMode: boolean;
+  /** Registry AI models keyed by backend provider id (anthropic, openai). */
+  aiModels?: Record<string, ModelOption[]>;
   setAgent: (updater: (prev: AgentState) => AgentState) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function StepAgent({ agent, demoMode, setAgent, onNext, onBack }: Props) {
+export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, onBack }: Props) {
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
   const liveTranslationKey = agent.liveTranslationKey ?? '';
+
+  // Model options for a key-method selection (claude → anthropic, codex → openai).
+  const aiRegistryId = aiModelProviderId(agent.provider);
+  const keyModels = agent.method === 'key' && aiRegistryId ? (aiModels[aiRegistryId] ?? []) : [];
+
+  // Always keep a concrete model selected once a key-based provider is chosen, so
+  // "provide a key" implies "and a model". Defaults to the first (cheapest) model.
+  useEffect(() => {
+    if (keyModels.length > 0 && !keyModels.some((m) => m.id === agent.model)) {
+      setAgent((a) => ({ ...a, model: keyModels[0].id }));
+    }
+  }, [keyModels, agent.model, setAgent]);
 
   function pick(id: string) {
     const p = PROVIDERS.find((x) => x.id === id);
@@ -165,6 +181,51 @@ export function StepAgent({ agent, demoMode, setAgent, onNext, onBack }: Props) 
                 >
                   {agent.status === 'connected' ? 'Connected' : 'Verify'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {!demoMode && agent.method === 'key' && keyModels.length > 0 && (
+            <div>
+              <div className={c.fieldLabel}>Model</div>
+              <div className={c.field}>
+                <select
+                  className={c.fieldInput}
+                  value={agent.model}
+                  onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
+                  aria-label={`${prov.name} model`}
+                >
+                  {keyModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={c.locknote}>
+                <Glyph name="spark" size={15} />
+                The model that generates your lessons. Change it anytime in admin settings.
+              </div>
+            </div>
+          )}
+
+          {!demoMode && agent.method === 'url' && (
+            <div>
+              <div className={c.fieldLabel}>Model</div>
+              <div className={c.field}>
+                <input
+                  className={c.fieldInput}
+                  type="text"
+                  placeholder="qwen3, llama3.3, gemma3…"
+                  value={agent.model}
+                  onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
+                  aria-label="Local model name"
+                />
+              </div>
+              <div className={c.locknote}>
+                <Glyph name="spark" size={15} />
+                The model your local server serves (sent as AI_MODEL). Change it anytime in admin
+                settings.
               </div>
             </div>
           )}

@@ -1,9 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TTS_PROVIDERS, STT_PROVIDERS } from '../data';
-import type { VoiceState } from '../WelcomeFlow';
-import { DEFAULT_LOCAL_STT_BASE_URL, DEFAULT_LOCAL_TTS_BASE_URL } from '../providerMap';
+import type { ModelOption, VoiceState } from '../WelcomeFlow';
+import {
+  DEFAULT_LOCAL_STT_BASE_URL,
+  DEFAULT_LOCAL_TTS_BASE_URL,
+  sttModelProviderId,
+} from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.module.css';
@@ -20,6 +24,10 @@ interface VoicePickerProps {
   onBaseUrl: (id: string, val: string) => void;
   localPlaceholder: string;
   demoMode: boolean;
+  /** Model options for the currently selected provider (empty for local/none). */
+  modelOptions: ModelOption[];
+  modelValue: string;
+  onModel: (modelId: string) => void;
 }
 
 function VoicePicker({
@@ -34,6 +42,9 @@ function VoicePicker({
   onBaseUrl,
   localPlaceholder,
   demoMode,
+  modelOptions,
+  modelValue,
+  onModel,
 }: VoicePickerProps) {
   const sel = providers.find((p) => p.id === value) ?? providers[0];
   const k = keys[sel.id] ?? '';
@@ -157,6 +168,25 @@ function VoicePicker({
               </a>
             ) : null}
           </div>
+          {modelOptions.length > 0 && (
+            <div className={c.vkRow}>
+              <span className={c.vkLabel}>
+                <Glyph name="spark" size={13} /> {sel.name} model
+              </span>
+              <select
+                className={c.vkInput}
+                value={modelValue}
+                onChange={(e) => onModel(e.target.value)}
+                aria-label={`${sel.name} model`}
+              >
+                {modelOptions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className={c.vkNote}>
             {k.trim()
               ? `Saved to your config · ${sel.note} · edit anytime in settings`
@@ -171,6 +201,10 @@ function VoicePicker({
 interface Props {
   voice: VoiceState;
   demoMode: boolean;
+  /** Registry TTS models keyed by provider id (elevenlabs, openai, cartesia, hume). */
+  ttsModels?: Record<string, ModelOption[]>;
+  /** Registry STT models keyed by registry provider id (openai, deepgram, assemblyai, elevenlabs). */
+  sttModels?: Record<string, ModelOption[]>;
   setVoice: (updater: (prev: VoiceState) => VoiceState) => void;
   onNext: () => void;
   onBack: () => void;
@@ -195,7 +229,15 @@ function isLocalProvider(id: string, providers: typeof TTS_PROVIDERS) {
   return providers.some((provider) => provider.id === id && provider.local);
 }
 
-export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) {
+export function StepVoice({
+  voice,
+  demoMode,
+  ttsModels = {},
+  sttModels = {},
+  setVoice,
+  onNext,
+  onBack,
+}: Props) {
   const [localCheck, setLocalCheck] = useState<LocalSpeechCheckState>({
     status: 'idle',
     signature: '',
@@ -208,6 +250,38 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
     setVoice((s) => ({ ...s, baseUrls: { ...s.baseUrls, [id]: val } }));
   const ttsIsLocal = isLocalProvider(voice.tts, TTS_PROVIDERS);
   const sttIsLocal = isLocalProvider(voice.stt, STT_PROVIDERS);
+
+  // Model pickers for the currently-selected cloud provider. TTS keys by provider
+  // id directly; STT remaps the wizard id (whisper→local, assembly→assemblyai).
+  const ttsModelRegId = voice.tts;
+  const sttModelRegId = sttModelProviderId(voice.stt);
+  const ttsModelOptions = useMemo<ModelOption[]>(
+    () => (ttsIsLocal ? [] : (ttsModels[ttsModelRegId] ?? [])),
+    [ttsIsLocal, ttsModels, ttsModelRegId]
+  );
+  const sttModelOptions = useMemo<ModelOption[]>(
+    () => (sttIsLocal ? [] : (sttModels[sttModelRegId] ?? [])),
+    [sttIsLocal, sttModels, sttModelRegId]
+  );
+  const setTtsModel = (modelId: string) =>
+    setVoice((s) => ({ ...s, ttsModel: { ...s.ttsModel, [ttsModelRegId]: modelId } }));
+  const setSttModel = (modelId: string) =>
+    setVoice((s) => ({ ...s, sttModel: { ...s.sttModel, [sttModelRegId]: modelId } }));
+
+  // Keep a concrete model selected for the active cloud provider (defaults to the
+  // first option) so choosing a provider always yields a model — changeable later.
+  useEffect(() => {
+    if (ttsModelOptions.length > 0 && !ttsModelOptions.some((m) => m.id === voice.ttsModel[ttsModelRegId])) {
+      setTtsModel(ttsModelOptions[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsModelOptions, ttsModelRegId, voice.ttsModel]);
+  useEffect(() => {
+    if (sttModelOptions.length > 0 && !sttModelOptions.some((m) => m.id === voice.sttModel[sttModelRegId])) {
+      setSttModel(sttModelOptions[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sttModelOptions, sttModelRegId, voice.sttModel]);
   const needsLocalCheck = !demoMode && (ttsIsLocal || sttIsLocal);
   const localCheckSignature = useMemo(
     () =>
@@ -306,6 +380,9 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8000"
         demoMode={demoMode}
+        modelOptions={ttsModelOptions}
+        modelValue={voice.ttsModel[ttsModelRegId] ?? ''}
+        onModel={setTtsModel}
       />
 
       <VoicePicker
@@ -320,6 +397,9 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8001/v1"
         demoMode={demoMode}
+        modelOptions={sttModelOptions}
+        modelValue={voice.sttModel[sttModelRegId] ?? ''}
+        onModel={setSttModel}
       />
 
       <div className={`${c.locknote} ${c.voiceFoot}`}>

@@ -236,7 +236,7 @@ describe('welcome hosted-demo mode', () => {
     expect(copy).toMatch(/course|lesson/i);
   });
 
-  it('keeps local endpoint setup to the design URL field only', () => {
+  it('captures the local endpoint URL and the served model name', () => {
     render(
       <StepAgent
         agent={{
@@ -254,7 +254,10 @@ describe('welcome hosted-demo mode', () => {
     );
 
     expect(screen.getByLabelText(/endpoint URL/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/local model name/i)).not.toBeInTheDocument();
+    // The local server's served model (AI_MODEL) is now captured here too.
+    const modelInput = screen.getByLabelText(/local model name/i);
+    expect(modelInput).toBeInTheDocument();
+    expect(modelInput).toHaveValue('qwen3');
   });
 
   it('simulates every agent connection in hosted demo without key or endpoint prompts', async () => {
@@ -283,7 +286,7 @@ describe('welcome hosted-demo mode', () => {
   it('previews voice providers in demo mode without asking for API keys', () => {
     render(
       <StepVoice
-        voice={{ tts: 'elevenlabs', stt: 'deepgram', keys: {}, baseUrls: {} }}
+        voice={{ tts: 'elevenlabs', stt: 'deepgram', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
         demoMode
         setVoice={vi.fn()}
         onNext={vi.fn()}
@@ -314,7 +317,7 @@ describe('welcome hosted-demo mode', () => {
 
   it('requires a green local endpoint check before continuing with local speech', async () => {
     const user = userEvent.setup();
-    let voice = { tts: 'local', stt: 'local', keys: {}, baseUrls: {} };
+    let voice = { tts: 'local', stt: 'local', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} };
     const setVoice = vi.fn((updater: (prev: typeof voice) => typeof voice) => {
       voice = updater(voice);
     });
@@ -494,7 +497,7 @@ describe('welcome hosted-demo mode', () => {
         sources={new Set(['reading'])}
         contextItems={[]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
-        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} }}
+        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
         config={{ selfHosted: false, isOwner: false }}
         onRestart={vi.fn()}
         onJump={onJump}
@@ -542,7 +545,7 @@ describe('welcome hosted-demo mode', () => {
           },
         ]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
-        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} }}
+        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
         config={{ selfHosted: true, isOwner: false }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
@@ -592,7 +595,7 @@ describe('welcome hosted-demo mode', () => {
           liveTranslationKey: 'AIza-live',
           status: 'connected',
         }}
-        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} }}
+        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
         config={{ selfHosted: true, isOwner: false }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
