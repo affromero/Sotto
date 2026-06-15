@@ -137,6 +137,7 @@ impl From<types::StartPracticeUnavailableReason> for Unavailable {
 /// Friendly skill name for a practice kind, used in notices.
 fn skill_name(kind: types::PracticeKind) -> &'static str {
     match kind {
+        types::PracticeKind::Full => "Full catch-up",
         types::PracticeKind::Vocab => "Vocabulary",
         types::PracticeKind::Grammar => "Grammar",
         types::PracticeKind::Reading => "Reading",
@@ -154,7 +155,7 @@ pub(crate) enum RetryKind {
 }
 
 /// The skills the terminal can start from the CourseHome menu. Vocab/listening/
-/// speaking landed in P4/P5; grammar/reading are wired in P6a. Writing still
+/// speaking landed in P4/P5; grammar/reading are wired in P6a. Full/writing still
 /// routes to a "not in the terminal yet" notice via [`reduce_start`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SkillChoice {
@@ -1525,7 +1526,7 @@ fn section_complete(section: &ClassSection) -> bool {
 /// - `ready` that is empty/malformed for its skill → a `Malformed` notice; we
 ///   never enter a review we cannot present honestly.
 /// - `unavailable` → the server's reason as a notice.
-/// - `ready_writing` → a not-in-terminal notice.
+/// - `ready_writing` / `ready_full` → a not-in-terminal notice.
 ///
 /// In every non-review case the learner stays on `CourseHome` (the start
 /// in-flight flag is cleared). If `view` is not a `CourseHome`, it is returned
@@ -1566,6 +1567,11 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
             course,
             due,
             Unavailable::NotInTerminal(skill_name(types::PracticeKind::Writing)),
+        ),
+        types::StartPracticeResponse::ReadyFull(_) => course_home_notice(
+            course,
+            due,
+            Unavailable::NotInTerminal(skill_name(types::PracticeKind::Full)),
         ),
     }
 }

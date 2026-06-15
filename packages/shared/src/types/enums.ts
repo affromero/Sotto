@@ -21,13 +21,7 @@ export type EpisodeStatus =
 
 export type EpisodeVisibility = 'UNLISTED' | 'PRIVATE';
 
-export type EpisodeSource =
-  | 'WEB'
-  | 'API'
-  | 'AGENT'
-  | 'IMPORT'
-  | 'ADMIN'
-  | 'CLASS';
+export type EpisodeSource = 'WEB' | 'API' | 'AGENT' | 'IMPORT' | 'ADMIN' | 'CLASS';
 
 export type Speaker = string;
 
@@ -89,7 +83,14 @@ export type EdgeType =
 
 // Ungated single-skill practice. VOCAB is first-class (spaced-repetition recall)
 // and is intentionally NOT part of SkillType (which gates the four class sections).
-export type PracticeKind = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'VOCAB';
+export type PracticeKind =
+  | 'FULL'
+  | 'GRAMMAR'
+  | 'READING'
+  | 'LISTENING'
+  | 'SPEAKING'
+  | 'WRITING'
+  | 'VOCAB';
 
 export type PracticeStatus = 'ACTIVE' | 'COMPLETED';
 

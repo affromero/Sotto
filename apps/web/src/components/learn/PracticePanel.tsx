@@ -18,6 +18,7 @@ interface Overview {
 type StartResponse = PracticeStart | { status: 'unavailable'; reason: string };
 
 const KINDS: Array<{ kind: string; label: string; blurb: string }> = [
+  { kind: 'FULL', label: 'Full catch-up', blurb: 'Mixed review across weak spots' },
   { kind: 'VOCAB', label: 'Vocabulary', blurb: 'Recall words from memory' },
   { kind: 'GRAMMAR', label: 'Grammar', blurb: 'Fresh grammar questions' },
   { kind: 'READING', label: 'Reading', blurb: 'Short passages + comprehension' },
@@ -68,7 +69,9 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
       });
       const data = (await res.json()) as StartResponse;
       if (data.status === 'unavailable') {
-        setMessage(UNAVAILABLE_COPY[data.reason] ?? 'Practice is not available yet for this skill.');
+        setMessage(
+          UNAVAILABLE_COPY[data.reason] ?? 'Practice is not available yet for this skill.'
+        );
         setPhase('unavailable');
         return;
       }
@@ -90,7 +93,12 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
     return (
       <div className={styles.root}>
         <header className={styles.runHeader}>
-          <button type="button" className={styles.backLink} onClick={backToOverview} aria-label="Back to practice menu">
+          <button
+            type="button"
+            className={styles.backLink}
+            onClick={backToOverview}
+            aria-label="Back to practice menu"
+          >
             ← Practice menu
           </button>
         </header>
@@ -100,6 +108,7 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
   }
 
   const dueBadge: Record<string, number | undefined> = {
+    FULL: overview ? overview.due.vocab + overview.due.grammar : undefined,
     VOCAB: overview?.due.vocab,
     GRAMMAR: overview?.due.grammar,
   };
@@ -108,7 +117,9 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
     <div className={styles.root}>
       <header className={styles.header}>
         <h2 className={styles.courseName}>{courseName}</h2>
-        <p className={styles.subtitle}>Quick, ungated review — separate from your graded classes.</p>
+        <p className={styles.subtitle}>
+          Quick, ungated review — separate from your graded classes.
+        </p>
       </header>
 
       {phase === 'unavailable' && (

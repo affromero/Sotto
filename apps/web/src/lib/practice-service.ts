@@ -16,6 +16,8 @@ import type { CefrLevel, PracticeKind, SkillType, PedagogyStyle } from '@sotto/s
 
 const MC_COUNT = 6;
 const VOCAB_COUNT = 12;
+const FULL_VOCAB_COUNT = 5;
+const FULL_DUE_COUNT = 12;
 const MIN_VOCAB = 2;
 const VOCAB_CHOICES = 4;
 
@@ -53,9 +55,24 @@ export interface PracticeWritingItem {
 
 export type StartPracticeResult =
   | { status: 'unavailable'; reason: 'not_enough_vocab' | 'nothing_due' | 'no_content' }
-  | { status: 'ready'; sessionId: string; kind: PracticeKind; items: PracticeMcItemPublic[]; episodeId?: string }
+  | {
+      status: 'ready';
+      sessionId: string;
+      kind: PracticeKind;
+      items: PracticeMcItemPublic[];
+      episodeId?: string;
+    }
   | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] }
-  | { status: 'ready_writing'; sessionId: string; prompts: PracticeWritingItem[] };
+  | { status: 'ready_writing'; sessionId: string; prompts: PracticeWritingItem[] }
+  | {
+      status: 'ready_full';
+      sessionId: string;
+      kind: 'FULL';
+      items: PracticeMcItemPublic[];
+      episodeId?: string;
+      speakingPrompts: PracticeSpeakingItem[];
+      writingPrompts: PracticeWritingItem[];
+    };
 
 export interface PracticeAnswer {
   itemId: string;
@@ -66,6 +83,15 @@ export interface SubmitPracticeResult {
   score: number;
   correct: number;
   total: number;
+}
+
+interface MultipleChoiceScore {
+  correct: number;
+  total: number;
+  score: number;
+  correctLemmas: string[];
+  incorrectLemmas: string[];
+  sections: Record<string, { correct: number; total: number }>;
 }
 
 function toPublic(it: PracticeMcItem): PracticeMcItemPublic {
@@ -85,6 +111,49 @@ function sample<T>(arr: T[], n: number): T[] {
   return shuffle(arr).slice(0, n);
 }
 
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim() !== ''))];
+}
+
+function mcSection(itemId: string): string {
+  const prefix = itemId.charAt(0);
+  return prefix === 'v' || prefix === 'g' || prefix === 'r' || prefix === 'l' ? prefix : 'q';
+}
+
+function scoreMultipleChoice(
+  items: PracticeMcItem[],
+  answers: PracticeAnswer[]
+): MultipleChoiceScore {
+  const sections: Record<string, { correct: number; total: number }> = {};
+  const answered = new Map(answers.map((answer) => [answer.itemId, answer.selectedIndex]));
+  let correct = 0;
+  const correctLemmas: string[] = [];
+  const incorrectLemmas: string[] = [];
+
+  for (const item of items) {
+    const selectedIndex = answered.get(item.id);
+    const section = mcSection(item.id);
+    sections[section] ??= { correct: 0, total: 0 };
+    sections[section].total += 1;
+    const ok = selectedIndex === item.correctIndex;
+    if (ok) {
+      correct += 1;
+      sections[section].correct += 1;
+    }
+    if (item.vocabLemma) (ok ? correctLemmas : incorrectLemmas).push(item.vocabLemma);
+  }
+
+  const total = items.length;
+  return {
+    correct,
+    total,
+    score: total > 0 ? correct / total : 0,
+    correctLemmas,
+    incorrectLemmas,
+    sections,
+  };
+}
+
 interface CourseCtx {
   id: string;
   userId: string;
@@ -98,7 +167,15 @@ interface CourseCtx {
 async function loadCourse(courseId: string, userId: string): Promise<CourseCtx> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
-    select: { id: true, userId: true, nativeLang: true, targetLang: true, currentLevel: true, curriculumId: true, pedagogy: true },
+    select: {
+      id: true,
+      userId: true,
+      nativeLang: true,
+      targetLang: true,
+      currentLevel: true,
+      curriculumId: true,
+      pedagogy: true,
+    },
   });
   if (!course) throw new PracticeCourseNotFoundError('Course not found');
   return course;
@@ -114,7 +191,7 @@ interface PracticeSeed {
 // curriculum lesson so the learner can still practice their level's material.
 async function resolveSeed(
   course: CourseCtx,
-  due: Awaited<ReturnType<typeof getDueItems>>,
+  due: Awaited<ReturnType<typeof getDueItems>>
 ): Promise<PracticeSeed | null> {
   const grammarPoints = due.grammar.map((g) => g.topicKey);
   const targetVocab = due.vocab.map((v) => ({ lemma: v.lemma, gloss: v.translation }));
@@ -132,7 +209,9 @@ async function resolveSeed(
     lemma: string;
     gloss: string;
   }>;
-  const lessonGrammar = (Array.isArray(lesson.grammarPoints) ? lesson.grammarPoints : []) as string[];
+  const lessonGrammar = (
+    Array.isArray(lesson.grammarPoints) ? lesson.grammarPoints : []
+  ) as string[];
   if (lessonGrammar.length === 0 && lessonVocab.length === 0) return null;
   return { objective: lesson.objective, grammarPoints: lessonGrammar, targetVocab: lessonVocab };
 }
@@ -140,7 +219,7 @@ async function resolveSeed(
 export async function startPractice(
   courseId: string,
   userId: string,
-  kind: PracticeKind,
+  kind: PracticeKind
 ): Promise<StartPracticeResult> {
   const course = await loadCourse(courseId, userId);
   const seedToken = `${courseId}-${kind}-${Date.now()}`;
@@ -148,10 +227,11 @@ export async function startPractice(
   if (kind === 'VOCAB') return startVocab(course, seedToken);
 
   const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
-  const due = await getDueItems(courseId, MC_COUNT);
+  const due = await getDueItems(courseId, kind === 'FULL' ? FULL_DUE_COUNT : MC_COUNT);
   const seed = await resolveSeed(course, due);
   if (!seed) return { status: 'unavailable', reason: 'no_content' };
 
+  if (kind === 'FULL') return startFull(course, seed, seedToken, note);
   if (kind === 'GRAMMAR' || kind === 'READING') {
     return startMc(course, kind, seed, seedToken, note);
   }
@@ -160,18 +240,26 @@ export async function startPractice(
   return startWriting(course, seed, seedToken, note);
 }
 
-async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPracticeResult> {
+type VocabPracticeBuild =
+  | { status: 'ready'; items: PracticeMcItem[]; lemmas: string[] }
+  | { status: 'unavailable'; reason: 'not_enough_vocab' | 'nothing_due' };
+
+async function buildVocabItems(
+  course: CourseCtx,
+  count: number,
+  idPrefix: string
+): Promise<VocabPracticeBuild> {
   const totalVocab = await prisma.learnerVocab.count({ where: { courseId: course.id } });
   if (totalVocab < MIN_VOCAB) return { status: 'unavailable', reason: 'not_enough_vocab' };
 
-  const due = await getDueItems(course.id, VOCAB_COUNT);
+  const due = await getDueItems(course.id, count);
   let review = due.vocab;
   if (review.length === 0) {
     // Everything mastered + not yet due: refresh the weakest items.
     review = await prisma.learnerVocab.findMany({
       where: { courseId: course.id },
       orderBy: { mastery: 'asc' },
-      take: VOCAB_COUNT,
+      take: count,
       select: { id: true, lemma: true, translation: true, mastery: true },
     });
   }
@@ -179,9 +267,13 @@ async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPr
 
   // Distractor pool: other course lemmas, padded from curriculum vocab on cold start.
   const pool = new Set(
-    (await prisma.learnerVocab.findMany({ where: { courseId: course.id }, select: { lemma: true }, take: 300 })).map(
-      (v) => v.lemma,
-    ),
+    (
+      await prisma.learnerVocab.findMany({
+        where: { courseId: course.id },
+        select: { lemma: true },
+        take: 300,
+      })
+    ).map((v) => v.lemma)
   );
   if (pool.size < VOCAB_CHOICES) {
     const lessons = await prisma.lesson.findMany({
@@ -189,7 +281,9 @@ async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPr
       select: { targetVocab: true },
     });
     for (const l of lessons) {
-      for (const tv of (Array.isArray(l.targetVocab) ? l.targetVocab : []) as Array<{ lemma: string }>) {
+      for (const tv of (Array.isArray(l.targetVocab) ? l.targetVocab : []) as Array<{
+        lemma: string;
+      }>) {
         if (tv?.lemma) pool.add(tv.lemma);
       }
     }
@@ -198,11 +292,11 @@ async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPr
   const items: PracticeMcItem[] = shuffle(review).map((v, i) => {
     const distractors = sample(
       [...pool].filter((l) => l !== v.lemma),
-      VOCAB_CHOICES - 1,
+      VOCAB_CHOICES - 1
     );
     const options = shuffle([v.lemma, ...distractors]);
     return {
-      id: `v${i}`,
+      id: `${idPrefix}${i}`,
       prompt: v.translation,
       options,
       correctIndex: options.indexOf(v.lemma),
@@ -211,17 +305,29 @@ async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPr
     };
   });
 
+  return { status: 'ready', items, lemmas: review.map((v) => v.lemma) };
+}
+
+async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPracticeResult> {
+  const built = await buildVocabItems(course, VOCAB_COUNT, 'v');
+  if (built.status === 'unavailable') return built;
+
   const session = await prisma.practiceSession.create({
     data: {
       courseId: course.id,
       kind: 'VOCAB',
-      items: items as unknown as Prisma.InputJsonValue,
+      items: built.items as unknown as Prisma.InputJsonValue,
       seed: seedToken,
-      vocabLemmas: review.map((v) => v.lemma),
+      vocabLemmas: built.lemmas,
       grammarKeys: [],
     },
   });
-  return { status: 'ready', sessionId: session.id, kind: 'VOCAB', items: items.map(toPublic) };
+  return {
+    status: 'ready',
+    sessionId: session.id,
+    kind: 'VOCAB',
+    items: built.items.map(toPublic),
+  };
 }
 
 async function startMc(
@@ -229,28 +335,9 @@ async function startMc(
   kind: 'GRAMMAR' | 'READING',
   seed: PracticeSeed,
   seedToken: string,
-  note: string,
+  note: string
 ): Promise<StartPracticeResult> {
-  const questions = await generateSectionQuestions({
-    userId: course.userId,
-    skill: kind as SkillType,
-    level: course.currentLevel,
-    nativeLang: course.nativeLang,
-    targetLang: course.targetLang,
-    objective: seed.objective,
-    grammarPoints: seed.grammarPoints,
-    targetVocab: seed.targetVocab,
-    seed: seedToken,
-    note,
-  });
-  const items: PracticeMcItem[] = questions.map((q, i) => ({
-    id: `q${i}`,
-    prompt: q.question,
-    options: q.options,
-    correctIndex: q.correctIndex,
-    explanation: q.explanation,
-    vocabLemma: null,
-  }));
+  const items = await buildSectionMcItems(course, kind, seed, seedToken, note, 'q');
   const session = await prisma.practiceSession.create({
     data: {
       courseId: course.id,
@@ -264,11 +351,162 @@ async function startMc(
   return { status: 'ready', sessionId: session.id, kind, items: items.map(toPublic) };
 }
 
+async function buildSectionMcItems(
+  course: CourseCtx,
+  kind: 'GRAMMAR' | 'READING',
+  seed: PracticeSeed,
+  seedToken: string,
+  note: string,
+  idPrefix: string
+): Promise<PracticeMcItem[]> {
+  const questions = await generateSectionQuestions({
+    userId: course.userId,
+    skill: kind as SkillType,
+    level: course.currentLevel,
+    nativeLang: course.nativeLang,
+    targetLang: course.targetLang,
+    objective: seed.objective,
+    grammarPoints: seed.grammarPoints,
+    targetVocab: seed.targetVocab,
+    seed: seedToken,
+    note,
+  });
+  return questions.map((q, i) => ({
+    id: `${idPrefix}${i}`,
+    prompt: q.question,
+    options: q.options,
+    correctIndex: q.correctIndex,
+    explanation: q.explanation,
+    vocabLemma: null,
+  }));
+}
+
+async function startFull(
+  course: CourseCtx,
+  seed: PracticeSeed,
+  seedToken: string,
+  note: string
+): Promise<StartPracticeResult> {
+  const vocab = await buildVocabItems(course, FULL_VOCAB_COUNT, 'v');
+  const vocabItems = vocab.status === 'ready' ? vocab.items : [];
+  const vocabLemmas = vocab.status === 'ready' ? vocab.lemmas : [];
+
+  const [grammarItems, readingItems, listening, speakingComposed, writingComposed] =
+    await Promise.all([
+      buildSectionMcItems(course, 'GRAMMAR', seed, `${seedToken}-grammar`, note, 'g'),
+      buildSectionMcItems(course, 'READING', seed, `${seedToken}-reading`, note, 'r'),
+      composeListeningContent({
+        userId: course.userId,
+        courseId: course.id,
+        level: course.currentLevel,
+        nativeLang: course.nativeLang,
+        targetLang: course.targetLang,
+        objective: seed.objective,
+        mustIncludeVocab: seed.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
+        note,
+      }),
+      composeSpeakingPrompts({
+        userId: course.userId,
+        level: course.currentLevel,
+        nativeLang: course.nativeLang,
+        targetLang: course.targetLang,
+        objective: seed.objective,
+        targetVocab: seed.targetVocab,
+        refId: seedToken,
+        note,
+      }),
+      composeWritingPrompts({
+        userId: course.userId,
+        level: course.currentLevel,
+        nativeLang: course.nativeLang,
+        targetLang: course.targetLang,
+        objective: seed.objective,
+        targetVocab: seed.targetVocab,
+        note,
+      }),
+    ]);
+
+  const listeningItems: PracticeMcItem[] = listening.comprehensionQuestions.map((q, i) => ({
+    id: `l${i}`,
+    prompt: q.question,
+    options: q.options,
+    correctIndex: q.correctIndex,
+    explanation: q.explanation,
+    vocabLemma: null,
+  }));
+  const items = [...vocabItems, ...grammarItems, ...readingItems, ...listeningItems];
+  if (items.length === 0 && speakingComposed.length === 0 && writingComposed.length === 0) {
+    return { status: 'unavailable', reason: 'no_content' };
+  }
+
+  const session = await prisma.practiceSession.create({
+    data: {
+      courseId: course.id,
+      kind: 'FULL',
+      items: items as unknown as Prisma.InputJsonValue,
+      seed: seedToken,
+      vocabLemmas: uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)]),
+      grammarKeys: seed.grammarPoints,
+      episodeId: listening.episodeId,
+    },
+  });
+
+  await Promise.all([
+    prisma.speakingPrompt.createMany({
+      data: speakingComposed.map((c, i) => ({
+        practiceSessionId: session.id,
+        order: i + 1,
+        targetPhrase: c.targetPhrase,
+        translation: c.translation,
+        ipa: c.ipa,
+        referenceTtsUrl: c.referenceTtsUrl,
+      })),
+    }),
+    prisma.writingPrompt.createMany({
+      data: writingComposed.map((c, i) => ({
+        practiceSessionId: session.id,
+        order: i + 1,
+        task: c.task,
+        guidance: c.guidance,
+      })),
+    }),
+  ]);
+
+  const [speakingPrompts, writingPrompts] = await Promise.all([
+    prisma.speakingPrompt.findMany({
+      where: { practiceSessionId: session.id },
+      orderBy: { order: 'asc' },
+      select: { id: true, targetPhrase: true, translation: true, referenceTtsUrl: true },
+    }),
+    prisma.writingPrompt.findMany({
+      where: { practiceSessionId: session.id },
+      orderBy: { order: 'asc' },
+      select: { id: true, task: true, guidance: true },
+    }),
+  ]);
+
+  logger.info('Full practice generated', {
+    sessionId: session.id,
+    itemCount: String(items.length),
+    speakingCount: String(speakingPrompts.length),
+    writingCount: String(writingPrompts.length),
+  });
+  return {
+    status: 'ready_full',
+    sessionId: session.id,
+    kind: 'FULL',
+    items: items.map(toPublic),
+    episodeId: listening.episodeId,
+    speakingPrompts,
+    writingPrompts,
+  };
+}
+
 async function startListening(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string,
+  note: string
 ): Promise<StartPracticeResult> {
   const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: course.userId,
@@ -299,14 +537,20 @@ async function startListening(
       episodeId,
     },
   });
-  return { status: 'ready', sessionId: session.id, kind: 'LISTENING', items: items.map(toPublic), episodeId };
+  return {
+    status: 'ready',
+    sessionId: session.id,
+    kind: 'LISTENING',
+    items: items.map(toPublic),
+    episodeId,
+  };
 }
 
 async function startSpeaking(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string,
+  note: string
 ): Promise<StartPracticeResult> {
   // Speaking prompts hang off the session, so create it first to namespace them.
   const session = await prisma.practiceSession.create({
@@ -348,7 +592,10 @@ async function startSpeaking(
     select: { id: true, targetPhrase: true, translation: true, referenceTtsUrl: true },
   });
 
-  logger.info('Speaking practice generated', { sessionId: session.id, promptCount: String(prompts.length) });
+  logger.info('Speaking practice generated', {
+    sessionId: session.id,
+    promptCount: String(prompts.length),
+  });
   return { status: 'ready_speaking', sessionId: session.id, prompts };
 }
 
@@ -356,7 +603,7 @@ async function startWriting(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string,
+  note: string
 ): Promise<StartPracticeResult> {
   // Writing prompts hang off the session, so create it first.
   const session = await prisma.practiceSession.create({
@@ -395,14 +642,17 @@ async function startWriting(
     select: { id: true, task: true, guidance: true },
   });
 
-  logger.info('Writing practice generated', { sessionId: session.id, promptCount: String(prompts.length) });
+  logger.info('Writing practice generated', {
+    sessionId: session.id,
+    promptCount: String(prompts.length),
+  });
   return { status: 'ready_writing', sessionId: session.id, prompts };
 }
 
 export async function submitPractice(
   sessionId: string,
   userId: string,
-  answers: PracticeAnswer[],
+  answers: PracticeAnswer[]
 ): Promise<SubmitPracticeResult> {
   const session = await prisma.practiceSession.findFirst({
     where: { id: sessionId, course: { userId } },
@@ -418,41 +668,116 @@ export async function submitPractice(
   }
 
   const items = (session.items as unknown as PracticeMcItem[]) ?? [];
-  const byId = new Map(items.map((it) => [it.id, it]));
-  let correct = 0;
-  const correctLemmas: string[] = [];
-  const incorrectLemmas: string[] = [];
-  for (const a of answers) {
-    const it = byId.get(a.itemId);
-    if (!it) continue;
-    const ok = a.selectedIndex === it.correctIndex;
-    if (ok) correct++;
-    if (it.vocabLemma) (ok ? correctLemmas : incorrectLemmas).push(it.vocabLemma);
+  if (session.kind === 'FULL') {
+    return submitFull(
+      session.id,
+      session.courseId,
+      session.vocabLemmas,
+      session.grammarKeys,
+      items,
+      answers,
+      now
+    );
   }
-  const total = items.length;
-  const score = total > 0 ? correct / total : 0;
+
+  const mc = scoreMultipleChoice(items, answers);
 
   if (session.kind === 'VOCAB') {
     // Per-item SRS: each lemma gets a quality from its own answer.
-    if (correctLemmas.length) await applyReviewOutcome(session.courseId, correctLemmas, [], 1, 0, now);
-    if (incorrectLemmas.length) await applyReviewOutcome(session.courseId, incorrectLemmas, [], 0, 0, now);
+    if (mc.correctLemmas.length)
+      await applyReviewOutcome(session.courseId, mc.correctLemmas, [], 1, 0, now);
+    if (mc.incorrectLemmas.length)
+      await applyReviewOutcome(session.courseId, mc.incorrectLemmas, [], 0, 0, now);
   } else {
     // Aggregate score across the session's due items (questions aren't per-item tagged).
-    await applyReviewOutcome(session.courseId, session.vocabLemmas, session.grammarKeys, score, score, now);
+    await applyReviewOutcome(
+      session.courseId,
+      session.vocabLemmas,
+      session.grammarKeys,
+      mc.score,
+      mc.score,
+      now
+    );
+  }
+
+  await prisma.practiceSession.update({
+    where: { id: sessionId },
+    data: { status: 'COMPLETED', score: mc.score, completedAt: now },
+  });
+  return { score: mc.score, correct: mc.correct, total: mc.total };
+}
+
+async function submitFull(
+  sessionId: string,
+  courseId: string,
+  vocabLemmas: string[],
+  grammarKeys: string[],
+  items: PracticeMcItem[],
+  answers: PracticeAnswer[],
+  now: Date
+): Promise<SubmitPracticeResult> {
+  const mc = scoreMultipleChoice(items, answers);
+  const [recordings, responses, speakingTotal, writingTotal] = await Promise.all([
+    prisma.speakingRecording.findMany({
+      where: { practiceSessionId: sessionId, overallScore: { not: null } },
+      select: { overallScore: true },
+    }),
+    prisma.writingResponse.findMany({
+      where: { practiceSessionId: sessionId, overallScore: { not: null } },
+      select: { overallScore: true },
+    }),
+    prisma.speakingPrompt.count({ where: { practiceSessionId: sessionId } }),
+    prisma.writingPrompt.count({ where: { practiceSessionId: sessionId } }),
+  ]);
+
+  const speakingAvg =
+    recordings.length > 0
+      ? recordings.reduce((sum, r) => sum + (r.overallScore ?? 0), 0) / recordings.length
+      : null;
+  const writingAvg =
+    responses.length > 0
+      ? responses.reduce((sum, r) => sum + (r.overallScore ?? 0), 0) / responses.length
+      : null;
+  const scoredParts = [mc.total > 0 ? mc.score : null, speakingAvg, writingAvg].filter(
+    (score): score is number => score !== null
+  );
+  const score =
+    scoredParts.length > 0
+      ? scoredParts.reduce((sum, part) => sum + part, 0) / scoredParts.length
+      : 0;
+
+  if (mc.correctLemmas.length) await applyReviewOutcome(courseId, mc.correctLemmas, [], 1, 0, now);
+  if (mc.incorrectLemmas.length)
+    await applyReviewOutcome(courseId, mc.incorrectLemmas, [], 0, 0, now);
+
+  const taggedLemmas = new Set([...mc.correctLemmas, ...mc.incorrectLemmas]);
+  const aggregateVocab = vocabLemmas.filter((lemma) => !taggedLemmas.has(lemma));
+  const grammarSection = mc.sections.g;
+  const grammarScore =
+    grammarSection && grammarSection.total > 0
+      ? grammarSection.correct / grammarSection.total
+      : score;
+  if (aggregateVocab.length > 0 || grammarKeys.length > 0) {
+    await applyReviewOutcome(courseId, aggregateVocab, grammarKeys, score, grammarScore, now);
   }
 
   await prisma.practiceSession.update({
     where: { id: sessionId },
     data: { status: 'COMPLETED', score, completedAt: now },
   });
-  return { score, correct, total };
+
+  return {
+    score,
+    correct: mc.correct + recordings.length + responses.length,
+    total: mc.total + speakingTotal + writingTotal,
+  };
 }
 
 async function submitSpeaking(
   sessionId: string,
   courseId: string,
   vocabLemmas: string[],
-  now: Date,
+  now: Date
 ): Promise<SubmitPracticeResult> {
   const recordings = await prisma.speakingRecording.findMany({
     where: { practiceSessionId: sessionId, overallScore: { not: null } },
@@ -473,7 +798,7 @@ async function submitWriting(
   sessionId: string,
   courseId: string,
   vocabLemmas: string[],
-  now: Date,
+  now: Date
 ): Promise<SubmitPracticeResult> {
   const responses = await prisma.writingResponse.findMany({
     where: { practiceSessionId: sessionId, overallScore: { not: null } },

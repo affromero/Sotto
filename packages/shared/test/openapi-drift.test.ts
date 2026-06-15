@@ -41,14 +41,12 @@ describe('openapi.json drift guard', () => {
   it('regeneration is deterministic / idempotent', () => {
     expect(buildOpenApiDocument()).toEqual(buildOpenApiDocument());
     expect(buildOpenApiDocument({ codegen: true })).toEqual(
-      buildOpenApiDocument({ codegen: true }),
+      buildOpenApiDocument({ codegen: true })
     );
   });
 
   it('matches the committed codegen spec (progenitor input)', () => {
-    const committed = JSON.parse(
-      readFileSync(OPENAPI_CODEGEN_OUTPUT_PATH, 'utf8'),
-    );
+    const committed = JSON.parse(readFileSync(OPENAPI_CODEGEN_OUTPUT_PATH, 'utf8'));
     const regenerated = buildOpenApiDocument({ codegen: true });
     expect(regenerated).toEqual(committed);
   });
@@ -73,20 +71,20 @@ describe('openapi.json drift guard', () => {
     // No codegen operation declares two distinct 2xx response bodies (the
     // progenitor constraint that motivated the exclusion).
     for (const ops of Object.values(
-      codegen.paths as Record<string, Record<string, { responses?: object }>>,
+      codegen.paths as Record<string, Record<string, { responses?: object }>>
     )) {
       for (const op of Object.values(ops)) {
-        const twoxx = Object.keys(op.responses ?? {}).filter((s) =>
-          s.startsWith('2'),
-        );
+        const twoxx = Object.keys(op.responses ?? {}).filter((s) => s.startsWith('2'));
         const refs = new Set(
           twoxx.map(
             (s) =>
               (
-                (op.responses as Record<string, Record<string, unknown>>)[s]
-                  .content as Record<string, Record<string, { schema: { $ref?: string } }>>
-              )['application/json'].schema.$ref,
-          ),
+                (op.responses as Record<string, Record<string, unknown>>)[s].content as Record<
+                  string,
+                  Record<string, { schema: { $ref?: string } }>
+                >
+              )['application/json'].schema.$ref
+          )
         );
         expect(refs.size).toBeLessThanOrEqual(1);
       }
@@ -101,19 +99,16 @@ describe('openapi.json drift guard', () => {
         Record<
           string,
           {
-            responses: Record<
-              string,
-              { content: Record<string, { schema: { $ref: string } }> }
-            >;
+            responses: Record<string, { content: Record<string, { schema: { $ref: string } }> }>;
           }
         >
       >
     )['/api/v1/courses/{courseId}/next-class'].post;
     expect(op.responses['201'].content['application/json'].schema.$ref).toBe(
-      '#/components/schemas/NextClassCreatedResponse',
+      '#/components/schemas/NextClassCreatedResponse'
     );
     expect(op.responses['200'].content['application/json'].schema.$ref).toBe(
-      '#/components/schemas/NextClassDoneResponse',
+      '#/components/schemas/NextClassDoneResponse'
     );
   });
 
@@ -144,15 +139,15 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/episodes/{episodeId}/interact',
         'GET /api/v1/episodes/{episodeId}/interact/{interactionId}',
         'POST /api/v1/auth/pair/redeem',
-      ].sort(),
+      ].sort()
     );
   });
 
   it('declares the speaking poll recordingId query parameter', () => {
     const doc = buildOpenApiDocument();
-    const op = (
-      doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>
-    )['/api/v1/practice/{sessionId}/speaking/{promptId}'].get;
+    const op = (doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>)[
+      '/api/v1/practice/{sessionId}/speaking/{promptId}'
+    ].get;
     expect(op.parameters).toContainEqual({
       name: 'recordingId',
       in: 'query',
@@ -166,8 +161,10 @@ describe('openapi.json drift guard', () => {
   // lies about the superset the routes return. Exact-match schemas stay closed.
   it('leaves subset-of-route response schemas open and exact-match ones closed', () => {
     const doc = buildOpenApiDocument();
-    const schemas = (doc.components as Record<string, Record<string, unknown>>)
-      .schemas as Record<string, { additionalProperties?: unknown }>;
+    const schemas = (doc.components as Record<string, Record<string, unknown>>).schemas as Record<
+      string,
+      { additionalProperties?: unknown }
+    >;
 
     for (const open of [
       'EpisodeSegment',
@@ -201,6 +198,7 @@ describe('openapi.json drift guard', () => {
       'PracticeOverviewResponse',
       'SubmitPracticeResponse',
       'StartPracticeReady',
+      'StartPracticeReadyFull',
       'RedeemPairingResponse',
       // Class submit + speaking prompt are exact-match -> closed.
       'ClassSpeakingPrompt',
@@ -232,8 +230,10 @@ describe('openapi.json drift guard', () => {
 
   it('EpisodeStatus covers the Prisma enum including TRANSCRIBING', () => {
     const doc = buildOpenApiDocument();
-    const schemas = (doc.components as Record<string, Record<string, unknown>>)
-      .schemas as Record<string, { enum?: string[] }>;
+    const schemas = (doc.components as Record<string, Record<string, unknown>>).schemas as Record<
+      string,
+      { enum?: string[] }
+    >;
     expect(schemas.EpisodeStatus.enum).toContain('TRANSCRIBING');
   });
 });
@@ -284,8 +284,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
   });
 
   it('StartPracticeResponse is a discriminated oneOf over named variants', () => {
-    const schemas = (doc.components as Record<string, Record<string, unknown>>)
-      .schemas;
+    const schemas = (doc.components as Record<string, Record<string, unknown>>).schemas;
     const response = schemas.StartPracticeResponse as {
       oneOf: { $ref: string }[];
       discriminator: { propertyName: string; mapping: Record<string, string> };
@@ -295,6 +294,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
       { $ref: '#/components/schemas/StartPracticeReady' },
       { $ref: '#/components/schemas/StartPracticeReadySpeaking' },
       { $ref: '#/components/schemas/StartPracticeReadyWriting' },
+      { $ref: '#/components/schemas/StartPracticeReadyFull' },
     ]);
     expect(response.discriminator).toEqual({
       propertyName: 'status',
@@ -303,6 +303,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
         ready: '#/components/schemas/StartPracticeReady',
         ready_speaking: '#/components/schemas/StartPracticeReadySpeaking',
         ready_writing: '#/components/schemas/StartPracticeReadyWriting',
+        ready_full: '#/components/schemas/StartPracticeReadyFull',
       },
     });
     for (const variant of Object.values(response.discriminator.mapping)) {
@@ -315,28 +316,20 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     const codes = (path: string, method: string): string[] =>
       Object.keys(
         (
-          (doc.paths as Record<string, Record<string, { responses: object }>>)[
-            path
-          ][method] as { responses: object }
-        ).responses,
+          (doc.paths as Record<string, Record<string, { responses: object }>>)[path][method] as {
+            responses: object;
+          }
+        ).responses
       ).sort();
     expect(codes('/api/v1/health', 'get')).toEqual(['200', '503']);
     expect(codes('/api/v1/courses', 'get')).toEqual(['200']);
     expect(codes('/api/v1/courses/{courseId}/practice', 'get')).toEqual(['200']);
-    expect(codes('/api/v1/courses/{courseId}/practice', 'post')).toEqual([
-      '200',
-      '201',
-    ]);
+    expect(codes('/api/v1/courses/{courseId}/practice', 'post')).toEqual(['200', '201']);
     expect(codes('/api/v1/practice/{sessionId}/submit', 'post')).toEqual(['200']);
     expect(codes('/api/v1/episodes/{episodeId}', 'get')).toEqual(['200']);
-    expect(
-      codes('/api/v1/practice/{sessionId}/speaking/{promptId}', 'get'),
-    ).toEqual(['200']);
+    expect(codes('/api/v1/practice/{sessionId}/speaking/{promptId}', 'get')).toEqual(['200']);
     // next-class returns 200 { done } or 201 { classId }.
-    expect(codes('/api/v1/courses/{courseId}/next-class', 'post')).toEqual([
-      '200',
-      '201',
-    ]);
+    expect(codes('/api/v1/courses/{courseId}/next-class', 'post')).toEqual(['200', '201']);
     expect(codes('/api/v1/classes/{classId}', 'get')).toEqual(['200']);
     expect(codes('/api/v1/classes/{classId}/submit', 'post')).toEqual(['200']);
     // Exam start returns 201; get/submit return 200.
@@ -350,20 +343,16 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/onboarding/config', 'get')).toEqual(['200']);
     expect(codes('/api/v1/users/me', 'get')).toEqual(['200']);
     // Ask creates a PENDING interaction (201); polling reads it (200).
-    expect(codes('/api/v1/episodes/{episodeId}/interact', 'post')).toEqual([
-      '201',
-    ]);
-    expect(
-      codes('/api/v1/episodes/{episodeId}/interact/{interactionId}', 'get'),
-    ).toEqual(['200']);
+    expect(codes('/api/v1/episodes/{episodeId}/interact', 'post')).toEqual(['201']);
+    expect(codes('/api/v1/episodes/{episodeId}/interact/{interactionId}', 'get')).toEqual(['200']);
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
   });
 
   it('declares the placement native/target query parameters', () => {
     const doc = buildOpenApiDocument();
-    const op = (
-      doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>
-    )['/api/v1/placement'].get;
+    const op = (doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>)[
+      '/api/v1/placement'
+    ].get;
     expect(op.parameters).toContainEqual({
       name: 'native',
       in: 'query',
@@ -386,7 +375,7 @@ describe('response schemas accept representative payloads', () => {
         status: 'healthy',
         version: 'dev',
         timestamp: '2026-06-13T00:00:00.000Z',
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -405,7 +394,7 @@ describe('response schemas accept representative payloads', () => {
             placement: { level: 'A1', createdAt: '2026-06-13T00:00:00.000Z' },
           },
         ],
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -424,7 +413,7 @@ describe('response schemas accept representative payloads', () => {
             completedAt: '2026-06-13T00:05:00.000Z',
           },
         ],
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -433,7 +422,7 @@ describe('response schemas accept representative payloads', () => {
       startPracticeResponseSchema.parse({
         status: 'unavailable',
         reason: 'nothing_due',
-      }),
+      })
     ).toBeTruthy();
     expect(
       startPracticeResponseSchema.parse({
@@ -441,7 +430,7 @@ describe('response schemas accept representative payloads', () => {
         sessionId: 's1',
         kind: 'GRAMMAR',
         items: [{ id: 'q0', prompt: 'Pick one', options: ['a', 'b'] }],
-      }),
+      })
     ).toBeTruthy();
     expect(
       startPracticeResponseSchema.parse({
@@ -455,21 +444,36 @@ describe('response schemas accept representative payloads', () => {
             referenceTtsUrl: null,
           },
         ],
-      }),
+      })
     ).toBeTruthy();
     expect(
       startPracticeResponseSchema.parse({
         status: 'ready_writing',
         sessionId: 's3',
         prompts: [{ id: 'w1', task: 'Describe your day', guidance: null }],
-      }),
+      })
+    ).toBeTruthy();
+    expect(
+      startPracticeResponseSchema.parse({
+        status: 'ready_full',
+        sessionId: 's4',
+        kind: 'FULL',
+        items: [{ id: 'q0', prompt: 'Pick one', options: ['a', 'b'] }],
+        speakingPrompts: [
+          {
+            id: 'p1',
+            targetPhrase: 'Hola',
+            translation: 'Hello',
+            referenceTtsUrl: null,
+          },
+        ],
+        writingPrompts: [{ id: 'w1', task: 'Describe your day', guidance: null }],
+      })
     ).toBeTruthy();
   });
 
   it('submit practice', () => {
-    expect(
-      submitPracticeResponseSchema.parse({ score: 0.5, correct: 3, total: 6 }),
-    ).toBeTruthy();
+    expect(submitPracticeResponseSchema.parse({ score: 0.5, correct: 3, total: 6 })).toBeTruthy();
   });
 
   it('episode detail (segments with resolved audio, nullable fields)', () => {
@@ -501,7 +505,7 @@ describe('response schemas accept representative payloads', () => {
             duration: null,
           },
         ],
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -512,7 +516,7 @@ describe('response schemas accept representative payloads', () => {
         overallScore: null,
         transcript: null,
         feedback: null,
-      }),
+      })
     ).toBeTruthy();
     expect(
       speakingPollResponseSchema.parse({
@@ -520,7 +524,7 @@ describe('response schemas accept representative payloads', () => {
         overallScore: 0.87,
         transcript: 'Hola, ¿qué tal?',
         feedback: 'Great rhythm; soften the final vowel.',
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -582,11 +586,9 @@ describe('response schemas accept representative payloads', () => {
           image: null,
           role: 'USER',
         },
-      }),
+      })
     ).toBeTruthy();
-    expect(
-      redeemPairingResponseSchema.parse({ token: 'sk_sotto_xyz', user: null }),
-    ).toBeTruthy();
+    expect(redeemPairingResponseSchema.parse({ token: 'sk_sotto_xyz', user: null })).toBeTruthy();
   });
 
   it('next class — distinct closed shapes per status', () => {
@@ -677,7 +679,7 @@ describe('response schemas accept representative payloads', () => {
         passedSections: 4,
         totalSections: 5,
         sections: [{ id: 'sec-g', skill: 'GRAMMAR', score: 0.9, passed: true }],
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -748,11 +750,9 @@ describe('response schemas accept representative payloads', () => {
           overallScore: 0.74,
           band: 'B2',
           feedback: 'Strong reading.',
-          sectionResults: [
-            { sectionId: 'ex-g', skill: 'GRAMMAR', score: 0.8, feedback: null },
-          ],
+          sectionResults: [{ sectionId: 'ex-g', skill: 'GRAMMAR', score: 0.8, feedback: null }],
         },
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -766,7 +766,7 @@ describe('response schemas accept representative payloads', () => {
           { sectionId: 'ex-g', skill: 'GRAMMAR', weight: 0.5, score: 0.8 },
           { sectionId: 'ex-r', skill: 'READING', weight: 0.5, score: 0.6 },
         ],
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -784,7 +784,7 @@ describe('response schemas accept representative payloads', () => {
             options: ['el', 'la', 'los', 'las'],
           },
         ],
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -794,7 +794,7 @@ describe('response schemas accept representative payloads', () => {
         courseId: 'c-new',
         level: 'B1',
         scoreBySkill: { grammar: 0.8, vocab: 0.5, reading: 0.6 },
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -838,14 +838,14 @@ describe('response schemas accept representative payloads', () => {
           s3Bucket: 'sotto',
           s3Region: 'auto',
         },
-      }),
+      })
     ).toBeTruthy();
     expect(
       onboardingConfigResponseSchema.parse({
         selfHosted: false,
         isOwner: false,
         infra: null,
-      }),
+      })
     ).toBeTruthy();
   });
 
@@ -871,15 +871,11 @@ describe('response schemas accept representative payloads', () => {
       askInteractionRequestSchema.parse({
         question: 'What does casa mean?',
         timestamp: 12.5,
-      }),
+      })
     ).toBeTruthy();
     // Empty question and negative timestamp are rejected.
-    expect(() =>
-      askInteractionRequestSchema.parse({ question: '', timestamp: 0 }),
-    ).toThrow();
-    expect(() =>
-      askInteractionRequestSchema.parse({ question: 'hi', timestamp: -1 }),
-    ).toThrow();
+    expect(() => askInteractionRequestSchema.parse({ question: '', timestamp: 0 })).toThrow();
+    expect(() => askInteractionRequestSchema.parse({ question: 'hi', timestamp: -1 })).toThrow();
   });
 
   it('interaction response (pending -> answered, nullable fields)', () => {
@@ -893,7 +889,7 @@ describe('response schemas accept representative payloads', () => {
         answer: null,
         helpful: null,
         segmentOrder: null,
-      }),
+      })
     ).toBeTruthy();
     // Answered: text present, and the POST's extra row fields are tolerated
     // because the schema is `.loose()`.
@@ -908,7 +904,7 @@ describe('response schemas accept representative payloads', () => {
         segmentOrder: 2,
         userId: 'u-extra',
         createdAt: '2026-06-13T00:00:00.000Z',
-      }),
+      })
     ).toBeTruthy();
   });
 });

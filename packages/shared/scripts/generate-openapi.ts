@@ -61,6 +61,7 @@ import {
   startExamRequestSchema,
   startExamResponseSchema,
   startPracticeReadySchema,
+  startPracticeReadyFullSchema,
   startPracticeReadySpeakingSchema,
   startPracticeReadyWritingSchema,
   startPracticeRequestSchema,
@@ -86,13 +87,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const sharedRoot = resolve(here, '..');
 
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type JsonSchema = { [key: string]: JsonValue };
 
 // The response emitted for the StartPracticeResponse component: a 3.0
@@ -103,6 +98,7 @@ const startPracticeVariants: Record<string, string> = {
   ready: 'StartPracticeReady',
   ready_speaking: 'StartPracticeReadySpeaking',
   ready_writing: 'StartPracticeReadyWriting',
+  ready_full: 'StartPracticeReadyFull',
 };
 
 // Named component schemas. Reusable leaves are registered so they emit `$ref`
@@ -127,6 +123,7 @@ const namedSchemas: Record<string, z.ZodType> = {
   StartPracticeReady: startPracticeReadySchema,
   StartPracticeReadySpeaking: startPracticeReadySpeakingSchema,
   StartPracticeReadyWriting: startPracticeReadyWritingSchema,
+  StartPracticeReadyFull: startPracticeReadyFullSchema,
   [START_PRACTICE_RESPONSE_NAME]: startPracticeResponseSchema,
   SubmitPracticeRequest: submitPracticeRequestSchema,
   SubmitPracticeResponse: submitPracticeResponseSchema,
@@ -184,14 +181,14 @@ const namedSchemas: Record<string, z.ZodType> = {
 
 // Map a Zod schema instance back to its component name so endpoints can $ref it.
 const nameBySchema = new Map<z.ZodType, string>(
-  Object.entries(namedSchemas).map(([name, schema]) => [schema, name]),
+  Object.entries(namedSchemas).map(([name, schema]) => [schema, name])
 );
 
 function refFor(schema: z.ZodType): { $ref: string } {
   const name = nameBySchema.get(schema);
   if (!name) {
     throw new Error(
-      'Endpoint schema is not registered as a named component. Add it to namedSchemas in generate-openapi.ts.',
+      'Endpoint schema is not registered as a named component. Add it to namedSchemas in generate-openapi.ts.'
     );
   }
   return { $ref: `#/components/schemas/${name}` };
@@ -302,7 +299,7 @@ function buildComponentsSchemas(): Record<string, JsonValue> {
         Object.entries(startPracticeVariants).map(([value, variant]) => [
           value,
           `#/components/schemas/${variant}`,
-        ]),
+        ])
       ),
     },
   };
@@ -344,9 +341,7 @@ function operationFor(endpoint: EndpointDef): JsonValue {
     }
   } else {
     if (!endpoint.response) {
-      throw new Error(
-        `Endpoint ${endpoint.id} must define either \`response\` or \`responses\`.`,
-      );
+      throw new Error(`Endpoint ${endpoint.id} must define either \`response\` or \`responses\`.`);
     }
     const responseRef = refFor(endpoint.response);
     for (const status of endpoint.successStatuses ?? [200]) {
@@ -363,10 +358,7 @@ function operationFor(endpoint: EndpointDef): JsonValue {
     responses,
   };
 
-  const parameters = [
-    ...pathParameters(endpoint.path),
-    ...queryParameters(endpoint),
-  ];
+  const parameters = [...pathParameters(endpoint.path), ...queryParameters(endpoint)];
   if (parameters.length > 0) operation.parameters = parameters;
 
   if (endpoint.request) {
@@ -398,9 +390,9 @@ function buildPaths(opts: { codegen: boolean }): Record<string, JsonValue> {
 // truthful contract.
 export function buildOpenApiDocument(opts: { codegen?: boolean } = {}): JsonSchema {
   const codegen = opts.codegen ?? false;
-  const pkg = JSON.parse(
-    readFileSync(resolve(sharedRoot, 'package.json'), 'utf8'),
-  ) as { version: string };
+  const pkg = JSON.parse(readFileSync(resolve(sharedRoot, 'package.json'), 'utf8')) as {
+    version: string;
+  };
 
   return {
     openapi: '3.0.3',
@@ -428,21 +420,14 @@ export function buildOpenApiDocument(opts: { codegen?: boolean } = {}): JsonSche
 export const OPENAPI_OUTPUT_PATH = resolve(sharedRoot, 'openapi.json');
 // The progenitor codegen input: the truthful spec minus operations progenitor
 // cannot generate. The Rust `generate_api!` macro reads THIS file.
-export const OPENAPI_CODEGEN_OUTPUT_PATH = resolve(
-  sharedRoot,
-  'openapi.codegen.json',
-);
+export const OPENAPI_CODEGEN_OUTPUT_PATH = resolve(sharedRoot, 'openapi.codegen.json');
 // A vendored copy of the codegen spec that lives INSIDE the `tui/` crate so the
 // Rust `generate_api!` macro can read it from within the crate. This makes the
 // crate build standalone (and publishable to crates.io, where the workspace
 // path `packages/shared` does not ship). `gen:openapi` writes both copies, so
 // the vendored one can never drift; a sync check guards it in CI.
 const repoRoot = resolve(sharedRoot, '..', '..');
-export const OPENAPI_TUI_VENDOR_PATH = resolve(
-  repoRoot,
-  'tui',
-  'openapi.codegen.json',
-);
+export const OPENAPI_TUI_VENDOR_PATH = resolve(repoRoot, 'tui', 'openapi.codegen.json');
 
 function main(): void {
   const doc = buildOpenApiDocument();

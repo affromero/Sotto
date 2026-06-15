@@ -11,6 +11,7 @@ import { z } from 'zod';
 export const cefrLevelSchema = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 
 export const practiceKindSchema = z.enum([
+  'FULL',
   'GRAMMAR',
   'READING',
   'LISTENING',
@@ -59,9 +60,7 @@ export const courseSummarySchema = z.object({
   startLevel: cefrLevelSchema,
   activeClassId: z.string().nullable(),
   curriculum: z.object({ title: z.string() }),
-  placement: z
-    .object({ level: cefrLevelSchema, createdAt: z.string() })
-    .nullable(),
+  placement: z.object({ level: cefrLevelSchema, createdAt: z.string() }).nullable(),
 });
 
 export const coursesListResponseSchema = z.object({
@@ -146,11 +145,22 @@ export const startPracticeReadyWritingSchema = z.object({
   prompts: z.array(practiceWritingPromptSchema),
 });
 
+export const startPracticeReadyFullSchema = z.object({
+  status: z.literal('ready_full'),
+  sessionId: z.string(),
+  kind: z.literal('FULL'),
+  items: z.array(practiceItemSchema),
+  episodeId: z.string().optional(),
+  speakingPrompts: z.array(practiceSpeakingPromptSchema),
+  writingPrompts: z.array(practiceWritingPromptSchema),
+});
+
 export const startPracticeResponseSchema = z.discriminatedUnion('status', [
   startPracticeUnavailableSchema,
   startPracticeReadySchema,
   startPracticeReadySpeakingSchema,
   startPracticeReadyWritingSchema,
+  startPracticeReadyFullSchema,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -163,7 +173,7 @@ export const submitPracticeRequestSchema = z.object({
     z.object({
       itemId: z.string().min(1),
       selectedIndex: z.number().int().min(0),
-    }),
+    })
   ),
 });
 
@@ -246,12 +256,7 @@ export const episodeDetailResponseSchema = z
 // and phonemeScores (Json); the terminal client only uses these scalar fields.
 // ---------------------------------------------------------------------------
 
-export const speakingGradeStatusSchema = z.enum([
-  'PENDING',
-  'GRADING',
-  'SCORED',
-  'FAILED',
-]);
+export const speakingGradeStatusSchema = z.enum(['PENDING', 'GRADING', 'SCORED', 'FAILED']);
 
 // `.loose()`: the GET route also returns rubricScores and phonemeScores (Json).
 // We model only the scalar fields the client uses and keep the object OPEN so
@@ -283,13 +288,7 @@ export const speakingPollResponseSchema = z
 // ---------------------------------------------------------------------------
 
 // Mirrors the Prisma `SkillType` enum (gates the four class section skills).
-export const skillTypeSchema = z.enum([
-  'GRAMMAR',
-  'READING',
-  'LISTENING',
-  'SPEAKING',
-  'WRITING',
-]);
+export const skillTypeSchema = z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']);
 
 // Mirrors the Prisma `ClassStatus` enum.
 export const classStatusSchema = z.enum([
@@ -406,7 +405,7 @@ export const submitClassRequestSchema = z.object({
       z.object({
         questionId: z.string(),
         selectedIndex: z.number().int().min(0).max(3),
-      }),
+      })
     )
     .min(1),
 });
@@ -506,7 +505,7 @@ export const examResultSchema = z
           score: z.number(),
           feedback: z.string().nullable(),
         })
-        .loose(),
+        .loose()
     ),
   })
   .loose();
@@ -546,7 +545,7 @@ export const submitExamRequestSchema = z.object({
       z.object({
         questionId: z.string().min(1),
         selectedIndex: z.number().int().min(0),
-      }),
+      })
     )
     .max(200),
 });
@@ -601,7 +600,7 @@ export const submitPlacementRequestSchema = z.object({
       z.object({
         id: z.string(),
         selectedIndex: z.number().int().min(0).max(4),
-      }),
+      })
     )
     .min(1),
 });

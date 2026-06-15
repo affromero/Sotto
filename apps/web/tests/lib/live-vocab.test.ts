@@ -23,13 +23,17 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 const mockUpsertLiveVocab = vi.fn();
+const mockUpsertCourseGrammar = vi.fn();
 vi.mock('@/lib/knowledge-graph', () => ({
   upsertLiveVocab: (...a: unknown[]) => mockUpsertLiveVocab(...a),
+  upsertCourseGrammar: (...a: unknown[]) => mockUpsertCourseGrammar(...a),
 }));
 
 import {
+  parseNoteLearningTargets,
   parseLiveVocab,
   extractAndStoreLiveVocab,
+  extractAndStoreNoteLearningTargets,
   extractAndStoreNoteVocab,
 } from '@/lib/live-vocab';
 
@@ -37,6 +41,16 @@ const SAMPLE = JSON.stringify([
   { lemma: 'bestellen', gloss: 'to order', pos: 'verb' },
   { lemma: 'der Kaffee', gloss: 'coffee', pos: 'noun' },
 ]);
+const NOTE_SAMPLE = JSON.stringify({
+  vocabulary: [
+    { lemma: 'bestellen', gloss: 'to order', pos: 'verb' },
+    { lemma: 'der Kaffee', gloss: 'coffee', pos: 'noun' },
+  ],
+  grammar: [
+    { key: 'modal-verbs', title: 'Modal verbs' },
+    { key: 'Past tense', title: 'Past tense' },
+  ],
+});
 
 const PARAMS = {
   userId: 'u1',
@@ -67,6 +81,25 @@ describe('parseLiveVocab', () => {
   it('drops items missing a lemma', () => {
     const out = parseLiveVocab(JSON.stringify([{ gloss: 'x' }, { lemma: 'gut', gloss: 'good' }]));
     expect(out).toEqual([{ lemma: 'gut', gloss: 'good', pos: undefined }]);
+  });
+});
+
+describe('parseNoteLearningTargets', () => {
+  it('parses vocab and normalized grammar targets', () => {
+    expect(parseNoteLearningTargets(NOTE_SAMPLE)).toEqual({
+      vocabulary: [
+        { lemma: 'bestellen', gloss: 'to order', pos: 'verb' },
+        { lemma: 'der Kaffee', gloss: 'coffee', pos: 'noun' },
+      ],
+      grammar: [
+        { key: 'modal-verbs', title: 'Modal verbs' },
+        { key: 'past-tense', title: 'Past tense' },
+      ],
+    });
+  });
+
+  it('returns empty targets for malformed content', () => {
+    expect(parseNoteLearningTargets('not json')).toEqual({ vocabulary: [], grammar: [] });
   });
 });
 
@@ -124,6 +157,12 @@ describe('extractAndStoreLiveVocab', () => {
   });
 
   it('extracts vocab from course notes and fences forged note markers', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: NOTE_SAMPLE,
+      inputTokens: 10,
+      outputTokens: 20,
+      model: 'm',
+    });
     const n = await extractAndStoreNoteVocab({
       userId: 'u1',
       courseId: 'c1',
@@ -146,5 +185,35 @@ describe('extractAndStoreLiveVocab', () => {
       ],
       'B1'
     );
+    expect(mockUpsertCourseGrammar).toHaveBeenCalledWith(
+      'c1',
+      [
+        { key: 'modal-verbs', title: 'Modal verbs' },
+        { key: 'past-tense', title: 'Past tense' },
+      ],
+      'B1'
+    );
+  });
+
+  it('returns note vocabulary and grammar counts for catch-up target extraction', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: NOTE_SAMPLE,
+      inputTokens: 10,
+      outputTokens: 20,
+      model: 'm',
+    });
+    mockUpsertLiveVocab.mockResolvedValue(2);
+    mockUpsertCourseGrammar.mockResolvedValue(2);
+
+    const result = await extractAndStoreNoteLearningTargets({
+      userId: 'u1',
+      courseId: 'c1',
+      targetLang: 'it',
+      nativeLang: 'en',
+      level: 'B1',
+      note: 'Lezione: verbi modali e passato.',
+    });
+
+    expect(result).toEqual({ addedVocabulary: 2, addedGrammar: 2 });
   });
 });

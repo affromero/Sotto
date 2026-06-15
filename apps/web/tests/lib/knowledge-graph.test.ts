@@ -37,6 +37,7 @@ import {
   applyReviewOutcome,
   getDueItems,
   getMemoryGraph,
+  upsertCourseGrammar,
   upsertLiveVocab,
 } from '@/lib/knowledge-graph';
 
@@ -52,21 +53,33 @@ const FRESH_SRS = {
   mastery: 0.1,
 };
 
-function makeFreshVocabRow(overrides: Partial<typeof FRESH_SRS & { id: string; lemma: string; translation: string }> = {}) {
+function makeFreshVocabRow(
+  overrides: Partial<
+    typeof FRESH_SRS & { id: string; lemma: string; translation: string; dueAt: Date; lastReviewed: Date | null }
+  > = {},
+) {
   return {
     id: 'v1',
     lemma: 'hola',
     translation: 'hello',
+    dueAt: NOW,
+    lastReviewed: null,
     ...FRESH_SRS,
     ...overrides,
   };
 }
 
-function makeFreshGrammarRow(overrides: Partial<typeof FRESH_SRS & { id: string; topicKey: string; title: string }> = {}) {
+function makeFreshGrammarRow(
+  overrides: Partial<
+    typeof FRESH_SRS & { id: string; topicKey: string; title: string; dueAt: Date; lastReviewed: Date | null }
+  > = {},
+) {
   return {
     id: 'g1',
     topicKey: 'articles',
     title: 'Articles',
+    dueAt: NOW,
+    lastReviewed: null,
     ...FRESH_SRS,
     ...overrides,
   };
@@ -233,8 +246,8 @@ describe('getDueItems', () => {
   });
 
   it('returns { vocab, grammar } shaped results from findMany', async () => {
-    const vocabRow = { id: 'v1', lemma: 'hola', translation: 'hello', mastery: 0.3 };
-    const grammarRow = { id: 'g1', topicKey: 'articles', title: 'Articles', mastery: 0.2 };
+    const vocabRow = makeFreshVocabRow({ id: 'v1', lemma: 'hola', translation: 'hello', mastery: 0.3 });
+    const grammarRow = makeFreshGrammarRow({ id: 'g1', topicKey: 'articles', title: 'Articles', mastery: 0.2 });
 
     mockLearnerVocabFindMany.mockResolvedValue([vocabRow]);
     mockLearnerGrammarFindMany.mockResolvedValue([grammarRow]);
@@ -263,12 +276,8 @@ describe('getDueItems', () => {
 
     await getDueItems('course-1', 4);
 
-    expect(mockLearnerVocabFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 4 }),
-    );
-    expect(mockLearnerGrammarFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 4 }),
-    );
+    expect(mockLearnerVocabFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 16 }));
+    expect(mockLearnerGrammarFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 16 }));
   });
 
   it('uses courseId in the where clause', async () => {
@@ -280,6 +289,36 @@ describe('getDueItems', () => {
     expect(mockLearnerVocabFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ courseId: 'course-xyz' }) }),
     );
+  });
+
+  it('ranks weak uncertain items ahead of easy not-due items', async () => {
+    mockLearnerVocabFindMany.mockResolvedValue([
+      makeFreshVocabRow({
+        id: 'easy',
+        lemma: 'facil',
+        translation: 'easy',
+        mastery: 0.95,
+        reps: 8,
+        lapses: 0,
+        dueAt: new Date('2026-07-01T00:00:00.000Z'),
+        lastReviewed: NOW,
+      }),
+      makeFreshVocabRow({
+        id: 'gap',
+        lemma: 'subjuntivo',
+        translation: 'subjunctive',
+        mastery: 0.2,
+        reps: 0,
+        lapses: 1,
+        dueAt: new Date('2026-06-01T00:00:00.000Z'),
+        lastReviewed: null,
+      }),
+    ]);
+    mockLearnerGrammarFindMany.mockResolvedValue([]);
+
+    const result = await getDueItems('course-1', 2);
+
+    expect(result.vocab.map((item) => item.id)).toEqual(['gap', 'easy']);
   });
 });
 
@@ -425,5 +464,44 @@ describe('upsertLiveVocab', () => {
     const mundo = calls.find((c) => c.where.courseId_lemma.lemma === 'mundo');
     expect(mundo.create.firstSeenClassId).toBeNull();
     expect(mundo.create.cefrLevel).toBe('B1');
+  });
+});
+
+describe('upsertCourseGrammar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLearnerGrammarUpsert.mockResolvedValue({});
+  });
+
+  it('returns 0 and skips the DB for an empty list', async () => {
+    const added = await upsertCourseGrammar('course-1', []);
+    expect(added).toBe(0);
+    expect(mockLearnerGrammarFindMany).not.toHaveBeenCalled();
+    expect(mockLearnerGrammarUpsert).not.toHaveBeenCalled();
+  });
+
+  it('counts only newly created grammar topics and preserves known SRS state', async () => {
+    mockLearnerGrammarFindMany.mockResolvedValue([{ topicKey: 'articles' }]);
+
+    const added = await upsertCourseGrammar(
+      'course-1',
+      [
+        { key: 'articles', title: 'Articles' },
+        { key: 'subjunctive-mood', title: 'Subjunctive mood' },
+      ],
+      'B1',
+    );
+
+    expect(added).toBe(1);
+    expect(mockLearnerGrammarUpsert).toHaveBeenCalledTimes(2);
+    const calls = mockLearnerGrammarUpsert.mock.calls.map((c) => c[0]);
+    expect(calls.every((c) => Object.keys(c.update).length === 0)).toBe(true);
+    const subjunctive = calls.find((c) => c.where.courseId_topicKey.topicKey === 'subjunctive-mood');
+    expect(subjunctive.create).toMatchObject({
+      courseId: 'course-1',
+      topicKey: 'subjunctive-mood',
+      title: 'Subjunctive mood',
+      cefrLevel: 'B1',
+    });
   });
 });
