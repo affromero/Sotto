@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
+import { prisma } from '@/lib/prisma';
+import { ACTIVE_PROFILE_COOKIE } from '@/lib/local-user';
+import { switchProfileSchema } from '@/lib/validations';
+import { errorResponse } from '@/lib/api-response';
+import { logger } from '@/lib/logger';
+
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+/**
+ * Switch the active household profile by setting the `sotto_profile` cookie.
+ * Passwordless by design: any visitor to this trusted local instance may pick a
+ * profile, exactly like a shared TV. The cookie is the only place a profile is
+ * "set" — `auth()` only ever reads it.
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const authed = await authenticateRequest(request);
+    if (!authed) return errorResponse('Unauthorized', 401);
+
+    const body = await request.json();
+    const validation = switchProfileSchema.safeParse(body);
+    if (!validation.success) {
+      return errorResponse(validation.error.issues[0].message, 400);
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: validation.data.profileId },
+      select: { id: true },
+    });
+    if (!target) return errorResponse('Profile not found', 404);
+
+    const response = NextResponse.json({ ok: true, profileId: target.id });
+    response.cookies.set(ACTIVE_PROFILE_COOKIE, target.id, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ONE_YEAR_SECONDS,
+      secure: process.env.NODE_ENV === 'production',
+    });
+    return response;
+  } catch (error: unknown) {
+    logger.error('Failed to switch profile', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return errorResponse('Failed to switch profile', 500);
+  }
+}
