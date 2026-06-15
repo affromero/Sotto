@@ -6,6 +6,7 @@ mod overlay;
 mod state;
 mod ui;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::Result;
@@ -32,9 +33,10 @@ use crate::tui::Tui;
 use overlay::{AccountsOverlay, ThemePicker};
 
 use state::{
-    AnswerStep, Course, DueCounts, EpisodeDetail, PracticeResult, RetryKind, SectionProgress,
-    SkillChoice, SpeakingPhase, View, WritingPhase, answer_current, can_review_vocab, cursor_down,
-    cursor_up, list_down, list_up, poll_is_terminal, reduce_speaking_poll, reduce_start,
+    AnswerStep, Course, DueCounts, EpisodeDetail, NotesPhase, PracticeResult, RetryKind,
+    SectionProgress, SkillChoice, SpeakingPhase, View, WritingPhase, answer_current,
+    can_review_vocab, cursor_down, cursor_up, list_down, list_up, poll_is_terminal,
+    reduce_speaking_poll, reduce_start,
 };
 
 /// The interactive Sotto client. Owns the session [`Config`], the [`Api`] seam
@@ -44,6 +46,10 @@ use state::{
 /// `action_tx`, so the render loop never blocks on the network.
 pub(crate) struct App {
     config: Config,
+    /// Where `config` is persisted. `Some(path)` in production (the real
+    /// platform config file); `None` in tests so saving is a no-op and the
+    /// suite never clobbers the developer's real `~/.config` config.
+    config_path: Option<PathBuf>,
     client: Arc<dyn Api>,
     /// Builds an [`Api`] client for a given profile. Production uses a real
     /// [`SottoClient`]; tests inject a stub. Stored so the account switcher can
@@ -96,20 +102,36 @@ impl App {
         Self::with_factory(config, factory)
     }
 
-    /// Build an app around a [`ClientFactory`]. Production passes the real
-    /// client builder; tests pass a stub factory so dispatch and reducers run
-    /// with zero network. The initial client is built for the active profile.
+    /// Build an app around a [`ClientFactory`], persisting to the real platform
+    /// config path. Used by [`App::new`]; tests use [`App::with_factory_at`].
     fn with_factory(config: Config, client_factory: ClientFactory) -> Result<Self> {
+        Self::with_factory_at(config, client_factory, Some(crate::config::config_path()?))
+    }
+
+    /// Build an app around a [`ClientFactory`] that persists `config` to
+    /// `config_path` (`None` = do not persist). Tests inject a stub factory and
+    /// `None`/a temp path so dispatch and reducers run with zero network and the
+    /// suite never writes the developer's real config file.
+    fn with_factory_at(
+        config: Config,
+        client_factory: ClientFactory,
+        config_path: Option<PathBuf>,
+    ) -> Result<Self> {
         // Build the initial client for the active profile (or an empty stand-in
         // profile when there is none, so the app can still render the switcher).
         let profile = config.active_profile().cloned().unwrap_or_default();
         let client = client_factory(&profile)?;
-        Ok(Self::assemble(config, client_factory, client))
+        Ok(Self::assemble(config, config_path, client_factory, client))
     }
 
     /// Assemble the App from its already-built pieces. Shared by the factory
     /// path and the test stub-injection path.
-    fn assemble(config: Config, client_factory: ClientFactory, client: Arc<dyn Api>) -> Self {
+    fn assemble(
+        config: Config,
+        config_path: Option<PathBuf>,
+        client_factory: ClientFactory,
+        client: Arc<dyn Api>,
+    ) -> Self {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let server = config
             .active_profile()
@@ -123,6 +145,7 @@ impl App {
         let theme = Theme::from_choice(&config.theme);
         Self {
             config,
+            config_path,
             client,
             client_factory,
             view: View::Loading,
@@ -269,6 +292,16 @@ impl App {
             Action::PlacementSubmitted(req_gen, result) => {
                 self.on_placement_submitted(req_gen, result)
             }
+            Action::NotesDeduced(req_gen, result) => self.on_notes_deduced(req_gen, result),
+            Action::NotesConfirmed(req_gen, result) => self.on_notes_confirmed(req_gen, result),
+            Action::NotesStart => self.start_notes_placement(),
+            Action::NotesInput(c) => self.notes_input_char(c),
+            Action::NotesInputNewline => self.notes_input_newline(),
+            Action::NotesInputBackspace => self.notes_input_backspace(),
+            Action::NotesSubmit => self.notes_submit(),
+            Action::NotesConfirm => self.notes_confirm(),
+            Action::NotesTakeTest => self.notes_take_test(),
+            Action::NotesCancel => self.notes_cancel(),
             Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),
             Action::ConfigLoaded(req_gen, result) => self.on_config_loaded(req_gen, result),
             Action::ToggleAsk => self.on_toggle_ask(),
@@ -417,6 +450,32 @@ impl App {
             return Some(Action::SubmitText);
         }
 
+        // Notes-based placement owns input in its own phases: a text editor while
+        // typing materials, then a two-choice result. Returns above the global
+        // polish keys so `t`/`?` are typed into the materials, not intercepted.
+        if let View::NotesPlacement { phase, .. } = &self.view {
+            let ctrl_d = matches!(key.code, KeyCode::Char('d'))
+                && key.modifiers.contains(KeyModifiers::CONTROL);
+            return match phase {
+                NotesPhase::Entry => match key.code {
+                    _ if ctrl_d => Some(Action::NotesSubmit),
+                    KeyCode::Esc => Some(Action::NotesCancel),
+                    KeyCode::Enter => Some(Action::NotesInputNewline),
+                    KeyCode::Backspace => Some(Action::NotesInputBackspace),
+                    KeyCode::Char(c) => Some(Action::NotesInput(c)),
+                    _ => None,
+                },
+                NotesPhase::Result { .. } => match key.code {
+                    KeyCode::Enter => Some(Action::NotesConfirm),
+                    KeyCode::Char('t') => Some(Action::NotesTakeTest),
+                    KeyCode::Esc => Some(Action::NotesCancel),
+                    _ => None,
+                },
+                // Deducing / Confirming: a request is in flight; swallow keys.
+                NotesPhase::Deducing | NotesPhase::Confirming => None,
+            };
+        }
+
         // Global polish keys (reached only when no text-entry/ask overlay is
         // active — those modes return above, so these never disturb typing):
         // `t` theme picker, `?` key-help, `A` (shift+a) account switcher.
@@ -432,6 +491,10 @@ impl App {
             // Persistent error screen: `r` retries the failed action.
             View::Error { .. } if matches!(key.code, KeyCode::Char('r')) => {
                 return Some(Action::Retry);
+            }
+            // PlacementLang: `m` opens the "paste materials" placement path.
+            View::PlacementLang { .. } if matches!(key.code, KeyCode::Char('m')) => {
+                return Some(Action::NotesStart);
             }
             // Listening (standalone or class section): space toggles playback.
             _ if self.audio_screen() && matches!(key.code, KeyCode::Char(' ')) => {
@@ -728,11 +791,20 @@ impl App {
         }
     }
 
+    /// Persist `config` to its configured path. A no-op when `config_path` is
+    /// `None` (tests), so the suite never writes the developer's real config.
+    fn persist_config(&self) -> Result<()> {
+        match &self.config_path {
+            Some(path) => self.config.save_to(path),
+            None => Ok(()),
+        }
+    }
+
     /// Write the active theme into `config` and persist it. A save failure is
     /// surfaced in the status bar rather than crashing the UI loop.
     fn persist_theme(&mut self) {
         self.config.theme = self.theme.to_choice();
-        if let Err(e) = self.config.save() {
+        if let Err(e) = self.persist_config() {
             self.status_bar
                 .set_error(format!("could not save theme: {e}"));
         }
@@ -810,7 +882,7 @@ impl App {
         self.status_bar.set_session(profile.server_url, user);
         // `set_active` cannot fail here: `name` came from `profile_names()`.
         let _ = self.config.set_active(&name);
-        if let Err(e) = self.config.save() {
+        if let Err(e) = self.persist_config() {
             self.status_bar.set_error(format!("could not save: {e}"));
         }
         // Reload courses against the NEW client (bumps gen, sets Loading).
@@ -824,6 +896,8 @@ impl App {
                     self.enter_course_home(course);
                 }
             }
+            // Enter is handled in map_key for notes placement (submit / confirm).
+            View::NotesPlacement { .. } => {}
             View::CourseHome {
                 course,
                 due,
@@ -958,6 +1032,8 @@ impl App {
                 self.fetch_courses();
                 self.render();
             }
+            // Esc is handled in map_key for notes placement (NotesCancel).
+            View::NotesPlacement { .. } => {}
             View::ItemReview { course, .. }
             | View::ListeningReview { course, .. }
             | View::SpeakingReview { course, .. }
@@ -1937,6 +2013,30 @@ mod tests {
             .expect("valid submit-placement JSON"))
         }
 
+        async fn deduce_from_notes(
+            &self,
+            _native: &str,
+            _target: &str,
+            _content: &str,
+        ) -> Result<types::DeduceFromNotesResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "native": "en", "target": "es",
+                "deducedLevel": "B1", "rationale": "Uses past tense.", "confidence": 0.8
+            }))
+            .expect("valid deduce-from-notes JSON"))
+        }
+
+        async fn confirm_from_notes(
+            &self,
+            _native: &str,
+            _target: &str,
+        ) -> Result<types::ConfirmFromNotesResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-stub", "level": "B1", "addedVocabulary": 5
+            }))
+            .expect("valid confirm-from-notes JSON"))
+        }
+
         async fn graph(&self, _course_id: &str) -> Result<types::MemoryGraphResponse> {
             Ok(
                 serde_json::from_value(serde_json::json!({ "nodes": [], "edges": [] }))
@@ -2017,7 +2117,29 @@ mod tests {
     /// network is possible: the only [`Api`] impl is the stub.
     fn test_app() -> App {
         let (factory, _) = recording_factory();
-        App::with_factory(stub_config(), factory).expect("stub app builds")
+        // `None` config path: tests must never persist to the real config file.
+        App::with_factory_at(stub_config(), factory, None).expect("stub app builds")
+    }
+
+    #[test]
+    fn config_persists_to_the_injected_path_only() {
+        // Regression: the App must write to its injected config_path, never the
+        // real platform path, or running `cargo test` clobbers the developer's
+        // own ~/.config/sotto/config.toml.
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("config.toml");
+        let (factory, _) = recording_factory();
+        let mut app =
+            App::with_factory_at(stub_config(), factory, Some(path.clone())).expect("app builds");
+
+        assert!(!path.exists(), "nothing is written before a save");
+        app.persist_theme();
+        assert!(path.exists(), "persist_theme writes to the injected path");
+
+        // A None-path app persists nowhere and must not panic.
+        let (factory2, _) = recording_factory();
+        let mut noop = App::with_factory_at(stub_config(), factory2, None).expect("app builds");
+        noop.persist_theme();
     }
 
     fn course(id: &str) -> Course {
@@ -2140,6 +2262,121 @@ mod tests {
             app.request_gen, after_first,
             "a second Select while starting must not dispatch again"
         );
+    }
+
+    // --- Notes-based placement (P5) ----------------------------------------
+
+    fn deduce_resp(level: &str, confidence: f64) -> ApiResult<types::DeduceFromNotesResponse> {
+        Arc::new(Ok(serde_json::from_value(serde_json::json!({
+            "native": "en", "target": "es",
+            "deducedLevel": level, "rationale": "Uses past tense.", "confidence": confidence
+        }))
+        .expect("valid deduce JSON")))
+    }
+
+    #[test]
+    fn materials_path_opens_the_editor_from_the_language_picker() {
+        let mut app = test_app();
+        app.view = View::placement_lang();
+        app.start_notes_placement();
+        assert!(matches!(
+            app.view,
+            View::NotesPlacement {
+                phase: NotesPhase::Entry,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn typing_then_submitting_materials_deduces_a_level() {
+        let mut app = test_app();
+        app.view = View::placement_lang();
+        app.start_notes_placement();
+        for c in "hola mundo".chars() {
+            app.notes_input_char(c);
+        }
+        match &app.view {
+            View::NotesPlacement { input, .. } => assert_eq!(input, "hola mundo"),
+            other => panic!("expected NotesPlacement, got {other:?}"),
+        }
+
+        // Submit dispatches deduction; deliver the result with the current gen.
+        app.notes_submit();
+        let req_gen = app.request_gen;
+        app.on_notes_deduced(req_gen, deduce_resp("B1", 0.8));
+
+        match &app.view {
+            View::NotesPlacement {
+                phase:
+                    NotesPhase::Result {
+                        level, confidence, ..
+                    },
+                ..
+            } => {
+                assert_eq!(level, "B1");
+                assert_eq!(*confidence, 80);
+            }
+            other => panic!("expected Result phase, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn starting_here_creates_the_course_and_lands_in_it() {
+        let mut app = test_app();
+        app.view = View::NotesPlacement {
+            native: "en".into(),
+            target: "es".into(),
+            input: String::new(),
+            phase: NotesPhase::Result {
+                level: "B1".into(),
+                rationale: "r".into(),
+                confidence: 80,
+            },
+        };
+        app.notes_confirm();
+        let req_gen = app.request_gen;
+        let resp: ApiResult<types::ConfirmFromNotesResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-9", "level": "B1", "addedVocabulary": 4
+            }))
+            .expect("valid confirm JSON")));
+        app.on_notes_confirmed(req_gen, resp);
+
+        match &app.view {
+            View::CourseHome { course, .. } => {
+                assert_eq!(course.id, "course-9");
+                assert_eq!(course.current_level, "B1");
+                assert_eq!(course.native_lang, "en");
+                assert_eq!(course.target_lang, "es");
+            }
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn esc_steps_back_from_result_to_editing_then_to_the_picker() {
+        let mut app = test_app();
+        app.view = View::NotesPlacement {
+            native: "en".into(),
+            target: "es".into(),
+            input: "notes".into(),
+            phase: NotesPhase::Result {
+                level: "B1".into(),
+                rationale: "r".into(),
+                confidence: 80,
+            },
+        };
+        app.notes_cancel();
+        assert!(matches!(
+            app.view,
+            View::NotesPlacement {
+                phase: NotesPhase::Entry,
+                ..
+            }
+        ));
+        app.notes_cancel();
+        assert!(matches!(app.view, View::PlacementLang { .. }));
     }
 
     #[tokio::test]
@@ -3935,7 +4172,7 @@ mod tests {
         );
         config.active = "home".into();
         let (factory, built) = recording_factory();
-        let app = App::with_factory(config, factory).expect("two-profile app builds");
+        let app = App::with_factory_at(config, factory, None).expect("two-profile app builds");
         (app, built)
     }
 
@@ -4053,7 +4290,7 @@ mod tests {
                 Ok(Arc::new(StubApi) as Arc<dyn Api>)
             }
         });
-        let app = App::with_factory(config, factory).expect("home profile builds");
+        let app = App::with_factory_at(config, factory, None).expect("home profile builds");
         (app, built)
     }
 

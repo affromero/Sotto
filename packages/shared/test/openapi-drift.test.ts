@@ -136,6 +136,8 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/exams/{examId}/submit',
         'GET /api/v1/placement',
         'POST /api/v1/placement',
+        'POST /api/v1/placement/from-notes',
+        'POST /api/v1/placement/from-notes/confirm',
         'GET /api/v1/courses/{courseId}/graph',
         'GET /api/v1/onboarding/config',
         'GET /api/v1/users/me',

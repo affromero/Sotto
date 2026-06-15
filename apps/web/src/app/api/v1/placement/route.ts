@@ -11,11 +11,15 @@ import {
   toPublic,
   type PlacementQuestion,
 } from '@/lib/placement-test';
-import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
-import { getCourseNote } from '@/lib/course-notes';
-import { higherLevel } from '@/lib/cefr-levels';
+import { createOrRaiseCourse } from '@/lib/placement-course';
+import { getCourseNote, mergeCourseNote, setCourseNote } from '@/lib/course-notes';
+import { getCachedNotesDeduction, clearNotesDeduction } from '@/lib/placement-notes';
+import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
 
 const langCode = z.string().trim().toLowerCase().length(2);
+const cefrLevel = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+// "Verify with a few questions": a shorter, focused run after a notes deduction.
+const VERIFY_PER_BAND = 2;
 const submitSchema = z.object({
   native: langCode,
   target: langCode,
@@ -56,9 +60,25 @@ export async function GET(request: NextRequest) {
       where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
       select: { id: true },
     });
-    const note = existingCourse ? await getCourseNote(existingCourse.id) : '';
+    const baseNote = existingCourse ? await getCourseNote(existingCourse.id) : '';
 
-    const { questions } = await generatePlacement(userId, native, target, note);
+    // "Verify with a few questions": a shorter run that leans toward the level a
+    // notes deduction suggested, while keeping the full ladder so scoring is valid.
+    const focusParse = cefrLevel.safeParse(request.nextUrl.searchParams.get('focusLevel'));
+    const focusLevel = focusParse.success ? focusParse.data : undefined;
+    const note = focusLevel
+      ? [baseNote, `The learner's own materials suggest about ${focusLevel}; ensure solid coverage around that level.`]
+          .filter(Boolean)
+          .join('\n\n')
+      : baseNote;
+
+    const { questions } = await generatePlacement(
+      userId,
+      native,
+      target,
+      note,
+      focusLevel ? VERIFY_PER_BAND : undefined,
+    );
 
     // Cache the full questions (with answers) for grading; return public versions.
     await cache.set(cacheKey(userId, native, target), questions, 3600);
@@ -85,32 +105,11 @@ export async function POST(request: NextRequest) {
     const questions = await cache.get<PlacementQuestion[]>(cacheKey(userId, native, target));
     if (!questions) return errorResponse('Placement session expired. Start the test again.', 409);
 
-    const curriculum = await getOrCreateCurriculum(userId, native, target);
     const outcome = scorePlacement(questions, answers);
 
-    // Safe re-take: when a learner re-takes placement for a pair they already
-    // have, keep the original startLevel and never lower currentLevel (only
-    // raise), so re-testing can never discard progress made through classes.
-    const existing = await prisma.course.findUnique({
-      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
-      select: { currentLevel: true },
-    });
-    const nextCurrentLevel = existing ? higherLevel(existing.currentLevel, outcome.level) : outcome.level;
-
-    const course = await prisma.course.upsert({
-      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
-      create: {
-        userId,
-        nativeLang: native,
-        targetLang: target,
-        curriculumId: curriculum.id,
-        currentLevel: outcome.level,
-        startLevel: outcome.level,
-      },
-      // startLevel is intentionally not updated — it is the immutable first
-      // placement. currentLevel only moves up.
-      update: { currentLevel: nextCurrentLevel },
-    });
+    // Safe re-take lives in createOrRaiseCourse: keep startLevel, only raise
+    // currentLevel, so re-testing never discards progress made through classes.
+    const course = await createOrRaiseCourse(userId, native, target, outcome.level);
 
     await prisma.placementResult.upsert({
       where: { courseId: course.id },
@@ -122,6 +121,24 @@ export async function POST(request: NextRequest) {
       },
       update: { level: outcome.level, responses: outcome.responses, scoreBySkill: outcome.scoreBySkill },
     });
+
+    // If the learner reached this test via notes-based "verify with a few
+    // questions", seed the cached materials as the course note + vocabulary,
+    // the same personalization the direct "start here" confirm does.
+    const cachedNotes = await getCachedNotesDeduction(userId, native, target);
+    if (cachedNotes) {
+      const merged = mergeCourseNote(await getCourseNote(course.id), cachedNotes.content);
+      await setCourseNote(course.id, merged);
+      await extractAndStoreNoteVocab({
+        userId,
+        courseId: course.id,
+        nativeLang: native,
+        targetLang: target,
+        level: course.currentLevel,
+        note: merged,
+      });
+      await clearNotesDeduction(userId, native, target);
+    }
 
     await cache.delete(cacheKey(userId, native, target)).catch(() => {});
 

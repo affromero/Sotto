@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { extname } from 'path';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
@@ -13,7 +12,7 @@ import {
   setCourseNote,
 } from '@/lib/course-notes';
 import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
-import { extractViaMarkit } from '@/lib/extractors/markit';
+import { extractUploadTexts, isUploadFile } from '@/lib/note-upload';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
@@ -21,24 +20,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const noteSchema = z.object({ body: z.string().max(MAX_NOTE_LENGTH) });
-const MAX_IMPORTED_FILE_CHARS = 3000;
-const TEXT_EXTENSIONS = new Set([
-  '.csv',
-  '.html',
-  '.json',
-  '.log',
-  '.markdown',
-  '.md',
-  '.mdx',
-  '.rtf',
-  '.text',
-  '.tsv',
-  '.txt',
-  '.xml',
-  '.yaml',
-  '.yml',
-]);
-const MARKIT_EXTENSIONS = new Set(['.pdf', '.docx', '.pptx', '.xlsx', '.epub']);
 
 interface OwnedCourseContext {
   nativeLang: string;
@@ -54,40 +35,6 @@ async function getOwnedCourse(
     where: { id: courseId, userId },
     select: { nativeLang: true, targetLang: true, currentLevel: true },
   });
-}
-
-function isUploadFile(value: FormDataEntryValue): value is File {
-  return typeof value === 'object' && value !== null && 'arrayBuffer' in value && 'name' in value;
-}
-
-function clipImportedText(text: string): string {
-  const trimmed = text.replace(/\0/g, '').trim();
-  if (trimmed.length <= MAX_IMPORTED_FILE_CHARS) return trimmed;
-  return `${trimmed.slice(0, MAX_IMPORTED_FILE_CHARS).trim()}\n[Trimmed from a longer upload.]`;
-}
-
-async function extractUploadText(file: File): Promise<string> {
-  const name = file.name || 'uploaded-notes';
-  const extension = extname(name).toLowerCase();
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  if (file.type.startsWith('text/') || TEXT_EXTENSIONS.has(extension)) {
-    const text = clipImportedText(buffer.toString('utf8'));
-    if (!text) throw new Error('Empty note file');
-    return `Uploaded course note: ${name}\n${text}`;
-  }
-
-  if (MARKIT_EXTENSIONS.has(extension)) {
-    const extracted = await extractViaMarkit(buffer, {
-      extension,
-      url: `upload://${encodeURIComponent(name)}`,
-    });
-    const text = clipImportedText(extracted.markdown || extracted.text);
-    if (!text) throw new Error('No readable text');
-    return `Uploaded course note: ${name}\n${text}`;
-  }
-
-  throw new Error('Unsupported note file');
 }
 
 async function updateVocabularyFromNote(
@@ -163,11 +110,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const files = form.getAll('files').filter(isUploadFile);
     if (files.length === 0) return errorResponse('No note files uploaded', 400);
 
-    const results = await Promise.allSettled(files.map(extractUploadText));
-    const additions = results.flatMap((result) =>
-      result.status === 'fulfilled' ? [result.value] : []
-    );
-    const failed = results.length - additions.length;
+    const { texts: additions, failed } = await extractUploadTexts(files);
     if (additions.length === 0) return errorResponse('No readable note files uploaded', 422);
 
     const current = await getCourseNote(courseId);

@@ -13,6 +13,12 @@ const mockToPublic = vi.fn();
 const mockCourseUpsert = vi.fn();
 const mockCourseFindUnique = vi.fn();
 const mockPlacementResultUpsert = vi.fn();
+const mockGetCachedNotesDeduction = vi.fn();
+const mockClearNotesDeduction = vi.fn();
+const mockGetCourseNote = vi.fn();
+const mockMergeCourseNote = vi.fn();
+const mockSetCourseNote = vi.fn();
+const mockExtractAndStoreNoteVocab = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -51,6 +57,21 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('@/lib/placement-notes', () => ({
+  getCachedNotesDeduction: (...args: unknown[]) => mockGetCachedNotesDeduction(...args),
+  clearNotesDeduction: (...args: unknown[]) => mockClearNotesDeduction(...args),
+}));
+
+vi.mock('@/lib/course-notes', () => ({
+  getCourseNote: (...args: unknown[]) => mockGetCourseNote(...args),
+  mergeCourseNote: (...args: unknown[]) => mockMergeCourseNote(...args),
+  setCourseNote: (...args: unknown[]) => mockSetCourseNote(...args),
+}));
+
+vi.mock('@/lib/live-vocab', () => ({
+  extractAndStoreNoteVocab: (...args: unknown[]) => mockExtractAndStoreNoteVocab(...args),
 }));
 
 import { GET, POST } from '@/app/api/v1/placement/route';
@@ -203,6 +224,20 @@ describe('GET /api/v1/placement', () => {
       expect(response.status).toBe(200);
     }
   });
+
+  it('verify mode (focusLevel) runs a shorter test and emphasizes the level', async () => {
+    const req = new NextRequest(
+      'http://localhost:3000/api/v1/placement?native=en&target=es&focusLevel=B1',
+      { method: 'GET' },
+    );
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+
+    // generatePlacement(userId, native, target, note, perBand)
+    const call = mockGeneratePlacement.mock.calls[0];
+    expect(call[4]).toBe(2); // shorter run for verification
+    expect(call[3]).toContain('B1'); // the focus note names the deduced level
+  });
 });
 
 describe('POST /api/v1/placement', () => {
@@ -232,6 +267,12 @@ describe('POST /api/v1/placement', () => {
     mockCourseUpsert.mockResolvedValue({ id: 'course-1', nativeLang: 'en', targetLang: 'de', currentLevel: 'B1' });
     mockPlacementResultUpsert.mockResolvedValue({ courseId: 'course-1', level: 'B1' });
     mockCacheDelete.mockResolvedValue(undefined);
+    // Default: this submission did not come from a notes deduction.
+    mockGetCachedNotesDeduction.mockResolvedValue(null);
+    mockMergeCourseNote.mockReturnValue('merged');
+    mockGetCourseNote.mockResolvedValue('');
+    mockSetCourseNote.mockResolvedValue(undefined);
+    mockExtractAndStoreNoteVocab.mockResolvedValue(0);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -385,5 +426,29 @@ describe('POST /api/v1/placement', () => {
 
     expect(response.status).toBe(200);
     expect(body.level).toBe('A1');
+  });
+
+  it('does not touch course notes when there is no pending notes deduction', async () => {
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
+    expect(mockSetCourseNote).not.toHaveBeenCalled();
+    expect(mockExtractAndStoreNoteVocab).not.toHaveBeenCalled();
+  });
+
+  it('seeds the cached materials as note + vocab when verifying a notes deduction', async () => {
+    mockGetCachedNotesDeduction.mockResolvedValue({
+      level: 'B1',
+      rationale: 'r',
+      confidence: 0.8,
+      content: 'mis materiales',
+    });
+    mockMergeCourseNote.mockReturnValue('mis materiales');
+
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
+
+    expect(mockSetCourseNote).toHaveBeenCalledWith('course-1', 'mis materiales');
+    expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
+      expect.objectContaining({ courseId: 'course-1', userId: 'u1', note: 'mis materiales' }),
+    );
+    expect(mockClearNotesDeduction).toHaveBeenCalledWith('u1', 'en', 'de');
   });
 });

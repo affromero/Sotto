@@ -1490,6 +1490,99 @@
         ],
         "additionalProperties": false
       },
+      "DeduceFromNotesRequest": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "target": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "DeduceFromNotesResponse": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "deducedLevel": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "deducedLevel",
+          "rationale",
+          "confidence"
+        ],
+        "additionalProperties": false
+      },
+      "ConfirmFromNotesRequest": {
+        "type": "object",
+        "properties": {
+          "native": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "target": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          }
+        },
+        "required": [
+          "native",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "ConfirmFromNotesResponse": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "addedVocabulary": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "courseId",
+          "level",
+          "addedVocabulary"
+        ],
+        "additionalProperties": false
+      },
       "MemoryNode": {
         "type": "object",
         "properties": {
@@ -2365,6 +2458,72 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SubmitPlacementRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/placement/from-notes": {
+      "post": {
+        "operationId": "deducePlacementFromNotes",
+        "summary": "Deduce a CEFR level from pasted materials (creates no course).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeduceFromNotesResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeduceFromNotesRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/placement/from-notes/confirm": {
+      "post": {
+        "operationId": "confirmPlacementFromNotes",
+        "summary": "Accept the deduced level; create the course and seed note + vocab.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmFromNotesResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmFromNotesRequest"
               }
             }
           }

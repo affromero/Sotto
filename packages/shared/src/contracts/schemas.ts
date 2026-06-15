@@ -614,6 +614,39 @@ export const submitPlacementResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/v1/placement/from-notes — deduce a CEFR level from pasted materials
+// (JSON). Mirrors apps/web/src/app/api/v1/placement/from-notes/route.ts. Web
+// file uploads use a separate multipart route (not in the contract).
+// ---------------------------------------------------------------------------
+
+export const deduceFromNotesRequestSchema = z.object({
+  native: z.string().length(2),
+  target: z.string().length(2),
+  content: z.string().min(1),
+});
+
+export const deduceFromNotesResponseSchema = z.object({
+  native: z.string(),
+  target: z.string(),
+  deducedLevel: cefrLevelSchema,
+  rationale: z.string(),
+  confidence: z.number(),
+});
+
+// POST /api/v1/placement/from-notes/confirm — accept the deduced level, create
+// the course, and seed the note + vocabulary. Mirrors the confirm route.
+export const confirmFromNotesRequestSchema = z.object({
+  native: z.string().length(2),
+  target: z.string().length(2),
+});
+
+export const confirmFromNotesResponseSchema = z.object({
+  courseId: z.string(),
+  level: cefrLevelSchema,
+  addedVocabulary: z.number(),
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/v1/courses/{courseId}/graph — the vocabulary/grammar memory graph.
 // Mirrors apps/web/src/lib/knowledge-graph.ts (getMemoryGraph). The route
 // returns exactly `{ nodes, edges }`; `.loose()` on the node tolerates any

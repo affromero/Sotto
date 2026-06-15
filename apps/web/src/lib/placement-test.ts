@@ -8,6 +8,7 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { CEFR_ORDER } from './cefr-levels';
 import type { CefrLevel } from '@sotto/shared';
 
 export const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2'];
@@ -80,16 +81,20 @@ export async function generatePlacement(
   nativeLang: string,
   targetLang: string,
   note = '',
+  // Questions per CEFR band. Defaults to the full test; the "verify with a few
+  // questions" path passes a smaller value for a shorter run. Clamped 1..PER_BAND.
+  perBand: number = PER_BAND,
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
   const ai = await resolveLearningAi(userId);
-  const count = PLACEMENT_LEVELS.length * PER_BAND;
+  const bandCount = Math.max(1, Math.min(PER_BAND, Math.round(perBand)));
+  const count = PLACEMENT_LEVELS.length * bandCount;
 
   const systemPrompt = loadAndRender('placement/placement-probe.md', {
     NATIVE: nativeLang,
     TARGET: targetLang,
     LEVELS: PLACEMENT_LEVELS.join(', '),
     SKILLS: PLACEMENT_SKILLS.join(', '),
-    PER_BAND: String(PER_BAND),
+    PER_BAND: String(bandCount),
     COUNT: String(count),
     NOTES: formatNotesForPrompt(note),
   });
@@ -97,7 +102,7 @@ export async function generatePlacement(
   const provider = createAIProvider(ai.provider);
   const response = await provider.generateResponse(
     systemPrompt,
-    [{ role: 'user', content: `Generate exactly ${count} placement questions (${PER_BAND} per CEFR level).` }],
+    [{ role: 'user', content: `Generate exactly ${count} placement questions (${bandCount} per CEFR level).` }],
     { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 6000, temperature: 0.7 },
   );
 
@@ -189,4 +194,67 @@ export function scorePlacement(
   }
 
   return { level, scoreByBand, scoreBySkill, responses };
+}
+
+export interface NotesDeduction {
+  level: CefrLevel;
+  rationale: string;
+  /** 0..1 — how strongly the materials support the level. */
+  confidence: number;
+}
+
+/**
+ * Deduce a learner's CEFR level from materials they uploaded (notes, a textbook
+ * excerpt, their own writing). Pure inference — no DB writes; the caller decides
+ * whether to confirm directly or verify with a short quiz, then creates the
+ * course. Reuses the learner's resolved AI provider, same as generatePlacement.
+ */
+export async function deduceLevelFromNotes(
+  userId: string,
+  nativeLang: string,
+  targetLang: string,
+  content: string,
+): Promise<{ deduction: NotesDeduction; provider: string; model: string }> {
+  const ai = await resolveLearningAi(userId);
+
+  const systemPrompt = loadAndRender('placement/deduce-from-notes.md', {
+    NATIVE: nativeLang,
+    TARGET: targetLang,
+    CONTENT: content,
+  });
+
+  const provider = createAIProvider(ai.provider);
+  const response = await provider.generateResponse(
+    systemPrompt,
+    [{ role: 'user', content: 'Assess the CEFR level shown by these materials.' }],
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 800, temperature: 0.2 },
+  );
+
+  logUsage({
+    service: ai.provider,
+    model: response.model,
+    category: 'placement',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    userId,
+  });
+
+  const cleaned = response.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  let raw: { level?: string; rationale?: string; confidence?: number };
+  try {
+    raw = JSON.parse(cleaned);
+  } catch (err) {
+    logger.error('Failed to parse notes-deduction LLM response', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw new Error('Level deduction returned malformed output.');
+  }
+
+  const level = (CEFR_ORDER as readonly string[]).includes(raw.level ?? '')
+    ? (raw.level as CefrLevel)
+    : 'A1';
+  const confidence = typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : 0;
+  const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : '';
+
+  return { deduction: { level, rationale, confidence }, provider: ai.provider, model: response.model };
 }

@@ -1,28 +1,31 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// generatePlacement reaches out to the resolved AI provider; mock the seams so
-// the test stays hermetic and asserts only our option-shaping behavior.
+// generatePlacement / deduceLevelFromNotes reach out to the resolved AI
+// provider; mock the seams so the tests stay hermetic. The provider's
+// generateResponse is a shared mock each test drives with its own LLM output.
+const { mockGenerateResponse } = vi.hoisted(() => ({ mockGenerateResponse: vi.fn() }));
+
 vi.mock('@/lib/learning-ai', () => ({
   resolveLearningAi: vi.fn().mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: vi.fn(() => ({
-    generateResponse: vi.fn().mockResolvedValue({
-      content: JSON.stringify([
-        { cefr: 'A1', skill: 'grammar', prompt: 'q1', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: '' },
-        { cefr: 'B1', skill: 'reading', prompt: 'q2', options: ['w', 'x', 'y', 'z'], correctIndex: 2, explanation: '' },
-      ]),
-      model: 'test-model',
-      inputTokens: 0,
-      outputTokens: 0,
-    }),
-  })),
+  createAIProvider: vi.fn(() => ({ generateResponse: mockGenerateResponse })),
 }));
 vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: vi.fn(() => '') }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/course-notes', () => ({ formatNotesForPrompt: vi.fn(() => '') }));
 
-import { scorePlacement, idkLabel, generatePlacement, type PlacementQuestion } from '@/lib/placement-test';
+function llmResponse(content: string) {
+  return { content, model: 'test-model', inputTokens: 0, outputTokens: 0 };
+}
+
+import {
+  scorePlacement,
+  idkLabel,
+  generatePlacement,
+  deduceLevelFromNotes,
+  type PlacementQuestion,
+} from '@/lib/placement-test';
 
 function q(id: string, cefr: string, skill: string): PlacementQuestion {
   return {
@@ -100,6 +103,17 @@ describe('idkLabel', () => {
 });
 
 describe('generatePlacement option shaping', () => {
+  beforeEach(() => {
+    mockGenerateResponse.mockResolvedValue(
+      llmResponse(
+        JSON.stringify([
+          { cefr: 'A1', skill: 'grammar', prompt: 'q1', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: '' },
+          { cefr: 'B1', skill: 'reading', prompt: 'q2', options: ['w', 'x', 'y', 'z'], correctIndex: 2, explanation: '' },
+        ]),
+      ),
+    );
+  });
+
   it('appends the native-language "I don\'t know" as the last option', async () => {
     const { questions: out } = await generatePlacement('user-1', 'es', 'en');
     expect(out.length).toBeGreaterThan(0);
@@ -109,5 +123,44 @@ describe('generatePlacement option shaping', () => {
       // correctIndex always points at a content option, never the IDK option.
       expect(question.correctIndex).toBeLessThan(4);
     }
+  });
+
+  it('honors a smaller perBand for a shorter verification run', async () => {
+    await generatePlacement('user-1', 'en', 'es', '', 2);
+    const messages = mockGenerateResponse.mock.calls.at(-1)?.[1] as Array<{ content: string }>;
+    // 4 CEFR bands * 2 per band = 8 questions.
+    expect(messages[0].content).toContain('2 per CEFR level');
+    expect(messages[0].content).toContain('8');
+  });
+});
+
+describe('deduceLevelFromNotes', () => {
+  it('parses the deduced level, rationale, and confidence', async () => {
+    mockGenerateResponse.mockResolvedValue(
+      llmResponse('{"level":"B1","rationale":"Uses past tense and subordinate clauses.","confidence":0.8}'),
+    );
+
+    const { deduction } = await deduceLevelFromNotes('user-1', 'en', 'es', 'mi cuaderno');
+
+    expect(deduction.level).toBe('B1');
+    expect(deduction.rationale).toContain('subordinate');
+    expect(deduction.confidence).toBe(0.8);
+  });
+
+  it('clamps confidence to 0..1 and floors an unknown level to A1', async () => {
+    mockGenerateResponse.mockResolvedValue(
+      llmResponse('{"level":"Z9","rationale":"","confidence":4}'),
+    );
+
+    const { deduction } = await deduceLevelFromNotes('user-1', 'en', 'es', 'x');
+
+    expect(deduction.level).toBe('A1');
+    expect(deduction.confidence).toBe(1);
+  });
+
+  it('throws on malformed LLM output', async () => {
+    mockGenerateResponse.mockResolvedValue(llmResponse('not json'));
+
+    await expect(deduceLevelFromNotes('user-1', 'en', 'es', 'x')).rejects.toThrow(/malformed/i);
   });
 });
