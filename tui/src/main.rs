@@ -206,7 +206,6 @@ async fn run_whoami() -> Result<()> {
                     .name
                     .clone()
                     .or_else(|| me.email.clone())
-                    .or_else(|| me.handle.clone())
                     .unwrap_or_else(|| me.id.clone());
                 println!(
                     "{who} @ {} (profile '{}', live)",
