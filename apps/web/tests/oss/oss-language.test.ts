@@ -1028,12 +1028,14 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(userValidationSources).not.toContain("'following'");
   });
 
-  it('does not ship directory-style user search', () => {
+  it('does not ship directory-style user search or @handles', () => {
     expect(existsSync(resolve(webRoot, 'src/app/api/v1/users/search'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/app/api/v1/handles'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/lib/handles.ts'))).toBe(false);
     const validationSource = readSource('src/lib/validations.ts');
 
-    expect(validationSource).toContain('handle: handleSchema');
-    expect(validationSource).not.toContain('Search by @handle');
+    expect(validationSource).not.toContain('handleSchema');
+    expect(validationSource).not.toContain('userSearchSchema');
   });
 
   it('does not ship the voice marketplace', () => {

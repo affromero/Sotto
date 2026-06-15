@@ -12,13 +12,8 @@ describe('url helpers', () => {
     vi.unstubAllEnvs();
   });
 
-  it('builds profile slug episode paths when a slug and handle are available', () => {
-    expect(episodeUrl({ id: 'pod-1', slug: 'daily-brief' }, 'alice')).toBe('/@alice/daily-brief');
-  });
-
-  it('builds id episode paths when a slug or handle is missing', () => {
-    expect(episodeUrl({ id: 'pod-1', slug: 'daily-brief' }, null)).toBe('/episode/pod-1');
-    expect(episodeUrl({ id: 'pod-1', slug: null }, 'alice')).toBe('/episode/pod-1');
+  it('builds id episode paths', () => {
+    expect(episodeUrl({ id: 'pod-1' })).toBe('/episode/pod-1');
   });
 
   it('uses NEXT_PUBLIC_APP_URL as the app base URL', () => {
@@ -66,8 +61,8 @@ describe('url helpers', () => {
   it('builds absolute episode URLs from explicit deployment configuration', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com/');
 
-    expect(absoluteEpisodeUrl({ id: 'pod-1', slug: 'daily-brief' }, 'alice')).toBe(
-      'https://selfhost.example.com/@alice/daily-brief'
+    expect(absoluteEpisodeUrl({ id: 'pod-1' })).toBe(
+      'https://selfhost.example.com/episode/pod-1'
     );
   });
 });

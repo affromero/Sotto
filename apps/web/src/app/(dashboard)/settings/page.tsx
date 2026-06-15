@@ -32,7 +32,6 @@ export default async function SettingsPage() {
       select: {
         name: true,
         email: true,
-        handle: true,
         image: true,
         preferredLanguage: true,
         preferredAiModel: true,
@@ -97,7 +96,6 @@ export default async function SettingsPage() {
 
       <SettingsForm
         initialName={user.name ?? ''}
-        initialHandle={user.handle ?? ''}
         email={user.email}
         image={user.image}
         preferredLanguage={user.preferredLanguage}

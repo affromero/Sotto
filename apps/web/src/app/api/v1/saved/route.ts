@@ -29,7 +29,7 @@ export async function GET() {
           source: true,
           sourcePlatform: true,
           language: true,
-          user: { select: { id: true, name: true, handle: true, image: true } },
+          user: { select: { id: true, name: true, image: true } },
           tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
         },
       },

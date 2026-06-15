@@ -61,13 +61,7 @@ export function getPublicAppBaseUrl(env: AppUrlEnv = process.env): string {
 }
 
 /** Generate a episode URL. */
-export function episodeUrl(
-  episode: { id: string; slug?: string | null },
-  handle?: string | null
-): string {
-  if (episode.slug && handle) {
-    return `/@${handle}/${episode.slug}`;
-  }
+export function episodeUrl(episode: { id: string }): string {
   return `/episode/${episode.id}`;
 }
 
@@ -75,9 +69,8 @@ export function episodeUrl(
  * Generate an absolute episode URL.
  */
 export function absoluteEpisodeUrl(
-  episode: { id: string; slug?: string | null },
-  handle?: string | null,
+  episode: { id: string },
   appUrl = getAppBaseUrl()
 ): string {
-  return `${appUrl}${episodeUrl(episode, handle)}`;
+  return `${appUrl}${episodeUrl(episode)}`;
 }

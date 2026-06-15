@@ -16,8 +16,8 @@ export const ACTIVE_PROFILE_COOKIE = 'sotto_profile';
 /**
  * Idempotently ensure the owner profile exists. Safe to call on every request —
  * `auth()` reads first and only upserts when the row is missing (i.e. on a fresh
- * install). `email`/`handle` are unique placeholders the learner can change from
- * settings. The owner is always ADMIN.
+ * install). `email` is a unique placeholder the learner can change from settings.
+ * The owner is always ADMIN.
  */
 export async function ensureLocalUser() {
   return prisma.user.upsert({
@@ -27,7 +27,6 @@ export async function ensureLocalUser() {
       id: LOCAL_USER_ID,
       email: 'learner@localhost',
       name: 'Learner',
-      handle: 'learner',
       role: 'ADMIN',
     },
   });
@@ -36,9 +35,8 @@ export async function ensureLocalUser() {
 /**
  * Create an additional household profile (a regular learner, never the owner).
  * The placeholder email is unique per profile so it satisfies `User.email`'s
- * unique constraint; the learner renames it from settings. `handle` is left null
- * (Postgres allows many nulls under a unique index). An optional preset animal
- * avatar slug seeds the profile's picture.
+ * unique constraint; the learner renames it from settings. An optional preset
+ * animal avatar slug seeds the profile's picture.
  */
 export async function createProfile({
   name,

@@ -17,7 +17,6 @@ export const getEpisodeForDetailPage = cache(async (episodeId: string) => {
           id: true,
           name: true,
           image: true,
-          handle: true,
         },
       },
       segments: {
