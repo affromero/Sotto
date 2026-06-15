@@ -7,6 +7,8 @@ import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { AudioPlayerContext } from '@/components/providers/AudioPlayerProvider';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { SegmentData } from '@/types/episode';
 import type { ReferenceData } from '@/types/reference';
 import type { VocabularyEntryData } from '@/types/vocabulary';
@@ -114,7 +116,10 @@ export function TranscriptPanel({
               <span className={styles.speaker} data-speaker-index={idx}>
                 {segment.speaker}
               </span>
-              <div className={styles.text}>
+              <div
+                className={`${styles.text} ${guardStyles.guarded}`}
+                {...learningTextGuardProps<HTMLDivElement>()}
+              >
                 {hasRefs && hasVocab
                   ? parseTextWithCitationsAndVocabulary(segment.text, references, vocabularyEntries, onVocabPause, onVocabResume)
                   : hasRefs

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveAudio } from '@/lib/hooks/useLiveAudio';
 import { openLiveSession, type LiveSessionHandle, type LiveTokenPayload } from '@/lib/live-session';
+import guardStyles from '@/components/ui/LearningTextGuard.module.css';
+import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import styles from './LiveConversation.module.css';
 
 type Direction = 'native_to_target' | 'target_to_native';
@@ -235,7 +237,12 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
                 <span className={styles.lineRole}>
                   {line.role === 'translation' ? hearLabel : speakLabel}
                 </span>
-                <span className={styles.lineText}>{line.text}</span>
+                <span
+                  className={`${styles.lineText} ${guardStyles.guarded}`}
+                  {...learningTextGuardProps<HTMLSpanElement>()}
+                >
+                  {line.text}
+                </span>
               </li>
             ))}
           </ul>
