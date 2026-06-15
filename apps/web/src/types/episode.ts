@@ -27,7 +27,6 @@ export interface EpisodeSummary {
   user: {
     id: string;
     name: string | null;
-    handle: string | null;
     image: string | null;
     role?: string;
   };

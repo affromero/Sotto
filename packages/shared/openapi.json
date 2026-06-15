@@ -1808,10 +1808,6 @@
             "type": "string",
             "nullable": true
           },
-          "handle": {
-            "type": "string",
-            "nullable": true
-          },
           "image": {
             "type": "string",
             "nullable": true
@@ -1939,10 +1935,6 @@
           "email": {
             "type": "string"
           },
-          "handle": {
-            "type": "string",
-            "nullable": true
-          },
           "image": {
             "type": "string",
             "nullable": true
@@ -1955,7 +1947,6 @@
           "id",
           "name",
           "email",
-          "handle",
           "image",
           "role"
         ],
@@ -2649,7 +2640,7 @@
     "/api/v1/users/me": {
       "get": {
         "operationId": "getMe",
-        "summary": "The authenticated learner identity (id, name, email, handle).",
+        "summary": "The authenticated learner identity (id, name, email).",
         "responses": {
           "200": {
             "description": "Success",

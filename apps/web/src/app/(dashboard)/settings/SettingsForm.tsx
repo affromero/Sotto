@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -32,7 +32,6 @@ interface CategoryTag {
 
 interface SettingsFormProps {
   initialName: string;
-  initialHandle: string;
   email: string;
   image: string | null;
   preferredLanguage: string | null;
@@ -50,7 +49,6 @@ interface SettingsFormProps {
 
 export function SettingsForm({
   initialName,
-  initialHandle,
   email,
   image,
   preferredLanguage: initialPreferredLanguage,
@@ -66,46 +64,8 @@ export function SettingsForm({
   initialPushNotifications,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
-  const [handle, setHandle] = useState(initialHandle);
-  const [handleStatus, setHandleStatus] = useState<{
-    checking: boolean;
-    available?: boolean;
-    reason?: string;
-  }>({ checking: false });
-  const handleCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  const checkHandle = useCallback(
-    (value: string) => {
-      if (handleCheckTimer.current) clearTimeout(handleCheckTimer.current);
-      if (!value || value === initialHandle) {
-        setHandleStatus({ checking: false });
-        return;
-      }
-      setHandleStatus({ checking: true });
-      handleCheckTimer.current = setTimeout(async () => {
-        try {
-          const res = await fetch(`/api/v1/handles/check?handle=${encodeURIComponent(value)}`);
-          if (res.ok) {
-            const data = await res.json();
-            setHandleStatus({ checking: false, available: data.available, reason: data.reason });
-          } else {
-            setHandleStatus({ checking: false });
-          }
-        } catch {
-          setHandleStatus({ checking: false });
-        }
-      }, 400);
-    },
-    [initialHandle]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (handleCheckTimer.current) clearTimeout(handleCheckTimer.current);
-    };
-  }, []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
@@ -181,9 +141,6 @@ export function SettingsForm({
     setSaved(false);
     try {
       const payload: Record<string, string> = { name };
-      if (handle && handle !== initialHandle) {
-        payload.handle = handle;
-      }
       const response = await fetch('/api/v1/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -365,36 +322,6 @@ export function SettingsForm({
             maxLength={100}
           />
 
-          <div className={styles.fieldGroup}>
-            <label htmlFor="handle" className={styles.fieldLabel}>
-              Handle
-            </label>
-            <div className={styles.handleInputWrap}>
-              <span className={styles.handlePrefix}>@</span>
-              <input
-                id="handle"
-                type="text"
-                className={styles.handleInput}
-                value={handle}
-                onChange={(e) => {
-                  const val = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-                  setHandle(val);
-                  checkHandle(val);
-                }}
-                placeholder="your_handle"
-                maxLength={30}
-                autoComplete="off"
-              />
-            </div>
-            {handleStatus.checking && <span className={styles.handleChecking}>Checking...</span>}
-            {!handleStatus.checking &&
-              handleStatus.available === true &&
-              handle !== initialHandle && <span className={styles.handleAvailable}>Available</span>}
-            {!handleStatus.checking && handleStatus.available === false && (
-              <span className={styles.handleTaken}>{handleStatus.reason || 'Not available'}</span>
-            )}
-          </div>
-
           <div className={styles.formActions}>
             <Button type="submit" loading={saving} disabled={saving}>
               {saved ? 'Saved' : 'Save Changes'}
@@ -417,7 +344,7 @@ export function SettingsForm({
             </label>
             <select
               id="preferredLanguage"
-              className={styles.handleInput}
+              className={styles.selectField}
               value={preferredLanguage ?? ''}
               onChange={(e) => setPreferredLanguage(e.target.value || null)}
               aria-label="Preferred interaction language"

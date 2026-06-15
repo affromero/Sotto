@@ -355,7 +355,7 @@ export function EpisodePlayerView({
                   />
                 ) : (
                   <span className={styles.creatorAvatarFallback}>
-                    {(episode.user.name || episode.user.handle || 'U')[0].toUpperCase()}
+                    {(episode.user.name || 'U')[0].toUpperCase()}
                   </span>
                 )}
               </div>
