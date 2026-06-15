@@ -16,15 +16,33 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 const mockGetAiProviderMeta = vi.fn();
+const mockGetProviderForModel = vi.fn();
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: (...args: unknown[]) => mockGetAiProviderMeta(...args),
+  getProviderForModel: (...args: unknown[]) => mockGetProviderForModel(...args),
+}));
+
+const mockGetAutoModelConfig = vi.fn();
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
 import { resolveLearningAi } from '@/lib/learning-ai';
 
+// Default: configured AI provider differs from the BYOK provider, so the BYOK
+// branch falls back to the provider's registry default model. Individual tests
+// override this to exercise the configured-model path.
+function stubAutoConfig(aiProvider = 'anthropic', aiModel = 'claude-sonnet-4-6') {
+  mockGetAutoModelConfig.mockResolvedValue({ model: { aiProvider, aiModel } });
+}
+
 describe('resolveLearningAi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stubAutoConfig();
+    mockGetProviderForModel.mockImplementation((id: string) =>
+      id?.startsWith('claude') ? 'anthropic' : id?.startsWith('gpt') ? 'openai' : null
+    );
   });
 
   afterEach(() => {
@@ -39,6 +57,33 @@ describe('resolveLearningAi', () => {
 
     expect(resolved).toEqual({ provider: 'openai', model: 'gpt-5', apiKey: 'sk-user-123' });
     expect(mockGetAiProviderMeta).toHaveBeenCalledWith('openai');
+  });
+
+  it('uses the owner-configured model when it matches the BYOK provider', async () => {
+    mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'sk-ant-123' });
+    // Configured default for anthropic is a non-default model the owner picked.
+    stubAutoConfig('anthropic', 'claude-opus-4-6');
+    mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'claude-haiku-4-5-20251001' });
+
+    const resolved = await resolveLearningAi('user-1');
+
+    // The configured model wins over the registry default.
+    expect(resolved).toEqual({
+      provider: 'anthropic',
+      model: 'claude-opus-4-6',
+      apiKey: 'sk-ant-123',
+    });
+  });
+
+  it('falls back to the registry default when the configured model belongs to another provider', async () => {
+    mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'sk-ant-123' });
+    // Owner configured an OpenAI model as the default; it must not leak to anthropic.
+    stubAutoConfig('openai', 'gpt-5');
+    mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'claude-haiku-4-5-20251001' });
+
+    const resolved = await resolveLearningAi('user-1');
+
+    expect(resolved.model).toBe('claude-haiku-4-5-20251001');
   });
 
   it('throws when the BYOK provider has no default model configured', async () => {
