@@ -327,4 +327,28 @@ describe('PATCH /api/v1/users/me', () => {
     expect(body.preferredAiModel).toBeNull();
   });
 
+  it('accepts per-profile appearance prefs and refreshes the theme cookie', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      themeMode: 'dark',
+      themePalette: 'aula',
+      themeAccent: null,
+      reducedMotion: true,
+    });
+
+    const request = createPatchRequest({ themeMode: 'dark', reducedMotion: true });
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie().some((c) => c.startsWith('sotto_theme='))).toBe(true);
+  });
+
+  it('rejects an invalid accent color', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await PATCH(createPatchRequest({ themeAccent: 'blue' }));
+    expect(response.status).toBe(400);
+  });
+
 });

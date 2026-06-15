@@ -21,7 +21,17 @@ const ACCENT_SWATCHES = [
 ];
 
 export function AppearanceControls() {
-  const { theme, setTheme, resolvedTheme, accent, setAccent, palette, setPalette } = useTheme();
+  const {
+    theme,
+    setTheme,
+    resolvedTheme,
+    accent,
+    setAccent,
+    palette,
+    setPalette,
+    reducedMotion,
+    setReducedMotion,
+  } = useTheme();
 
   return (
     <div className={styles.root}>
@@ -96,6 +106,29 @@ export function AppearanceControls() {
               />
             );
           })}
+        </div>
+      </div>
+
+      {/* MOTION -------------------------------------------------------------- */}
+      <div className={styles.group}>
+        <span className={styles.groupLabel}>Motion</span>
+        <div className={styles.segmented} role="group" aria-label="Motion">
+          <button
+            type="button"
+            className={`${styles.segBtn} ${!reducedMotion ? styles.segBtnActive : ''}`}
+            onClick={() => setReducedMotion(false)}
+            aria-pressed={!reducedMotion}
+          >
+            <span>Full</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.segBtn} ${reducedMotion ? styles.segBtnActive : ''}`}
+            onClick={() => setReducedMotion(true)}
+            aria-pressed={reducedMotion}
+          >
+            <span>Reduced</span>
+          </button>
         </div>
       </div>
     </div>

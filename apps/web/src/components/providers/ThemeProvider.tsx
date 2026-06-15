@@ -15,6 +15,8 @@ interface ThemeContextValue {
   setAccent: (accent: string) => void;
   palette: Palette;
   setPalette: (palette: Palette) => void;
+  reducedMotion: boolean;
+  setReducedMotion: (reduced: boolean) => void;
 }
 
 import { createContext, useContext, useEffect } from 'react';
@@ -27,11 +29,14 @@ const ThemeContext = createContext<ThemeContextValue>({
   setAccent: () => {},
   palette: 'aula',
   setPalette: () => {},
+  reducedMotion: false,
+  setReducedMotion: () => {},
 });
 
 const STORAGE_KEY = 'sotto-theme';
 const ACCENT_STORAGE_KEY = 'sotto-accent';
 const PALETTE_STORAGE_KEY = 'sotto-palette';
+const MOTION_STORAGE_KEY = 'sotto-motion';
 
 const DEFAULT_ACCENT = '#3F4FB0';
 const DEFAULT_PALETTE: Palette = 'aula';
@@ -42,6 +47,29 @@ function isLightOnlyRoute(pathname: string): boolean {
     pathname.startsWith('/auth/') ||
     (pathname.startsWith('/episode/') && pathname.endsWith('/embed'))
   );
+}
+
+// ── Persist the active profile's appearance to the DB (keeps it across switches) ──
+// Reads the current values straight from localStorage so every setter persists the
+// full set without threading state. Debounced so dragging the accent doesn't spam.
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function schedulePersist() {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    const accent = localStorage.getItem(ACCENT_STORAGE_KEY);
+    fetch('/api/v1/users/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        themeMode: getThemeSnapshot(),
+        themePalette: getPaletteSnapshot(),
+        themeAccent: accent ?? null,
+        reducedMotion: getMotionSnapshot(),
+      }),
+    }).catch(() => {});
+  }, 400);
 }
 
 // ── Theme external store ──────────────────────────────────────────────────────
@@ -67,6 +95,7 @@ function getThemeServerSnapshot(): Theme {
 function setStoredTheme(theme: Theme) {
   localStorage.setItem(STORAGE_KEY, theme);
   themeListeners.forEach((l) => l());
+  schedulePersist();
 }
 
 // ── System (prefers-color-scheme) store ──────────────────────────────────────
@@ -107,6 +136,7 @@ function getAccentServerSnapshot(): string {
 function setStoredAccent(accent: string) {
   localStorage.setItem(ACCENT_STORAGE_KEY, accent);
   accentListeners.forEach((l) => l());
+  schedulePersist();
 }
 
 // ── Palette external store ────────────────────────────────────────────────────
@@ -132,6 +162,32 @@ function getPaletteServerSnapshot(): Palette {
 function setStoredPalette(palette: Palette) {
   localStorage.setItem(PALETTE_STORAGE_KEY, palette);
   paletteListeners.forEach((l) => l());
+  schedulePersist();
+}
+
+// ── Reduced-motion external store ─────────────────────────────────────────────
+
+let motionListeners: Array<() => void> = [];
+
+function subscribeMotion(listener: () => void) {
+  motionListeners = [...motionListeners, listener];
+  return () => {
+    motionListeners = motionListeners.filter((l) => l !== listener);
+  };
+}
+
+function getMotionSnapshot(): boolean {
+  return localStorage.getItem(MOTION_STORAGE_KEY) === 'reduce';
+}
+
+function getMotionServerSnapshot(): boolean {
+  return false;
+}
+
+function setStoredMotion(reduced: boolean) {
+  localStorage.setItem(MOTION_STORAGE_KEY, reduced ? 'reduce' : 'auto');
+  motionListeners.forEach((l) => l());
+  schedulePersist();
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -142,6 +198,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemThemeSnapshot, getSystemThemeServerSnapshot);
   const accent = useSyncExternalStore(subscribeAccent, getAccentSnapshot, getAccentServerSnapshot);
   const palette = useSyncExternalStore(subscribePalette, getPaletteSnapshot, getPaletteServerSnapshot);
+  const reducedMotion = useSyncExternalStore(subscribeMotion, getMotionSnapshot, getMotionServerSnapshot);
 
   const resolvedTheme = useMemo<ResolvedTheme>(() => {
     if (isLightOnlyRoute(pathname)) return 'light';
@@ -163,6 +220,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.palette = palette;
   }, [palette]);
 
+  // Sync reduced-motion to DOM
+  useEffect(() => {
+    if (reducedMotion) {
+      document.documentElement.dataset.reducedMotion = 'reduce';
+    } else {
+      delete document.documentElement.dataset.reducedMotion;
+    }
+  }, [reducedMotion]);
+
   const setTheme = useCallback((newTheme: Theme) => {
     setStoredTheme(newTheme);
   }, []);
@@ -175,8 +241,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setStoredPalette(newPalette);
   }, []);
 
+  const setReducedMotion = useCallback((reduced: boolean) => {
+    setStoredMotion(reduced);
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, accent, setAccent, palette, setPalette }}>
+    <ThemeContext.Provider
+      value={{ theme, resolvedTheme, setTheme, accent, setAccent, palette, setPalette, reducedMotion, setReducedMotion }}
+    >
       {children}
     </ThemeContext.Provider>
   );

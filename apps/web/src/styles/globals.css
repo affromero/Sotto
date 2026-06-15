@@ -569,6 +569,22 @@ a:hover {
   }
 }
 
+/* Per-profile reduced motion — the active profile opted out, on top of the OS setting */
+html[data-reduced-motion='reduce'] *,
+html[data-reduced-motion='reduce'] *::before,
+html[data-reduced-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-reduced-motion='reduce'] ::view-transition-group(*),
+html[data-reduced-motion='reduce'] ::view-transition-old(*),
+html[data-reduced-motion='reduce'] ::view-transition-new(*) {
+  animation-duration: 0s !important;
+}
+
 /* ============================================ */
 /* MOBILE-FIRST RESPONSIVE                       */
 /* ============================================ */
