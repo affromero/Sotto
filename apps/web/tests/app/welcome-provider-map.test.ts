@@ -52,6 +52,14 @@ describe('resolveAi', () => {
     expect(r.keyPost).toBeNull();
     expect(r.infra).toEqual({ aiProvider: 'claude-code' });
     expect(r.preferredAiProvider).toBe('claude-code');
+    expect(r.preferredAiModel).toBeNull();
+  });
+
+  it('carries the picked claude-code model for the CLI method', () => {
+    const r = resolveAi('claude', 'cli', '', 'opus');
+    expect(r.preferredAiProvider).toBe('claude-code');
+    expect(r.preferredAiModel).toBe('opus');
+    expect(r.infra).toEqual({ aiProvider: 'claude-code', aiModel: 'opus' });
   });
 
   it('maps a local/custom URL to the local provider with base URL + model', () => {
