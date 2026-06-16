@@ -46,6 +46,7 @@ export default async function LearnPage() {
       nativeLang: true,
       targetLang: true,
       currentLevel: true,
+      placementSource: true,
       activeClassId: true,
       pedagogy: true,
       curriculum: { select: { title: true } },
@@ -134,6 +135,17 @@ export default async function LearnPage() {
                     >
                       <i style={{ width: `${pct}%` }} />
                     </div>
+                    {course.placementSource === 'MANUAL' && (
+                      <p className={styles.manualHint}>
+                        You set this level yourself.{' '}
+                        <Link
+                          href={`/learn/placement?native=${course.nativeLang}&target=${course.targetLang}`}
+                        >
+                          Take the placement test
+                        </Link>{' '}
+                        to confirm it.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className={styles.courseActions}>
