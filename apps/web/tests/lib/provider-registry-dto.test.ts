@@ -52,8 +52,8 @@ describe('AI Provider Client DTO', () => {
 describe('TTS Provider Client DTO', () => {
   const meta = getAllTtsProviderClientMeta();
 
-  it('returns the 8 BYOK TTS providers and excludes keyless locals', () => {
-    expect(meta).toHaveLength(8);
+  it('returns the 11 BYOK TTS providers and excludes keyless locals', () => {
+    expect(meta).toHaveLength(11);
     expect(meta.map((m) => m.id)).not.toContain('kokoro');
     expect(meta.map((m) => m.id)).not.toContain('local');
   });

@@ -27,6 +27,9 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   minimax: { label: 'MiniMax', shortLabel: 'MiniMax' },
   mistral: { label: 'Mistral (Voxtral)', shortLabel: 'Mistral' },
   kokoro: { label: 'Kokoro (Local)', shortLabel: 'Kokoro' },
+  deepgram: { label: 'Deepgram Aura', shortLabel: 'Aura' },
+  rime: { label: 'Rime', shortLabel: 'Rime' },
+  playht: { label: 'PlayHT', shortLabel: 'PlayHT' },
   local: { label: 'Local TTS sidecar', shortLabel: 'Local' },
 };
 
@@ -176,6 +179,11 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   'gpt-4o-mini-tts': 'GPT-4o Mini TTS',
   'inworld-tts-1.5-max': 'Inworld 1.5 Max',
   'inworld-tts-1.5-mini': 'Inworld 1.5 Mini',
+  'aura-2': 'Aura 2',
+  arcana: 'Arcana',
+  mistv2: 'Mist v2',
+  'Play3.0-mini': 'Play 3.0 Mini',
+  PlayDialog: 'PlayDialog',
   kokoro: 'Kokoro 82M',
   local: 'Local TTS',
 };

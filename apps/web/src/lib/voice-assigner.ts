@@ -16,6 +16,9 @@ import {
   MINIMAX_VOICE_POOL,
   MISTRAL_VOICE_POOL,
   KOKORO_VOICE_POOL,
+  DEEPGRAM_AURA_VOICE_POOL,
+  RIME_VOICE_POOL,
+  PLAYHT_VOICE_POOL,
   getLocalTtsVoicePool,
 } from './providers/tts-voices';
 import type { TtsProviderId } from './providers/tts-registry';
@@ -141,6 +144,21 @@ function selectDeterministicVoiceIds(
 
     case 'kokoro': {
       const voices = selectVoiceSetFromPool(KOKORO_VOICE_POOL, episodeId, speakerCount, metadata);
+      return voices.map((v) => v.id);
+    }
+
+    case 'deepgram': {
+      const voices = selectVoiceSetFromPool(DEEPGRAM_AURA_VOICE_POOL, episodeId, speakerCount, metadata);
+      return voices.map((v) => v.id);
+    }
+
+    case 'rime': {
+      const voices = selectVoiceSetFromPool(RIME_VOICE_POOL, episodeId, speakerCount, metadata);
+      return voices.map((v) => v.id);
+    }
+
+    case 'playht': {
+      const voices = selectVoiceSetFromPool(PLAYHT_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 

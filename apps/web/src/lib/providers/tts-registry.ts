@@ -14,6 +14,9 @@ export type TtsProviderId =
   | 'minimax'
   | 'mistral'
   | 'kokoro'
+  | 'deepgram'
+  | 'rime'
+  | 'playht'
   | 'local';
 
 export interface TtsProviderAuthField {
@@ -87,6 +90,12 @@ const LANG_MISTRAL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it'
 const LANG_INWORLD: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
 /** Kokoro-82M (local sidecar) — 8 languages */
 const LANG_KOKORO: ReadonlySet<string> = new Set(['en','es','fr','hi','it','pt','ja','zh']);
+/** Deepgram Aura-2 — 7 languages (via voice-id suffix) */
+const LANG_DEEPGRAM_AURA: ReadonlySet<string> = new Set(['en','es','de','fr','nl','it','ja']);
+/** Rime Arcana — 10 languages (Tamil excluded; not a Sotto course language) */
+const LANG_RIME: ReadonlySet<string> = new Set(['en','es','fr','de','hi','he','ja','pt','ar']);
+/** PlayHT Play3.0-mini — Sotto languages PlayHT names (see PLAYHT_LANGUAGE_NAMES) */
+const LANG_PLAYHT: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','cs','hu','el','he','th','id','ms','uk','ca']);
 
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
@@ -416,6 +425,114 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       // generation time by the provider (clear error if TTS_BASE_URL is unset
       // or the sidecar is unreachable).
       validate: async () => true,
+    },
+  },
+
+  // Deepgram Aura-2 — real-time voice-agent TTS. The voice id IS the model
+  // (aura-2-{name}-{lang}); language is encoded in the voice suffix.
+  deepgram: {
+    id: 'deepgram',
+    displayName: 'Deepgram Aura',
+    getApiKeyUrl: 'https://console.deepgram.com/',
+    supportsSfx: false,
+    supportsStreaming: true,
+    maxSegmentChars: 2000,
+    defaultModel: 'aura-2',
+    models: [{ id: 'aura-2', displayName: 'Aura 2', tier: 'premium', supportedLanguages: LANG_DEEPGRAM_AURA }],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0.03,
+    modelsWithoutTextContext: ['aura-2'],
+    languageDetection: 'optional_hint',
+    languageParam: null,
+    voicesAreCrossLingual: false,
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.deepgram.com/v1/projects', {
+            headers: { Authorization: `Token ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  // Rime — Arcana flagship voices. `speaker` + `modelId`; mp3 via Accept header.
+  rime: {
+    id: 'rime',
+    displayName: 'Rime',
+    getApiKeyUrl: 'https://app.rime.ai/tokens',
+    supportsSfx: false,
+    supportsStreaming: true,
+    maxSegmentChars: 3000,
+    defaultModel: 'arcana',
+    models: [
+      { id: 'arcana', displayName: 'Arcana', tier: 'premium', supportedLanguages: LANG_RIME },
+      { id: 'mistv2', displayName: 'Mist v2', tier: 'standard', supportedLanguages: new Set(['en','es','fr','de']) },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0.02,
+    modelsWithoutTextContext: ['arcana', 'mistv2'],
+    languageDetection: 'optional_hint',
+    languageParam: 'lang',
+    voicesAreCrossLingual: true,
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://users.rime.ai/data/voices', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  // PlayHT — Play3.0-mini multilingual. Dual-credential auth; S3 URI voices.
+  playht: {
+    id: 'playht',
+    displayName: 'PlayHT',
+    getApiKeyUrl: 'https://play.ht/studio/api-access',
+    supportsSfx: false,
+    supportsStreaming: true,
+    maxSegmentChars: 20000,
+    defaultModel: 'Play3.0-mini',
+    models: [
+      { id: 'Play3.0-mini', displayName: 'Play 3.0 Mini', tier: 'premium', supportedLanguages: LANG_PLAYHT },
+      { id: 'PlayDialog', displayName: 'PlayDialog', tier: 'ultra', supportedLanguages: LANG_PLAYHT },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0.03,
+    modelsWithoutTextContext: ['Play3.0-mini', 'PlayDialog'],
+    languageDetection: 'recommended',
+    languageParam: 'language',
+    voicesAreCrossLingual: true,
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const userId = process.env.PLAYHT_USER_ID;
+          if (!userId) return false;
+          const res = await fetch('https://api.play.ht/api/v2/voices', {
+            headers: { 'X-USER-ID': userId, AUTHORIZATION: creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
     },
   },
 
