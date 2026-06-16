@@ -11,6 +11,7 @@ import { WelcomeFlow } from '@/app/welcome/WelcomeFlow';
 import type { AgentState, ContextItem, VoiceState } from '@/app/welcome/WelcomeFlow';
 import { StepAgent } from '@/app/welcome/steps/StepAgent';
 import { StepContext } from '@/app/welcome/steps/StepContext';
+import { StepLearnerProfile } from '@/app/welcome/steps/StepLearnerProfile';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
 import { StepReady } from '@/app/welcome/steps/StepReady';
 import { StepVoice } from '@/app/welcome/steps/StepVoice';
@@ -168,10 +169,60 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByText(/Often comfortable with/i)).not.toBeInTheDocument();
   });
 
+  it('starts reset onboarding with a welcome screen before learner setup', async () => {
+    const user = userEvent.setup();
+    mockConfigFetch(false);
+
+    render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
+
+    expect(await screen.findByRole('heading', { name: /Welcome to Sotto/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Learn Italian/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Continue$/i }));
+
+    expect(await screen.findByRole('heading', { name: /Who's learning/i })).toBeInTheDocument();
+    expect(screen.getByText(/admin · first learner/i)).toBeInTheDocument();
+  });
+
+  it('saves the admin learner profile before continuing self-host onboarding', async () => {
+    const user = userEvent.setup();
+    const onNext = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <StepLearnerProfile
+        name="Andres"
+        avatarSlug="capybara"
+        demoMode={false}
+        setName={vi.fn()}
+        setAvatarSlug={vi.fn()}
+        onNext={onNext}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/onboarding/name',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Andres', avatarSlug: 'capybara' }),
+      })
+    );
+    expect(onNext).toHaveBeenCalled();
+  });
+
   it('keeps the placement ladder to one selected rung', async () => {
     const user = userEvent.setup();
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=4&lang=de');
+    window.history.pushState({}, '', '/welcome?step=6&lang=de');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -559,7 +610,7 @@ describe('welcome hosted-demo mode', () => {
     );
 
     await user.click(screen.getByTitle('Change language'));
-    expect(onJump).toHaveBeenCalledWith(0);
+    expect(onJump).toHaveBeenCalledWith(2);
 
     await user.click(screen.getByRole('button', { name: /finish demo/i }));
 
@@ -747,7 +798,7 @@ describe('welcome hosted-demo mode', () => {
 
   it('supports design step deep-links without persisting hosted-demo state', async () => {
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=4&lang=es');
+    window.history.pushState({}, '', '/welcome?step=6&lang=es');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -773,6 +824,8 @@ describe('welcome hosted-demo mode', () => {
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
+    await user.click(screen.getByRole('button', { name: /^Continue$/i }));
+    await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
     await user.click(screen.getByRole('button', { name: /Learn Italian/i }));
     await user.keyboard('{Enter}');
 
@@ -782,10 +835,25 @@ describe('welcome hosted-demo mode', () => {
 
   it('keeps self-host welcome progress resumable and keyboard navigable', async () => {
     const user = userEvent.setup();
-    mockConfigFetch(true);
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/onboarding/name')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        json: async () => ({ selfHosted: true, isOwner: false }),
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     render(<WelcomeFlow initialConfig={{ selfHosted: true, isOwner: false }} />);
 
+    await user.click(screen.getByRole('button', { name: /^Continue$/i }));
+    await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
     await user.click(screen.getByRole('button', { name: /Learn Italian/i }));
     await user.keyboard('{Enter}');
 
@@ -794,7 +862,12 @@ describe('welcome hosted-demo mode', () => {
     await waitFor(() => {
       const raw = window.localStorage.getItem('sotto.onboarding.v1');
       expect(raw).not.toBeNull();
-      expect(JSON.parse(raw ?? '{}')).toMatchObject({ step: 1, language: 'it' });
+      expect(JSON.parse(raw ?? '{}')).toMatchObject({
+        step: 3,
+        profileName: 'Learner',
+        avatarSlug: 'capybara',
+        language: 'it',
+      });
     });
   });
 });

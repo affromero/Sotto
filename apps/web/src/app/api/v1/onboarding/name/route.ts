@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
+import { avatarImagePath, isAnimalSlug } from '@/lib/avatars';
 import { validateDisplayName } from '@/lib/name-validation';
 import { moderateDisplayName } from '@/lib/name-moderation';
 
@@ -12,6 +13,7 @@ const nameSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .pipe(z.string().min(1, 'Name is required').max(100)),
+  avatarSlug: z.string().refine(isAnimalSlug, 'Unknown avatar').optional(),
 });
 
 /**
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { name } = validation.data;
+    const { name, avatarSlug } = validation.data;
 
     // Gibberish / format check
     const formatCheck = validateDisplayName(name);
@@ -48,12 +50,17 @@ export async function POST(request: NextRequest) {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { name },
+      data: {
+        name,
+        ...(avatarSlug !== undefined && { image: avatarImagePath(avatarSlug) }),
+      },
     });
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    logger.error('Failed to set onboarding name', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to set onboarding name', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to set name', 500);
   }
 }

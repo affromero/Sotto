@@ -239,8 +239,8 @@ function VoicePicker({
           )}
           <div className={c.vkNote}>
             {k.trim()
-              ? `Saved to your config · ${sel.note} · edit anytime in settings`
-              : `${sel.note} · paste now or add it later in settings`}
+              ? `Saved to your config · ${sel.note} · edit anytime in admin providers`
+              : `${sel.note} · paste now or add it later in admin providers`}
           </div>
         </div>
       )}
@@ -290,8 +290,8 @@ function VisualCuePicker({
       </div>
 
       <p className={c.learningCopy}>
-        Pronounce uses the text-to-speech provider above. Image cues use a separate visual
-        provider so practice can build memory from context instead of translation.
+        Pronounce uses the text-to-speech provider above. Image cues use a separate visual provider
+        so practice can build memory from context instead of translation.
       </p>
 
       <div className={c.visualChoiceRow} role="group" aria-label="Visual cue provider">
@@ -368,7 +368,9 @@ function VisualCuePicker({
           </div>
         )
       ) : (
-        <div className={c.vkNote}>Image cues are disabled. Right-click focus practice still works.</div>
+        <div className={c.vkNote}>
+          Image cues are disabled. Right-click focus practice still works.
+        </div>
       )}
     </section>
   );
@@ -449,13 +451,19 @@ export function StepVoice({
   // Keep a concrete model selected for the active cloud provider (defaults to the
   // first option) so choosing a provider always yields a model — changeable later.
   useEffect(() => {
-    if (ttsModelOptions.length > 0 && !ttsModelOptions.some((m) => m.id === voice.ttsModel[ttsModelRegId])) {
+    if (
+      ttsModelOptions.length > 0 &&
+      !ttsModelOptions.some((m) => m.id === voice.ttsModel[ttsModelRegId])
+    ) {
       setTtsModel(ttsModelOptions[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsModelOptions, ttsModelRegId, voice.ttsModel]);
   useEffect(() => {
-    if (sttModelOptions.length > 0 && !sttModelOptions.some((m) => m.id === voice.sttModel[sttModelRegId])) {
+    if (
+      sttModelOptions.length > 0 &&
+      !sttModelOptions.some((m) => m.id === voice.sttModel[sttModelRegId])
+    ) {
       setSttModel(sttModelOptions[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -541,7 +549,7 @@ export function StepVoice({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>02 ·</span> Voice
+        <span className={t.eyebrowIdx}>04 ·</span> Voice
       </div>
       <h1 className={t.title}>
         Choose the tools that <em>practice with you</em>.

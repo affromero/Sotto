@@ -12,22 +12,23 @@ interface Props {
   setBaseLang: (code: string) => void;
   setLanguage: (code: string) => void;
   onNext: () => void;
+  onBack: () => void;
 }
 
-export function StepWelcome({ state, demoMode, setBaseLang, setLanguage, onNext }: Props) {
+export function StepWelcome({ state, demoMode, setBaseLang, setLanguage, onNext, onBack }: Props) {
   const { baseLang, language } = state;
 
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>00 ·</span> Begin
+        <span className={t.eyebrowIdx}>02 ·</span> Languages
       </div>
       <h1 className={t.title}>
-        A course shaped by <em>what you choose</em>.
+        Choose the first <em>language bridge</em>.
       </h1>
       <p className={t.lede}>
-        Sotto runs on your stack and teaches through the things you already care about. First — set
-        the pair you&apos;re bridging.
+        Sotto teaches through the things you already care about. Set the pair this admin learner
+        starts with; more courses can be added later.
       </p>
 
       <div className={c.fromRow}>
@@ -71,18 +72,21 @@ export function StepWelcome({ state, demoMode, setBaseLang, setLanguage, onNext 
       </div>
 
       <div className={t.actions}>
+        <button className={`${t.btn} ${t.btnGhost}`} onClick={onBack} type="button">
+          Back
+        </button>
+        <span className={t.spacer} />
         <button
           className={`${t.btn} ${t.btnPrimary}`}
           disabled={!language}
           onClick={onNext}
-          aria-label="Begin onboarding"
+          aria-label="Continue to agent setup"
         >
-          Begin{' '}
+          Continue{' '}
           <span className={t.btnArrow}>
             <Glyph name="arrow" size={17} />
           </span>
         </button>
-        <span className={t.spacer} />
         <span className={t.mlabel}>
           {demoMode ? 'public demo · no signup' : 'open-source · self-hosted'}
         </span>
