@@ -39,7 +39,7 @@ function q(id: string, cefr: string, skill: string): PlacementQuestion {
   };
 }
 
-// Two questions per band A1..B2 (>=70% ⇒ both correct to pass a band).
+// Two questions per band A1..C2 (>=70% ⇒ both correct to pass a band).
 const questions: PlacementQuestion[] = [
   q('a1-1', 'A1', 'grammar'),
   q('a1-2', 'A1', 'vocab'),
@@ -49,14 +49,18 @@ const questions: PlacementQuestion[] = [
   q('b1-2', 'B1', 'reading'),
   q('b2-1', 'B2', 'grammar'),
   q('b2-2', 'B2', 'reading'),
+  q('c1-1', 'C1', 'grammar'),
+  q('c1-2', 'C1', 'reading'),
+  q('c2-1', 'C2', 'grammar'),
+  q('c2-2', 'C2', 'vocab'),
 ];
 const allCorrect = questions.map((x) => ({ id: x.id, selectedIndex: 0 }));
 
 const IDK_INDEX = 4;
 
 describe('scorePlacement staircase', () => {
-  it('assigns the highest fully-passed band', () => {
-    expect(scorePlacement(questions, allCorrect).level).toBe('B2');
+  it('assigns the highest fully-passed band (reaches C2)', () => {
+    expect(scorePlacement(questions, allCorrect).level).toBe('C2');
   });
 
   it('stops one band below the first failed band', () => {
@@ -128,9 +132,9 @@ describe('generatePlacement option shaping', () => {
   it('honors a smaller perBand for a shorter verification run', async () => {
     await generatePlacement('user-1', 'en', 'es', '', 2);
     const messages = mockGenerateResponse.mock.calls.at(-1)?.[1] as Array<{ content: string }>;
-    // 4 CEFR bands * 2 per band = 8 questions.
+    // 6 CEFR bands (A1..C2) * 2 per band = 12 questions.
     expect(messages[0].content).toContain('2 per CEFR level');
-    expect(messages[0].content).toContain('8');
+    expect(messages[0].content).toContain('12');
   });
 });
 
