@@ -47,6 +47,15 @@ describe('resolveAi', () => {
     expect(r.preferredAiProvider).toBe('google');
   });
 
+  it('maps cloud LLM key cards (xai/deepseek/mistral/groq/nvidia) to their registry id', () => {
+    for (const p of ['xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
+      const r = resolveAi(p, 'key', `${p}-key`, '');
+      expect(r.preferredAiProvider).toBe(p);
+      expect(r.keyPost).toEqual({ endpoint: 'ai-keys', provider: p, apiKey: `${p}-key` });
+    }
+    expect(resolveAi('xai', 'key', 'xai-key', 'grok-4').preferredAiModel).toBe('grok-4');
+  });
+
   it('maps the CLI method to the keyless claude-code backend (no key, infra set)', () => {
     const r = resolveAi('claude', 'cli', '', '');
     expect(r.keyPost).toBeNull();
@@ -223,6 +232,12 @@ describe('model provider id helpers', () => {
     expect(aiModelProviderId('codex')).toBe('openai');
     expect(aiModelProviderId('local')).toBeNull();
     expect(aiModelProviderId('custom')).toBeNull();
+  });
+
+  it('maps cloud LLM wizard ids to their registry provider', () => {
+    for (const p of ['google', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
+      expect(aiModelProviderId(p)).toBe(p);
+    }
   });
 
   it('maps wizard STT ids to their registry provider', () => {
