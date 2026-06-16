@@ -171,17 +171,21 @@ describe('welcome hosted-demo mode', () => {
 
   it('starts reset onboarding with a welcome screen before learner setup', async () => {
     const user = userEvent.setup();
-    mockConfigFetch(false);
+    mockConfigFetch(true);
 
-    render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
+    render(<WelcomeFlow initialConfig={{ selfHosted: true, isOwner: false }} />);
 
-    expect(await screen.findByRole('heading', { name: /Welcome to Sotto/i })).toBeInTheDocument();
+    expect(await screen.findByText(/First launch/i)).toBeInTheDocument();
+    expect(screen.getByText(/Swipe up to begin/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Setup progress/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Learn Italian/i })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^Continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^Skip$/i }));
+    await user.click(screen.getByRole('button', { name: /^Get started$/i }));
 
     expect(await screen.findByRole('heading', { name: /Who's learning/i })).toBeInTheDocument();
     expect(screen.getByText(/admin · first learner/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Setup progress/i)).toBeInTheDocument();
   });
 
   it('saves the admin learner profile before continuing self-host onboarding', async () => {
@@ -810,12 +814,16 @@ describe('welcome hosted-demo mode', () => {
     expect(window.localStorage.getItem('sotto.onboarding.v1')).toBeNull();
   });
 
-  it('links the sidebar logo back to home throughout the hosted demo', () => {
+  it('links the sidebar logo back to home after entering the hosted demo setup', async () => {
     mockConfigFetch(false);
+    window.history.pushState({}, '', '/welcome?step=1');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
-    expect(screen.getByRole('link', { name: /go to sotto home/i })).toHaveAttribute('href', '/');
+    expect(await screen.findByRole('link', { name: /go to sotto home/i })).toHaveAttribute(
+      'href',
+      '/'
+    );
   });
 
   it('does not persist hosted-demo progress while visitors move through welcome', async () => {
@@ -824,7 +832,8 @@ describe('welcome hosted-demo mode', () => {
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
-    await user.click(screen.getByRole('button', { name: /^Continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^Skip$/i }));
+    await user.click(screen.getByRole('button', { name: /^Get started$/i }));
     await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
     await user.click(screen.getByRole('button', { name: /Learn Italian/i }));
     await user.keyboard('{Enter}');
@@ -852,7 +861,8 @@ describe('welcome hosted-demo mode', () => {
 
     render(<WelcomeFlow initialConfig={{ selfHosted: true, isOwner: false }} />);
 
-    await user.click(screen.getByRole('button', { name: /^Continue$/i }));
+    await user.click(screen.getByRole('button', { name: /^Skip$/i }));
+    await user.click(screen.getByRole('button', { name: /^Get started$/i }));
     await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
     await user.click(screen.getByRole('button', { name: /Learn Italian/i }));
     await user.keyboard('{Enter}');

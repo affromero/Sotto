@@ -1,0 +1,412 @@
+.welcome {
+  --serif: var(--font-newsreader, Georgia, serif);
+  --mono: var(--font-ibm-plex-mono, ui-monospace, monospace);
+  --sans: var(--font-ibm-plex-sans, system-ui, sans-serif);
+  --accent: var(--user-accent, #6a9bff);
+  --accent-fg: #0b0c09;
+  --voice-bg: #0b0c09;
+  --voice-bg-2: #131510;
+  --voice-fg: #e9e3d3;
+  --voice-soft: #8c8675;
+  --line: rgba(233, 227, 211, 0.15);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--voice-fg);
+  background:
+    radial-gradient(circle at 50% 112%, rgba(106, 155, 255, 0.2), transparent 35%),
+    radial-gradient(circle at 58% 45%, rgba(255, 255, 255, 0.045), transparent 30%),
+    linear-gradient(90deg, #050604 0%, var(--voice-bg) 42%, var(--voice-bg-2) 100%);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  cursor: pointer;
+}
+
+.welcome::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.welcome::after {
+  content: '';
+  position: fixed;
+  right: 12%;
+  bottom: -220px;
+  z-index: 0;
+  width: 520px;
+  height: 520px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(106, 155, 255, 0.22), transparent 70%);
+  filter: blur(10px);
+}
+
+.top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 36px 40px;
+  width: fit-content;
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--voice-fg);
+  font-family: var(--serif);
+  font-size: 36px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.markImage {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgba(106, 155, 255, 0.36);
+}
+
+.sub {
+  padding-left: 27px;
+  color: var(--voice-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 120px 40px 150px;
+}
+
+.greets {
+  display: grid;
+  place-items: center;
+  min-width: min(820px, 100%);
+  min-height: 220px;
+}
+
+.greet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  color: var(--voice-fg);
+  text-align: center;
+  will-change: transform, opacity, filter;
+}
+
+.enter {
+  animation: greetIn 660ms var(--ease) both;
+}
+
+.appear {
+  animation: greetSettle 720ms var(--ease) both;
+}
+
+.greetSettled {
+  filter: none;
+}
+
+.word {
+  font-family: var(--serif);
+  font-size: 136px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.upright .word {
+  font-style: normal;
+  font-family: var(--sans);
+  font-weight: 500;
+}
+
+.lang {
+  color: var(--voice-soft);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.rtl .lang {
+  direction: rtl;
+}
+
+.foot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 54px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(22px);
+  transition:
+    opacity 420ms var(--ease),
+    transform 420ms var(--ease);
+}
+
+.settled .foot {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.swipe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: color-mix(in oklab, var(--voice-fg) 72%, transparent);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.chev {
+  color: var(--accent);
+}
+
+.cta,
+.skip,
+.replay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.cta {
+  gap: 12px;
+  min-height: 54px;
+  padding: 0 24px;
+  color: var(--accent-fg);
+  background: var(--accent);
+  box-shadow: 0 12px 36px rgba(106, 155, 255, 0.2);
+  transition:
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease),
+    opacity 180ms var(--ease);
+}
+
+.cta:disabled {
+  cursor: default;
+  opacity: 0;
+}
+
+.cta:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 42px rgba(106, 155, 255, 0.28);
+}
+
+.cta:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.skip,
+.replay {
+  position: fixed;
+  z-index: 3;
+  min-height: 34px;
+  color: color-mix(in oklab, var(--voice-fg) 74%, transparent);
+  background: rgba(233, 227, 211, 0.055);
+  box-shadow: inset 0 0 0 1px var(--line);
+  backdrop-filter: blur(16px);
+  transition:
+    color 180ms var(--ease),
+    background 180ms var(--ease),
+    opacity 180ms var(--ease);
+}
+
+.skip {
+  right: 38px;
+  bottom: 36px;
+  padding: 0 14px;
+}
+
+.replay {
+  right: 38px;
+  top: 36px;
+  gap: 7px;
+  padding: 0 13px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settled .replay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.skip:hover,
+.replay:hover {
+  color: var(--voice-fg);
+  background: rgba(233, 227, 211, 0.09);
+}
+
+.boot {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: bootProgress 21s linear forwards;
+  opacity: 0.75;
+}
+
+.settled .boot {
+  animation: none;
+  opacity: 0;
+  transform: scaleX(1);
+  transition:
+    opacity 260ms var(--ease),
+    transform 260ms var(--ease);
+}
+
+.cta:focus-visible,
+.skip:focus-visible,
+.replay:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+@keyframes greetIn {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes greetSettle {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bootProgress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .top {
+    padding: 28px 26px;
+  }
+
+  .mark {
+    font-size: 32px;
+  }
+
+  .stage {
+    padding: 110px 24px 170px;
+  }
+
+  .word {
+    font-size: 88px;
+  }
+
+  .lang {
+    font-size: 12px;
+  }
+
+  .foot {
+    bottom: 34px;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .cta {
+    min-width: 190px;
+  }
+
+  .skip {
+    right: 26px;
+    bottom: 26px;
+  }
+
+  .replay {
+    top: 28px;
+    right: 26px;
+  }
+}
+
+@media (max-width: 420px) {
+  .word {
+    font-size: 66px;
+  }
+
+  .greets {
+    min-height: 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter,
+  .appear,
+  .boot {
+    animation: none;
+  }
+
+  .foot,
+  .cta,
+  .skip,
+  .replay {
+    transition: none;
+  }
+}

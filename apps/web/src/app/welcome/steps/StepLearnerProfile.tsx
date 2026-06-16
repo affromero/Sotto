@@ -77,7 +77,13 @@ export function StepLearnerProfile({
       <div className={c.profileSetup}>
         <div className={c.ownerPreview} aria-label="Admin profile preview">
           <span className={c.ownerAvatar}>
-            <Image src={`/avatars/${selectedAvatar.slug}.png`} alt="" width={108} height={108} />
+            <Image
+              src={`/avatars/${selectedAvatar.slug}.png`}
+              alt=""
+              width={108}
+              height={108}
+              unoptimized
+            />
           </span>
           <span className={c.ownerName}>{cleanName || 'Admin'}</span>
           <span className={c.ownerMeta}>admin · first learner</span>
@@ -111,7 +117,15 @@ export function StepLearnerProfile({
                   className={`${c.avatarChoice} ${selected ? c.avatarChoiceSel : ''}`}
                   onClick={() => setAvatarSlug(avatar.slug)}
                 >
-                  <Image src={`/avatars/${avatar.slug}.png`} alt="" width={58} height={58} />
+                  <span className={c.avatarChoiceImage}>
+                    <Image
+                      src={`/avatars/${avatar.slug}.png`}
+                      alt=""
+                      width={90}
+                      height={90}
+                      unoptimized
+                    />
+                  </span>
                 </button>
               );
             })}

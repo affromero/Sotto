@@ -428,7 +428,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       if (e.key === 'Enter') {
         const canAdvance =
           step === 0
-            ? true
+            ? false
             : step === 1
               ? false
               : step === 2
@@ -609,6 +609,10 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       break;
     default:
       stepView = null;
+  }
+
+  if (step === 0) {
+    return <>{stepView}</>;
   }
 
   return (
