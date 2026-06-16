@@ -2,6 +2,11 @@
  * Declarative STT provider registry — models and metadata for every
  * supported speech-to-text provider.
  */
+import {
+  normalizeSottoLanguageCode,
+  STT_LANGUAGE_SUPPORT_SETS,
+} from '../speech-language-support';
+
 export type SttProviderId =
   | 'openai'
   | 'elevenlabs'
@@ -14,6 +19,8 @@ export interface SttModelOption {
   id: string;
   displayName: string;
   tier: 'fast' | 'balanced' | 'best' | 'max';
+  /** ISO 639-1 codes this model can transcribe. */
+  supportedLanguages: ReadonlySet<string>;
 }
 
 export interface SttProviderMeta {
@@ -24,15 +31,17 @@ export interface SttProviderMeta {
   platformCostPerMinute: number;
 }
 
+const { all: LANG_ALL, deepgramNova2: LANG_DEEPGRAM_NOVA_2 } = STT_LANGUAGE_SUPPORT_SETS;
+
 const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
   openai: {
     id: 'openai',
     displayName: 'OpenAI',
     defaultModel: 'whisper-1',
     models: [
-      { id: 'whisper-1', displayName: 'Whisper-1', tier: 'balanced' },
-      { id: 'gpt-4o-transcribe', displayName: 'GPT-4o Transcribe', tier: 'best' },
-      { id: 'gpt-4o-mini-transcribe', displayName: 'GPT-4o Mini Transcribe', tier: 'fast' },
+      { id: 'whisper-1', displayName: 'Whisper-1', tier: 'balanced', supportedLanguages: LANG_ALL },
+      { id: 'gpt-4o-transcribe', displayName: 'GPT-4o Transcribe', tier: 'best', supportedLanguages: LANG_ALL },
+      { id: 'gpt-4o-mini-transcribe', displayName: 'GPT-4o Mini Transcribe', tier: 'fast', supportedLanguages: LANG_ALL },
     ],
     platformCostPerMinute: 0.006,
   },
@@ -42,7 +51,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'ElevenLabs',
     defaultModel: 'scribe_v1',
     models: [
-      { id: 'scribe_v1', displayName: 'Scribe v1', tier: 'best' },
+      { id: 'scribe_v1', displayName: 'Scribe v1', tier: 'best', supportedLanguages: LANG_ALL },
     ],
     platformCostPerMinute: 0,
   },
@@ -52,7 +61,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'Together AI',
     defaultModel: 'openai/whisper-large-v3',
     models: [
-      { id: 'openai/whisper-large-v3', displayName: 'Whisper Large v3', tier: 'balanced' },
+      { id: 'openai/whisper-large-v3', displayName: 'Whisper Large v3', tier: 'balanced', supportedLanguages: LANG_ALL },
     ],
     platformCostPerMinute: 0.0015,
   },
@@ -62,8 +71,8 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'Deepgram',
     defaultModel: 'nova-3',
     models: [
-      { id: 'nova-3', displayName: 'Nova-3', tier: 'best' },
-      { id: 'nova-2', displayName: 'Nova-2', tier: 'balanced' },
+      { id: 'nova-3', displayName: 'Nova-3', tier: 'best', supportedLanguages: LANG_ALL },
+      { id: 'nova-2', displayName: 'Nova-2', tier: 'balanced', supportedLanguages: LANG_DEEPGRAM_NOVA_2 },
     ],
     platformCostPerMinute: 0.0077,
   },
@@ -73,9 +82,9 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'AssemblyAI',
     defaultModel: 'best',
     models: [
-      { id: 'best', displayName: 'Universal-2', tier: 'best' },
-      { id: 'nano', displayName: 'Nano', tier: 'fast' },
-      { id: 'universal-3-pro', displayName: 'Universal-3 Pro', tier: 'max' },
+      { id: 'best', displayName: 'Universal-2', tier: 'best', supportedLanguages: LANG_ALL },
+      { id: 'nano', displayName: 'Nano', tier: 'fast', supportedLanguages: LANG_ALL },
+      { id: 'universal-3-pro', displayName: 'Universal-3 Pro', tier: 'max', supportedLanguages: LANG_ALL },
     ],
     platformCostPerMinute: 0.0025,
   },
@@ -89,7 +98,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'Local Whisper',
     defaultModel: 'whisper-1',
     models: [
-      { id: 'whisper-1', displayName: 'Local Whisper (OpenAI-compatible)', tier: 'balanced' },
+      { id: 'whisper-1', displayName: 'Local Whisper (OpenAI-compatible)', tier: 'balanced', supportedLanguages: LANG_ALL },
     ],
     platformCostPerMinute: 0,
   },
@@ -97,6 +106,48 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
 
 export function getAllSttProviderMeta(): SttProviderMeta[] {
   return Object.values(STT_PROVIDERS);
+}
+
+export function supportsSttLanguage(
+  providerId: SttProviderId,
+  modelId: string,
+  lang: string | null | undefined,
+): boolean {
+  const normalized = normalizeSottoLanguageCode(lang);
+  if (!normalized) return true;
+  try {
+    const model = getSttProviderMeta(providerId).models.find((m) => m.id === modelId);
+    return !!model?.supportedLanguages.has(normalized);
+  } catch {
+    return false;
+  }
+}
+
+export function getDefaultSttModelForLanguage(
+  providerId: SttProviderId,
+  lang: string,
+  preferred?: string | null,
+): string | null {
+  const normalized = normalizeSottoLanguageCode(lang);
+  if (!normalized) return null;
+  try {
+    const meta = getSttProviderMeta(providerId);
+    if (preferred && supportsSttLanguage(providerId, preferred, normalized)) return preferred;
+
+    const tierOrder: Record<SttModelOption['tier'], number> = {
+      max: 4,
+      best: 3,
+      balanced: 2,
+      fast: 1,
+    };
+    const compatible = meta.models
+      .filter((model) => model.supportedLanguages.has(normalized))
+      .sort((a, b) => tierOrder[b.tier] - tierOrder[a.tier]);
+
+    return compatible[0]?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function getSttProviderMeta(id: SttProviderId): SttProviderMeta {

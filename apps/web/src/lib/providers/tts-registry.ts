@@ -3,6 +3,7 @@
  * support, and validation functions for every supported BYOK provider.
  */
 import { logger } from '../logger';
+import { TTS_LANGUAGE_SUPPORT_SETS } from '../speech-language-support';
 
 export type TtsProviderId =
   | 'elevenlabs'
@@ -64,29 +65,20 @@ export interface TtsProviderMeta {
 // exported from tts-language-support.ts.
 // ---------------------------------------------------------------------------
 
-/** All 30 Sotto-supported languages */
-const LANG_ALL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','no','cs','ro','hu','el','he','th','vi','id','ms','uk','ca']);
-const LANG_EN: ReadonlySet<string> = new Set(['en']);
-/** ElevenLabs Multilingual v2 — 24 languages */
-const LANG_EL_MLV2: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','cs','ro','hu','el','id','ms']);
-/** ElevenLabs Flash v2.5 — 27 languages */
-const LANG_EL_FLASH: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','no','cs','ro','hu','el','he','vi','id','ms']);
-/** Cartesia Sonic 3 — 28 languages */
-const LANG_CARTESIA_3: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','no','cs','ro','hu','el','he','th','vi','id','ms']);
-/** Cartesia Sonic Turbo / Sonic 2 — 15 languages */
-const LANG_CARTESIA_TURBO: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
-/** Hume Octave v2 — 11 languages */
-const LANG_HUME_V2: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','hi','ru']);
-/** Hume Octave v1 — 2 languages */
-const LANG_HUME_V1: ReadonlySet<string> = new Set(['en','es']);
-/** Qwen3-TTS (Fal + Replicate) — 10 languages */
-const LANG_QWEN3: ReadonlySet<string> = new Set(['en','es','fr','de','ja','ko','zh','it','pt','ru']);
-/** Mistral Voxtral — 9 languages */
-const LANG_MISTRAL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh']);
-/** Replicate Inworld TTS — 15 languages */
-const LANG_INWORLD: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
-/** Kokoro-82M (local sidecar) — 8 languages */
-const LANG_KOKORO: ReadonlySet<string> = new Set(['en','es','fr','hi','it','pt','ja','zh']);
+const {
+  all: LANG_ALL,
+  en: LANG_EN,
+  elevenLabsMultilingualV2: LANG_EL_MLV2,
+  elevenLabsFlash: LANG_EL_FLASH,
+  cartesiaSonic3: LANG_CARTESIA_3,
+  cartesiaTurbo: LANG_CARTESIA_TURBO,
+  humeV2: LANG_HUME_V2,
+  humeV1: LANG_HUME_V1,
+  qwen3: LANG_QWEN3,
+  mistral: LANG_MISTRAL,
+  inworld: LANG_INWORLD,
+  kokoro: LANG_KOKORO,
+} = TTS_LANGUAGE_SUPPORT_SETS;
 
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {

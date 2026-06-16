@@ -5,12 +5,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockClassSectionCreate,
   mockSpeakingPromptCreateMany,
+  mockUserFindUnique,
 } = vi.hoisted(() => {
   const classSectionCreate = vi.fn();
   const speakingPromptCreateMany = vi.fn();
+  const userFindUnique = vi.fn();
   return {
     mockClassSectionCreate: classSectionCreate,
     mockSpeakingPromptCreateMany: speakingPromptCreateMany,
+    mockUserFindUnique: userFindUnique,
   };
 });
 
@@ -41,6 +44,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     speakingPrompt: {
       createMany: (...args: unknown[]) => mockSpeakingPromptCreateMany(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
   },
 }));
@@ -118,6 +124,7 @@ const mockGetVoiceId = vi.fn(() => 'voice-abc');
 function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
   mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
+  mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
   mockLoadAndRender.mockReturnValue('You are a speaking prompt author.');
   mockGenerateResponse.mockResolvedValue({
     content: SAMPLE_PHRASES_JSON,
@@ -154,6 +161,7 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
 describe('generateClassSpeaking', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
   });
 
   describe('happy path', () => {

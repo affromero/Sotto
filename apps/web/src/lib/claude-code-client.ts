@@ -1,47 +1,16 @@
 import { spawn } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { isCommandAvailable } from './local-command';
+import { getClaudeSshHost, isClaudeAvailable } from './agent-availability';
+import { buildAgentInvocation } from './agent-invocation';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
-const SSH_OPTS = ['-o', 'BatchMode=yes', '-T'];
-
-/** Single-quote a value for safe interpolation into a remote shell command. */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-/** Trimmed CLAUDE_CODE_SSH_HOST, or undefined when the CLI runs locally. */
-export function getClaudeSshHost(): string | undefined {
-  const host = process.env.CLAUDE_CODE_SSH_HOST?.trim();
-  return host ? host : undefined;
-}
-
-/**
- * Resolve how to invoke an agent CLI. Locally this is the CLI directly; when an
- * SSH host is configured (the user's agent lives on a VPS) it becomes
- * `ssh <host> '<cli> <quoted args>'`. The prompt is still piped over stdin,
- * which ssh forwards to the remote process transparently.
- */
-export function buildAgentInvocation(
-  cli: string,
-  args: string[],
-  sshHost?: string,
-): { command: string; args: string[] } {
-  if (!sshHost) return { command: cli, args };
-  const remote = [cli, ...args].map(shellQuote).join(' ');
-  return { command: 'ssh', args: [...SSH_OPTS, sshHost, remote] };
-}
-
-export function isClaudeAvailable(): Promise<boolean> {
-  // With a remote agent (VPS), "available" means the local ssh client exists;
-  // the remote `claude` is validated on first execution.
-  if (getClaudeSshHost()) return isCommandAvailable('ssh');
-  return isCommandAvailable('claude');
-}
+export { buildAgentInvocation, shellQuote } from './agent-invocation';
+export { getClaudeSshHost, isClaudeAvailable };
+export { serializeMessages } from './agent-messages';
 
 /**
  * Prepare a writable HOME directory for the claude subprocess.
@@ -65,9 +34,16 @@ function ensureClaudeHome(): string | undefined {
   if (credsJson) {
     try {
       const runtimeDir = '/tmp/claude-runtime';
-      const claudeDir = join(runtimeDir, '.claude');
-      mkdirSync(claudeDir, { recursive: true });
-      writeFileSync(join(claudeDir, '.credentials.json'), credsJson, { mode: 0o600 });
+      const claudeDir = join(/* turbopackIgnore: true */ runtimeDir, '.claude');
+      mkdirSync(/* turbopackIgnore: true */ claudeDir, { recursive: true });
+      writeFileSync(
+        /* turbopackIgnore: true */ join(
+          /* turbopackIgnore: true */ claudeDir,
+          '.credentials.json',
+        ),
+        credsJson,
+        { mode: 0o600 },
+      );
       _claudeHome = runtimeDir;
       logger.info('claude-code: initialized writable home from CLAUDE_CODE_CREDENTIALS_JSON', {
         dir: runtimeDir,
@@ -95,26 +71,6 @@ interface ClaudeCodeOptions {
   model?: string;
   timeoutMs?: number;
   useWebSearch?: boolean;
-}
-
-/**
- * Convert a message array into a single prompt string for the CLI.
- * Single user message returns content directly.
- * Multi-turn formats as labeled turns separated by `---`.
- */
-export function serializeMessages(
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>
-): string {
-  if (messages.length === 1) {
-    return messages[0].content;
-  }
-
-  return messages
-    .map((m) => {
-      const label = m.role === 'user' ? 'USER' : 'ASSISTANT';
-      return `${label}: ${m.content}`;
-    })
-    .join('\n\n---\n\n');
 }
 
 function buildArgs(model: string, systemPrompt: string, opts?: ClaudeCodeOptions): string[] {

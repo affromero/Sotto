@@ -116,7 +116,7 @@ const SAMPLE_RECORDING = {
   audioUrl: 'https://r2.example.com/speaking/user-001/prompt-001/abc.webm',
   status: 'PENDING',
   prompt: { targetPhrase: 'Guten Morgen' },
-  user: { id: 'user-001' },
+  user: { id: 'user-001', preferredSttModel: null },
 };
 
 const SAMPLE_SECTION = {
@@ -320,6 +320,25 @@ describe('processSpeakingGrading', () => {
 
       expect(mockResolveSttProvider).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-001' })
+      );
+    });
+
+    it('passes the learner preferred STT model to provider resolution', async () => {
+      mockSpeakingRecordingFindUnique.mockResolvedValue({
+        ...SAMPLE_RECORDING,
+        user: { id: 'user-001', preferredSttModel: 'gpt-4o-transcribe' },
+      });
+
+      const job = makeJob({ recordingId: 'rec-001' });
+      await processSpeakingGrading(job);
+
+      expect(mockResolveSttProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-001',
+          requestedProvider: 'openai',
+          requestedModel: 'gpt-4o-transcribe',
+          language: 'de',
+        })
       );
     });
   });

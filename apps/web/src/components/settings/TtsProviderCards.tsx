@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import { normalizeSottoLanguageCode, SOTTO_LANGUAGE_CODES } from '@/lib/speech-language-support';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
@@ -15,6 +17,7 @@ interface ProviderStatus {
 interface TtsProviderCardsProps {
   initialConfigured: Array<ProviderStatus>;
   providerMeta: TtsProviderClientMeta[];
+  preferredLanguage?: string | null;
   onReadyChange?: (ready: boolean) => void;
 }
 
@@ -24,9 +27,51 @@ const QUALITY_LABELS: Record<string, string> = {
   ultra: 'Ultra',
 };
 
+const TIER_RANK: Record<string, number> = {
+  ultra: 3,
+  premium: 2,
+  standard: 1,
+};
+
+function languageName(code: string): string {
+  return LANGUAGE_DISPLAY[code as keyof typeof LANGUAGE_DISPLAY] ?? code.toUpperCase();
+}
+
+function summarizeLanguageSupport(
+  provider: TtsProviderClientMeta,
+  preferredLanguage?: string | null
+) {
+  const language = normalizeSottoLanguageCode(preferredLanguage);
+  const languageCount = new Set(provider.models.flatMap((model) => model.supportedLanguages)).size;
+
+  if (!language) {
+    return {
+      tone: 'neutral' as const,
+      label: `${languageCount}/${SOTTO_LANGUAGE_CODES.size} Sotto languages`,
+    };
+  }
+
+  const compatible = provider.models
+    .filter((model) => model.supportedLanguages.includes(language))
+    .sort((a, b) => (TIER_RANK[b.tier] ?? 0) - (TIER_RANK[a.tier] ?? 0));
+
+  if (compatible[0]) {
+    return {
+      tone: 'ok' as const,
+      label: `${languageName(language)} ready via ${compatible[0].displayName}`,
+    };
+  }
+
+  return {
+    tone: 'warn' as const,
+    label: `No ${languageName(language)} TTS model`,
+  };
+}
+
 export function TtsProviderCards({
   initialConfigured,
   providerMeta,
+  preferredLanguage,
   onReadyChange,
 }: TtsProviderCardsProps) {
   const [configured, setConfigured] = useState<Map<string, boolean>>(
@@ -124,6 +169,7 @@ export function TtsProviderCards({
         const isSaving = savingId === provider.id;
         const qualityLabel = QUALITY_LABELS[provider.qualityTier] ?? provider.qualityTier;
         const modelCount = provider.models.length;
+        const languageSummary = summarizeLanguageSupport(provider, preferredLanguage);
 
         return (
           <div key={provider.id} className={styles.card}>
@@ -136,6 +182,17 @@ export function TtsProviderCards({
                   </span>
                   <span className={styles.cardQuality}>
                     {qualityLabel} · {modelCount} {modelCount === 1 ? 'model' : 'models'}
+                  </span>
+                  <span
+                    className={`${styles.languageLine} ${
+                      languageSummary.tone === 'ok'
+                        ? styles.languageLineOk
+                        : languageSummary.tone === 'warn'
+                          ? styles.languageLineWarn
+                          : ''
+                    }`}
+                  >
+                    {languageSummary.label}
                   </span>
                   <div className={styles.capabilityRow}>
                     {provider.supportsSfx && (

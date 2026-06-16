@@ -23,10 +23,15 @@ function langLabel(code: string): string {
   return LANG_LABELS[code.toLowerCase()] ?? code.toUpperCase();
 }
 
-export default async function PracticePage() {
+interface PracticePageProps {
+  searchParams?: Promise<{ course?: string; target?: string; auto?: string }>;
+}
+
+export default async function PracticePage({ searchParams }: PracticePageProps) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
+  const params = (await searchParams) ?? {};
 
   const courses = await prisma.course.findMany({
     where: { userId },
@@ -39,14 +44,16 @@ export default async function PracticePage() {
       <header className={styles.header}>
         <h1 className={styles.title}>Practice</h1>
         <p className={styles.subtitle}>
-          Sharpen a single skill on your own time. Practice is ungated and feeds your memory graph — it&rsquo;s
-          separate from your mastery-gated classes.
+          Sharpen a single skill on your own time. Practice is ungated and feeds your memory graph —
+          it&rsquo;s separate from your mastery-gated classes.
         </p>
       </header>
 
       {courses.length === 0 ? (
         <section className={styles.empty}>
-          <p className={styles.emptyText}>You have no active courses yet. Take a placement test to get started.</p>
+          <p className={styles.emptyText}>
+            You have no active courses yet. Take a placement test to get started.
+          </p>
           <Link href="/learn/placement" className={styles.ctaButton}>
             Take Placement Test
           </Link>
@@ -58,6 +65,8 @@ export default async function PracticePage() {
               key={course.id}
               courseId={course.id}
               courseName={course.curriculum?.title ?? langLabel(course.targetLang)}
+              initialFocusTargetId={params.course === course.id ? (params.target ?? null) : null}
+              initialAutoMode={params.course === course.id ? (params.auto ?? null) : null}
             />
           ))}
         </div>

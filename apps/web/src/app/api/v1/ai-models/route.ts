@@ -3,7 +3,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getAutoModelConfig, resolveIncludedModels } from '@/lib/auto-model-config';
-import { isClaudeAvailable } from '@/lib/claude-code-client';
+import { isClaudeAvailable } from '@/lib/agent-availability';
 
 import { errorResponse } from '@/lib/api-response';
 

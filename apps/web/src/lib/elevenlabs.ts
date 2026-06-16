@@ -15,10 +15,6 @@ function getApiKey(): string | undefined {
   return process.env.ELEVENLABS_API_KEY;
 }
 
-if (!getApiKey()) {
-  logger.warn('ELEVENLABS_API_KEY is not set — audio generation will not work');
-}
-
 // ---------------------------------------------------------------------------
 // Voice Pool — re-exported from voice-pool.ts for backward compatibility
 // ---------------------------------------------------------------------------

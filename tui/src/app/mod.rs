@@ -1857,6 +1857,7 @@ mod tests {
         async fn class(&self, _class_id: &str) -> Result<types::ClassDetailResponse> {
             Ok(serde_json::from_value(serde_json::json!({
                 "id": "cls-stub",
+                "courseId": "course-stub",
                 "status": "IN_PROGRESS",
                 "order": 1,
                 "passThreshold": 0.7,
@@ -2443,7 +2444,11 @@ mod tests {
         Arc::new(Ok(outcome))
     }
 
-    fn class_detail(json: serde_json::Value) -> ApiResult<types::ClassDetailResponse> {
+    fn class_detail(mut json: serde_json::Value) -> ApiResult<types::ClassDetailResponse> {
+        if let Some(obj) = json.as_object_mut() {
+            obj.entry("courseId")
+                .or_insert_with(|| serde_json::json!("course1"));
+        }
         Arc::new(Ok(serde_json::from_value(json).expect("valid class JSON")))
     }
 
@@ -2575,7 +2580,7 @@ mod tests {
     fn class_with_sections(sections: serde_json::Value) -> View {
         let cls: types::ClassDetailResponse = serde_json::from_value(serde_json::json!({
             "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
-            "submitted": false, "sections": sections
+            "courseId": "course1", "submitted": false, "sections": sections
         }))
         .expect("valid class");
         let built = state::class_sections(&cls).expect("well-formed sections");

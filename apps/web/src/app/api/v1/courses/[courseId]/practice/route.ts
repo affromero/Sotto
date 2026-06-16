@@ -10,6 +10,7 @@ type RouteParams = { params: Promise<{ courseId: string }> };
 
 const startSchema = z.object({
   kind: z.enum(['FULL', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'VOCAB']),
+  focusTargetId: z.string().min(1).optional(),
 });
 
 /** POST /api/courses/[courseId]/practice — start an ungated practice session. */
@@ -22,7 +23,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parsed = startSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse('Invalid practice kind', 400);
 
-    const result = await startPractice(courseId, authed.userId, parsed.data.kind);
+    const result = await startPractice(courseId, authed.userId, parsed.data.kind, {
+      focusTargetId: parsed.data.focusTargetId ?? null,
+    });
     if (result.status === 'unavailable') {
       return NextResponse.json(result, { status: 200 });
     }

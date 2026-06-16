@@ -82,6 +82,11 @@ export interface ListeningContent {
 export async function composeListeningContent(p: ListeningContentParams): Promise<ListeningContent> {
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveLearningAi(p.userId);
+  const userSpeechPrefs = await prisma.user.findUnique({
+    where: { id: p.userId },
+    select: { preferredTtsModel: true },
+  });
+  const configuredTtsProvider = getConfiguredTtsProviderId();
 
   // Step 2: create a CLASS episode. When the instance pins an explicit TTS
   // provider (TTS_PROVIDER, e.g. the keyless local kokoro sidecar), seed it on
@@ -95,7 +100,8 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       visibility: 'PRIVATE',
       language: p.targetLang,
       status: 'PENDING',
-      ttsProvider: getConfiguredTtsProviderId() ?? undefined,
+      ttsProvider: configuredTtsProvider ?? undefined,
+      ttsModel: configuredTtsProvider ? (userSpeechPrefs?.preferredTtsModel ?? undefined) : undefined,
     },
   });
   const episodeId = episode.id;

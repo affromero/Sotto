@@ -91,6 +91,7 @@ export interface ClassSection {
 
 export interface ClassData {
   id: string;
+  courseId: string;
   status: string;
   order: number;
   passThreshold: number;

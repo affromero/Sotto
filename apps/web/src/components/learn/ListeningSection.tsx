@@ -15,6 +15,7 @@ import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, MasteryMeter } from './ClassWidgets';
+import { LearningSelectionMenu } from './LearningSelectionMenu';
 import { fmtClock, type ClassQuestion, type ClassSectionEpisode } from './classTypes';
 import styles from './ListeningSection.module.css';
 
@@ -35,6 +36,8 @@ function genWave(n: number, seed = 13): number[] {
 }
 
 interface ListeningSectionProps {
+  courseId: string;
+  sourceId: string;
   episode: ClassSectionEpisode | null;
   questions: ClassQuestion[];
   gate: number; // 0..100
@@ -45,6 +48,8 @@ interface ListeningSectionProps {
 }
 
 export function ListeningSection({
+  courseId,
+  sourceId,
   episode,
   questions,
   gate,
@@ -192,12 +197,19 @@ export function ListeningSection({
             const sel = picked[q.id];
             return (
               <div className={styles.lq} key={q.id}>
-                <div
-                  className={`${styles.lqQ} ${guardStyles.guarded}`}
-                  {...learningTextGuardProps<HTMLDivElement>()}
+                <LearningSelectionMenu
+                  courseId={courseId}
+                  sourceType="CLASS"
+                  sourceId={sourceId}
+                  sourceLabel="Listening"
                 >
-                  {q.question}
-                </div>
+                  <div
+                    className={`${styles.lqQ} ${guardStyles.guarded}`}
+                    {...learningTextGuardProps<HTMLDivElement>()}
+                  >
+                    {q.question}
+                  </div>
+                </LearningSelectionMenu>
                 <div
                   className={styles.lqOpts}
                   role="group"
@@ -219,21 +231,28 @@ export function ListeningSection({
                     }
                     const showMark = sel !== undefined && (q.correctIndex === oi || sel === oi);
                     return (
-                      <button
+                      <LearningSelectionMenu
                         key={oi}
-                        type="button"
-                        className={`${cls} ${guardStyles.guarded}`}
-                        {...learningTextGuardProps<HTMLButtonElement>()}
-                        disabled={sel !== undefined}
-                        aria-pressed={sel === oi}
-                        aria-label={`Option ${oi + 1}: ${opt}`}
-                        onClick={() => pick(q.id, oi)}
+                        courseId={courseId}
+                        sourceType="CLASS"
+                        sourceId={sourceId}
+                        sourceLabel="Listening"
                       >
-                        <span className={styles.lqMark}>
-                          <ClassGlyph name={showMark ? mark : 'dot'} size={showMark ? 15 : 7} />
-                        </span>
-                        {opt}
-                      </button>
+                        <button
+                          type="button"
+                          className={`${cls} ${guardStyles.guarded}`}
+                          {...learningTextGuardProps<HTMLButtonElement>()}
+                          disabled={sel !== undefined}
+                          aria-pressed={sel === oi}
+                          aria-label={`Option ${oi + 1}: ${opt}`}
+                          onClick={() => pick(q.id, oi)}
+                        >
+                          <span className={styles.lqMark}>
+                            <ClassGlyph name={showMark ? mark : 'dot'} size={showMark ? 15 : 7} />
+                          </span>
+                          {opt}
+                        </button>
+                      </LearningSelectionMenu>
                     );
                   })}
                 </div>
