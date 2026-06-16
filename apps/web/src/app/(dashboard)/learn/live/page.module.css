@@ -1,10 +1,10 @@
 .gate {
-  max-width: 560px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 56px 20px 120px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .gateEyebrow {
@@ -34,6 +34,52 @@
   line-height: 1.5;
   color: var(--ink-mute);
   margin: 0;
+  max-width: 62ch;
+}
+
+.gateBrief {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.gateCard {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--well);
+}
+
+.gateCardTitle {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 9px;
+}
+
+.gateList {
+  margin: 0;
+  padding-left: 17px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.gateList li + li {
+  margin-top: 7px;
+}
+
+.gateCardText {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 
 .gateActions {
@@ -74,4 +120,10 @@
 .gateBack:hover,
 .gateLink:hover {
   opacity: 0.92;
+}
+
+@media (max-width: 760px) {
+  .gateBrief {
+    grid-template-columns: 1fr;
+  }
 }
