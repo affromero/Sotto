@@ -1,5 +1,5 @@
 import { moderateOrThrow } from '../moderation';
-import { isReasoningModel } from './ai-registry';
+import { isReasoningModel, getAiProviderMeta } from './ai-registry';
 import type { AiProviderId } from './ai-registry';
 import { logger } from '../logger';
 import { withRetry } from '../retry';
@@ -395,6 +395,102 @@ class GoogleProvider implements AIProvider {
 }
 
 /**
+ * Generic OpenAI-compatible LLM provider — drives any chat-completions API that
+ * speaks the OpenAI wire format (xAI, DeepSeek, Mistral, Groq, NVIDIA NIM) via
+ * the OpenAI SDK with a per-provider baseURL + API key. BYOK keys arrive through
+ * opts.apiKeyOverride; otherwise the provider's env key is used.
+ */
+class OpenAiCompatibleProvider implements AIProvider {
+  constructor(
+    private cfg: { label: string; envKey: string; baseURL: string; defaultModel: string }
+  ) {}
+
+  private async getClient(apiKeyOverride?: string) {
+    const apiKey = apiKeyOverride || process.env[this.cfg.envKey];
+    if (!apiKey) throw new Error(`${this.cfg.envKey} is not set`);
+    const { default: OpenAI } = await import('openai');
+    return new OpenAI({ apiKey, maxRetries: 0, baseURL: this.cfg.baseURL });
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+    }
+
+    const client = await this.getClient(opts?.apiKeyOverride);
+    const model = opts?.model || this.cfg.defaultModel;
+
+    return withRetry(`[${this.cfg.label}:ChatCompletions]`, async () => {
+      const response = await client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        ...(opts?.jsonSchema
+          ? {
+              response_format: {
+                type: 'json_schema' as const,
+                json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+              },
+            }
+          : {}),
+      });
+
+      const content = response.choices[0]?.message?.content || '';
+      return {
+        content,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        model,
+      };
+    });
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+    }
+
+    const client = await this.getClient(opts?.apiKeyOverride);
+    const model = opts?.model || this.cfg.defaultModel;
+
+    const stream = await withRetry(`[${this.cfg.label}:ChatCompletions:stream]`, () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        stream: true,
+      })
+    );
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  }
+}
+
+// baseURL + env key per OpenAI-compatible LLM provider; default model from registry.
+const OPENAI_COMPATIBLE_LLMS: Record<string, { label: string; envKey: string; baseURL: string }> = {
+  xai: { label: 'xAI', envKey: 'XAI_API_KEY', baseURL: 'https://api.x.ai/v1' },
+  deepseek: { label: 'DeepSeek', envKey: 'DEEPSEEK_API_KEY', baseURL: 'https://api.deepseek.com/v1' },
+  mistral: { label: 'Mistral', envKey: 'MISTRAL_API_KEY', baseURL: 'https://api.mistral.ai/v1' },
+  groq: { label: 'Groq', envKey: 'GROQ_API_KEY', baseURL: 'https://api.groq.com/openai/v1' },
+  nvidia: { label: 'NVIDIA', envKey: 'NVIDIA_API_KEY', baseURL: 'https://integrate.api.nvidia.com/v1' },
+};
+
+/**
  * Local provider — talks to any OpenAI-compatible local inference server
  * (Ollama, vLLM, LM Studio, llama.cpp server) via the OpenAI SDK with a
  * configurable baseURL. Keyless by design: local servers usually ignore the
@@ -564,8 +660,19 @@ export function createAIProvider(type: string): AIProvider {
       return new CodexLazyProvider();
     case 'local':
       return new LocalProvider();
+    case 'xai':
+    case 'deepseek':
+    case 'mistral':
+    case 'groq':
+    case 'nvidia': {
+      const cfg = OPENAI_COMPATIBLE_LLMS[type];
+      return new OpenAiCompatibleProvider({
+        ...cfg,
+        defaultModel: getAiProviderMeta(type).defaultModel,
+      });
+    }
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local`);
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`);
   }
 }
 

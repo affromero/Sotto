@@ -19,7 +19,15 @@ interface TtsProviderLogoProps {
     | 'google'
     | 'together'
     | 'deepgram'
-    | 'assemblyai';
+    | 'assemblyai'
+    | 'groq'
+    | 'gladia'
+    | 'speechmatics'
+    | 'xai'
+    | 'deepseek'
+    | 'nvidia'
+    | 'rime'
+    | 'playht';
   size?: number;
   className?: string;
 }
@@ -215,6 +223,74 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           </text>
         </svg>
       );
+    case 'groq':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#F55036" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Gq
+          </text>
+        </svg>
+      );
+    case 'gladia':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#5B21B6" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Gl
+          </text>
+        </svg>
+      );
+    case 'speechmatics':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#0B1F3A" />
+          <text x="12" y="16" textAnchor="middle" fill="#3DD6C4" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Sm
+          </text>
+        </svg>
+      );
+    case 'xai':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#000" />
+          <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+    case 'deepseek':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#4D6BFE" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            DS
+          </text>
+        </svg>
+      );
+    case 'nvidia':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#76B900" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            NV
+          </text>
+        </svg>
+      );
+    case 'rime':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#111827" />
+          <text x="12" y="16" textAnchor="middle" fill="#A78BFA" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Ri
+          </text>
+        </svg>
+      );
+    case 'playht':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#FA5560" />
+          <path d="M9 7l8 5-8 5V7z" fill="#fff" />
+        </svg>
+      );
     case 'kokoro':
       return (
         <svg {...props}>
@@ -261,6 +337,14 @@ const PROVIDER_NAMES: Record<string, string> = {
   together: 'Together AI',
   deepgram: 'Deepgram',
   assemblyai: 'AssemblyAI',
+  groq: 'Groq',
+  gladia: 'Gladia',
+  speechmatics: 'Speechmatics',
+  xai: 'xAI Grok',
+  deepseek: 'DeepSeek',
+  nvidia: 'NVIDIA NIM',
+  rime: 'Rime',
+  playht: 'PlayHT',
 };
 
 /**

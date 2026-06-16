@@ -185,6 +185,45 @@ describe('createSttProvider', () => {
     expect(() => createSttProvider('assemblyai')).toThrow('No AssemblyAI API key provided');
   });
 
+  it('returns a cartesia provider for "cartesia"', () => {
+    const provider = createSttProvider('cartesia', 'sk_car_test');
+    expect(provider).toBeDefined();
+    expect(provider.transcribe).toBeInstanceOf(Function);
+  });
+
+  it('cartesia provider throws without API key', () => {
+    vi.stubEnv('CARTESIA_API_KEY', '');
+    expect(() => createSttProvider('cartesia')).toThrow('No Cartesia API key provided');
+  });
+
+  it('returns a groq provider for "groq" (OpenAI-compatible)', () => {
+    const provider = createSttProvider('groq', 'gsk_test');
+    expect(provider).toBeDefined();
+    expect(provider.transcribe).toBeInstanceOf(Function);
+  });
+
+  it('returns a gladia provider for "gladia"', () => {
+    const provider = createSttProvider('gladia', 'gladia_test');
+    expect(provider).toBeDefined();
+    expect(provider.transcribe).toBeInstanceOf(Function);
+  });
+
+  it('gladia provider throws without API key', () => {
+    vi.stubEnv('GLADIA_API_KEY', '');
+    expect(() => createSttProvider('gladia')).toThrow('No Gladia API key provided');
+  });
+
+  it('returns a speechmatics provider for "speechmatics"', () => {
+    const provider = createSttProvider('speechmatics', 'sm_test');
+    expect(provider).toBeDefined();
+    expect(provider.transcribe).toBeInstanceOf(Function);
+  });
+
+  it('speechmatics provider throws without API key', () => {
+    vi.stubEnv('SPEECHMATICS_API_KEY', '');
+    expect(() => createSttProvider('speechmatics')).toThrow('No Speechmatics API key provided');
+  });
+
   it('local provider throws without STT_BASE_URL', () => {
     vi.stubEnv('STT_BASE_URL', '');
     expect(() => createSttProvider('local', 'local')).toThrow('STT_BASE_URL is required');
@@ -363,6 +402,14 @@ describe('importEpisodeSchema — STT providers', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it.each(['cartesia', 'groq', 'gladia', 'speechmatics'])(
+    'accepts %s as sttProvider',
+    (sttProvider) => {
+      const result = importEpisodeSchema.safeParse({ sourcePlatform: 'youtube', sttProvider });
+      expect(result.success).toBe(true);
+    }
+  );
 
   it('accepts omitted sttProvider', () => {
     const result = importEpisodeSchema.safeParse({
@@ -548,6 +595,35 @@ describe('resolveSttProvider', () => {
     expect(result.apiKey).toBe('el-byok-key');
     expect(result.source).toBe('byok');
     expect(mockGetByokKey).toHaveBeenCalledWith('user-1', 'elevenlabs');
+  });
+
+  it('resolves cartesia via getByokKey (key lives in the TTS store)', async () => {
+    mockGetByokKey.mockResolvedValue('car-byok-key');
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'cartesia',
+    });
+
+    expect(result.providerId).toBe('cartesia');
+    expect(result.apiKey).toBe('car-byok-key');
+    expect(result.source).toBe('byok');
+    expect(result.model).toBe('ink-whisper');
+    expect(mockGetByokKey).toHaveBeenCalledWith('user-1', 'cartesia');
+  });
+
+  it('resolves groq via the AI-key store', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'gsk-byok', provider: 'groq' });
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'groq',
+    });
+
+    expect(result.providerId).toBe('groq');
+    expect(result.apiKey).toBe('gsk-byok');
+    expect(result.model).toBe('whisper-large-v3-turbo');
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'groq');
   });
 
   it('resolves the keyless local provider with a placeholder key (no cloud key needed)', async () => {

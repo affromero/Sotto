@@ -50,11 +50,28 @@ describe('resolveAi', () => {
     expect(r.preferredAiProvider).toBe('google');
   });
 
+  it('maps cloud LLM key cards (xai/deepseek/mistral/groq/nvidia) to their registry id', () => {
+    for (const p of ['xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
+      const r = resolveAi(p, 'key', `${p}-key`, '');
+      expect(r.preferredAiProvider).toBe(p);
+      expect(r.keyPost).toEqual({ endpoint: 'ai-keys', provider: p, apiKey: `${p}-key` });
+    }
+    expect(resolveAi('xai', 'key', 'xai-key', 'grok-4').preferredAiModel).toBe('grok-4');
+  });
+
   it('maps the CLI method to the keyless claude-code backend (no key, infra set)', () => {
     const r = resolveAi('claude', 'cli', '', '');
     expect(r.keyPost).toBeNull();
     expect(r.infra).toEqual({ aiProvider: 'claude-code' });
     expect(r.preferredAiProvider).toBe('claude-code');
+    expect(r.preferredAiModel).toBeNull();
+  });
+
+  it('carries the picked claude-code model for the CLI method', () => {
+    const r = resolveAi('claude', 'cli', '', 'opus');
+    expect(r.preferredAiProvider).toBe('claude-code');
+    expect(r.preferredAiModel).toBe('opus');
+    expect(r.infra).toEqual({ aiProvider: 'claude-code', aiModel: 'opus' });
   });
 
   it('maps a local/custom URL to the local provider with base URL + model', () => {
@@ -197,6 +214,22 @@ describe('resolveStt', () => {
     });
   });
 
+  it('routes a Cartesia Ink STT key to the BYOK store (shared with Cartesia TTS)', () => {
+    const r = resolveStt('cartesia', 'sk_car_k', '');
+    expect(r.keyPost).toEqual({ endpoint: 'byok', provider: 'cartesia', apiKey: 'sk_car_k' });
+    expect(r.preferredSttProvider).toBe('cartesia');
+  });
+
+  it('routes groq/gladia/speechmatics STT keys to the AI-key store', () => {
+    for (const p of ['groq', 'gladia', 'speechmatics']) {
+      expect(resolveStt(p, `${p}_k`, '').keyPost).toEqual({
+        endpoint: 'ai-keys',
+        provider: p,
+        apiKey: `${p}_k`,
+      });
+    }
+  });
+
   it('carries the picked STT model and the resolved provider', () => {
     const r = resolveStt('assembly', 'aai_key', '', 'universal-3-pro');
     expect(r.preferredSttProvider).toBe('assemblyai');
@@ -216,6 +249,12 @@ describe('model provider id helpers', () => {
     expect(aiModelProviderId('codex')).toBe('openai');
     expect(aiModelProviderId('local')).toBeNull();
     expect(aiModelProviderId('custom')).toBeNull();
+  });
+
+  it('maps cloud LLM wizard ids to their registry provider', () => {
+    for (const p of ['google', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
+      expect(aiModelProviderId(p)).toBe(p);
+    }
   });
 
   it('maps wizard STT ids to their registry provider', () => {

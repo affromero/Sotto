@@ -390,6 +390,9 @@ export function findVoiceName(voiceId: string): string | undefined {
     MINIMAX_VOICE_POOL,
     MISTRAL_VOICE_POOL,
     KOKORO_VOICE_POOL,
+    DEEPGRAM_AURA_VOICE_POOL,
+    RIME_VOICE_POOL,
+    PLAYHT_VOICE_POOL,
     getLocalTtsVoicePool,
   } = require('./providers/tts-voices') as typeof import('./providers/tts-voices');
   const providerPools = [
@@ -400,6 +403,9 @@ export function findVoiceName(voiceId: string): string | undefined {
     MINIMAX_VOICE_POOL,
     MISTRAL_VOICE_POOL,
     KOKORO_VOICE_POOL,
+    DEEPGRAM_AURA_VOICE_POOL,
+    RIME_VOICE_POOL,
+    PLAYHT_VOICE_POOL,
     getLocalTtsVoicePool(),
   ];
   for (const pool of providerPools) {

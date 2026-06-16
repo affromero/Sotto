@@ -105,6 +105,19 @@ describe('resolveLearningAi', () => {
     expect(mockGetAiProviderMeta).toHaveBeenCalledWith('claude-code');
   });
 
+  it('uses the owner-configured claude-code model (wizard CLI picker) when set', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', 'claude-code');
+    stubAutoConfig('claude-code', 'opus');
+    mockGetProviderForModel.mockImplementation((id: string) => (id === 'opus' ? 'claude-code' : null));
+    mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'sonnet' });
+
+    const resolved = await resolveLearningAi('user-1');
+
+    // The configured claude-code model wins over the registry default.
+    expect(resolved).toEqual({ provider: 'claude-code', model: 'opus' });
+  });
+
   it('falls back to a keyless local server when no BYOK key and AI_PROVIDER=local', async () => {
     mockGetAiKey.mockResolvedValue(null);
     vi.stubEnv('AI_PROVIDER', 'local');
