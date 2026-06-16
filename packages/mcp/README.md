@@ -6,7 +6,7 @@ MCP server for Sotto. Create and manage private AI episodes from any MCP-compati
 
 ### 1. Get an API key
 
-Create an API key from your Sotto deployment at `/settings/api`. Keys start with `sk_sotto_`.
+Create an API key from your Sotto deployment at `/settings/devices` (owner only). Keys start with `sk_sotto_`.
 
 ### 2. Configure your client
 

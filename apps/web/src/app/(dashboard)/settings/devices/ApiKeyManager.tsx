@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import type { ApiKeyData, ApiKeyCreated } from '@/types/api-key';
-import styles from './page.module.css';
+import styles from './ApiKeyManager.module.css';
 
 interface ApiKeyManagerProps {
   initialKeys: ApiKeyData[];
@@ -95,14 +95,14 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
     <>
       {/* Create Key */}
       <section className={styles.createSection}>
-        <h2 className={styles.sectionTitle}>Create API Key</h2>
+        <h3 className={styles.sectionTitle}>Create API Key</h3>
         <form onSubmit={handleCreate} className={styles.createForm}>
           <div className={styles.createInput}>
             <Input
               label="Key Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Production, CI/CD, Development"
+              placeholder="e.g. Terminal app, CI/CD, Local agent"
               maxLength={100}
             />
           </div>
@@ -118,7 +118,7 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
       {/* Active Keys */}
       <div className={styles.keyList}>
         <div className={styles.keyListHeader}>
-          <h2 className={styles.keyListTitle}>Active Keys ({activeKeys.length})</h2>
+          <h3 className={styles.keyListTitle}>Active Keys ({activeKeys.length})</h3>
         </div>
         {activeKeys.length === 0 ? (
           <p className={styles.emptyKeys}>No active API keys. Create one above.</p>
@@ -153,7 +153,7 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
       {revokedKeys.length > 0 && (
         <div className={styles.keyList}>
           <div className={styles.keyListHeader}>
-            <h2 className={styles.keyListTitle}>Revoked Keys ({revokedKeys.length})</h2>
+            <h3 className={styles.keyListTitle}>Revoked Keys ({revokedKeys.length})</h3>
           </div>
           {revokedKeys.map((apiKey) => (
             <div key={apiKey.id} className={styles.keyRow}>
