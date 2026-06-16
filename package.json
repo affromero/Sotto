@@ -2,14 +2,14 @@
   "name": "sotto",
   "version": "0.1.0",
   "private": true,
+  "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
+  "license": "AGPL-3.0-only",
   "workspaces": [
     "apps/*",
     "packages/*",
     "services/*",
     "!apps/desktop"
   ],
-  "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
-  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",
@@ -26,15 +26,15 @@
     "start": "npm run start --workspace=@sotto/web",
     "start:workers": "npm run start:workers --workspace=@sotto/web",
     "test": "npm run test --workspace=@sotto/web",
-    "test:smoke": "npm run test:smoke --workspace=@sotto/web",
     "test:coverage": "npm run test:coverage --workspace=@sotto/web",
+    "test:smoke": "npm run test:smoke --workspace=@sotto/web",
     "test:watch": "npm run test:watch --workspace=@sotto/web",
     "type-check": "npm run type-check --workspace=@sotto/web",
     "update-mbfc": "curl -sL https://raw.githubusercontent.com/drmikecrowe/mbfcext/master/docs/v5/data/combined.json -o apps/web/src/data/mbfc-combined.json"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix --max-warnings 0"
+      "eslint --config apps/web/eslint.config.mjs --fix --max-warnings 0"
     ],
     "*.{ts,tsx,js,jsx,json,md,css,yaml,yml}": [
       "prettier --write"
@@ -42,6 +42,14 @@
     "package.json": [
       "sort-package-json"
     ]
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "geoip-lite": "^2.0.2",
+    "pg": "^8.13.0",
+    "pricetoken": "^0.13.9",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@copilotkit/llmock": "^1.1.1",
@@ -51,14 +59,6 @@
     "prettier": "^3.8.1",
     "prisma": "7.8.0",
     "sort-package-json": "^4.0.0"
-  },
-  "dependencies": {
-    "@prisma/adapter-pg": "7.8.0",
-    "@prisma/client": "7.8.0",
-    "geoip-lite": "^2.0.2",
-    "pg": "^8.13.0",
-    "pricetoken": "^0.13.9",
-    "zod": "4.4.3"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "^16.1.7"
