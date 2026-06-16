@@ -1186,6 +1186,7 @@ export const MODULES: Module[] = [
 
 export const STEPS = [
   'Welcome',
+  'How it works',
   "Who's learning?",
   'Languages',
   'Connect agent',
@@ -1199,6 +1200,7 @@ export type StepName = (typeof STEPS)[number];
 
 export const WHISPERS: string[] = [
   'A fresh start begins at the front door.',
+  'See the loop before you choose your path.',
   'The owner is the first learner on a self-hosted system.',
   "Every course is a conversation. Let's begin yours.",
   'The best tutor teaches in the language of your work.',

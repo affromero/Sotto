@@ -34,6 +34,11 @@ Open-source, self-hostable language-learning infrastructure — a full **[CEFR](
 
 <sub>Open-source language learning for the context you choose to share.</sub>
 
+<br/>
+<br/>
+
+<img src="assets/sotto-how-it-works.gif" alt="Animated Sotto onboarding flow showing learner setup, languages, placement, course composition, mastery gates, and memory graph" width="760">
+
 </div>
 
 ---
