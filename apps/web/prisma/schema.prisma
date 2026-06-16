@@ -34,6 +34,7 @@ model User {
   preferredLanguage    String?
   preferredTtsProvider String?
   preferredTtsModel    String?
+  preferredSttModel    String?
   preferredAiProvider  String?
   preferredAiModel     String?
 
@@ -68,6 +69,9 @@ model User {
 
   // BYOK AI keys (LLM providers)
   userAiKeys UserAiKey[]
+
+  // Visual cue provider keys (for learner-marked target imagery)
+  userVisualCueKeys UserVisualCueKey[]
 
   // Interests (onboarding + settings)
   interests              UserInterest[]
@@ -846,6 +850,25 @@ model UserAiKey {
   @@index([userId])
 }
 
+// ============ USER VISUAL CUE KEYS ============
+
+model UserVisualCueKey {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String // 'pexels'
+  encryptedKey String    @db.Text
+  isValid      Boolean   @default(true)
+  label        String?
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
 // ============ AUTO MODEL CONFIG ============
 
 model AutoModelConfig {
@@ -1015,6 +1038,7 @@ model Course {
   practiceSessions PracticeSession[]
   note             CourseNote?
   mockExams        MockExam[]
+  focusTargets     LearnerFocusTarget[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -1080,6 +1104,21 @@ enum PracticeKind {
 enum PracticeStatus {
   ACTIVE
   COMPLETED
+}
+
+enum FocusTargetKind {
+  WORD
+  PHRASE
+  SENTENCE
+}
+
+enum FocusTargetSource {
+  TRANSCRIPT
+  CLASS
+  PRACTICE
+  NOTES
+  LIVE
+  MANUAL
 }
 
 // A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
@@ -1517,18 +1556,19 @@ model VocabEdge {
 // Ungated single-skill practice within a course. Distinct from the gated
 // CourseClass: short, repeatable, and only consolidates the memory graph (SRS).
 model PracticeSession {
-  id           String         @id @default(cuid())
-  courseId     String
-  kind         PracticeKind
-  status       PracticeStatus @default(ACTIVE)
-  items        Json // generated practice items (recall cards / questions / prompt refs)
-  seed         String
-  score        Float? // 0..1, set on submit
-  vocabLemmas  String[]       @default([]) // lemmas this session reviews (SRS targets)
-  grammarKeys  String[]       @default([]) // grammar topicKeys this session reviews
-  episodeId    String?        @unique // LISTENING practice audio (one episode per session)
-  startedAt    DateTime       @default(now())
-  completedAt  DateTime?
+  id             String         @id @default(cuid())
+  courseId       String
+  kind           PracticeKind
+  status         PracticeStatus @default(ACTIVE)
+  items          Json // generated practice items (recall cards / questions / prompt refs)
+  seed           String
+  score          Float? // 0..1, set on submit
+  vocabLemmas    String[]       @default([]) // lemmas this session reviews (SRS targets)
+  grammarKeys    String[]       @default([]) // grammar topicKeys this session reviews
+  focusTargetIds String[]       @default([]) // selected difficult words/sentences reviewed
+  episodeId      String?        @unique // LISTENING practice audio (one episode per session)
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
 
   course           Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   episode          Episode?            @relation(fields: [episodeId], references: [id], onDelete: SetNull)
@@ -1539,6 +1579,39 @@ model PracticeSession {
 
   @@index([courseId, kind])
   @@index([courseId, status])
+}
+
+// Learner-marked difficult words, phrases, and full sentences. These are
+// separate from LearnerVocab so sentence-level context survives and can seed
+// cloze, sentence, speaking, and visual-cue practice without reducing the
+// target to a one-word translation card.
+model LearnerFocusTarget {
+  id                    String            @id @default(cuid())
+  courseId              String
+  kind                  FocusTargetKind
+  text                  String            @db.Text
+  normalizedText        String
+  contextText           String?           @db.Text
+  sourceType            FocusTargetSource @default(MANUAL)
+  sourceId              String?
+  sourceLabel           String?
+  userMarkedDifficulty  Int               @default(3)
+  priorityBoost         Float             @default(0.35)
+  visualCueUrl          String?
+  visualCueAlt          String?
+  visualCueAttribution  String?
+  visualCueProvider     String?
+  pronunciationAudioUrl String?
+  lastSelectedAt        DateTime          @default(now())
+  lastPracticedAt       DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, kind, normalizedText])
+  @@index([courseId, kind])
+  @@index([courseId, lastSelectedAt])
 }
 
 // One editable free-text context doc per course: goals, background, interests.

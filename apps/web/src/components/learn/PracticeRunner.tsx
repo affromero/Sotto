@@ -5,6 +5,7 @@ import { SpeakingExercise } from '@/components/class/SpeakingExercise';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ScoreDial } from './ClassWidgets';
+import { LearningSelectionMenu } from './LearningSelectionMenu';
 import { WritingSection } from './WritingSection';
 import type { WritingPromptData } from './classTypes';
 import styles from './PracticeRunner.module.css';
@@ -57,6 +58,7 @@ interface SubmitResult {
 }
 
 interface PracticeRunnerProps {
+  courseId: string;
   start: PracticeStart;
   onDone: () => void;
 }
@@ -124,10 +126,14 @@ function ResultPanel({ result, onDone }: { result: SubmitResult; onDone: () => v
 }
 
 function MultipleChoiceList({
+  courseId,
+  sessionId,
   items,
   answers,
   onAnswer,
 }: {
+  courseId: string;
+  sessionId: string;
   items: PracticeMcItem[];
   answers: Record<string, number>;
   onAnswer: (itemId: string, selectedIndex: number) => void;
@@ -144,30 +150,44 @@ function MultipleChoiceList({
                   {qi + 1} of {items.length}
                 </span>
               </div>
-              <p
-                className={`${styles.questionText} ${guardStyles.guarded}`}
-                {...learningTextGuardProps<HTMLParagraphElement>()}
+              <LearningSelectionMenu
+                courseId={courseId}
+                sourceType="PRACTICE"
+                sourceId={sessionId}
+                sourceLabel="Practice"
               >
-                {it.prompt}
-              </p>
+                <p
+                  className={`${styles.questionText} ${guardStyles.guarded}`}
+                  {...learningTextGuardProps<HTMLParagraphElement>()}
+                >
+                  {it.prompt}
+                </p>
+              </LearningSelectionMenu>
               <div className={styles.options} role="group" aria-label={`Options for: ${it.prompt}`}>
                 {it.options.map((opt, idx) => {
                   const isSelected = selected === idx;
                   return (
-                    <button
+                    <LearningSelectionMenu
                       key={idx}
-                      type="button"
-                      className={`${styles.option} ${isSelected ? styles.optionSelected : ''} ${guardStyles.guarded}`}
-                      {...learningTextGuardProps<HTMLButtonElement>()}
-                      onClick={() => onAnswer(it.id, idx)}
-                      aria-pressed={isSelected}
-                      aria-label={`Option ${idx + 1}: ${opt}`}
+                      courseId={courseId}
+                      sourceType="PRACTICE"
+                      sourceId={sessionId}
+                      sourceLabel="Practice"
                     >
-                      <span className={styles.optionLetter} aria-hidden="true">
-                        {String.fromCharCode(65 + idx)}
-                      </span>
-                      <span className={styles.optionText}>{opt}</span>
-                    </button>
+                      <button
+                        type="button"
+                        className={`${styles.option} ${isSelected ? styles.optionSelected : ''} ${guardStyles.guarded}`}
+                        {...learningTextGuardProps<HTMLButtonElement>()}
+                        onClick={() => onAnswer(it.id, idx)}
+                        aria-pressed={isSelected}
+                        aria-label={`Option ${idx + 1}: ${opt}`}
+                      >
+                        <span className={styles.optionLetter} aria-hidden="true">
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                        <span className={styles.optionText}>{opt}</span>
+                      </button>
+                    </LearningSelectionMenu>
                   );
                 })}
               </div>
@@ -182,9 +202,11 @@ function MultipleChoiceList({
 // ---- MC runner (VOCAB / GRAMMAR / READING / LISTENING) ----
 
 function McRunner({
+  courseId,
   start,
   onDone,
 }: {
+  courseId: string;
   start: Extract<PracticeStart, { status: 'ready' }>;
   onDone: () => void;
 }) {
@@ -236,6 +258,8 @@ function McRunner({
       )}
 
       <MultipleChoiceList
+        courseId={courseId}
+        sessionId={start.sessionId}
         items={start.items}
         answers={answers}
         onAnswer={(itemId, selectedIndex) =>
@@ -363,9 +387,11 @@ function WritingRunner({
 }
 
 function FullRunner({
+  courseId,
   start,
   onDone,
 }: {
+  courseId: string;
   start: Extract<PracticeStart, { status: 'ready_full' }>;
   onDone: () => void;
 }) {
@@ -425,6 +451,8 @@ function FullRunner({
 
       {start.items.length > 0 && (
         <MultipleChoiceList
+          courseId={courseId}
+          sessionId={start.sessionId}
           items={start.items}
           answers={answers}
           onAnswer={(itemId, selectedIndex) =>
@@ -476,9 +504,9 @@ function FullRunner({
   );
 }
 
-export function PracticeRunner({ start, onDone }: PracticeRunnerProps) {
+export function PracticeRunner({ courseId, start, onDone }: PracticeRunnerProps) {
   if (start.status === 'ready_full') {
-    return <FullRunner start={start} onDone={onDone} />;
+    return <FullRunner courseId={courseId} start={start} onDone={onDone} />;
   }
   if (start.status === 'ready_speaking') {
     return <SpeakingRunner start={start} onDone={onDone} />;
@@ -486,5 +514,5 @@ export function PracticeRunner({ start, onDone }: PracticeRunnerProps) {
   if (start.status === 'ready_writing') {
     return <WritingRunner start={start} onDone={onDone} />;
   }
-  return <McRunner start={start} onDone={onDone} />;
+  return <McRunner courseId={courseId} start={start} onDone={onDone} />;
 }

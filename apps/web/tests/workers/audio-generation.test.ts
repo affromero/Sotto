@@ -142,6 +142,9 @@ vi.mock('@/lib/redis', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getByokKey: vi.fn().mockResolvedValue(null),
+  getSharedByokKey: vi.fn().mockResolvedValue(null),
+  hasSharedByokKey: vi.fn().mockResolvedValue(false),
+  getByokExtraData: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/logger', () => ({

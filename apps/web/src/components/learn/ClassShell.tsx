@@ -50,9 +50,7 @@ const SKILL_ORDER: Record<string, number> = {
 };
 
 function orderSections(sections: ClassSection[]): ClassSection[] {
-  return [...sections].sort(
-    (a, b) => (SKILL_ORDER[a.skill] ?? 99) - (SKILL_ORDER[b.skill] ?? 99),
-  );
+  return [...sections].sort((a, b) => (SKILL_ORDER[a.skill] ?? 99) - (SKILL_ORDER[b.skill] ?? 99));
 }
 
 export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
@@ -83,7 +81,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
   const passageReferences = useMemo(
     () => classReferences.map(classRefToReferenceData),
-    [classReferences],
+    [classReferences]
   );
 
   const loadClass = useCallback(async () => {
@@ -142,7 +140,10 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   }, [loadClass]);
 
   function commit(sectionId: string, value: number) {
-    setScores((prev) => ({ ...prev, [sectionId]: Math.max(prev[sectionId] ?? 0, Math.round(value)) }));
+    setScores((prev) => ({
+      ...prev,
+      [sectionId]: Math.max(prev[sectionId] ?? 0, Math.round(value)),
+    }));
   }
 
   function recordAnswer(questionId: string, selectedIndex: number) {
@@ -262,8 +263,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
   // ---- stage content ----
   let stage: React.ReactNode = null;
-  const nextName =
-    segIdx < sections.length - 1 ? skillLabel(sections[segIdx + 1].skill) : null;
+  const nextName = segIdx < sections.length - 1 ? skillLabel(sections[segIdx + 1].skill) : null;
 
   const sourcesPanel =
     classReferences.length > 0 || cls.sourceUrl ? (
@@ -316,6 +316,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         stage = (
           <GrammarSection
             key={seg.id}
+            courseId={cls.courseId}
+            sourceId={seg.id}
             skill={seg.skill}
             questions={seg.questions}
             gate={gate}
@@ -330,6 +332,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         stage = (
           <ListeningSection
             key={seg.id}
+            courseId={cls.courseId}
+            sourceId={seg.id}
             episode={seg.episode}
             questions={seg.questions}
             gate={gate}
@@ -436,7 +440,7 @@ function HubRail({ level, sections, scores }: HubRailProps) {
           return (
             <div className={styles.cnavItem} key={s.id}>
               <span className={styles.cnavIco}>
-                <ClassGlyph name={done ? 'check' : SKILL_GLYPH[s.skill] ?? 'gate'} size={18} />
+                <ClassGlyph name={done ? 'check' : (SKILL_GLYPH[s.skill] ?? 'gate')} size={18} />
               </span>
               {skillLabel(s.skill)}
             </div>
@@ -504,12 +508,7 @@ function TimelineRail({
 
           const clickable = !isSummary && state === 'done';
           const committed = scores[s.id] ?? 0;
-          const mini =
-            state === 'done'
-              ? committed || 100
-              : state === 'active'
-                ? curScore
-                : 0;
+          const mini = state === 'done' ? committed || 100 : state === 'active' ? curScore : 0;
 
           const segClass = [
             styles.ctlSeg,
@@ -526,7 +525,7 @@ function TimelineRail({
               ? 'check'
               : state === 'locked'
                 ? 'lock'
-                : SKILL_GLYPH[s.skill] ?? 'gate';
+                : (SKILL_GLYPH[s.skill] ?? 'gate');
 
           return (
             <button

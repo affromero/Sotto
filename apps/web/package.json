@@ -25,7 +25,8 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "seed:demo": "tsx prisma/seed-demo.ts",
-    "seed:curriculum": "tsx prisma/seed-curriculum.ts"
+    "seed:curriculum": "tsx prisma/seed-curriculum.ts",
+    "smoke:audio-providers": "tsx scripts/smoke-audio-providers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.101.0",

@@ -2,9 +2,9 @@ import { spawn } from 'child_process';
 import { readFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { isCommandAvailable } from './local-command';
+import { getCodexSshHost, isCodexAvailable } from './agent-availability';
 import { logger } from './logger';
-import { buildAgentInvocation } from './claude-code-client';
+import { buildAgentInvocation } from './agent-invocation';
 
 /**
  * Codex CLI provider client — routes AI calls through `codex exec` in a
@@ -21,18 +21,7 @@ import { buildAgentInvocation } from './claude-code-client';
 const SANDBOX = ['-s', 'read-only'];
 const NO_MCP = ['-c', 'mcp_servers={}'];
 
-/** Trimmed CODEX_SSH_HOST, or undefined when the CLI runs locally. */
-export function getCodexSshHost(): string | undefined {
-  const host = process.env.CODEX_SSH_HOST?.trim();
-  return host ? host : undefined;
-}
-
-export function isCodexAvailable(): Promise<boolean> {
-  // With a remote agent (VPS), "available" means the local ssh client exists;
-  // the remote `codex` is validated on first execution.
-  if (getCodexSshHost()) return isCommandAvailable('ssh');
-  return isCommandAvailable('codex');
-}
+export { getCodexSshHost, isCodexAvailable };
 
 interface CodexResponse {
   content: string;
@@ -65,7 +54,10 @@ export async function executeCodex(
   const model = resolveModel(opts?.model);
   const timeoutMs = opts?.timeoutMs || 600_000;
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const outFile = join(tmpdir(), `codex-${process.pid}-${Date.now()}.txt`);
+  const outFile = join(
+    /* turbopackIgnore: true */ tmpdir(),
+    `codex-${process.pid}-${Date.now()}.txt`,
+  );
 
   const args = ['exec', ...SANDBOX, ...NO_MCP, '-o', outFile];
   if (model) args.push('-m', model);
@@ -104,12 +96,12 @@ export async function executeCodex(
 
       let content = '';
       try {
-        content = readFileSync(outFile, 'utf8').trim();
+        content = readFileSync(/* turbopackIgnore: true */ outFile, 'utf8').trim();
       } catch {
         // fall back to stdout below
       }
       try {
-        unlinkSync(outFile);
+        unlinkSync(/* turbopackIgnore: true */ outFile);
       } catch {
         // best-effort cleanup
       }

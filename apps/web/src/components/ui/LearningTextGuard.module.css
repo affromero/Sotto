@@ -1,6 +1,6 @@
 .guarded {
-  user-select: none;
-  -webkit-user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
   -webkit-touch-callout: none;
 }
 

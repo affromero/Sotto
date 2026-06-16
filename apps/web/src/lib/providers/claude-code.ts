@@ -1,5 +1,5 @@
 import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
-import { executeClaudeCode, streamClaudeCode, serializeMessages } from '../claude-code-client';
+import { serializeMessages } from '../agent-messages';
 import { getAiProviderMeta } from './ai-registry';
 
 /** Extract plain text from ChatMessage content (string or ContentPart[]). */
@@ -29,6 +29,7 @@ export class ClaudeCodeProvider implements AIProvider {
   ): Promise<AIResponse> {
     const { cliModel, reportedModel } = resolveClaudeCodeModel(opts?.model);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const { executeClaudeCode } = await import('../claude-code-client');
     const result = await executeClaudeCode(system, serializeMessages(textMessages), {
       model: cliModel,
       useWebSearch: opts?.useWebSearch,
@@ -43,6 +44,7 @@ export class ClaudeCodeProvider implements AIProvider {
   ): AsyncGenerator<string> {
     const { cliModel } = resolveClaudeCodeModel(opts?.model);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const { streamClaudeCode } = await import('../claude-code-client');
     yield* streamClaudeCode(system, serializeMessages(textMessages), {
       model: cliModel,
       useWebSearch: opts?.useWebSearch,

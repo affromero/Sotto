@@ -36,6 +36,47 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderIdsWithPricing: vi.fn(() => []),
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    model: {
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
+  }),
+}));
+
+vi.mock('@/lib/providers/tts', () => ({
+  getConfiguredTtsProviderId: vi.fn(() => 'openai'),
+}));
+
+vi.mock('@/lib/providers/tts-registry', () => ({
+  getProviderMeta: vi.fn(() => ({
+    models: [{ id: 'tts-1-hd', displayName: 'TTS HD', supportedLanguages: new Set(['en', 'es']) }],
+  })),
+}));
+
+vi.mock('@/lib/providers/stt-registry', () => ({
+  getSttProviderMeta: vi.fn(() => ({
+    models: [{ id: 'whisper-1', displayName: 'Whisper', supportedLanguages: new Set(['en', 'es']) }],
+  })),
+  isValidSttProviderId: vi.fn((id: string) => id === 'openai'),
+  supportsSttLanguage: vi.fn((_provider: string, _model: string, language: string) =>
+    ['en', 'es'].includes(language)
+  ),
+}));
+
+vi.mock('@/lib/server-config', () => ({
+  getServerInfra: vi.fn().mockResolvedValue({ sttProvider: 'openai' }),
+}));
+
+vi.mock('@/lib/tts-language-support', () => ({
+  supportsLanguage: vi.fn((_provider: string, _model: string, language: string) =>
+    ['en', 'es'].includes(language)
+  ),
+}));
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     user: {
@@ -81,6 +122,10 @@ const mockUser = {
   createdAt: new Date('2025-01-10T10:00:00Z'),
   preferredHostVoiceId: 'voice-host-1',
   preferredExpertVoiceId: 'voice-expert-1',
+  preferredLanguage: 'en',
+  preferredAiModel: null,
+  preferredTtsModel: null,
+  preferredSttModel: null,
 };
 
 const mockUserMinimal = {
@@ -92,6 +137,10 @@ const mockUserMinimal = {
   createdAt: new Date('2025-01-15T10:00:00Z'),
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
+  preferredLanguage: null,
+  preferredAiModel: null,
+  preferredTtsModel: null,
+  preferredSttModel: null,
 };
 
 describe('GET /api/v1/users/me', () => {
@@ -325,6 +374,38 @@ describe('PATCH /api/v1/users/me', () => {
 
     expect(response.status).toBe(200);
     expect(body.preferredAiModel).toBeNull();
+  });
+
+  it('updates learner speech models when compatible with the profile language', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.findUnique.mockResolvedValue({ preferredLanguage: 'es' });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      preferredLanguage: 'es',
+      preferredTtsModel: 'tts-1-hd',
+      preferredSttModel: 'whisper-1',
+    });
+
+    const request = createPatchRequest({
+      preferredLanguage: 'es',
+      preferredTtsModel: 'tts-1-hd',
+      preferredSttModel: 'whisper-1',
+    });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.preferredTtsModel).toBe('tts-1-hd');
+    expect(body.preferredSttModel).toBe('whisper-1');
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          preferredLanguage: 'es',
+          preferredTtsModel: 'tts-1-hd',
+          preferredSttModel: 'whisper-1',
+        }),
+      })
+    );
   });
 
   it('accepts per-profile appearance prefs and refreshes the theme cookie', async () => {

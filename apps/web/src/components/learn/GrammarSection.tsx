@@ -15,10 +15,13 @@ import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import type { ReferenceData } from '@/types/reference';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, DotRail, MasteryMeter, type DotState } from './ClassWidgets';
+import { LearningSelectionMenu } from './LearningSelectionMenu';
 import type { ClassQuestion } from './classTypes';
 import styles from './GrammarSection.module.css';
 
 interface GrammarSectionProps {
+  courseId: string;
+  sourceId: string;
   skill: 'GRAMMAR' | 'READING';
   questions: ClassQuestion[];
   gate: number; // 0..100
@@ -50,6 +53,8 @@ const SKILL_COPY: Record<'GRAMMAR' | 'READING', { eyebrow: string; title: string
   };
 
 export function GrammarSection({
+  courseId,
+  sourceId,
   skill,
   questions,
   gate,
@@ -74,7 +79,7 @@ export function GrammarSection({
         if (sel === undefined || q.correctIndex === undefined) return n;
         return n + (sel === q.correctIndex ? 1 : 0);
       }, 0),
-    [questions, picked],
+    [questions, picked]
   );
 
   const recall = total > 0 ? Math.round((correctCount / total) * 100) : 0;
@@ -123,42 +128,61 @@ export function GrammarSection({
         {!done && cur ? (
           <div className={styles.drillCard} key={cur.id}>
             {cur.passageText ? (
-              <blockquote
-                className={`${styles.passage} ${guardStyles.guarded}`}
-                {...learningTextGuardProps<HTMLQuoteElement>()}
+              <LearningSelectionMenu
+                courseId={courseId}
+                sourceType="CLASS"
+                sourceId={sourceId}
+                sourceLabel={copy.eyebrow}
               >
-                {parseTextWithCitations(cur.passageText, references)}
-              </blockquote>
-            ) : (
-              cur.passageRef && (
                 <blockquote
                   className={`${styles.passage} ${guardStyles.guarded}`}
                   {...learningTextGuardProps<HTMLQuoteElement>()}
                 >
-                  {cur.passageRef}
+                  {parseTextWithCitations(cur.passageText, references)}
                 </blockquote>
+              </LearningSelectionMenu>
+            ) : (
+              cur.passageRef && (
+                <LearningSelectionMenu
+                  courseId={courseId}
+                  sourceType="CLASS"
+                  sourceId={sourceId}
+                  sourceLabel={copy.eyebrow}
+                >
+                  <blockquote
+                    className={`${styles.passage} ${guardStyles.guarded}`}
+                    {...learningTextGuardProps<HTMLQuoteElement>()}
+                  >
+                    {cur.passageRef}
+                  </blockquote>
+                </LearningSelectionMenu>
               )
             )}
 
             <div className={styles.drillMeta}>
-              <span className={styles.verb}>{skill === 'READING' ? 'comprehension' : 'choose'}</span>
+              <span className={styles.verb}>
+                {skill === 'READING' ? 'comprehension' : 'choose'}
+              </span>
               <span>
                 · {pos + 1} of {total}
               </span>
             </div>
 
-            <p
-              className={`${styles.drillPrompt} ${guardStyles.guarded}`}
-              {...learningTextGuardProps<HTMLParagraphElement>()}
+            <LearningSelectionMenu
+              courseId={courseId}
+              sourceType="CLASS"
+              sourceId={sourceId}
+              sourceLabel={copy.eyebrow}
             >
-              {cur.question}
-            </p>
+              <p
+                className={`${styles.drillPrompt} ${guardStyles.guarded}`}
+                {...learningTextGuardProps<HTMLParagraphElement>()}
+              >
+                {cur.question}
+              </p>
+            </LearningSelectionMenu>
 
-            <div
-              className={styles.optRow}
-              role="group"
-              aria-label={`Options for: ${cur.question}`}
-            >
+            <div className={styles.optRow} role="group" aria-label={`Options for: ${cur.question}`}>
               {cur.options.map((opt, idx) => {
                 let optClass = styles.opt;
                 if (curPicked !== undefined) {
@@ -167,24 +191,33 @@ export function GrammarSection({
                   else optClass += ` ${styles.optDim}`;
                 }
                 return (
-                  <button
+                  <LearningSelectionMenu
                     key={idx}
-                    type="button"
-                    className={`${optClass} ${guardStyles.guarded}`}
-                    {...learningTextGuardProps<HTMLButtonElement>()}
-                    disabled={curPicked !== undefined}
-                    aria-pressed={curPicked === idx}
-                    aria-label={`Option ${idx + 1}: ${opt}`}
-                    onClick={() => pick(idx)}
+                    courseId={courseId}
+                    sourceType="CLASS"
+                    sourceId={sourceId}
+                    sourceLabel={copy.eyebrow}
                   >
-                    {opt}
-                  </button>
+                    <button
+                      type="button"
+                      className={`${optClass} ${guardStyles.guarded}`}
+                      {...learningTextGuardProps<HTMLButtonElement>()}
+                      disabled={curPicked !== undefined}
+                      aria-pressed={curPicked === idx}
+                      aria-label={`Option ${idx + 1}: ${opt}`}
+                      onClick={() => pick(idx)}
+                    >
+                      {opt}
+                    </button>
+                  </LearningSelectionMenu>
                 );
               })}
             </div>
 
             {curPicked !== undefined && cur.explanation && (
-              <div className={`${styles.drillWhy} ${curCorrect ? styles.drillWhyOk : styles.drillWhyNo}`}>
+              <div
+                className={`${styles.drillWhy} ${curCorrect ? styles.drillWhyOk : styles.drillWhyNo}`}
+              >
                 <div className={styles.whyHead}>
                   <ClassGlyph name={curCorrect ? 'check' : 'x'} size={13} />
                   {curCorrect
@@ -200,7 +233,11 @@ export function GrammarSection({
             {curPicked !== undefined && (
               <div className={styles.cactions}>
                 <span className={styles.grow} />
-                <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={next}>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  onClick={next}
+                >
                   {pos + 1 >= total ? 'See result' : 'Next'} <ClassGlyph name="arrow" size={16} />
                 </button>
               </div>

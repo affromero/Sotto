@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isSelfHosted } from './lib/self-hosted';
 
 // Sotto is fully self-hosted for a single learner — there is no login, so the
-// middleware does no auth gating. The only routing left is steering the managed
+// proxy does no auth gating. The only routing left is steering the managed
 // showcase (SELF_HOSTED=false) into its non-persisting /welcome demo. Real
 // self-hosted installs pass every request straight through.
 const HOSTED_MOCK_ROUTES = [
@@ -27,7 +27,7 @@ function isHostedMockRoute(pathname: string): boolean {
   );
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip static files and SEO routes

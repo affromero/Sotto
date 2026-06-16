@@ -21,7 +21,7 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
         select: { targetPhrase: true },
       },
       user: {
-        select: { id: true },
+        select: { id: true, preferredSttModel: true },
       },
     },
   });
@@ -93,6 +93,8 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
     const resolvedStt = await resolveSttProvider({
       userId,
       requestedProvider: getConfiguredSttProviderId(),
+      requestedModel: recording.user.preferredSttModel ?? undefined,
+      language: targetLang,
     });
 
     const sttProvider = createSttProvider(resolvedStt.providerId, resolvedStt.apiKey, resolvedStt.model);

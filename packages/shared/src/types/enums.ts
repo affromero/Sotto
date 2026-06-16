@@ -94,6 +94,10 @@ export type PracticeKind =
 
 export type PracticeStatus = 'ACTIVE' | 'COMPLETED';
 
+export type FocusTargetKind = 'WORD' | 'PHRASE' | 'SENTENCE';
+
+export type FocusTargetSource = 'TRANSCRIPT' | 'CLASS' | 'PRACTICE' | 'NOTES' | 'LIVE' | 'MANUAL';
+
 // Mock exams: a full-length practice exam modeled on a flagship CEFR exam's FORMAT.
 // Never affiliated with the real institution; structure only, never exam content.
 export type ExamInstitution = 'GOETHE' | 'DELE' | 'CAMBRIDGE' | 'CEFR_GENERIC';

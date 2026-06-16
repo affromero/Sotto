@@ -6,6 +6,13 @@ import { generateTagSlug } from '@/lib/slugify';
 import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
+import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
+import { getProviderMeta } from '@/lib/providers/tts-registry';
+import { getSttProviderMeta, isValidSttProviderId } from '@/lib/providers/stt-registry';
+import { getServerInfra } from '@/lib/server-config';
+import { supportsLanguage } from '@/lib/tts-language-support';
+import { supportsSttLanguage } from '@/lib/providers/stt-registry';
 import { errorResponse } from '@/lib/api-response';
 import {
   THEME_PREFS_COOKIE,
@@ -40,6 +47,8 @@ const updateUserSchema = z
       .optional(),
     preferredLanguage: z.string().max(5).nullable().optional(),
     preferredAiModel: z.string().nullable().optional(),
+    preferredTtsModel: z.string().nullable().optional(),
+    preferredSttModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
@@ -89,6 +98,8 @@ export async function GET(request: NextRequest) {
       voicePreferences: user.voicePreferences,
       preferredLanguage: user.preferredLanguage,
       preferredAiModel: user.preferredAiModel,
+      preferredTtsModel: user.preferredTtsModel,
+      preferredSttModel: user.preferredSttModel,
     });
   } catch (error: unknown) {
     logger.error('Failed to fetch user', {
@@ -117,6 +128,8 @@ export async function PATCH(request: NextRequest) {
       customTags,
       voicePreferences,
       preferredAiModel,
+      preferredTtsModel,
+      preferredSttModel,
       ...data
     } = validation.data;
 
@@ -136,6 +149,61 @@ export async function PATCH(request: NextRequest) {
       (data as Record<string, unknown>).preferredAiProvider = preferredAiModel
         ? (getProviderForModel(preferredAiModel) ?? null)
         : null;
+    }
+
+    if (preferredTtsModel !== undefined || preferredSttModel !== undefined) {
+      const [autoConfig, infra, currentUser] = await Promise.all([
+        getAutoModelConfig(),
+        getServerInfra(),
+        prisma.user.findUnique({
+          where: { id: authResult.userId },
+          select: { preferredLanguage: true },
+        }),
+      ]);
+      const language =
+        validation.data.preferredLanguage ??
+        currentUser?.preferredLanguage ??
+        null;
+
+      if (preferredTtsModel) {
+        const provider = getConfiguredTtsProviderId() ?? autoConfig.model.ttsProvider;
+        const meta = getProviderMeta(provider);
+        if (!meta.models.some((model) => model.id === preferredTtsModel)) {
+          return errorResponse(
+            `TTS model "${preferredTtsModel}" is not available on provider "${provider}".`,
+            400
+          );
+        }
+        if (language && !supportsLanguage(provider, preferredTtsModel, language)) {
+          return errorResponse(
+            `TTS model "${preferredTtsModel}" does not support language "${language}".`,
+            400
+          );
+        }
+      }
+
+      if (preferredSttModel) {
+        const configuredSttProvider = infra.sttProvider ?? '';
+        const provider = isValidSttProviderId(configuredSttProvider)
+          ? configuredSttProvider
+          : autoConfig.model.sttProvider;
+        const meta = getSttProviderMeta(provider);
+        if (!meta.models.some((model) => model.id === preferredSttModel)) {
+          return errorResponse(
+            `STT model "${preferredSttModel}" is not available on provider "${provider}".`,
+            400
+          );
+        }
+        if (language && !supportsSttLanguage(provider, preferredSttModel, language)) {
+          return errorResponse(
+            `STT model "${preferredSttModel}" does not support language "${language}".`,
+            400
+          );
+        }
+      }
+
+      (data as Record<string, unknown>).preferredTtsModel = preferredTtsModel ?? null;
+      (data as Record<string, unknown>).preferredSttModel = preferredSttModel ?? null;
     }
 
     const updatedUser = await prisma.$transaction(async (tx) => {
@@ -244,6 +312,8 @@ export async function PATCH(request: NextRequest) {
       voicePreferences: updatedUser.voicePreferences,
       preferredLanguage: updatedUser.preferredLanguage,
       preferredAiModel: updatedUser.preferredAiModel,
+      preferredTtsModel: updatedUser.preferredTtsModel,
+      preferredSttModel: updatedUser.preferredSttModel,
     });
 
     // Keep the active profile's appearance cookie in sync so the next load applies

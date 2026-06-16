@@ -50,6 +50,7 @@ interface SttModelOption {
   id: string;
   displayName: string;
   tier: string;
+  supportedLanguages?: string[];
 }
 
 export async function GET(request: NextRequest) {
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest) {
           id: compositeId,
           displayName: `${provider.displayName} ${model.displayName}`,
           tier: model.tier,
+          supportedLanguages: [...model.supportedLanguages],
         });
       }
     }
