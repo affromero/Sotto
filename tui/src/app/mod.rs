@@ -2150,6 +2150,7 @@ mod tests {
             native_lang: "en".into(),
             target_lang: "es".into(),
             current_level: "A2".into(),
+            placement_source: None,
         }
     }
 
@@ -4366,7 +4367,8 @@ mod tests {
     fn course_summary(id: &str) -> types::CourseSummary {
         serde_json::from_value(serde_json::json!({
             "id": id, "nativeLang": "en", "targetLang": "es",
-            "currentLevel": "A1", "startLevel": "A1", "activeClassId": null,
+            "currentLevel": "A1", "startLevel": "A1", "placementSource": null,
+            "activeClassId": null,
             "curriculum": { "title": format!("Course {id}") },
             "placement": null
         }))

@@ -702,9 +702,11 @@ impl SottoClient {
         native: &str,
         target: &str,
     ) -> Result<types::GeneratePlacementResponse> {
+        // Query params are generated alphabetically: (focusLevel, native, target).
+        // The TUI runs a cold placement, so it never biases toward a level.
         let resp = self
             .inner
-            .generate_placement(native, target)
+            .generate_placement(None, native, target)
             .await
             .map_err(|e| eyre!("failed to generate placement: {e}"))?;
         Ok(resp.into_inner())

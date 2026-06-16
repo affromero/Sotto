@@ -5,8 +5,7 @@
 import { prisma } from '@/lib/prisma';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
 import { higherLevel } from '@/lib/cefr-levels';
-import type { CefrLevel } from '@sotto/shared';
-import type { PlacementSource } from '@/generated/prisma/client';
+import type { CefrLevel, PlacementSource } from '@sotto/shared';
 
 /**
  * Create the (native, target) course at `level`, or raise an existing course's

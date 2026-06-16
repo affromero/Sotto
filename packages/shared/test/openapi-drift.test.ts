@@ -29,6 +29,8 @@ import {
   submitExamResponseSchema,
   submitPlacementResponseSchema,
   submitPracticeResponseSchema,
+  manualPlacementResponseSchema,
+  deleteCourseResponseSchema,
 } from '../src/contracts/schemas';
 
 describe('openapi.json drift guard', () => {
@@ -118,6 +120,8 @@ describe('openapi.json drift guard', () => {
       [
         'GET /api/v1/health',
         'GET /api/v1/courses',
+        'DELETE /api/v1/courses/{courseId}',
+        'POST /api/v1/placement/manual',
         'GET /api/v1/courses/{courseId}/learning-targets',
         'GET /api/v1/courses/{courseId}/practice',
         'POST /api/v1/courses/{courseId}/learning-targets',
@@ -369,6 +373,12 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
       required: true,
       schema: { type: 'string' },
     });
+    expect(op.parameters).toContainEqual({
+      name: 'focusLevel',
+      in: 'query',
+      required: false,
+      schema: { type: 'string' },
+    });
   });
 });
 
@@ -393,6 +403,7 @@ describe('response schemas accept representative payloads', () => {
             targetLang: 'es',
             currentLevel: 'A1',
             startLevel: 'A1',
+            placementSource: 'TEST',
             activeClassId: null,
             curriculum: { title: 'Spanish for English speakers' },
             placement: { level: 'A1', createdAt: '2026-06-13T00:00:00.000Z' },
@@ -798,6 +809,22 @@ describe('response schemas accept representative payloads', () => {
         courseId: 'c-new',
         level: 'B1',
         scoreBySkill: { grammar: 0.8, vocab: 0.5, reading: 0.6 },
+      })
+    ).toBeTruthy();
+  });
+
+  it('manual placement result (courseId + level)', () => {
+    expect(manualPlacementResponseSchema.parse({ courseId: 'c-new', level: 'C1' })).toBeTruthy();
+  });
+
+  it('delete course result (deleted flag + counts)', () => {
+    expect(
+      deleteCourseResponseSchema.parse({
+        deleted: true,
+        episodesDeleted: 3,
+        filesAttempted: 12,
+        filesDeleted: 11,
+        filesFailed: 1,
       })
     ).toBeTruthy();
   });

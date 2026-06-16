@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         targetLang: true,
         currentLevel: true,
         startLevel: true,
+        placementSource: true,
         activeClassId: true,
         curriculum: { select: { title: true } },
         placement: { select: { level: true, createdAt: true } },

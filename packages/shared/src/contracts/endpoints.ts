@@ -38,6 +38,10 @@ import {
   deduceFromNotesResponseSchema,
   confirmFromNotesRequestSchema,
   confirmFromNotesResponseSchema,
+  manualPlacementRequestSchema,
+  manualPlacementResponseSchema,
+  deleteCourseRequestSchema,
+  deleteCourseResponseSchema,
   submitPracticeRequestSchema,
   submitPracticeResponseSchema,
 } from './schemas';
@@ -96,6 +100,16 @@ export const endpoints: EndpointDef[] = [
     summary: "List the authenticated learner's courses.",
     auth: 'bearer',
     response: coursesListResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'deleteCourse',
+    method: 'DELETE',
+    path: '/api/v1/courses/{courseId}',
+    summary: 'Permanently delete a course and everything tied to it.',
+    auth: 'bearer',
+    request: deleteCourseRequestSchema,
+    response: deleteCourseResponseSchema,
     successStatuses: [200],
   },
   {
@@ -258,6 +272,8 @@ export const endpoints: EndpointDef[] = [
     query: [
       { name: 'native', required: true },
       { name: 'target', required: true },
+      // Optional: bias a shorter "verify" run toward a notes-deduced level.
+      { name: 'focusLevel', required: false },
     ],
     response: generatePlacementResponseSchema,
     successStatuses: [200],
@@ -290,6 +306,16 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     request: confirmFromNotesRequestSchema,
     response: confirmFromNotesResponseSchema,
+    successStatuses: [201],
+  },
+  {
+    id: 'manualPlacement',
+    method: 'POST',
+    path: '/api/v1/placement/manual',
+    summary: 'Declare a CEFR level manually; create the course or raise to it.',
+    auth: 'bearer',
+    request: manualPlacementRequestSchema,
+    response: manualPlacementResponseSchema,
     successStatuses: [201],
   },
   {
