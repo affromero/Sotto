@@ -102,7 +102,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-md);
-  margin-top: var(--spacing-xl);
+  margin: var(--spacing-lg) 0;
   padding: var(--spacing-md);
   background: color-mix(in oklab, var(--color-error, #dc2626) 7%, var(--color-surface));
   border: 1px solid color-mix(in oklab, var(--color-error, #dc2626) 28%, var(--color-border));
@@ -142,6 +142,85 @@
 
 .resetBtn:hover:not(:disabled) {
   background: color-mix(in oklab, var(--color-error, #dc2626) 10%, var(--color-surface));
+}
+
+.confirmBanner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid color-mix(in oklab, var(--color-error, #dc2626) 36%, var(--color-border));
+  border-left: 4px solid var(--color-error, #dc2626);
+  border-radius: var(--radius-md);
+}
+
+.confirmTitle {
+  font: var(--text-body);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 6px;
+}
+
+.confirmText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.confirmActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--spacing-sm);
+}
+
+.confirmResetBtn,
+.cancelBtn {
+  min-height: 44px;
+  padding: 10px 14px;
+  font: var(--text-body-sm);
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.confirmResetBtn {
+  color: white;
+  background: var(--color-error, #dc2626);
+  border: 1px solid var(--color-error, #dc2626);
+}
+
+.cancelBtn {
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+}
+
+.confirmResetBtn:disabled,
+.cancelBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.resultBanner {
+  padding: 10px 12px;
+  margin-bottom: var(--spacing-lg);
+  font: var(--text-body-sm);
+  border-radius: var(--radius-md);
+}
+
+.resultSuccess {
+  color: var(--color-success, #16a34a);
+  background: color-mix(in oklab, var(--color-success, #16a34a) 10%, var(--color-surface));
+  border: 1px solid color-mix(in oklab, var(--color-success, #16a34a) 28%, var(--color-border));
+}
+
+.resultError {
+  color: var(--color-error, #dc2626);
+  background: color-mix(in oklab, var(--color-error, #dc2626) 9%, var(--color-surface));
+  border: 1px solid color-mix(in oklab, var(--color-error, #dc2626) 28%, var(--color-border));
 }
 
 .rowLabel {
@@ -220,7 +299,9 @@
 
 @media (max-width: 640px) {
   .actions,
-  .dangerZone {
+  .dangerZone,
+  .confirmBanner,
+  .confirmActions {
     align-items: stretch;
     flex-direction: column;
   }

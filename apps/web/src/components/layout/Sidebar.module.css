@@ -30,14 +30,18 @@
   visibility: hidden;
   transform: translateX(-100%);
   pointer-events: none;
-  transition: transform var(--transition-base), visibility 0s linear 250ms;
+  transition:
+    transform var(--transition-base),
+    visibility 0s linear 250ms;
 }
 
 .sidebarOpen .sidebar {
   visibility: visible;
   transform: translateX(0);
   pointer-events: auto;
-  transition: transform var(--transition-base), visibility 0s linear 0s;
+  transition:
+    transform var(--transition-base),
+    visibility 0s linear 0s;
   width: 280px;
   box-shadow: var(--shadow-xl);
 }
@@ -127,31 +131,6 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* Status link */
-
-.statusLink {
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-top: 1px solid var(--color-border);
-}
-
-.statusLinkAnchor {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-lg);
-  font: var(--text-body-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.statusLinkAnchor:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
 /* Admin link */
 
 .adminLink {
@@ -191,7 +170,10 @@
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .sidebar, .overlay { transition: none; }
+  .sidebar,
+  .overlay {
+    transition: none;
+  }
 }
 
 /* Desktop: always visible */

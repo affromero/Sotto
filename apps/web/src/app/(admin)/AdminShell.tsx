@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
     href: '/admin/system',
     label: 'System',
     glyph: 'gear',
-    match: ['/admin/system', '/admin/health', '/admin/queues', '/admin/episodes', '/admin/site-config'],
+    match: ['/admin/system', '/admin/queues', '/admin/episodes', '/admin/site-config'],
   },
 ];
 
@@ -71,7 +71,10 @@ export function AdminShell({ children }: AdminShellProps) {
 
       {open && <div className={styles.overlay} onClick={() => setOpen(false)} aria-hidden="true" />}
 
-      <nav className={`${styles.adminNav} ${open ? styles.open : ''}`} aria-label="Admin navigation">
+      <nav
+        className={`${styles.adminNav} ${open ? styles.open : ''}`}
+        aria-label="Admin navigation"
+      >
         <Link href="/dashboard" className={styles.adminBrand} aria-label="Sotto admin home">
           <GlassBead className={styles.brandBead} />
           <span className={styles.abWord}>sotto</span>

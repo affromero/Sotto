@@ -2,14 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  GraduationCap,
-  Network,
-  Settings,
-  Key,
-  Shield,
-  Activity,
-} from 'lucide-react';
+import { GraduationCap, Network, Settings, Key, Shield } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import styles from './Sidebar.module.css';
@@ -62,7 +55,14 @@ export function Sidebar({
       <aside className={styles.sidebar} aria-label="Main navigation">
         <div className={styles.brand}>
           <Link href="/" className={styles.logo}>
-            <Image src="/brand/sotto-mark.svg" alt="" width={26} height={26} className={styles.logoMark} unoptimized />
+            <Image
+              src="/brand/sotto-mark.svg"
+              alt=""
+              width={26}
+              height={26}
+              className={styles.logoMark}
+              unoptimized
+            />
             Sotto
           </Link>
         </div>
@@ -87,18 +87,6 @@ export function Sidebar({
 
         <div className={styles.notificationSection}>
           <NotificationDropdown />
-        </div>
-
-        <div className={styles.statusLink}>
-          <a
-            href="https://stats.uptimerobot.com/jft3J7XAG9"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.statusLinkAnchor}
-          >
-            <Activity size={16} aria-hidden="true" />
-            System Status
-          </a>
         </div>
 
         {role === 'ADMIN' && (
