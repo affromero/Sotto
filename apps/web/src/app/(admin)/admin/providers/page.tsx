@@ -19,8 +19,11 @@ export default async function AdminProvidersPage() {
     getTestableProviders(userId),
   ]);
 
+  // STT-only providers live in the AI registry for the key store but are not
+  // language models — keep them out of the "Language model" picker.
+  const STT_ONLY_AI = new Set(['deepgram', 'assemblyai', 'together', 'gladia', 'speechmatics']);
   const aiProviders = getAllAiProviderMeta()
-    .filter((p) => p.id !== 'deepgram' && p.id !== 'assemblyai')
+    .filter((p) => !STT_ONLY_AI.has(p.id))
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
