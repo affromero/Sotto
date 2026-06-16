@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * GrammarSection — the drill card module from the design bundle
+ * GrammarSection renders the drill card module from the design bundle
  * (`class-grammar.jsx`), adapted to our `Question` shape. Reused for READING:
  * when a question carries a `passageRef`, it renders as a passage above the
  * prompt. Client-side mastery gate accumulates correctness and reports the
@@ -43,7 +43,7 @@ const SKILL_COPY: Record<'GRAMMAR' | 'READING', { eyebrow: string; title: string
     GRAMMAR: {
       eyebrow: 'Grammar',
       title: 'The form that fits.',
-      lede: 'Pick the option that completes each line. Reasoning lands the moment you choose — drawn from your week.',
+      lede: 'Pick the option that completes each line. Reasoning lands the moment you choose, drawn from your week.',
     },
     READING: {
       eyebrow: 'Reading',
@@ -254,7 +254,7 @@ export function GrammarSection({
             <p className={styles.drillPrompt}>
               {passed ? (
                 <>
-                  Solid — you can tell them <em className={styles.emGood}>apart</em>.
+                  Solid: you can tell them <em className={styles.emGood}>apart</em>.
                 </>
               ) : (
                 <>

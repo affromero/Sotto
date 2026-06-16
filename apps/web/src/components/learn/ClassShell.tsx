@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * ClassShell — the full-screen two-panel class experience (left rail + stage)
+ * ClassShell renders the full-screen two-panel class experience (left rail + stage)
  * and the view state machine (hub → hour → summary), ported from the design
  * bundle (`class-app.jsx`). Owns the class fetch, the cross-section answer map,
  * the gated advance flow, the final `/submit`, and failed-section regeneration.
  *
  * Skill mapping: our skills (GRAMMAR, READING, LISTENING, SPEAKING, WRITING)
- * map onto the design's module styles — grammar + reading render as the drill
+ * map onto the design's module styles. Grammar + reading render as the drill
  * MC card (reading shows its passage), listening is the waveform player + MCQ
  * wired to the real audio, speaking is record + rubric bars, writing is the
  * task card + textarea + inline corrections.
@@ -382,7 +382,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             <span className={styles.wordmarkDot} aria-hidden="true" />
             sotto
           </div>
-          <div className={styles.cwordmarkSub}>v0 · self-hosted</div>
+          <div className={styles.cwordmarkSub}>v0 · self hosted</div>
         </div>
 
         {onHub ? (

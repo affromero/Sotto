@@ -1,4 +1,4 @@
-/* data.ts — typed static content for the welcome onboarding flow */
+/* Typed static content for the welcome onboarding flow. */
 
 export interface Language {
   code: string;
@@ -1177,7 +1177,7 @@ export const COMPOSE_LOG: ComposeLogLine[] = [
 ];
 
 export const MODULES: Module[] = [
-  { id: 'grammar', name: 'Grammar', meta: '9 units · mastery-gated', glyph: 'gate' },
+  { id: 'grammar', name: 'Grammar', meta: '9 units · gated by mastery', glyph: 'gate' },
   { id: 'reading', name: 'Reading', meta: 'in your domains', glyph: 'book' },
   { id: 'listening', name: 'Listening', meta: 'adaptive audio lesson', glyph: 'wave' },
   { id: 'speaking', name: 'Speaking', meta: 'pronunciation scoring', glyph: 'mic' },
@@ -1201,11 +1201,11 @@ export type StepName = (typeof STEPS)[number];
 export const WHISPERS: string[] = [
   'A fresh start begins at the front door.',
   'See the loop before you choose your path.',
-  'The owner is the first learner on a self-hosted system.',
+  'The owner is the first learner on a self hosted system.',
   "Every course is a conversation. Let's begin yours.",
   'The best tutor teaches in the language of your work.',
-  'A voice and memory cues you choose — for listening, speaking, and practice.',
-  "Tell me what you love — we'll learn the language for it.",
+  'A voice and memory cues you choose, for listening, speaking, and practice.',
+  "Tell me what you love. We'll learn the language for it.",
   "I'll meet you a half-step beyond where you stand.",
   'Every lesson, shaped to the things you care about.',
   "Step by step, you'll build fluency.",

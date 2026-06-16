@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * SpeakingSection — the say-it-aloud module from the design bundle
+ * SpeakingSection renders the say-it-aloud module from the design bundle
  * (`class-speaking.jsx`): the round record button, live wave, and post-record
  * score bars + coach tip. It reuses the proven upload/poll wiring from
  * `SpeakingExercise` (record → POST to `{endpointBase}/{promptId}` → poll until
@@ -112,7 +112,7 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
         }));
       }
     },
-    [endpointBase, prompt.id],
+    [endpointBase, prompt.id]
   );
 
   // Upload once the recorded blob lands.
@@ -131,7 +131,7 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
       const tick = async () => {
         try {
           const res = await fetch(
-            `${endpointBase}/${prompt.id}?recordingId=${encodeURIComponent(recordingId)}`,
+            `${endpointBase}/${prompt.id}?recordingId=${encodeURIComponent(recordingId)}`
           );
           if (!res.ok) {
             pollTimerRef.current = setTimeout(() => void tick(), POLL_INTERVAL_MS);
@@ -157,7 +157,7 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
       };
       void tick();
     },
-    [endpointBase, prompt.id, onScored],
+    [endpointBase, prompt.id, onScored]
   );
 
   useEffect(() => {
@@ -185,16 +185,12 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
   }
 
   const { phase, result, error } = state;
-  const overall =
-    result?.overallScore != null ? Math.round(result.overallScore * 100) : 0;
+  const overall = result?.overallScore != null ? Math.round(result.overallScore * 100) : 0;
   const rubric = result?.rubricScores ?? null;
   const isBusy = phase === 'uploading' || phase === 'grading';
 
   return (
-    <article
-      className={styles.speakCard}
-      aria-label={`Speaking prompt ${index + 1} of ${total}`}
-    >
+    <article className={styles.speakCard} aria-label={`Speaking prompt ${index + 1} of ${total}`}>
       <div className={styles.speakTarget} lang="auto">
         {prompt.targetPhrase}
       </div>
@@ -228,7 +224,9 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
         ) : isBusy ? (
           <div className={styles.busyRow} role="status" aria-live="polite">
             <span className={styles.spinner} aria-hidden="true" />
-            <span className={styles.recHint}>{phase === 'uploading' ? 'uploading…' : 'grading…'}</span>
+            <span className={styles.recHint}>
+              {phase === 'uploading' ? 'uploading…' : 'grading…'}
+            </span>
           </div>
         ) : phase === 'scored' && result ? (
           <div className={styles.scoredZone}>
@@ -277,7 +275,11 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
         {phase === 'failed' && (
           <div className={styles.failedRow} role="alert">
             <span className={styles.failedText}>{error}</span>
-            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={handleReset}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={handleReset}
+            >
               Try again
             </button>
           </div>
@@ -288,9 +290,16 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
         <div className={styles.speakOverall}>
           <ScoreDial value={overall} size={60} />
           <div className={styles.speakTip}>
-            {result.feedback ?? (overall >= 75 ? 'Clear enough to be understood.' : 'A little muddy — give it another take.')}
+            {result.feedback ??
+              (overall >= 75
+                ? 'Clear enough to be understood.'
+                : 'A little muddy. Give it another take.')}
           </div>
-          <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={handleReset}>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnGhost}`}
+            onClick={handleReset}
+          >
             <ClassGlyph name="retry" size={15} /> Re-record
           </button>
         </div>

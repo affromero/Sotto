@@ -77,7 +77,7 @@ export function PlacementEntry({ native, target }: PlacementEntryProps) {
       <button type="button" className={styles.card} onClick={() => setMode('manual')}>
         <span className={styles.cardTitle}>I already know my level</span>
         <span className={styles.cardBody}>
-          Pick your CEFR level yourself. It is a quick start, though less accurate than the test —
+          Pick your CEFR level yourself. It is a quick start, though less accurate than the test,
           you can take the test anytime.
         </span>
       </button>

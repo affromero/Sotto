@@ -22,7 +22,7 @@ export function CreateGitHubIssueButton({
   technicalError,
 }: Props) {
   function handleClick() {
-    const issueTitle = `[Pipeline] ${failedAtStatus ?? 'UNKNOWN'} failure — episode ${episodeId}`;
+    const issueTitle = `[Pipeline] ${failedAtStatus ?? 'UNKNOWN'} failure, episode ${episodeId}`;
 
     const MAX_ERROR_LENGTH = 3000;
     let truncatedError = technicalError ?? 'N/A';

@@ -31,7 +31,7 @@ const STEPS: Step[] = [
     num: '01',
     label: 'Connect',
     title: 'Bring your own agent',
-    body: 'Point Sotto at the Claude or Codex you already run, with your own keys. No new account to teach, no provider lock-in. The model that knows your work teaches the language.',
+    body: 'Point Sotto at the Claude or Codex you already run, with your own keys. No new account to teach, no provider trap. The model that knows your work teaches the language.',
     icon: 'plug',
   },
   {
@@ -61,7 +61,7 @@ const SKILLS: Skill[] = [
   {
     label: 'Grammar',
     name: 'Structure, drilled',
-    body: 'Mastery-gated grammar exercises that adapt to what you keep getting wrong.',
+    body: 'Grammar exercises that stay locked until you show mastery.',
     icon: 'spark',
   },
   {
@@ -85,7 +85,7 @@ const SKILLS: Skill[] = [
   {
     label: 'Writing',
     name: 'Inline corrections',
-    body: 'Write freely and receive corrections that explain the why, not just the what.',
+    body: 'Write freely and receive corrections that explain what changed and why.',
     icon: 'check',
   },
   {
@@ -118,8 +118,8 @@ const TENETS: Tenet[] = [
   },
   {
     label: 'Your stack',
-    title: 'Open and self-hostable',
-    body: 'The whole thing is open-source and runs on infrastructure you control. Read it, audit it, host it.',
+    title: 'Open, run it yourself',
+    body: 'The whole thing is open source and runs on infrastructure you control. Read it, audit it, host it.',
     icon: 'repo',
   },
 ];
@@ -259,7 +259,7 @@ const WALK_PROVIDERS: WalkProvider[] = [
   { name: 'Claude', meta: 'Anthropic · CLI', selected: true },
   { name: 'Codex', meta: 'OpenAI · CLI' },
   { name: 'Local', meta: 'Ollama · llama.cpp' },
-  { name: 'Custom', meta: 'OpenAI-compatible' },
+  { name: 'Custom', meta: 'OpenAI compatible' },
 ];
 
 const WALK_SOURCES: WalkSource[] = [
@@ -404,7 +404,7 @@ export default async function LandingPage() {
         <section className={styles.hero} aria-labelledby="hero-title">
           <p className={styles.eyebrow}>
             <span className={styles.eyebrowDash} aria-hidden="true" />
-            Open-source · Self-hosted
+            Open source · run it yourself
           </p>
           <h1 id="hero-title" className={styles.heroTitle}>
             Learn a language, <em>taught in your own context.</em>
@@ -415,7 +415,7 @@ export default async function LandingPage() {
 
           <p className={styles.whisper}>
             <span className={styles.whisperTag}>private by design</span>
-            The agent that already knows you, now teaching you to speak.
+            The agent that knows your work now teaches you to speak.
           </p>
         </section>
 
@@ -427,8 +427,8 @@ export default async function LandingPage() {
               Connect the companies and models <em>you already trust</em>.
             </h2>
             <p className={styles.providersCopy}>
-              AI, text-to-speech, speech-to-text, CLI agents, and local models all plug into the
-              same self-hosted learning stack.
+              LLMs, speech generation, speech recognition, CLI agents, and local models all plug
+              into the same stack you run.
             </p>
           </div>
 
@@ -562,7 +562,7 @@ export default async function LandingPage() {
               Your keys, your data, <em>your stack</em>.
             </h2>
             <p className={styles.sectionLede}>
-              A learning stack you fully control — your courses, progress, and keys live on
+              A learning stack you fully control. Your courses, progress, and keys live on
               infrastructure you own.
             </p>
           </header>

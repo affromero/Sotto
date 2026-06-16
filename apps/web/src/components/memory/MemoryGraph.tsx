@@ -13,9 +13,9 @@ if (!fcoseRegistered) {
   fcoseRegistered = true;
 }
 
-// Brand color literals — Cytoscape styles its own <canvas> via JS.
+// Brand color literals. Cytoscape styles its own <canvas> via JS.
 // This is an accepted, documented exception to the CSS-Modules-only rule.
-const COLOR_VOCAB = '#3F4FB0';   // Aula Indigo
+const COLOR_VOCAB = '#3F4FB0'; // Aula Indigo
 const COLOR_GRAMMAR = '#2A3550'; // Aula Slate
 const COLOR_DUE_BORDER = '#DC2626';
 const COLOR_NORMAL_BORDER = '#E2E4EC';
@@ -72,21 +72,17 @@ export function MemoryGraph({ graph }: MemoryGraphProps) {
 
   const visibleIds = new Set(visibleNodes.map((n) => n.id));
   const visibleEdges = graph.edges.filter(
-    (e) => visibleIds.has(e.source) && visibleIds.has(e.target),
+    (e) => visibleIds.has(e.source) && visibleIds.has(e.target)
   );
 
   useEffect(() => {
     if (!containerRef.current || visibleNodes.length === 0) return;
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const elements: cytoscape.ElementDefinition[] = [
       ...visibleNodes.map((n) => {
-        const size =
-          MIN_NODE_SIZE +
-          Math.round(n.strength * (MAX_NODE_SIZE - MIN_NODE_SIZE));
+        const size = MIN_NODE_SIZE + Math.round(n.strength * (MAX_NODE_SIZE - MIN_NODE_SIZE));
         return {
           data: {
             id: n.id,
@@ -144,8 +140,7 @@ export function MemoryGraph({ graph }: MemoryGraphProps) {
         {
           selector: 'edge',
           style: {
-            width: (ele: cytoscape.EdgeSingular) =>
-              Math.max(1, (ele.data('weight') as number) * 3),
+            width: (ele: cytoscape.EdgeSingular) => Math.max(1, (ele.data('weight') as number) * 3),
             'line-color': COLOR_EDGE,
             'curve-style': 'bezier' as const,
             opacity: 0.7,
@@ -193,9 +188,7 @@ export function MemoryGraph({ graph }: MemoryGraphProps) {
     return (
       <div className={styles.empty} role="status" aria-label="Memory graph empty">
         <p className={styles.emptyHeading}>Your memory graph is empty.</p>
-        <p className={styles.emptyBody}>
-          Complete a class to start building it.
-        </p>
+        <p className={styles.emptyBody}>Complete a class to start building it.</p>
       </div>
     );
   }
@@ -211,16 +204,12 @@ export function MemoryGraph({ graph }: MemoryGraphProps) {
 
       {isTruncated && (
         <p className={styles.truncationNote} role="note" aria-live="polite">
-          Showing the {MAX_NODES} strongest/due nodes — {totalNodes - MAX_NODES} more
-          are hidden.
+          Showing the {MAX_NODES} strongest or due nodes. {totalNodes - MAX_NODES} more are hidden.
         </p>
       )}
 
       {selectedNode && (
-        <MemoryNodeDetail
-          node={selectedNode}
-          onClose={() => setSelectedNode(null)}
-        />
+        <MemoryNodeDetail node={selectedNode} onClose={() => setSelectedNode(null)} />
       )}
     </div>
   );

@@ -53,7 +53,7 @@ export interface ModelOption {
  * Registry model lists for the wizard's model pickers, keyed by backend provider
  * id (AI: anthropic/openai; TTS: elevenlabs/openai/cartesia/hume; STT: openai/
  * deepgram/assemblyai/elevenlabs). Sourced server-side from the provider
- * registries in welcome/page.tsx — never hardcoded.
+ * registries in welcome/page.tsx and never hardcoded.
  */
 export interface ModelMeta {
   ai: Record<string, ModelOption[]>;
@@ -640,7 +640,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
             sotto
           </div>
           <div className={t.wordmarkSub}>
-            {config.selfHosted ? 'v0 · self-hosted' : 'v0 · hosted demo'}
+            {config.selfHosted ? 'v0 · self hosted' : 'v0 · hosted demo'}
           </div>
         </Link>
 

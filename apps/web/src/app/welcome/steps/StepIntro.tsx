@@ -135,7 +135,7 @@ export function StepIntro({ demoMode, onNext }: Props) {
           sotto
         </div>
         <div className={styles.sub}>
-          {demoMode ? 'Hosted preview' : 'First launch · self-hosted'}
+          {demoMode ? 'Hosted preview' : 'First launch · self hosted'}
         </div>
       </header>
 

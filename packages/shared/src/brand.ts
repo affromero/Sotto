@@ -10,15 +10,16 @@ export const BRAND = {
 
   // Consumer-facing
   tagline: 'Learn a language, taught in your own context.',
-  subline: 'Open-source, self-hostable courses built from the context of your work and interests, through the agent and keys you already own.',
+  subline:
+    'Courses from your notes, work, and interests, running on your own stack with the agents and keys you already use.',
   cta: 'Place. Practice. Progress.',
 
   // Pre-composed
   title: 'Sotto. Learn a language, taught in your own context.',
   description:
-    'Open-source, self-hostable language learning, taught in your own context. Connect your own Claude or Codex and choose what it may read, then take mastery-gated CEFR courses across grammar, reading, listening, speaking, and writing, with your keys, your data, and the whole stack.',
+    'Language learning you run yourself. Connect Claude or Codex, choose what they may read, then study CEFR courses across grammar, reading, listening, speaking, and writing with your keys, data, and stack.',
   longDescription:
-    'Sotto is open-source language-learning infrastructure that teaches in your context. Connect your own Claude or Codex and choose what it may read, and it builds a language course around your work and interests: mastery-gated CEFR grammar, reading, adaptive listening lessons, speaking with pronunciation feedback, and writing with inline corrections, plus a personal vocabulary memory graph you own. Self-host it on your stack, with your keys and your data.',
+    'Sotto is open source language learning that teaches from your context. Connect Claude or Codex, choose what they may read, and build a course around your work and interests: CEFR grammar, reading, adaptive listening, speaking with pronunciation feedback, writing with inline corrections, and a vocabulary memory graph you own. Run it on your stack, with your keys and your data.',
 } as const;
 
 export type Brand = typeof BRAND;

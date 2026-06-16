@@ -336,7 +336,7 @@ export function StepContext({
 
       <div className={c.ctxTally}>
         {totalContext === 0 ? (
-          'Add at least one source, link, note, or file — the richer the context, the better your course.'
+          'Add at least one source, link, note, or file. The richer the context, the better your course.'
         ) : (
           <>
             Sotto will weave your course from{' '}

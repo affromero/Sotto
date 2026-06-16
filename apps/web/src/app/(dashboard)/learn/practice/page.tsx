@@ -44,8 +44,8 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       <header className={styles.header}>
         <h1 className={styles.title}>Practice</h1>
         <p className={styles.subtitle}>
-          Sharpen a single skill on your own time. Practice is ungated and feeds your memory graph —
-          it&rsquo;s separate from your mastery-gated classes.
+          Sharpen a single skill on your own time. Practice is ungated and feeds your memory graph.
+          It&rsquo;s separate from your classes gated by mastery.
         </p>
       </header>
 

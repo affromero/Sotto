@@ -5,8 +5,8 @@ import styles from './page.module.css';
 
 type Platform = 'mac' | 'windows' | 'linux' | 'unknown';
 
-// Everything is distributed from sotto.fm. The product itself is self-hosted —
-// these are the clients + installer that connect to YOUR server.
+// Everything is distributed from sotto.fm. The product runs on the user's stack,
+// and these are the clients + installer that connect to YOUR server.
 const DL_BASE = 'https://sotto.fm/download';
 
 interface DesktopTarget {
@@ -35,7 +35,7 @@ export function DownloadOptions() {
   const [platform, setPlatform] = useState<Platform>('unknown');
 
   useEffect(() => {
-    // Client-only OS detection after mount — starting from 'unknown' keeps the
+    // Client-only OS detection after mount. Starting from 'unknown' keeps the
     // server and first client render identical (no hydration mismatch).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlatform(detectPlatform());
@@ -43,10 +43,12 @@ export function DownloadOptions() {
 
   return (
     <section className={styles.desktop} aria-labelledby="desktop-heading">
-      <h2 id="desktop-heading" className={styles.sectionTitle}>Desktop app</h2>
+      <h2 id="desktop-heading" className={styles.sectionTitle}>
+        Desktop app
+      </h2>
       <p className={styles.sectionText}>
-        <strong>Sotto Host</strong> runs the whole stack on your computer — no terminal. Open it,
-        and it starts the database, workers, and your local or cloud AI, then hands you the app.
+        <strong>Sotto Host</strong> runs the whole stack on your computer, no terminal. Open it, and
+        it starts the database, workers, and your local or cloud AI, then hands you the app.
       </p>
       <div className={styles.cards}>
         {DESKTOP_TARGETS.map((target) => {
@@ -74,7 +76,7 @@ export function DownloadOptions() {
             sotto.fm/download
           </a>{' '}
           (or add this site to your home screen), then scan the code from{' '}
-          <strong>Settings → Devices</strong> to connect — no password to type.
+          <strong>Settings → Devices</strong> to connect, no password to type.
         </p>
       </div>
     </section>

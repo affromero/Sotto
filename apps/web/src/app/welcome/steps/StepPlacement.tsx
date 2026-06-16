@@ -111,7 +111,7 @@ export function StepPlacement({
         <div className={c.cefrRead} dir={sourceRtl ? 'rtl' : 'auto'}>
           {level ? (
             <>
-              {copy.estimatedLevel} <b>{level}</b> — {topLevel ? copy.beginsTop : copy.beginsNext}
+              {copy.estimatedLevel} <b>{level}</b>: {topLevel ? copy.beginsTop : copy.beginsNext}
             </>
           ) : (
             'Select what you understand to estimate your level.'

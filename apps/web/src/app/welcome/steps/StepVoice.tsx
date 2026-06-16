@@ -449,7 +449,7 @@ export function StepVoice({
     setVoice((s) => ({ ...s, sttModel: { ...s.sttModel, [sttModelRegId]: modelId } }));
 
   // Keep a concrete model selected for the active cloud provider (defaults to the
-  // first option) so choosing a provider always yields a model — changeable later.
+  // first option) so choosing a provider always yields a model. This is changeable later.
   useEffect(() => {
     if (
       ttsModelOptions.length > 0 &&
@@ -556,8 +556,8 @@ export function StepVoice({
       </h1>
       <p className={t.lede}>
         {demoMode
-          ? 'This hosted walkthrough previews the learning stack without asking for keys. In self-hosted Sotto, these choices power listening lessons, pronunciation feedback, and right-click focus practice.'
-          : 'Listening, pronunciation, and visual memory cues run on providers you pick — swap them anytime. Drop in your keys now so the whole stack is wired from the first session.'}
+          ? 'This hosted walkthrough previews the learning stack without asking for keys. In self hosted Sotto, these choices power listening lessons, pronunciation feedback, and right click focus practice.'
+          : 'Listening, pronunciation, and visual memory cues run on providers you pick. Swap them anytime. Drop in your keys now so the whole stack is wired from the first session.'}
       </p>
 
       <VoicePicker
@@ -619,7 +619,7 @@ export function StepVoice({
         <Glyph name="spark" size={15} />
         {demoMode
           ? 'No credentials are requested or stored in the hosted demo; this is only a preview of the provider choices.'
-          : 'Keys are shared where it makes sense — enter OpenAI, ElevenLabs, or a visual provider once and Sotto uses the selected provider for the matching learning action.'}
+          : 'Keys are shared where it makes sense. Enter OpenAI, ElevenLabs, or a visual provider once and Sotto uses the selected provider for the matching learning action.'}
       </div>
 
       {needsLocalCheck && (

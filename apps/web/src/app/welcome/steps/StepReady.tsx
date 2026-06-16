@@ -149,7 +149,7 @@ export function StepReady({
     );
 
     // BYOK keys → the validated key routes. Surface failures (don't swallow)
-    // but don't block onboarding — keys are editable later in Admin Providers.
+    // but don't block onboarding. Keys are editable later in Admin Providers.
     const failures: string[] = [];
     const postedKeys = new Set<string>();
     for (const post of [
@@ -221,8 +221,8 @@ export function StepReady({
       </h1>
       <p className={t.lede}>
         {config.selfHosted
-          ? 'Mastery-gated, drawn from your world, running on your keys. Pick up where the agent left off — it remembers everything, because the memory is yours.'
-          : 'This is the hosted preview of a mastery-gated course drawn from mock context. No profile, source connection, key, or course record is created.'}
+          ? 'Gated by mastery, drawn from your world, running on your keys. Pick up where the agent left off. It remembers everything because the memory is yours.'
+          : 'This is the hosted preview of a course drawn from mock context and gated by mastery. No profile, source connection, key, or course record is created.'}
       </p>
 
       <div className={c.readyHero}>

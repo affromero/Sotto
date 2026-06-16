@@ -88,7 +88,7 @@ export function StepWelcome({ state, demoMode, setBaseLang, setLanguage, onNext,
           </span>
         </button>
         <span className={t.mlabel}>
-          {demoMode ? 'public demo · no signup' : 'open-source · self-hosted'}
+          {demoMode ? 'public demo · no signup' : 'open source · self hosted'}
         </span>
       </div>
     </div>

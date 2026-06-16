@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Sotto — Learn a language in your context",
+  "name": "Sotto: Learn a language in your context",
   "short_name": "Sotto",
-  "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
+  "description": "Language learning you run yourself, with courses built from your notes, work, and interests.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -19,8 +19,23 @@
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    { "name": "Learn", "short_name": "Learn", "url": "/learn", "description": "Continue your course" },
-    { "name": "Practice", "short_name": "Practice", "url": "/learn/practice", "description": "Ungated skill practice" },
-    { "name": "Connect a device", "short_name": "Connect", "url": "/settings/devices", "description": "Pair a phone or tablet" }
+    {
+      "name": "Learn",
+      "short_name": "Learn",
+      "url": "/learn",
+      "description": "Continue your course"
+    },
+    {
+      "name": "Practice",
+      "short_name": "Practice",
+      "url": "/learn/practice",
+      "description": "Ungated skill practice"
+    },
+    {
+      "name": "Connect a device",
+      "short_name": "Connect",
+      "url": "/settings/devices",
+      "description": "Pair a phone or tablet"
+    }
   ]
 }

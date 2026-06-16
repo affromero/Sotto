@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ClassHub — the "Today" entry view from the design bundle (`class-hub.jsx`),
+ * ClassHub renders the "Today" entry view from the design bundle (`class-hub.jsx`),
  * adapted to our class data. Shows the lesson header, a skill-chip sequence
  * card with Begin/Resume, and a roster of the four skills with their status.
  *
@@ -26,7 +26,15 @@ interface ClassHubProps {
   onBegin: () => void;
 }
 
-export function ClassHub({ classId, lesson, order, sections, scores, started, onBegin }: ClassHubProps) {
+export function ClassHub({
+  classId,
+  lesson,
+  order,
+  sections,
+  scores,
+  started,
+  onBegin,
+}: ClassHubProps) {
   const doneCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
   const totalSkills = sections.length;
 
@@ -48,7 +56,7 @@ export function ClassHub({ classId, lesson, order, sections, scores, started, on
           <div className={styles.hourCardTop}>
             <span className={styles.hourLabel}>Your class</span>
             <span className={styles.hourDur}>
-              <ClassGlyph name="clock" size={14} /> {totalSkills} skills · mastery-gated
+              <ClassGlyph name="clock" size={14} /> {totalSkills} skills · gated by mastery
             </span>
           </div>
 
@@ -59,7 +67,10 @@ export function ClassHub({ classId, lesson, order, sections, scores, started, on
                 <div className={`${styles.segChip} ${done ? styles.segChipDone : ''}`} key={s.id}>
                   <div className={styles.segConn} aria-hidden="true" />
                   <div className={styles.segChipIco}>
-                    <ClassGlyph name={done ? 'check' : SKILL_GLYPH[s.skill] ?? 'gate'} size={18} />
+                    <ClassGlyph
+                      name={done ? 'check' : (SKILL_GLYPH[s.skill] ?? 'gate')}
+                      size={18}
+                    />
                   </div>
                   <div className={styles.segChipName}>{skillLabel(s.skill)}</div>
                 </div>
@@ -73,16 +84,24 @@ export function ClassHub({ classId, lesson, order, sections, scores, started, on
                 <span>
                   {doneCount} of {totalSkills} skills
                 </span>
-                <span>mastery-gated</span>
+                <span>gated by mastery</span>
               </div>
               <div className={styles.hpBar}>
                 <i style={{ width: `${totalSkills > 0 ? (doneCount / totalSkills) * 100 : 0}%` }} />
               </div>
             </div>
-            <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={onBegin}>
-              {started ? 'Resume the class' : 'Begin the class'} <ClassGlyph name="arrow" size={17} />
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={onBegin}
+            >
+              {started ? 'Resume the class' : 'Begin the class'}{' '}
+              <ClassGlyph name="arrow" size={17} />
             </button>
-            <a className={`${styles.btn} ${styles.btnSecondary}`} href={`/classes/${classId}/worksheet`}>
+            <a
+              className={`${styles.btn} ${styles.btnSecondary}`}
+              href={`/classes/${classId}/worksheet`}
+            >
               <ClassGlyph name="pen" size={17} /> iPad workbook
             </a>
           </div>
@@ -106,7 +125,7 @@ export function ClassHub({ classId, lesson, order, sections, scores, started, on
                   <div className={styles.ptSub}>{itemCount} items</div>
                 </div>
                 <span className={`${styles.ptScore} ${sc ? styles.ptScoreHas : ''}`}>
-                  {sc ? `${sc}%` : '—'}
+                  {sc ? `${sc}%` : 'n/a'}
                 </span>
               </div>
             );

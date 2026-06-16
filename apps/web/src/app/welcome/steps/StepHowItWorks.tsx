@@ -25,7 +25,7 @@ const HOW_STEPS: readonly HowStep[] = [
     phase: 0,
     label: "Who's learning",
     glyph: 'headset',
-    desc: 'Create the learner profile. On self-hosted, the first learner is the admin.',
+    desc: 'Create the learner profile. On self hosted, the first learner is the admin.',
   },
   {
     n: '02',
@@ -60,7 +60,7 @@ const HOW_STEPS: readonly HowStep[] = [
     phase: 2,
     label: 'Placement',
     glyph: 'graph',
-    desc: 'Test, upload notes, answer tailored follow-ups, or set a level by hand.',
+    desc: 'Test, upload notes, answer short follow ups, or set a level by hand.',
   },
   {
     n: '07',

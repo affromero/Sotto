@@ -73,9 +73,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       <div className={styles.adminHead}>
         <div>
           <h1>Users &amp; access</h1>
-          <div className={styles.ahSub}>
-            {total.toLocaleString()} learners · roles and levels
-          </div>
+          <div className={styles.ahSub}>{total.toLocaleString()} learners · roles and levels</div>
         </div>
       </div>
 
@@ -141,7 +139,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                         {extra > 0 && ` +${extra}`}
                       </>
                     ) : (
-                      '—'
+                      'n/a'
                     )}
                   </td>
                   <td className={styles.mono}>{user._count.episodes}</td>
@@ -176,7 +174,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           )}
         </div>
       )}
-
     </>
   );
 }

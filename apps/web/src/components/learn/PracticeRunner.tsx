@@ -96,7 +96,7 @@ function ListeningAudio({ episodeId }: { episodeId: string }) {
   if (!audioUrl) {
     return (
       <p className={styles.audioGenerating} role="status">
-        Audio is generating — the questions below are ready while you wait.
+        Audio is generating. The questions below are ready while you wait.
       </p>
     );
   }
@@ -116,7 +116,7 @@ function ResultPanel({ result, onDone }: { result: SubmitResult; onDone: () => v
     <div className={styles.resultPanel} role="region" aria-label="Practice result">
       <ScoreDial value={Math.round(result.score * 100)} size={92} stroke={7} />
       <p className={styles.resultLine}>
-        {result.correct} of {result.total} correct — reviewed and scheduled for spaced repetition.
+        {result.correct} of {result.total} correct, reviewed and scheduled for spaced repetition.
       </p>
       <button type="button" className={styles.primaryButton} onClick={onDone}>
         Done

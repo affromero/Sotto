@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: EpisodePageProps): Promise<Me
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${episode.title} — by ${creatorName}`,
+      title: `${episode.title} by ${creatorName}`,
       description: episode.topic,
     },
     alternates: { canonical: episodeUrl },
@@ -80,11 +80,7 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
   const visibility = episode.visibility;
 
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
-  const [
-    resolvedAudioUrl,
-    resolvedSegments,
-    resolvedVersions,
-  ] = await Promise.all([
+  const [resolvedAudioUrl, resolvedSegments, resolvedVersions] = await Promise.all([
     resolveAudioUrl(episode.audioUrl),
     Promise.all(
       episode.segments.map(async (s) => ({
@@ -157,7 +153,6 @@ export default async function EpisodePage({ params }: EpisodePageProps) {
           isAdmin={isAdmin}
           isAuthenticated={!!userId}
         />
-
       </div>
     </main>
   );
