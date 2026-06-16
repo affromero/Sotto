@@ -294,6 +294,7 @@ impl App {
                 native_lang: outcome.native.clone(),
                 target_lang: outcome.target.clone(),
                 current_level: outcome.level.clone(),
+                placement_source: Some("TEST".to_string()),
             };
             self.enter_course_home(course);
         }
@@ -476,6 +477,7 @@ impl App {
                     native_lang: native,
                     target_lang: target,
                     current_level: resp.level.to_string(),
+                    placement_source: Some("NOTES".to_string()),
                 };
                 self.enter_course_home(course);
             }

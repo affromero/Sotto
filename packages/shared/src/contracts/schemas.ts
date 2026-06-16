@@ -10,6 +10,10 @@ import { z } from 'zod';
 
 export const cefrLevelSchema = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 
+// How a course's level was established (null on legacy courses placed before the
+// field existed). Mirrors the Prisma PlacementSource enum.
+export const placementSourceSchema = z.enum(['TEST', 'NOTES', 'NOTES_VERIFIED', 'MANUAL']);
+
 export const practiceKindSchema = z.enum([
   'FULL',
   'GRAMMAR',
@@ -69,6 +73,7 @@ export const courseSummarySchema = z.object({
   targetLang: z.string(),
   currentLevel: cefrLevelSchema,
   startLevel: cefrLevelSchema,
+  placementSource: placementSourceSchema.nullable(),
   activeClassId: z.string().nullable(),
   curriculum: z.object({ title: z.string() }),
   placement: z.object({ level: cefrLevelSchema, createdAt: z.string() }).nullable(),
@@ -696,6 +701,41 @@ export const confirmFromNotesResponseSchema = z.object({
   courseId: z.string(),
   level: cefrLevelSchema,
   addedVocabulary: z.number(),
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/placement/manual — the learner declares their own CEFR level.
+// Creates the course at that level or raises to it (lowering is a reset).
+// Mirrors apps/web/src/app/api/v1/placement/manual/route.ts.
+// ---------------------------------------------------------------------------
+
+export const manualPlacementRequestSchema = z.object({
+  native: z.string().length(2),
+  target: z.string().length(2),
+  level: cefrLevelSchema,
+});
+
+export const manualPlacementResponseSchema = z.object({
+  courseId: z.string(),
+  level: cefrLevelSchema,
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v1/courses/{courseId} — permanently delete a course and everything
+// tied to it (graph, classes, exams, practice, generated episodes, stored files).
+// `confirm` must echo the course's target language. Mirrors the DELETE route.
+// ---------------------------------------------------------------------------
+
+export const deleteCourseRequestSchema = z.object({
+  confirm: z.string(),
+});
+
+export const deleteCourseResponseSchema = z.object({
+  deleted: z.boolean(),
+  episodesDeleted: z.number(),
+  filesAttempted: z.number(),
+  filesDeleted: z.number(),
+  filesFailed: z.number(),
 });
 
 // ---------------------------------------------------------------------------
