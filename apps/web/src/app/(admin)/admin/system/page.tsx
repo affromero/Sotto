@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { DURATION_TOLERANCE_SECONDS } from '@/lib/duration';
 import { Glyph, type GlyphName } from '@/components/Glyph';
 import { fmtInt } from '@/lib/admin/format';
+import { FactoryResetPanel } from './FactoryResetPanel';
 import styles from '../../adminTheme.module.css';
 
 export const metadata = { title: 'System · Sotto admin' };
@@ -31,7 +32,7 @@ const TOOLS: Tool[] = [
     href: '/admin/site-config',
     glyph: 'gear',
     name: 'Admin settings',
-    desc: 'Infrastructure selection for AI, speech, and storage, with factory reset.',
+    desc: 'Infrastructure selection for AI, speech, and storage.',
   },
   {
     href: '/admin/providers',
@@ -74,6 +75,8 @@ export default async function AdminSystemPage() {
           <div className={styles.ahSub}>Queues, lessons, providers, and configuration</div>
         </div>
       </div>
+
+      <FactoryResetPanel />
 
       <div className={styles.toolGrid}>
         {TOOLS.map((t) => (
