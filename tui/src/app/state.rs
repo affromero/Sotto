@@ -72,6 +72,9 @@ pub(crate) struct Course {
     pub native_lang: String,
     pub target_lang: String,
     pub current_level: String,
+    /// How the level was set (null/None on legacy courses placed before the
+    /// field existed). Lets screens hint that a self-selected level is unverified.
+    pub placement_source: Option<String>,
 }
 
 impl From<&types::CourseSummary> for Course {
@@ -82,6 +85,7 @@ impl From<&types::CourseSummary> for Course {
             native_lang: summary.native_lang.clone(),
             target_lang: summary.target_lang.clone(),
             current_level: summary.current_level.to_string(),
+            placement_source: summary.placement_source.as_ref().map(|s| s.to_string()),
         }
     }
 }
@@ -1785,6 +1789,7 @@ mod tests {
             native_lang: "en".into(),
             target_lang: "es".into(),
             current_level: "A2".into(),
+            placement_source: None,
         }
     }
 

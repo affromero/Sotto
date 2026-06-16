@@ -360,6 +360,7 @@ describe('POST /api/v1/placement', () => {
         curriculumId: 'c1',
         currentLevel: 'B1',
         startLevel: 'B1',
+        placementSource: 'TEST',
       }),
       update: { currentLevel: 'B1' },
     });
@@ -386,7 +387,11 @@ describe('POST /api/v1/placement', () => {
 
     await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
-    expect(mockCourseUpsert.mock.calls[0][0].update).toEqual({ currentLevel: 'B1' });
+    // A real raise stamps provenance (TEST) alongside the new level.
+    expect(mockCourseUpsert.mock.calls[0][0].update).toEqual({
+      currentLevel: 'B1',
+      placementSource: 'TEST',
+    });
   });
 
   it('upserts placement result for the course', async () => {
@@ -450,5 +455,9 @@ describe('POST /api/v1/placement', () => {
       expect.objectContaining({ courseId: 'course-1', userId: 'u1', note: 'mis materiales' }),
     );
     expect(mockClearNotesDeduction).toHaveBeenCalledWith('u1', 'en', 'de');
+    // Arriving via the notes "verify" path records NOTES_VERIFIED provenance.
+    expect(mockCourseUpsert.mock.calls[0][0].create).toEqual(
+      expect.objectContaining({ placementSource: 'NOTES_VERIFIED' }),
+    );
   });
 });

@@ -212,6 +212,20 @@ pub(crate) trait Api: Send + Sync {
         native: &str,
         target: &str,
     ) -> Result<types::ConfirmFromNotesResponse>;
+    /// Declare a CEFR level manually; creates the course or raises to it.
+    async fn manual_placement(
+        &self,
+        native: &str,
+        target: &str,
+        level: &str,
+    ) -> Result<types::ManualPlacementResponse>;
+    /// Permanently delete a course and everything tied to it. `confirm` must
+    /// echo the course's target language code.
+    async fn delete_course(
+        &self,
+        course_id: &str,
+        confirm: &str,
+    ) -> Result<types::DeleteCourseResponse>;
     /// Fetch the course's vocabulary/grammar memory graph.
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse>;
     /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
@@ -702,9 +716,11 @@ impl SottoClient {
         native: &str,
         target: &str,
     ) -> Result<types::GeneratePlacementResponse> {
+        // Query params are generated alphabetically: (focusLevel, native, target).
+        // The TUI runs a cold placement, so it never biases toward a level.
         let resp = self
             .inner
-            .generate_placement(native, target)
+            .generate_placement(None, native, target)
             .await
             .map_err(|e| eyre!("failed to generate placement: {e}"))?;
         Ok(resp.into_inner())
@@ -774,6 +790,46 @@ impl SottoClient {
             .confirm_placement_from_notes(&body)
             .await
             .map_err(|e| eyre!("failed to confirm placement from notes: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Declare a CEFR level manually; creates the course or raises to it.
+    pub async fn manual_placement(
+        &self,
+        native: &str,
+        target: &str,
+        level: &str,
+    ) -> Result<types::ManualPlacementResponse> {
+        let body = types::ManualPlacementRequest {
+            native: types::ManualPlacementRequestNative::try_from(native.to_string())
+                .map_err(|e| eyre!("invalid native language code: {e}"))?,
+            target: types::ManualPlacementRequestTarget::try_from(target.to_string())
+                .map_err(|e| eyre!("invalid target language code: {e}"))?,
+            level: types::CefrLevel::try_from(level)
+                .map_err(|e| eyre!("invalid CEFR level: {e}"))?,
+        };
+        let resp = self
+            .inner
+            .manual_placement(&body)
+            .await
+            .map_err(|e| eyre!("failed to set manual placement: {e}"))?;
+        Ok(resp.into_inner())
+    }
+
+    /// Permanently delete a course and everything tied to it.
+    pub async fn delete_course(
+        &self,
+        course_id: &str,
+        confirm: &str,
+    ) -> Result<types::DeleteCourseResponse> {
+        let body = types::DeleteCourseRequest {
+            confirm: confirm.to_string(),
+        };
+        let resp = self
+            .inner
+            .delete_course(course_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to delete course: {e}"))?;
         Ok(resp.into_inner())
     }
 
@@ -1021,6 +1077,23 @@ impl Api for SottoClient {
         target: &str,
     ) -> Result<types::ConfirmFromNotesResponse> {
         SottoClient::confirm_from_notes(self, native, target).await
+    }
+
+    async fn manual_placement(
+        &self,
+        native: &str,
+        target: &str,
+        level: &str,
+    ) -> Result<types::ManualPlacementResponse> {
+        SottoClient::manual_placement(self, native, target, level).await
+    }
+
+    async fn delete_course(
+        &self,
+        course_id: &str,
+        confirm: &str,
+    ) -> Result<types::DeleteCourseResponse> {
+        SottoClient::delete_course(self, course_id, confirm).await
     }
 
     async fn graph(&self, course_id: &str) -> Result<types::MemoryGraphResponse> {

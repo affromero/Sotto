@@ -8,6 +8,7 @@ import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getServerInfra } from '@/lib/server-config';
 import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
 import { SettingsForm } from './SettingsForm';
+import { CourseManagement } from '@/components/settings/CourseManagement';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -147,6 +148,27 @@ export default async function SettingsPage() {
   if (process.env.ELEVENLABS_API_KEY || accessibleTtsProviders.has('elevenlabs')) {
     accessibleAiProviders.add('elevenlabs');
   }
+
+  const managedCourses = (
+    await prisma.course.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        nativeLang: true,
+        targetLang: true,
+        currentLevel: true,
+        curriculum: { select: { title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  ).map((course) => ({
+    id: course.id,
+    nativeLang: course.nativeLang,
+    targetLang: course.targetLang,
+    currentLevel: course.currentLevel,
+    title: course.curriculum?.title ?? '',
+  }));
+
   return (
     <main className={styles.main}>
       <h1 className={styles.pageTitle}>Settings</h1>
@@ -172,6 +194,8 @@ export default async function SettingsPage() {
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
       />
+
+      <CourseManagement courses={managedCourses} />
     </main>
   );
 }

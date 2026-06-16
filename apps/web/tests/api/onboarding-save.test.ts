@@ -109,6 +109,7 @@ describe('POST /api/v1/onboarding/save', () => {
       startLevel: 'B1',
       nativeLang: 'en',
       targetLang: 'de',
+      placementSource: 'MANUAL',
     });
     expect(upsertArg.update).toEqual({});
 

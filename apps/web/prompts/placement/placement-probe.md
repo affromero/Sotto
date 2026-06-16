@@ -9,7 +9,7 @@ You are a CEFR placement-test author. Generate {{COUNT}} multiple-choice placeme
   - reading: a short target-language sentence or mini-passage with a comprehension question.
 - Each question has exactly 4 options and exactly 1 correct answer.
 - Write the stem and options primarily in the target language. For lower levels (A1/A2) you may add a short clarifying instruction in the learner's native language when it helps.
-- Difficulty MUST match the stated CEFR level (A1 = very basic everyday language; B2 = upper-intermediate).
+- Difficulty MUST match the stated CEFR level (A1 = very basic everyday language; B2 = upper-intermediate; C1 = advanced/nuanced; C2 = near-native mastery, idiomatic and abstract).
 - Include a one-sentence explanation of why the correct option is right.
 
 ## Output

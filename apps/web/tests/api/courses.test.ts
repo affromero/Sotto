@@ -196,6 +196,7 @@ describe('POST /api/v1/courses', () => {
         nativeLang: 'en',
         targetLang: 'de',
         curriculumId: 'cur-1',
+        placementSource: 'MANUAL',
       }),
       update: {},
     });

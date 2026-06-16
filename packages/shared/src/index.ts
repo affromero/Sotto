@@ -14,6 +14,7 @@ export type {
   FeedbackType,
   FeedbackStatus,
   CefrLevel,
+  PlacementSource,
   SkillType,
   ClassStatus,
   SectionStatus,

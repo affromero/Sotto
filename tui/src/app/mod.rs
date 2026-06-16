@@ -30,7 +30,7 @@ use crate::event::Event;
 use crate::theme::Theme;
 use crate::tui::Tui;
 
-use overlay::{AccountsOverlay, ThemePicker};
+use overlay::{AccountsOverlay, DeleteOverlay, ManualOverlay, ThemePicker};
 
 use state::{
     AnswerStep, Course, DueCounts, EpisodeDetail, NotesPhase, PracticeResult, RetryKind,
@@ -84,6 +84,10 @@ pub(crate) struct App {
     help_open: bool,
     /// The account switcher overlay (`A`) — modal; lists profiles to switch to.
     accounts: AccountsOverlay,
+    /// The manual-placement overlay (`l` on the language picker) — modal.
+    manual: ManualOverlay,
+    /// The course-delete confirm overlay (`x` on the course home) — modal.
+    delete: DeleteOverlay,
 }
 
 /// Builds an [`Api`] client for a profile (server + key). Boxed so production
@@ -161,6 +165,8 @@ impl App {
             theme_picker: ThemePicker::closed(),
             help_open: false,
             accounts: AccountsOverlay::closed(),
+            manual: ManualOverlay::closed(),
+            delete: DeleteOverlay::closed(),
         }
     }
 
@@ -304,6 +310,16 @@ impl App {
             Action::NotesCancel => self.notes_cancel(),
             Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),
             Action::ConfigLoaded(req_gen, result) => self.on_config_loaded(req_gen, result),
+            Action::ManualPlacementOpen => self.on_manual_open(),
+            Action::ManualPlacementSubmit => self.on_manual_submit(),
+            Action::ManualPlacementClose => self.on_manual_close(),
+            Action::ManualPlaced(req_gen, result) => self.on_manual_placed(req_gen, result),
+            Action::DeleteCourseOpen => self.on_delete_open(),
+            Action::DeleteCourseInput(c) => self.on_delete_input(c),
+            Action::DeleteCourseBackspace => self.on_delete_backspace(),
+            Action::DeleteCourseConfirm => self.on_delete_confirm(),
+            Action::DeleteCourseClose => self.on_delete_close(),
+            Action::CourseDeleted(req_gen, result) => self.on_course_deleted(req_gen, result),
             Action::ToggleAsk => self.on_toggle_ask(),
             Action::InteractionAsked(req_gen, result) => self.on_interaction_asked(req_gen, result),
             Action::InteractionPolled(req_gen, result) => {
@@ -376,6 +392,34 @@ impl App {
                 KeyCode::Char('A') | KeyCode::Esc | KeyCode::Char('q') => {
                     Some(Action::ToggleAccounts)
                 }
+                _ => None,
+            };
+        }
+
+        // Manual placement (`l` from the language picker) is MODAL: ↑/↓ pick a
+        // level, Enter confirms, Esc/`l`/`q` close; everything else is swallowed.
+        if self.manual.open {
+            return match key.code {
+                KeyCode::Up | KeyCode::Char('k') => Some(Action::Up),
+                KeyCode::Down | KeyCode::Char('j') => Some(Action::Down),
+                KeyCode::Enter => Some(Action::ManualPlacementSubmit),
+                KeyCode::Esc | KeyCode::Char('l') | KeyCode::Char('q') => {
+                    Some(Action::ManualPlacementClose)
+                }
+                _ => None,
+            };
+        }
+
+        // Delete-confirm (`x` from the course home) is MODAL and owns text input:
+        // type the language code, Enter confirms, Backspace edits, Esc cancels.
+        // Returns above the global polish keys so `t`/`?`/`q` are typed, not
+        // intercepted as theme/help/back.
+        if self.delete.open {
+            return match key.code {
+                KeyCode::Enter => Some(Action::DeleteCourseConfirm),
+                KeyCode::Esc => Some(Action::DeleteCourseClose),
+                KeyCode::Backspace => Some(Action::DeleteCourseBackspace),
+                KeyCode::Char(c) => Some(Action::DeleteCourseInput(c)),
                 _ => None,
             };
         }
@@ -496,6 +540,10 @@ impl App {
             View::PlacementLang { .. } if matches!(key.code, KeyCode::Char('m')) => {
                 return Some(Action::NotesStart);
             }
+            // PlacementLang: `l` opens the "I know my level" manual picker.
+            View::PlacementLang { .. } if matches!(key.code, KeyCode::Char('l')) => {
+                return Some(Action::ManualPlacementOpen);
+            }
             // Listening (standalone or class section): space toggles playback.
             _ if self.audio_screen() && matches!(key.code, KeyCode::Char(' ')) => {
                 return Some(Action::PlayPause);
@@ -532,6 +580,12 @@ impl App {
                 starting: false, ..
             } if matches!(key.code, KeyCode::Char('s')) => {
                 return Some(Action::OpenSettings);
+            }
+            // CourseHome: `x` opens the delete-course confirm overlay.
+            View::CourseHome {
+                starting: false, ..
+            } if matches!(key.code, KeyCode::Char('x')) => {
+                return Some(Action::DeleteCourseOpen);
             }
             // Courses: `n` and `s` start placement / open settings (the empty
             // courses state must be actionable for a fresh self-hoster).
@@ -654,6 +708,12 @@ impl App {
             self.render();
             return;
         }
+        // The manual placement overlay owns ↑/↓ when open (level selection).
+        if self.manual.open {
+            self.manual.move_cursor(false);
+            self.render();
+            return;
+        }
         if self.in_section_walk() {
             self.class_cursor_move(true);
             return;
@@ -690,6 +750,11 @@ impl App {
         }
         if self.accounts.open {
             self.accounts.move_cursor(true, self.config.profiles.len());
+            self.render();
+            return;
+        }
+        if self.manual.open {
+            self.manual.move_cursor(true);
             self.render();
             return;
         }
@@ -1752,6 +1817,10 @@ impl App {
                 self.accounts.cursor,
                 &palette,
             );
+        } else if self.manual.open {
+            overlay::draw_manual_placement(frame, chunks[0], &self.manual, &palette);
+        } else if self.delete.open {
+            overlay::draw_delete_course(frame, chunks[0], &self.delete, &palette);
         }
         Ok(())
     }
@@ -2038,6 +2107,30 @@ mod tests {
             .expect("valid confirm-from-notes JSON"))
         }
 
+        async fn manual_placement(
+            &self,
+            _native: &str,
+            _target: &str,
+            level: &str,
+        ) -> Result<types::ManualPlacementResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-stub", "level": level
+            }))
+            .expect("valid manual-placement JSON"))
+        }
+
+        async fn delete_course(
+            &self,
+            _course_id: &str,
+            _confirm: &str,
+        ) -> Result<types::DeleteCourseResponse> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "deleted": true, "episodesDeleted": 0,
+                "filesAttempted": 0, "filesDeleted": 0, "filesFailed": 0
+            }))
+            .expect("valid delete-course JSON"))
+        }
+
         async fn graph(&self, _course_id: &str) -> Result<types::MemoryGraphResponse> {
             Ok(
                 serde_json::from_value(serde_json::json!({ "nodes": [], "edges": [] }))
@@ -2150,6 +2243,7 @@ mod tests {
             native_lang: "en".into(),
             target_lang: "es".into(),
             current_level: "A2".into(),
+            placement_source: None,
         }
     }
 
@@ -2353,6 +2447,96 @@ mod tests {
             }
             other => panic!("expected CourseHome, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn manual_placement_opens_picks_a_level_and_lands_in_the_course() {
+        let mut app = test_app();
+        app.view = View::placement_lang();
+
+        // `l` opens the manual level picker for the chosen pair.
+        app.on_manual_open();
+        assert!(app.manual.open);
+
+        // ↓↓ selects B1 (A1, A2, B1), then Enter submits.
+        app.on_down();
+        app.on_down();
+        assert_eq!(app.manual.level(), "B1");
+        app.on_manual_submit();
+        assert!(app.manual.submitting);
+
+        let req_gen = app.request_gen;
+        let resp: ApiResult<types::ManualPlacementResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "courseId": "course-man", "level": "B1"
+            }))
+            .expect("valid manual JSON")));
+        app.on_manual_placed(req_gen, resp);
+
+        assert!(!app.manual.open);
+        match &app.view {
+            View::CourseHome { course, .. } => {
+                assert_eq!(course.id, "course-man");
+                assert_eq!(course.current_level, "B1");
+                assert_eq!(course.placement_source.as_deref(), Some("MANUAL"));
+            }
+            other => panic!("expected CourseHome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn manual_placement_rejects_identical_languages() {
+        let mut app = test_app();
+        // Both columns default to the first language, so native == target.
+        app.view = View::PlacementLang {
+            native_cursor: 0,
+            target_cursor: 0,
+            column: state::LangColumn::Native,
+            loading: false,
+        };
+        app.on_manual_open();
+        assert!(
+            !app.manual.open,
+            "must not open the picker for identical pair"
+        );
+    }
+
+    #[tokio::test]
+    async fn deleting_a_course_requires_the_matching_code_then_reloads() {
+        let mut app = test_app();
+        app.enter_course_home(course("c1")); // target_lang "es"
+        app.on_delete_open();
+        assert!(app.delete.open);
+        assert_eq!(app.delete.target_lang, "es");
+
+        // Wrong code: confirm is a no-op (no request dispatched).
+        app.on_delete_input('f');
+        app.on_delete_input('r');
+        assert!(!app.delete.confirmed());
+        app.on_delete_confirm();
+        assert!(!app.delete.deleting);
+
+        // Correct code: confirm dispatches the delete.
+        app.on_delete_backspace();
+        app.on_delete_backspace();
+        app.on_delete_input('e');
+        app.on_delete_input('s');
+        assert!(app.delete.confirmed());
+        app.on_delete_confirm();
+        assert!(app.delete.deleting);
+
+        let req_gen = app.request_gen;
+        let resp: ApiResult<types::DeleteCourseResponse> =
+            Arc::new(Ok(serde_json::from_value(serde_json::json!({
+                "deleted": true, "episodesDeleted": 0,
+                "filesAttempted": 0, "filesDeleted": 0, "filesFailed": 0
+            }))
+            .expect("valid delete JSON")));
+        app.on_course_deleted(req_gen, resp);
+
+        // The overlay closes and the course list reloads.
+        assert!(!app.delete.open);
+        assert!(matches!(app.view, View::Loading));
     }
 
     #[test]
@@ -4366,7 +4550,8 @@ mod tests {
     fn course_summary(id: &str) -> types::CourseSummary {
         serde_json::from_value(serde_json::json!({
             "id": id, "nativeLang": "en", "targetLang": "es",
-            "currentLevel": "A1", "startLevel": "A1", "activeClassId": null,
+            "currentLevel": "A1", "startLevel": "A1", "placementSource": null,
+            "activeClassId": null,
             "curriculum": { "title": format!("Course {id}") },
             "placement": null
         }))

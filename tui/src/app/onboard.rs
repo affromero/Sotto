@@ -16,6 +16,7 @@ use crate::action::{Action, ApiResult};
 use crate::api::types;
 
 use super::App;
+use super::overlay::{DeleteOverlay, ManualOverlay};
 use super::state::{
     ConfigView, LANGUAGES, LangColumn, NotesPhase, PlacementOutcome, View, answer_current_choice,
     build_placement_answers, course_title, cursor_down, cursor_up, list_down, list_up,
@@ -294,6 +295,7 @@ impl App {
                 native_lang: outcome.native.clone(),
                 target_lang: outcome.target.clone(),
                 current_level: outcome.level.clone(),
+                placement_source: Some("TEST".to_string()),
             };
             self.enter_course_home(course);
         }
@@ -476,6 +478,7 @@ impl App {
                     native_lang: native,
                     target_lang: target,
                     current_level: resp.level.to_string(),
+                    placement_source: Some("NOTES".to_string()),
                 };
                 self.enter_course_home(course);
             }
@@ -620,6 +623,166 @@ impl App {
             }
             Err(message) => self.status_bar.set_error(message.clone()),
         }
+        self.render();
+    }
+
+    // --- Manual placement (declare a level yourself) -----------------------
+
+    /// Open the manual level picker for the languages picked in PlacementLang.
+    pub(super) fn on_manual_open(&mut self) {
+        if let View::PlacementLang {
+            native_cursor,
+            target_cursor,
+            loading,
+            ..
+        } = &self.view
+        {
+            if *loading {
+                return;
+            }
+            let last = LANGUAGES.len() - 1;
+            let native = LANGUAGES[(*native_cursor).min(last)].0.to_string();
+            let target = LANGUAGES[(*target_cursor).min(last)].0.to_string();
+            if native == target {
+                self.status_bar
+                    .set_error("Native and target languages must differ.".to_string());
+                self.render();
+                return;
+            }
+            self.manual = ManualOverlay::opened(native, target);
+            self.render();
+        }
+    }
+
+    /// Submit the picked level: create the course or raise to it (MANUAL).
+    pub(super) fn on_manual_submit(&mut self) {
+        if !self.manual.open || self.manual.submitting {
+            return;
+        }
+        let native = self.manual.native.clone();
+        let target = self.manual.target.clone();
+        let level = self.manual.level().to_string();
+        let req_gen = self.bump_gen();
+        self.manual.submitting = true;
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.manual_placement(&native, &target, &level).await },
+            Action::ManualPlaced,
+        );
+        self.render();
+    }
+
+    pub(super) fn on_manual_placed(
+        &mut self,
+        req_gen: u64,
+        result: ApiResult<types::ManualPlacementResponse>,
+    ) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(resp) => {
+                let native = self.manual.native.clone();
+                let target = self.manual.target.clone();
+                let course = super::state::Course {
+                    id: resp.course_id.clone(),
+                    title: course_title(&native, &target),
+                    native_lang: native,
+                    target_lang: target,
+                    current_level: resp.level.to_string(),
+                    placement_source: Some("MANUAL".to_string()),
+                };
+                self.manual = ManualOverlay::closed();
+                self.enter_course_home(course);
+            }
+            Err(message) => {
+                self.manual.submitting = false;
+                self.status_bar.set_error(message.clone());
+                self.render();
+            }
+        }
+    }
+
+    /// Close the manual level picker without submitting.
+    pub(super) fn on_manual_close(&mut self) {
+        self.manual = ManualOverlay::closed();
+        self.render();
+    }
+
+    // --- Course delete (reset / remove) ------------------------------------
+
+    /// Open the delete-confirm overlay for the current course.
+    pub(super) fn on_delete_open(&mut self) {
+        if let View::CourseHome { course, .. } = &self.view {
+            self.delete = DeleteOverlay::opened(
+                course.id.clone(),
+                course.target_lang.clone(),
+                course.title.clone(),
+            );
+            self.render();
+        }
+    }
+
+    /// Append a typed character to the delete-confirm input.
+    pub(super) fn on_delete_input(&mut self, c: char) {
+        if self.delete.open && !self.delete.deleting {
+            self.delete.input.push(c);
+            self.render();
+        }
+    }
+
+    /// Delete the last character of the delete-confirm input.
+    pub(super) fn on_delete_backspace(&mut self) {
+        if self.delete.open && !self.delete.deleting {
+            self.delete.input.pop();
+            self.render();
+        }
+    }
+
+    /// Confirm deletion once the typed code matches the target language.
+    pub(super) fn on_delete_confirm(&mut self) {
+        if !self.delete.open || self.delete.deleting || !self.delete.confirmed() {
+            return;
+        }
+        let course_id = self.delete.course_id.clone();
+        let confirm = self.delete.target_lang.clone();
+        let req_gen = self.bump_gen();
+        self.delete.deleting = true;
+        let client = Arc::clone(&self.client);
+        self.dispatch(
+            req_gen,
+            async move { client.delete_course(&course_id, &confirm).await },
+            Action::CourseDeleted,
+        );
+        self.render();
+    }
+
+    pub(super) fn on_course_deleted(
+        &mut self,
+        req_gen: u64,
+        result: ApiResult<types::DeleteCourseResponse>,
+    ) {
+        if !self.is_current(req_gen) {
+            return;
+        }
+        match result.as_ref() {
+            Ok(_) => {
+                // The course is gone; close the overlay and reload the list.
+                self.delete = DeleteOverlay::closed();
+                self.fetch_courses();
+            }
+            Err(message) => {
+                self.delete.deleting = false;
+                self.status_bar.set_error(message.clone());
+                self.render();
+            }
+        }
+    }
+
+    /// Close the delete-confirm overlay without deleting.
+    pub(super) fn on_delete_close(&mut self) {
+        self.delete = DeleteOverlay::closed();
         self.render();
     }
 }

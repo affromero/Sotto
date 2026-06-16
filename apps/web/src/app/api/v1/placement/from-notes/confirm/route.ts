@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const cached = await getCachedNotesDeduction(userId, native, target);
     if (!cached) return errorResponse('Deduction expired. Upload your materials again.', 409);
 
-    const course = await createOrRaiseCourse(userId, native, target, cached.level);
+    const course = await createOrRaiseCourse(userId, native, target, cached.level, 'NOTES');
 
     // Personalize from day one: keep the materials as the course note and seed
     // the memory graph with vocabulary extracted from them.

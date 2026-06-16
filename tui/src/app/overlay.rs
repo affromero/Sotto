@@ -119,6 +119,108 @@ impl AccountsOverlay {
     }
 }
 
+/// The CEFR ladder offered in the manual-placement overlay.
+pub(crate) const MANUAL_LEVELS: [(&str, &str); 6] = [
+    ("A1", "Beginner"),
+    ("A2", "Elementary"),
+    ("B1", "Intermediate"),
+    ("B2", "Upper-Intermediate"),
+    ("C1", "Advanced"),
+    ("C2", "Proficient"),
+];
+
+/// The manual-placement overlay (`l` on the language picker): declare a CEFR
+/// level yourself for the chosen pair, instead of testing or pasting materials.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ManualOverlay {
+    pub open: bool,
+    pub native: String,
+    pub target: String,
+    pub cursor: usize,
+    /// True while the create/raise request is in flight.
+    pub submitting: bool,
+}
+
+impl ManualOverlay {
+    pub fn closed() -> Self {
+        Self {
+            open: false,
+            native: String::new(),
+            target: String::new(),
+            cursor: 0,
+            submitting: false,
+        }
+    }
+
+    pub fn opened(native: String, target: String) -> Self {
+        Self {
+            open: true,
+            native,
+            target,
+            cursor: 0,
+            submitting: false,
+        }
+    }
+
+    /// Move the level cursor up/down (wrapping).
+    pub fn move_cursor(&mut self, down: bool) {
+        let n = MANUAL_LEVELS.len();
+        self.cursor = if down {
+            (self.cursor + 1) % n
+        } else {
+            (self.cursor + n - 1) % n
+        };
+    }
+
+    /// The selected CEFR level code (e.g. "B1").
+    pub fn level(&self) -> &'static str {
+        MANUAL_LEVELS[self.cursor.min(MANUAL_LEVELS.len() - 1)].0
+    }
+}
+
+/// The course-delete confirm overlay (`x` on the course home): type the target
+/// language code to permanently delete the course and everything tied to it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct DeleteOverlay {
+    pub open: bool,
+    pub course_id: String,
+    pub target_lang: String,
+    pub title: String,
+    pub input: String,
+    /// True while the delete request is in flight.
+    pub deleting: bool,
+}
+
+impl DeleteOverlay {
+    pub fn closed() -> Self {
+        Self {
+            open: false,
+            course_id: String::new(),
+            target_lang: String::new(),
+            title: String::new(),
+            input: String::new(),
+            deleting: false,
+        }
+    }
+
+    pub fn opened(course_id: String, target_lang: String, title: String) -> Self {
+        Self {
+            open: true,
+            course_id,
+            target_lang,
+            title,
+            input: String::new(),
+            deleting: false,
+        }
+    }
+
+    /// True once the typed input matches the target language code (the server
+    /// re-checks this, so it is a guard, not the trust boundary).
+    pub fn confirmed(&self) -> bool {
+        self.input.trim().eq_ignore_ascii_case(&self.target_lang)
+    }
+}
+
 // --- Rendering --------------------------------------------------------------
 
 /// A centered modal box sized to `w`×`h` (clamped to `area`), cleared first so
@@ -350,6 +452,141 @@ pub(crate) fn draw_accounts(
     );
 }
 
+/// Draw the manual-placement modal: the CEFR ladder with a warning that a
+/// self-selected level is a guess.
+pub(crate) fn draw_manual_placement(
+    frame: &mut Frame,
+    area: Rect,
+    overlay: &ManualOverlay,
+    p: &Palette,
+) {
+    let rect = modal_area(area, 52, MANUAL_LEVELS.len() as u16 + 8);
+    frame.render_widget(Clear, rect);
+    let block = modal_block("Pick your level", p);
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let chunks = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .split(inner);
+
+    let warning = Paragraph::new(Text::from(vec![
+        Line::default(),
+        Line::from(Span::styled(
+            "A guess is fine — the test is more accurate, and your level",
+            Style::default().fg(p.ink_soft),
+        )),
+        Line::from(Span::styled(
+            "adjusts as you learn. You can take the test anytime.",
+            Style::default().fg(p.ink_soft),
+        )),
+    ]))
+    .wrap(Wrap { trim: true });
+    frame.render_widget(warning, chunks[0]);
+
+    let mut lines: Vec<Line> = Vec::new();
+    for (i, (code, label)) in MANUAL_LEVELS.iter().enumerate() {
+        let focused = i == overlay.cursor;
+        let marker = if focused { "▌ " } else { "  " };
+        let style = if focused {
+            Style::default().fg(p.primary).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(p.ink)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(marker.to_string(), Style::default().fg(p.primary)),
+            Span::styled(format!("{code:<4}"), style),
+            Span::styled((*label).to_string(), Style::default().fg(p.ink_soft)),
+        ]));
+    }
+    frame.render_widget(Paragraph::new(Text::from(lines)), chunks[1]);
+
+    let hint = if overlay.submitting {
+        " setting up your course… "
+    } else {
+        " ↑/↓ move   enter start at this level   esc cancel "
+    };
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            hint,
+            Style::default().fg(p.ink_soft),
+        ))),
+        chunks[2],
+    );
+}
+
+/// Draw the course-delete confirm modal: what is lost + a code-to-confirm input.
+pub(crate) fn draw_delete_course(
+    frame: &mut Frame,
+    area: Rect,
+    overlay: &DeleteOverlay,
+    p: &Palette,
+) {
+    let rect = modal_area(area, 56, 12);
+    frame.render_widget(Clear, rect);
+    let block = modal_block("Delete course", p);
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let chunks = Layout::vertical([
+        Constraint::Fill(1),
+        Constraint::Length(2),
+        Constraint::Length(1),
+    ])
+    .split(inner);
+
+    let body = Paragraph::new(Text::from(vec![
+        Line::default(),
+        Line::from(Span::styled(
+            format!("Permanently delete {}?", overlay.title),
+            Style::default().fg(p.ink).add_modifier(Modifier::BOLD),
+        )),
+        Line::default(),
+        Line::from(Span::styled(
+            "This removes its vocabulary, grammar, classes, exams,",
+            Style::default().fg(p.ink_soft),
+        )),
+        Line::from(Span::styled(
+            "practice, generated audio, and progress. It cannot be undone.",
+            Style::default().fg(p.ink_soft),
+        )),
+    ]))
+    .wrap(Wrap { trim: true });
+    frame.render_widget(body, chunks[0]);
+
+    let confirm_line = Line::from(vec![
+        Span::styled("Type ", Style::default().fg(p.ink_soft)),
+        Span::styled(
+            overlay.target_lang.clone(),
+            Style::default().fg(p.primary).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" to confirm:  ", Style::default().fg(p.ink_soft)),
+        Span::styled(
+            format!("{}▏", overlay.input),
+            Style::default().fg(p.ink).add_modifier(Modifier::BOLD),
+        ),
+    ]);
+    frame.render_widget(Paragraph::new(confirm_line), chunks[1]);
+
+    let hint = if overlay.deleting {
+        " deleting… ".to_string()
+    } else if overlay.confirmed() {
+        " enter delete permanently   esc cancel ".to_string()
+    } else {
+        " esc cancel ".to_string()
+    };
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            hint,
+            Style::default().fg(p.ink_soft),
+        ))),
+        chunks[2],
+    );
+}
+
 // --- Key-help source (single source for the overlay) ------------------------
 
 /// The global keys available on (almost) every screen.
@@ -383,6 +620,7 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             ("e", "mock exam"),
             ("m", "memory graph"),
             ("s", "settings"),
+            ("x", "delete course"),
         ],
         View::ItemReview { .. } => vec![
             ("↑/↓ j/k", "move option"),
@@ -419,6 +657,7 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             ("tab", "switch column"),
             ("enter", "start placement"),
             ("m", "use my materials"),
+            ("l", "I know my level"),
         ],
         View::PlacementReview { .. } => vec![("↑/↓ 1-9", "answer"), ("PgUp/PgDn", "scroll")],
         View::PlacementResult { .. } => vec![("enter", "start course")],
