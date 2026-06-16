@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
         nativeLang: course.native,
         targetLang: course.target,
         curriculumId: curriculum.id,
+        // Welcome-wizard self-assessment ladder is a manual pick.
+        placementSource: 'MANUAL',
         ...(course.level && { currentLevel: course.level, startLevel: course.level }),
       },
       update: {},
