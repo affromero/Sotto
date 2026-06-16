@@ -20,26 +20,45 @@ interface Config {
 
 type InfraKey = keyof Config;
 
-const GROUPS: Array<{ title: string; fields: Array<{ key: InfraKey; label: string; placeholder: string }> }> = [
+const GROUPS: Array<{
+  title: string;
+  fields: Array<{ key: InfraKey; label: string; placeholder: string }>;
+}> = [
   {
     title: 'AI generation',
     fields: [
-      { key: 'aiProvider', label: 'Provider', placeholder: 'anthropic · openai · google · claude-code · local' },
+      {
+        key: 'aiProvider',
+        label: 'Provider',
+        placeholder: 'anthropic · openai · google · claude-code · local',
+      },
       { key: 'aiModel', label: 'Model', placeholder: 'blank for the provider default' },
-      { key: 'aiBaseUrl', label: 'Base URL', placeholder: 'http://localhost:11434/v1 (local only)' },
+      {
+        key: 'aiBaseUrl',
+        label: 'Base URL',
+        placeholder: 'http://localhost:11434/v1 (local only)',
+      },
     ],
   },
   {
     title: 'Text to speech',
     fields: [
-      { key: 'ttsProvider', label: 'Provider', placeholder: 'elevenlabs · openai · cartesia · kokoro' },
+      {
+        key: 'ttsProvider',
+        label: 'Provider',
+        placeholder: 'elevenlabs · openai · cartesia · kokoro',
+      },
       { key: 'ttsBaseUrl', label: 'Base URL', placeholder: 'local TTS endpoint (optional)' },
     ],
   },
   {
     title: 'Speech to text',
     fields: [
-      { key: 'sttProvider', label: 'Provider', placeholder: 'openai · deepgram · assemblyai · whisper' },
+      {
+        key: 'sttProvider',
+        label: 'Provider',
+        placeholder: 'openai · deepgram · assemblyai · whisper',
+      },
       { key: 'sttBaseUrl', label: 'Base URL', placeholder: 'local STT endpoint (optional)' },
     ],
   },
@@ -56,7 +75,8 @@ const GROUPS: Array<{ title: string; fields: Array<{ key: InfraKey; label: strin
 export default function SiteConfigPage() {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'resetting' | 'reset' | 'error'>('idle');
 
   useEffect(() => {
     fetch('/api/v1/admin/site-config')
@@ -70,17 +90,21 @@ export default function SiteConfigPage() {
 
   function setField(key: keyof Config, value: string | boolean | null) {
     setCfg((c) => (c ? { ...c, [key]: value } : c));
-    setStatus('idle');
+    setSaveStatus('idle');
+    setResetStatus('idle');
   }
 
   async function save() {
     if (!cfg) return;
-    setStatus('saving');
-    const infra = GROUPS.flatMap((g) => g.fields).reduce<Record<string, string | null>>((acc, f) => {
-      const v = (cfg[f.key] ?? '').toString().trim();
-      acc[f.key] = v === '' ? null : v;
-      return acc;
-    }, {});
+    setSaveStatus('saving');
+    const infra = GROUPS.flatMap((g) => g.fields).reduce<Record<string, string | null>>(
+      (acc, f) => {
+        const v = (cfg[f.key] ?? '').toString().trim();
+        acc[f.key] = v === '' ? null : v;
+        return acc;
+      },
+      {}
+    );
     try {
       const res = await fetch('/api/v1/admin/site-config', {
         method: 'PATCH',
@@ -88,9 +112,30 @@ export default function SiteConfigPage() {
         body: JSON.stringify(infra),
       });
       if (!res.ok) throw new Error('Failed to save');
-      setStatus('saved');
+      const data = (await res.json()) as Config;
+      setCfg(data);
+      setSaveStatus('saved');
+      setResetStatus('idle');
     } catch {
-      setStatus('error');
+      setSaveStatus('error');
+    }
+  }
+
+  async function resetToFactoryDefaults() {
+    const confirmed = confirm(
+      'Factory reset server settings? This clears only the admin infra overrides and falls back to environment defaults.'
+    );
+    if (!confirmed) return;
+    setResetStatus('resetting');
+    setSaveStatus('idle');
+    try {
+      const res = await fetch('/api/v1/admin/site-config', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to reset');
+      const data = (await res.json()) as Config;
+      setCfg(data);
+      setResetStatus('reset');
+    } catch {
+      setResetStatus('error');
     }
   }
 
@@ -128,12 +173,48 @@ export default function SiteConfigPage() {
       ))}
 
       <div className={styles.actions}>
-        <button type="button" className={styles.saveBtn} onClick={save} disabled={status === 'saving'}>
-          {status === 'saving' ? 'Saving...' : 'Save changes'}
+        <button
+          type="button"
+          className={styles.saveBtn}
+          onClick={save}
+          disabled={saveStatus === 'saving' || resetStatus === 'resetting'}
+        >
+          {saveStatus === 'saving' ? 'Saving...' : 'Save changes'}
         </button>
-        {status === 'saved' && <span className={`${styles.status} ${styles.statusSaved}`}>Saved</span>}
-        {status === 'error' && <span className={`${styles.status} ${styles.statusError}`}>Failed to save</span>}
+        {saveStatus === 'saved' && (
+          <span className={`${styles.status} ${styles.statusSaved}`}>Saved</span>
+        )}
+        {saveStatus === 'error' && (
+          <span className={`${styles.status} ${styles.statusError}`}>Failed to save</span>
+        )}
       </div>
+
+      <section className={styles.dangerZone} aria-labelledby="factory-reset-title">
+        <div>
+          <h2 id="factory-reset-title" className={styles.dangerTitle}>
+            Factory reset settings
+          </h2>
+          <p className={styles.dangerText}>
+            Clear all owner-set AI, speech, and storage overrides. Learner data, keys, and generated
+            lessons stay untouched.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={styles.resetBtn}
+          onClick={resetToFactoryDefaults}
+          disabled={resetStatus === 'resetting' || saveStatus === 'saving'}
+        >
+          {resetStatus === 'resetting' ? 'Resetting...' : 'Factory reset settings'}
+        </button>
+      </section>
+
+      {resetStatus === 'reset' && (
+        <span className={`${styles.status} ${styles.statusSaved}`}>Factory defaults restored</span>
+      )}
+      {resetStatus === 'error' && (
+        <span className={`${styles.status} ${styles.statusError}`}>Failed to reset settings</span>
+      )}
     </div>
   );
 }

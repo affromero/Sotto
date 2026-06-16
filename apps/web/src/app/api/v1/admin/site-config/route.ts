@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
-import { getSiteConfig, setSiteConfig } from '@/lib/site-config';
+import { getSiteConfig, resetSiteConfig, setSiteConfig } from '@/lib/site-config';
 import { siteConfigUpdateSchema } from '@/lib/validations';
 import { invalidateServerInfra } from '@/lib/server-config';
 import { errorResponse } from '@/lib/api-response';
@@ -28,6 +28,18 @@ export async function PATCH(request: NextRequest) {
   }
 
   await setSiteConfig(parsed.data, adminId);
+  invalidateServerInfra();
+  const updated = await getSiteConfig();
+  return NextResponse.json(updated);
+}
+
+export async function DELETE() {
+  const adminId = await requireAdmin();
+  if (!adminId) {
+    return errorResponse('Forbidden', 403);
+  }
+
+  await resetSiteConfig(adminId);
   invalidateServerInfra();
   const updated = await getSiteConfig();
   return NextResponse.json(updated);
