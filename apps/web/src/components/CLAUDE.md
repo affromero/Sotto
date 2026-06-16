@@ -24,6 +24,7 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 
 ### Learn Component Notes
 
+- `CourseClassHistory` / `WorkbookLink`: per-course saved class list on `/learn`, linking every class back to the web runner and worksheet. `WorkbookLink` keeps the worksheet visible on every device and relabels it for iPad/touch/Pencil as a progressive enhancement.
 - `CourseNotesPanel`: per-course official/enrolled-course notes affordance on `/learn`; lets learners paste notes or upload many note files, then saves through `/api/v1/courses/[courseId]/notes` so future class/practice generation and vocabulary extraction can adapt to the learner's real course material.
 - `LearningSelectionMenu`: right-click selection tray for guarded class/practice text. It lets learners add selected words, phrases, or sentences to focused practice, launch sentence practice, request pronunciation, or attach an optional image cue without exposing translation as the primary action.
 

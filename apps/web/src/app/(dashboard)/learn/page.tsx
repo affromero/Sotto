@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { CourseClassHistory } from '@/components/learn/CourseClassHistory';
 import { StartNextClass } from '@/components/learn/StartNextClass';
 import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
@@ -50,6 +51,22 @@ export default async function LearnPage() {
       activeClassId: true,
       pedagogy: true,
       curriculum: { select: { title: true } },
+      classes: {
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          id: true,
+          order: true,
+          status: true,
+          attempt: true,
+          sourceTitle: true,
+          createdAt: true,
+          submittedAt: true,
+          passedAt: true,
+          failedAt: true,
+          lesson: { select: { title: true, level: true } },
+          submission: { select: { overallScore: true, passed: true, submittedAt: true } },
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -191,6 +208,9 @@ export default async function LearnPage() {
                 </div>
                 <div className={styles.sourcedRow}>
                   <CourseNotesPanel courseId={course.id} />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <CourseClassHistory classes={course.classes} courseTitle={courseTitle} />
                 </div>
               </li>
             );
