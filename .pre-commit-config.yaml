@@ -1,6 +1,17 @@
 ---
-# Setup: uv sync && uv run pre-commit install --install-hooks
+# Setup: uv run pre-commit install --install-hooks
+#   (installs BOTH the pre-commit and pre-push hooks; see
+#   default_install_hook_types below). /worktree runs this on every worktree.
 # See https://pre-commit.com for more information
+#
+# Two tiers, mirroring CI (.github/workflows/sotto-ci.yml):
+#   pre-commit (fast, every commit): hygiene + lint-staged + tsc + cargo
+#     fmt --check + clippy -D warnings (cargo scoped to tui/ changes).
+#   pre-push (the full gate, every push): vitest + next build + cargo
+#     build --locked + cargo test. Heavy, run once per push.
+default_install_hook_types: [pre-commit, pre-push]
+# Unscoped hooks run on commit only; the push gate opts in via stages.
+default_stages: [pre-commit]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -21,6 +32,7 @@ repos:
 
   - repo: local
     hooks:
+      # --- pre-commit: fast checks on every commit ---
       - id: lint-staged
         name: lint-staged (eslint + prettier + sort-package-json)
         entry: npx lint-staged --allow-empty
@@ -32,5 +44,52 @@ repos:
         name: typecheck (tsc --noEmit)
         entry: npm run type-check
         language: system
+        always_run: true
+        pass_filenames: false
+
+      - id: cargo-fmt
+        name: cargo fmt --check (tui)
+        entry: bash -c 'cd tui && cargo fmt --check'
+        language: system
+        files: ^tui/
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy -D warnings (tui)
+        entry: bash -c 'cd tui && cargo clippy --all-targets -- -D warnings'
+        language: system
+        files: ^tui/
+        pass_filenames: false
+
+      # --- pre-push: the full CI-equivalent gate, run once per push ---
+      - id: web-test
+        name: vitest (web)
+        entry: npm run test --workspace=@sotto/web
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+
+      - id: web-build
+        name: next build (web)
+        entry: bash -c './scripts/run-with-env.sh npm run build'
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+
+      - id: cargo-build
+        name: cargo build --locked (tui)
+        entry: bash -c 'cd tui && cargo build --locked'
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+
+      - id: cargo-test
+        name: cargo test (tui)
+        entry: bash -c 'cd tui && cargo test'
+        language: system
+        stages: [pre-push]
         always_run: true
         pass_filenames: false
