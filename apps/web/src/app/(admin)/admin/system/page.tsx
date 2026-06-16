@@ -16,12 +16,6 @@ interface Tool {
 
 const TOOLS: Tool[] = [
   {
-    href: '/admin/health',
-    glyph: 'spark',
-    name: 'Services & health',
-    desc: 'Live database, Redis, storage, and provider reachability, plus env and OAuth config.',
-  },
-  {
     href: '/admin/queues',
     glyph: 'retry',
     name: 'Queues',
@@ -36,8 +30,8 @@ const TOOLS: Tool[] = [
   {
     href: '/admin/site-config',
     glyph: 'gear',
-    name: 'Site config',
-    desc: 'Infrastructure selection (AI / TTS / STT / storage) and sign-in access.',
+    name: 'Admin settings',
+    desc: 'Infrastructure selection for AI, speech, and storage, with factory reset.',
   },
   {
     href: '/admin/providers',
@@ -77,7 +71,7 @@ export default async function AdminSystemPage() {
       <div className={styles.adminHead}>
         <div>
           <h1>System</h1>
-          <div className={styles.ahSub}>Services, queues, content, and configuration</div>
+          <div className={styles.ahSub}>Queues, lessons, providers, and configuration</div>
         </div>
       </div>
 

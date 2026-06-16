@@ -77,6 +77,7 @@ export default function SiteConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [resetStatus, setResetStatus] = useState<'idle' | 'resetting' | 'reset' | 'error'>('idle');
+  const [resetBannerOpen, setResetBannerOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/v1/admin/site-config')
@@ -92,6 +93,7 @@ export default function SiteConfigPage() {
     setCfg((c) => (c ? { ...c, [key]: value } : c));
     setSaveStatus('idle');
     setResetStatus('idle');
+    setResetBannerOpen(false);
   }
 
   async function save() {
@@ -116,16 +118,13 @@ export default function SiteConfigPage() {
       setCfg(data);
       setSaveStatus('saved');
       setResetStatus('idle');
+      setResetBannerOpen(false);
     } catch {
       setSaveStatus('error');
     }
   }
 
   async function resetToFactoryDefaults() {
-    const confirmed = confirm(
-      'Factory reset server settings? This clears only the admin infra overrides and falls back to environment defaults.'
-    );
-    if (!confirmed) return;
     setResetStatus('resetting');
     setSaveStatus('idle');
     try {
@@ -134,9 +133,16 @@ export default function SiteConfigPage() {
       const data = (await res.json()) as Config;
       setCfg(data);
       setResetStatus('reset');
+      setResetBannerOpen(false);
     } catch {
       setResetStatus('error');
     }
+  }
+
+  function showResetBanner() {
+    setResetBannerOpen(true);
+    setResetStatus('idle');
+    setSaveStatus('idle');
   }
 
   if (loading || !cfg) return <div className={styles.container}>Loading...</div>;
@@ -144,12 +150,81 @@ export default function SiteConfigPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Site Config</h1>
+        <h1 className={styles.title}>Admin Settings</h1>
         <p className={styles.subtitle}>
           The same server settings the onboarding wizard sets, editable here. Changes take effect
           immediately. Leave a field blank to fall back to the environment variable.
         </p>
       </div>
+
+      <section className={styles.dangerZone} aria-labelledby="factory-reset-title">
+        <div>
+          <h2 id="factory-reset-title" className={styles.dangerTitle}>
+            Factory reset settings
+          </h2>
+          <p className={styles.dangerText}>
+            Reset Sotto back to environment-backed server settings. This only clears admin overrides
+            for AI, speech, and storage.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={styles.resetBtn}
+          onClick={showResetBanner}
+          disabled={resetStatus === 'resetting' || saveStatus === 'saving'}
+          aria-expanded={resetBannerOpen}
+        >
+          Factory reset settings
+        </button>
+      </section>
+
+      {resetBannerOpen && (
+        <section
+          className={styles.confirmBanner}
+          aria-labelledby="factory-reset-confirm-title"
+          aria-describedby="factory-reset-confirm-copy"
+        >
+          <div>
+            <h2 id="factory-reset-confirm-title" className={styles.confirmTitle}>
+              Confirm factory reset
+            </h2>
+            <p id="factory-reset-confirm-copy" className={styles.confirmText}>
+              This clears all owner-set provider and storage overrides, then Sotto falls back to the
+              matching environment variables. Learner profiles, courses, BYOK keys, generated
+              lessons, and media stay untouched.
+            </p>
+          </div>
+          <div className={styles.confirmActions}>
+            <button
+              type="button"
+              className={styles.confirmResetBtn}
+              onClick={resetToFactoryDefaults}
+              disabled={resetStatus === 'resetting'}
+            >
+              {resetStatus === 'resetting' ? 'Resetting...' : 'Reset admin settings'}
+            </button>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setResetBannerOpen(false)}
+              disabled={resetStatus === 'resetting'}
+            >
+              Cancel
+            </button>
+          </div>
+        </section>
+      )}
+
+      {resetStatus === 'reset' && (
+        <div className={`${styles.resultBanner} ${styles.resultSuccess}`} role="status">
+          Factory defaults restored. Sotto is now using environment-backed settings where available.
+        </div>
+      )}
+      {resetStatus === 'error' && (
+        <div className={`${styles.resultBanner} ${styles.resultError}`} role="status">
+          Failed to reset settings.
+        </div>
+      )}
 
       {GROUPS.map((group) => (
         <section key={group.title} className={styles.group}>
@@ -188,33 +263,6 @@ export default function SiteConfigPage() {
           <span className={`${styles.status} ${styles.statusError}`}>Failed to save</span>
         )}
       </div>
-
-      <section className={styles.dangerZone} aria-labelledby="factory-reset-title">
-        <div>
-          <h2 id="factory-reset-title" className={styles.dangerTitle}>
-            Factory reset settings
-          </h2>
-          <p className={styles.dangerText}>
-            Clear all owner-set AI, speech, and storage overrides. Learner data, keys, and generated
-            lessons stay untouched.
-          </p>
-        </div>
-        <button
-          type="button"
-          className={styles.resetBtn}
-          onClick={resetToFactoryDefaults}
-          disabled={resetStatus === 'resetting' || saveStatus === 'saving'}
-        >
-          {resetStatus === 'resetting' ? 'Resetting...' : 'Factory reset settings'}
-        </button>
-      </section>
-
-      {resetStatus === 'reset' && (
-        <span className={`${styles.status} ${styles.statusSaved}`}>Factory defaults restored</span>
-      )}
-      {resetStatus === 'error' && (
-        <span className={`${styles.status} ${styles.statusError}`}>Failed to reset settings</span>
-      )}
     </div>
   );
 }

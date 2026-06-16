@@ -37,6 +37,7 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Create')).not.toBeInTheDocument();
     expect(screen.queryByText('Voices')).not.toBeInTheDocument();
     expect(screen.queryByText('Library')).not.toBeInTheDocument();
+    expect(screen.queryByText('System Status')).not.toBeInTheDocument();
   });
 
   it('marks active link with aria-current for exact path match', () => {
