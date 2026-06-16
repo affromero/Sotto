@@ -183,6 +183,12 @@ describe('welcome hosted-demo mode', () => {
     await user.click(screen.getByRole('button', { name: /^Skip$/i }));
     await user.click(screen.getByRole('button', { name: /^Get started$/i }));
 
+    expect(await screen.findByText(/How Sotto works/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Setup progress/i)).not.toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /Get started/i }));
+
     expect(await screen.findByRole('heading', { name: /Who's learning/i })).toBeInTheDocument();
     expect(screen.getByText(/admin · first learner/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Setup progress/i)).toBeInTheDocument();
@@ -226,7 +232,7 @@ describe('welcome hosted-demo mode', () => {
   it('keeps the placement ladder to one selected rung', async () => {
     const user = userEvent.setup();
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=6&lang=de');
+    window.history.pushState({}, '', '/welcome?step=7&lang=de');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -802,7 +808,7 @@ describe('welcome hosted-demo mode', () => {
 
   it('supports design step deep-links without persisting hosted-demo state', async () => {
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=6&lang=es');
+    window.history.pushState({}, '', '/welcome?step=7&lang=es');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -816,7 +822,7 @@ describe('welcome hosted-demo mode', () => {
 
   it('links the sidebar logo back to home after entering the hosted demo setup', async () => {
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=1');
+    window.history.pushState({}, '', '/welcome?step=2');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -834,6 +840,8 @@ describe('welcome hosted-demo mode', () => {
 
     await user.click(screen.getByRole('button', { name: /^Skip$/i }));
     await user.click(screen.getByRole('button', { name: /^Get started$/i }));
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /Get started/i }));
     await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
     await user.click(screen.getByRole('button', { name: /Learn Italian/i }));
     await user.keyboard('{Enter}');
@@ -863,6 +871,8 @@ describe('welcome hosted-demo mode', () => {
 
     await user.click(screen.getByRole('button', { name: /^Skip$/i }));
     await user.click(screen.getByRole('button', { name: /^Get started$/i }));
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /Get started/i }));
     await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
     await user.click(screen.getByRole('button', { name: /Learn Italian/i }));
     await user.keyboard('{Enter}');
@@ -873,7 +883,7 @@ describe('welcome hosted-demo mode', () => {
       const raw = window.localStorage.getItem('sotto.onboarding.v1');
       expect(raw).not.toBeNull();
       expect(JSON.parse(raw ?? '{}')).toMatchObject({
-        step: 3,
+        step: 4,
         profileName: 'Learner',
         avatarSlug: 'capybara',
         language: 'it',
