@@ -102,6 +102,7 @@ export function StepReady({
   const ttsName = (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
   const sttName = (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
   const visualCueName = voice.visualCueProvider === 'pexels' ? 'Pexels cues' : 'Image cues off';
+  const contextSignalCount = sources.size + contextItems.length;
 
   function goHome() {
     router.push('/');
@@ -221,7 +222,7 @@ export function StepReady({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>08 ·</span> Ready
+        <span className={t.eyebrowIdx}>09 ·</span> Ready
       </div>
       <h1 className={t.title}>
         Welcome to your <em>{lang.native}</em>.
@@ -237,7 +238,7 @@ export function StepReady({
           <div className={c.courseTop}>
             <button
               className={`${c.courseLang} ${c.courseJump}`}
-              onClick={() => onJump(2)}
+              onClick={() => onJump(3)}
               title="Change language"
               type="button"
             >
@@ -246,7 +247,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.courseBadge} ${c.courseJump}`}
-              onClick={() => onJump(6)}
+              onClick={() => onJump(7)}
               title="Retake placement"
               type="button"
             >
@@ -265,15 +266,15 @@ export function StepReady({
             <div className={c.flTag}>First up · drawn from your context</div>
             <div className={c.flTitle}>&ldquo;{lessonTitle(lang.code)}&rdquo;</div>
             <div className={c.flSub}>
-              {sources.size} context source{sources.size > 1 ? 's' : ''} woven in · grammar gate
-              unlocks at 85% recall
+              {contextSignalCount} context signal{contextSignalCount === 1 ? '' : 's'} woven in ·
+              grammar gate unlocks at 85% recall
             </div>
           </div>
           <div className={c.courseStack}>
             <span className={c.csLabel}>{config.selfHosted ? 'Your stack' : 'Preview stack'}</span>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(3)}
+              onClick={() => onJump(4)}
               title="Change agent"
               type="button"
             >
@@ -282,7 +283,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(4)}
+              onClick={() => onJump(5)}
               title="Change pronunciation audio"
               type="button"
             >
@@ -291,7 +292,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(4)}
+              onClick={() => onJump(5)}
               title="Change voice"
               type="button"
             >
@@ -300,7 +301,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(4)}
+              onClick={() => onJump(5)}
               title="Change visual cue provider"
               type="button"
             >

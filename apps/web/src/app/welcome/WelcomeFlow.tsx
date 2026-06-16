@@ -15,6 +15,7 @@ import { StepAgent } from './steps/StepAgent';
 import { StepVoice } from './steps/StepVoice';
 import { StepContext } from './steps/StepContext';
 import { StepPlacement } from './steps/StepPlacement';
+import { StepContextReview } from './steps/StepContextReview';
 import { StepCompose } from './steps/StepCompose';
 import { StepReady } from './steps/StepReady';
 import { OnboardingThemeSwitch } from './OnboardingThemeSwitch';
@@ -469,13 +470,15 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                         ? contextItems.length > 0
                         : step === 7
                           ? !!level
-                          : false;
+                          : step === 8
+                            ? contextItems.length > 0 && !!level
+                            : false;
 
-        if (canAdvance && step < 8) {
+        if (canAdvance && step < 9) {
           e.preventDefault();
           go(step + 1);
         }
-      } else if (e.key === 'Escape' && step > 1 && step <= 8) {
+      } else if (e.key === 'Escape' && step > 1 && step <= 9) {
         e.preventDefault();
         go(step - 1);
       }
@@ -511,6 +514,22 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       if (prev.has(lvl)) return new Set();
       return new Set([lvl]);
     });
+  }
+
+  function selectPlacementLevel(lvl: CefrLevel) {
+    setUnderstood(new Set([lvl]));
+  }
+
+  function addContextItems(items: Array<Omit<ContextItem, 'id'>>) {
+    if (!items.length) return;
+    const stamp = Date.now();
+    setContextItems((prev) => [
+      ...prev,
+      ...items.map((item, index) => ({
+        ...item,
+        id: `ctx-${item.kind}-${stamp}-${prev.length + index}`,
+      })),
+    ]);
   }
 
   const flowState: FlowState = { baseLang, language };
@@ -593,6 +612,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           language={language}
           understood={understood}
           toggleUnderstood={toggleUnderstood}
+          selectPlacementLevel={selectPlacementLevel}
+          onAddContextItems={addContextItems}
           level={level}
           demoMode={demoMode}
           onNext={() => go(8)}
@@ -602,16 +623,28 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       break;
     case 8:
       stepView = (
-        <StepCompose
+        <StepContextReview
+          baseLang={baseLang}
+          language={language}
           level={level}
-          voice={voice}
-          demoMode={demoMode}
-          onDone={() => go(9)}
+          contextItems={contextItems}
+          onNext={() => go(9)}
           onBack={() => go(7)}
         />
       );
       break;
     case 9:
+      stepView = (
+        <StepCompose
+          level={level}
+          voice={voice}
+          demoMode={demoMode}
+          onDone={() => go(10)}
+          onBack={() => go(8)}
+        />
+      );
+      break;
+    case 10:
       stepView = (
         <StepReady
           baseLang={baseLang}

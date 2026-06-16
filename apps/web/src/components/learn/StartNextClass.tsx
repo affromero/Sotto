@@ -16,6 +16,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState('');
+  const buttonLabel = activeClassId ? 'Resume class' : 'Take a class';
 
   async function handleContinue() {
     setError('');
@@ -93,9 +94,9 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         type="button"
         className={styles.button}
         onClick={handleContinue}
-        aria-label="Continue to next class"
+        aria-label={activeClassId ? 'Resume active class' : 'Take a class at this level'}
       >
-        Continue
+        {buttonLabel}
       </button>
     </div>
   );

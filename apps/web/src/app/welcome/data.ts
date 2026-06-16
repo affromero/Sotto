@@ -1193,6 +1193,7 @@ export const STEPS = [
   'Voice & cues',
   'Grant context',
   'Placement',
+  'Teaching brief',
   'Compose',
   'Ready',
 ] as const;
@@ -1207,6 +1208,7 @@ export const WHISPERS: string[] = [
   'A voice and memory cues you choose, for listening, speaking, and practice.',
   "Tell me what you love. We'll learn the language for it.",
   "I'll meet you a half-step beyond where you stand.",
+  'Read the context like a teacher before the course is written.',
   'Every lesson, shaped to the things you care about.',
   "Step by step, you'll build fluency.",
 ];

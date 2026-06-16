@@ -52,38 +52,45 @@ const MATERIAL_TYPES: Array<{
   {
     id: 'link',
     label: 'Web links',
-    hint: 'pages, papers, videos',
+    hint: 'one URL per line: articles, papers, videos, docs',
     placeholder: 'https://example.com/paper\nhttps://youtube.com/watch?v=...',
     icon: 'link',
   },
   {
     id: 'book',
     label: 'Books',
-    hint: 'titles, authors, excerpts',
+    hint: 'titles, authors, chapters, or pasted excerpts',
     placeholder: 'Invisible Cities by Italo Calvino\nThe Design of Everyday Things',
     icon: 'book',
   },
   {
     id: 'article',
     label: 'Articles & news',
-    hint: 'newspapers, magazines, newsletters',
+    hint: 'publication names, article URLs, or newsletter topics',
     placeholder: 'The Economist: a story about public transit\nhttps://nytimes.com/...',
     icon: 'globe',
   },
   {
     id: 'music',
     label: 'Music & audio',
-    hint: 'songs, artists, podcasts',
+    hint: 'songs, artists, podcasts, speeches, interviews',
     placeholder: 'Caetano Veloso - Tigresa\nRadio Ambulante episodes about travel',
     icon: 'volume',
   },
   {
     id: 'topic',
     label: 'Topics',
-    hint: 'anything you care about',
-    placeholder: 'Bolognese food markets\nDistributed systems\nOpera history',
+    hint: 'work, hobbies, places, goals, people, situations',
+    placeholder: 'Bolognese food markets\nDistributed systems at work\nOpera history',
     icon: 'spark',
   },
+];
+
+const CONTEXT_PROMPTS = [
+  'Class notes, a syllabus, or the chapter you are studying now',
+  'A paragraph you can partly read, plus words you keep missing',
+  'Work, travel, family, or hobby situations you want to talk about',
+  'Articles, videos, podcasts, songs, or books you actually want in lessons',
 ];
 
 function normalizeUrl(value: string) {
@@ -265,8 +272,8 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
       </h1>
       <p className={t.lede}>
         {demoMode
-          ? 'This is the part that makes Sotto yours. In the hosted demo, added material stays in the browser so you can see how a course gets shaped without connecting anything.'
-          : 'This is the part that makes Sotto yours. Add links, books, articles, music, notes, topics, or files you want woven into the course.'}
+          ? 'Add at least one concrete source or topic. In the hosted demo, added material stays in the browser so you can see how a course gets shaped without connecting anything.'
+          : 'Add at least one concrete source or topic. Specific notes, links, titles, excerpts, and situations give Sotto better examples, vocabulary, and lesson topics.'}
       </p>
 
       <section className={c.contextDirect} aria-labelledby="direct-context-title">
@@ -276,13 +283,22 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
               Course material
             </div>
             <p className={c.contextDirectCopy}>
-              Add the specific things Sotto should draw from when it chooses examples, vocabulary,
-              and lesson topics.
+              Start with one exact thing: a class note, a syllabus line, an article URL, a book, a
+              song, a paragraph, or a situation you want to handle in the target language.
             </p>
           </div>
           <span className={c.contextDirectCount}>
-            {directCount > 0 ? `${directCount} added` : 'Optional'}
+            {directCount > 0 ? `${directCount} added` : 'Required'}
           </span>
+        </div>
+
+        <div className={c.contextGuide} aria-label="Good context examples">
+          <span className={c.contextGuideLabel}>Good inputs</span>
+          <ul className={c.contextGuideList}>
+            {CONTEXT_PROMPTS.map((prompt) => (
+              <li key={prompt}>{prompt}</li>
+            ))}
+          </ul>
         </div>
 
         <div className={c.materialTypeGroup} role="radiogroup" aria-label="Material type">
@@ -385,7 +401,7 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
 
       <div className={c.ctxTally}>
         {totalContext === 0 ? (
-          'Add at least one link, title, article, song, topic, or file. The richer the context, the better your course.'
+          'One context item is required. If you are unsure, add the textbook chapter, a URL, or three situations you want to practice.'
         ) : (
           <>
             Sotto will weave your course from{' '}

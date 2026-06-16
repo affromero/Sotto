@@ -11,6 +11,7 @@ import { WelcomeFlow } from '@/app/welcome/WelcomeFlow';
 import type { AgentState, ContextItem, VoiceState } from '@/app/welcome/WelcomeFlow';
 import { StepAgent } from '@/app/welcome/steps/StepAgent';
 import { StepContext } from '@/app/welcome/steps/StepContext';
+import { StepContextReview } from '@/app/welcome/steps/StepContextReview';
 import { StepLearnerProfile } from '@/app/welcome/steps/StepLearnerProfile';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
 import { StepReady } from '@/app/welcome/steps/StepReady';
@@ -88,7 +89,8 @@ describe('welcome hosted-demo mode', () => {
     window.history.pushState({}, '', '/welcome');
   });
 
-  it('keeps placement inside the welcome flow instead of linking to /learn', () => {
+  it('offers placement choices inside the welcome flow instead of linking to /learn', async () => {
+    const user = userEvent.setup();
     render(
       <StepPlacement
         baseLang="es"
@@ -104,8 +106,75 @@ describe('welcome hosted-demo mode', () => {
     expect(
       screen.queryByRole('link', { name: /take the full placement test/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Take the quick placement test/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload notes or material/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Choose my CEFR level/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Take the quick placement test/i }));
+
     expect(screen.getByText('Me llamo Luca.')).toBeInTheDocument();
     expect(screen.getByText(/Tap the highest sentence you fully understand/i)).toBeInTheDocument();
+  });
+
+  it('lets learners force a CEFR level from the welcome placement step', async () => {
+    const user = userEvent.setup();
+    const selectPlacementLevel = vi.fn();
+
+    render(
+      <StepPlacement
+        baseLang="en"
+        language="de"
+        understood={new Set()}
+        toggleUnderstood={vi.fn()}
+        selectPlacementLevel={selectPlacementLevel}
+        level={null}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Choose my CEFR level/i }));
+    await user.click(screen.getByRole('button', { name: /C1 Advanced/i }));
+
+    expect(selectPlacementLevel).toHaveBeenCalledWith('C1');
+  });
+
+  it('can estimate placement from uploaded or pasted material in demo mode', async () => {
+    const user = userEvent.setup();
+    const selectPlacementLevel = vi.fn();
+    const onAddContextItems = vi.fn();
+
+    render(
+      <StepPlacement
+        baseLang="en"
+        language="de"
+        understood={new Set()}
+        toggleUnderstood={vi.fn()}
+        selectPlacementLevel={selectPlacementLevel}
+        onAddContextItems={onAddContextItems}
+        level={null}
+        demoMode
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Upload notes or material/i }));
+    await user.type(
+      screen.getByLabelText(/Notes, lesson material, or writing sample/i),
+      'I can understand menus and short messages from my German class.'
+    );
+    await user.click(screen.getByRole('button', { name: /Estimate from material/i }));
+
+    expect(
+      await screen.findByText(/Demo estimate based on the amount of material/i)
+    ).toBeInTheDocument();
+    expect(selectPlacementLevel).toHaveBeenCalledWith('A1');
+    expect(onAddContextItems).toHaveBeenCalledWith([
+      expect.objectContaining({ kind: 'text', label: 'Placement notes' }),
+    ]);
   });
 
   it('explains the selected placement level so learners can skip the formal test', () => {
@@ -188,7 +257,7 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByRole('button', { name: /^Back$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Skip animation/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^Back$/i }));
+    await user.click(screen.getByRole('button', { name: /Back/i }));
     expect(await screen.findByText(/First launch/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^Skip$/i }));
@@ -514,6 +583,9 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
 
     expect(screen.getByText(/Course material/i)).toBeInTheDocument();
+    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(screen.getByText(/Class notes, a syllabus/i)).toBeInTheDocument();
+    expect(screen.queryByText('Optional')).not.toBeInTheDocument();
     expect(screen.getByText(/Text files are read locally/i)).toBeInTheDocument();
     expect(screen.queryByText(/Context permissions/i)).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Web links/i })).toHaveAttribute(
@@ -535,7 +607,7 @@ describe('welcome hosted-demo mode', () => {
     );
     await user.click(screen.getByRole('button', { name: /^Add material$/i }));
 
-    await user.click(screen.getByRole('radio', { name: /Topics/i }));
+    await user.click(screen.getByRole('radio', { name: /^Topics/i }));
     await user.type(
       screen.getByLabelText(/Material details/i),
       'cooking, distributed systems, and opera'
@@ -603,6 +675,50 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByText('Include')).not.toBeInTheDocument();
   });
 
+  it('shows a teacher-style brief from extracted context before composing', async () => {
+    const user = userEvent.setup();
+    const onNext = vi.fn();
+    const onBack = vi.fn();
+
+    render(
+      <StepContextReview
+        baseLang="en"
+        language="es"
+        level="B1"
+        contextItems={[
+          {
+            id: 'ctx-topic-1',
+            kind: 'topic',
+            label: 'Distributed systems',
+            value: 'distributed systems, incident reviews, and backend architecture',
+          },
+          {
+            id: 'ctx-music-1',
+            kind: 'music',
+            label: 'Radio Ambulante',
+            value: 'Radio Ambulante episodes about travel and work',
+          },
+        ]}
+        onNext={onNext}
+        onBack={onBack}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: /Review the teaching brief/i })).toBeInTheDocument();
+    expect(screen.getByText(/Teacher read/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/CEFR B1/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Distributed systems/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Radio Ambulante/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/independent practice/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/First lesson priorities/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Compose from this brief/i }));
+    expect(onNext).toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /Back/i }));
+    expect(onBack).toHaveBeenCalled();
+  });
+
   it('finishes the hosted demo without saving or navigating into the app', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn();
@@ -633,7 +749,7 @@ describe('welcome hosted-demo mode', () => {
     );
 
     await user.click(screen.getByTitle('Change language'));
-    expect(onJump).toHaveBeenCalledWith(2);
+    expect(onJump).toHaveBeenCalledWith(3);
 
     await user.click(screen.getByRole('button', { name: /finish demo/i }));
 
@@ -836,9 +952,25 @@ describe('welcome hosted-demo mode', () => {
 
     expect(await screen.findByText(/Where do you/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/placement test available/i)).toHaveTextContent(
-      /short adaptive test that places learners/i
+      /use this quick ladder, estimate from notes, or choose a CEFR level/i
     );
     expect(screen.getByText(/Estimated level/i).textContent).toContain('B1');
+    expect(window.localStorage.getItem('sotto.onboarding.v1')).toBeNull();
+  });
+
+  it('deep-links to the context brief before compose', async () => {
+    mockConfigFetch(false);
+    window.history.pushState({}, '', '/welcome?step=8&lang=es');
+
+    render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
+
+    expect(
+      await screen.findByRole('heading', { name: /Review the teaching brief/i })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/example.com/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Invisible Cities/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/CEFR B1/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Composing your course/i)).not.toBeInTheDocument();
     expect(window.localStorage.getItem('sotto.onboarding.v1')).toBeNull();
   });
 
