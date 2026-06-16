@@ -35,21 +35,27 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  min-height: 44px;
-  padding: 8px 14px;
-  background: transparent;
-  border: 1px dashed var(--line-strong, rgba(30, 33, 40, 0.24));
+  min-height: 58px;
+  padding: 9px 16px;
+  background: var(--paper, #f5f4f0);
+  border: 1px solid var(--line-strong, rgba(30, 33, 40, 0.24));
   border-radius: var(--r, 4px);
   cursor: pointer;
   text-align: left;
   transition:
     border-color 0.18s,
-    background 0.18s;
+    background 0.18s,
+    color 0.18s;
 }
 
 .opener:hover {
   border-color: var(--accent, #3f4fb0);
   background: var(--accent-soft, rgba(63, 79, 176, 0.1));
+}
+
+.opener:focus-visible {
+  outline: 2px solid var(--accent, #3f4fb0);
+  outline-offset: 2px;
 }
 
 .openerLede {
