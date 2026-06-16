@@ -35,6 +35,9 @@ function buildModelMeta(): ModelMeta {
       openai: opt(getProviderMeta('openai').models),
       cartesia: opt(getProviderMeta('cartesia').models),
       hume: opt(getProviderMeta('hume').models),
+      deepgram: opt(getProviderMeta('deepgram').models),
+      rime: opt(getProviderMeta('rime').models),
+      playht: opt(getProviderMeta('playht').models),
     },
     stt: {
       openai: opt(getSttProviderMeta('openai').models),

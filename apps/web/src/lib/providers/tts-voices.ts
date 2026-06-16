@@ -206,6 +206,41 @@ export function getLocalTtsVoicePool(): ProviderVoice[] {
 }
 
 // ---------------------------------------------------------------------------
+// Deepgram Aura-2 voices — the voice id IS the model (aura-2-{name}-{lang}).
+// English subset for episode generation (other languages via the voice-id suffix).
+// ---------------------------------------------------------------------------
+export const DEEPGRAM_AURA_VOICE_POOL: ProviderVoice[] = [
+  { id: 'aura-2-thalia-en', name: 'Thalia', gender: 'female', character: 'warm narrator' },
+  { id: 'aura-2-asteria-en', name: 'Asteria', gender: 'female', character: 'friendly conversationalist' },
+  { id: 'aura-2-athena-en', name: 'Athena', gender: 'female', character: 'articulate intellectual' },
+  { id: 'aura-2-hera-en', name: 'Hera', gender: 'female', character: 'confident presenter' },
+  { id: 'aura-2-zeus-en', name: 'Zeus', gender: 'male', character: 'authoritative expert' },
+  { id: 'aura-2-orion-en', name: 'Orion', gender: 'male', character: 'warm mentor' },
+  { id: 'aura-2-arcas-en', name: 'Arcas', gender: 'male', character: 'casual and curious' },
+  { id: 'aura-2-apollo-en', name: 'Apollo', gender: 'male', character: 'polished professional' },
+];
+
+// ---------------------------------------------------------------------------
+// Rime voices — cross-model speakers (work on arcana/coda). `speaker` field.
+// ---------------------------------------------------------------------------
+export const RIME_VOICE_POOL: ProviderVoice[] = [
+  { id: 'astra', name: 'Astra', gender: 'female', character: 'energetic conversationalist' },
+  { id: 'luna', name: 'Luna', gender: 'female', character: 'warm narrator' },
+  { id: 'celeste', name: 'Celeste', gender: 'female', character: 'friendly presenter' },
+  { id: 'masonry', name: 'Masonry', gender: 'male', character: 'authoritative expert' },
+  { id: 'albion', name: 'Albion', gender: 'male', character: 'warm mentor' },
+];
+
+// ---------------------------------------------------------------------------
+// PlayHT voices — S3 URI voice ids (documented Play3.0-mini examples). Discover
+// more via GET /api/v2/voices; the ids here are a stable curated starter pair.
+// ---------------------------------------------------------------------------
+export const PLAYHT_VOICE_POOL: ProviderVoice[] = [
+  { id: 's3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json', name: 'Charlotte', gender: 'female', character: 'warm narrator' },
+  { id: 's3://voice-cloning-zero-shot/831bd330-85c6-4333-b2b4-10c476ea3491/original/manifest.json', name: 'William', gender: 'male', character: 'authoritative expert' },
+];
+
+// ---------------------------------------------------------------------------
 // Provider → voice pool map (auto-populated, never needs manual updates)
 // ---------------------------------------------------------------------------
 
@@ -219,6 +254,9 @@ const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
   minimax: MINIMAX_VOICE_POOL,
   mistral: MISTRAL_VOICE_POOL,
   kokoro: KOKORO_VOICE_POOL,
+  deepgram: DEEPGRAM_AURA_VOICE_POOL,
+  rime: RIME_VOICE_POOL,
+  playht: PLAYHT_VOICE_POOL,
   local: LOCAL_TTS_VOICE_POOL,
 };
 

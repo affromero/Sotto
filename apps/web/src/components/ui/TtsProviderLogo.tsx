@@ -25,7 +25,9 @@ interface TtsProviderLogoProps {
     | 'speechmatics'
     | 'xai'
     | 'deepseek'
-    | 'nvidia';
+    | 'nvidia'
+    | 'rime'
+    | 'playht';
   size?: number;
   className?: string;
 }
@@ -273,6 +275,22 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           </text>
         </svg>
       );
+    case 'rime':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#111827" />
+          <text x="12" y="16" textAnchor="middle" fill="#A78BFA" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Ri
+          </text>
+        </svg>
+      );
+    case 'playht':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#FA5560" />
+          <path d="M9 7l8 5-8 5V7z" fill="#fff" />
+        </svg>
+      );
     case 'kokoro':
       return (
         <svg {...props}>
@@ -325,6 +343,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   xai: 'xAI Grok',
   deepseek: 'DeepSeek',
   nvidia: 'NVIDIA NIM',
+  rime: 'Rime',
+  playht: 'PlayHT',
 };
 
 /**
