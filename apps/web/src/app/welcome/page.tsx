@@ -35,6 +35,10 @@ function buildModelMeta(): ModelMeta {
       deepgram: opt(getSttProviderMeta('deepgram').models),
       assemblyai: opt(getSttProviderMeta('assemblyai').models),
       elevenlabs: opt(getSttProviderMeta('elevenlabs').models),
+      cartesia: opt(getSttProviderMeta('cartesia').models),
+      groq: opt(getSttProviderMeta('groq').models),
+      gladia: opt(getSttProviderMeta('gladia').models),
+      speechmatics: opt(getSttProviderMeta('speechmatics').models),
     },
   };
 }

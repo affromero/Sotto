@@ -157,8 +157,8 @@ export function resolveTts(
 
 /**
  * STT → backend. "whisper" and "local" are keyless local servers (infra + base URL);
- * "assembly" → assemblyai. ElevenLabs keys live in the TTS/BYOK store; every
- * other cloud STT key lives in the AI-key store (matching resolveSttProvider).
+ * "assembly" → assemblyai. ElevenLabs and Cartesia keys live in the TTS/BYOK store;
+ * every other cloud STT key lives in the AI-key store (matching resolveSttProvider).
  */
 export function resolveStt(
   sttId: string,
@@ -179,7 +179,7 @@ export function resolveStt(
   }
 
   const key = clean(apiKey);
-  const endpoint = resolvedId === 'elevenlabs' ? 'byok' : 'ai-keys';
+  const endpoint = resolvedId === 'elevenlabs' || resolvedId === 'cartesia' ? 'byok' : 'ai-keys';
   return {
     keyPost: key ? { endpoint, provider: resolvedId, apiKey: key } : null,
     preferredSttProvider: resolvedId,

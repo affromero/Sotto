@@ -8,6 +8,9 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
   together: { label: 'Together AI', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
   assemblyai: { label: 'AssemblyAI', shortLabel: 'AssemblyAI' },
+  groq: { label: 'Groq', shortLabel: 'Groq' },
+  gladia: { label: 'Gladia', shortLabel: 'Gladia' },
+  speechmatics: { label: 'Speechmatics', shortLabel: 'Speechmatics' },
 };
 
 export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
@@ -29,6 +32,10 @@ export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   together: { label: 'Together AI Whisper', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
   assemblyai: { label: 'AssemblyAI', shortLabel: 'AssemblyAI' },
+  cartesia: { label: 'Cartesia Ink', shortLabel: 'Ink' },
+  groq: { label: 'Groq Whisper', shortLabel: 'Groq' },
+  gladia: { label: 'Gladia', shortLabel: 'Gladia' },
+  speechmatics: { label: 'Speechmatics', shortLabel: 'Speechmatics' },
   local: { label: 'Local Whisper', shortLabel: 'Local' },
 };
 

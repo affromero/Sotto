@@ -19,7 +19,10 @@ interface TtsProviderLogoProps {
     | 'google'
     | 'together'
     | 'deepgram'
-    | 'assemblyai';
+    | 'assemblyai'
+    | 'groq'
+    | 'gladia'
+    | 'speechmatics';
   size?: number;
   className?: string;
 }
@@ -215,6 +218,33 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           </text>
         </svg>
       );
+    case 'groq':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#F55036" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Gq
+          </text>
+        </svg>
+      );
+    case 'gladia':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#5B21B6" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Gl
+          </text>
+        </svg>
+      );
+    case 'speechmatics':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#0B1F3A" />
+          <text x="12" y="16" textAnchor="middle" fill="#3DD6C4" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Sm
+          </text>
+        </svg>
+      );
     case 'kokoro':
       return (
         <svg {...props}>
@@ -261,6 +291,9 @@ const PROVIDER_NAMES: Record<string, string> = {
   together: 'Together AI',
   deepgram: 'Deepgram',
   assemblyai: 'AssemblyAI',
+  groq: 'Groq',
+  gladia: 'Gladia',
+  speechmatics: 'Speechmatics',
 };
 
 /**

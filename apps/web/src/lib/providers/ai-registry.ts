@@ -43,7 +43,7 @@ export function getPricetokenModelInfo(modelId: string): {
   };
 }
 
-export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'codex' | 'local' | 'together' | 'deepgram' | 'assemblyai';
+export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'codex' | 'local' | 'together' | 'deepgram' | 'assemblyai' | 'groq' | 'gladia' | 'speechmatics';
 
 export interface AiProviderAuthField {
   key: string;
@@ -275,6 +275,74 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     },
   },
 
+  // Groq — STT key store (Whisper). Promoted to a full LLM provider (models +
+  // client) alongside the other OpenAI-compatible LLMs; STT routes via stt.ts.
+  groq: {
+    id: 'groq',
+    displayName: 'Groq (STT)',
+    shortLabel: 'Groq',
+    defaultModel: '',
+    getApiKeyUrl: 'https://console.groq.com/keys',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  gladia: {
+    id: 'gladia',
+    displayName: 'Gladia (STT)',
+    shortLabel: 'Gladia',
+    defaultModel: '',
+    getApiKeyUrl: 'https://app.gladia.io/',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.gladia.io/v2/pre-recorded', {
+            headers: { 'x-gladia-key': creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  speechmatics: {
+    id: 'speechmatics',
+    displayName: 'Speechmatics (STT)',
+    shortLabel: 'Speechmatics',
+    defaultModel: '',
+    getApiKeyUrl: 'https://portal.speechmatics.com/',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://eu1.asr.api.speechmatics.com/v2/jobs', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
   google: {
     id: 'google',
     displayName: 'Google (Gemini)',
@@ -389,6 +457,9 @@ const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'code
   together: { description: 'Cheap Whisper STT at $0.0015/min', badge: 'optional' },
   deepgram: { description: 'Nova-3 STT — high accuracy with $200 free credits', badge: 'optional' },
   assemblyai: { description: 'Universal-2 STT — 99 languages with $50 free credits', badge: 'optional' },
+  groq: { description: 'Whisper STT — fastest and cheapest, plus Llama/GPT-OSS LLMs', badge: 'optional' },
+  gladia: { description: 'Solaria STT — 140 languages with accurate word timings', badge: 'optional' },
+  speechmatics: { description: 'Enhanced STT — enterprise accuracy across 80+ languages', badge: 'optional' },
 };
 
 /**
