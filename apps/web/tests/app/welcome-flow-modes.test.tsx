@@ -493,7 +493,7 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByText(/Endpoint changed/i)).toBeInTheDocument();
   });
 
-  it('adds direct links, notes, and uploaded files in the context step', async () => {
+  it('adds typed links, books, topics, and uploaded files in the context step', async () => {
     const user = userEvent.setup();
     let contextItems: ContextItem[] = [];
     const setContextItems = (updater: ContextItem[] | ((prev: ContextItem[]) => ContextItem[])) => {
@@ -501,8 +501,6 @@ describe('welcome hosted-demo mode', () => {
     };
     const renderStep = () => (
       <StepContext
-        sources={new Set()}
-        toggle={vi.fn()}
         contextItems={contextItems}
         setContextItems={setContextItems}
         demoMode={false}
@@ -515,19 +513,31 @@ describe('welcome hosted-demo mode', () => {
 
     expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
 
-    expect(screen.getByText(/Direct material/i)).toBeInTheDocument();
+    expect(screen.getByText(/Course material/i)).toBeInTheDocument();
     expect(screen.getByText(/Text files are read locally/i)).toBeInTheDocument();
-    expect(screen.getByText(/Context permissions/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Context permissions/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Web links/i })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
 
-    await user.type(screen.getByLabelText(/Links, notes, or topics/i), 'example.com/paper');
+    await user.type(screen.getByLabelText(/Material details/i), 'example.com/paper');
     await user.click(screen.getByRole('button', { name: /^Add material$/i }));
     rerender(renderStep());
 
     expect(screen.getByText('example.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
 
+    await user.click(screen.getByRole('radio', { name: /Books/i }));
     await user.type(
-      screen.getByLabelText(/Links, notes, or topics/i),
+      screen.getByLabelText(/Material details/i),
+      'Invisible Cities by Italo Calvino'
+    );
+    await user.click(screen.getByRole('button', { name: /^Add material$/i }));
+
+    await user.click(screen.getByRole('radio', { name: /Topics/i }));
+    await user.type(
+      screen.getByLabelText(/Material details/i),
       'cooking, distributed systems, and opera'
     );
     await user.click(screen.getByRole('button', { name: /^Add material$/i }));
@@ -543,7 +553,8 @@ describe('welcome hosted-demo mode', () => {
     await waitFor(() => {
       expect(contextItems.map((item) => item.kind)).toEqual([
         'link',
-        'text',
+        'book',
+        'topic',
         'file',
         'file',
         'file',
@@ -559,20 +570,17 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByText(/Added the first/i)).not.toBeInTheDocument();
   });
 
-  it('labels source selections as included context instead of opaque toggles', async () => {
+  it('adds music as concrete context instead of toggling opaque permissions', async () => {
     const user = userEvent.setup();
-    const selected = new Set<string>();
-    const toggle = vi.fn((id: string) => {
-      if (selected.has(id)) selected.delete(id);
-      else selected.add(id);
-    });
+    let contextItems: ContextItem[] = [];
+    const setContextItems = (updater: ContextItem[] | ((prev: ContextItem[]) => ContextItem[])) => {
+      contextItems = typeof updater === 'function' ? updater(contextItems) : updater;
+    };
 
     const renderStep = () => (
       <StepContext
-        sources={selected}
-        toggle={toggle}
-        contextItems={[]}
-        setContextItems={vi.fn()}
+        contextItems={contextItems}
+        setContextItems={setContextItems}
         demoMode={false}
         onNext={vi.fn()}
         onBack={vi.fn()}
@@ -581,21 +589,18 @@ describe('welcome hosted-demo mode', () => {
 
     const { rerender } = render(renderStep());
 
-    const reading = screen.getByRole('button', {
-      name: /include reading list context: articles and saved links/i,
-    });
-    expect(reading).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getAllByText('Include').length).toBeGreaterThan(0);
+    const music = screen.getByRole('radio', { name: /Music & audio/i });
+    expect(music).toHaveAttribute('aria-checked', 'false');
 
-    await user.click(reading);
+    await user.click(music);
+    expect(music).toHaveAttribute('aria-checked', 'true');
+    await user.type(screen.getByLabelText(/Material details/i), 'Radio Ambulante');
+    await user.click(screen.getByRole('button', { name: /^Add material$/i }));
     rerender(renderStep());
 
-    expect(
-      screen.getByRole('button', {
-        name: /remove reading list context: articles and saved links/i,
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Included')).toBeInTheDocument();
+    expect(contextItems[0]).toMatchObject({ kind: 'music', label: 'Radio Ambulante' });
+    expect(screen.getByText('music/audio')).toBeInTheDocument();
+    expect(screen.queryByText('Include')).not.toBeInTheDocument();
   });
 
   it('finishes the hosted demo without saving or navigating into the app', async () => {
@@ -658,13 +663,19 @@ describe('welcome hosted-demo mode', () => {
         baseLang="en"
         language="it"
         level="A2"
-        sources={new Set(['reading', 'repos'])}
+        sources={new Set()}
         contextItems={[
           {
             id: 'ctx-link-1',
             kind: 'link',
             label: 'example.com',
             value: 'https://example.com/paper',
+          },
+          {
+            id: 'ctx-book-1',
+            kind: 'book',
+            label: 'Invisible Cities',
+            value: 'Invisible Cities by Italo Calvino',
           },
         ]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
@@ -699,7 +710,10 @@ describe('welcome hosted-demo mode', () => {
       preferred: { language: 'it' },
     });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('https://example.com/paper');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('Allowed context sources:');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('[book] Invisible Cities');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).not.toContain(
+      'Allowed context sources:'
+    );
     expect(mockPush).toHaveBeenCalledWith('/learn');
   });
 

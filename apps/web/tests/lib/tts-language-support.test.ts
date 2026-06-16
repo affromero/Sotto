@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  getWelcomeSpeechProviderLanguageCount,
+  fromSttProviderLanguageCode,
   normalizeSottoLanguageCode,
   SOTTO_LANGUAGE_CODES,
+  supportsWelcomeSpeechProviderLanguage,
   toElevenLabsScribeLanguageCode,
+  toSttProviderLanguageCode,
 } from '@/lib/speech-language-support';
 import {
   supportsLanguage,
@@ -34,6 +38,59 @@ describe('speech language normalization', () => {
   it('maps Sotto language codes to ElevenLabs Scribe language codes', () => {
     expect(toElevenLabsScribeLanguageCode('es')).toBe('spa');
     expect(toElevenLabsScribeLanguageCode('en')).toBe('eng');
+  });
+
+  it('maps STT language codes to provider-specific API codes', () => {
+    expect(toSttProviderLanguageCode('cartesia', 'de-DE')).toBe('de');
+    expect(toSttProviderLanguageCode('elevenlabs', 'zh')).toBe('zho');
+    expect(toSttProviderLanguageCode('speechmatics', 'zh')).toBe('cmn');
+    expect(fromSttProviderLanguageCode('speechmatics', 'cmn')).toBe('zh');
+  });
+});
+
+describe('welcome STT provider language support', () => {
+  const visibleSttProviders = [
+    'whisper',
+    'local',
+    'deepgram',
+    'elevenlabs',
+    'assembly',
+    'openai',
+    'groq',
+    'cartesia',
+    'gladia',
+    'speechmatics',
+  ];
+
+  it('marks every visible STT provider ready for German when the provider has full support', () => {
+    for (const providerId of visibleSttProviders) {
+      expect(supportsWelcomeSpeechProviderLanguage('stt', providerId, 'de')).toBe(true);
+      expect(getWelcomeSpeechProviderLanguageCount('stt', providerId)).toBeGreaterThan(0);
+    }
+  });
+
+  it('does not mark unknown STT providers ready for a selected language', () => {
+    expect(supportsWelcomeSpeechProviderLanguage('stt', 'unknown-provider', 'de')).toBe(false);
+  });
+});
+
+describe('welcome TTS provider language support', () => {
+  it('marks visible TTS providers ready for German only when their configured pack supports it', () => {
+    for (const providerId of [
+      'elevenlabs',
+      'hume',
+      'openai',
+      'cartesia',
+      'deepgram',
+      'rime',
+      'playht',
+      'local',
+    ]) {
+      expect(supportsWelcomeSpeechProviderLanguage('tts', providerId, 'de')).toBe(true);
+      expect(getWelcomeSpeechProviderLanguageCount('tts', providerId)).toBeGreaterThan(0);
+    }
+
+    expect(supportsWelcomeSpeechProviderLanguage('tts', 'kokoro', 'de')).toBe(false);
   });
 });
 

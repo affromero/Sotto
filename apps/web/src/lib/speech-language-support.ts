@@ -6,204 +6,121 @@
  * individual workers or UI components.
  */
 
-export const SOTTO_LANGUAGE_CODES = new Set([
-  'en',
-  'es',
-  'fr',
-  'de',
-  'pt',
-  'it',
-  'ja',
-  'ko',
-  'zh',
-  'ar',
-  'hi',
-  'ru',
-  'nl',
-  'sv',
-  'pl',
-  'tr',
-  'da',
-  'fi',
-  'no',
-  'cs',
-  'ro',
-  'hu',
-  'el',
-  'he',
-  'th',
-  'vi',
-  'id',
-  'ms',
-  'uk',
-  'ca',
-]);
+import speechLanguageSupportConfig from './speech-language-support.config.json';
 
-export const TTS_LANGUAGE_SUPPORT_SETS = {
-  all: SOTTO_LANGUAGE_CODES,
-  en: new Set(['en']),
-  elevenLabsMultilingualV2: new Set([
-    'en',
-    'es',
-    'fr',
-    'de',
-    'pt',
-    'it',
-    'ja',
-    'ko',
-    'zh',
-    'ar',
-    'hi',
-    'ru',
-    'nl',
-    'sv',
-    'pl',
-    'tr',
-    'da',
-    'fi',
-    'cs',
-    'ro',
-    'hu',
-    'el',
-    'id',
-    'ms',
-  ]),
-  elevenLabsFlash: new Set([
-    'en',
-    'es',
-    'fr',
-    'de',
-    'pt',
-    'it',
-    'ja',
-    'ko',
-    'zh',
-    'ar',
-    'hi',
-    'ru',
-    'nl',
-    'sv',
-    'pl',
-    'tr',
-    'da',
-    'fi',
-    'no',
-    'cs',
-    'ro',
-    'hu',
-    'el',
-    'he',
-    'vi',
-    'id',
-    'ms',
-  ]),
-  cartesiaSonic3: new Set([
-    'en',
-    'es',
-    'fr',
-    'de',
-    'pt',
-    'it',
-    'ja',
-    'ko',
-    'zh',
-    'ar',
-    'hi',
-    'ru',
-    'nl',
-    'sv',
-    'pl',
-    'tr',
-    'da',
-    'fi',
-    'no',
-    'cs',
-    'ro',
-    'hu',
-    'el',
-    'he',
-    'th',
-    'vi',
-    'id',
-    'ms',
-  ]),
-  cartesiaTurbo: new Set([
-    'en',
-    'es',
-    'fr',
-    'de',
-    'pt',
-    'it',
-    'ja',
-    'ko',
-    'zh',
-    'ar',
-    'hi',
-    'ru',
-    'nl',
-    'sv',
-    'pl',
-  ]),
-  humeV2: new Set(['en', 'es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'zh', 'hi', 'ru']),
-  humeV1: new Set(['en', 'es']),
-  qwen3: new Set(['en', 'es', 'fr', 'de', 'ja', 'ko', 'zh', 'it', 'pt', 'ru']),
-  mistral: new Set(['en', 'es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'zh']),
-  inworld: new Set(['en', 'es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'zh', 'ar', 'hi', 'ru', 'nl', 'sv', 'pl']),
-  kokoro: new Set(['en', 'es', 'fr', 'hi', 'it', 'pt', 'ja', 'zh']),
-} satisfies Record<string, ReadonlySet<string>>;
+type LanguageSupportSection = Record<string, readonly string[]>;
+type WelcomeProviderSupportSection = Record<string, string>;
 
-export const STT_LANGUAGE_SUPPORT_SETS = {
-  all: SOTTO_LANGUAGE_CODES,
-  deepgramNova2: new Set([
-    'en',
-    'es',
-    'fr',
-    'de',
-    'pt',
-    'it',
-    'ja',
-    'ko',
-    'zh',
-    'hi',
-    'ru',
-    'nl',
-    'sv',
-    'pl',
-    'tr',
-    'da',
-    'fi',
-    'no',
-    'cs',
-    'hu',
-    'el',
-    'th',
-    'vi',
-    'id',
-    'ms',
-    'uk',
-    'ca',
-  ]),
-} satisfies Record<string, ReadonlySet<string>>;
+function validateLanguageList(
+  path: string,
+  languages: readonly string[],
+  knownLanguages?: ReadonlySet<string>
+): string[] {
+  const seen = new Set<string>();
+  for (const language of languages) {
+    if (seen.has(language)) {
+      throw new Error(`Duplicate language "${language}" in ${path}.`);
+    }
+    if (knownLanguages && !knownLanguages.has(language)) {
+      throw new Error(
+        `Unknown language "${language}" in ${path}. Add it to sottoLanguageCodes first.`
+      );
+    }
+    seen.add(language);
+  }
+  return [...seen];
+}
 
-export const WELCOME_TTS_PROVIDER_LANGUAGE_SUPPORT: Record<string, ReadonlySet<string>> = {
-  elevenlabs: TTS_LANGUAGE_SUPPORT_SETS.all,
-  hume: TTS_LANGUAGE_SUPPORT_SETS.humeV2,
-  openai: TTS_LANGUAGE_SUPPORT_SETS.all,
-  cartesia: TTS_LANGUAGE_SUPPORT_SETS.cartesiaSonic3,
-  kokoro: TTS_LANGUAGE_SUPPORT_SETS.kokoro,
-  local: TTS_LANGUAGE_SUPPORT_SETS.all,
-};
+function buildLanguageSupportSets(
+  path: string,
+  configuredSets: LanguageSupportSection,
+  seedSets: Record<string, ReadonlySet<string>> = {}
+): Record<string, ReadonlySet<string>> {
+  const sets: Record<string, ReadonlySet<string>> = {
+    all: SOTTO_LANGUAGE_CODES,
+    ...seedSets,
+  };
 
-export const WELCOME_STT_PROVIDER_LANGUAGE_SUPPORT: Record<string, ReadonlySet<string>> = {
-  whisper: STT_LANGUAGE_SUPPORT_SETS.all,
-  local: STT_LANGUAGE_SUPPORT_SETS.all,
-  deepgram: STT_LANGUAGE_SUPPORT_SETS.all,
-  elevenlabs: STT_LANGUAGE_SUPPORT_SETS.all,
-  assembly: STT_LANGUAGE_SUPPORT_SETS.all,
-  assemblyai: STT_LANGUAGE_SUPPORT_SETS.all,
-  openai: STT_LANGUAGE_SUPPORT_SETS.all,
-  together: STT_LANGUAGE_SUPPORT_SETS.all,
-};
+  for (const [name, languages] of Object.entries(configuredSets)) {
+    if (sets[name]) {
+      throw new Error(`Language support set "${name}" in ${path} conflicts with a built-in set.`);
+    }
+    sets[name] = new Set(validateLanguageList(`${path}.${name}`, languages, SOTTO_LANGUAGE_CODES));
+  }
+
+  return sets;
+}
+
+function buildWelcomeProviderLanguageSupport(
+  path: string,
+  configuredProviders: WelcomeProviderSupportSection,
+  supportSets: Record<string, ReadonlySet<string>>
+): Record<string, ReadonlySet<string>> {
+  const result: Record<string, ReadonlySet<string>> = {};
+
+  for (const [providerId, setName] of Object.entries(configuredProviders)) {
+    const set = supportSets[setName];
+    if (!set) {
+      throw new Error(`Unknown language support set "${setName}" for ${path}.${providerId}.`);
+    }
+    result[providerId] = set;
+  }
+
+  return result;
+}
+
+function validateAliasMap(path: string, aliases: Record<string, string>): Record<string, string> {
+  for (const [alias, sottoCode] of Object.entries(aliases)) {
+    if (!SOTTO_LANGUAGE_CODES.has(sottoCode)) {
+      throw new Error(`Unknown Sotto language "${sottoCode}" for ${path}.${alias}.`);
+    }
+  }
+  return aliases;
+}
+
+function validateProviderLanguageCodeOverrides(
+  path: string,
+  overrides: Record<string, Record<string, string>>
+): Record<string, Record<string, string>> {
+  for (const [providerId, providerOverrides] of Object.entries(overrides)) {
+    for (const [sottoCode, providerCode] of Object.entries(providerOverrides)) {
+      if (!SOTTO_LANGUAGE_CODES.has(sottoCode)) {
+        throw new Error(`Unknown Sotto language "${sottoCode}" for ${path}.${providerId}.`);
+      }
+      if (!providerCode.trim()) {
+        throw new Error(`Empty provider language code for ${path}.${providerId}.${sottoCode}.`);
+      }
+    }
+  }
+  return overrides;
+}
+
+export const SOTTO_LANGUAGE_CODES = new Set(
+  validateLanguageList('sottoLanguageCodes', speechLanguageSupportConfig.sottoLanguageCodes)
+);
+
+export const TTS_LANGUAGE_SUPPORT_SETS = buildLanguageSupportSets(
+  'ttsLanguageSupport',
+  speechLanguageSupportConfig.ttsLanguageSupport,
+  { en: new Set(['en']) }
+);
+
+export const STT_LANGUAGE_SUPPORT_SETS = buildLanguageSupportSets(
+  'sttLanguageSupport',
+  speechLanguageSupportConfig.sttLanguageSupport
+);
+
+export const WELCOME_TTS_PROVIDER_LANGUAGE_SUPPORT = buildWelcomeProviderLanguageSupport(
+  'welcomeProviderLanguageSupport.tts',
+  speechLanguageSupportConfig.welcomeProviderLanguageSupport.tts,
+  TTS_LANGUAGE_SUPPORT_SETS
+);
+
+export const WELCOME_STT_PROVIDER_LANGUAGE_SUPPORT = buildWelcomeProviderLanguageSupport(
+  'welcomeProviderLanguageSupport.stt',
+  speechLanguageSupportConfig.welcomeProviderLanguageSupport.stt,
+  STT_LANGUAGE_SUPPORT_SETS
+);
 
 const ISO_639_1_TO_639_3: Record<string, string> = {
   ar: 'ara',
@@ -238,8 +155,16 @@ const ISO_639_1_TO_639_3: Record<string, string> = {
   zh: 'zho',
 };
 
-const ISO_639_3_TO_639_1 = Object.fromEntries(
-  Object.entries(ISO_639_1_TO_639_3).map(([alpha2, alpha3]) => [alpha3, alpha2])
+const ISO_639_3_TO_639_1: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(ISO_639_1_TO_639_3).map(([alpha2, alpha3]) => [alpha3, alpha2])
+  ),
+  ...validateAliasMap('languageAliasesToSotto', speechLanguageSupportConfig.languageAliasesToSotto),
+};
+
+const STT_PROVIDER_LANGUAGE_CODE_OVERRIDES = validateProviderLanguageCodeOverrides(
+  'sttProviderLanguageCodeOverrides',
+  speechLanguageSupportConfig.sttProviderLanguageCodeOverrides
 );
 
 const LANGUAGE_NAME_TO_639_1: Record<string, string> = {
@@ -297,9 +222,10 @@ export function toSttProviderLanguageCode(
 ): string | undefined {
   const normalized = normalizeSottoLanguageCode(language);
   if (!normalized) return undefined;
-  return providerId === 'elevenlabs'
-    ? toElevenLabsScribeLanguageCode(normalized)
-    : normalized;
+  if (providerId === 'elevenlabs') {
+    return toElevenLabsScribeLanguageCode(normalized);
+  }
+  return STT_PROVIDER_LANGUAGE_CODE_OVERRIDES[providerId]?.[normalized] ?? normalized;
 }
 
 export function fromSttProviderLanguageCode(

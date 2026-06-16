@@ -16,13 +16,15 @@
     "dev": "scripts/run-with-env.sh npm run dev --workspace=@sotto/web",
     "dev:web": "scripts/run-with-env.sh npm run dev:web --workspace=@sotto/web",
     "dev:workers": "scripts/run-with-env.sh npm run dev:workers --workspace=@sotto/web",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,jsonc,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,jsonc,md}\"",
     "gen:openapi": "npm run -w @sotto/shared gen:openapi",
     "lint": "npm run lint --workspace=@sotto/web",
     "lint:fix": "npm run lint:fix --workspace=@sotto/web",
     "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",
     "smoke:audio-providers": "npm run smoke:audio-providers --workspace=@sotto/web",
+    "speech:config": "npm run speech:config --workspace=@sotto/web",
+    "speech:config:check": "npm run speech:config:check --workspace=@sotto/web",
     "start": "npm run start --workspace=@sotto/web",
     "start:workers": "npm run start:workers --workspace=@sotto/web",
     "test": "npm run test --workspace=@sotto/web",
@@ -36,7 +38,7 @@
     "*.{ts,tsx}": [
       "eslint --config apps/web/eslint.config.mjs --fix --max-warnings 0"
     ],
-    "*.{ts,tsx,js,jsx,json,md,css,yaml,yml}": [
+    "*.{ts,tsx,js,jsx,json,jsonc,md,css,yaml,yml}": [
       "prettier --write"
     ],
     "package.json": [

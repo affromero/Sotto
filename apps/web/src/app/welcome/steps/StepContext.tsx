@@ -8,15 +8,13 @@ import {
   type FormEvent,
   type SetStateAction,
 } from 'react';
-import { SOURCES, iconFor } from '../data';
+import type { GlyphName } from '@/components/Glyph';
 import { Glyph } from '../Glyph';
-import type { ContextItem } from '../WelcomeFlow';
+import type { ContextItem, ContextItemKind } from '../WelcomeFlow';
 import t from '../theme.module.css';
 import c from '../components.module.css';
 
 interface Props {
-  sources: Set<string>;
-  toggle: (id: string) => void;
   contextItems: ContextItem[];
   setContextItems: Dispatch<SetStateAction<ContextItem[]>>;
   demoMode: boolean;
@@ -42,6 +40,52 @@ const TEXT_FILE_EXTENSIONS = new Set([
   'yml',
 ]);
 
+type MaterialEntryKind = 'link' | 'book' | 'article' | 'music' | 'topic';
+
+const MATERIAL_TYPES: Array<{
+  id: MaterialEntryKind;
+  label: string;
+  hint: string;
+  placeholder: string;
+  icon: GlyphName;
+}> = [
+  {
+    id: 'link',
+    label: 'Web links',
+    hint: 'pages, papers, videos',
+    placeholder: 'https://example.com/paper\nhttps://youtube.com/watch?v=...',
+    icon: 'link',
+  },
+  {
+    id: 'book',
+    label: 'Books',
+    hint: 'titles, authors, excerpts',
+    placeholder: 'Invisible Cities by Italo Calvino\nThe Design of Everyday Things',
+    icon: 'book',
+  },
+  {
+    id: 'article',
+    label: 'Articles & news',
+    hint: 'newspapers, magazines, newsletters',
+    placeholder: 'The Economist: a story about public transit\nhttps://nytimes.com/...',
+    icon: 'globe',
+  },
+  {
+    id: 'music',
+    label: 'Music & audio',
+    hint: 'songs, artists, podcasts',
+    placeholder: 'Caetano Veloso - Tigresa\nRadio Ambulante episodes about travel',
+    icon: 'volume',
+  },
+  {
+    id: 'topic',
+    label: 'Topics',
+    hint: 'anything you care about',
+    placeholder: 'Bolognese food markets\nDistributed systems\nOpera history',
+    icon: 'spark',
+  },
+];
+
 function normalizeUrl(value: string) {
   const trimmed = value.trim();
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
@@ -65,6 +109,33 @@ function labelForLink(value: string) {
   } catch {
     return 'Link';
   }
+}
+
+function compactLabel(value: string) {
+  const oneLine = value.replace(/\s+/g, ' ').trim();
+  return oneLine.length > 58 ? `${oneLine.slice(0, 55).trim()}...` : oneLine;
+}
+
+function labelForMaterial(kind: MaterialEntryKind, value: string) {
+  if (kind === 'link') return isLikelyUrl(value) ? labelForLink(normalizeUrl(value)) : 'Web link';
+  if (kind === 'article') {
+    return isLikelyUrl(value) ? labelForLink(normalizeUrl(value)) : compactLabel(value);
+  }
+  return compactLabel(value);
+}
+
+function valueForMaterial(kind: MaterialEntryKind, value: string) {
+  if ((kind === 'link' || kind === 'article') && isLikelyUrl(value)) {
+    return normalizeUrl(value);
+  }
+  return value;
+}
+
+function displayKind(kind: ContextItemKind) {
+  if (kind === 'article') return 'article/news';
+  if (kind === 'music') return 'music/audio';
+  if (kind === 'text') return 'note';
+  return kind;
 }
 
 function preview(value: string) {
@@ -111,22 +182,16 @@ async function contextItemFromFile(file: File): Promise<Omit<ContextItem, 'id'>>
   };
 }
 
-export function StepContext({
-  sources,
-  toggle,
-  contextItems,
-  setContextItems,
-  demoMode,
-  onNext,
-  onBack,
-}: Props) {
-  const n = sources.size;
+export function StepContext({ contextItems, setContextItems, demoMode, onNext, onBack }: Props) {
   const directCount = contextItems.length;
-  const totalContext = n + directCount;
+  const totalContext = directCount;
+  const [entryKind, setEntryKind] = useState<MaterialEntryKind>('link');
   const [entry, setEntry] = useState('');
   const [fileError, setFileError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedMaterial =
+    MATERIAL_TYPES.find((type) => type.id === entryKind) ?? MATERIAL_TYPES[0];
 
   function addContextItems(items: Array<Omit<ContextItem, 'id'>>) {
     if (!items.length) return;
@@ -151,11 +216,8 @@ export function StepContext({
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        if (isLikelyUrl(line)) {
-          const value = normalizeUrl(line);
-          return { kind: 'link', label: labelForLink(value), value };
-        }
-        return { kind: 'text', label: 'Note/topic', value: line };
+        const value = valueForMaterial(entryKind, line);
+        return { kind: entryKind, label: labelForMaterial(entryKind, line), value };
       });
 
     addContextItems(directItems);
@@ -203,18 +265,19 @@ export function StepContext({
       </h1>
       <p className={t.lede}>
         {demoMode
-          ? 'This is the part that makes Sotto yours. In the hosted demo, these are mock context signals so you can see how a course gets shaped without connecting anything.'
-          : 'This is the part that makes Sotto yours. Choose what the agent may read, then add any links, notes, topics, or files you want woven into the course.'}
+          ? 'This is the part that makes Sotto yours. In the hosted demo, added material stays in the browser so you can see how a course gets shaped without connecting anything.'
+          : 'This is the part that makes Sotto yours. Add links, books, articles, music, notes, topics, or files you want woven into the course.'}
       </p>
 
       <section className={c.contextDirect} aria-labelledby="direct-context-title">
         <div className={c.contextDirectHead}>
           <div>
             <div id="direct-context-title" className={c.contextDirectLabel}>
-              Direct material
+              Course material
             </div>
             <p className={c.contextDirectCopy}>
-              Links, notes, topics, and text files become lesson seeds for the first course.
+              Add the specific things Sotto should draw from when it chooses examples, vocabulary,
+              and lesson topics.
             </p>
           </div>
           <span className={c.contextDirectCount}>
@@ -222,22 +285,45 @@ export function StepContext({
           </span>
         </div>
 
+        <div className={c.materialTypeGroup} role="radiogroup" aria-label="Material type">
+          {MATERIAL_TYPES.map((type) => {
+            const selected = entryKind === type.id;
+            return (
+              <button
+                key={type.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                className={`${c.materialType} ${selected ? c.materialTypeOn : ''}`}
+                onClick={() => setEntryKind(type.id)}
+              >
+                <span className={c.materialTypeIcon} aria-hidden="true">
+                  <Glyph name={type.icon} size={16} />
+                </span>
+                <span className={c.materialTypeText}>
+                  <span className={c.materialTypeLabel}>{type.label}</span>
+                  <span className={c.materialTypeHint}>{type.hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         <form className={c.contextEntry} onSubmit={submitEntry}>
           <label className={c.contextTextLabel} htmlFor="context-entry">
-            Links, notes, or topics
+            Material details
           </label>
+          <div className={c.contextSelectedHint}>{selectedMaterial.hint}</div>
           <div className={c.contextEntryGrid}>
             <span className={c.contextBarIcon} aria-hidden="true">
-              <Glyph name="link" size={18} />
+              <Glyph name={selectedMaterial.icon} size={18} />
             </span>
             <textarea
               id="context-entry"
               className={c.contextInput}
               value={entry}
               onChange={(event) => setEntry(event.currentTarget.value)}
-              placeholder={
-                'https://example.com/paper\nCooking verbs for Emilia-Romagna\nLecture notes from Monday'
-              }
+              placeholder={selectedMaterial.placeholder}
               rows={3}
             />
             <button className={c.contextAdd} type="submit" disabled={!entry.trim()}>
@@ -278,7 +364,7 @@ export function StepContext({
         <div className={c.contextItems} aria-label="Added context">
           {contextItems.map((item) => (
             <div key={item.id} className={c.contextItem}>
-              <span className={c.contextKind}>{item.kind}</span>
+              <span className={c.contextKind}>{displayKind(item.kind)}</span>
               <div className={c.contextItemText}>
                 <span className={c.contextItemLabel}>{item.label}</span>
                 <span className={c.contextItemPreview}>{preview(item.value)}</span>
@@ -297,46 +383,9 @@ export function StepContext({
       ) : null}
       {fileError ? <div className={c.contextNotice}>{fileError}</div> : null}
 
-      <div className={c.sourceIntro}>
-        <span className={c.sourceIntroLabel}>Context permissions</span>
-        <span>These categories tell Sotto what it may use when it shapes lesson topics.</span>
-      </div>
-
-      <div className={c.sourceList}>
-        {SOURCES.map((s) => {
-          const on = sources.has(s.id);
-          const sourceAction = on ? 'Included' : 'Include';
-          return (
-            <button
-              key={s.id}
-              type="button"
-              className={`${c.sourceRow} ${on ? c.sourceRowOn : ''}`}
-              onClick={() => toggle(s.id)}
-              aria-pressed={on}
-              aria-label={`${on ? 'Remove' : 'Include'} ${s.label} context: ${s.meta}`}
-            >
-              <span className={c.sico}>
-                <Glyph name={iconFor(s.id)} size={20} />
-              </span>
-              <div>
-                <div className={c.stop}>
-                  <span className={c.slabel}>{s.label}</span>
-                  <span className={c.smeta}>{s.meta}</span>
-                </div>
-                <div className={c.ssample}>e.g. {s.sample}</div>
-              </div>
-              <span className={`${c.sourceState} ${on ? c.sourceStateOn : ''}`} aria-hidden="true">
-                {on ? <Glyph name="check" size={13} /> : null}
-                {sourceAction}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
       <div className={c.ctxTally}>
         {totalContext === 0 ? (
-          'Add at least one source, link, note, or file. The richer the context, the better your course.'
+          'Add at least one link, title, article, song, topic, or file. The richer the context, the better your course.'
         ) : (
           <>
             Sotto will weave your course from{' '}

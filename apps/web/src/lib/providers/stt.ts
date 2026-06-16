@@ -611,7 +611,8 @@ class CartesiaSttProvider implements SttProvider {
     form.append('file', new File([new Uint8Array(audio)], `audio.${ext}`, { type: mime }));
     form.append('model', this.model);
     form.append('timestamp_granularities[]', 'word');
-    if (opts?.language) form.append('language', opts.language);
+    const language = toSttProviderLanguageCode('cartesia', opts?.language);
+    if (language) form.append('language', language);
 
     const response = await fetch('https://api.cartesia.ai/stt', {
       method: 'POST',
@@ -640,7 +641,12 @@ class CartesiaSttProvider implements SttProvider {
       segments: String(segments.length),
       durationMs: String(Date.now() - startTime),
     });
-    return { text, segments, words, language: data.language };
+    return {
+      text,
+      segments,
+      words,
+      language: fromSttProviderLanguageCode('cartesia', data.language),
+    };
   }
 }
 
@@ -662,6 +668,7 @@ class GladiaProvider implements SttProvider {
   async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
     const startTime = Date.now();
     const { ext, mime } = detectAudioFormat(audio);
+    const language = toSttProviderLanguageCode('gladia', opts?.language);
 
     const uploadForm = new FormData();
     uploadForm.append('audio', new File([new Uint8Array(audio)], `audio.${ext}`, { type: mime }));
@@ -671,7 +678,9 @@ class GladiaProvider implements SttProvider {
       body: uploadForm,
     });
     if (!uploadRes.ok) {
-      throw new Error(`Gladia upload error (${uploadRes.status}): ${await uploadRes.text().catch(() => '')}`);
+      throw new Error(
+        `Gladia upload error (${uploadRes.status}): ${await uploadRes.text().catch(() => '')}`
+      );
     }
     const { audio_url } = (await uploadRes.json()) as { audio_url: string };
 
@@ -682,11 +691,13 @@ class GladiaProvider implements SttProvider {
         audio_url,
         model: this.model,
         accurate_words_timestamps: true,
-        ...(opts?.language && { language_config: { languages: [opts.language] } }),
+        ...(language && { language_config: { languages: [language] } }),
       }),
     });
     if (!submitRes.ok) {
-      throw new Error(`Gladia submit error (${submitRes.status}): ${await submitRes.text().catch(() => '')}`);
+      throw new Error(
+        `Gladia submit error (${submitRes.status}): ${await submitRes.text().catch(() => '')}`
+      );
     }
     const submit = (await submitRes.json()) as { id: string; result_url?: string };
     const pollUrl = submit.result_url ?? `https://api.gladia.io/v2/pre-recorded/${submit.id}`;
@@ -726,7 +737,12 @@ class GladiaProvider implements SttProvider {
           segments: String(segments.length),
           durationMs: String(Date.now() - startTime),
         });
-        return { text, segments, words: words?.length ? words : undefined, language: tr?.languages?.[0] };
+        return {
+          text,
+          segments,
+          words: words?.length ? words : undefined,
+          language: fromSttProviderLanguageCode('gladia', tr?.languages?.[0]),
+        };
       }
     }
     throw new Error('Gladia transcription timed out after 5 minutes');
@@ -752,9 +768,10 @@ class SpeechmaticsProvider implements SttProvider {
   async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
     const startTime = Date.now();
     const { ext, mime } = detectAudioFormat(audio);
+    const language = toSttProviderLanguageCode('speechmatics', opts?.language) ?? 'en';
     const config = {
       type: 'transcription',
-      transcription_config: { language: opts?.language ?? 'en', operating_point: this.model },
+      transcription_config: { language, operating_point: this.model },
     };
     const form = new FormData();
     form.append('data_file', new File([new Uint8Array(audio)], `audio.${ext}`, { type: mime }));
@@ -766,7 +783,9 @@ class SpeechmaticsProvider implements SttProvider {
       body: form,
     });
     if (!submitRes.ok) {
-      throw new Error(`Speechmatics submit error (${submitRes.status}): ${await submitRes.text().catch(() => '')}`);
+      throw new Error(
+        `Speechmatics submit error (${submitRes.status}): ${await submitRes.text().catch(() => '')}`
+      );
     }
     const { id } = (await submitRes.json()) as { id: string };
 
@@ -819,7 +838,10 @@ class SpeechmaticsProvider implements SttProvider {
           text,
           segments,
           words: words.length ? words : undefined,
-          language: tr.metadata?.transcription_config?.language,
+          language: fromSttProviderLanguageCode(
+            'speechmatics',
+            tr.metadata?.transcription_config?.language
+          ),
         };
       }
     }
@@ -866,7 +888,7 @@ export function createSttProvider(
       const baseURL = infra('sttBaseUrl', 'STT_BASE_URL');
       if (!baseURL) {
         throw new Error(
-          'STT_BASE_URL is required for STT_PROVIDER=local. Point it at your local OpenAI-compatible Whisper server (e.g. http://localhost:8000/v1 for faster-whisper-server / Speaches).',
+          'STT_BASE_URL is required for STT_PROVIDER=local. Point it at your local OpenAI-compatible Whisper server (e.g. http://localhost:8000/v1 for faster-whisper-server / Speaches).'
         );
       }
       const config: WhisperProviderConfig = {

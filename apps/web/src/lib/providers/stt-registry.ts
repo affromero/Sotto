@@ -2,10 +2,7 @@
  * Declarative STT provider registry — models and metadata for every
  * supported speech-to-text provider.
  */
-import {
-  normalizeSottoLanguageCode,
-  STT_LANGUAGE_SUPPORT_SETS,
-} from '../speech-language-support';
+import { normalizeSottoLanguageCode, STT_LANGUAGE_SUPPORT_SETS } from '../speech-language-support';
 
 export type SttProviderId =
   | 'openai'
@@ -35,7 +32,12 @@ export interface SttProviderMeta {
   platformCostPerMinute: number;
 }
 
-const { all: LANG_ALL, deepgramNova2: LANG_DEEPGRAM_NOVA_2 } = STT_LANGUAGE_SUPPORT_SETS;
+const {
+  all: LANG_ALL,
+  assemblyUniversal3Pro: LANG_ASSEMBLY_UNIVERSAL_3_PRO,
+  deepgramNova2: LANG_DEEPGRAM_NOVA_2,
+  gladiaSolaria3: LANG_GLADIA_SOLARIA_3,
+} = STT_LANGUAGE_SUPPORT_SETS;
 
 const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
   openai: {
@@ -44,8 +46,18 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     defaultModel: 'whisper-1',
     models: [
       { id: 'whisper-1', displayName: 'Whisper-1', tier: 'balanced', supportedLanguages: LANG_ALL },
-      { id: 'gpt-4o-transcribe', displayName: 'GPT-4o Transcribe', tier: 'best', supportedLanguages: LANG_ALL },
-      { id: 'gpt-4o-mini-transcribe', displayName: 'GPT-4o Mini Transcribe', tier: 'fast', supportedLanguages: LANG_ALL },
+      {
+        id: 'gpt-4o-transcribe',
+        displayName: 'GPT-4o Transcribe',
+        tier: 'best',
+        supportedLanguages: LANG_ALL,
+      },
+      {
+        id: 'gpt-4o-mini-transcribe',
+        displayName: 'GPT-4o Mini Transcribe',
+        tier: 'fast',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     platformCostPerMinute: 0.006,
   },
@@ -65,7 +77,12 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'Together AI',
     defaultModel: 'openai/whisper-large-v3',
     models: [
-      { id: 'openai/whisper-large-v3', displayName: 'Whisper Large v3', tier: 'balanced', supportedLanguages: LANG_ALL },
+      {
+        id: 'openai/whisper-large-v3',
+        displayName: 'Whisper Large v3',
+        tier: 'balanced',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     platformCostPerMinute: 0.0015,
   },
@@ -76,7 +93,12 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     defaultModel: 'nova-3',
     models: [
       { id: 'nova-3', displayName: 'Nova-3', tier: 'best', supportedLanguages: LANG_ALL },
-      { id: 'nova-2', displayName: 'Nova-2', tier: 'balanced', supportedLanguages: LANG_DEEPGRAM_NOVA_2 },
+      {
+        id: 'nova-2',
+        displayName: 'Nova-2',
+        tier: 'balanced',
+        supportedLanguages: LANG_DEEPGRAM_NOVA_2,
+      },
     ],
     platformCostPerMinute: 0.0077,
   },
@@ -88,7 +110,12 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     models: [
       { id: 'best', displayName: 'Universal-2', tier: 'best', supportedLanguages: LANG_ALL },
       { id: 'nano', displayName: 'Nano', tier: 'fast', supportedLanguages: LANG_ALL },
-      { id: 'universal-3-pro', displayName: 'Universal-3 Pro', tier: 'max', supportedLanguages: LANG_ALL },
+      {
+        id: 'universal-3-pro',
+        displayName: 'Universal-3 Pro',
+        tier: 'max',
+        supportedLanguages: LANG_ASSEMBLY_UNIVERSAL_3_PRO,
+      },
     ],
     platformCostPerMinute: 0.0025,
   },
@@ -99,7 +126,9 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     id: 'cartesia',
     displayName: 'Cartesia (Ink)',
     defaultModel: 'ink-whisper',
-    models: [{ id: 'ink-whisper', displayName: 'Ink Whisper', tier: 'best', supportedLanguages: LANG_ALL }],
+    models: [
+      { id: 'ink-whisper', displayName: 'Ink Whisper', tier: 'best', supportedLanguages: LANG_ALL },
+    ],
     platformCostPerMinute: 0.0,
   },
 
@@ -109,8 +138,18 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'Groq (Whisper)',
     defaultModel: 'whisper-large-v3-turbo',
     models: [
-      { id: 'whisper-large-v3-turbo', displayName: 'Whisper Large v3 Turbo', tier: 'fast', supportedLanguages: LANG_ALL },
-      { id: 'whisper-large-v3', displayName: 'Whisper Large v3', tier: 'balanced', supportedLanguages: LANG_ALL },
+      {
+        id: 'whisper-large-v3-turbo',
+        displayName: 'Whisper Large v3 Turbo',
+        tier: 'fast',
+        supportedLanguages: LANG_ALL,
+      },
+      {
+        id: 'whisper-large-v3',
+        displayName: 'Whisper Large v3',
+        tier: 'balanced',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     platformCostPerMinute: 0.0007,
   },
@@ -122,7 +161,12 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     defaultModel: 'solaria-1',
     models: [
       { id: 'solaria-1', displayName: 'Solaria 1', tier: 'balanced', supportedLanguages: LANG_ALL },
-      { id: 'solaria-3', displayName: 'Solaria 3', tier: 'best', supportedLanguages: LANG_ALL },
+      {
+        id: 'solaria-3',
+        displayName: 'Solaria 3',
+        tier: 'best',
+        supportedLanguages: LANG_GLADIA_SOLARIA_3,
+      },
     ],
     platformCostPerMinute: 0.0,
   },
@@ -148,7 +192,12 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     displayName: 'Local Whisper',
     defaultModel: 'whisper-1',
     models: [
-      { id: 'whisper-1', displayName: 'Local Whisper (OpenAI-compatible)', tier: 'balanced', supportedLanguages: LANG_ALL },
+      {
+        id: 'whisper-1',
+        displayName: 'Local Whisper (OpenAI-compatible)',
+        tier: 'balanced',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     platformCostPerMinute: 0,
   },
@@ -161,7 +210,7 @@ export function getAllSttProviderMeta(): SttProviderMeta[] {
 export function supportsSttLanguage(
   providerId: SttProviderId,
   modelId: string,
-  lang: string | null | undefined,
+  lang: string | null | undefined
 ): boolean {
   const normalized = normalizeSottoLanguageCode(lang);
   if (!normalized) return true;
@@ -176,7 +225,7 @@ export function supportsSttLanguage(
 export function getDefaultSttModelForLanguage(
   providerId: SttProviderId,
   lang: string,
-  preferred?: string | null,
+  preferred?: string | null
 ): string | null {
   const normalized = normalizeSottoLanguageCode(lang);
   if (!normalized) return null;

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sotto.app/schemas/speech-language-support.schema.json",
+  "title": "Sotto speech language support",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sottoLanguageCodes",
+    "ttsLanguageSupport",
+    "sttLanguageSupport",
+    "welcomeProviderLanguageSupport",
+    "sttProviderLanguageCodeOverrides",
+    "languageAliasesToSotto"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "sottoLanguageCodes": {
+      "$ref": "#/$defs/languageList"
+    },
+    "ttsLanguageSupport": {
+      "type": "object",
+      "description": "Named TTS language packs. Use ISO 639-1 Sotto course language codes.",
+      "additionalProperties": {
+        "$ref": "#/$defs/languageList"
+      }
+    },
+    "sttLanguageSupport": {
+      "type": "object",
+      "description": "Named STT language packs. Use ISO 639-1 Sotto course language codes.",
+      "additionalProperties": {
+        "$ref": "#/$defs/languageList"
+      }
+    },
+    "welcomeProviderLanguageSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tts", "stt"],
+      "properties": {
+        "tts": {
+          "$ref": "#/$defs/providerSupportMap"
+        },
+        "stt": {
+          "$ref": "#/$defs/providerSupportMap"
+        }
+      }
+    },
+    "sttProviderLanguageCodeOverrides": {
+      "type": "object",
+      "description": "Provider-specific outbound language code mappings, keyed by normalized Sotto code.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "languageAliasesToSotto": {
+      "type": "object",
+      "description": "Inbound provider language aliases normalized back to Sotto ISO 639-1 codes.",
+      "additionalProperties": {
+        "$ref": "#/$defs/languageCode"
+      }
+    }
+  },
+  "$defs": {
+    "languageCode": {
+      "type": "string",
+      "pattern": "^[a-z]{2}$"
+    },
+    "languageList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/languageCode"
+      },
+      "uniqueItems": true
+    },
+    "providerSupportMap": {
+      "type": "object",
+      "description": "Provider id to language support pack name. Built-in pack names: all, en.",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

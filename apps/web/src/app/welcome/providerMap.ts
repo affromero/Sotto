@@ -73,7 +73,11 @@ export function resolveWelcomeSttProviderId(sttId: string): string | null {
     sttId === 'deepgram' ||
     sttId === 'elevenlabs' ||
     sttId === 'openai' ||
-    sttId === 'together'
+    sttId === 'together' ||
+    sttId === 'cartesia' ||
+    sttId === 'groq' ||
+    sttId === 'gladia' ||
+    sttId === 'speechmatics'
   ) {
     return sttId;
   }

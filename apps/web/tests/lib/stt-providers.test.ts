@@ -34,11 +34,13 @@ vi.mock('openai', () => ({
   },
 }));
 
-import { createSttProvider, resolveSttProvider, getSttPlatformKey, getConfiguredSttProviderId } from '@/lib/providers/stt';
 import {
-  getDefaultSttModelForLanguage,
-  supportsSttLanguage,
-} from '@/lib/providers/stt-registry';
+  createSttProvider,
+  resolveSttProvider,
+  getSttPlatformKey,
+  getConfiguredSttProviderId,
+} from '@/lib/providers/stt';
+import { getDefaultSttModelForLanguage, supportsSttLanguage } from '@/lib/providers/stt-registry';
 import {
   isValidAiProviderId,
   getAiProviderMeta,
@@ -196,6 +198,25 @@ describe('createSttProvider', () => {
     expect(() => createSttProvider('cartesia')).toThrow('No Cartesia API key provided');
   });
 
+  it('cartesia provider normalizes selected STT language codes', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) => {
+      const form = (init as RequestInit).body as FormData;
+      expect(form.get('language')).toBe('de');
+      return new Response(JSON.stringify({ text: 'Hallo.', language: 'de' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    try {
+      const provider = createSttProvider('cartesia', 'sk_car_test');
+      const result = await provider.transcribe(Buffer.from('audio'), { language: 'de-DE' });
+      expect(result.language).toBe('de');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('returns a groq provider for "groq" (OpenAI-compatible)', () => {
     const provider = createSttProvider('groq', 'gsk_test');
     expect(provider).toBeDefined();
@@ -213,6 +234,31 @@ describe('createSttProvider', () => {
     expect(() => createSttProvider('gladia')).toThrow('No Gladia API key provided');
   });
 
+  it('gladia provider normalizes selected STT language codes', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => {
+        return new Response(JSON.stringify({ audio_url: 'https://audio.example/test.wav' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      })
+      .mockImplementationOnce(async (_url, init) => {
+        const body = JSON.parse((init as RequestInit).body as string);
+        expect(body.language_config.languages).toEqual(['de']);
+        return new Response('invalid', { status: 400 });
+      });
+
+    try {
+      const provider = createSttProvider('gladia', 'gladia_test');
+      await expect(
+        provider.transcribe(Buffer.from('audio'), { language: 'de-DE' })
+      ).rejects.toThrow('Gladia submit error (400)');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('returns a speechmatics provider for "speechmatics"', () => {
     const provider = createSttProvider('speechmatics', 'sm_test');
     expect(provider).toBeDefined();
@@ -222,6 +268,24 @@ describe('createSttProvider', () => {
   it('speechmatics provider throws without API key', () => {
     vi.stubEnv('SPEECHMATICS_API_KEY', '');
     expect(() => createSttProvider('speechmatics')).toThrow('No Speechmatics API key provided');
+  });
+
+  it('speechmatics provider maps Sotto Chinese to the Speechmatics Mandarin code', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) => {
+      const form = (init as RequestInit).body as FormData;
+      const config = JSON.parse(form.get('config') as string);
+      expect(config.transcription_config.language).toBe('cmn');
+      return new Response('invalid', { status: 400 });
+    });
+
+    try {
+      const provider = createSttProvider('speechmatics', 'sm_test');
+      await expect(provider.transcribe(Buffer.from('audio'), { language: 'zh' })).rejects.toThrow(
+        'Speechmatics submit error (400)'
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it('local provider throws without STT_BASE_URL', () => {
@@ -647,10 +711,17 @@ describe('STT language support metadata', () => {
     expect(supportsSttLanguage('deepgram', 'nova-2', 'es')).toBe(true);
     expect(supportsSttLanguage('deepgram', 'nova-2', 'ar')).toBe(false);
     expect(supportsSttLanguage('deepgram', 'nova-3', 'ar')).toBe(true);
+    expect(supportsSttLanguage('assemblyai', 'universal-3-pro', 'de')).toBe(true);
+    expect(supportsSttLanguage('assemblyai', 'universal-3-pro', 'ja')).toBe(false);
+    expect(supportsSttLanguage('gladia', 'solaria-3', 'de')).toBe(true);
+    expect(supportsSttLanguage('gladia', 'solaria-3', 'pt')).toBe(false);
+    expect(supportsSttLanguage('speechmatics', 'enhanced', 'zh')).toBe(true);
   });
 
   it('chooses the strongest compatible model for a provider and language', () => {
     expect(getDefaultSttModelForLanguage('deepgram', 'ar', 'nova-2')).toBe('nova-3');
+    expect(getDefaultSttModelForLanguage('assemblyai', 'ja', 'universal-3-pro')).toBe('best');
+    expect(getDefaultSttModelForLanguage('gladia', 'pt', 'solaria-3')).toBe('solaria-1');
     expect(getDefaultSttModelForLanguage('deepgram', 'xx', 'nova-2')).toBeNull();
   });
 });

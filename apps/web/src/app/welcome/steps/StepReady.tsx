@@ -31,6 +31,13 @@ import c from '../components.module.css';
 const MAX_ONBOARDING_NOTE_CHARS = 4000;
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
 
+function contextKindLabel(item: ContextItem) {
+  if (item.kind === 'article') return 'article/news';
+  if (item.kind === 'music') return 'music/audio';
+  if (item.kind === 'text') return 'note';
+  return item.kind;
+}
+
 function buildContextNote(sources: Set<string>, contextItems: ContextItem[]) {
   const parts: string[] = [];
   const selectedSources = SOURCES.filter((source) => sources.has(source.id));
@@ -48,7 +55,7 @@ function buildContextNote(sources: Set<string>, contextItems: ContextItem[]) {
     parts.push(
       [
         'Direct context:',
-        ...contextItems.map((item) => `[${item.kind}] ${item.label}\n${item.value}`),
+        ...contextItems.map((item) => `[${contextKindLabel(item)}] ${item.label}\n${item.value}`),
       ].join('\n\n')
     );
   }

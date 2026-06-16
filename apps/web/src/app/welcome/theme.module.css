@@ -45,7 +45,7 @@
   height: 100vh;
   height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(320px, 38%) 1fr;
+  grid-template-columns: clamp(320px, 30vw, 520px) minmax(0, 1fr);
   background: var(--paper);
   overflow: hidden;
   position: relative;
@@ -203,6 +203,20 @@
   text-transform: uppercase;
   color: var(--voice-soft);
   padding-left: 18px;
+}
+
+.railThemeSwitch {
+  position: absolute;
+  top: 42px;
+  left: calc(var(--pad) + 178px);
+  z-index: 2;
+}
+
+@media (max-width: 880px) {
+  .railThemeSwitch {
+    top: 25px;
+    left: 204px;
+  }
 }
 
 /* vertical stepper */

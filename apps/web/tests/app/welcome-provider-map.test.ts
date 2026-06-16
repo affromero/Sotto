@@ -124,7 +124,17 @@ describe('welcome provider ID normalization', () => {
   it('maps welcome STT display IDs to backend STT provider IDs', () => {
     expect(resolveWelcomeSttProviderId('whisper')).toBe('local');
     expect(resolveWelcomeSttProviderId('assembly')).toBe('assemblyai');
-    expect(resolveWelcomeSttProviderId('deepgram')).toBe('deepgram');
+    for (const p of [
+      'deepgram',
+      'elevenlabs',
+      'openai',
+      'cartesia',
+      'groq',
+      'gladia',
+      'speechmatics',
+    ]) {
+      expect(resolveWelcomeSttProviderId(p)).toBe(p);
+    }
   });
 });
 
@@ -260,8 +270,9 @@ describe('model provider id helpers', () => {
   it('maps wizard STT ids to their registry provider', () => {
     expect(sttModelProviderId('whisper')).toBe('local');
     expect(sttModelProviderId('assembly')).toBe('assemblyai');
-    expect(sttModelProviderId('deepgram')).toBe('deepgram');
-    expect(sttModelProviderId('elevenlabs')).toBe('elevenlabs');
+    for (const p of ['deepgram', 'elevenlabs', 'cartesia', 'groq', 'gladia', 'speechmatics']) {
+      expect(sttModelProviderId(p)).toBe(p);
+    }
   });
 });
 

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { Glyph } from '../Glyph';
+import { OnboardingThemeSwitch } from '../OnboardingThemeSwitch';
 import styles from './StepIntro.module.css';
 
 interface Props {
@@ -138,6 +139,8 @@ export function StepIntro({ demoMode, onNext }: Props) {
           {demoMode ? 'Hosted preview' : 'First launch · self hosted'}
         </div>
       </header>
+
+      <OnboardingThemeSwitch className={styles.themeSwitch} />
 
       <main className={styles.stage}>
         <div className={styles.greets}>

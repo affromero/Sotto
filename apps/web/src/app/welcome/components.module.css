@@ -1211,7 +1211,7 @@
   }
 }
 
-/* ---------- source list ---------- */
+/* ---------- context material ---------- */
 .contextDirect {
   margin-top: 26px;
   background: var(--well);
@@ -1259,6 +1259,70 @@
   white-space: nowrap;
 }
 
+.materialTypeGroup {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.materialType {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink-soft);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    color 0.18s;
+}
+
+.materialType:hover {
+  border-color: var(--line-strong);
+}
+
+.materialTypeOn {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.materialTypeIcon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.materialTypeText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.materialTypeLabel {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.materialTypeHint {
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .contextEntry {
   margin-top: 14px;
 }
@@ -1269,6 +1333,13 @@
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 7px;
+}
+
+.contextSelectedHint {
+  margin: -3px 0 8px;
+  color: var(--ink-mute);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .contextEntryGrid {
@@ -1465,6 +1536,14 @@
     grid-template-columns: 1fr;
   }
 
+  .materialTypeGroup {
+    grid-template-columns: 1fr;
+  }
+
+  .materialType {
+    min-height: 54px;
+  }
+
   .contextDirectCount {
     width: fit-content;
   }
@@ -1481,128 +1560,6 @@
   .contextAdd {
     grid-column: 1 / -1;
   }
-}
-
-.sourceList {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sourceIntro {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 24px;
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-
-.sourceIntroLabel {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-mute);
-}
-
-.sourceRow {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  background: var(--well);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  padding: 14px 16px;
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    background 0.2s;
-  text-align: left;
-  min-height: 44px;
-}
-
-.sourceRow:hover {
-  border-color: var(--line-strong);
-}
-
-.sourceRowOn {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-}
-
-.sico {
-  color: var(--ink-soft);
-  display: flex;
-}
-
-.sourceRowOn .sico {
-  color: var(--accent);
-}
-
-.stop {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.slabel {
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.smeta {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--ink-mute);
-  letter-spacing: 0.03em;
-}
-
-.ssample {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 13px;
-  color: var(--ink-soft);
-  margin-top: 4px;
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition: all 0.3s var(--ease);
-}
-
-.sourceRowOn .ssample {
-  max-height: 30px;
-  opacity: 1;
-  margin-top: 5px;
-}
-
-.sourceState {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 86px;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 18px;
-  border: 1px solid var(--line-strong);
-  color: var(--ink-soft);
-  background: var(--paper);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.sourceStateOn {
-  color: var(--accent);
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
 }
 
 .ctxTally {
