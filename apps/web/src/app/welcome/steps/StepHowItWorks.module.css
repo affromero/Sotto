@@ -392,55 +392,18 @@
   background: var(--accent);
 }
 
-.phase {
-  position: absolute;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--voice-soft);
-  font-family: var(--mono);
-  font-size: 9.5px;
-  line-height: 1;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  pointer-events: none;
-}
-
-.phaseDot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--accent) 70%, transparent);
-}
-
-.phase0 {
-  left: 50%;
-  top: 28%;
-  transform: translateX(-50%);
-}
-
-.phase1 {
-  right: -27%;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.phase2 {
-  left: 50%;
-  bottom: -13%;
-  transform: translateX(-50%);
-}
-
 .hub {
   position: absolute;
   left: 50%;
   top: 50%;
-  display: flex;
+  display: grid;
+  grid-template-rows: 34px 1fr;
+  justify-items: center;
+  align-content: start;
   width: 300px;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  height: 196px;
+  gap: 12px;
+  overflow: hidden;
   text-align: center;
   transform: translate(-50%, -50%);
 }
@@ -448,14 +411,17 @@
 .hubBead {
   width: 30px;
   height: 30px;
-  margin-bottom: 4px;
 }
 
 .hubBody {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-rows: 10px minmax(28px, 56px) 1fr;
+  justify-items: center;
+  align-content: start;
+  width: 100%;
+  height: 150px;
   gap: 7px;
+  overflow: hidden;
   animation: swap 340ms var(--ease) both;
 }
 
@@ -470,7 +436,10 @@
 }
 
 .hubTitle {
+  display: -webkit-box;
+  max-width: 270px;
   margin: 0;
+  overflow: hidden;
   color: var(--voice-fg);
   font-family: var(--serif);
   font-size: 25px;
@@ -478,6 +447,8 @@
   line-height: 1.12;
   letter-spacing: 0;
   text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hubTitle em {
@@ -486,14 +457,19 @@
 }
 
 .hubDesc {
+  display: -webkit-box;
   max-width: 30ch;
+  max-height: 58px;
   margin: 2px auto 0;
+  overflow: hidden;
   color: var(--voice-soft);
   font-size: 13px;
   line-height: 1.5;
   letter-spacing: 0;
   text-align: center;
   text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .foot {
@@ -605,10 +581,10 @@
 
 @keyframes swap {
   from {
-    transform: translateY(6px);
+    opacity: 0.52;
   }
   to {
-    transform: none;
+    opacity: 1;
   }
 }
 
@@ -708,6 +684,9 @@
 
   .hub {
     width: 200px;
+    height: 164px;
+    grid-template-rows: 28px 1fr;
+    gap: 9px;
   }
 
   .hubBead {
@@ -715,11 +694,20 @@
     height: 24px;
   }
 
+  .hubBody {
+    height: 126px;
+    grid-template-rows: 10px minmax(24px, 46px) 1fr;
+    gap: 6px;
+  }
+
   .hubTitle {
+    max-width: 180px;
     font-size: 20px;
   }
 
   .hubDesc {
+    max-width: 22ch;
+    max-height: 49px;
     font-size: 11.5px;
     line-height: 1.42;
   }
