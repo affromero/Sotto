@@ -16,40 +16,27 @@
     "schemas": {
       "CefrLevel": {
         "type": "string",
-        "enum": [
-          "A1",
-          "A2",
-          "B1",
-          "B2",
-          "C1",
-          "C2"
-        ]
+        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
       },
       "PracticeKind": {
         "type": "string",
-        "enum": [
-          "FULL",
-          "GRAMMAR",
-          "READING",
-          "LISTENING",
-          "SPEAKING",
-          "WRITING",
-          "VOCAB"
-        ]
+        "enum": ["FULL", "GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING", "VOCAB"]
       },
       "PracticeStatus": {
         "type": "string",
-        "enum": [
-          "ACTIVE",
-          "COMPLETED"
-        ]
+        "enum": ["ACTIVE", "COMPLETED"]
       },
       "UserRole": {
         "type": "string",
-        "enum": [
-          "USER",
-          "ADMIN"
-        ]
+        "enum": ["USER", "ADMIN"]
+      },
+      "FocusTargetKind": {
+        "type": "string",
+        "enum": ["WORD", "PHRASE", "SENTENCE"]
+      },
+      "FocusTargetSource": {
+        "type": "string",
+        "enum": ["TRANSCRIPT", "CLASS", "PRACTICE", "NOTES", "LIVE", "MANUAL"]
       },
       "HealthCheckResult": {
         "type": "object",
@@ -64,9 +51,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "additionalProperties": false
       },
       "HealthResponse": {
@@ -74,10 +59,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "healthy",
-              "degraded"
-            ]
+            "enum": ["healthy", "degraded"]
           },
           "timestamp": {
             "type": "string"
@@ -107,10 +89,7 @@
             }
           }
         },
-        "required": [
-          "status",
-          "timestamp"
-        ],
+        "required": ["status", "timestamp"],
         "additionalProperties": false
       },
       "CourseSummary": {
@@ -142,9 +121,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "title"
-            ],
+            "required": ["title"],
             "additionalProperties": false
           },
           "placement": {
@@ -157,10 +134,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "level",
-              "createdAt"
-            ],
+            "required": ["level", "createdAt"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -187,9 +161,7 @@
             }
           }
         },
-        "required": [
-          "courses"
-        ],
+        "required": ["courses"],
         "additionalProperties": false
       },
       "PracticeRecentSession": {
@@ -216,14 +188,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "status",
-          "score",
-          "startedAt",
-          "completedAt"
-        ],
+        "required": ["id", "kind", "status", "score", "startedAt", "completedAt"],
         "additionalProperties": false
       },
       "PracticeOverviewResponse": {
@@ -239,10 +204,7 @@
                 "type": "number"
               }
             },
-            "required": [
-              "vocab",
-              "grammar"
-            ],
+            "required": ["vocab", "grammar"],
             "additionalProperties": false
           },
           "totalVocab": {
@@ -255,11 +217,7 @@
             }
           }
         },
-        "required": [
-          "due",
-          "totalVocab",
-          "recent"
-        ],
+        "required": ["due", "totalVocab", "recent"],
         "additionalProperties": false
       },
       "PracticeItem": {
@@ -278,11 +236,7 @@
             }
           }
         },
-        "required": [
-          "id",
-          "prompt",
-          "options"
-        ],
+        "required": ["id", "prompt", "options"],
         "additionalProperties": false
       },
       "PracticeSpeakingPrompt": {
@@ -302,12 +256,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "targetPhrase",
-          "translation",
-          "referenceTtsUrl"
-        ],
+        "required": ["id", "targetPhrase", "translation", "referenceTtsUrl"],
         "additionalProperties": false
       },
       "PracticeWritingPrompt": {
@@ -324,11 +273,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "task",
-          "guidance"
-        ],
+        "required": ["id", "task", "guidance"],
         "additionalProperties": false
       },
       "StartPracticeRequest": {
@@ -336,11 +281,13 @@
         "properties": {
           "kind": {
             "$ref": "#/components/schemas/PracticeKind"
+          },
+          "focusTargetId": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "required": [
-          "kind"
-        ],
+        "required": ["kind"],
         "additionalProperties": false
       },
       "StartPracticeUnavailable": {
@@ -348,23 +295,14 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "unavailable"
-            ]
+            "enum": ["unavailable"]
           },
           "reason": {
             "type": "string",
-            "enum": [
-              "not_enough_vocab",
-              "nothing_due",
-              "no_content"
-            ]
+            "enum": ["not_enough_vocab", "nothing_due", "no_content"]
           }
         },
-        "required": [
-          "status",
-          "reason"
-        ],
+        "required": ["status", "reason"],
         "additionalProperties": false
       },
       "StartPracticeReady": {
@@ -372,9 +310,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ready"
-            ]
+            "enum": ["ready"]
           },
           "sessionId": {
             "type": "string"
@@ -392,12 +328,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "status",
-          "sessionId",
-          "kind",
-          "items"
-        ],
+        "required": ["status", "sessionId", "kind", "items"],
         "additionalProperties": false
       },
       "StartPracticeReadySpeaking": {
@@ -405,9 +336,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ready_speaking"
-            ]
+            "enum": ["ready_speaking"]
           },
           "sessionId": {
             "type": "string"
@@ -419,11 +348,7 @@
             }
           }
         },
-        "required": [
-          "status",
-          "sessionId",
-          "prompts"
-        ],
+        "required": ["status", "sessionId", "prompts"],
         "additionalProperties": false
       },
       "StartPracticeReadyWriting": {
@@ -431,9 +356,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ready_writing"
-            ]
+            "enum": ["ready_writing"]
           },
           "sessionId": {
             "type": "string"
@@ -445,11 +368,7 @@
             }
           }
         },
-        "required": [
-          "status",
-          "sessionId",
-          "prompts"
-        ],
+        "required": ["status", "sessionId", "prompts"],
         "additionalProperties": false
       },
       "StartPracticeReadyFull": {
@@ -457,18 +376,14 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "ready_full"
-            ]
+            "enum": ["ready_full"]
           },
           "sessionId": {
             "type": "string"
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "FULL"
-            ]
+            "enum": ["FULL"]
           },
           "items": {
             "type": "array",
@@ -492,14 +407,7 @@
             }
           }
         },
-        "required": [
-          "status",
-          "sessionId",
-          "kind",
-          "items",
-          "speakingPrompts",
-          "writingPrompts"
-        ],
+        "required": ["status", "sessionId", "kind", "items", "speakingPrompts", "writingPrompts"],
         "additionalProperties": false
       },
       "StartPracticeResponse": {
@@ -549,17 +457,12 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "itemId",
-                "selectedIndex"
-              ],
+              "required": ["itemId", "selectedIndex"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "answers"
-        ],
+        "required": ["answers"],
         "additionalProperties": false
       },
       "SubmitPracticeResponse": {
@@ -575,11 +478,147 @@
             "type": "number"
           }
         },
+        "required": ["score", "correct", "total"],
+        "additionalProperties": false
+      },
+      "LearningTarget": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FocusTargetKind"
+          },
+          "text": {
+            "type": "string"
+          },
+          "normalizedText": {
+            "type": "string"
+          },
+          "contextText": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/FocusTargetSource"
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "userMarkedDifficulty": {
+            "type": "number"
+          },
+          "priorityBoost": {
+            "type": "number"
+          },
+          "visualCueUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "visualCueAlt": {
+            "type": "string",
+            "nullable": true
+          },
+          "visualCueAttribution": {
+            "type": "string",
+            "nullable": true
+          },
+          "visualCueProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "pronunciationAudioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSelectedAt": {
+            "type": "string"
+          },
+          "lastPracticedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
         "required": [
-          "score",
-          "correct",
-          "total"
+          "id",
+          "courseId",
+          "kind",
+          "text",
+          "normalizedText",
+          "contextText",
+          "sourceType",
+          "sourceId",
+          "sourceLabel",
+          "userMarkedDifficulty",
+          "priorityBoost",
+          "visualCueUrl",
+          "visualCueAlt",
+          "visualCueAttribution",
+          "visualCueProvider",
+          "pronunciationAudioUrl",
+          "lastSelectedAt",
+          "lastPracticedAt"
         ],
+        "additionalProperties": false
+      },
+      "ListLearningTargetsResponse": {
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningTarget"
+            }
+          }
+        },
+        "required": ["targets"],
+        "additionalProperties": false
+      },
+      "AddLearningTargetRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FocusTargetKind"
+          },
+          "contextText": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/FocusTargetSource"
+          },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "sourceLabel": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "userMarkedDifficulty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
+        },
+        "required": ["text"],
         "additionalProperties": false
       },
       "EpisodeStatus": {
@@ -632,15 +671,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "speaker",
-          "text",
-          "audioUrl",
-          "order",
-          "startTime",
-          "duration"
-        ],
+        "required": ["id", "speaker", "text", "audioUrl", "order", "startTime", "duration"],
         "additionalProperties": {}
       },
       "EpisodeDetailResponse": {
@@ -674,25 +705,12 @@
             }
           }
         },
-        "required": [
-          "id",
-          "title",
-          "status",
-          "audioUrl",
-          "duration",
-          "language",
-          "segments"
-        ],
+        "required": ["id", "title", "status", "audioUrl", "duration", "language", "segments"],
         "additionalProperties": {}
       },
       "SpeakingGradeStatus": {
         "type": "string",
-        "enum": [
-          "PENDING",
-          "GRADING",
-          "SCORED",
-          "FAILED"
-        ]
+        "enum": ["PENDING", "GRADING", "SCORED", "FAILED"]
       },
       "SpeakingPollResponse": {
         "type": "object",
@@ -713,23 +731,12 @@
             "nullable": true
           }
         },
-        "required": [
-          "status",
-          "overallScore",
-          "transcript",
-          "feedback"
-        ],
+        "required": ["status", "overallScore", "transcript", "feedback"],
         "additionalProperties": {}
       },
       "SkillType": {
         "type": "string",
-        "enum": [
-          "GRAMMAR",
-          "READING",
-          "LISTENING",
-          "SPEAKING",
-          "WRITING"
-        ]
+        "enum": ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"]
       },
       "ClassStatus": {
         "type": "string",
@@ -745,15 +752,7 @@
       },
       "SectionStatus": {
         "type": "string",
-        "enum": [
-          "PENDING",
-          "GENERATING",
-          "READY",
-          "IN_PROGRESS",
-          "SUBMITTED",
-          "PASSED",
-          "FAILED"
-        ]
+        "enum": ["PENDING", "GENERATING", "READY", "IN_PROGRESS", "SUBMITTED", "PASSED", "FAILED"]
       },
       "ClassQuestion": {
         "type": "object",
@@ -784,14 +783,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "order",
-          "question",
-          "options",
-          "passageRef",
-          "passageText"
-        ],
+        "required": ["id", "order", "question", "options", "passageRef", "passageText"],
         "additionalProperties": {}
       },
       "ClassSpeakingPrompt": {
@@ -820,14 +812,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "order",
-          "targetPhrase",
-          "translation",
-          "ipa",
-          "referenceTtsUrl"
-        ],
+        "required": ["id", "order", "targetPhrase", "translation", "ipa", "referenceTtsUrl"],
         "additionalProperties": false
       },
       "ClassWritingPrompt": {
@@ -849,12 +834,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "order",
-          "task",
-          "guidance"
-        ],
+        "required": ["id", "order", "task", "guidance"],
         "additionalProperties": {}
       },
       "ClassEpisodeRef": {
@@ -871,11 +851,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "audioUrl",
-          "title"
-        ],
+        "required": ["id", "audioUrl", "title"],
         "additionalProperties": {}
       },
       "ClassSection": {
@@ -917,21 +893,16 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "skill",
-          "status",
-          "questions",
-          "prompts",
-          "writingPrompts",
-          "episode"
-        ],
+        "required": ["id", "skill", "status", "questions", "prompts", "writingPrompts", "episode"],
         "additionalProperties": {}
       },
       "ClassDetailResponse": {
         "type": "object",
         "properties": {
           "id": {
+            "type": "string"
+          },
+          "courseId": {
             "type": "string"
           },
           "status": {
@@ -955,14 +926,7 @@
             }
           }
         },
-        "required": [
-          "id",
-          "status",
-          "order",
-          "passThreshold",
-          "submitted",
-          "sections"
-        ],
+        "required": ["id", "courseId", "status", "order", "passThreshold", "submitted", "sections"],
         "additionalProperties": {}
       },
       "NextClassCreatedResponse": {
@@ -972,9 +936,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "classId"
-        ],
+        "required": ["classId"],
         "additionalProperties": false
       },
       "NextClassDoneResponse": {
@@ -982,14 +944,10 @@
         "properties": {
           "done": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           }
         },
-        "required": [
-          "done"
-        ],
+        "required": ["done"],
         "additionalProperties": false
       },
       "SubmitClassRequest": {
@@ -1010,17 +968,12 @@
                   "maximum": 3
                 }
               },
-              "required": [
-                "questionId",
-                "selectedIndex"
-              ],
+              "required": ["questionId", "selectedIndex"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "answers"
-        ],
+        "required": ["answers"],
         "additionalProperties": false
       },
       "SubmitClassSectionResult": {
@@ -1039,12 +992,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "id",
-          "skill",
-          "score",
-          "passed"
-        ],
+        "required": ["id", "skill", "score", "passed"],
         "additionalProperties": false
       },
       "SubmitClassResponse": {
@@ -1069,25 +1017,12 @@
             }
           }
         },
-        "required": [
-          "passed",
-          "overallScore",
-          "passedSections",
-          "totalSections",
-          "sections"
-        ],
+        "required": ["passed", "overallScore", "passedSections", "totalSections", "sections"],
         "additionalProperties": false
       },
       "MockExamStatus": {
         "type": "string",
-        "enum": [
-          "GENERATING",
-          "READY",
-          "IN_PROGRESS",
-          "SUBMITTED",
-          "SCORED",
-          "FAILED"
-        ]
+        "enum": ["GENERATING", "READY", "IN_PROGRESS", "SUBMITTED", "SCORED", "FAILED"]
       },
       "ExamSpeakingPrompt": {
         "type": "object",
@@ -1111,13 +1046,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "order",
-          "targetPhrase",
-          "translation",
-          "referenceTtsUrl"
-        ],
+        "required": ["id", "order", "targetPhrase", "translation", "referenceTtsUrl"],
         "additionalProperties": false
       },
       "ExamEpisodeRef": {
@@ -1134,11 +1063,7 @@
             "$ref": "#/components/schemas/EpisodeStatus"
           }
         },
-        "required": [
-          "id",
-          "audioUrl",
-          "status"
-        ],
+        "required": ["id", "audioUrl", "status"],
         "additionalProperties": {}
       },
       "ExamSection": {
@@ -1248,22 +1173,12 @@
                   "nullable": true
                 }
               },
-              "required": [
-                "sectionId",
-                "skill",
-                "score",
-                "feedback"
-              ],
+              "required": ["sectionId", "skill", "score", "feedback"],
               "additionalProperties": {}
             }
           }
         },
-        "required": [
-          "overallScore",
-          "band",
-          "feedback",
-          "sectionResults"
-        ],
+        "required": ["overallScore", "band", "feedback", "sectionResults"],
         "additionalProperties": {}
       },
       "ExamDetailResponse": {
@@ -1325,9 +1240,7 @@
             "$ref": "#/components/schemas/CefrLevel"
           }
         },
-        "required": [
-          "courseId"
-        ],
+        "required": ["courseId"],
         "additionalProperties": false
       },
       "StartExamResponse": {
@@ -1337,9 +1250,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "examId"
-        ],
+        "required": ["examId"],
         "additionalProperties": false
       },
       "SubmitExamRequest": {
@@ -1361,17 +1272,12 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "questionId",
-                "selectedIndex"
-              ],
+              "required": ["questionId", "selectedIndex"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "answers"
-        ],
+        "required": ["answers"],
         "additionalProperties": false
       },
       "ExamSectionScore": {
@@ -1390,12 +1296,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "sectionId",
-          "skill",
-          "weight",
-          "score"
-        ],
+        "required": ["sectionId", "skill", "weight", "score"],
         "additionalProperties": false
       },
       "SubmitExamResponse": {
@@ -1417,12 +1318,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "overallScore",
-          "band",
-          "sections",
-          "feedback"
-        ],
+        "required": ["overallScore", "band", "sections", "feedback"],
         "additionalProperties": false
       },
       "PlacementQuestion": {
@@ -1447,13 +1343,7 @@
             }
           }
         },
-        "required": [
-          "id",
-          "cefr",
-          "skill",
-          "prompt",
-          "options"
-        ],
+        "required": ["id", "cefr", "skill", "prompt", "options"],
         "additionalProperties": false
       },
       "GeneratePlacementResponse": {
@@ -1472,11 +1362,7 @@
             }
           }
         },
-        "required": [
-          "native",
-          "target",
-          "questions"
-        ],
+        "required": ["native", "target", "questions"],
         "additionalProperties": false
       },
       "SubmitPlacementRequest": {
@@ -1507,19 +1393,12 @@
                   "maximum": 4
                 }
               },
-              "required": [
-                "id",
-                "selectedIndex"
-              ],
+              "required": ["id", "selectedIndex"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "native",
-          "target",
-          "answers"
-        ],
+        "required": ["native", "target", "answers"],
         "additionalProperties": false
       },
       "SubmitPlacementResponse": {
@@ -1538,11 +1417,7 @@
             }
           }
         },
-        "required": [
-          "courseId",
-          "level",
-          "scoreBySkill"
-        ],
+        "required": ["courseId", "level", "scoreBySkill"],
         "additionalProperties": false
       },
       "DeduceFromNotesRequest": {
@@ -1563,11 +1438,7 @@
             "minLength": 1
           }
         },
-        "required": [
-          "native",
-          "target",
-          "content"
-        ],
+        "required": ["native", "target", "content"],
         "additionalProperties": false
       },
       "DeduceFromNotesResponse": {
@@ -1589,13 +1460,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "native",
-          "target",
-          "deducedLevel",
-          "rationale",
-          "confidence"
-        ],
+        "required": ["native", "target", "deducedLevel", "rationale", "confidence"],
         "additionalProperties": false
       },
       "ConfirmFromNotesRequest": {
@@ -1612,10 +1477,7 @@
             "maxLength": 2
           }
         },
-        "required": [
-          "native",
-          "target"
-        ],
+        "required": ["native", "target"],
         "additionalProperties": false
       },
       "ConfirmFromNotesResponse": {
@@ -1631,11 +1493,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "courseId",
-          "level",
-          "addedVocabulary"
-        ],
+        "required": ["courseId", "level", "addedVocabulary"],
         "additionalProperties": false
       },
       "MemoryNode": {
@@ -1646,10 +1504,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "vocab",
-              "grammar"
-            ]
+            "enum": ["vocab", "grammar"]
           },
           "label": {
             "type": "string"
@@ -1664,13 +1519,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "label",
-          "strength",
-          "due"
-        ],
+        "required": ["id", "kind", "label", "strength", "due"],
         "additionalProperties": {}
       },
       "MemoryEdge": {
@@ -1689,12 +1538,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "source",
-          "target",
-          "type",
-          "weight"
-        ],
+        "required": ["source", "target", "type", "weight"],
         "additionalProperties": {}
       },
       "MemoryGraphResponse": {
@@ -1713,10 +1557,7 @@
             }
           }
         },
-        "required": [
-          "nodes",
-          "edges"
-        ],
+        "required": ["nodes", "edges"],
         "additionalProperties": {}
       },
       "OnboardingInfra": {
@@ -1787,11 +1628,7 @@
             ]
           }
         },
-        "required": [
-          "selfHosted",
-          "isOwner",
-          "infra"
-        ],
+        "required": ["selfHosted", "isOwner", "infra"],
         "additionalProperties": false
       },
       "MeResponse": {
@@ -1813,21 +1650,12 @@
             "nullable": true
           }
         },
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "additionalProperties": {}
       },
       "InteractionStatus": {
         "type": "string",
-        "enum": [
-          "PENDING",
-          "ANSWERING",
-          "ANSWERED",
-          "RESOLVED",
-          "INCORPORATING",
-          "INCORPORATED"
-        ]
+        "enum": ["PENDING", "ANSWERING", "ANSWERED", "RESOLVED", "INCORPORATING", "INCORPORATED"]
       },
       "AskInteractionRequest": {
         "type": "object",
@@ -1842,10 +1670,7 @@
             "minimum": 0
           }
         },
-        "required": [
-          "question",
-          "timestamp"
-        ],
+        "required": ["question", "timestamp"],
         "additionalProperties": false
       },
       "InteractionResponse": {
@@ -1876,15 +1701,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "question",
-          "timestamp",
-          "status",
-          "answer",
-          "helpful",
-          "segmentOrder"
-        ],
+        "required": ["id", "question", "timestamp", "status", "answer", "helpful", "segmentOrder"],
         "additionalProperties": {}
       },
       "RedeemPairingRequest": {
@@ -1896,9 +1713,7 @@
             "maxLength": 256
           }
         },
-        "required": [
-          "token"
-        ],
+        "required": ["token"],
         "additionalProperties": false
       },
       "RedeemPairingResponse": {
@@ -1916,10 +1731,7 @@
             ]
           }
         },
-        "required": [
-          "token",
-          "user"
-        ],
+        "required": ["token", "user"],
         "additionalProperties": false
       },
       "PairedUser": {
@@ -1943,13 +1755,7 @@
             "$ref": "#/components/schemas/UserRole"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "email",
-          "image",
-          "role"
-        ],
+        "required": ["id", "name", "email", "image", "role"],
         "additionalProperties": false
       }
     }
@@ -2126,6 +1932,162 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/learning-targets": {
+      "get": {
+        "operationId": "listLearningTargets",
+        "summary": "Learner-marked words, phrases, and sentences for focused practice.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLearningTargetsResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "addLearningTarget",
+        "summary": "Add or refresh a learner-marked difficult word, phrase, or sentence.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningTarget"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLearningTargetRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/learning-targets/{targetId}/visual-cue": {
+      "post": {
+        "operationId": "addLearningTargetVisualCue",
+        "summary": "Attach a visual cue to a learner-marked target when configured.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningTarget"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/learning-targets/{targetId}/pronunciation": {
+      "post": {
+        "operationId": "generateLearningTargetPronunciation",
+        "summary": "Generate pronunciation audio for a learner-marked target when configured.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningTarget"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "security": [
           {
             "bearerAuth": []

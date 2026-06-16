@@ -523,6 +523,82 @@ function PlatformSection({
   );
 }
 
+interface SpeechProviderOnlySectionProps {
+  title: string;
+  icon: 'volume' | 'mic';
+  providers: ProviderOption[];
+  selectedProvider: string;
+  onProviderChange: (provider: string) => void;
+}
+
+function SpeechProviderOnlySection({
+  title,
+  icon,
+  providers,
+  selectedProvider,
+  onProviderChange,
+}: SpeechProviderOnlySectionProps) {
+  const activeProvider = providers.find((provider) => provider.id === selectedProvider) ?? providers[0];
+  const modelCount = activeProvider?.models.length ?? 0;
+
+  return (
+    <div className={shell.panel}>
+      <div className={shell.panelHead}>
+        <span className={shell.phTitle}>
+          <Glyph name={icon} size={15} />
+          {title}
+        </span>
+      </div>
+      <div className={shell.panelBody}>
+        <p
+          style={{
+            fontSize: '13px',
+            color: 'var(--ink-soft)',
+            marginTop: 0,
+            marginBottom: '14px',
+            lineHeight: 1.6,
+          }}
+        >
+          Admin chooses the provider for the install. Learners choose the compatible model for
+          their language from their own Settings page.
+        </p>
+        <div className={shell.seg} role="radiogroup" aria-label={`${title} provider`}>
+          {providers.map((provider) => (
+            <button
+              key={provider.id}
+              type="button"
+              role="radio"
+              aria-checked={selectedProvider === provider.id}
+              aria-label={provider.displayName}
+              className={selectedProvider === provider.id ? shell.on : ''}
+              onClick={() => onProviderChange(provider.id)}
+              style={{ minHeight: '44px' }}
+            >
+              {provider.displayName}
+            </button>
+          ))}
+        </div>
+        {activeProvider ? (
+          <p
+            style={{
+              fontSize: '12.5px',
+              color: 'var(--ink-mute)',
+              margin: '12px 0 0',
+            }}
+          >
+            {modelCount} {modelCount === 1 ? 'model' : 'models'} will be available for
+            language-aware learner selection when provider access is configured.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function firstModelForProvider(providers: ProviderOption[], providerId: string): string {
+  return providers.find((provider) => provider.id === providerId)?.models[0]?.id ?? '';
+}
+
 // ---------------------------------------------------------------------------
 // Root export
 // ---------------------------------------------------------------------------
@@ -548,25 +624,8 @@ export function ProviderModelConfig({
     compositeIds: false,
   });
 
-  const ttsState = useUnifiedModelState({
-    initialDefault: {
-      provider: initialConfig.model.ttsProvider,
-      model: initialConfig.model.ttsModel,
-    },
-    initialIncluded: initialConfig.includedTtsModels,
-    providers: ttsProviders,
-    compositeIds: true,
-  });
-
-  const sttState = useUnifiedModelState({
-    initialDefault: {
-      provider: initialConfig.model.sttProvider,
-      model: initialConfig.model.sttModel,
-    },
-    initialIncluded: initialConfig.includedSttModels,
-    providers: sttProviders,
-    compositeIds: true,
-  });
+  const [ttsProvider, setTtsProvider] = useState(initialConfig.model.ttsProvider);
+  const [sttProvider, setSttProvider] = useState(initialConfig.model.sttProvider);
 
   const [platformAiProvider, setPlatformAiProvider] = useState(
     initialConfig.platform.aiProvider,
@@ -586,15 +645,15 @@ export function ProviderModelConfig({
           model: {
             aiProvider: aiState.defaultSelection.provider,
             aiModel: aiState.defaultSelection.model,
-            ttsProvider: ttsState.defaultSelection.provider,
-            ttsModel: ttsState.defaultSelection.model,
-            sttProvider: sttState.defaultSelection.provider,
-            sttModel: sttState.defaultSelection.model,
+            ttsProvider,
+            ttsModel: firstModelForProvider(ttsProviders, ttsProvider),
+            sttProvider,
+            sttModel: firstModelForProvider(sttProviders, sttProvider),
           },
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
           includedModels: setToArray(aiState.included),
-          includedTtsModels: setToArray(ttsState.included),
-          includedSttModels: setToArray(sttState.included),
+          includedTtsModels: null,
+          includedSttModels: null,
         }),
       });
 
@@ -615,8 +674,20 @@ export function ProviderModelConfig({
   return (
     <div>
       <TaskSection title="Language model (AI)" icon="spark" state={aiState} />
-      <TaskSection title="Text-to-speech (TTS)" icon="volume" state={ttsState} />
-      <TaskSection title="Speech-to-text (STT)" icon="mic" state={sttState} />
+      <SpeechProviderOnlySection
+        title="Text-to-speech provider"
+        icon="volume"
+        providers={ttsProviders}
+        selectedProvider={ttsProvider}
+        onProviderChange={setTtsProvider}
+      />
+      <SpeechProviderOnlySection
+        title="Speech-to-text provider"
+        icon="mic"
+        providers={sttProviders}
+        selectedProvider={sttProvider}
+        onProviderChange={setSttProvider}
+      />
 
       <PlatformSection
         aiProviders={aiProviders}

@@ -4,10 +4,13 @@ import { join } from 'path';
 // Runtime and CI run with cwd=apps/web, so prompts live at <cwd>/prompts. Some
 // tooling (e.g. the pre-commit test runner) invokes from the monorepo root, so
 // fall back to apps/web/prompts. Still cwd-based, no __dirname across packages.
-const PROMPTS_DIR =
-  [join(process.cwd(), 'prompts'), join(process.cwd(), 'apps', 'web', 'prompts')].find(
-    existsSync
-  ) ?? join(process.cwd(), 'prompts');
+function resolvePromptsDir(): string {
+  const localPrompts = join(/* turbopackIgnore: true */ process.cwd(), 'prompts');
+  if (existsSync(/* turbopackIgnore: true */ localPrompts)) return localPrompts;
+  return join(/* turbopackIgnore: true */ process.cwd(), 'apps', 'web', 'prompts');
+}
+
+const PROMPTS_DIR = resolvePromptsDir();
 const cache = new Map<string, string>();
 
 /**
@@ -18,7 +21,10 @@ export function loadPrompt(path: string): string {
   const cached = cache.get(path);
   if (cached !== undefined) return cached;
 
-  const content = readFileSync(join(PROMPTS_DIR, path), 'utf-8');
+  const content = readFileSync(
+    /* turbopackIgnore: true */ join(/* turbopackIgnore: true */ PROMPTS_DIR, path),
+    'utf-8',
+  );
   cache.set(path, content);
   return content;
 }

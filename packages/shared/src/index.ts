@@ -21,6 +21,8 @@ export type {
   EdgeType,
   PracticeKind,
   PracticeStatus,
+  FocusTargetKind,
+  FocusTargetSource,
   ExamInstitution,
   MockExamStatus,
   PedagogyStyle,

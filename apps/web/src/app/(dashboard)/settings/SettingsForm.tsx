@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
@@ -30,11 +31,37 @@ interface CategoryTag {
   children: SubTag[];
 }
 
+interface SpeechProviderModel {
+  id: string;
+  displayName: string;
+  tier: string;
+  supportedLanguages: string[];
+}
+
+interface SttProviderClientMeta {
+  id: string;
+  displayName: string;
+  defaultModel: string;
+  models: SpeechProviderModel[];
+}
+
+interface SpeechTtsProviderClientMeta {
+  id: string;
+  displayName: string;
+  models: SpeechProviderModel[];
+}
+
 interface SettingsFormProps {
   initialName: string;
   email: string;
   image: string | null;
+  role: string;
   preferredLanguage: string | null;
+  speechLanguage: string | null;
+  selectedTtsProvider: string;
+  selectedSttProvider: string;
+  ttsProviderAvailable: boolean;
+  sttProviderAvailable: boolean;
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
@@ -42,16 +69,46 @@ interface SettingsFormProps {
   aiProviderMeta: AiProviderClientMeta[];
   aiSystemProviders: Array<{ id: string; label: string; description: string; available: boolean }>;
   ttsProviderMeta: TtsProviderClientMeta[];
+  speechTtsProviderMeta: SpeechTtsProviderClientMeta[];
+  sttProviderMeta: SttProviderClientMeta[];
+  initialPreferredTtsModel: string | null;
+  initialPreferredSttModel: string | null;
   initialPreferredAiModel: string | null;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
+}
+
+function languageName(code: string | null): string {
+  if (!code) return 'your course language';
+  return LANGUAGE_DISPLAY[code as keyof typeof LANGUAGE_DISPLAY] ?? code.toUpperCase();
+}
+
+function compatibleModels(
+  models: SpeechProviderModel[],
+  language: string | null
+): SpeechProviderModel[] {
+  if (!language) return models;
+  return models.filter((model) => model.supportedLanguages.includes(language));
+}
+
+function providerLabel(
+  providerId: string,
+  providers: Array<{ id: string; displayName: string }>
+): string {
+  return providers.find((provider) => provider.id === providerId)?.displayName ?? providerId;
 }
 
 export function SettingsForm({
   initialName,
   email,
   image,
+  role,
   preferredLanguage: initialPreferredLanguage,
+  speechLanguage,
+  selectedTtsProvider,
+  selectedSttProvider,
+  ttsProviderAvailable,
+  sttProviderAvailable,
   interestCategories,
   selectedInterestTagIds,
   configuredTtsProviders,
@@ -59,10 +116,15 @@ export function SettingsForm({
   aiProviderMeta,
   aiSystemProviders,
   ttsProviderMeta,
+  speechTtsProviderMeta,
+  sttProviderMeta,
+  initialPreferredTtsModel,
+  initialPreferredSttModel,
   initialPreferredAiModel,
   initialEmailNotifications,
   initialPushNotifications,
 }: SettingsFormProps) {
+  const router = useRouter();
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -85,6 +147,24 @@ export function SettingsForm({
   );
   const [languageSaving, setLanguageSaving] = useState(false);
   const [languageSaved, setLanguageSaved] = useState(false);
+
+  const isAdmin = role === 'ADMIN';
+  const activeSpeechLanguage = preferredLanguage ?? speechLanguage;
+  const activeSpeechLanguageName = languageName(activeSpeechLanguage);
+  const selectedTtsProviderMeta = speechTtsProviderMeta.find((provider) => provider.id === selectedTtsProvider);
+  const selectedSttProviderMeta = sttProviderMeta.find((provider) => provider.id === selectedSttProvider);
+  const ttsModels = compatibleModels(
+    selectedTtsProviderMeta?.models ?? [],
+    activeSpeechLanguage
+  );
+  const sttModels = compatibleModels(
+    selectedSttProviderMeta?.models ?? [],
+    activeSpeechLanguage
+  );
+  const [preferredTtsModel, setPreferredTtsModel] = useState(initialPreferredTtsModel ?? '');
+  const [preferredSttModel, setPreferredSttModel] = useState(initialPreferredSttModel ?? '');
+  const [speechSaving, setSpeechSaving] = useState(false);
+  const [speechSaved, setSpeechSaved] = useState(false);
 
   // AI model preference state
   const [preferredAiModel, setPreferredAiModel] = useState(initialPreferredAiModel ?? '');
@@ -155,12 +235,37 @@ export function SettingsForm({
     }
   };
 
+  const handleSaveSpeechModels = async () => {
+    setSpeechSaving(true);
+    setSpeechSaved(false);
+    try {
+      const response = await fetch('/api/v1/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          preferredTtsModel: ttsModels.some((model) => model.id === preferredTtsModel)
+            ? preferredTtsModel
+            : null,
+          preferredSttModel: sttModels.some((model) => model.id === preferredSttModel)
+            ? preferredSttModel
+            : null,
+        }),
+      });
+      if (response.ok) {
+        setSpeechSaved(true);
+        setTimeout(() => setSpeechSaved(false), 3000);
+      }
+    } finally {
+      setSpeechSaving(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     const response = await fetch('/api/v1/users/me', {
       method: 'DELETE',
     });
     if (response.ok) {
-      window.location.href = '/';
+      router.push('/');
     }
   };
 
@@ -385,6 +490,115 @@ export function SettingsForm({
         </div>
       </section>
 
+      {/* Speech Model Preference Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Speech models</h2>
+        <p className={styles.sectionDesc}>
+          Choose the models Sotto should use for {activeSpeechLanguageName}. Providers are set by
+          the admin so every learner uses the same available speech stack.
+        </p>
+
+        {!ttsProviderAvailable && !isAdmin ? (
+          <div className={styles.accessBanner} role="alert">
+            <strong>Text-to-speech provider unavailable.</strong>
+            <span>
+              {providerLabel(selectedTtsProvider, speechTtsProviderMeta)} is selected for this install,
+              but your profile cannot use it yet. Tell an admin to enable learner access or switch
+              the install to another provider.
+            </span>
+          </div>
+        ) : null}
+
+        {!sttProviderAvailable && !isAdmin ? (
+          <div className={styles.accessBanner} role="alert">
+            <strong>Speech-to-text provider unavailable.</strong>
+            <span>
+              {providerLabel(selectedSttProvider, sttProviderMeta)} is selected for this install,
+              but your profile cannot use it yet. Tell an admin to enable learner access or switch
+              the install to another provider.
+            </span>
+          </div>
+        ) : null}
+
+        <div className={styles.speechModelGrid}>
+          <div className={styles.speechModelPanel}>
+            <div className={styles.speechModelTopline}>Text to speech</div>
+            <div className={styles.speechModelProvider}>
+              {providerLabel(selectedTtsProvider, speechTtsProviderMeta)}
+            </div>
+            <label htmlFor="preferredTtsModel" className={styles.fieldLabel}>
+              Model
+            </label>
+            <select
+              id="preferredTtsModel"
+              className={styles.modelSelect}
+              value={ttsModels.some((model) => model.id === preferredTtsModel) ? preferredTtsModel : ''}
+              onChange={(event) => setPreferredTtsModel(event.target.value)}
+              disabled={!ttsProviderAvailable || ttsModels.length === 0}
+              aria-label="Preferred text-to-speech model"
+            >
+              <option value="">Best compatible default</option>
+              {ttsModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.displayName} — {model.tier}
+                </option>
+              ))}
+            </select>
+            <p className={styles.speechModelHint}>
+              {ttsModels.length > 0
+                ? `${ttsModels.length} model${ttsModels.length === 1 ? '' : 's'} available for ${activeSpeechLanguageName}.`
+                : `No ${activeSpeechLanguageName} TTS model is available on this provider.`}
+            </p>
+          </div>
+
+          <div className={styles.speechModelPanel}>
+            <div className={styles.speechModelTopline}>Speech to text</div>
+            <div className={styles.speechModelProvider}>
+              {providerLabel(selectedSttProvider, sttProviderMeta)}
+            </div>
+            <label htmlFor="preferredSttModel" className={styles.fieldLabel}>
+              Model
+            </label>
+            <select
+              id="preferredSttModel"
+              className={styles.modelSelect}
+              value={sttModels.some((model) => model.id === preferredSttModel) ? preferredSttModel : ''}
+              onChange={(event) => setPreferredSttModel(event.target.value)}
+              disabled={!sttProviderAvailable || sttModels.length === 0}
+              aria-label="Preferred speech-to-text model"
+            >
+              <option value="">Best compatible default</option>
+              {sttModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.displayName} — {model.tier}
+                </option>
+              ))}
+            </select>
+            <p className={styles.speechModelHint}>
+              {sttModels.length > 0
+                ? `${sttModels.length} model${sttModels.length === 1 ? '' : 's'} available for ${activeSpeechLanguageName}.`
+                : `No ${activeSpeechLanguageName} STT model is available on this provider.`}
+            </p>
+          </div>
+        </div>
+
+        <div className={styles.formActions}>
+          <Button
+            onClick={handleSaveSpeechModels}
+            loading={speechSaving}
+            disabled={
+              speechSaving ||
+              !ttsProviderAvailable ||
+              !sttProviderAvailable ||
+              ttsModels.length === 0 ||
+              sttModels.length === 0
+            }
+          >
+            {speechSaved ? 'Saved' : 'Save Speech Models'}
+          </Button>
+        </div>
+      </section>
+
       {/* Interests Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Interests</h2>
@@ -575,17 +789,20 @@ export function SettingsForm({
       </section>
 
       {/* TTS Provider Keys */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Voice Providers</h2>
-        <p className={styles.sectionDesc}>
-          Add voice provider keys to use your preferred TTS models. Keys are encrypted with
-          AES-256-GCM.
-        </p>
-        <TtsProviderCards
-          initialConfigured={configuredTtsProviders}
-          providerMeta={ttsProviderMeta}
-        />
-      </section>
+      {isAdmin ? (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Voice Providers</h2>
+          <p className={styles.sectionDesc}>
+            Add voice provider keys for the household speech stack. Learners choose compatible
+            models for their language in Speech models.
+          </p>
+          <TtsProviderCards
+            initialConfigured={configuredTtsProviders}
+            providerMeta={ttsProviderMeta}
+            preferredLanguage={preferredLanguage}
+          />
+        </section>
+      ) : null}
 
       {/* Danger Zone */}
       <section className={`${styles.section} ${styles.dangerSection}`}>

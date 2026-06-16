@@ -1,19 +1,38 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { TTS_PROVIDERS, STT_PROVIDERS } from '../data';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
+import { LANGUAGES, TTS_PROVIDERS, STT_PROVIDERS } from '../data';
 import type { VoiceState } from '../WelcomeFlow';
 import { DEFAULT_LOCAL_STT_BASE_URL, DEFAULT_LOCAL_TTS_BASE_URL } from '../providerMap';
 import { Glyph } from '../Glyph';
+import {
+  getWelcomeSpeechProviderLanguageCount,
+  normalizeSottoLanguageCode,
+  SOTTO_LANGUAGE_CODES,
+  supportsWelcomeSpeechProviderLanguage,
+} from '@/lib/speech-language-support';
 import t from '../theme.module.css';
 import c from '../components.module.css';
+
+const VISUAL_CUE_KEY_ID = 'visual:pexels';
+
+function displayLanguageName(code: string): string {
+  return (
+    LANGUAGES.find((language) => language.code === code)?.name ??
+    LANGUAGE_DISPLAY[code as keyof typeof LANGUAGE_DISPLAY] ??
+    code.toUpperCase()
+  );
+}
 
 interface VoicePickerProps {
   label: string;
   sub: string;
   providers: typeof TTS_PROVIDERS;
+  kind: 'tts' | 'stt';
   value: string;
   onChange: (id: string) => void;
+  language: string;
   keys: Record<string, string>;
   onKey: (id: string, val: string) => void;
   baseUrls: Record<string, string>;
@@ -26,8 +45,10 @@ function VoicePicker({
   label,
   sub,
   providers,
+  kind,
   value,
   onChange,
+  language,
   keys,
   onKey,
   baseUrls,
@@ -36,6 +57,14 @@ function VoicePicker({
   demoMode,
 }: VoicePickerProps) {
   const sel = providers.find((p) => p.id === value) ?? providers[0];
+  const languageCode = normalizeSottoLanguageCode(language);
+  const languageLabel = languageCode ? displayLanguageName(languageCode) : null;
+  const selectedSupported = supportsWelcomeSpeechProviderLanguage(kind, sel.id, languageCode);
+  const selectedReason = languageLabel
+    ? selectedSupported
+      ? `${sel.name} has a compatible ${kind === 'tts' ? 'speech' : 'transcription'} model for ${languageLabel}. Sotto keeps the configured model when it fits and swaps within ${sel.name} before calling the provider when it does not.`
+      : `${sel.name} has no ${kind === 'tts' ? 'speech' : 'transcription'} model for ${languageLabel}. Choose another provider before continuing.`
+    : 'Choose a course language first; Sotto checks model-language fit before any provider call.';
   const k = keys[sel.id] ?? '';
   const bu = baseUrls[sel.id] ?? '';
   const selectedLinkLabel = sel.apiLabel === 'API' ? 'Get key' : (sel.apiLabel ?? 'Get key');
@@ -52,12 +81,25 @@ function VoicePicker({
         {providers.map((p) => {
           const set = !p.local && (keys[p.id] ?? '').trim().length > 0;
           const isSelected = value === p.id;
+          const isSupported = supportsWelcomeSpeechProviderLanguage(kind, p.id, languageCode);
+          const languageCount = getWelcomeSpeechProviderLanguageCount(kind, p.id);
+          const languageNote = languageLabel
+            ? isSupported
+              ? `${languageLabel} ready`
+              : `No ${languageLabel}`
+            : `${languageCount}/${SOTTO_LANGUAGE_CODES.size} languages`;
           return (
             <button
               key={p.id}
-              className={`${c.voiceChoice} ${isSelected ? c.voiceChoiceSel : ''}`}
-              onClick={() => onChange(p.id)}
+              className={`${c.voiceChoice} ${isSelected ? c.voiceChoiceSel : ''} ${
+                !isSupported ? c.voiceChoiceDisabled : ''
+              }`}
+              onClick={() => {
+                if (isSupported) onChange(p.id);
+              }}
               aria-pressed={isSelected}
+              aria-disabled={!isSupported}
+              disabled={!isSupported}
             >
               <span className={c.voiceChipText}>
                 <span className={c.voiceChipName}>
@@ -75,10 +117,18 @@ function VoicePicker({
                   )}
                 </span>
                 <span className={c.voiceChipNote}>{p.note}</span>
+                <span className={`${c.vcLang} ${!isSupported ? c.vcLangBad : ''}`}>
+                  {languageNote}
+                </span>
               </span>
             </button>
           );
         })}
+      </div>
+
+      <div className={`${c.voiceReason} ${!selectedSupported ? c.voiceReasonWarn : ''}`}>
+        <Glyph name={selectedSupported ? 'check' : 'x'} size={13} />
+        <span>{selectedReason}</span>
       </div>
 
       {demoMode ? (
@@ -168,9 +218,136 @@ function VoicePicker({
   );
 }
 
+function VisualCuePicker({
+  voice,
+  demoMode,
+  onProvider,
+  onKey,
+}: {
+  voice: VoiceState;
+  demoMode: boolean;
+  onProvider: (provider: VoiceState['visualCueProvider']) => void;
+  onKey: (value: string) => void;
+}) {
+  const enabled = voice.visualCueProvider === 'pexels';
+  const key = voice.keys[VISUAL_CUE_KEY_ID] ?? '';
+
+  return (
+    <section className={c.learningBlock} aria-labelledby="learning-tools-title">
+      <div className={c.learningHead}>
+        <div>
+          <span className={t.mlabel}>Learning actions</span>
+          <h2 id="learning-tools-title" className={c.learningTitle}>
+            Right-click practice that feeds the model
+          </h2>
+        </div>
+        <span className={c.learningBadge}>optional</span>
+      </div>
+
+      <div className={c.learningFlow} aria-label="Right-click learning flow">
+        <div className={c.learningStep}>
+          <Glyph name="book" size={16} />
+          <span>Select a word or sentence</span>
+        </div>
+        <div className={c.learningStep}>
+          <Glyph name="graph" size={16} />
+          <span>Mark it as a weak target</span>
+        </div>
+        <div className={c.learningStep}>
+          <Glyph name="volume" size={16} />
+          <span>Practice, hear it, or attach an image</span>
+        </div>
+      </div>
+
+      <p className={c.learningCopy}>
+        Pronounce uses the text-to-speech provider above. Image cues use a separate visual
+        provider so practice can build memory from context instead of translation.
+      </p>
+
+      <div className={c.visualChoiceRow} role="group" aria-label="Visual cue provider">
+        <button
+          type="button"
+          className={`${c.visualChoice} ${enabled ? c.visualChoiceSel : ''}`}
+          aria-pressed={enabled}
+          onClick={() => onProvider('pexels')}
+        >
+          <Glyph name="spark" size={15} />
+          <span>
+            <strong>Pexels</strong>
+            <small>licensed image search for memory cues</small>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`${c.visualChoice} ${!enabled ? c.visualChoiceSel : ''}`}
+          aria-pressed={!enabled}
+          onClick={() => onProvider('off')}
+        >
+          <Glyph name="x" size={15} />
+          <span>
+            <strong>Off</strong>
+            <small>save focus targets without images</small>
+          </span>
+        </button>
+      </div>
+
+      {enabled ? (
+        demoMode ? (
+          <div className={c.voiceNote}>
+            <Glyph name="lock" size={13} />
+            Hosted demo preview · no visual provider key is requested or saved.
+            <a
+              className={c.voiceInlineLink}
+              href="https://www.pexels.com/api/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open Pexels API page"
+            >
+              Get key
+            </a>
+          </div>
+        ) : (
+          <div className={c.voiceKey}>
+            <div className={c.vkRow}>
+              <span className={c.vkLabel}>
+                <Glyph name="key" size={13} /> Pexels key
+              </span>
+              <input
+                className={c.vkInput}
+                type="password"
+                placeholder="pexels_..."
+                value={key}
+                onChange={(event) => onKey(event.target.value)}
+                aria-label="Pexels API key"
+              />
+              <a
+                className={c.vkActionLink}
+                href="https://www.pexels.com/api/"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open Pexels API page"
+              >
+                Get key
+              </a>
+            </div>
+            <div className={c.vkNote}>
+              {key.trim()
+                ? 'Saved as an encrypted visual cue key when setup finishes.'
+                : 'Paste now or add it later; image cues stay optional.'}
+            </div>
+          </div>
+        )
+      ) : (
+        <div className={c.vkNote}>Image cues are disabled. Right-click focus practice still works.</div>
+      )}
+    </section>
+  );
+}
+
 interface Props {
   voice: VoiceState;
   demoMode: boolean;
+  language: string;
   setVoice: (updater: (prev: VoiceState) => VoiceState) => void;
   onNext: () => void;
   onBack: () => void;
@@ -195,7 +372,7 @@ function isLocalProvider(id: string, providers: typeof TTS_PROVIDERS) {
   return providers.some((provider) => provider.id === id && provider.local);
 }
 
-export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) {
+export function StepVoice({ voice, demoMode, language, setVoice, onNext, onBack }: Props) {
   const [localCheck, setLocalCheck] = useState<LocalSpeechCheckState>({
     status: 'idle',
     signature: '',
@@ -208,6 +385,11 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
     setVoice((s) => ({ ...s, baseUrls: { ...s.baseUrls, [id]: val } }));
   const ttsIsLocal = isLocalProvider(voice.tts, TTS_PROVIDERS);
   const sttIsLocal = isLocalProvider(voice.stt, STT_PROVIDERS);
+  const ttsLanguageCompatible = supportsWelcomeSpeechProviderLanguage('tts', voice.tts, language);
+  const sttLanguageCompatible = supportsWelcomeSpeechProviderLanguage('stt', voice.stt, language);
+  const languageCompatible = ttsLanguageCompatible && sttLanguageCompatible;
+  const languageCode = normalizeSottoLanguageCode(language);
+  const languageLabel = languageCode ? displayLanguageName(languageCode) : null;
   const needsLocalCheck = !demoMode && (ttsIsLocal || sttIsLocal);
   const localCheckSignature = useMemo(
     () =>
@@ -230,7 +412,8 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
   const localCheckFresh = localCheck.signature === localCheckSignature;
   const localCheckStatus =
     localCheck.status !== 'idle' && !localCheckFresh ? 'stale' : localCheck.status;
-  const canContinue = !needsLocalCheck || (localCheckStatus === 'ok' && localCheckFresh);
+  const canContinue =
+    languageCompatible && (!needsLocalCheck || (localCheckStatus === 'ok' && localCheckFresh));
 
   async function checkLocalSpeech() {
     setLocalCheck({
@@ -286,20 +469,22 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
         <span className={t.eyebrowIdx}>02 ·</span> Voice
       </div>
       <h1 className={t.title}>
-        Choose the voice that <em>speaks with you</em>.
+        Choose the tools that <em>practice with you</em>.
       </h1>
       <p className={t.lede}>
         {demoMode
-          ? 'This hosted walkthrough previews the voice stack without asking for keys. In self-hosted Sotto, these choices power listening lessons and pronunciation feedback.'
-          : 'Listening and speaking run on providers you pick — swap them anytime. Drop in your keys now so the whole stack is wired from the first session; you can change any of it later in settings.'}
+          ? 'This hosted walkthrough previews the learning stack without asking for keys. In self-hosted Sotto, these choices power listening lessons, pronunciation feedback, and right-click focus practice.'
+          : 'Listening, pronunciation, and visual memory cues run on providers you pick — swap them anytime. Drop in your keys now so the whole stack is wired from the first session.'}
       </p>
 
       <VoicePicker
         label="Text to speech"
-        sub="your listening lesson & spoken examples"
+        sub="listening lessons, spoken examples, and right-click Pronounce"
         providers={TTS_PROVIDERS}
+        kind="tts"
         value={voice.tts}
         onChange={(v) => setVoice((s) => ({ ...s, tts: v }))}
+        language={language}
         keys={voice.keys}
         onKey={setKey}
         baseUrls={voice.baseUrls}
@@ -310,10 +495,12 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
 
       <VoicePicker
         label="Speech to text"
-        sub="scores your pronunciation, phoneme by phoneme"
+        sub="speaking submissions and pronunciation feedback"
         providers={STT_PROVIDERS}
+        kind="stt"
         value={voice.stt}
         onChange={(v) => setVoice((s) => ({ ...s, stt: v }))}
+        language={language}
         keys={voice.keys}
         onKey={setKey}
         baseUrls={voice.baseUrls}
@@ -322,11 +509,28 @@ export function StepVoice({ voice, demoMode, setVoice, onNext, onBack }: Props) 
         demoMode={demoMode}
       />
 
+      {!languageCompatible && languageLabel ? (
+        <div className={c.compatWarning} role="alert">
+          <Glyph name="x" size={14} />
+          <span>
+            Choose voice providers with {languageLabel} support before continuing. Runtime
+            generation and speaking grading will reject incompatible model choices.
+          </span>
+        </div>
+      ) : null}
+
+      <VisualCuePicker
+        voice={voice}
+        demoMode={demoMode}
+        onProvider={(provider) => setVoice((s) => ({ ...s, visualCueProvider: provider }))}
+        onKey={(value) => setKey(VISUAL_CUE_KEY_ID, value)}
+      />
+
       <div className={`${c.locknote} ${c.voiceFoot}`}>
         <Glyph name="spark" size={15} />
         {demoMode
           ? 'No credentials are requested or stored in the hosted demo; this is only a preview of the provider choices.'
-          : 'Keys are shared where it makes sense — enter ElevenLabs or OpenAI once and it powers both. Everything writes to your local config, nothing leaves your machine.'}
+          : 'Keys are shared where it makes sense — enter OpenAI, ElevenLabs, or a visual provider once and Sotto uses the selected provider for the matching learning action.'}
       </div>
 
       {needsLocalCheck && (

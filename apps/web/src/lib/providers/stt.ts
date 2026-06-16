@@ -1,8 +1,19 @@
 import { logger } from '../logger';
-import { getSttProviderMeta, isValidSttProviderId, type SttProviderId } from './stt-registry';
-import { getAiKey, getByokKey } from '../byok';
+import {
+  getDefaultSttModelForLanguage,
+  getSttProviderMeta,
+  isValidSttProviderId,
+  supportsSttLanguage,
+  type SttProviderId,
+} from './stt-registry';
+import { getSharedAiKey, getSharedByokKey } from '../byok';
 import { infra } from '../server-config';
 import { detectAudioFormat } from '../audio-format';
+import {
+  fromSttProviderLanguageCode,
+  normalizeSottoLanguageCode,
+  toSttProviderLanguageCode,
+} from '../speech-language-support';
 
 export type { SttProviderId } from './stt-registry';
 
@@ -93,13 +104,14 @@ class OpenAIWhisperProvider implements SttProvider {
     const uint8Array = new Uint8Array(audio);
     const { ext, mime } = detectAudioFormat(audio);
     const file = new File([uint8Array], `audio.${ext}`, { type: mime });
+    const language = normalizeSottoLanguageCode(opts?.language) ?? undefined;
 
     try {
       const response = await this.client.audio.transcriptions.create({
         file,
         model: this.config.model,
         response_format: 'verbose_json',
-        language: opts?.language,
+        language,
         timestamp_granularities: ['word', 'segment'],
       });
 
@@ -144,7 +156,7 @@ class OpenAIWhisperProvider implements SttProvider {
         text: verboseResponse.text,
         segments,
         words,
-        language: verboseResponse.language,
+        language: normalizeSottoLanguageCode(verboseResponse.language) ?? verboseResponse.language,
       };
     } catch (err) {
       if (err instanceof Error && err.message.includes('verbose_json')) {
@@ -156,7 +168,7 @@ class OpenAIWhisperProvider implements SttProvider {
           file,
           model: this.config.model,
           response_format: 'text',
-          language: opts?.language,
+          language,
         });
 
         const text =
@@ -165,7 +177,7 @@ class OpenAIWhisperProvider implements SttProvider {
         return {
           text,
           segments: [{ start: 0, end: 0, text }],
-          language: opts?.language,
+          language,
         };
       }
 
@@ -203,9 +215,10 @@ class ElevenLabsScribeProvider implements SttProvider {
     formData.append('model_id', this.model);
     formData.append('tag_audio_events', 'false');
     formData.append('diarize', 'false');
+    const language = toSttProviderLanguageCode('elevenlabs', opts?.language);
 
-    if (opts?.language) {
-      formData.append('language_code', opts.language);
+    if (language) {
+      formData.append('language_code', language);
     }
 
     const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
@@ -254,7 +267,7 @@ class ElevenLabsScribeProvider implements SttProvider {
       text: data.text,
       segments,
       words,
-      language: data.language_code,
+      language: fromSttProviderLanguageCode('elevenlabs', data.language_code),
     };
   }
 
@@ -338,7 +351,8 @@ class DeepgramProvider implements SttProvider {
       utterances: 'true',
       punctuate: 'true',
     });
-    if (opts?.language) params.set('language', opts.language);
+    const language = toSttProviderLanguageCode('deepgram', opts?.language);
+    if (language) params.set('language', language);
 
     const response = await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
       method: 'POST',
@@ -426,7 +440,12 @@ class DeepgramProvider implements SttProvider {
       durationMs: String(durationMs),
     });
 
-    return { text, segments, words, language: data.metadata?.language };
+    return {
+      text,
+      segments,
+      words,
+      language: fromSttProviderLanguageCode('deepgram', data.metadata?.language),
+    };
   }
 }
 
@@ -479,8 +498,9 @@ class AssemblyAIProvider implements SttProvider {
       submitBody.speech_model = 'conformer-2';
     }
 
-    if (opts?.language) {
-      submitBody.language_code = opts.language;
+    const language = toSttProviderLanguageCode('assemblyai', opts?.language);
+    if (language) {
+      submitBody.language_code = language;
     }
 
     const submitRes = await fetch('https://api.assemblyai.com/v2/transcript', {
@@ -548,7 +568,11 @@ class AssemblyAIProvider implements SttProvider {
           durationMs: String(durationMs),
         });
 
-        return { text, segments, language: result.language_code };
+        return {
+          text,
+          segments,
+          language: fromSttProviderLanguageCode('assemblyai', result.language_code),
+        };
       }
     }
 
@@ -660,8 +684,10 @@ export async function resolveSttProvider(context: {
   userId: string;
   requestedProvider?: SttProviderId;
   requestedModel?: string;
+  /** ISO 639-1 language code — validates provider/model compatibility when set. */
+  language?: string | null;
 }): Promise<ResolvedSttProvider> {
-  const { userId, requestedProvider, requestedModel } = context;
+  const { userId, requestedProvider, requestedModel, language } = context;
 
   if (!requestedProvider) {
     throw new Error('STT provider is required. Choose a provider before transcribing audio.');
@@ -675,7 +701,25 @@ export async function resolveSttProvider(context: {
     );
   }
 
-  const model = requestedModel ?? getSttProviderMeta(requestedProvider).defaultModel;
+  const defaultModel = getSttProviderMeta(requestedProvider).defaultModel;
+  let model = requestedModel ?? defaultModel;
+
+  if (language && !supportsSttLanguage(requestedProvider, model, language)) {
+    const fallback = getDefaultSttModelForLanguage(requestedProvider, language, model);
+    if (!fallback) {
+      throw new Error(
+        `STT provider "${requestedProvider}" does not support language "${language}" with any configured model.`
+      );
+    }
+    logger.info('Language-aware STT model swap', {
+      providerId: requestedProvider,
+      from: model,
+      to: fallback,
+      language,
+    });
+    model = fallback;
+  }
+
   return {
     providerId: requestedProvider,
     apiKey: key,
@@ -693,10 +737,10 @@ async function resolveKeyForProvider(
 ): Promise<string | undefined> {
   // ElevenLabs keys are stored in UserTtsKey, others in UserAiKey
   if (provider === 'elevenlabs') {
-    const byokKey = await getByokKey(userId, 'elevenlabs');
-    return byokKey ?? getSttPlatformKey(provider) ?? undefined;
+    const byokKey = await getSharedByokKey(userId, 'elevenlabs');
+    return byokKey?.apiKey ?? getSttPlatformKey(provider) ?? undefined;
   }
 
-  const byokKey = await getAiKey(userId, provider);
+  const byokKey = await getSharedAiKey(userId, provider);
   return byokKey?.apiKey ?? getSttPlatformKey(provider) ?? undefined;
 }

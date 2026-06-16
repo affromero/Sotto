@@ -42,7 +42,32 @@ vi.mock('@/lib/voice-pool', () => ({
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'test-model' }),
+  getProviderMeta: vi.fn((id: string) => {
+    const allLanguages = new Set(['en', 'es', 'uk']);
+    const humeLanguages = new Set(['en', 'es']);
+    return {
+      defaultModel: id === 'hume' ? 'octave-v2' : 'test-model',
+      models:
+        id === 'hume'
+          ? [
+              {
+                id: 'octave-v2',
+                displayName: 'Octave V2',
+                tier: 'ultra',
+                supportedLanguages: humeLanguages,
+              },
+            ]
+          : [
+              {
+                id: 'test-model',
+                displayName: 'Test Model',
+                tier: 'premium',
+                supportedLanguages: allLanguages,
+              },
+            ],
+      modelsWithoutTextContext: [],
+    };
+  }),
   compareQuality: vi.fn(),
   isValidProviderId: (id: string) =>
     [
@@ -61,6 +86,8 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getByokKey: vi.fn(),
+  getSharedByokKey: vi.fn().mockResolvedValue(null),
+  hasSharedByokKey: vi.fn().mockResolvedValue(false),
   getByokExtraData: vi.fn(),
   listByokProviders: vi.fn().mockResolvedValue([]),
 }));
@@ -192,7 +219,7 @@ describe('Provider Factories', () => {
       );
       expect(mockExecuteClaudeCode).toHaveBeenCalledWith(
         'system',
-        JSON.stringify([{ role: 'user', content: 'hello' }]),
+        'hello',
         { model: 'opus', useWebSearch: undefined }
       );
       expect(result).toEqual({
@@ -242,6 +269,17 @@ describe('Provider Factories', () => {
           requestedProvider: 'auto',
         })
       ).rejects.toThrow('TTS provider is required');
+    });
+
+    it('rejects a selected TTS provider when no model supports the language', async () => {
+      await expect(
+        resolveTtsProvider({
+          userId: 'user-1',
+          episodeId: 'episode-1',
+          requestedProvider: 'hume',
+          language: 'uk',
+        })
+      ).rejects.toThrow('TTS provider "hume" does not support language "uk"');
     });
   });
 

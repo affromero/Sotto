@@ -40,7 +40,6 @@ const GROUPS: Array<{ title: string; fields: Array<{ key: InfraKey; label: strin
     title: 'Speech to text',
     fields: [
       { key: 'sttProvider', label: 'Provider', placeholder: 'openai · deepgram · assemblyai · whisper' },
-      { key: 'sttModel', label: 'Model', placeholder: 'optional' },
       { key: 'sttBaseUrl', label: 'Base URL', placeholder: 'local STT endpoint (optional)' },
     ],
   },
