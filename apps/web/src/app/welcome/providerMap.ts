@@ -97,11 +97,14 @@ export function resolveAi(
   }
 
   if (method === 'cli') {
+    // The CLI backend is the keyless local agent (claude-code). The picked model
+    // is a claude-code model id (haiku/sonnet/opus); it drives generation via
+    // AutoModelConfig + infra.aiModel once persisted.
     return {
       keyPost: null,
       preferredAiProvider: 'claude-code',
-      preferredAiModel: null,
-      infra: { aiProvider: 'claude-code' },
+      preferredAiModel: m || null,
+      infra: { aiProvider: 'claude-code', ...(m && { aiModel: m }) },
     };
   }
 

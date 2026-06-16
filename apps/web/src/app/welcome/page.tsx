@@ -21,6 +21,8 @@ function buildModelMeta(): ModelMeta {
     ai: {
       anthropic: opt(getAiProviderMeta('anthropic').models),
       openai: opt(getAiProviderMeta('openai').models),
+      // Backs the CLI (claude-code) model picker: haiku/sonnet/opus.
+      'claude-code': opt(getAiProviderMeta('claude-code').models),
     },
     tts: {
       elevenlabs: opt(getProviderMeta('elevenlabs').models),
