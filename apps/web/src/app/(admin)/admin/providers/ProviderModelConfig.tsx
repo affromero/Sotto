@@ -2,10 +2,13 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { Glyph } from '@/components/Glyph';
+import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import shell from '../../adminTheme.module.css';
 
+type LogoProvider = Parameters<typeof TtsProviderLogo>[0]['provider'];
+
 // ---------------------------------------------------------------------------
-// Shared types (mirror AutoModelForm's prop shape exactly)
+// Shared types
 // ---------------------------------------------------------------------------
 
 interface ModelOption {
@@ -49,7 +52,7 @@ export interface ProviderModelConfigProps {
 }
 
 // ---------------------------------------------------------------------------
-// Key helpers — mirrors AutoModelForm toKey/parseKey/compositeIds convention
+// Key helpers
 // ---------------------------------------------------------------------------
 
 function toKey(provider: string, model: string, composite: boolean): string {
@@ -87,8 +90,17 @@ function setToArray(set: Set<string>): string[] | null {
   return set.size > 0 ? [...set] : null;
 }
 
+function tierClass(tier: string): string {
+  const t = tier.toLowerCase();
+  if (t === 'fast') return `${shell.tierBadge} ${shell.tierFast}`;
+  if (t === 'best' || t === 'max' || t === 'ultra' || t === 'premium') {
+    return `${shell.tierBadge} ${shell.tierBest}`;
+  }
+  return shell.tierBadge;
+}
+
 // ---------------------------------------------------------------------------
-// Unified model state hook — identical logic to AutoModelForm
+// Unified model state hook
 // ---------------------------------------------------------------------------
 
 interface UnifiedStateConfig {
@@ -161,14 +173,14 @@ type UnifiedModelState = ReturnType<typeof useUnifiedModelState>;
 interface TaskSectionProps {
   title: string;
   icon: 'spark' | 'volume' | 'mic';
+  lede?: string;
   state: UnifiedModelState;
 }
 
-function TaskSection({ title, icon, state }: TaskSectionProps) {
+function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
   const { providers, compositeIds } = state;
   const [open, setOpen] = useState(false);
 
-  // Derive the active provider from the current defaultKey
   const activeProviderId = state.defaultSelection.provider || providers[0]?.id || '';
   const [selectedProvider, setSelectedProvider] = useState(activeProviderId);
 
@@ -177,19 +189,24 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
     [providers, selectedProvider],
   );
 
-  // Cards to display — if no models, show a single "use configured" card
+  // Cards for the selected provider — a "use configured" card when it has no models.
   const cards = useMemo(() => {
     if (!providerData) return [];
     if (providerData.models.length === 0) {
-      // Codex / local provider with no enumerated models
-      return [{ id: '', displayName: `Use the configured ${providerData.displayName} model`, tier: '', price: undefined }];
+      return [
+        {
+          id: '',
+          displayName: `Use the configured ${providerData.displayName} model`,
+          tier: '',
+          price: undefined,
+        },
+      ];
     }
     return providerData.models;
   }, [providerData]);
 
   function handleProviderChange(newProvider: string) {
     setSelectedProvider(newProvider);
-    // Auto-select first model of new provider
     const pData = providers.find((p) => p.id === newProvider);
     if (pData) {
       const firstKey = pData.models[0]
@@ -199,18 +216,19 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
     }
   }
 
-  // Flat list for the advanced learner-available section
   const flatModels = useMemo(
     () =>
       providers.flatMap((p) => {
         if (p.models.length === 0) {
-          return [{ provider: p, model: { id: '', displayName: `${p.displayName} (configured)`, tier: '', price: undefined }, key: toKey(p.id, '', compositeIds) }];
+          return [
+            {
+              provider: p,
+              model: { id: '', displayName: `${p.displayName} (configured)`, tier: '', price: undefined },
+              key: toKey(p.id, '', compositeIds),
+            },
+          ];
         }
-        return p.models.map((m) => ({
-          provider: p,
-          model: m,
-          key: toKey(p.id, m.id, compositeIds),
-        }));
+        return p.models.map((m) => ({ provider: p, model: m, key: toKey(p.id, m.id, compositeIds) }));
       }),
     [providers, compositeIds],
   );
@@ -225,55 +243,34 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
       </div>
 
       <div className={shell.panelBody}>
-        {/* Step 1: Provider chooser */}
-        <div style={{ marginBottom: '16px' }}>
-          <div
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: '10px',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-mute)',
-              marginBottom: '8px',
-            }}
-          >
-            Provider
-          </div>
-          <div
-            className={shell.seg}
-            role="radiogroup"
-            aria-label={`${title} provider`}
-          >
-            {providers.map((p) => (
+        {lede ? <p className={shell.sectionLede}>{lede}</p> : null}
+
+        {/* Provider chips */}
+        <div className={shell.pickLabel}>Provider</div>
+        <div className={shell.provGrid} role="radiogroup" aria-label={`${title} provider`}>
+          {providers.map((p) => {
+            const on = selectedProvider === p.id;
+            return (
               <button
                 key={p.id}
                 type="button"
                 role="radio"
-                aria-checked={selectedProvider === p.id}
+                aria-checked={on}
                 aria-label={p.displayName}
-                className={selectedProvider === p.id ? shell.on : ''}
+                className={`${shell.provChip}${on ? ` ${shell.on}` : ''}`}
                 onClick={() => handleProviderChange(p.id)}
-                style={{ minHeight: '44px' }}
               >
-                {p.displayName}
+                <span className={shell.provChipLogo} aria-hidden="true">
+                  <TtsProviderLogo provider={p.id as LogoProvider} size={20} />
+                </span>
+                <span className={shell.provChipName}>{p.displayName}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        {/* Step 2: Model grid for the selected provider */}
-        <div
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: '10px',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-mute)',
-            marginBottom: '10px',
-          }}
-        >
-          Model
-        </div>
+        {/* Model grid for the selected provider */}
+        <div className={shell.pickLabel}>Default model</div>
         <div className={shell.modelGrid} role="radiogroup" aria-label={`${title} model`}>
           {cards.map((model) => {
             const cardKey = toKey(selectedProvider, model.id, compositeIds);
@@ -289,8 +286,10 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
                 onClick={() => state.setDefault(cardKey)}
                 style={{ minHeight: '44px' }}
               >
-                <div className={shell.mcName}>{model.displayName}</div>
-                {model.tier && <div className={shell.mcNote}>{model.tier}</div>}
+                <div className={shell.mcName}>
+                  {model.displayName}
+                  {model.tier ? <span className={tierClass(model.tier)}>{model.tier}</span> : null}
+                </div>
                 {model.price && <div className={shell.mcPrice}>{model.price}</div>}
                 <span className={shell.mcCheck} aria-hidden="true">
                   <Glyph name="check" size={14} />
@@ -300,50 +299,29 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
           })}
         </div>
 
-        {/* Advanced: learner-available models (collapsible) */}
-        <div style={{ marginTop: '16px', borderTop: '1px solid var(--line)', paddingTop: '14px' }}>
+        {/* Advanced: learner-available models */}
+        <div className={shell.advWrap}>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'var(--mono)',
-              fontSize: '10px',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-mute)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0',
-              minHeight: '44px',
-            }}
+            className={shell.advToggle}
             aria-label={`${open ? 'Collapse' : 'Expand'} learner-available models for ${title}`}
           >
             <Glyph name={open ? 'arrow' : 'plus'} size={12} />
-            Advanced: learner-available models
+            Learner-available models
           </button>
 
           {open && (
-            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className={shell.advList}>
               {flatModels.map(({ model, key, provider: prov }) => {
                 const checked = state.included.has(key);
                 const isDefault = key === state.defaultKey;
                 return (
                   <label
                     key={key}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      fontSize: '13px',
-                      color: 'var(--ink)',
-                      cursor: isDefault ? 'default' : 'pointer',
-                      minHeight: '44px',
-                    }}
+                    className={shell.advRow}
+                    style={{ cursor: isDefault ? 'default' : 'pointer' }}
                   >
                     <input
                       type="checkbox"
@@ -351,18 +329,10 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
                       disabled={isDefault}
                       onChange={() => state.toggleIncluded(key)}
                       aria-label={`${model.displayName} (${prov.displayName}) available to learners`}
-                      style={{ width: '16px', height: '16px', flexShrink: 0 }}
                     />
                     <span>
                       <span style={{ fontWeight: 500 }}>{model.displayName}</span>
-                      <span
-                        style={{
-                          fontFamily: 'var(--mono)',
-                          fontSize: '10px',
-                          color: 'var(--ink-mute)',
-                          marginLeft: '7px',
-                        }}
-                      >
+                      <span className={shell.advMeta}>
                         {prov.displayName}
                         {isDefault ? ' · current default' : ''}
                       </span>
@@ -373,19 +343,8 @@ function TaskSection({ title, icon, state }: TaskSectionProps) {
               <button
                 type="button"
                 onClick={state.reset}
-                style={{
-                  background: 'none',
-                  border: '1px solid var(--line-strong)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--sans)',
-                  fontSize: '11.5px',
-                  color: 'var(--ink-soft)',
-                  padding: '6px 10px',
-                  marginTop: '4px',
-                  alignSelf: 'flex-start',
-                  minHeight: '44px',
-                }}
+                className={shell.btnSm}
+                style={{ alignSelf: 'flex-start', marginTop: '6px' }}
                 aria-label={`Reset ${title} to default model only`}
               >
                 Reset to default only
@@ -445,30 +404,13 @@ function PlatformSection({
         </span>
       </div>
       <div className={shell.panelBody}>
-        <p
-          style={{
-            fontSize: '13px',
-            color: 'var(--ink-soft)',
-            marginTop: 0,
-            marginBottom: '14px',
-            lineHeight: 1.6,
-          }}
-        >
+        <p className={shell.sectionLede}>
           AI model for internal platform tasks (handle screening, credential lookup, language
           detection) that run without learner context.
         </p>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label
-              htmlFor="platform-provider"
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: '10px',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-mute)',
-              }}
-            >
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label htmlFor="platform-provider" className={shell.pickLabel} style={{ margin: 0 }}>
               Provider
             </label>
             <select
@@ -488,17 +430,8 @@ function PlatformSection({
           </div>
 
           {models.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <label
-                htmlFor="platform-model"
-                style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: '10px',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-mute)',
-                }}
-              >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label htmlFor="platform-model" className={shell.pickLabel} style={{ margin: 0 }}>
                 Model
               </label>
               <select
@@ -523,85 +456,13 @@ function PlatformSection({
   );
 }
 
-interface SpeechProviderOnlySectionProps {
-  title: string;
-  icon: 'volume' | 'mic';
-  providers: ProviderOption[];
-  selectedProvider: string;
-  onProviderChange: (provider: string) => void;
-}
-
-function SpeechProviderOnlySection({
-  title,
-  icon,
-  providers,
-  selectedProvider,
-  onProviderChange,
-}: SpeechProviderOnlySectionProps) {
-  const activeProvider = providers.find((provider) => provider.id === selectedProvider) ?? providers[0];
-  const modelCount = activeProvider?.models.length ?? 0;
-
-  return (
-    <div className={shell.panel}>
-      <div className={shell.panelHead}>
-        <span className={shell.phTitle}>
-          <Glyph name={icon} size={15} />
-          {title}
-        </span>
-      </div>
-      <div className={shell.panelBody}>
-        <p
-          style={{
-            fontSize: '13px',
-            color: 'var(--ink-soft)',
-            marginTop: 0,
-            marginBottom: '14px',
-            lineHeight: 1.6,
-          }}
-        >
-          Admin chooses the provider for the install. Learners choose the compatible model for
-          their language from their own Settings page.
-        </p>
-        <div className={shell.seg} role="radiogroup" aria-label={`${title} provider`}>
-          {providers.map((provider) => (
-            <button
-              key={provider.id}
-              type="button"
-              role="radio"
-              aria-checked={selectedProvider === provider.id}
-              aria-label={provider.displayName}
-              className={selectedProvider === provider.id ? shell.on : ''}
-              onClick={() => onProviderChange(provider.id)}
-              style={{ minHeight: '44px' }}
-            >
-              {provider.displayName}
-            </button>
-          ))}
-        </div>
-        {activeProvider ? (
-          <p
-            style={{
-              fontSize: '12.5px',
-              color: 'var(--ink-mute)',
-              margin: '12px 0 0',
-            }}
-          >
-            {modelCount} {modelCount === 1 ? 'model' : 'models'} will be available for
-            language-aware learner selection when provider access is configured.
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function firstModelForProvider(providers: ProviderOption[], providerId: string): string {
-  return providers.find((provider) => provider.id === providerId)?.models[0]?.id ?? '';
-}
-
 // ---------------------------------------------------------------------------
 // Root export
 // ---------------------------------------------------------------------------
+
+const SPEECH_LEDE =
+  'Pick the default model new lessons use. Enable extra language-compatible models under ' +
+  '“Learner-available models” so learners can switch in their own Settings.';
 
 export function ProviderModelConfig({
   initialConfig,
@@ -613,23 +474,28 @@ export function ProviderModelConfig({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Unified model states (same logic as AutoModelForm)
   const aiState = useUnifiedModelState({
-    initialDefault: {
-      provider: initialConfig.model.aiProvider,
-      model: initialConfig.model.aiModel,
-    },
+    initialDefault: { provider: initialConfig.model.aiProvider, model: initialConfig.model.aiModel },
     initialIncluded: initialConfig.includedModels,
     providers: aiProviders,
     compositeIds: false,
   });
 
-  const [ttsProvider, setTtsProvider] = useState(initialConfig.model.ttsProvider);
-  const [sttProvider, setSttProvider] = useState(initialConfig.model.sttProvider);
+  const ttsState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.model.ttsProvider, model: initialConfig.model.ttsModel },
+    initialIncluded: initialConfig.includedTtsModels,
+    providers: ttsProviders,
+    compositeIds: true,
+  });
 
-  const [platformAiProvider, setPlatformAiProvider] = useState(
-    initialConfig.platform.aiProvider,
-  );
+  const sttState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.model.sttProvider, model: initialConfig.model.sttModel },
+    initialIncluded: initialConfig.includedSttModels,
+    providers: sttProviders,
+    compositeIds: true,
+  });
+
+  const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
 
   async function handleSave() {
@@ -645,15 +511,15 @@ export function ProviderModelConfig({
           model: {
             aiProvider: aiState.defaultSelection.provider,
             aiModel: aiState.defaultSelection.model,
-            ttsProvider,
-            ttsModel: firstModelForProvider(ttsProviders, ttsProvider),
-            sttProvider,
-            sttModel: firstModelForProvider(sttProviders, sttProvider),
+            ttsProvider: ttsState.defaultSelection.provider,
+            ttsModel: ttsState.defaultSelection.model,
+            sttProvider: sttState.defaultSelection.provider,
+            sttModel: sttState.defaultSelection.model,
           },
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
           includedModels: setToArray(aiState.included),
-          includedTtsModels: null,
-          includedSttModels: null,
+          includedTtsModels: setToArray(ttsState.included),
+          includedSttModels: setToArray(sttState.included),
         }),
       });
 
@@ -674,20 +540,8 @@ export function ProviderModelConfig({
   return (
     <div>
       <TaskSection title="Language model (AI)" icon="spark" state={aiState} />
-      <SpeechProviderOnlySection
-        title="Text-to-speech provider"
-        icon="volume"
-        providers={ttsProviders}
-        selectedProvider={ttsProvider}
-        onProviderChange={setTtsProvider}
-      />
-      <SpeechProviderOnlySection
-        title="Speech-to-text provider"
-        icon="mic"
-        providers={sttProviders}
-        selectedProvider={sttProvider}
-        onProviderChange={setSttProvider}
-      />
+      <TaskSection title="Text-to-speech" icon="volume" lede={SPEECH_LEDE} state={ttsState} />
+      <TaskSection title="Speech-to-text" icon="mic" lede={SPEECH_LEDE} state={sttState} />
 
       <PlatformSection
         aiProviders={aiProviders}
