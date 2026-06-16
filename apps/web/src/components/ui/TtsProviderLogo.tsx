@@ -22,7 +22,10 @@ interface TtsProviderLogoProps {
     | 'assemblyai'
     | 'groq'
     | 'gladia'
-    | 'speechmatics';
+    | 'speechmatics'
+    | 'xai'
+    | 'deepseek'
+    | 'nvidia';
   size?: number;
   className?: string;
 }
@@ -245,6 +248,31 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           </text>
         </svg>
       );
+    case 'xai':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#000" />
+          <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+    case 'deepseek':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#4D6BFE" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            DS
+          </text>
+        </svg>
+      );
+    case 'nvidia':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#76B900" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            NV
+          </text>
+        </svg>
+      );
     case 'kokoro':
       return (
         <svg {...props}>
@@ -294,6 +322,9 @@ const PROVIDER_NAMES: Record<string, string> = {
   groq: 'Groq',
   gladia: 'Gladia',
   speechmatics: 'Speechmatics',
+  xai: 'xAI Grok',
+  deepseek: 'DeepSeek',
+  nvidia: 'NVIDIA NIM',
 };
 
 /**

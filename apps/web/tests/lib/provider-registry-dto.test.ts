@@ -5,8 +5,8 @@ import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 describe('AI Provider Client DTO', () => {
   const meta = getAllAiProviderClientMeta();
 
-  it('returns 9 providers and excludes the keyless server-configured providers', () => {
-    expect(meta).toHaveLength(9);
+  it('returns 13 providers and excludes the keyless server-configured providers', () => {
+    expect(meta).toHaveLength(13);
     // claude-code and local are keyless, server-configured backends — never
     // surfaced in the BYOK client metadata (they have no API-key fields).
     expect(meta.map((m) => m.id)).not.toContain('claude-code');
@@ -21,9 +21,11 @@ describe('AI Provider Client DTO', () => {
   });
 
   it('LLM providers have non-empty models, STT-only providers have empty models', () => {
-    const llmProviders = meta.filter((m) => ['anthropic', 'openai', 'google'].includes(m.id));
+    const llmProviders = meta.filter((m) =>
+      ['anthropic', 'openai', 'google', 'groq', 'xai', 'deepseek', 'mistral', 'nvidia'].includes(m.id)
+    );
     const sttOnlyProviders = meta.filter((m) =>
-      ['together', 'deepgram', 'assemblyai', 'groq', 'gladia', 'speechmatics'].includes(m.id)
+      ['together', 'deepgram', 'assemblyai', 'gladia', 'speechmatics'].includes(m.id)
     );
 
     for (const provider of llmProviders) {

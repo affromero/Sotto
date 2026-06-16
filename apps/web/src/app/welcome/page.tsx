@@ -23,6 +23,12 @@ function buildModelMeta(): ModelMeta {
       openai: opt(getAiProviderMeta('openai').models),
       // Backs the CLI (claude-code) model picker: haiku/sonnet/opus.
       'claude-code': opt(getAiProviderMeta('claude-code').models),
+      // Cloud LLM cards.
+      xai: opt(getAiProviderMeta('xai').models),
+      deepseek: opt(getAiProviderMeta('deepseek').models),
+      mistral: opt(getAiProviderMeta('mistral').models),
+      groq: opt(getAiProviderMeta('groq').models),
+      nvidia: opt(getAiProviderMeta('nvidia').models),
     },
     tts: {
       elevenlabs: opt(getProviderMeta('elevenlabs').models),

@@ -59,7 +59,11 @@ function clean(v: string | undefined | null): string {
 export function aiModelProviderId(wizardId: string): string | null {
   if (wizardId === 'claude') return 'anthropic';
   if (wizardId === 'codex') return 'openai';
-  if (wizardId === 'google') return 'google';
+  // Cloud LLM cards use their registry id directly (google + the OpenAI-compatible
+  // providers). local/custom return null (free-text model, not a registry picker).
+  if (['google', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia'].includes(wizardId)) {
+    return wizardId;
+  }
   return null;
 }
 
@@ -84,8 +88,8 @@ export function resolveAi(
   const m = clean(model);
 
   if (method === 'key' && v) {
-    const byokProvider =
-      provider === 'claude' ? 'anthropic' : provider === 'google' ? 'google' : 'openai';
+    // claude → anthropic, codex → openai, cloud LLM cards → their registry id.
+    const byokProvider = aiModelProviderId(provider) ?? 'openai';
     return {
       keyPost: { endpoint: 'ai-keys', provider: byokProvider, apiKey: v },
       preferredAiProvider: byokProvider,
