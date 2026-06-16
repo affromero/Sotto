@@ -118,7 +118,11 @@ describe('openapi.json drift guard', () => {
       [
         'GET /api/v1/health',
         'GET /api/v1/courses',
+        'GET /api/v1/courses/{courseId}/learning-targets',
         'GET /api/v1/courses/{courseId}/practice',
+        'POST /api/v1/courses/{courseId}/learning-targets',
+        'POST /api/v1/courses/{courseId}/learning-targets/{targetId}/pronunciation',
+        'POST /api/v1/courses/{courseId}/learning-targets/{targetId}/visual-cue',
         'POST /api/v1/courses/{courseId}/practice',
         'POST /api/v1/practice/{sessionId}/submit',
         'GET /api/v1/episodes/{episodeId}',
@@ -603,6 +607,7 @@ describe('response schemas accept representative payloads', () => {
   it('class detail (mixed sections, route superset is loose)', () => {
     const parsed = classDetailResponseSchema.parse({
       id: 'cls1',
+      courseId: 'course1',
       status: 'IN_PROGRESS',
       order: 3,
       passThreshold: 0.7,
