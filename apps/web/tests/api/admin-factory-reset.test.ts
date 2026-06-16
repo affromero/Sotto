@@ -90,7 +90,7 @@ describe('POST /api/v1/admin/factory-reset', () => {
     expect(mockInvalidateServerInfra).toHaveBeenCalledTimes(1);
     expect(body).toEqual({
       success: true,
-      redirectTo: '/welcome',
+      redirectTo: '/welcome?reset=1',
       usersDeleted: 2,
       episodesDeleted: 4,
       filesAttempted: 6,

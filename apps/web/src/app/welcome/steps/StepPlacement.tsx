@@ -46,7 +46,7 @@ export function StepPlacement({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>04 ·</span> Placement
+        <span className={t.eyebrowIdx}>06 ·</span> Placement
       </div>
       <h1 className={t.title}>
         Where do you <em>start</em> in {lang.native}?

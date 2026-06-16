@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { PROVIDERS } from '../data';
 import type { AgentState, ModelOption } from '../WelcomeFlow';
 import { aiModelProviderId } from '../providerMap';
@@ -18,15 +18,31 @@ interface Props {
   onBack: () => void;
 }
 
-export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, onBack }: Props) {
+const EMPTY_AI_MODELS: Record<string, ModelOption[]> = {};
+
+export function StepAgent({
+  agent,
+  demoMode,
+  aiModels = EMPTY_AI_MODELS,
+  setAgent,
+  onNext,
+  onBack,
+}: Props) {
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
   const liveTranslationKey = agent.liveTranslationKey ?? '';
 
   // Model options for the current method. key: claude → anthropic, codex → openai.
   // cli: the keyless local agent backend (claude-code, models haiku/sonnet/opus).
   const aiRegistryId =
-    agent.method === 'cli' ? 'claude-code' : agent.method === 'key' ? aiModelProviderId(agent.provider) : null;
-  const pickerModels = aiRegistryId ? (aiModels[aiRegistryId] ?? []) : [];
+    agent.method === 'cli'
+      ? 'claude-code'
+      : agent.method === 'key'
+        ? aiModelProviderId(agent.provider)
+        : null;
+  const pickerModels = useMemo(
+    () => (aiRegistryId ? (aiModels[aiRegistryId] ?? []) : []),
+    [aiModels, aiRegistryId]
+  );
 
   // Always keep a concrete model selected once a provider+method is chosen, so
   // configuring an agent always implies a model. Defaults to the first (cheapest).
@@ -66,7 +82,7 @@ export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, on
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>01 ·</span> Bring your own agent
+        <span className={t.eyebrowIdx}>03 ·</span> Bring your own agent
       </div>
       <h1 className={t.title}>
         Connect the agent that <em>already knows you</em>.
@@ -187,29 +203,31 @@ export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, on
             </div>
           )}
 
-          {!demoMode && (agent.method === 'key' || agent.method === 'cli') && pickerModels.length > 0 && (
-            <div>
-              <div className={c.fieldLabel}>Model</div>
-              <div className={c.field}>
-                <select
-                  className={c.fieldInput}
-                  value={agent.model}
-                  onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
-                  aria-label={`${prov.name} model`}
-                >
-                  {pickerModels.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+          {!demoMode &&
+            (agent.method === 'key' || agent.method === 'cli') &&
+            pickerModels.length > 0 && (
+              <div>
+                <div className={c.fieldLabel}>Model</div>
+                <div className={c.field}>
+                  <select
+                    className={c.fieldInput}
+                    value={agent.model}
+                    onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
+                    aria-label={`${prov.name} model`}
+                  >
+                    {pickerModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={c.locknote}>
+                  <Glyph name="spark" size={15} />
+                  The model that generates your lessons. Change it anytime in admin settings.
+                </div>
               </div>
-              <div className={c.locknote}>
-                <Glyph name="spark" size={15} />
-                The model that generates your lessons. Change it anytime in admin settings.
-              </div>
-            </div>
-          )}
+            )}
 
           {!demoMode && agent.method === 'url' && (
             <div>

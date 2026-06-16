@@ -3,9 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
 import { Glyph } from './Glyph';
+import { StepIntro } from './steps/StepIntro';
+import { StepLearnerProfile } from './steps/StepLearnerProfile';
 import { StepWelcome } from './steps/StepWelcome';
 import { StepAgent } from './steps/StepAgent';
 import { StepVoice } from './steps/StepVoice';
@@ -107,6 +110,8 @@ const DEFAULT_VOICE: VoiceState = {
 
 interface WelcomeSnapshot {
   step: number;
+  profileName: string;
+  avatarSlug: string;
   baseLang: string;
   language: string;
   agent: AgentState;
@@ -139,6 +144,10 @@ function toSingleUnderstoodSet(levels: Iterable<CefrLevel>): Set<CefrLevel> {
 
 function isContextItemKind(value: unknown): value is ContextItemKind {
   return value === 'link' || value === 'text' || value === 'file';
+}
+
+function isKnownAvatarSlug(value: unknown): value is string {
+  return typeof value === 'string' && ANIMAL_AVATARS.some((avatar) => avatar.slug === value);
 }
 
 function parseAgent(value: unknown): AgentState {
@@ -227,6 +236,11 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
 
     return {
       step: clampStep(storedStep),
+      profileName:
+        typeof record.profileName === 'string' && record.profileName.trim()
+          ? record.profileName
+          : 'Learner',
+      avatarSlug: isKnownAvatarSlug(record.avatarSlug) ? record.avatarSlug : ANIMAL_AVATARS[0].slug,
       baseLang: typeof record.baseLang === 'string' ? record.baseLang : 'en',
       language: typeof record.language === 'string' ? record.language : '',
       agent: parseAgent(record.agent),
@@ -242,13 +256,15 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
 
 function designSnapshotForStep(step: number, languageParam: string | null): WelcomeSnapshot {
   const clamped = clampStep(step);
-  const language = languageParam || (clamped >= 1 ? 'it' : '');
+  const language = languageParam || (clamped >= 2 ? 'it' : '');
   return {
     step: clamped,
+    profileName: 'Learner',
+    avatarSlug: ANIMAL_AVATARS[0].slug,
     baseLang: 'en',
     language,
     agent:
-      clamped >= 1
+      clamped >= 3
         ? {
             provider: 'claude',
             method: 'cli',
@@ -259,14 +275,16 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
           }
         : { ...DEFAULT_AGENT },
     voice: { ...DEFAULT_VOICE },
-    sources: new Set(clamped >= 3 ? ['repos', 'reading', 'notes', 'calendar'] : []),
+    sources: new Set(clamped >= 5 ? ['repos', 'reading', 'notes', 'calendar'] : []),
     contextItems: [],
-    understood: new Set<CefrLevel>(clamped >= 4 ? ['B1'] : []),
+    understood: new Set<CefrLevel>(clamped >= 6 ? ['B1'] : []),
   };
 }
 
 export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: WelcomeFlowProps) {
   const [step, setStep] = useState(0);
+  const [profileName, setProfileName] = useState('Learner');
+  const [avatarSlug, setAvatarSlug] = useState(ANIMAL_AVATARS[0].slug);
   const [baseLang, setBaseLang] = useState('en');
   const [language, setLanguage] = useState('');
   const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
@@ -310,6 +328,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
 
   function applySnapshot(snapshot: WelcomeSnapshot) {
     setStep(snapshot.step);
+    setProfileName(snapshot.profileName);
+    setAvatarSlug(snapshot.avatarSlug);
     setBaseLang(snapshot.baseLang);
     setLanguage(snapshot.language);
     setAgent(snapshot.agent);
@@ -327,6 +347,14 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       if (cancelled || hydratedRef.current) return;
 
       const params = new URLSearchParams(window.location.search);
+      if (params.has('reset')) {
+        window.localStorage.removeItem(SAVE_KEY);
+        window.history.replaceState({}, '', '/welcome');
+        setStorageReady(true);
+        hydratedRef.current = true;
+        return;
+      }
+
       if (params.has('step')) {
         const requestedStep = Number.parseInt(params.get('step') ?? '0', 10);
         applySnapshot(
@@ -365,6 +393,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       SAVE_KEY,
       JSON.stringify({
         step,
+        profileName,
+        avatarSlug,
         baseLang,
         language,
         agent,
@@ -376,11 +406,13 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     );
   }, [
     agent,
+    avatarSlug,
     baseLang,
     config.selfHosted,
     contextItems,
     deepLinkMode,
     language,
+    profileName,
     sources,
     step,
     storageReady,
@@ -396,22 +428,26 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       if (e.key === 'Enter') {
         const canAdvance =
           step === 0
-            ? !!language
+            ? true
             : step === 1
-              ? agent.status === 'connected'
+              ? false
               : step === 2
-                ? true
+                ? !!language
                 : step === 3
-                  ? sources.size + contextItems.length > 0
+                  ? agent.status === 'connected'
                   : step === 4
-                    ? !!level
-                    : false;
+                    ? true
+                    : step === 5
+                      ? sources.size + contextItems.length > 0
+                      : step === 6
+                        ? !!level
+                        : false;
 
-        if (canAdvance && step < 5) {
+        if (canAdvance && step < 7) {
           e.preventDefault();
           go(step + 1);
         }
-      } else if (e.key === 'Escape' && step > 0 && step <= 5) {
+      } else if (e.key === 'Escape' && step > 0 && step <= 7) {
         e.preventDefault();
         go(step - 1);
       }
@@ -428,6 +464,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
 
   function reset() {
     setStep(0);
+    setProfileName('Learner');
+    setAvatarSlug(ANIMAL_AVATARS[0].slug);
     setLanguage('');
     setBaseLang('en');
     setAgent({ ...DEFAULT_AGENT });
@@ -462,29 +500,46 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   let stepView: React.ReactNode;
   switch (step) {
     case 0:
-      stepView = (
-        <StepWelcome
-          state={flowState}
-          demoMode={demoMode}
-          setBaseLang={chooseBaseLang}
-          setLanguage={setLanguage}
-          onNext={() => go(1)}
-        />
-      );
+      stepView = <StepIntro demoMode={demoMode} onNext={() => go(1)} />;
       break;
     case 1:
       stepView = (
-        <StepAgent
-          agent={agent}
+        <StepLearnerProfile
+          name={profileName}
+          avatarSlug={avatarSlug}
           demoMode={demoMode}
-          aiModels={modelMeta.ai}
-          setAgent={(updater) => setAgent((prev) => updater(prev))}
+          setName={setProfileName}
+          setAvatarSlug={setAvatarSlug}
           onNext={() => go(2)}
           onBack={() => go(0)}
         />
       );
       break;
     case 2:
+      stepView = (
+        <StepWelcome
+          state={flowState}
+          demoMode={demoMode}
+          setBaseLang={chooseBaseLang}
+          setLanguage={setLanguage}
+          onNext={() => go(3)}
+          onBack={() => go(1)}
+        />
+      );
+      break;
+    case 3:
+      stepView = (
+        <StepAgent
+          agent={agent}
+          demoMode={demoMode}
+          aiModels={modelMeta.ai}
+          setAgent={(updater) => setAgent((prev) => updater(prev))}
+          onNext={() => go(4)}
+          onBack={() => go(2)}
+        />
+      );
+      break;
+    case 4:
       stepView = (
         <StepVoice
           voice={voice}
@@ -493,12 +548,12 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           sttModels={modelMeta.stt}
           language={language}
           setVoice={(updater) => setVoice((prev) => updater(prev))}
-          onNext={() => go(3)}
-          onBack={() => go(1)}
+          onNext={() => go(5)}
+          onBack={() => go(3)}
         />
       );
       break;
-    case 3:
+    case 5:
       stepView = (
         <StepContext
           sources={sources}
@@ -506,12 +561,12 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           contextItems={contextItems}
           setContextItems={setContextItems}
           demoMode={demoMode}
-          onNext={() => go(4)}
-          onBack={() => go(2)}
+          onNext={() => go(6)}
+          onBack={() => go(4)}
         />
       );
       break;
-    case 4:
+    case 6:
       stepView = (
         <StepPlacement
           baseLang={baseLang}
@@ -520,23 +575,23 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           toggleUnderstood={toggleUnderstood}
           level={level}
           demoMode={demoMode}
-          onNext={() => go(5)}
-          onBack={() => go(3)}
+          onNext={() => go(7)}
+          onBack={() => go(5)}
         />
       );
       break;
-    case 5:
+    case 7:
       stepView = (
         <StepCompose
           level={level}
           voice={voice}
           demoMode={demoMode}
-          onDone={() => go(6)}
-          onBack={() => go(4)}
+          onDone={() => go(8)}
+          onBack={() => go(6)}
         />
       );
       break;
-    case 6:
+    case 8:
       stepView = (
         <StepReady
           baseLang={baseLang}

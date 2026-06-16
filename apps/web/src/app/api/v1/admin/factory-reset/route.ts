@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      redirectTo: '/welcome',
+      redirectTo: '/welcome?reset=1',
       ...result,
     });
     response.cookies.delete(ACTIVE_PROFILE_COOKIE);

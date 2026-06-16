@@ -148,8 +148,8 @@ export function StepReady({
       voice.keys[VISUAL_CUE_KEY_ID] ?? ''
     );
 
-    // BYOK keys → the validated settings routes. Surface failures (don't swallow)
-    // but don't block onboarding — keys are editable later in Settings.
+    // BYOK keys → the validated key routes. Surface failures (don't swallow)
+    // but don't block onboarding — keys are editable later in Admin Providers.
     const failures: string[] = [];
     const postedKeys = new Set<string>();
     for (const post of [
@@ -168,7 +168,7 @@ export function StepReady({
     }
     if (failures.length) {
       setWarnings([
-        `Couldn't verify your ${failures.join(', ')} key${failures.length > 1 ? 's' : ''}. Add ${failures.length > 1 ? 'them' : 'it'} later in Settings.`,
+        `Couldn't verify your ${failures.join(', ')} key${failures.length > 1 ? 's' : ''}. Add ${failures.length > 1 ? 'them' : 'it'} later in Admin Providers.`,
       ]);
     }
 
@@ -214,7 +214,7 @@ export function StepReady({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>06 ·</span> Ready
+        <span className={t.eyebrowIdx}>08 ·</span> Ready
       </div>
       <h1 className={t.title}>
         Welcome to your <em>{lang.native}</em>.
@@ -230,7 +230,7 @@ export function StepReady({
           <div className={c.courseTop}>
             <button
               className={`${c.courseLang} ${c.courseJump}`}
-              onClick={() => onJump(0)}
+              onClick={() => onJump(2)}
               title="Change language"
               type="button"
             >
@@ -239,7 +239,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.courseBadge} ${c.courseJump}`}
-              onClick={() => onJump(4)}
+              onClick={() => onJump(6)}
               title="Retake placement"
               type="button"
             >
@@ -266,7 +266,7 @@ export function StepReady({
             <span className={c.csLabel}>{config.selfHosted ? 'Your stack' : 'Preview stack'}</span>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(1)}
+              onClick={() => onJump(3)}
               title="Change agent"
               type="button"
             >
@@ -275,7 +275,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(2)}
+              onClick={() => onJump(4)}
               title="Change pronunciation audio"
               type="button"
             >
@@ -284,7 +284,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(2)}
+              onClick={() => onJump(4)}
               title="Change voice"
               type="button"
             >
@@ -293,7 +293,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}
-              onClick={() => onJump(2)}
+              onClick={() => onJump(4)}
               title="Change visual cue provider"
               type="button"
             >

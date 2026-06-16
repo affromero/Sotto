@@ -56,7 +56,9 @@ import { POST as setName } from '@/app/api/v1/onboarding/name/route';
 
 function createRequest(body?: object): NextRequest {
   const url = new URL('http://localhost:3000/api/v1/onboarding/interests');
-  const init: { method: string; body?: string; headers?: Record<string, string> } = { method: 'POST' };
+  const init: { method: string; body?: string; headers?: Record<string, string> } = {
+    method: 'POST',
+  };
   if (body) {
     init.body = JSON.stringify(body);
     init.headers = { 'Content-Type': 'application/json' };
@@ -117,9 +119,7 @@ describe('POST /api/v1/onboarding/interests', () => {
 
   it('returns 400 when top-level tags are selected', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockTagFindMany.mockResolvedValue([
-      { id: 'tag-1', parentId: null },
-    ]);
+    mockTagFindMany.mockResolvedValue([{ id: 'tag-1', parentId: null }]);
 
     const response = await saveInterests(createRequest({ tagIds: ['tag-1'] }));
     const body = await response.json();
@@ -228,7 +228,10 @@ describe('POST /api/v1/onboarding/name', () => {
 
   it('returns 400 when moderateDisplayName rejects', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockModerateDisplayName.mockResolvedValue({ valid: false, reason: 'This name contains inappropriate content' });
+    mockModerateDisplayName.mockResolvedValue({
+      valid: false,
+      reason: 'This name contains inappropriate content',
+    });
 
     const response = await setName(createNameRequest({ name: 'BadWord' }));
     const body = await response.json();
@@ -241,15 +244,26 @@ describe('POST /api/v1/onboarding/name', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockUserUpdate.mockResolvedValue({ id: 'user-1', name: 'Alice' });
 
-    const response = await setName(createNameRequest({ name: 'Alice' }));
+    const response = await setName(createNameRequest({ name: 'Alice', avatarSlug: 'capybara' }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      data: { name: 'Alice' },
+      data: { name: 'Alice', image: '/avatars/capybara.png' },
     });
+  });
+
+  it('returns 400 for an unknown avatar slug', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await setName(createNameRequest({ name: 'Alice', avatarSlug: 'dragon' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('Unknown avatar');
+    expect(mockUserUpdate).not.toHaveBeenCalled();
   });
 
   it('trims whitespace from name before saving', async () => {

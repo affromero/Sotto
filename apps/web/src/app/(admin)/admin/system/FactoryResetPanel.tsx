@@ -18,6 +18,7 @@ export function FactoryResetPanel() {
         body: JSON.stringify({ confirm: 'DELETE EVERYTHING' }),
       });
       if (!res.ok) throw new Error('Failed to reset');
+      const body = (await res.json().catch(() => null)) as { redirectTo?: string } | null;
       setStatus('reset');
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem('sotto.onboarding.v1');
@@ -25,7 +26,7 @@ export function FactoryResetPanel() {
         window.localStorage.removeItem('sotto-palette');
         window.localStorage.removeItem('sotto-accent');
         window.localStorage.removeItem('sotto-motion');
-        window.location.assign('/welcome');
+        window.location.assign(body?.redirectTo ?? '/welcome?reset=1');
       }
     } catch {
       setStatus('error');
