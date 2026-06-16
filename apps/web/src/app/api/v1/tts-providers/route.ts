@@ -12,6 +12,14 @@ export async function GET(request: NextRequest) {
     qualityTier: meta.qualityTier,
     supportsSfx: meta.supportsSfx,
     supportsStreaming: meta.supportsStreaming,
+    languageDetection: meta.languageDetection,
+    voicesAreCrossLingual: meta.voicesAreCrossLingual,
+    models: meta.models.map((model) => ({
+      id: model.id,
+      displayName: model.displayName,
+      tier: model.tier,
+      supportedLanguages: [...model.supportedLanguages],
+    })),
     authFields: meta.auth.fields.map((f) => ({
       key: f.key,
       label: f.label,

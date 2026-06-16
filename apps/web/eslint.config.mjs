@@ -18,6 +18,12 @@ export default [
     },
   },
   {
-    ignores: ["node_modules/", ".next/", "public/sw.js", "src/lib/vendor/"],
+    ignores: [
+      "node_modules/",
+      ".next/",
+      "public/sw.js",
+      "src/generated/prisma/",
+      "src/lib/vendor/",
+    ],
   },
 ];

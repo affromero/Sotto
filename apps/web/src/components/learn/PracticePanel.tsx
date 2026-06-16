@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PracticeRunner, type PracticeStart } from './PracticeRunner';
 import styles from './PracticePanel.module.css';
 
 interface PracticePanelProps {
   courseId: string;
   courseName: string;
+  initialFocusTargetId?: string | null;
+  initialAutoMode?: string | null;
 }
 
 interface Overview {
@@ -35,7 +37,13 @@ const UNAVAILABLE_COPY: Record<string, string> = {
 
 type Phase = 'overview' | 'starting' | 'running' | 'unavailable';
 
-export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
+export function PracticePanel({
+  courseId,
+  courseName,
+  initialFocusTargetId = null,
+  initialAutoMode = null,
+}: PracticePanelProps) {
+  const autoStarted = useRef(false);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [phase, setPhase] = useState<Phase>('overview');
   const [start, setStart] = useState<PracticeStart | null>(null);
@@ -57,31 +65,44 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
     })();
   }, [loadOverview]);
 
-  async function startKind(kind: string) {
-    setPhase('starting');
-    setError('');
-    setMessage('');
-    try {
-      const res = await fetch(`/api/v1/courses/${courseId}/practice`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind }),
-      });
-      const data = (await res.json()) as StartResponse;
-      if (data.status === 'unavailable') {
-        setMessage(
-          UNAVAILABLE_COPY[data.reason] ?? 'Practice is not available yet for this skill.'
-        );
-        setPhase('unavailable');
-        return;
+  const startKind = useCallback(
+    async (kind: string, focusTargetId?: string | null) => {
+      setPhase('starting');
+      setError('');
+      setMessage('');
+      try {
+        const res = await fetch(`/api/v1/courses/${courseId}/practice`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind, ...(focusTargetId ? { focusTargetId } : {}) }),
+        });
+        const data = (await res.json()) as StartResponse;
+        if (data.status === 'unavailable') {
+          setMessage(
+            UNAVAILABLE_COPY[data.reason] ?? 'Practice is not available yet for this skill.'
+          );
+          setPhase('unavailable');
+          return;
+        }
+        setStart(data);
+        setPhase('running');
+      } catch {
+        setError('Network error. Please try again.');
+        setPhase('overview');
       }
-      setStart(data);
-      setPhase('running');
-    } catch {
-      setError('Network error. Please try again.');
-      setPhase('overview');
-    }
-  }
+    },
+    [courseId]
+  );
+
+  useEffect(() => {
+    if (!initialFocusTargetId || autoStarted.current) return;
+    autoStarted.current = true;
+    const kind = initialAutoMode === 'sentences' ? 'READING' : 'FULL';
+    const timer = window.setTimeout(() => {
+      void startKind(kind, initialFocusTargetId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialAutoMode, initialFocusTargetId, startKind]);
 
   function backToOverview() {
     setStart(null);
@@ -102,7 +123,7 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
             ← Practice menu
           </button>
         </header>
-        <PracticeRunner start={start} onDone={backToOverview} />
+        <PracticeRunner courseId={courseId} start={start} onDone={backToOverview} />
       </div>
     );
   }

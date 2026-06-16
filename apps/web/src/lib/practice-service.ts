@@ -11,6 +11,11 @@ import { composeSpeakingPrompts } from './class-speaking-generator';
 import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { buildLearnerContext } from './pedagogy';
+import {
+  getPracticeFocusTargets,
+  markFocusTargetsPracticed,
+  type FocusPracticeTarget,
+} from './learning-targets';
 import { logger } from './logger';
 import type { CefrLevel, PracticeKind, SkillType, PedagogyStyle } from '@sotto/shared';
 
@@ -32,6 +37,7 @@ interface PracticeMcItem {
   correctIndex: number;
   explanation: string;
   vocabLemma: string | null;
+  focusTargetId: string | null;
 }
 
 export interface PracticeMcItemPublic {
@@ -85,6 +91,10 @@ export interface SubmitPracticeResult {
   total: number;
 }
 
+export interface StartPracticeOptions {
+  focusTargetId?: string | null;
+}
+
 interface MultipleChoiceScore {
   correct: number;
   total: number;
@@ -113,6 +123,74 @@ function sample<T>(arr: T[], n: number): T[] {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.trim() !== ''))];
+}
+
+function uniqueVocab(
+  values: Array<{ lemma: string; gloss: string }>
+): Array<{ lemma: string; gloss: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ lemma: string; gloss: string }> = [];
+  for (const value of values) {
+    const key = value.lemma.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
+}
+
+function blankTargetInContext(context: string | null, text: string): string | null {
+  if (!context) return null;
+  const haystack = context.toLowerCase();
+  const needle = text.toLowerCase();
+  const idx = haystack.indexOf(needle);
+  if (idx < 0) return null;
+  return `${context.slice(0, idx)}_____ ${context.slice(idx + text.length)}`
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildFocusItems(
+  focusTargets: FocusPracticeTarget[],
+  idPrefix: string,
+  distractorPool: string[]
+): PracticeMcItem[] {
+  const allDistractors = uniqueStrings([
+    ...focusTargets.map((target) => target.text),
+    ...distractorPool,
+  ]);
+
+  return focusTargets.flatMap((target, index) => {
+    const distractors = sample(
+      allDistractors.filter((value) => value.toLowerCase() !== target.text.toLowerCase()),
+      VOCAB_CHOICES - 1
+    );
+    const options = shuffle(uniqueStrings([target.text, ...distractors])).slice(0, VOCAB_CHOICES);
+    if (options.length < 2) return [];
+
+    const cloze = blankTargetInContext(target.contextText, target.text);
+    const prompt =
+      cloze && target.kind !== 'SENTENCE'
+        ? `Complete the sentence: ${cloze}`
+        : target.contextText
+          ? `Choose the marked expression from this context: ${target.contextText}`
+          : 'Choose the learner-marked expression to practice.';
+
+    return [
+      {
+        id: `${idPrefix}${index}`,
+        prompt,
+        options,
+        correctIndex: options.indexOf(target.text),
+        explanation:
+          target.kind === 'SENTENCE'
+            ? 'This sentence was marked as difficult and is kept in the practice rotation.'
+            : `Keep using "${target.text}" in context until it stops needing support.`,
+        vocabLemma: target.kind === 'SENTENCE' ? null : target.text,
+        focusTargetId: target.id,
+      },
+    ];
+  });
 }
 
 function mcSection(itemId: string): string {
@@ -216,28 +294,58 @@ async function resolveSeed(
   return { objective: lesson.objective, grammarPoints: lessonGrammar, targetVocab: lessonVocab };
 }
 
+function focusSeedFallback(focusTargets: FocusPracticeTarget[]): PracticeSeed | null {
+  if (focusTargets.length === 0) return null;
+  return {
+    objective: 'Practice learner-marked difficult material from previous classes.',
+    grammarPoints: [],
+    targetVocab: [],
+  };
+}
+
+function applyFocusToSeed(seed: PracticeSeed, focusTargets: FocusPracticeTarget[]): PracticeSeed {
+  if (focusTargets.length === 0) return seed;
+  const focusVocab = focusTargets.map((target) => ({
+    lemma: target.text,
+    gloss: target.contextText ?? '',
+  }));
+  const focusText = focusTargets.map((target) => target.text).join('; ');
+  return {
+    objective: `${seed.objective} Prioritize learner-marked difficult material: ${focusText}.`,
+    grammarPoints: seed.grammarPoints,
+    targetVocab: uniqueVocab([...focusVocab, ...seed.targetVocab]),
+  };
+}
+
 export async function startPractice(
   courseId: string,
   userId: string,
-  kind: PracticeKind
+  kind: PracticeKind,
+  options: StartPracticeOptions = {}
 ): Promise<StartPracticeResult> {
   const course = await loadCourse(courseId, userId);
   const seedToken = `${courseId}-${kind}-${Date.now()}`;
+  const focusTargets = await getPracticeFocusTargets(
+    courseId,
+    kind === 'FULL' ? 4 : 2,
+    options.focusTargetId ?? null
+  );
 
-  if (kind === 'VOCAB') return startVocab(course, seedToken);
+  if (kind === 'VOCAB') return startVocab(course, seedToken, focusTargets);
 
   const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
   const due = await getDueItems(courseId, kind === 'FULL' ? FULL_DUE_COUNT : MC_COUNT);
-  const seed = await resolveSeed(course, due);
-  if (!seed) return { status: 'unavailable', reason: 'no_content' };
+  const baseSeed = (await resolveSeed(course, due)) ?? focusSeedFallback(focusTargets);
+  if (!baseSeed) return { status: 'unavailable', reason: 'no_content' };
+  const seed = applyFocusToSeed(baseSeed, focusTargets);
 
-  if (kind === 'FULL') return startFull(course, seed, seedToken, note);
+  if (kind === 'FULL') return startFull(course, seed, seedToken, note, focusTargets);
   if (kind === 'GRAMMAR' || kind === 'READING') {
-    return startMc(course, kind, seed, seedToken, note);
+    return startMc(course, kind, seed, seedToken, note, focusTargets);
   }
-  if (kind === 'LISTENING') return startListening(course, seed, seedToken, note);
-  if (kind === 'SPEAKING') return startSpeaking(course, seed, seedToken, note);
-  return startWriting(course, seed, seedToken, note);
+  if (kind === 'LISTENING') return startListening(course, seed, seedToken, note, focusTargets);
+  if (kind === 'SPEAKING') return startSpeaking(course, seed, seedToken, note, focusTargets);
+  return startWriting(course, seed, seedToken, note, focusTargets);
 }
 
 type VocabPracticeBuild =
@@ -302,31 +410,47 @@ async function buildVocabItems(
       correctIndex: options.indexOf(v.lemma),
       explanation: `"${v.lemma}" means "${v.translation}".`,
       vocabLemma: v.lemma,
+      focusTargetId: null,
     };
   });
 
   return { status: 'ready', items, lemmas: review.map((v) => v.lemma) };
 }
 
-async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPracticeResult> {
+async function startVocab(
+  course: CourseCtx,
+  seedToken: string,
+  focusTargets: FocusPracticeTarget[]
+): Promise<StartPracticeResult> {
   const built = await buildVocabItems(course, VOCAB_COUNT, 'v');
-  if (built.status === 'unavailable') return built;
+  const focusItems = buildFocusItems(
+    focusTargets.filter((target) => target.kind !== 'SENTENCE'),
+    'f',
+    built.status === 'ready' ? built.lemmas : []
+  );
+  if (built.status === 'unavailable' && focusItems.length === 0) return built;
+  const items = built.status === 'ready' ? [...focusItems, ...built.items] : focusItems;
+  const lemmas = uniqueStrings([
+    ...(built.status === 'ready' ? built.lemmas : []),
+    ...focusTargets.filter((target) => target.kind !== 'SENTENCE').map((target) => target.text),
+  ]);
 
   const session = await prisma.practiceSession.create({
     data: {
       courseId: course.id,
       kind: 'VOCAB',
-      items: built.items as unknown as Prisma.InputJsonValue,
+      items: items as unknown as Prisma.InputJsonValue,
       seed: seedToken,
-      vocabLemmas: built.lemmas,
+      vocabLemmas: lemmas,
       grammarKeys: [],
+      focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
   return {
     status: 'ready',
     sessionId: session.id,
     kind: 'VOCAB',
-    items: built.items.map(toPublic),
+    items: items.map(toPublic),
   };
 }
 
@@ -335,9 +459,16 @@ async function startMc(
   kind: 'GRAMMAR' | 'READING',
   seed: PracticeSeed,
   seedToken: string,
-  note: string
+  note: string,
+  focusTargets: FocusPracticeTarget[]
 ): Promise<StartPracticeResult> {
-  const items = await buildSectionMcItems(course, kind, seed, seedToken, note, 'q');
+  const generatedItems = await buildSectionMcItems(course, kind, seed, seedToken, note, 'q');
+  const focusItems = buildFocusItems(
+    focusTargets,
+    'f',
+    seed.targetVocab.map((v) => v.lemma)
+  );
+  const items = [...focusItems, ...generatedItems];
   const session = await prisma.practiceSession.create({
     data: {
       courseId: course.id,
@@ -346,6 +477,7 @@ async function startMc(
       seed: seedToken,
       vocabLemmas: seed.targetVocab.map((v) => v.lemma),
       grammarKeys: seed.grammarPoints,
+      focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
   return { status: 'ready', sessionId: session.id, kind, items: items.map(toPublic) };
@@ -378,6 +510,7 @@ async function buildSectionMcItems(
     correctIndex: q.correctIndex,
     explanation: q.explanation,
     vocabLemma: null,
+    focusTargetId: null,
   }));
 }
 
@@ -385,11 +518,17 @@ async function startFull(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string
+  note: string,
+  focusTargets: FocusPracticeTarget[]
 ): Promise<StartPracticeResult> {
   const vocab = await buildVocabItems(course, FULL_VOCAB_COUNT, 'v');
   const vocabItems = vocab.status === 'ready' ? vocab.items : [];
   const vocabLemmas = vocab.status === 'ready' ? vocab.lemmas : [];
+  const focusItems = buildFocusItems(
+    focusTargets,
+    'f',
+    uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)])
+  );
 
   const [grammarItems, readingItems, listening, speakingComposed, writingComposed] =
     await Promise.all([
@@ -433,8 +572,9 @@ async function startFull(
     correctIndex: q.correctIndex,
     explanation: q.explanation,
     vocabLemma: null,
+    focusTargetId: null,
   }));
-  const items = [...vocabItems, ...grammarItems, ...readingItems, ...listeningItems];
+  const items = [...focusItems, ...vocabItems, ...grammarItems, ...readingItems, ...listeningItems];
   if (items.length === 0 && speakingComposed.length === 0 && writingComposed.length === 0) {
     return { status: 'unavailable', reason: 'no_content' };
   }
@@ -448,6 +588,7 @@ async function startFull(
       vocabLemmas: uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)]),
       grammarKeys: seed.grammarPoints,
       episodeId: listening.episodeId,
+      focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
 
@@ -506,7 +647,8 @@ async function startListening(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string
+  note: string,
+  focusTargets: FocusPracticeTarget[]
 ): Promise<StartPracticeResult> {
   const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: course.userId,
@@ -525,23 +667,31 @@ async function startListening(
     correctIndex: q.correctIndex,
     explanation: q.explanation,
     vocabLemma: null,
+    focusTargetId: null,
   }));
+  const focusItems = buildFocusItems(
+    focusTargets,
+    'f',
+    seed.targetVocab.map((v) => v.lemma)
+  );
+  const allItems = [...focusItems, ...items];
   const session = await prisma.practiceSession.create({
     data: {
       courseId: course.id,
       kind: 'LISTENING',
-      items: items as unknown as Prisma.InputJsonValue,
+      items: allItems as unknown as Prisma.InputJsonValue,
       seed: seedToken,
       vocabLemmas: seed.targetVocab.map((v) => v.lemma),
       grammarKeys: [],
       episodeId,
+      focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
   return {
     status: 'ready',
     sessionId: session.id,
     kind: 'LISTENING',
-    items: items.map(toPublic),
+    items: allItems.map(toPublic),
     episodeId,
   };
 }
@@ -550,7 +700,8 @@ async function startSpeaking(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string
+  note: string,
+  focusTargets: FocusPracticeTarget[]
 ): Promise<StartPracticeResult> {
   // Speaking prompts hang off the session, so create it first to namespace them.
   const session = await prisma.practiceSession.create({
@@ -561,6 +712,7 @@ async function startSpeaking(
       seed: seedToken,
       vocabLemmas: seed.targetVocab.map((v) => v.lemma),
       grammarKeys: [],
+      focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
 
@@ -603,7 +755,8 @@ async function startWriting(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
-  note: string
+  note: string,
+  focusTargets: FocusPracticeTarget[]
 ): Promise<StartPracticeResult> {
   // Writing prompts hang off the session, so create it first.
   const session = await prisma.practiceSession.create({
@@ -614,6 +767,7 @@ async function startWriting(
       seed: seedToken,
       vocabLemmas: seed.targetVocab.map((v) => v.lemma),
       grammarKeys: [],
+      focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
 
@@ -661,10 +815,22 @@ export async function submitPractice(
 
   const now = new Date();
   if (session.kind === 'SPEAKING') {
-    return submitSpeaking(session.id, session.courseId, session.vocabLemmas, now);
+    return submitSpeaking(
+      session.id,
+      session.courseId,
+      session.vocabLemmas,
+      session.focusTargetIds ?? [],
+      now
+    );
   }
   if (session.kind === 'WRITING') {
-    return submitWriting(session.id, session.courseId, session.vocabLemmas, now);
+    return submitWriting(
+      session.id,
+      session.courseId,
+      session.vocabLemmas,
+      session.focusTargetIds ?? [],
+      now
+    );
   }
 
   const items = (session.items as unknown as PracticeMcItem[]) ?? [];
@@ -674,6 +840,7 @@ export async function submitPractice(
       session.courseId,
       session.vocabLemmas,
       session.grammarKeys,
+      session.focusTargetIds ?? [],
       items,
       answers,
       now
@@ -699,6 +866,7 @@ export async function submitPractice(
       now
     );
   }
+  await markFocusTargetsPracticed(session.courseId, session.focusTargetIds ?? [], mc.score, now);
 
   await prisma.practiceSession.update({
     where: { id: sessionId },
@@ -712,6 +880,7 @@ async function submitFull(
   courseId: string,
   vocabLemmas: string[],
   grammarKeys: string[],
+  focusTargetIds: string[],
   items: PracticeMcItem[],
   answers: PracticeAnswer[],
   now: Date
@@ -760,6 +929,7 @@ async function submitFull(
   if (aggregateVocab.length > 0 || grammarKeys.length > 0) {
     await applyReviewOutcome(courseId, aggregateVocab, grammarKeys, score, grammarScore, now);
   }
+  await markFocusTargetsPracticed(courseId, focusTargetIds, score, now);
 
   await prisma.practiceSession.update({
     where: { id: sessionId },
@@ -777,6 +947,7 @@ async function submitSpeaking(
   sessionId: string,
   courseId: string,
   vocabLemmas: string[],
+  focusTargetIds: string[],
   now: Date
 ): Promise<SubmitPracticeResult> {
   const recordings = await prisma.speakingRecording.findMany({
@@ -786,6 +957,7 @@ async function submitSpeaking(
   const graded = recordings.length;
   const avg = graded > 0 ? recordings.reduce((s, r) => s + (r.overallScore ?? 0), 0) / graded : 0;
   if (vocabLemmas.length > 0) await applyReviewOutcome(courseId, vocabLemmas, [], avg, 0, now);
+  await markFocusTargetsPracticed(courseId, focusTargetIds, avg, now);
   await prisma.practiceSession.update({
     where: { id: sessionId },
     data: { status: 'COMPLETED', score: avg, completedAt: now },
@@ -798,6 +970,7 @@ async function submitWriting(
   sessionId: string,
   courseId: string,
   vocabLemmas: string[],
+  focusTargetIds: string[],
   now: Date
 ): Promise<SubmitPracticeResult> {
   const responses = await prisma.writingResponse.findMany({
@@ -807,6 +980,7 @@ async function submitWriting(
   const graded = responses.length;
   const avg = graded > 0 ? responses.reduce((s, r) => s + (r.overallScore ?? 0), 0) / graded : 0;
   if (vocabLemmas.length > 0) await applyReviewOutcome(courseId, vocabLemmas, [], avg, 0, now);
+  await markFocusTargetsPracticed(courseId, focusTargetIds, avg, now);
   await prisma.practiceSession.update({
     where: { id: sessionId },
     data: { status: 'COMPLETED', score: avg, completedAt: now },

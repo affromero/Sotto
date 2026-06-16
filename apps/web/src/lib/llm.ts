@@ -61,7 +61,8 @@ export async function generateResponse(
 
   // Per-request claude-code routing (model selected via dropdown, e.g. "claude-code:opus")
   if (options?.model?.startsWith('claude-code:')) {
-    const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
+    const { executeClaudeCode } = await import('./claude-code-client');
+    const { serializeMessages } = await import('./agent-messages');
     const ccModel = options.model.split(':')[1] || 'opus';
     const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
     const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
@@ -75,7 +76,7 @@ export async function generateResponse(
   // Per-request codex routing (model "codex" or "codex:<model>")
   if (options?.model === 'codex' || options?.model?.startsWith('codex:')) {
     const { executeCodex } = await import('./codex-client');
-    const { serializeMessages } = await import('./claude-code-client');
+    const { serializeMessages } = await import('./agent-messages');
     const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
     const result = await executeCodex(systemPrompt, serializeMessages(textMessages), {
       model: options.model,
@@ -208,7 +209,8 @@ export async function* streamResponse(
 
   // Per-request claude-code routing (model selected via dropdown, e.g. "claude-code:opus")
   if (options?.model?.startsWith('claude-code:')) {
-    const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
+    const { streamClaudeCode } = await import('./claude-code-client');
+    const { serializeMessages } = await import('./agent-messages');
     const ccModel = options.model.split(':')[1] || 'opus';
     const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
     const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
@@ -223,7 +225,7 @@ export async function* streamResponse(
   // Per-request codex routing (model "codex" or "codex:<model>")
   if (options?.model === 'codex' || options?.model?.startsWith('codex:')) {
     const { streamCodex } = await import('./codex-client');
-    const { serializeMessages } = await import('./claude-code-client');
+    const { serializeMessages } = await import('./agent-messages');
     const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
     yield* streamCodex(systemPrompt, serializeMessages(textMessages), { model: options.model });
     options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });

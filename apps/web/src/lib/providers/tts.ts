@@ -9,11 +9,12 @@ import {
 import type { TtsProviderId } from './tts-registry';
 import { isValidProviderId } from './tts-registry';
 import type { WordTiming } from '@sotto/shared';
-import { getByokKey, getByokExtraData, hasByokKey } from '../byok';
+import { getSharedByokKey, getByokExtraData, hasSharedByokKey } from '../byok';
 import { getAutoModelConfig } from '../auto-model-config';
 import { supportsLanguage, getDefaultModelForLanguage } from '../tts-language-support';
 import { logger } from '../logger';
 import { infra } from '../server-config';
+import { normalizeSottoLanguageCode } from '../speech-language-support';
 
 export interface SpeechParams {
   text: string;
@@ -241,7 +242,8 @@ export async function resolveTtsProvider(context: {
   /** ISO 639-1 language code — when set, validates provider/model compatibility. */
   language?: string | null;
 }): Promise<ResolvedProvider> {
-  const { userId, requestedProvider, requestedModel, language } = context;
+  const { userId, requestedProvider, requestedModel } = context;
+  const language = normalizeSottoLanguageCode(context.language);
 
   if (!requestedProvider || requestedProvider === 'auto') {
     throw new Error('TTS provider is required. Choose a provider before generating audio.');
@@ -253,7 +255,10 @@ export async function resolveTtsProvider(context: {
 
   // Helper: resolve a language-compatible model for a specific provider.
   // If the requested model doesn't support the language, try to find one that does.
-  const resolveModelForLanguage = (providerId: TtsProviderId, model?: string | null): string | undefined => {
+  const resolveModelForLanguage = (
+    providerId: TtsProviderId,
+    model?: string | null
+  ): string | undefined => {
     if (!language) return model ?? undefined;
     if (model && supportsLanguage(providerId, model, language)) return model;
     const fallback = getDefaultModelForLanguage(providerId, language, model);
@@ -261,18 +266,19 @@ export async function resolveTtsProvider(context: {
       logger.info('Language-aware model swap', { providerId, from: model, to: fallback, language });
       return fallback;
     }
-    // No compatible model on this provider — caller decides what to do
-    return model ?? undefined;
+    throw new Error(
+      `TTS provider "${providerId}" does not support language "${language}" with any configured model.`
+    );
   };
 
   const resolvedModel = resolveModelForLanguage(requestedProvider, requestedModel);
 
-  const byokKey = context.skipByok ? null : await getByokKey(userId, requestedProvider);
+  const byokKey = context.skipByok ? null : await getSharedByokKey(userId, requestedProvider);
   if (byokKey) {
-    const extraData = await getByokExtraData(userId, requestedProvider);
+    const extraData = await getByokExtraData(byokKey.ownerUserId, requestedProvider);
     const provider = await createTtsProviderAsync(
       requestedProvider,
-      byokKey,
+      byokKey.apiKey,
       extraData ?? undefined,
       resolvedModel
     );
@@ -363,7 +369,7 @@ export function getConfiguredTtsProviderId(): TtsProviderId | null {
  * Check if TTS can be resolved for a user without throwing.
  */
 export async function canResolveTts(userId: string): Promise<boolean> {
-  if (await hasByokKey(userId)) return true;
+  if (await hasSharedByokKey(userId)) return true;
   // Keyless local TTS sidecars count only when explicitly configured AND given a
   // reachable endpoint — never auto-selected by mere availability.
   const configuredTtsProvider = getConfiguredTtsProviderId();

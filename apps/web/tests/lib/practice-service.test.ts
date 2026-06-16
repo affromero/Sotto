@@ -64,6 +64,13 @@ vi.mock('@/lib/knowledge-graph', () => ({
   applyReviewOutcome: (...a: unknown[]) => mockApplyReviewOutcome(...a),
 }));
 
+const mockGetPracticeFocusTargets = vi.fn();
+const mockMarkFocusTargetsPracticed = vi.fn();
+vi.mock('@/lib/learning-targets', () => ({
+  getPracticeFocusTargets: (...a: unknown[]) => mockGetPracticeFocusTargets(...a),
+  markFocusTargetsPracticed: (...a: unknown[]) => mockMarkFocusTargetsPracticed(...a),
+}));
+
 const mockGenerateSectionQuestions = vi.fn();
 vi.mock('@/lib/class-generation', () => ({
   generateSectionQuestions: (...a: unknown[]) => mockGenerateSectionQuestions(...a),
@@ -96,6 +103,8 @@ const COURSE = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockCourseFindFirst.mockResolvedValue(COURSE);
+  mockGetPracticeFocusTargets.mockResolvedValue([]);
+  mockMarkFocusTargetsPracticed.mockResolvedValue(undefined);
   mockPracticeSessionCreate.mockResolvedValue({ id: 'ps1' });
   mockPracticeSessionUpdate.mockResolvedValue({});
   mockSpeakingPromptCreateMany.mockResolvedValue({ count: 1 });
@@ -205,6 +214,40 @@ describe('startPractice — GRAMMAR', () => {
     const r = await startPractice('c1', 'u1', 'GRAMMAR');
     expect(r).toEqual({ status: 'unavailable', reason: 'no_content' });
     expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
+  });
+
+  it('adds selected focus targets to a generated reading practice session', async () => {
+    mockGetPracticeFocusTargets.mockResolvedValue([
+      {
+        id: 'ft1',
+        kind: 'SENTENCE',
+        text: 'Me cuesta entenderlo.',
+        normalizedText: 'me cuesta entenderlo.',
+        contextText: 'Me cuesta entenderlo cuando hablan rápido.',
+        priorityBoost: 0.5,
+      },
+    ]);
+    mockGetDueItems.mockResolvedValue({
+      vocab: [{ id: 'lv1', lemma: 'entender', translation: 'understand', mastery: 0.4 }],
+      grammar: [],
+    });
+    mockGenerateSectionQuestions.mockResolvedValue([
+      {
+        question: 'What does the speaker find difficult?',
+        options: ['a', 'b', 'c', 'd'],
+        correctIndex: 0,
+        explanation: 'context',
+      },
+    ]);
+
+    const r = await startPractice('c1', 'u1', 'READING', { focusTargetId: 'ft1' });
+    if (r.status !== 'ready') throw new Error('expected ready');
+
+    expect(mockGetPracticeFocusTargets).toHaveBeenCalledWith('c1', 2, 'ft1');
+    const createArg = mockPracticeSessionCreate.mock.calls[0][0];
+    expect(createArg.data.focusTargetIds).toEqual(['ft1']);
+    expect(createArg.data.items[0]).toMatchObject({ focusTargetId: 'ft1' });
+    expect(r.items[0].prompt).toContain('Choose the marked expression');
   });
 });
 
@@ -350,6 +393,24 @@ describe('submitPractice — SRS', () => {
       1,
       expect.any(Date)
     );
+  });
+
+  it('marks focus targets practiced using the practice score', async () => {
+    mockPracticeSessionFindFirst.mockResolvedValue({
+      id: 'ps-focus',
+      kind: 'READING',
+      courseId: 'c1',
+      vocabLemmas: [],
+      grammarKeys: [],
+      focusTargetIds: ['ft1'],
+      items: [
+        { id: 'f0', correctIndex: 0, vocabLemma: null, prompt: 'q', options: [], explanation: '' },
+      ],
+    });
+
+    await submitPractice('ps-focus', 'u1', [{ itemId: 'f0', selectedIndex: 0 }]);
+
+    expect(mockMarkFocusTargetsPracticed).toHaveBeenCalledWith('c1', ['ft1'], 1, expect.any(Date));
   });
 
   it('applies precise vocab and section-weighted aggregate SRS for FULL sessions', async () => {

@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  normalizeSottoLanguageCode,
+  SOTTO_LANGUAGE_CODES,
+  toElevenLabsScribeLanguageCode,
+} from '@/lib/speech-language-support';
+import {
   supportsLanguage,
   getProvidersForLanguage,
   getDefaultModelForLanguage,
-  SOTTO_LANGUAGE_CODES,
   VOICE_LANGUAGE_AFFINITIES,
 } from '@/lib/tts-language-support';
 
@@ -17,6 +21,19 @@ describe('SOTTO_LANGUAGE_CODES', () => {
     for (const code of ['en', 'es', 'fr', 'de', 'ja', 'ko', 'zh', 'ar']) {
       expect(SOTTO_LANGUAGE_CODES.has(code)).toBe(true);
     }
+  });
+});
+
+describe('speech language normalization', () => {
+  it('normalizes provider names and ISO-639-3 codes to Sotto language codes', () => {
+    expect(normalizeSottoLanguageCode('spanish')).toBe('es');
+    expect(normalizeSottoLanguageCode('spa')).toBe('es');
+    expect(normalizeSottoLanguageCode('pt-BR')).toBe('pt');
+  });
+
+  it('maps Sotto language codes to ElevenLabs Scribe language codes', () => {
+    expect(toElevenLabsScribeLanguageCode('es')).toBe('spa');
+    expect(toElevenLabsScribeLanguageCode('en')).toBe('eng');
   });
 });
 

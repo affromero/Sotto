@@ -140,6 +140,10 @@ export async function composeSpeakingPrompts(
       }
     }
   }
+  const userSpeechPrefs = await prisma.user.findUnique({
+    where: { id: p.userId },
+    select: { preferredTtsModel: true },
+  });
 
   const referenceTtsUrls: (string | null)[] = [];
   for (let i = 0; i < phrases.length; i++) {
@@ -152,6 +156,7 @@ export async function composeSpeakingPrompts(
         userId: p.userId,
         episodeId: p.refId,
         requestedProvider: requestedTtsProvider as Parameters<typeof resolveTtsProvider>[0]['requestedProvider'],
+        requestedModel: userSpeechPrefs?.preferredTtsModel ?? undefined,
         language: p.targetLang,
       });
       const voiceId = provider.getVoiceId('HOST', p.refId, undefined, p.targetLang);

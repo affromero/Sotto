@@ -29,6 +29,7 @@ export interface AgentState {
 export interface VoiceState {
   tts: string;
   stt: string;
+  visualCueProvider: 'pexels' | 'off';
   keys: Record<string, string>;
   /** Optional base URLs for keyless local providers (kokoro/local TTS, whisper/local STT). */
   baseUrls: Record<string, string>;
@@ -72,6 +73,7 @@ const DEFAULT_AGENT: AgentState = {
 const DEFAULT_VOICE: VoiceState = {
   tts: 'elevenlabs',
   stt: 'whisper',
+  visualCueProvider: 'pexels',
   keys: {},
   baseUrls: {},
 };
@@ -141,6 +143,10 @@ function parseVoice(value: unknown): VoiceState {
   return {
     tts: typeof record?.tts === 'string' ? record.tts : DEFAULT_VOICE.tts,
     stt: typeof record?.stt === 'string' ? record.stt : DEFAULT_VOICE.stt,
+    visualCueProvider:
+      record?.visualCueProvider === 'off' || record?.visualCueProvider === 'pexels'
+        ? record.visualCueProvider
+        : DEFAULT_VOICE.visualCueProvider,
     keys: Object.fromEntries(
       Object.entries(keys).filter(
         (entry): entry is [string, string] => typeof entry[1] === 'string'
@@ -454,6 +460,7 @@ export function WelcomeFlow({ initialConfig }: WelcomeFlowProps) {
         <StepVoice
           voice={voice}
           demoMode={demoMode}
+          language={language}
           setVoice={(updater) => setVoice((prev) => updater(prev))}
           onNext={() => go(3)}
           onBack={() => go(1)}

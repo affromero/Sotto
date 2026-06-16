@@ -24,6 +24,17 @@ export const practiceStatusSchema = z.enum(['ACTIVE', 'COMPLETED']);
 
 export const userRoleSchema = z.enum(['USER', 'ADMIN']);
 
+export const focusTargetKindSchema = z.enum(['WORD', 'PHRASE', 'SENTENCE']);
+
+export const focusTargetSourceSchema = z.enum([
+  'TRANSCRIPT',
+  'CLASS',
+  'PRACTICE',
+  'NOTES',
+  'LIVE',
+  'MANUAL',
+]);
+
 // ---------------------------------------------------------------------------
 // GET /api/v1/health  (auth: none)
 // Mirrors HealthData in apps/web/src/lib/health.ts. Unauthenticated callers get
@@ -96,6 +107,7 @@ export const practiceOverviewResponseSchema = z.object({
 
 export const startPracticeRequestSchema = z.object({
   kind: practiceKindSchema,
+  focusTargetId: z.string().min(1).optional(),
 });
 
 // Public projection of a multiple-choice item (toPublic drops the answer).
@@ -162,6 +174,46 @@ export const startPracticeResponseSchema = z.discriminatedUnion('status', [
   startPracticeReadyWritingSchema,
   startPracticeReadyFullSchema,
 ]);
+
+// ---------------------------------------------------------------------------
+// Learning targets — learner-marked words, phrases, and sentences that should
+// stay emphasized in adaptive practice without turning into translations.
+// ---------------------------------------------------------------------------
+
+export const learningTargetSchema = z.object({
+  id: z.string(),
+  courseId: z.string(),
+  kind: focusTargetKindSchema,
+  text: z.string(),
+  normalizedText: z.string(),
+  contextText: z.string().nullable(),
+  sourceType: focusTargetSourceSchema,
+  sourceId: z.string().nullable(),
+  sourceLabel: z.string().nullable(),
+  userMarkedDifficulty: z.number(),
+  priorityBoost: z.number(),
+  visualCueUrl: z.string().nullable(),
+  visualCueAlt: z.string().nullable(),
+  visualCueAttribution: z.string().nullable(),
+  visualCueProvider: z.string().nullable(),
+  pronunciationAudioUrl: z.string().nullable(),
+  lastSelectedAt: z.string(),
+  lastPracticedAt: z.string().nullable(),
+});
+
+export const listLearningTargetsResponseSchema = z.object({
+  targets: z.array(learningTargetSchema),
+});
+
+export const addLearningTargetRequestSchema = z.object({
+  text: z.string().min(1).max(500),
+  kind: focusTargetKindSchema.optional(),
+  contextText: z.string().max(2000).nullable().optional(),
+  sourceType: focusTargetSourceSchema.optional(),
+  sourceId: z.string().max(200).nullable().optional(),
+  sourceLabel: z.string().max(200).nullable().optional(),
+  userMarkedDifficulty: z.number().int().min(1).max(5).optional(),
+});
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/practice/{sessionId}/submit  (auth: bearer)
@@ -375,6 +427,7 @@ export const classSectionSchema = z
 export const classDetailResponseSchema = z
   .object({
     id: z.string(),
+    courseId: z.string(),
     status: classStatusSchema,
     order: z.number().int(),
     passThreshold: z.number(),

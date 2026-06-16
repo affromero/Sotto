@@ -6,8 +6,9 @@
  * CLI), so this is the single source of truth for the translation.
  *
  * Pure functions, no I/O — unit-tested. The wizard calls these to decide which
- * keys to POST (to /api/v1/settings/ai-keys or /api/v1/settings/byok), which per-user
- * preferences to save, and — for the owner — which server-infra fields to set.
+ * keys to POST (to /api/v1/settings/ai-keys, /api/v1/settings/byok, or
+ * /api/v1/settings/visual-cues), which per-user preferences to save, and — for
+ * the owner — which server-infra fields to set.
  *
  * No availability-based fallback: each result reflects exactly what the learner
  * selected. No secrets are embedded here.
@@ -15,9 +16,9 @@
 
 export type AiMethod = 'cli' | 'key' | 'url' | null;
 
-/** A BYOK key to POST. `endpoint` selects the validated settings route. */
+/** A provider key to POST. `endpoint` selects the validated settings route. */
 export interface KeyPost {
-  endpoint: 'ai-keys' | 'byok';
+  endpoint: 'ai-keys' | 'byok' | 'visual-cues';
   provider: string;
   apiKey: string;
 }
@@ -41,11 +42,39 @@ export interface SttResolution {
   infra: { sttProvider?: string; sttBaseUrl?: string };
 }
 
+export interface VisualCueResolution {
+  keyPost: KeyPost | null;
+  provider: 'pexels' | 'off';
+}
+
 export const DEFAULT_LOCAL_TTS_BASE_URL = 'http://localhost:8000';
 export const DEFAULT_LOCAL_STT_BASE_URL = 'http://localhost:8001/v1';
 
 function clean(v: string | undefined | null): string {
   return (v ?? '').trim();
+}
+
+export function resolveWelcomeTtsProviderId(ttsId: string): string | null {
+  if (ttsId === 'elevenlabs' || ttsId === 'hume' || ttsId === 'openai' || ttsId === 'cartesia') {
+    return ttsId;
+  }
+  if (ttsId === 'kokoro' || ttsId === 'local') return ttsId;
+  return null;
+}
+
+export function resolveWelcomeSttProviderId(sttId: string): string | null {
+  if (sttId === 'whisper') return 'local';
+  if (sttId === 'assembly') return 'assemblyai';
+  if (
+    sttId === 'local' ||
+    sttId === 'deepgram' ||
+    sttId === 'elevenlabs' ||
+    sttId === 'openai' ||
+    sttId === 'together'
+  ) {
+    return sttId;
+  }
+  return null;
 }
 
 /**
@@ -106,20 +135,22 @@ export function resolveLiveTranslateKey(apiKey: string): KeyPost | null {
  * local are keyless local providers (infra + base URL); the rest take a BYOK key.
  */
 export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsResolution {
-  if (ttsId === 'kokoro' || ttsId === 'local') {
+  const resolvedId = resolveWelcomeTtsProviderId(ttsId) ?? ttsId;
+
+  if (resolvedId === 'kokoro' || resolvedId === 'local') {
     const u = clean(baseUrl) || DEFAULT_LOCAL_TTS_BASE_URL;
     return {
       keyPost: null,
-      preferredTtsProvider: ttsId,
-      infra: { ttsProvider: ttsId, ...(u && { ttsBaseUrl: u }) },
+      preferredTtsProvider: resolvedId,
+      infra: { ttsProvider: resolvedId, ...(u && { ttsBaseUrl: u }) },
     };
   }
 
   const key = clean(apiKey);
   return {
-    keyPost: key ? { endpoint: 'byok', provider: ttsId, apiKey: key } : null,
-    preferredTtsProvider: ttsId,
-    infra: { ttsProvider: ttsId },
+    keyPost: key ? { endpoint: 'byok', provider: resolvedId, apiKey: key } : null,
+    preferredTtsProvider: resolvedId,
+    infra: { ttsProvider: resolvedId },
   };
 }
 
@@ -129,7 +160,7 @@ export function resolveTts(ttsId: string, apiKey: string, baseUrl: string): TtsR
  * other cloud STT key lives in the AI-key store (matching resolveSttProvider).
  */
 export function resolveStt(sttId: string, apiKey: string, baseUrl: string): SttResolution {
-  const resolvedId = sttId === 'whisper' ? 'local' : sttId === 'assembly' ? 'assemblyai' : sttId;
+  const resolvedId = resolveWelcomeSttProviderId(sttId) ?? sttId;
 
   if (resolvedId === 'local') {
     const u = clean(baseUrl) || DEFAULT_LOCAL_STT_BASE_URL;
@@ -141,5 +172,18 @@ export function resolveStt(sttId: string, apiKey: string, baseUrl: string): SttR
   return {
     keyPost: key ? { endpoint, provider: resolvedId, apiKey: key } : null,
     infra: { sttProvider: resolvedId },
+  };
+}
+
+/** Visual cue provider → encrypted visual-cue key store. */
+export function resolveVisualCue(provider: string, apiKey: string): VisualCueResolution {
+  const selected = provider === 'off' ? 'off' : 'pexels';
+  const key = clean(apiKey);
+  return {
+    provider: selected,
+    keyPost:
+      selected === 'pexels' && key
+        ? { endpoint: 'visual-cues', provider: 'pexels', apiKey: key }
+        : null,
   };
 }

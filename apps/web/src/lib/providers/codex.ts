@@ -1,6 +1,5 @@
 import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
-import { executeCodex, streamCodex } from '../codex-client';
-import { serializeMessages } from '../claude-code-client';
+import { serializeMessages } from '../agent-messages';
 
 /** Extract plain text from ChatMessage content (string or ContentPart[]). */
 function textOf(content: ChatMessage['content']): string {
@@ -26,6 +25,7 @@ export class CodexProvider implements AIProvider {
     opts?: AIOptions
   ): Promise<AIResponse> {
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const { executeCodex } = await import('../codex-client');
     const result = await executeCodex(system, serializeMessages(textMessages), { model: opts?.model });
     return { ...result, model: reportedModelFor(opts?.model) };
   }
@@ -36,6 +36,7 @@ export class CodexProvider implements AIProvider {
     opts?: AIOptions
   ): AsyncGenerator<string> {
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const { streamCodex } = await import('../codex-client');
     yield* streamCodex(system, serializeMessages(textMessages), { model: opts?.model });
   }
 }
