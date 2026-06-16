@@ -16,6 +16,8 @@ import styles from './page.module.css';
 
 const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
 
+export const dynamic = 'force-dynamic';
+
 interface Step {
   num: string;
   label: string;
