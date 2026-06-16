@@ -68,7 +68,7 @@ export function StepCompose({ level, voice, demoMode, onDone, onBack }: Props) {
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>07 ·</span> Composing
+        <span className={t.eyebrowIdx}>08 ·</span> Composing
       </div>
       <h1 className={t.title}>
         {finished ? (

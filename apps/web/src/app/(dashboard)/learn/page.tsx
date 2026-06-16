@@ -109,14 +109,15 @@ export default async function LearnPage() {
         <ul className={styles.courseList} role="list">
           {courses.map((course) => {
             const pct = Math.round(levelFraction(course.currentLevel) * 100);
+            const isManualPlacement = course.placementSource === 'MANUAL';
+            const courseTitle = course.curriculum?.title ?? langLabel(course.targetLang);
+            const placementHref = `/learn/placement?native=${course.nativeLang}&target=${course.targetLang}`;
             return (
               <li key={course.id} className={styles.courseCard}>
                 <div className={styles.courseInfo}>
                   <div className={styles.courseTop}>
                     <span className={styles.courseEyebrow}>{langLabel(course.targetLang)}</span>
-                    <h2 className={styles.courseName}>
-                      {course.curriculum?.title ?? langLabel(course.targetLang)}
-                    </h2>
+                    <h2 className={styles.courseName}>{courseTitle}</h2>
                   </div>
                   <div className={styles.levelStrip}>
                     <div className={styles.levelTop}>
@@ -135,52 +136,49 @@ export default async function LearnPage() {
                     >
                       <i style={{ width: `${pct}%` }} />
                     </div>
-                    {course.placementSource === 'MANUAL' && (
+                    {isManualPlacement && (
                       <p className={styles.manualHint}>
-                        You set this level yourself.{' '}
-                        <Link
-                          href={`/learn/placement?native=${course.nativeLang}&target=${course.targetLang}`}
-                        >
-                          Take the placement test
-                        </Link>{' '}
-                        to confirm it.
+                        You set this level yourself. You can take a class now at{' '}
+                        {course.currentLevel}, or{' '}
+                        <Link href={placementHref}>take the placement test</Link> if you want Sotto
+                        to confirm it first.
                       </p>
                     )}
                   </div>
                 </div>
                 <div className={styles.courseActions}>
+                  <StartNextClass
+                    courseId={course.id}
+                    activeClassId={course.activeClassId ?? null}
+                  />
                   <Link
                     href="/learn/practice"
                     className={styles.practiceLink}
-                    aria-label={`Practice a single skill for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
+                    aria-label={`Practice a single skill for ${courseTitle}`}
                   >
                     Practice
                   </Link>
                   <Link
                     href={`/learn/live?course=${course.id}`}
                     className={styles.practiceLink}
-                    aria-label={`Live conversation for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
+                    aria-label={`Live conversation for ${courseTitle}`}
                   >
                     Live
                   </Link>
                   <Link
                     href={`/learn/exams?course=${course.id}`}
                     className={styles.practiceLink}
-                    aria-label={`Practice exam for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
+                    aria-label={`Practice exam for ${courseTitle}`}
                   >
                     Exam
                   </Link>
                   <Link
-                    href={`/learn/placement?native=${course.nativeLang}&target=${course.targetLang}`}
+                    href={placementHref}
                     className={styles.practiceLink}
-                    aria-label={`Retake the placement test for ${course.curriculum?.title ?? langLabel(course.targetLang)} (your level is never lowered)`}
+                    aria-label={`${isManualPlacement ? 'Confirm' : 'Retake'} the placement test for ${courseTitle} (your level is never lowered)`}
                   >
-                    Retake placement
+                    {isManualPlacement ? 'Confirm level' : 'Retake placement'}
                   </Link>
-                  <StartNextClass
-                    courseId={course.id}
-                    activeClassId={course.activeClassId ?? null}
-                  />
                 </div>
                 <div className={styles.sourcedRow}>
                   <SourcedClassEntry
