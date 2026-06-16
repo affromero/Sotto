@@ -9,10 +9,6 @@ import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
 import type { CustomTag } from '@/components/discovery/InterestGrid';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
-import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
-import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
-import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { AppearanceControls } from '@/components/settings/AppearanceControls';
 import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
@@ -64,11 +60,6 @@ interface SettingsFormProps {
   sttProviderAvailable: boolean;
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
-  configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
-  configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
-  aiProviderMeta: AiProviderClientMeta[];
-  aiSystemProviders: Array<{ id: string; label: string; description: string; available: boolean }>;
-  ttsProviderMeta: TtsProviderClientMeta[];
   speechTtsProviderMeta: SpeechTtsProviderClientMeta[];
   sttProviderMeta: SttProviderClientMeta[];
   initialPreferredTtsModel: string | null;
@@ -111,11 +102,6 @@ export function SettingsForm({
   sttProviderAvailable,
   interestCategories,
   selectedInterestTagIds,
-  configuredTtsProviders,
-  configuredAiProviders,
-  aiProviderMeta,
-  aiSystemProviders,
-  ttsProviderMeta,
   speechTtsProviderMeta,
   sttProviderMeta,
   initialPreferredTtsModel,
@@ -773,38 +759,6 @@ export function SettingsForm({
           </div>
         </section>
       )}
-
-      {/* AI Provider Keys — owner/admin only (server-infra concern, like Voice Providers) */}
-      {isAdmin ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>AI Providers</h2>
-          <p className={styles.sectionDesc}>
-            Configure the AI providers for lesson generation, Q&amp;A, and live conversation.
-            Keys are encrypted with AES-256-GCM.
-          </p>
-          <AiProviderCards
-            initialConfigured={configuredAiProviders}
-            providerMeta={aiProviderMeta}
-            systemProviders={aiSystemProviders}
-          />
-        </section>
-      ) : null}
-
-      {/* TTS Provider Keys */}
-      {isAdmin ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Voice Providers</h2>
-          <p className={styles.sectionDesc}>
-            Add voice provider keys for the household speech stack. Learners choose compatible
-            models for their language in Speech models.
-          </p>
-          <TtsProviderCards
-            initialConfigured={configuredTtsProviders}
-            providerMeta={ttsProviderMeta}
-            preferredLanguage={preferredLanguage}
-          />
-        </section>
-      ) : null}
 
       {/* Danger Zone */}
       <section className={`${styles.section} ${styles.dangerSection}`}>

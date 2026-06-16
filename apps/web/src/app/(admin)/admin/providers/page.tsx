@@ -1,7 +1,9 @@
 import { auth } from '@/lib/auth';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
-import { getAllProviderMeta } from '@/lib/providers/tts-registry';
+import { listAiProviders, listByokProviders } from '@/lib/byok';
+import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
+import { getAllAiProviderClientMeta, getAllAiProviderMeta } from '@/lib/providers/ai-registry';
+import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getTestableProviders } from '@/lib/admin/testable-providers';
 import { Glyph } from '@/components/Glyph';
@@ -14,10 +16,34 @@ export default async function AdminProvidersPage() {
   const session = await auth();
   const userId = session!.user!.id!;
 
-  const [config, testable] = await Promise.all([
-    getAutoModelConfig(),
-    getTestableProviders(userId),
-  ]);
+  const [config, testable, byokKeys, aiKeys, claudeCodeAvailable, codexAvailable] =
+    await Promise.all([
+      getAutoModelConfig(),
+      getTestableProviders(userId),
+      listByokProviders(userId),
+      listAiProviders(userId),
+      isClaudeAvailable(),
+      isCodexAvailable(),
+    ]);
+  const configuredTtsProviders = byokKeys.map((k) => ({
+    provider: k.provider,
+    isValid: k.isValid,
+  }));
+  const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
+  const aiSystemProviders = [
+    {
+      id: 'claude-code',
+      label: 'Claude Code',
+      description: 'Linked via the local Claude Code CLI. No API key needed.',
+      available: claudeCodeAvailable,
+    },
+    {
+      id: 'codex',
+      label: 'Codex',
+      description: 'Linked via the local Codex CLI. No API key needed.',
+      available: codexAvailable,
+    },
+  ];
 
   // STT-only providers live in the AI registry for the key store but are not
   // language models — keep them out of the "Language model" picker.
@@ -62,6 +88,13 @@ export default async function AdminProvidersPage() {
 
       <ProvidersTabs
         autoModels={{ initialConfig: config, aiProviders, ttsProviders, sttProviders }}
+        keys={{
+          configuredAiProviders,
+          configuredTtsProviders,
+          aiProviderMeta: getAllAiProviderClientMeta(),
+          ttsProviderMeta: getAllTtsProviderClientMeta(),
+          aiSystemProviders,
+        }}
         testable={{
           aiProviders: testable.ai,
           ttsProviders: testable.tts,
@@ -75,8 +108,8 @@ export default async function AdminProvidersPage() {
         </div>
         <p>
           A dedicated AI model runs internal tasks without learner context (handle screening,
-          credential lookup, language detection). Set it in the model defaults above; it can be
-          more capable than the learner-facing default.
+          credential lookup, language detection). Set it in the model defaults above; it can be more
+          capable than the learner-facing default.
         </p>
       </div>
     </>

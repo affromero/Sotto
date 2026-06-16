@@ -76,8 +76,8 @@ export default function SiteConfigPage() {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [resetStatus, setResetStatus] = useState<'idle' | 'resetting' | 'reset' | 'error'>('idle');
-  const [resetBannerOpen, setResetBannerOpen] = useState(false);
+  const [clearStatus, setClearStatus] = useState<'idle' | 'clearing' | 'cleared' | 'error'>('idle');
+  const [clearBannerOpen, setClearBannerOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/v1/admin/site-config')
@@ -92,8 +92,8 @@ export default function SiteConfigPage() {
   function setField(key: keyof Config, value: string | boolean | null) {
     setCfg((c) => (c ? { ...c, [key]: value } : c));
     setSaveStatus('idle');
-    setResetStatus('idle');
-    setResetBannerOpen(false);
+    setClearStatus('idle');
+    setClearBannerOpen(false);
   }
 
   async function save() {
@@ -117,31 +117,31 @@ export default function SiteConfigPage() {
       const data = (await res.json()) as Config;
       setCfg(data);
       setSaveStatus('saved');
-      setResetStatus('idle');
-      setResetBannerOpen(false);
+      setClearStatus('idle');
+      setClearBannerOpen(false);
     } catch {
       setSaveStatus('error');
     }
   }
 
-  async function resetToFactoryDefaults() {
-    setResetStatus('resetting');
+  async function clearAdminOverrides() {
+    setClearStatus('clearing');
     setSaveStatus('idle');
     try {
       const res = await fetch('/api/v1/admin/site-config', { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to reset');
+      if (!res.ok) throw new Error('Failed to clear overrides');
       const data = (await res.json()) as Config;
       setCfg(data);
-      setResetStatus('reset');
-      setResetBannerOpen(false);
+      setClearStatus('cleared');
+      setClearBannerOpen(false);
     } catch {
-      setResetStatus('error');
+      setClearStatus('error');
     }
   }
 
-  function showResetBanner() {
-    setResetBannerOpen(true);
-    setResetStatus('idle');
+  function showClearBanner() {
+    setClearBannerOpen(true);
+    setClearStatus('idle');
     setSaveStatus('idle');
   }
 
@@ -157,57 +157,56 @@ export default function SiteConfigPage() {
         </p>
       </div>
 
-      <section className={styles.dangerZone} aria-labelledby="factory-reset-title">
+      <section className={styles.dangerZone} aria-labelledby="clear-overrides-title">
         <div>
-          <h2 id="factory-reset-title" className={styles.dangerTitle}>
-            Factory reset settings
+          <h2 id="clear-overrides-title" className={styles.dangerTitle}>
+            Clear admin overrides
           </h2>
           <p className={styles.dangerText}>
-            Reset Sotto back to environment-backed server settings. This only clears admin overrides
-            for AI, speech, and storage.
+            Remove owner-set AI, speech, and storage selections so Sotto falls back to environment
+            variables. This does not delete profiles, courses, keys, lessons, or media.
           </p>
         </div>
         <button
           type="button"
           className={styles.resetBtn}
-          onClick={showResetBanner}
-          disabled={resetStatus === 'resetting' || saveStatus === 'saving'}
-          aria-expanded={resetBannerOpen}
+          onClick={showClearBanner}
+          disabled={clearStatus === 'clearing' || saveStatus === 'saving'}
+          aria-expanded={clearBannerOpen}
         >
-          Factory reset settings
+          Clear overrides
         </button>
       </section>
 
-      {resetBannerOpen && (
+      {clearBannerOpen && (
         <section
           className={styles.confirmBanner}
-          aria-labelledby="factory-reset-confirm-title"
-          aria-describedby="factory-reset-confirm-copy"
+          aria-labelledby="clear-overrides-confirm-title"
+          aria-describedby="clear-overrides-confirm-copy"
         >
           <div>
-            <h2 id="factory-reset-confirm-title" className={styles.confirmTitle}>
-              Confirm factory reset
+            <h2 id="clear-overrides-confirm-title" className={styles.confirmTitle}>
+              Confirm clearing overrides
             </h2>
-            <p id="factory-reset-confirm-copy" className={styles.confirmText}>
-              This clears all owner-set provider and storage overrides, then Sotto falls back to the
-              matching environment variables. Learner profiles, courses, BYOK keys, generated
-              lessons, and media stay untouched.
+            <p id="clear-overrides-confirm-copy" className={styles.confirmText}>
+              This only clears admin infrastructure fields. The destructive factory reset is on the
+              System page.
             </p>
           </div>
           <div className={styles.confirmActions}>
             <button
               type="button"
               className={styles.confirmResetBtn}
-              onClick={resetToFactoryDefaults}
-              disabled={resetStatus === 'resetting'}
+              onClick={clearAdminOverrides}
+              disabled={clearStatus === 'clearing'}
             >
-              {resetStatus === 'resetting' ? 'Resetting...' : 'Reset admin settings'}
+              {clearStatus === 'clearing' ? 'Clearing...' : 'Clear admin overrides'}
             </button>
             <button
               type="button"
               className={styles.cancelBtn}
-              onClick={() => setResetBannerOpen(false)}
-              disabled={resetStatus === 'resetting'}
+              onClick={() => setClearBannerOpen(false)}
+              disabled={clearStatus === 'clearing'}
             >
               Cancel
             </button>
@@ -215,14 +214,14 @@ export default function SiteConfigPage() {
         </section>
       )}
 
-      {resetStatus === 'reset' && (
+      {clearStatus === 'cleared' && (
         <div className={`${styles.resultBanner} ${styles.resultSuccess}`} role="status">
-          Factory defaults restored. Sotto is now using environment-backed settings where available.
+          Admin overrides cleared. Sotto is now using environment-backed settings where available.
         </div>
       )}
-      {resetStatus === 'error' && (
+      {clearStatus === 'error' && (
         <div className={`${styles.resultBanner} ${styles.resultError}`} role="status">
-          Failed to reset settings.
+          Failed to clear admin overrides.
         </div>
       )}
 
@@ -252,7 +251,7 @@ export default function SiteConfigPage() {
           type="button"
           className={styles.saveBtn}
           onClick={save}
-          disabled={saveStatus === 'saving' || resetStatus === 'resetting'}
+          disabled={saveStatus === 'saving' || clearStatus === 'clearing'}
         >
           {saveStatus === 'saving' ? 'Saving...' : 'Save changes'}
         </button>

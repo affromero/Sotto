@@ -521,8 +521,6 @@
   flex-wrap: wrap;
 }
 
-/* BYOK Section */
-
 .sectionDesc {
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
@@ -564,29 +562,6 @@
   }
 }
 
-.byokInputRow {
-  display: flex;
-  gap: var(--spacing-sm);
-  align-items: flex-start;
-}
-
-.byokInputRow input {
-  flex: 1;
-}
-
-.byokStatus {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  justify-content: space-between;
-}
-
-.byokConnected {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-success);
-}
-
 .successText {
   font: var(--text-body-sm);
   color: var(--color-success);
@@ -602,11 +577,5 @@
 @media (min-width: 600px) {
   .section {
     padding: var(--spacing-xl);
-  }
-}
-
-@media (max-width: 480px) {
-  .byokInputRow {
-    flex-direction: column;
   }
 }

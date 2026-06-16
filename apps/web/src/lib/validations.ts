@@ -313,6 +313,13 @@ export const deleteAccountSchema = z.object({
 });
 
 /**
+ * Full self-hosted factory reset confirmation
+ */
+export const factoryResetSchema = z.object({
+  confirm: z.literal('DELETE EVERYTHING'),
+});
+
+/**
  * Script regeneration with optional user feedback
  */
 export const regenerateWithFeedbackSchema = z

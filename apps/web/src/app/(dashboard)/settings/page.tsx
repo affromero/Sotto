@@ -2,16 +2,11 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
-import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
-import {
-  getAllTtsProviderClientMeta,
-  getAllProviderMeta as getAllTtsProviderMeta,
-} from '@/lib/providers/tts-registry';
+import { getAllProviderMeta as getAllTtsProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getServerInfra } from '@/lib/server-config';
 import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
-import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -104,8 +99,6 @@ export default async function SettingsPage() {
     ...configuredAiProviders.filter((k) => k.isValid).map((k) => k.provider),
     ...adminAiKeys.filter((k) => k.isValid).map((k) => k.provider),
   ]);
-  const aiProviderMeta = getAllAiProviderClientMeta();
-  const ttsProviderMeta = getAllTtsProviderClientMeta();
   const speechTtsProviderMeta = getAllTtsProviderMeta().map((meta) => ({
     id: meta.id,
     displayName: meta.displayName,
@@ -154,25 +147,6 @@ export default async function SettingsPage() {
   if (process.env.ELEVENLABS_API_KEY || accessibleTtsProviders.has('elevenlabs')) {
     accessibleAiProviders.add('elevenlabs');
   }
-  const [claudeCodeAvailable, codexAvailable] = await Promise.all([
-    isClaudeAvailable(),
-    isCodexAvailable(),
-  ]);
-  const aiSystemProviders = [
-    {
-      id: 'claude-code',
-      label: 'Claude Code',
-      description: 'Linked via the local Claude Code CLI. No API key needed.',
-      available: claudeCodeAvailable,
-    },
-    {
-      id: 'codex',
-      label: 'Codex',
-      description: 'Linked via the local Codex CLI. No API key needed.',
-      available: codexAvailable,
-    },
-  ];
-
   return (
     <main className={styles.main}>
       <h1 className={styles.pageTitle}>Settings</h1>
@@ -193,11 +167,6 @@ export default async function SettingsPage() {
         initialPreferredAiModel={user.preferredAiModel}
         interestCategories={categories}
         selectedInterestTagIds={selectedInterestTagIds}
-        configuredTtsProviders={configuredProviders}
-        configuredAiProviders={configuredAiProviders}
-        aiProviderMeta={aiProviderMeta}
-        aiSystemProviders={aiSystemProviders}
-        ttsProviderMeta={ttsProviderMeta}
         speechTtsProviderMeta={speechTtsProviderMeta}
         sttProviderMeta={sttProviderMeta}
         initialEmailNotifications={user.emailNotifications}

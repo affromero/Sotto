@@ -110,7 +110,7 @@ describe('DELETE /api/v1/admin/site-config', () => {
     expect(mockInvalidateServerInfra).not.toHaveBeenCalled();
   });
 
-  it('lets the owner factory reset infra config and returns defaults', async () => {
+  it('lets the owner clear admin overrides and returns defaults', async () => {
     mockRequireAdmin.mockResolvedValue('owner-1');
     mockResetSiteConfig.mockResolvedValue(undefined);
     mockGetSiteConfig.mockResolvedValue({
