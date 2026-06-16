@@ -335,7 +335,10 @@ impl SottoClient {
         course_id: &str,
         kind: types::PracticeKind,
     ) -> Result<types::StartPracticeResponse> {
-        let body = types::StartPracticeRequest { kind };
+        let body = types::StartPracticeRequest {
+            kind,
+            focus_target_id: None,
+        };
         let resp = self
             .inner
             .start_practice(course_id, &body)
