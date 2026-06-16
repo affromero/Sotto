@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * WritingSection — the say-it-in-writing module from the design bundle
+ * WritingSection renders the say-it-in-writing module from the design bundle
  * (`class-writing.jsx`): a task card, a textarea, a "Check writing" button,
  * then the submitted text with inline corrections (struck-through `old`, green
  * `new`, a `why` tooltip), a ScoreDial, and feedback.
@@ -12,8 +12,8 @@
  *
  * Adaptation to our data: the design matched a fixed set of seeded errors in
  * the local draft; our backend grades synchronously and returns the authoritative
- * corrections (`{old, new, why}`), overall score, and feedback. We render those —
- * locating each `old` substring in the submitted text to wrap it inline — instead
+ * corrections (`{old, new, why}`), overall score, and feedback. We render those by
+ * locating each `old` substring in the submitted text to wrap it inline instead
  * of recomputing anything client-side.
  */
 
@@ -85,11 +85,7 @@ function CorrectedText({ text, corrections }: CorrectedTextProps) {
     <>
       <p className={styles.corrected}>
         {nodes.map((node, idx) =>
-          node.kind === 'text' ? (
-            <span key={idx}>{node.value}</span>
-          ) : (
-            <Corr key={idx} c={node.c} />
-          ),
+          node.kind === 'text' ? <span key={idx}>{node.value}</span> : <Corr key={idx} c={node.c} />
         )}
       </p>
       {unmatched.length > 0 && (
@@ -252,7 +248,7 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
                 {result.feedback}
                 <span className={styles.tally}>
                   {issueCount === 0
-                    ? 'no issues found — clean'
+                    ? 'no issues found, clean'
                     : `${issueCount} correction${issueCount > 1 ? 's' : ''} · hover to see why`}
                 </span>
               </p>
@@ -328,7 +324,7 @@ export function WritingSection({
         </div>
         <h1 className={styles.title}>Write back, in your hand.</h1>
         <p className={styles.modLede}>
-          A quick reply — the agent reads it the way a patient friend would, marking only what
+          A quick reply. The agent reads it the way a patient friend would, marking only what
           matters and telling you why. Hover a fix to see the reason.
         </p>
       </div>

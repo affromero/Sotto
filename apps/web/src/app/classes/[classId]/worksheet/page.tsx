@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: WorksheetPageProps) {
     select: { lesson: { select: { title: true } } },
   });
 
-  return { title: cls ? `${cls.lesson.title} — iPad Workbook` : 'iPad Workbook' };
+  return { title: cls ? `${cls.lesson.title}: iPad Workbook` : 'iPad Workbook' };
 }
 
 // Letter labels for MC options
@@ -43,7 +43,10 @@ function SkillBadge({ skill }: { skill: string }) {
   );
 }
 
-function QuestionBlock({ question, index }: {
+function QuestionBlock({
+  question,
+  index,
+}: {
   question: ClassDocumentSection['questions'][number];
   index: number;
 }) {
@@ -51,18 +54,26 @@ function QuestionBlock({ question, index }: {
     <li className={styles.questionItem} aria-label={`Question ${index + 1}`}>
       {question.passageText ? (
         <blockquote className={styles.passageBlock}>
-          {question.passageRef && <cite className={styles.passageLabel}>{question.passageRef}</cite>}
+          {question.passageRef && (
+            <cite className={styles.passageLabel}>{question.passageRef}</cite>
+          )}
           <span>{question.passageText}</span>
         </blockquote>
-      ) : question.passageRef && (
-        <p className={styles.passageRef}>{question.passageRef}</p>
+      ) : (
+        question.passageRef && <p className={styles.passageRef}>{question.passageRef}</p>
       )}
       <p className={styles.questionText}>
-        <span className={styles.questionNumber} aria-hidden="true">{index + 1}.</span>
+        <span className={styles.questionNumber} aria-hidden="true">
+          {index + 1}.
+        </span>
         {question.question}
       </p>
       {question.options.length > 0 && (
-        <ol className={styles.optionList} role="list" aria-label={`Options for question ${index + 1}`}>
+        <ol
+          className={styles.optionList}
+          role="list"
+          aria-label={`Options for question ${index + 1}`}
+        >
           {question.options.map((option, oi) => (
             <li key={oi} className={styles.optionItem}>
               <label className={styles.optionLabel}>
@@ -85,17 +96,26 @@ function QuestionBlock({ question, index }: {
   );
 }
 
-function PromptBlock({ prompt, index }: {
+function PromptBlock({
+  prompt,
+  index,
+}: {
   prompt: ClassDocumentSection['prompts'][number];
   index: number;
 }) {
   return (
     <li className={styles.promptItem} aria-label={`Phrase ${index + 1}`}>
-      <div className={styles.promptNumber} aria-hidden="true">{index + 1}</div>
+      <div className={styles.promptNumber} aria-hidden="true">
+        {index + 1}
+      </div>
       <div className={styles.promptContent}>
-        <p className={styles.targetPhrase} lang="und">{prompt.targetPhrase}</p>
+        <p className={styles.targetPhrase} lang="und">
+          {prompt.targetPhrase}
+        </p>
         {prompt.ipa && (
-          <p className={styles.ipa} aria-label="Pronunciation">{prompt.ipa}</p>
+          <p className={styles.ipa} aria-label="Pronunciation">
+            {prompt.ipa}
+          </p>
         )}
         <p className={styles.translation}>{prompt.translation}</p>
         <div className={styles.pencilLinesCompact} aria-hidden="true">
@@ -107,14 +127,19 @@ function PromptBlock({ prompt, index }: {
   );
 }
 
-function WritingPromptBlock({ prompt, index }: {
+function WritingPromptBlock({
+  prompt,
+  index,
+}: {
   prompt: ClassDocumentSection['writingPrompts'][number];
   index: number;
 }) {
   return (
     <li className={styles.writingItem} aria-label={`Writing prompt ${index + 1}`}>
       <p className={styles.writingTask}>
-        <span className={styles.questionNumber} aria-hidden="true">{index + 1}.</span>
+        <span className={styles.questionNumber} aria-hidden="true">
+          {index + 1}.
+        </span>
         {prompt.task}
       </p>
       {prompt.guidance && <p className={styles.writingGuidance}>{prompt.guidance}</p>}
@@ -152,9 +177,7 @@ function SectionBlock({ section }: { section: ClassDocumentSection }) {
         )}
       </header>
 
-      {section.instructions && (
-        <p className={styles.instructions}>{section.instructions}</p>
-      )}
+      {section.instructions && <p className={styles.instructions}>{section.instructions}</p>}
 
       {section.questions.length > 0 && (
         <ol className={styles.questionList} aria-label={`${section.title} questions`}>
@@ -253,8 +276,12 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
       {/* Screen-only toolbar */}
       <div className={styles.toolbar} aria-label="Workbook controls">
         <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-          <a href="/learn" className={styles.breadcrumbLink}>Learn</a>
-          <span aria-hidden="true" className={styles.breadcrumbSep}>/</span>
+          <a href="/learn" className={styles.breadcrumbLink}>
+            Learn
+          </a>
+          <span aria-hidden="true" className={styles.breadcrumbSep}>
+            /
+          </span>
           <span className={styles.breadcrumbCurrent}>{doc.title}</span>
         </nav>
         <PrintButton />
@@ -279,14 +306,14 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
             <h1 className={styles.worksheetTitle}>{doc.title}</h1>
             <div className={styles.worksheetDetails}>
               <span className={styles.worksheetLevel}>{doc.level}</span>
-              <span className={styles.worksheetDot} aria-hidden="true">·</span>
+              <span className={styles.worksheetDot} aria-hidden="true">
+                ·
+              </span>
               <span className={styles.worksheetLang}>
                 {doc.nativeLang.toUpperCase()} → {doc.targetLang.toUpperCase()}
               </span>
             </div>
-            {doc.objective && (
-              <p className={styles.worksheetObjective}>{doc.objective}</p>
-            )}
+            {doc.objective && <p className={styles.worksheetObjective}>{doc.objective}</p>}
           </div>
 
           <div className={styles.worksheetNameLine} aria-label="Name field">

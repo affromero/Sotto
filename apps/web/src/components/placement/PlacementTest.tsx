@@ -30,10 +30,10 @@ const SKILL_LABELS: Record<string, string> = {
 };
 
 const LEVEL_DESCRIPTIONS: Record<string, string> = {
-  A1: 'Beginner — you are just starting out.',
-  A2: 'Elementary — you can handle everyday basics.',
-  B1: 'Intermediate — you can manage familiar topics.',
-  B2: 'Upper-Intermediate — you can discuss a wide range of subjects.',
+  A1: 'Beginner: you are just starting out.',
+  A2: 'Elementary: you can handle everyday basics.',
+  B1: 'Intermediate: you can manage familiar topics.',
+  B2: 'Upper Intermediate: you can discuss a wide range of subjects.',
 };
 
 interface PlacementTestProps {
@@ -56,7 +56,7 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
     try {
       const focusParam = focusLevel ? `&focusLevel=${encodeURIComponent(focusLevel)}` : '';
       const res = await fetch(
-        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}${focusParam}`,
+        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}${focusParam}`
       );
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
@@ -173,7 +173,16 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
     return (
       <div className={styles.center} role="alert">
         <div className={styles.errorIcon} aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -198,13 +207,24 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
     return (
       <div className={styles.center} role="alert">
         <div className={styles.warningIcon} aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         </div>
-        <p className={styles.errorMessage}>Your placement session expired. Start a fresh test to continue.</p>
+        <p className={styles.errorMessage}>
+          Your placement session expired. Start a fresh test to continue.
+        </p>
         <button className={styles.retryButton} onClick={() => void loadQuestions()}>
           Start a new test
         </button>
@@ -233,9 +253,18 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
                 <li key={skill} className={styles.skillItem}>
                   <div className={styles.skillMeta}>
                     <span className={styles.skillName}>{SKILL_LABELS[skill] ?? skill}</span>
-                    <span className={styles.skillScore} aria-label={`${pct} percent`}>{pct}%</span>
+                    <span className={styles.skillScore} aria-label={`${pct} percent`}>
+                      {pct}%
+                    </span>
                   </div>
-                  <div className={styles.progressTrack} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${SKILL_LABELS[skill] ?? skill} score`}>
+                  <div
+                    className={styles.progressTrack}
+                    role="progressbar"
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${SKILL_LABELS[skill] ?? skill} score`}
+                  >
                     <div
                       className={styles.progressFill}
                       style={{ '--pct': `${pct}%` } as React.CSSProperties}
@@ -247,7 +276,11 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
           </ul>
         </section>
 
-        <Link href="/learn" className={styles.startButton} aria-label="Start learning at your assigned level">
+        <Link
+          href="/learn"
+          className={styles.startButton}
+          aria-label="Start learning at your assigned level"
+        >
           Start learning
         </Link>
       </div>
@@ -270,8 +303,18 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
   return (
     <div className={styles.root}>
       {/* Progress bar */}
-      <div className={styles.progressBar} role="progressbar" aria-valuenow={answeredCount} aria-valuemin={0} aria-valuemax={questions.length} aria-label={`${answeredCount} of ${questions.length} questions answered`}>
-        <div className={styles.progressBarFill} style={{ '--pct': `${progressPct}%` } as React.CSSProperties} />
+      <div
+        className={styles.progressBar}
+        role="progressbar"
+        aria-valuenow={answeredCount}
+        aria-valuemin={0}
+        aria-valuemax={questions.length}
+        aria-label={`${answeredCount} of ${questions.length} questions answered`}
+      >
+        <div
+          className={styles.progressBarFill}
+          style={{ '--pct': `${progressPct}%` } as React.CSSProperties}
+        />
       </div>
 
       <div className={styles.meta}>
@@ -284,7 +327,9 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
       </div>
 
       <div className={styles.card}>
-        <p className={styles.prompt} id={`question-${q.id}`}>{q.prompt}</p>
+        <p className={styles.prompt} id={`question-${q.id}`}>
+          {q.prompt}
+        </p>
 
         <fieldset className={styles.options} aria-labelledby={`question-${q.id}`}>
           <legend className={styles.srOnly}>Choose the correct answer</legend>
@@ -293,14 +338,18 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
             return (
               <button
                 key={idx}
-                ref={(el) => { optionRefs.current[idx] = el; }}
+                ref={(el) => {
+                  optionRefs.current[idx] = el;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={selected}
                 className={`${styles.option} ${selected ? styles.optionSelected : ''}`}
                 onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: idx }))}
               >
-                <span className={styles.optionKey} aria-hidden="true">{idx + 1}</span>
+                <span className={styles.optionKey} aria-hidden="true">
+                  {idx + 1}
+                </span>
                 <span className={styles.optionText}>{option}</span>
               </button>
             );
@@ -316,7 +365,17 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
             disabled={currentIndex === 0}
             aria-label="Previous question"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
             Back
@@ -331,7 +390,17 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
               aria-label="Next question"
             >
               Next
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
@@ -364,7 +433,8 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
       </nav>
 
       <p className={styles.hint} aria-hidden="true">
-        Tip: press <kbd>1</kbd> to <kbd>{q.options.length}</kbd> to select, <kbd>Enter</kbd> to advance
+        Tip: press <kbd>1</kbd> to <kbd>{q.options.length}</kbd> to select, <kbd>Enter</kbd> to
+        advance
       </p>
     </div>
   );

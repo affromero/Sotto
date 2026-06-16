@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * ListeningSection — the audio player + comprehension module from the design
+ * ListeningSection renders the audio player + comprehension module from the design
  * bundle (`class-listening.jsx`), wired to a real <audio> element fed by the
  * section's `episode.audioUrl`. Waveform bars are driven from `timeupdate`
- * progress (a fixed pseudo-amplitude envelope — we have no precomputed peaks).
+ * progress (a fixed pseudo-amplitude envelope because we have no precomputed peaks).
  *
  * Adaptation: our class `episode` carries no transcript array, so the design's
  * transcript toggle is omitted; the player + MCQ are the live surface.
@@ -115,7 +115,7 @@ export function ListeningSection({
         </div>
         <h1 className={styles.title}>A scene, at your pace.</h1>
         <p className={styles.modLede}>
-          Synthesized in the voice you chose, slowed to where you can follow. Listen first — then
+          Synthesized in the voice you chose, slowed to where you can follow. Listen first, then
           answer the comprehension questions below.
         </p>
 
@@ -162,7 +162,7 @@ export function ListeningSection({
               ))}
             </div>
             <div className={styles.wfTime}>
-              {fmtClock(elapsed)} / {duration > 0 ? fmtClock(duration) : '–:––'}
+              {fmtClock(elapsed)} / {duration > 0 ? fmtClock(duration) : '0:00'}
             </div>
           </div>
 
@@ -185,7 +185,7 @@ export function ListeningSection({
 
           {!hasAudio && (
             <p className={styles.audioNotice} role="status">
-              Audio is still generating — your comprehension questions are ready below.
+              Audio is still generating. Your comprehension questions are ready below.
             </p>
           )}
         </div>

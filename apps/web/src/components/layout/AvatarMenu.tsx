@@ -4,7 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Network, Settings, Smartphone, Shield, Users, Sun, Moon, ChevronDown } from 'lucide-react';
+import {
+  BookOpen,
+  Network,
+  Settings,
+  Smartphone,
+  Shield,
+  Users,
+  Sun,
+  Moon,
+  ChevronDown,
+} from 'lucide-react';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { resolveProfileAvatar } from '@/lib/avatars';
 import { langLabel } from '@/lib/languages';
@@ -144,7 +154,11 @@ export function AvatarMenu({ user }: { user: AvatarMenuUser }) {
             <div className={styles.list}>
               <div className={styles.modeRow}>
                 <span className={styles.modeLabel}>
-                  {isDark ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
+                  {isDark ? (
+                    <Moon size={17} aria-hidden="true" />
+                  ) : (
+                    <Sun size={17} aria-hidden="true" />
+                  )}
                   {isDark ? 'Dark' : 'Light'} mode
                 </span>
                 <button
@@ -159,20 +173,45 @@ export function AvatarMenu({ user }: { user: AvatarMenuUser }) {
 
               <div className={styles.sep} role="separator" />
 
-              <Link href="/learn" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+              <Link
+                href="/learn"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
                 <BookOpen size={18} aria-hidden="true" /> Your courses
               </Link>
-              <Link href="/memory" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+              <Link
+                href="/memory"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
                 <Network size={18} aria-hidden="true" /> Memory graph
               </Link>
-              <Link href="/settings" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+              <Link
+                href="/settings"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
                 <Settings size={18} aria-hidden="true" /> Account &amp; appearance
               </Link>
-              <Link href="/settings/devices" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+              <Link
+                href="/settings/devices"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
                 <Smartphone size={18} aria-hidden="true" /> Connect a device
               </Link>
               {isOwner && (
-                <Link href="/admin" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+                <Link
+                  href="/admin"
+                  className={styles.item}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                >
                   <Shield size={18} aria-hidden="true" /> Admin console
                 </Link>
               )}
@@ -194,7 +233,7 @@ export function AvatarMenu({ user }: { user: AvatarMenuUser }) {
 
             <div className={styles.foot}>
               <span>Sotto</span>
-              <span>self-hosted</span>
+              <span>self hosted</span>
             </div>
           </div>
         </>

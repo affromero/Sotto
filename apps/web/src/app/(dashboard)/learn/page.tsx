@@ -62,7 +62,7 @@ export default async function LearnPage() {
           Pick up <em>where you left off</em>.
         </h1>
         <p className={styles.subtitle}>
-          Each course moves through mastery-gated classes. Resume the next class, or sharpen a
+          Each course moves through classes gated by mastery. Resume the next class, or sharpen a
           single skill in ungated practice.
         </p>
         <CefrDisclaimer />

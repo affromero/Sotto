@@ -6,7 +6,7 @@ import { LanguageDemo } from './LanguageDemo';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: `Language Learning — ${BRAND.name}`,
+  title: `Language Learning. ${BRAND.name}`,
   description:
     'Learn any language through audio lessons. Sotto highlights vocabulary inline, tracks your progress with spaced repetition, and supports 30+ languages at every level.',
 };
@@ -39,7 +39,16 @@ const STEPS = [
     description:
       'Choose from 30+ languages when you create a lesson. Sotto generates the script, vocabulary, and audio in the language you pick.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M5 8l6 6" />
         <path d="M4 14l6-6 2-3" />
         <path d="M2 5h12" />
@@ -55,7 +64,16 @@ const STEPS = [
     description:
       'Select a mix mode: vocabulary introduction for beginners, conversational mix for intermediates, or full immersion for advanced learners.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M12 20h9" />
         <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
       </svg>
@@ -67,7 +85,16 @@ const STEPS = [
     description:
       'Press play and learn naturally. Foreign words are highlighted inline with hover translations, pronunciation guides, and example sentences.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M9 18V5l12-2v13" />
         <circle cx="6" cy="18" r="3" />
         <circle cx="18" cy="16" r="3" />
@@ -90,10 +117,9 @@ export default function LanguagesPage() {
               while you listen.
             </h1>
             <p className={styles.subtitle}>
-              Generate lessons in 30+ languages with inline vocabulary
-              highlighting, hover translations, and spaced repetition. Pick a
-              topic you care about and learn a language through it — no
-              textbooks, no flashcard apps, just press play.
+              Generate lessons in 30+ languages with inline vocabulary highlighting, hover
+              translations, and spaced repetition. Pick a topic you care about and learn a language
+              through it, no textbooks, no flashcard apps, just press play.
             </p>
           </header>
 
@@ -106,8 +132,8 @@ export default function LanguagesPage() {
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Three ways to learn</h2>
             <p className={styles.sectionText}>
-              Choose how much of the lesson is in your target language. Start
-              gentle and ramp up as your confidence grows.
+              Choose how much of the lesson is in your target language. Start gentle and ramp up as
+              your confidence grows.
             </p>
             <div className={styles.modes}>
               {MODES.map((mode) => (
@@ -139,8 +165,7 @@ export default function LanguagesPage() {
           <section className={styles.cta}>
             <h2 className={styles.ctaTitle}>Start Learning</h2>
             <p className={styles.ctaText}>
-              Pick a language, choose a topic, and your first lesson is ready in
-              minutes.
+              Pick a language, choose a topic, and your first lesson is ready in minutes.
             </p>
             <Link href="/dashboard" className={styles.ctaButton}>
               Start Learning

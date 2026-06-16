@@ -42,7 +42,17 @@ export const metadata: Metadata = {
     template: `%s | ${BRAND.name}`,
   },
   description: BRAND.description,
-  keywords: ['language learning', 'CEFR', 'self-hosted', 'open-source', 'BYOK', 'grammar', 'speaking', 'pronunciation', 'private'],
+  keywords: [
+    'language learning',
+    'CEFR',
+    'self hosted',
+    'open source',
+    'BYOK',
+    'grammar',
+    'speaking',
+    'pronunciation',
+    'private',
+  ],
   alternates: {
     canonical: '/',
   },

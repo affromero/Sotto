@@ -31,7 +31,7 @@ const KINDS: Array<{ kind: string; label: string; blurb: string }> = [
 
 const UNAVAILABLE_COPY: Record<string, string> = {
   not_enough_vocab: 'Take a class first to build up some vocabulary to review.',
-  nothing_due: "You're all caught up — nothing is due for review right now.",
+  nothing_due: "You're all caught up. Nothing is due for review right now.",
   no_content: 'Take a class first to unlock practice for this skill.',
 };
 
@@ -55,7 +55,7 @@ export function PracticePanel({
       const res = await fetch(`/api/v1/courses/${courseId}/practice`);
       if (res.ok) setOverview((await res.json()) as Overview);
     } catch {
-      /* non-fatal — the picker still works */
+      /* non-fatal. The picker still works */
     }
   }, [courseId]);
 
@@ -138,9 +138,7 @@ export function PracticePanel({
     <div className={styles.root}>
       <header className={styles.header}>
         <h2 className={styles.courseName}>{courseName}</h2>
-        <p className={styles.subtitle}>
-          Quick, ungated review — separate from your graded classes.
-        </p>
+        <p className={styles.subtitle}>Quick, ungated review. Separate from your graded classes.</p>
       </header>
 
       {phase === 'unavailable' && (
@@ -169,7 +167,7 @@ export function PracticePanel({
                 onClick={() => void startKind(kind)}
                 disabled={phase === 'starting'}
                 aria-busy={phase === 'starting'}
-                aria-label={`Practice ${label}${due ? ` — ${due} due` : ''}`}
+                aria-label={`Practice ${label}${due ? `, ${due} due` : ''}`}
               >
                 <span className={styles.kindLabel}>{label}</span>
                 <span className={styles.kindBlurb}>{blurb}</span>

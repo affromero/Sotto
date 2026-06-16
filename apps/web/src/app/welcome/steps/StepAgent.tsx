@@ -90,7 +90,7 @@ export function StepAgent({
       <p className={t.lede}>
         {demoMode
           ? 'This hosted walkthrough simulates the connection. Choose an agent to see how Sotto turns your own stack into a tutor when you self-host it.'
-          : 'Sotto is infrastructure, not a model. Hook the Claude Code or Codex you already run, point it at a local endpoint, or paste a key — the same agent that knows your work becomes your tutor.'}
+          : 'Sotto is infrastructure, not a model. Hook the Claude Code or Codex you already run, point it at a local endpoint, or paste a key. The same agent that knows your work becomes your tutor.'}
       </p>
 
       <div className={c.providerGrid}>
@@ -273,8 +273,8 @@ export function StepAgent({
             {demoMode
               ? 'Demo mode only simulates this connection; no key or endpoint is sent or stored.'
               : agent.method === 'cli'
-                ? "Sotto reuses your CLI's existing auth — nothing new to paste, nothing leaves your machine."
-                : 'Your key stays in your environment. Sotto never proxies it through us — there is no us.'}
+                ? "Sotto reuses your CLI's existing auth. Nothing new to paste, nothing leaves your machine."
+                : 'Your key stays in your environment. Sotto never proxies it through us. There is no us.'}
           </div>
         </div>
       )}

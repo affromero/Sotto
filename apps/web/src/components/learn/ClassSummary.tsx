@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ClassSummary — the end-of-class wrap-up from the design bundle
+ * ClassSummary renders the end-of-class wrap-up from the design bundle
  * (`class-summary.jsx`), driven by the authoritative `/submit` result.
  *
  * Adaptation: the design's hardcoded "tomorrow's thread" + vocab-graph stats
@@ -48,7 +48,7 @@ export function ClassSummary({
             </>
           ) : (
             <>
-              Close — <em>one more pass</em>.
+              Close: <em>one more pass</em>.
             </>
           )}
         </h1>

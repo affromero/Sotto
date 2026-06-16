@@ -22,10 +22,7 @@ async function getEpisodes(search: string | undefined, status: string | undefine
   const where: Record<string, any> = {};
 
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { id: search },
-    ];
+    where.OR = [{ title: { contains: search, mode: 'insensitive' } }, { id: search }];
   }
 
   if (status && status !== 'ALL') {
@@ -156,11 +153,7 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
                         day: 'numeric',
                       })}
                     </td>
-                    <td>
-                      {isFailed && (
-                        <RetryButton episodeId={episode.id} />
-                      )}
-                    </td>
+                    <td>{isFailed && <RetryButton episodeId={episode.id} />}</td>
                   </tr>
                   {isFailed && (episode.failureReason || episode.technicalError) && (
                     <tr>
@@ -172,7 +165,9 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
                               <span>{episode.failedAtStatus.replace(/_/g, ' ')}</span>
                               {episode.failedAt && (
                                 <span className={styles.errorLabel}>
-                                  {' '}— {new Date(episode.failedAt).toLocaleString('en-US', {
+                                  {' '}
+                                  at{' '}
+                                  {new Date(episode.failedAt).toLocaleString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
                                     hour: 'numeric',
@@ -185,8 +180,8 @@ export default async function AdminEpisodesPage({ searchParams }: PageProps) {
                           {episode.failureReason && (
                             <div>
                               <span className={styles.errorLabel}>Reason:</span>{' '}
-                              <span className={styles.errorReason}>{episode.failureReason}</span>
-                              {' '}<CopyButton text={episode.failureReason} />
+                              <span className={styles.errorReason}>{episode.failureReason}</span>{' '}
+                              <CopyButton text={episode.failureReason} />
                             </div>
                           )}
                           {episode.technicalError && (

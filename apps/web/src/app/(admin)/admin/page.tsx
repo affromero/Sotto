@@ -39,7 +39,7 @@ export default async function AdminOverviewPage() {
           <GlassOrb size={40} />
           <div>
             <h1>Overview</h1>
-            <div className={styles.ahSub}>Self-hosted · last {WINDOW_DAYS} days</div>
+            <div className={styles.ahSub}>Self hosted · last {WINDOW_DAYS} days</div>
           </div>
         </div>
         <div className={styles.ahActions}>

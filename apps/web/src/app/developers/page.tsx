@@ -5,7 +5,7 @@ import styles from './page.module.css';
 export const metadata = {
   title: 'Developers. Sotto API',
   description:
-    'Sotto API documentation for self-hosted deployments. Connect your own agent and keys, then drive courses and classes over HTTP.',
+    'Sotto API documentation for deployments you run. Connect your own agent and keys, then drive courses and classes over HTTP.',
 };
 
 interface Param {
@@ -33,7 +33,7 @@ interface Section {
 const sections: Section[] = [
   {
     title: 'Courses',
-    description: 'Enroll in a language pair and drive a learner through mastery-gated courses.',
+    description: 'Enroll in a language pair and drive a learner through courses gated by mastery.',
     endpoints: [
       {
         method: 'GET',
@@ -48,8 +48,18 @@ const sections: Section[] = [
         description: 'Create a course enrollment for a native to target language pair.',
         auth: true,
         params: [
-          { name: 'nativeLang', type: 'string', required: true, description: 'Native language ISO code' },
-          { name: 'targetLang', type: 'string', required: true, description: 'Target language ISO code' },
+          {
+            name: 'nativeLang',
+            type: 'string',
+            required: true,
+            description: 'Native language ISO code',
+          },
+          {
+            name: 'targetLang',
+            type: 'string',
+            required: true,
+            description: 'Target language ISO code',
+          },
         ],
         response: '{ id: string, level: string }',
       },
@@ -60,8 +70,18 @@ const sections: Section[] = [
           'Generate the next gated class for a course. Optionally sourced from a real link or an interest topic.',
         auth: true,
         params: [
-          { name: 'sourceUrl', type: 'string', required: false, description: 'A readable link or paper to build the class from' },
-          { name: 'topic', type: 'string', required: false, description: 'An interest topic to build the class from' },
+          {
+            name: 'sourceUrl',
+            type: 'string',
+            required: false,
+            description: 'A readable link or paper to build the class from',
+          },
+          {
+            name: 'topic',
+            type: 'string',
+            required: false,
+            description: 'An interest topic to build the class from',
+          },
         ],
         response: '{ classId: string }',
       },
@@ -92,7 +112,12 @@ const sections: Section[] = [
         description: 'Submit placement answers. Creates a course and sets the starting CEFR level.',
         auth: true,
         params: [
-          { name: 'answers', type: 'array', required: true, description: 'Answers to the placement questions' },
+          {
+            name: 'answers',
+            type: 'array',
+            required: true,
+            description: 'Answers to the placement questions',
+          },
         ],
         response: '{ courseId: string, level: string }',
       },
@@ -117,7 +142,12 @@ const sections: Section[] = [
           'Submit a completed class. Scores the answers and advances the course level on a pass.',
         auth: true,
         params: [
-          { name: 'answers', type: 'array', required: true, description: 'Section answers for the class' },
+          {
+            name: 'answers',
+            type: 'array',
+            required: true,
+            description: 'Section answers for the class',
+          },
         ],
         response: '{ overallScore: number, passed: boolean }',
       },
@@ -135,8 +165,18 @@ const sections: Section[] = [
           'Ingest output from a local agent run, such as Claude Code or Codex. The result stays private to your account.',
         auth: true,
         params: [
-          { name: 'content', type: 'string', required: true, description: 'The agent output to ingest' },
-          { name: 'idempotency_key', type: 'string', required: false, description: 'Deduplicate repeated submissions' },
+          {
+            name: 'content',
+            type: 'string',
+            required: true,
+            description: 'The agent output to ingest',
+          },
+          {
+            name: 'idempotency_key',
+            type: 'string',
+            required: false,
+            description: 'Deduplicate repeated submissions',
+          },
         ],
         response: '{ id: string, visibility: "PRIVATE" }',
       },
@@ -183,9 +223,9 @@ export default function DevelopersPage() {
           <header className={styles.header}>
             <h1 className={styles.title}>API Documentation</h1>
             <p className={styles.subtitle}>
-              Build on your own Sotto deployment. Connect your agent and keys, then
-              drive placement, courses, and classes over HTTP. Endpoints require
-              authentication unless noted otherwise.
+              Build on your own Sotto deployment. Connect your agent and keys, then drive placement,
+              courses, and classes over HTTP. Endpoints require authentication unless noted
+              otherwise.
             </p>
           </header>
 
@@ -279,10 +319,10 @@ export default function DevelopersPage() {
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Rate Limits</h2>
             <p className={styles.sectionDescription}>
-              Because you host the instance, rate limits are yours to set. The
-              defaults guard authentication and generation endpoints, and you can
-              tune them in your deployment configuration. Generation throughput is
-              ultimately bounded by your own provider quotas.
+              Because you host the instance, rate limits are yours to set. The defaults guard
+              authentication and generation endpoints, and you can tune them in your deployment
+              configuration. Generation throughput is ultimately bounded by your own provider
+              quotas.
             </p>
           </section>
         </div>

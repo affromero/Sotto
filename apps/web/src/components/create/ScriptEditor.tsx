@@ -51,7 +51,12 @@ function nextTurnId(): string {
   return `turn-${++turnIdCounter}`;
 }
 
-export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBody }: ScriptEditorProps) {
+export function ScriptEditor({
+  episodeId,
+  onApprove,
+  onRegenerate,
+  getApproveBody,
+}: ScriptEditorProps) {
   const [turns, setTurns] = useState<TurnState[]>([]);
   const [references, setReferences] = useState<ReferenceData[]>([]);
   const [, setVersion] = useState(0);
@@ -107,7 +112,9 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
       }
     }
     fetchScript();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [episodeId]);
 
   // Auto-resize textarea
@@ -146,10 +153,7 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
 
   // Stats
   const stats = useMemo(() => {
-    const wordCount = turns.reduce(
-      (sum, t) => sum + t.text.split(/\s+/).filter(Boolean).length,
-      0
-    );
+    const wordCount = turns.reduce((sum, t) => sum + t.text.split(/\s+/).filter(Boolean).length, 0);
     const estimatedMinutes = Math.round(wordsToMinutes(wordCount));
     return { wordCount, estimatedMinutes, turnCount: turns.length, refCount: references.length };
   }, [turns, references]);
@@ -183,14 +187,17 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
   }, [episodeId, turns, saving]);
 
   // Edit mode handlers
-  const startEdit = useCallback((index: number) => {
-    setEditingIndex(index);
-    setEditText(turns[index].text);
-    setEditDirection(turns[index].direction ?? '');
-    setDeletingIndex(null);
-    // Focus textarea after render
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  }, [turns]);
+  const startEdit = useCallback(
+    (index: number) => {
+      setEditingIndex(index);
+      setEditText(turns[index].text);
+      setEditDirection(turns[index].direction ?? '');
+      setDeletingIndex(null);
+      // Focus textarea after render
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    },
+    [turns]
+  );
 
   const confirmEdit = useCallback(() => {
     if (editingIndex === null) return;
@@ -214,14 +221,17 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
   }, []);
 
   // Handle keyboard in textarea
-  const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      cancelEdit();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      confirmEdit();
-    }
-  }, [cancelEdit, confirmEdit]);
+  const handleTextareaKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        cancelEdit();
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        confirmEdit();
+      }
+    },
+    [cancelEdit, confirmEdit]
+  );
 
   // Cycle speaker through all unique speakers in the script
   const toggleSpeaker = useCallback((index: number) => {
@@ -249,20 +259,26 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
   }, []);
 
   // Delete turn
-  const deleteTurn = useCallback((index: number) => {
-    setTurns((prev) => {
-      if (prev.length <= 2) return prev;
-      return prev.filter((_, i) => i !== index);
-    });
-    setDirty(true);
-    setDeletingIndex(null);
-    if (editingIndex === index) setEditingIndex(null);
-  }, [editingIndex]);
+  const deleteTurn = useCallback(
+    (index: number) => {
+      setTurns((prev) => {
+        if (prev.length <= 2) return prev;
+        return prev.filter((_, i) => i !== index);
+      });
+      setDirty(true);
+      setDeletingIndex(null);
+      if (editingIndex === index) setEditingIndex(null);
+    },
+    [editingIndex]
+  );
 
-  // Add turn — pick the next speaker in rotation
+  // Add turn and pick the next speaker in rotation.
   const addTurn = useCallback(() => {
     const speakers = getUniqueSpeakers(turns);
-    const lastSpeaker = turns.length > 0 ? turns[turns.length - 1].speaker : speakers[speakers.length - 1] ?? 'Host';
+    const lastSpeaker =
+      turns.length > 0
+        ? turns[turns.length - 1].speaker
+        : (speakers[speakers.length - 1] ?? 'Host');
     const lastIdx = speakers.indexOf(lastSpeaker);
     const newSpeaker = speakers[(lastIdx + 1) % speakers.length];
     const newTurn: TurnState = {
@@ -317,36 +333,52 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
   }, [dirty, turns, episodeId, onApprove, getApproveBody]);
 
   // Regenerate (with optional feedback)
-  const handleRegenerate = useCallback(async (withFeedback = false) => {
-    setRegenerating(true);
-    setShowRegenerateConfirm(false);
-    try {
-      const feedbackText = generalFeedback.trim();
-      // Filter to only non-empty comments
-      const filteredComments: Record<number, string> = {};
-      for (const [k, v] of Object.entries(turnComments)) {
-        if (v.trim()) filteredComments[Number(k)] = v.trim();
+  const handleRegenerate = useCallback(
+    async (withFeedback = false) => {
+      setRegenerating(true);
+      setShowRegenerateConfirm(false);
+      try {
+        const feedbackText = generalFeedback.trim();
+        // Filter to only non-empty comments
+        const filteredComments: Record<number, string> = {};
+        for (const [k, v] of Object.entries(turnComments)) {
+          if (v.trim()) filteredComments[Number(k)] = v.trim();
+        }
+        const hasAnyFeedback =
+          feedbackText || Object.keys(filteredComments).length > 0 || highlights.length > 0;
+        const shouldSendBody = withFeedback && hasAnyFeedback;
+        const res = await fetch(`/api/v1/episodes/${episodeId}/script/regenerate`, {
+          method: 'POST',
+          ...(shouldSendBody
+            ? {
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...(feedbackText ? { feedback: feedbackText } : {}),
+                  ...(Object.keys(filteredComments).length > 0
+                    ? { turnComments: filteredComments }
+                    : {}),
+                  ...(highlights.length > 0
+                    ? {
+                        highlights: highlights.map(({ turnIndex, text, note }) => ({
+                          turnIndex,
+                          text,
+                          note,
+                        })),
+                      }
+                    : {}),
+                }),
+              }
+            : {}),
+        });
+        if (!res.ok) throw new Error('Failed to regenerate');
+        onRegenerate();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to regenerate');
+        setRegenerating(false);
       }
-      const hasAnyFeedback = feedbackText || Object.keys(filteredComments).length > 0 || highlights.length > 0;
-      const shouldSendBody = withFeedback && hasAnyFeedback;
-      const res = await fetch(`/api/v1/episodes/${episodeId}/script/regenerate`, {
-        method: 'POST',
-        ...(shouldSendBody ? {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...(feedbackText ? { feedback: feedbackText } : {}),
-            ...(Object.keys(filteredComments).length > 0 ? { turnComments: filteredComments } : {}),
-            ...(highlights.length > 0 ? { highlights: highlights.map(({ turnIndex, text, note }) => ({ turnIndex, text, note })) } : {}),
-          }),
-        } : {}),
-      });
-      if (!res.ok) throw new Error('Failed to regenerate');
-      onRegenerate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to regenerate');
-      setRegenerating(false);
-    }
-  }, [episodeId, onRegenerate, generalFeedback, turnComments, highlights]);
+    },
+    [episodeId, onRegenerate, generalFeedback, turnComments, highlights]
+  );
 
   // Text selection for highlighting (desktop only)
   const handleTurnTextMouseUp = useCallback((index: number) => {
@@ -413,58 +445,56 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
   }, [selectionPopover]);
 
   // Render turn text with highlights applied
-  const renderTurnText = useCallback((turnIndex: number, text: string) => {
-    const turnHighlights = highlights.filter((h) => h.turnIndex === turnIndex);
-    if (turnHighlights.length === 0) {
-      return references.length > 0 ? parseTextWithCitations(text, references) : text;
-    }
-
-    // Build segments by splitting text at highlighted substrings
-    type Segment = { text: string; highlight?: Highlight };
-    const segments: Segment[] = [];
-    let offset = 0;
-
-    // Sort highlights by position in text
-    const positioned = turnHighlights
-      .map((h) => ({ ...h, pos: text.indexOf(h.text, 0) }))
-      .filter((h) => h.pos !== -1)
-      .sort((a, b) => a.pos - b.pos);
-
-    for (const h of positioned) {
-      const pos = text.indexOf(h.text, offset);
-      if (pos === -1) continue;
-      if (pos > offset) {
-        segments.push({ text: text.slice(offset, pos) });
+  const renderTurnText = useCallback(
+    (turnIndex: number, text: string) => {
+      const turnHighlights = highlights.filter((h) => h.turnIndex === turnIndex);
+      if (turnHighlights.length === 0) {
+        return references.length > 0 ? parseTextWithCitations(text, references) : text;
       }
-      segments.push({ text: h.text, highlight: h });
-      offset = pos + h.text.length;
-    }
-    if (offset < text.length) {
-      segments.push({ text: text.slice(offset) });
-    }
 
-    return segments.map((seg, i) => {
-      const content = references.length > 0
-        ? parseTextWithCitations(seg.text, references)
-        : seg.text;
+      // Build segments by splitting text at highlighted substrings
+      type Segment = { text: string; highlight?: Highlight };
+      const segments: Segment[] = [];
+      let offset = 0;
 
-      if (seg.highlight) {
-        return (
-          <mark
-            key={i}
-            className={styles.highlightedText}
-            title={seg.highlight.note}
-          >
-            {content}
-            <span className={styles.annotationBadge} aria-label="Has annotation">
-              {highlights.filter((h) => h.turnIndex === turnIndex).indexOf(seg.highlight) + 1}
-            </span>
-          </mark>
-        );
+      // Sort highlights by position in text
+      const positioned = turnHighlights
+        .map((h) => ({ ...h, pos: text.indexOf(h.text, 0) }))
+        .filter((h) => h.pos !== -1)
+        .sort((a, b) => a.pos - b.pos);
+
+      for (const h of positioned) {
+        const pos = text.indexOf(h.text, offset);
+        if (pos === -1) continue;
+        if (pos > offset) {
+          segments.push({ text: text.slice(offset, pos) });
+        }
+        segments.push({ text: h.text, highlight: h });
+        offset = pos + h.text.length;
       }
-      return <span key={i}>{content}</span>;
-    });
-  }, [highlights, references]);
+      if (offset < text.length) {
+        segments.push({ text: text.slice(offset) });
+      }
+
+      return segments.map((seg, i) => {
+        const content =
+          references.length > 0 ? parseTextWithCitations(seg.text, references) : seg.text;
+
+        if (seg.highlight) {
+          return (
+            <mark key={i} className={styles.highlightedText} title={seg.highlight.note}>
+              {content}
+              <span className={styles.annotationBadge} aria-label="Has annotation">
+                {highlights.filter((h) => h.turnIndex === turnIndex).indexOf(seg.highlight) + 1}
+              </span>
+            </mark>
+          );
+        }
+        return <span key={i}>{content}</span>;
+      });
+    },
+    [highlights, references]
+  );
 
   // Drag and drop handlers
   const handleDragStart = useCallback((index: number) => {
@@ -476,13 +506,16 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
     setDragOverIndex(index);
   }, []);
 
-  const handleDrop = useCallback((index: number) => {
-    if (dragIndex !== null && dragIndex !== index) {
-      moveTurn(dragIndex, index);
-    }
-    setDragIndex(null);
-    setDragOverIndex(null);
-  }, [dragIndex, moveTurn]);
+  const handleDrop = useCallback(
+    (index: number) => {
+      if (dragIndex !== null && dragIndex !== index) {
+        moveTurn(dragIndex, index);
+      }
+      setDragIndex(null);
+      setDragOverIndex(null);
+    },
+    [dragIndex, moveTurn]
+  );
 
   const handleDragEnd = useCallback(() => {
     setDragIndex(null);
@@ -513,23 +546,15 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
       <header className={styles.header}>
         <h3 className={styles.title}>Script Preview</h3>
         <div className={styles.stats}>
-          <span className={styles.statItem}>
-            {stats.wordCount.toLocaleString()} words
-          </span>
+          <span className={styles.statItem}>{stats.wordCount.toLocaleString()} words</span>
           <span className={styles.statDivider} aria-hidden="true" />
-          <span className={styles.statItem}>
-            ~{stats.estimatedMinutes} min
-          </span>
+          <span className={styles.statItem}>~{stats.estimatedMinutes} min</span>
           <span className={styles.statDivider} aria-hidden="true" />
-          <span className={styles.statItem}>
-            {stats.turnCount} turns
-          </span>
+          <span className={styles.statItem}>{stats.turnCount} turns</span>
           {stats.refCount > 0 && (
             <>
               <span className={styles.statDivider} aria-hidden="true" />
-              <span className={styles.statItem}>
-                {stats.refCount} references
-              </span>
+              <span className={styles.statItem}>{stats.refCount} references</span>
             </>
           )}
           {dirty && (
@@ -543,7 +568,9 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
 
       {/* Error banner */}
       {error && turns.length > 0 && (
-        <div className={styles.error} role="alert">{error}</div>
+        <div className={styles.error} role="alert">
+          {error}
+        </div>
       )}
 
       {/* Turns */}
@@ -562,7 +589,9 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
                 isEditing ? styles.turnEditing : '',
                 dragIndex === index ? styles.turnDragging : '',
                 dragOverIndex === index ? styles.turnDragOver : '',
-              ].filter(Boolean).join(' ')}
+              ]
+                .filter(Boolean)
+                .join(' ')}
               data-speaker-index={speakerIdx}
               role="listitem"
               style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
@@ -624,9 +653,7 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
                       aria-label="Delivery direction"
                     />
                   ) : (
-                    turn.direction && (
-                      <span className={styles.direction}>({turn.direction})</span>
-                    )
+                    turn.direction && <span className={styles.direction}>({turn.direction})</span>
                   )}
 
                   {/* Text */}
@@ -719,7 +746,9 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
                   <textarea
                     className={styles.turnCommentInput}
                     value={turnComments[index] ?? ''}
-                    onChange={(e) => setTurnComments((prev) => ({ ...prev, [index]: e.target.value }))}
+                    onChange={(e) =>
+                      setTurnComments((prev) => ({ ...prev, [index]: e.target.value }))
+                    }
                     placeholder={`Comment on this ${turn.speaker} turn...`}
                     rows={2}
                     maxLength={2000}
@@ -739,11 +768,18 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
           className={styles.highlightPopover}
           style={{
             top: selectionPopover.top,
-            left: Math.max(16, Math.min(selectionPopover.left - 120, (rootRef.current?.clientWidth ?? 400) - 256)),
+            left: Math.max(
+              16,
+              Math.min(selectionPopover.left - 120, (rootRef.current?.clientWidth ?? 400) - 256)
+            ),
           }}
         >
           <div className={styles.highlightPopoverQuote}>
-            &ldquo;{selectionPopover.text.length > 60 ? selectionPopover.text.slice(0, 60) + '...' : selectionPopover.text}&rdquo;
+            &ldquo;
+            {selectionPopover.text.length > 60
+              ? selectionPopover.text.slice(0, 60) + '...'
+              : selectionPopover.text}
+            &rdquo;
           </div>
           <input
             className={styles.highlightNoteInput}
@@ -779,11 +815,7 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
 
       {/* Add turn */}
       <div className={styles.addTurnRow}>
-        <button
-          type="button"
-          className={styles.addTurnBtn}
-          onClick={addTurn}
-        >
+        <button type="button" className={styles.addTurnBtn} onClick={addTurn}>
           <Plus size={16} />
           Add Turn
         </button>
@@ -852,7 +884,9 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
           Notes for regeneration
           {(hasFeedback || hasComments || hasHighlights) && !showFeedbackPanel && (
             <span className={styles.feedbackBadge}>
-              {(hasFeedback ? 1 : 0) + Object.values(turnComments).filter((c) => c.trim()).length + highlights.length}
+              {(hasFeedback ? 1 : 0) +
+                Object.values(turnComments).filter((c) => c.trim()).length +
+                highlights.length}
             </span>
           )}
         </button>
@@ -862,14 +896,16 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
               className={styles.feedbackTextarea}
               value={generalFeedback}
               onChange={(e) => setGeneralFeedback(e.target.value)}
-              placeholder="Describe what you'd like changed — tone, emphasis, missing topics, too technical, etc."
+              placeholder="Describe what you'd like changed: tone, emphasis, missing topics, too technical, etc."
               rows={4}
               maxLength={5000}
               aria-label="General feedback for script regeneration"
             />
             {highlights.length > 0 && (
               <div className={styles.highlightsList}>
-                <span className={styles.highlightsLabel}>Text annotations ({highlights.length})</span>
+                <span className={styles.highlightsLabel}>
+                  Text annotations ({highlights.length})
+                </span>
                 {highlights.map((h, i) => (
                   <div key={i} className={styles.highlightItem}>
                     <div className={styles.highlightItemText}>
@@ -934,14 +970,11 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
           aria-modal="true"
           aria-labelledby="regen-title"
         >
-          <div
-            className={styles.confirmDialog}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()}>
             <h4 id="regen-title" className={styles.confirmTitle}>
               Regenerate Script?
             </h4>
-            {(hasFeedback || hasComments || hasHighlights) ? (
+            {hasFeedback || hasComments || hasHighlights ? (
               <>
                 <p className={styles.confirmText}>
                   Regenerate using your notes, or start fresh from scratch?
@@ -973,8 +1006,8 @@ export function ScriptEditor({ episodeId, onApprove, onRegenerate, getApproveBod
             ) : (
               <>
                 <p className={styles.confirmText}>
-                  This will discard the current script and generate a new one from scratch.
-                  This action cannot be undone.
+                  This will discard the current script and generate a new one from scratch. This
+                  action cannot be undone.
                 </p>
                 <div className={styles.confirmActions}>
                   <button

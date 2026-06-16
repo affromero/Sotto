@@ -48,10 +48,24 @@ async function runTest(p: TestableProvider): Promise<TestResponse> {
 }
 
 function StatusDot({ status }: { status: TestStatus }) {
-  if (status === 'idle') return <span className={styles.dotIdle} aria-label="Idle">●</span>;
+  if (status === 'idle')
+    return (
+      <span className={styles.dotIdle} aria-label="Idle">
+        ●
+      </span>
+    );
   if (status === 'running') return <span className={styles.spinner} aria-label="Running" />;
-  if (status === 'pass') return <span className={styles.dotPass} aria-label="Pass">✓</span>;
-  return <span className={styles.dotFail} aria-label="Fail">✗</span>;
+  if (status === 'pass')
+    return (
+      <span className={styles.dotPass} aria-label="Pass">
+        ✓
+      </span>
+    );
+  return (
+    <span className={styles.dotFail} aria-label="Fail">
+      ✗
+    </span>
+  );
 }
 
 function KeyBadges({ p }: { p: TestableProvider }) {
@@ -69,9 +83,7 @@ function ResultCell({ provider, result }: { provider: TestableProvider; result: 
   }
   if (result.status === 'pass') {
     if (provider.category === 'tts' && result.audioData) {
-      return (
-        <audio controls src={result.audioData} className={styles.audioPlayer} />
-      );
+      return <audio controls src={result.audioData} className={styles.audioPlayer} />;
     }
     if (provider.category === 'ai' && result.response) {
       return <span className={styles.responseText}>{result.response}</span>;
@@ -146,7 +158,10 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
         <button
           type="button"
           className={styles.testAllButton}
-          onClick={() => { setOpen(true); onTestAll(providers); }}
+          onClick={() => {
+            setOpen(true);
+            onTestAll(providers);
+          }}
           disabled={anyRunning}
         >
           Test All
@@ -185,7 +200,9 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
                     </td>
                     <td className={styles.tdMono}>{p.modelId}</td>
                     <td className={styles.td}>
-                      <span className={`${styles.tier} ${styles[`tier_${p.tier.replace('-', '_')}`]}`}>
+                      <span
+                        className={`${styles.tier} ${styles[`tier_${p.tier.replace('-', '_')}`]}`}
+                      >
                         {p.tier}
                       </span>
                     </td>
@@ -196,7 +213,7 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
                       <StatusDot status={result.status} />
                     </td>
                     <td className={styles.td}>
-                      {result.latencyMs !== undefined ? `${result.latencyMs}ms` : '—'}
+                      {result.latencyMs !== undefined ? `${result.latencyMs}ms` : 'n/a'}
                     </td>
                     <td className={styles.tdResult}>
                       <ResultCell provider={p} result={result} />
@@ -222,11 +239,7 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
   );
 }
 
-export function ModelTestPanel({
-  aiProviders,
-  ttsProviders,
-  sttProviders,
-}: ModelTestPanelProps) {
+export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders }: ModelTestPanelProps) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
 
   const setResult = useCallback((key: string, result: TestResult) => {

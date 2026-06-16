@@ -15,10 +15,7 @@ interface ProfilePickerProps {
   activeId: string | null;
 }
 
-type Editor =
-  | { mode: 'create' }
-  | { mode: 'edit'; profile: HouseholdProfile }
-  | null;
+type Editor = { mode: 'create' } | { mode: 'edit'; profile: HouseholdProfile } | null;
 
 function slugFromAvatarUrl(url: string): string {
   return url.match(/\/avatars\/(.+)\.png$/)?.[1] ?? ANIMAL_AVATARS[0].slug;
@@ -155,10 +152,17 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
           <GlassBead />
           sotto
         </div>
-        <div className={styles.panel} role="dialog" aria-modal="true" aria-label={isEdit ? 'Edit profile' : 'Add a learner'}>
+        <div
+          className={styles.panel}
+          role="dialog"
+          aria-modal="true"
+          aria-label={isEdit ? 'Edit profile' : 'Add a learner'}
+        >
           <h1 className={styles.panelTitle}>{isEdit ? 'Edit profile' : 'Add a learner'}</h1>
 
-          <label className={styles.fieldLabel} htmlFor="profile-name">Name</label>
+          <label className={styles.fieldLabel} htmlFor="profile-name">
+            Name
+          </label>
           <input
             id="profile-name"
             className={styles.nameInput}
@@ -189,7 +193,11 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
             })}
           </div>
 
-          {error && <p className={styles.error} role="alert">{error}</p>}
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          )}
 
           <div className={styles.panelActions}>
             <button type="button" className={styles.ghostBtn} onClick={closeEditor} disabled={busy}>
@@ -228,7 +236,8 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
 
       <h1 className={styles.heading}>Who&rsquo;s learning?</h1>
       <p className={styles.sub}>
-        self-hosted · {profiles.length} {profiles.length === 1 ? 'profile' : 'profiles'} on this server
+        self hosted · {profiles.length} {profiles.length === 1 ? 'profile' : 'profiles'} on this
+        server
       </p>
 
       <div className={styles.row}>
@@ -241,7 +250,9 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
             disabled={busy}
             aria-label={managing ? `Edit ${p.name}` : `Switch to ${p.name}`}
           >
-            <span className={`${styles.avatar} ${p.isOwner ? styles.owner : ''} ${p.id === activeId ? styles.active : ''}`}>
+            <span
+              className={`${styles.avatar} ${p.isOwner ? styles.owner : ''} ${p.id === activeId ? styles.active : ''}`}
+            >
               <Image src={p.avatarUrl} alt="" fill sizes="140px" />
               {managing && <span className={styles.editVeil}>edit</span>}
             </span>
@@ -251,7 +262,12 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
         ))}
 
         {!managing && (
-          <button type="button" className={`${styles.profile} ${styles.add}`} onClick={openCreate} disabled={busy}>
+          <button
+            type="button"
+            className={`${styles.profile} ${styles.add}`}
+            onClick={openCreate}
+            disabled={busy}
+          >
             <span className={`${styles.avatar} ${styles.addAvatar}`}>
               <Plus size={40} aria-hidden="true" />
             </span>
@@ -261,7 +277,11 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
         )}
       </div>
 
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
 
       <div className={styles.foot}>
         <button type="button" className={styles.manageBtn} onClick={() => setManaging((m) => !m)}>

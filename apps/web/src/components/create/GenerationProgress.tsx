@@ -37,7 +37,7 @@ function getVerificationMessage(vp: VerificationProgressSnapshot): string | null
     return `Checked ${vp.checked} of ${vp.total} references...`;
   }
   if (vp.phase === 'replacing') {
-    return `${vp.verified} verified, ${vp.removed + vp.rejected} need replacement — searching for better sources (attempt ${vp.attempt} of ${vp.maxAttempts})...`;
+    return `${vp.verified} verified, ${vp.removed + vp.rejected} need replacement. Searching for better sources (attempt ${vp.attempt} of ${vp.maxAttempts})...`;
   }
   if (vp.phase === 'complete') {
     return `All ${vp.total} references verified`;
@@ -45,7 +45,13 @@ function getVerificationMessage(vp: VerificationProgressSnapshot): string | null
   return null;
 }
 
-export function GenerationProgress({ status, progress, error, topic, verificationProgress }: GenerationProgressProps) {
+export function GenerationProgress({
+  status,
+  progress,
+  error,
+  topic,
+  verificationProgress,
+}: GenerationProgressProps) {
   const verificationStandardUrl = getVerificationStandardUrl();
   const currentIndex = useMemo(
     () => PIPELINE_STEPS.findIndex((step) => step.key === status),
@@ -77,13 +83,15 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
   });
 
   // Override sub-message and progress with real-time verification data
-  const vpMessage = verificationProgress && status === 'COMPILING'
-    ? getVerificationMessage(verificationProgress)
-    : null;
+  const vpMessage =
+    verificationProgress && status === 'COMPILING'
+      ? getVerificationMessage(verificationProgress)
+      : null;
   const subMessage = vpMessage ?? rotatingMessage;
-  const derivedProgress = verificationProgress && status === 'COMPILING' && verificationProgress.total > 0
-    ? Math.round((verificationProgress.checked / verificationProgress.total) * 100)
-    : progress;
+  const derivedProgress =
+    verificationProgress && status === 'COMPILING' && verificationProgress.total > 0
+      ? Math.round((verificationProgress.checked / verificationProgress.total) * 100)
+      : progress;
 
   return (
     <div className={styles.root} role="progressbar" aria-label="Lesson generation progress">
@@ -153,11 +161,7 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
           )}
 
           {subMessage && (
-            <span
-              key={transitionKey}
-              className={styles.subMessage}
-              aria-live="polite"
-            >
+            <span key={transitionKey} className={styles.subMessage} aria-live="polite">
               {subMessage}
             </span>
           )}
@@ -168,7 +172,7 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
               target="_blank"
               rel="noopener noreferrer"
               className={styles.verifyBadge}
-              aria-label="We don't ship hallucinations — view the open verification standard on GitHub"
+              aria-label="We don't ship hallucinations. View the open verification standard on GitHub"
             >
               <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
               We don&apos;t ship hallucinations

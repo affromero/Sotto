@@ -70,7 +70,7 @@ export function StepLearnerProfile({
         Who&apos;s <em>learning</em>?
       </h1>
       <p className={t.lede}>
-        Set up the first learner. On a self-hosted Sotto, that first learner is the admin and keeps
+        Set up the first learner. On a self hosted Sotto, that first learner is the admin and keeps
         access to the admin panel after onboarding.
       </p>
 
