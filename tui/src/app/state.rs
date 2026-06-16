@@ -2435,7 +2435,11 @@ mod tests {
 
     // --- P6b: classes ------------------------------------------------------
 
-    fn class_response(json: serde_json::Value) -> types::ClassDetailResponse {
+    fn class_response(mut json: serde_json::Value) -> types::ClassDetailResponse {
+        if let Some(obj) = json.as_object_mut() {
+            obj.entry("courseId")
+                .or_insert_with(|| serde_json::json!("course1"));
+        }
         serde_json::from_value(json).expect("valid ClassDetailResponse JSON")
     }
 
