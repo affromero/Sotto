@@ -204,6 +204,18 @@
   border-radius: 5px;
 }
 
+.manualHint {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+
+.manualHint a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* ---- card actions ---- */
 .courseActions {
   display: flex;

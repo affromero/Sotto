@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { PlacementTest } from './PlacementTest';
 import { NotesPlacement } from './NotesPlacement';
+import { ManualPlacement } from './ManualPlacement';
 import styles from './PlacementEntry.module.css';
 
 interface PlacementEntryProps {
@@ -10,7 +11,7 @@ interface PlacementEntryProps {
   target: string;
 }
 
-type Mode = 'choose' | 'test' | 'notes' | 'verify';
+type Mode = 'choose' | 'test' | 'notes' | 'verify' | 'manual';
 
 /**
  * Entry point for placement: the learner either takes the multiple-choice test
@@ -47,6 +48,17 @@ export function PlacementEntry({ native, target }: PlacementEntryProps) {
     );
   }
 
+  if (mode === 'manual') {
+    return (
+      <div className={styles.panel}>
+        <button type="button" className={styles.back} onClick={() => setMode('choose')}>
+          Back
+        </button>
+        <ManualPlacement native={native} target={target} />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.chooser}>
       <button type="button" className={styles.card} onClick={() => setMode('test')}>
@@ -60,6 +72,13 @@ export function PlacementEntry({ native, target }: PlacementEntryProps) {
         <span className={styles.cardBody}>
           Paste or upload notes, a lesson, or your own writing and we will estimate your level, then
           confirm it with you.
+        </span>
+      </button>
+      <button type="button" className={styles.card} onClick={() => setMode('manual')}>
+        <span className={styles.cardTitle}>I already know my level</span>
+        <span className={styles.cardBody}>
+          Pick your CEFR level yourself. It is a quick start, though less accurate than the test —
+          you can take the test anytime.
         </span>
       </button>
     </div>
