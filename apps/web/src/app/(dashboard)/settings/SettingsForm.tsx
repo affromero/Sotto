@@ -774,19 +774,21 @@ export function SettingsForm({
         </section>
       )}
 
-      {/* AI Provider Keys */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>AI Providers</h2>
-        <p className={styles.sectionDesc}>
-          Configure your preferred AI providers for lesson generation, Q&amp;A, and live conversation.
-          Keys are encrypted with AES-256-GCM.
-        </p>
-        <AiProviderCards
-          initialConfigured={configuredAiProviders}
-          providerMeta={aiProviderMeta}
-          systemProviders={aiSystemProviders}
-        />
-      </section>
+      {/* AI Provider Keys — owner/admin only (server-infra concern, like Voice Providers) */}
+      {isAdmin ? (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>AI Providers</h2>
+          <p className={styles.sectionDesc}>
+            Configure the AI providers for lesson generation, Q&amp;A, and live conversation.
+            Keys are encrypted with AES-256-GCM.
+          </p>
+          <AiProviderCards
+            initialConfigured={configuredAiProviders}
+            providerMeta={aiProviderMeta}
+            systemProviders={aiSystemProviders}
+          />
+        </section>
+      ) : null}
 
       {/* TTS Provider Keys */}
       {isAdmin ? (

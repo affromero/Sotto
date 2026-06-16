@@ -27,7 +27,9 @@ interface TtsProviderLogoProps {
     | 'deepseek'
     | 'nvidia'
     | 'rime'
-    | 'playht';
+    | 'playht'
+    | 'claude-code'
+    | 'codex';
   size?: number;
   className?: string;
 }
@@ -291,6 +293,20 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           <path d="M9 7l8 5-8 5V7z" fill="#fff" />
         </svg>
       );
+    case 'claude-code':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#D4A574" />
+          <path d="M7.5 8.5l-2 3.5 2 3.5M16.5 8.5l2 3.5-2 3.5M13.5 7l-3 10" stroke="#3D2B1F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+      );
+    case 'codex':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#0B0B0B" />
+          <path d="M7 9l-2.5 3L7 15M17 9l2.5 3L17 15M13.5 8l-3 8" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+      );
     case 'kokoro':
       return (
         <svg {...props}>
@@ -345,6 +361,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   nvidia: 'NVIDIA NIM',
   rime: 'Rime',
   playht: 'PlayHT',
+  'claude-code': 'Claude Code',
+  codex: 'Codex',
 };
 
 /**
