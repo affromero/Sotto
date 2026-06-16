@@ -19,6 +19,9 @@ import {
   MINIMAX_VOICE_POOL,
   MISTRAL_VOICE_POOL,
   KOKORO_VOICE_POOL,
+  DEEPGRAM_AURA_VOICE_POOL,
+  RIME_VOICE_POOL,
+  PLAYHT_VOICE_POOL,
   getLocalTtsVoicePool,
   type ProviderVoice,
 } from './providers/tts-voices';
@@ -290,6 +293,15 @@ export async function getVoiceCatalog(
 
     case 'kokoro':
       return providerVoiceToCatalog(KOKORO_VOICE_POOL);
+
+    case 'deepgram':
+      return providerVoiceToCatalog(DEEPGRAM_AURA_VOICE_POOL);
+
+    case 'rime':
+      return providerVoiceToCatalog(RIME_VOICE_POOL);
+
+    case 'playht':
+      return providerVoiceToCatalog(PLAYHT_VOICE_POOL);
 
     case 'local': {
       const cacheKey = 'tts:voicecatalog:local';

@@ -58,7 +58,10 @@ export async function resolveLearningAi(userId: string): Promise<ResolvedLearnin
   await getServerInfra();
   const envProvider = (infra('aiProvider', 'AI_PROVIDER') ?? '').trim();
   if (envProvider === 'claude-code') {
-    const model = getAiProviderMeta('claude-code').defaultModel;
+    // Honor the owner-configured claude-code model (wizard CLI picker / admin),
+    // falling back to the registry default (opus).
+    const configured = await configuredModelFor('claude-code');
+    const model = configured ?? getAiProviderMeta('claude-code').defaultModel;
     if (!model) throw new Error('No default model configured for claude-code.');
     return { provider: 'claude-code', model };
   }

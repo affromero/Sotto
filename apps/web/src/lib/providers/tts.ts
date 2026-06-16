@@ -108,6 +108,21 @@ async function importLocalTts() {
   return LocalTtsProvider;
 }
 
+async function importDeepgramTts() {
+  const { DeepgramAuraProvider } = await import('./tts/deepgram.provider');
+  return DeepgramAuraProvider;
+}
+
+async function importRime() {
+  const { RimeProvider } = await import('./tts/rime.provider');
+  return RimeProvider;
+}
+
+async function importPlayHt() {
+  const { PlayHtProvider } = await import('./tts/playht.provider');
+  return PlayHtProvider;
+}
+
 // ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
@@ -184,6 +199,19 @@ export async function createTtsProviderAsync(
     case 'mistral': {
       if (!apiKey) throw new Error('Mistral requires an API key');
       const Cls = await importMistral();
+      return new Cls(apiKey, model);
+    }
+    case 'deepgram': {
+      const Cls = await importDeepgramTts();
+      return new Cls(apiKey, model);
+    }
+    case 'rime': {
+      if (!apiKey) throw new Error('Rime requires an API key');
+      const Cls = await importRime();
+      return new Cls(apiKey, model);
+    }
+    case 'playht': {
+      const Cls = await importPlayHt();
       return new Cls(apiKey, model);
     }
     case 'kokoro': {
@@ -334,6 +362,18 @@ export async function resolveTtsProvider(context: {
     const provider = await createTtsProviderAsync('mistral', process.env.MISTRAL_API_KEY, undefined, resolvedModel);
     return { provider, source: 'platform', providerId: 'mistral' };
   }
+  if (requestedProvider === 'deepgram' && process.env.DEEPGRAM_API_KEY) {
+    const provider = await createTtsProviderAsync('deepgram', process.env.DEEPGRAM_API_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'deepgram' };
+  }
+  if (requestedProvider === 'rime' && process.env.RIME_API_KEY) {
+    const provider = await createTtsProviderAsync('rime', process.env.RIME_API_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'rime' };
+  }
+  if (requestedProvider === 'playht' && process.env.PLAYHT_API_KEY) {
+    const provider = await createTtsProviderAsync('playht', process.env.PLAYHT_API_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'playht' };
+  }
   // Kokoro is keyless and local — it is gated by TTS_BASE_URL, not an API key.
   // It is only ever resolved when explicitly requested (TTS_PROVIDER=kokoro);
   // it never auto-selects by availability. The provider constructor throws a
@@ -384,6 +424,9 @@ export async function canResolveTts(userId: string): Promise<boolean> {
   if (process.env.FAL_KEY) return true;
   if (process.env.REPLICATE_API_TOKEN) return true;
   if (process.env.MISTRAL_API_KEY) return true;
+  if (process.env.DEEPGRAM_API_KEY) return true;
+  if (process.env.RIME_API_KEY) return true;
+  if (process.env.PLAYHT_API_KEY) return true;
   return false;
 }
 

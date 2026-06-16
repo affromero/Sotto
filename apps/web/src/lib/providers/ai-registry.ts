@@ -43,7 +43,7 @@ export function getPricetokenModelInfo(modelId: string): {
   };
 }
 
-export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'codex' | 'local' | 'together' | 'deepgram' | 'assemblyai';
+export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'codex' | 'local' | 'together' | 'deepgram' | 'assemblyai' | 'groq' | 'gladia' | 'speechmatics' | 'xai' | 'deepseek' | 'mistral' | 'nvidia';
 
 export interface AiProviderAuthField {
   key: string;
@@ -275,6 +275,188 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     },
   },
 
+  // Groq — OpenAI-compatible LLM gateway (fastest TPS). Also serves Whisper STT
+  // (routed via stt.ts). One key/registry entry serves both.
+  groq: {
+    id: 'groq',
+    displayName: 'Groq',
+    shortLabel: 'Groq',
+    platformEnvKey: 'GROQ_API_KEY',
+    defaultModel: 'llama-3.1-8b-instant',
+    getApiKeyUrl: 'https://console.groq.com/keys',
+    models: [
+      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B Instant', shortDisplayName: 'Llama 8B', tier: 'fast', contextWindow: 131_072, maxOutputTokens: 131_072, pricing: { inputPerMTok: 0.05, outputPerMTok: 0.08 } },
+      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B Versatile', shortDisplayName: 'Llama 70B', tier: 'balanced', contextWindow: 131_072, maxOutputTokens: 32_768, pricing: { inputPerMTok: 0.59, outputPerMTok: 0.79 } },
+      { id: 'openai/gpt-oss-120b', displayName: 'GPT-OSS 120B', shortDisplayName: 'GPT-OSS 120B', tier: 'best', contextWindow: 131_072, maxOutputTokens: 65_536, isReasoning: true, pricing: { inputPerMTok: 0.15, outputPerMTok: 0.60 } },
+    ],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  // xAI Grok — OpenAI-compatible. Stable `grok-4` alias tracks the latest Grok 4.
+  xai: {
+    id: 'xai',
+    displayName: 'xAI (Grok)',
+    shortLabel: 'Grok',
+    platformEnvKey: 'XAI_API_KEY',
+    defaultModel: 'grok-4-fast',
+    getApiKeyUrl: 'https://console.x.ai/',
+    models: [
+      { id: 'grok-4-fast', displayName: 'Grok 4 Fast', shortDisplayName: 'Grok 4 Fast', tier: 'balanced', contextWindow: 1_000_000, maxOutputTokens: 32_768, pricing: { inputPerMTok: 1.25, outputPerMTok: 2.50 } },
+      { id: 'grok-4', displayName: 'Grok 4', shortDisplayName: 'Grok 4', tier: 'best', contextWindow: 1_000_000, maxOutputTokens: 32_768, isReasoning: true, pricing: { inputPerMTok: 1.25, outputPerMTok: 2.50 } },
+    ],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xai-...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.x.ai/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  // DeepSeek — OpenAI-compatible. V4 family; ~1/10 the cost of frontier models.
+  deepseek: {
+    id: 'deepseek',
+    displayName: 'DeepSeek',
+    shortLabel: 'DeepSeek',
+    platformEnvKey: 'DEEPSEEK_API_KEY',
+    defaultModel: 'deepseek-v4-flash',
+    getApiKeyUrl: 'https://platform.deepseek.com/api_keys',
+    models: [
+      { id: 'deepseek-v4-flash', displayName: 'DeepSeek V4 Flash', shortDisplayName: 'V4 Flash', tier: 'balanced', contextWindow: 1_000_000, maxOutputTokens: 65_536, pricing: { inputPerMTok: 0.14, outputPerMTok: 0.28 } },
+      { id: 'deepseek-v4-pro', displayName: 'DeepSeek V4 Pro', shortDisplayName: 'V4 Pro', tier: 'best', contextWindow: 1_000_000, maxOutputTokens: 65_536, isReasoning: true, pricing: { inputPerMTok: 0.435, outputPerMTok: 0.87 } },
+    ],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.deepseek.com/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  // Mistral — OpenAI-compatible chat. `-latest` aliases track stable releases.
+  mistral: {
+    id: 'mistral',
+    displayName: 'Mistral',
+    shortLabel: 'Mistral',
+    platformEnvKey: 'MISTRAL_API_KEY',
+    defaultModel: 'mistral-small-latest',
+    getApiKeyUrl: 'https://console.mistral.ai/api-keys',
+    models: [
+      { id: 'mistral-small-latest', displayName: 'Mistral Small', shortDisplayName: 'Small', tier: 'fast', contextWindow: 128_000, maxOutputTokens: 16_384, pricing: { inputPerMTok: 0.15, outputPerMTok: 0.60 } },
+      { id: 'mistral-medium-latest', displayName: 'Mistral Medium', shortDisplayName: 'Medium', tier: 'balanced', contextWindow: 131_072, maxOutputTokens: 16_384, pricing: { inputPerMTok: 0.40, outputPerMTok: 2.00 } },
+      { id: 'mistral-large-latest', displayName: 'Mistral Large', shortDisplayName: 'Large', tier: 'best', contextWindow: 256_000, maxOutputTokens: 32_768, pricing: { inputPerMTok: 0.50, outputPerMTok: 1.50 } },
+    ],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Mistral API key' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.mistral.ai/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  // NVIDIA NIM — OpenAI-compatible hosted models (Nemotron). Keys prefixed nvapi-.
+  nvidia: {
+    id: 'nvidia',
+    displayName: 'NVIDIA NIM',
+    shortLabel: 'NVIDIA',
+    platformEnvKey: 'NVIDIA_API_KEY',
+    defaultModel: 'nvidia/llama-3.3-nemotron-super-49b-v1',
+    getApiKeyUrl: 'https://build.nvidia.com/',
+    models: [
+      { id: 'nvidia/llama-3.3-nemotron-super-49b-v1', displayName: 'Nemotron Super 49B', shortDisplayName: 'Nemotron 49B', tier: 'balanced', contextWindow: 131_072, maxOutputTokens: 65_536, isReasoning: true },
+      { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', displayName: 'Nemotron Ultra 253B', shortDisplayName: 'Nemotron 253B', tier: 'best', contextWindow: 131_072, maxOutputTokens: 32_768, isReasoning: true },
+    ],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'nvapi-...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://integrate.api.nvidia.com/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  gladia: {
+    id: 'gladia',
+    displayName: 'Gladia (STT)',
+    shortLabel: 'Gladia',
+    defaultModel: '',
+    getApiKeyUrl: 'https://app.gladia.io/',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.gladia.io/v2/pre-recorded', {
+            headers: { 'x-gladia-key': creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  speechmatics: {
+    id: 'speechmatics',
+    displayName: 'Speechmatics (STT)',
+    shortLabel: 'Speechmatics',
+    defaultModel: '',
+    getApiKeyUrl: 'https://portal.speechmatics.com/',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://eu1.asr.api.speechmatics.com/v2/jobs', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
   google: {
     id: 'google',
     displayName: 'Google (Gemini)',
@@ -389,6 +571,13 @@ const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'code
   together: { description: 'Cheap Whisper STT at $0.0015/min', badge: 'optional' },
   deepgram: { description: 'Nova-3 STT — high accuracy with $200 free credits', badge: 'optional' },
   assemblyai: { description: 'Universal-2 STT — 99 languages with $50 free credits', badge: 'optional' },
+  groq: { description: 'Fastest inference — Llama & GPT-OSS LLMs, plus Whisper STT', badge: 'optional' },
+  gladia: { description: 'Solaria STT — 140 languages with accurate word timings', badge: 'optional' },
+  speechmatics: { description: 'Enhanced STT — enterprise accuracy across 80+ languages', badge: 'optional' },
+  xai: { description: 'Grok 4 with a 1M-token context window', badge: 'optional' },
+  deepseek: { description: 'DeepSeek V4 — frontier quality at ~1/10 the cost', badge: 'optional' },
+  mistral: { description: 'Mistral Small/Medium/Large open-weight LLMs', badge: 'optional' },
+  nvidia: { description: 'NVIDIA NIM — hosted Nemotron reasoning models', badge: 'optional' },
 };
 
 /**

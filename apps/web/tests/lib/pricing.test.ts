@@ -57,8 +57,9 @@ describe('getAiCost', () => {
 });
 
 describe('getCheapestModel', () => {
-  it('returns gpt-5-nano as the cheapest model', () => {
-    // gpt-5-nano: $0.05 + $0.40 = $0.45 total (cheapest of all)
-    expect(getCheapestModel()).toBe('gpt-5-nano');
+  it('returns the cheapest registered model by total per-MTok cost', () => {
+    // Groq's Llama 3.1 8B Instant ($0.05 + $0.08 = $0.13 total) is the cheapest,
+    // below gpt-5-nano ($0.05 + $0.40 = $0.45).
+    expect(getCheapestModel()).toBe('llama-3.1-8b-instant');
   });
 });

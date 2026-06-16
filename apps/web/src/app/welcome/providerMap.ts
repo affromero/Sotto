@@ -88,7 +88,11 @@ export function resolveWelcomeSttProviderId(sttId: string): string | null {
 export function aiModelProviderId(wizardId: string): string | null {
   if (wizardId === 'claude') return 'anthropic';
   if (wizardId === 'codex') return 'openai';
-  if (wizardId === 'google') return 'google';
+  // Cloud LLM cards use their registry id directly (google + the OpenAI-compatible
+  // providers). local/custom return null (free-text model, not a registry picker).
+  if (['google', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia'].includes(wizardId)) {
+    return wizardId;
+  }
   return null;
 }
 
@@ -113,8 +117,8 @@ export function resolveAi(
   const m = clean(model);
 
   if (method === 'key' && v) {
-    const byokProvider =
-      provider === 'claude' ? 'anthropic' : provider === 'google' ? 'google' : 'openai';
+    // claude → anthropic, codex → openai, cloud LLM cards → their registry id.
+    const byokProvider = aiModelProviderId(provider) ?? 'openai';
     return {
       keyPost: { endpoint: 'ai-keys', provider: byokProvider, apiKey: v },
       preferredAiProvider: byokProvider,
@@ -126,11 +130,14 @@ export function resolveAi(
   }
 
   if (method === 'cli') {
+    // The CLI backend is the keyless local agent (claude-code). The picked model
+    // is a claude-code model id (haiku/sonnet/opus); it drives generation via
+    // AutoModelConfig + infra.aiModel once persisted.
     return {
       keyPost: null,
       preferredAiProvider: 'claude-code',
-      preferredAiModel: null,
-      infra: { aiProvider: 'claude-code' },
+      preferredAiModel: m || null,
+      infra: { aiProvider: 'claude-code', ...(m && { aiModel: m }) },
     };
   }
 
@@ -185,8 +192,8 @@ export function resolveTts(
 
 /**
  * STT → backend. "whisper" and "local" are keyless local servers (infra + base URL);
- * "assembly" → assemblyai. ElevenLabs keys live in the TTS/BYOK store; every
- * other cloud STT key lives in the AI-key store (matching resolveSttProvider).
+ * "assembly" → assemblyai. ElevenLabs and Cartesia keys live in the TTS/BYOK store;
+ * every other cloud STT key lives in the AI-key store (matching resolveSttProvider).
  */
 export function resolveStt(
   sttId: string,
@@ -207,7 +214,7 @@ export function resolveStt(
   }
 
   const key = clean(apiKey);
-  const endpoint = resolvedId === 'elevenlabs' ? 'byok' : 'ai-keys';
+  const endpoint = resolvedId === 'elevenlabs' || resolvedId === 'cartesia' ? 'byok' : 'ai-keys';
   return {
     keyPost: key ? { endpoint, provider: resolvedId, apiKey: key } : null,
     preferredSttProvider: resolvedId,

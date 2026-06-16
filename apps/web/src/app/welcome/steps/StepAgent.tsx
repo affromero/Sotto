@@ -22,17 +22,19 @@ export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, on
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
   const liveTranslationKey = agent.liveTranslationKey ?? '';
 
-  // Model options for a key-method selection (claude → anthropic, codex → openai).
-  const aiRegistryId = aiModelProviderId(agent.provider);
-  const keyModels = agent.method === 'key' && aiRegistryId ? (aiModels[aiRegistryId] ?? []) : [];
+  // Model options for the current method. key: claude → anthropic, codex → openai.
+  // cli: the keyless local agent backend (claude-code, models haiku/sonnet/opus).
+  const aiRegistryId =
+    agent.method === 'cli' ? 'claude-code' : agent.method === 'key' ? aiModelProviderId(agent.provider) : null;
+  const pickerModels = aiRegistryId ? (aiModels[aiRegistryId] ?? []) : [];
 
-  // Always keep a concrete model selected once a key-based provider is chosen, so
-  // "provide a key" implies "and a model". Defaults to the first (cheapest) model.
+  // Always keep a concrete model selected once a provider+method is chosen, so
+  // configuring an agent always implies a model. Defaults to the first (cheapest).
   useEffect(() => {
-    if (keyModels.length > 0 && !keyModels.some((m) => m.id === agent.model)) {
-      setAgent((a) => ({ ...a, model: keyModels[0].id }));
+    if (pickerModels.length > 0 && !pickerModels.some((m) => m.id === agent.model)) {
+      setAgent((a) => ({ ...a, model: pickerModels[0].id }));
     }
-  }, [keyModels, agent.model, setAgent]);
+  }, [pickerModels, agent.model, setAgent]);
 
   function pick(id: string) {
     const p = PROVIDERS.find((x) => x.id === id);
@@ -185,7 +187,7 @@ export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, on
             </div>
           )}
 
-          {!demoMode && agent.method === 'key' && keyModels.length > 0 && (
+          {!demoMode && (agent.method === 'key' || agent.method === 'cli') && pickerModels.length > 0 && (
             <div>
               <div className={c.fieldLabel}>Model</div>
               <div className={c.field}>
@@ -195,7 +197,7 @@ export function StepAgent({ agent, demoMode, aiModels = {}, setAgent, onNext, on
                   onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
                   aria-label={`${prov.name} model`}
                 >
-                  {keyModels.map((m) => (
+                  {pickerModels.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.label}
                     </option>

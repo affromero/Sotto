@@ -21,18 +21,33 @@ function buildModelMeta(): ModelMeta {
     ai: {
       anthropic: opt(getAiProviderMeta('anthropic').models),
       openai: opt(getAiProviderMeta('openai').models),
+      // Backs the CLI (claude-code) model picker: haiku/sonnet/opus.
+      'claude-code': opt(getAiProviderMeta('claude-code').models),
+      // Cloud LLM cards.
+      xai: opt(getAiProviderMeta('xai').models),
+      deepseek: opt(getAiProviderMeta('deepseek').models),
+      mistral: opt(getAiProviderMeta('mistral').models),
+      groq: opt(getAiProviderMeta('groq').models),
+      nvidia: opt(getAiProviderMeta('nvidia').models),
     },
     tts: {
       elevenlabs: opt(getProviderMeta('elevenlabs').models),
       openai: opt(getProviderMeta('openai').models),
       cartesia: opt(getProviderMeta('cartesia').models),
       hume: opt(getProviderMeta('hume').models),
+      deepgram: opt(getProviderMeta('deepgram').models),
+      rime: opt(getProviderMeta('rime').models),
+      playht: opt(getProviderMeta('playht').models),
     },
     stt: {
       openai: opt(getSttProviderMeta('openai').models),
       deepgram: opt(getSttProviderMeta('deepgram').models),
       assemblyai: opt(getSttProviderMeta('assemblyai').models),
       elevenlabs: opt(getSttProviderMeta('elevenlabs').models),
+      cartesia: opt(getSttProviderMeta('cartesia').models),
+      groq: opt(getSttProviderMeta('groq').models),
+      gladia: opt(getSttProviderMeta('gladia').models),
+      speechmatics: opt(getSttProviderMeta('speechmatics').models),
     },
   };
 }

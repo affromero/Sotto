@@ -54,6 +54,20 @@ describe('assignVoicesForEpisode', () => {
     );
   });
 
+  it.each(['deepgram', 'rime', 'playht'] as const)(
+    'assigns voices from the %s pool (no unsupported-provider throw)',
+    async (provider) => {
+      await assignVoicesForEpisode('pod-1', [{ name: 'HOST' }, { name: 'EXPERT' }], provider);
+
+      const call = mockEpisodeVoiceCreateMany.mock.calls[0][0];
+      expect(call.data).toHaveLength(2);
+      for (const row of call.data as Array<{ provider: string; voiceId: string }>) {
+        expect(row.provider).toBe(provider);
+        expect(row.voiceId).toBeTruthy();
+      }
+    }
+  );
+
   it('preserves existing voice overrides', async () => {
     mockEpisodeVoiceFindMany.mockResolvedValue([
       { speaker: 'HOST' },
