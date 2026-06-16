@@ -146,6 +146,30 @@ pub(crate) enum Action {
     /// `GET /onboarding/config` returned (or failed).
     ConfigLoaded(u64, ApiResult<types::OnboardingConfigResponse>),
 
+    // --- Manual placement overlay (declare a level yourself) ---
+    /// Open the manual level picker from the language picker (`l`).
+    ManualPlacementOpen,
+    /// Submit the picked level (Enter in the overlay).
+    ManualPlacementSubmit,
+    /// Close the manual level picker (Esc).
+    ManualPlacementClose,
+    /// `POST /placement/manual` returned (or failed) — created/raised course.
+    ManualPlaced(u64, ApiResult<types::ManualPlacementResponse>),
+
+    // --- Course delete overlay (reset / remove) ---
+    /// Open the delete-confirm overlay from the course home (`x`).
+    DeleteCourseOpen,
+    /// A typed character for the delete-confirm input.
+    DeleteCourseInput(char),
+    /// Backspace in the delete-confirm input.
+    DeleteCourseBackspace,
+    /// Confirm deletion (Enter once the typed code matches).
+    DeleteCourseConfirm,
+    /// Close the delete-confirm overlay (Esc).
+    DeleteCourseClose,
+    /// `DELETE /courses/{id}` returned (or failed).
+    CourseDeleted(u64, ApiResult<types::DeleteCourseResponse>),
+
     // --- Adaptive-listening Q&A (P6e) ---
     /// Toggle the "ask a question" overlay on a listening screen (`a`).
     ToggleAsk,
