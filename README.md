@@ -4,7 +4,7 @@
 
 # Sotto
 
-### Learn a language, taught from your own context.
+### Learn a language, taught in your own context.
 
 Open source language learning you run yourself, with a full **[CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course** built around _your_ work and interests.<br/>Your progress, your data, your models, on a stack **you** control.
 

@@ -61,7 +61,7 @@ describe('open-source language-learning OSS surfaces', () => {
 
     // brand.ts must carry the new language-learning positioning
     expect(sharedPositioningSource).toContain('Learn a language, taught in your own context.');
-    expect(sharedPositioningSource).toContain('Open-source, self-hostable courses');
+    expect(sharedPositioningSource).toContain('Courses from your notes, work, and interests');
 
     // old social-episode and episode-network copy must be gone
     expect(landingSource).not.toContain('social episode network');
@@ -181,11 +181,7 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('requires bot and shared URL helpers to use an explicit deployment URL', () => {
-    const runtimeUrlSources = [
-      'src/lib/urls.ts',
-    ]
-      .map(readSource)
-      .join('\n');
+    const runtimeUrlSources = ['src/lib/urls.ts'].map(readSource).join('\n');
 
     expect(runtimeUrlSources).toContain('NEXT_PUBLIC_APP_URL is required');
     expect(runtimeUrlSources).toContain('getPublicAppBaseUrl');
@@ -485,10 +481,7 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('keeps release deployment docs self-host neutral', () => {
-    const releaseDocs = [
-      'docs/02-hosting-infrastructure.md',
-      'docs/03-self-host-deployment.md',
-    ]
+    const releaseDocs = ['docs/02-hosting-infrastructure.md', 'docs/03-self-host-deployment.md']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
     const releaseIndexSources = ['docs/CLAUDE.md']
@@ -625,10 +618,7 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('keeps onboarding setup explicit about transcription readiness', () => {
-    const setupSources = [
-      'apps/web/src/lib/setup-readiness.ts',
-      'apps/web/prisma/schema.prisma',
-    ]
+    const setupSources = ['apps/web/src/lib/setup-readiness.ts', 'apps/web/prisma/schema.prisma']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -892,10 +882,7 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps Prisma schema and seeds free of social tables', () => {
     const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
-    const seedSources = [
-      'apps/web/prisma/seed.ts',
-      'apps/web/prisma/seed-demo.ts',
-    ]
+    const seedSources = ['apps/web/prisma/seed.ts', 'apps/web/prisma/seed-demo.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
     const prismaGuideSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8');
@@ -934,7 +921,9 @@ describe('open-source language-learning OSS surfaces', () => {
       .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/episode.ts'), 'utf8'))
       .join('\n');
     const episodeRouteSource = readSource('src/app/api/v1/episodes/[episodeId]/route.ts');
-    const adminEpisodeRouteSource = readSource('src/app/api/v1/admin/episodes/[episodeId]/route.ts');
+    const adminEpisodeRouteSource = readSource(
+      'src/app/api/v1/admin/episodes/[episodeId]/route.ts'
+    );
 
     expect(summaryContractSources).not.toContain('saveCount');
     expect(summaryContractSources).not.toContain('likeCount');
@@ -993,12 +982,8 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
-    const userValidationSources = ['src/lib/validations.ts']
-      .map(readSource)
-      .join('\n');
-    const activityWriteSources = ['src/app/api/v1/episodes/route.ts']
-      .map(readSource)
-      .join('\n');
+    const userValidationSources = ['src/lib/validations.ts'].map(readSource).join('\n');
+    const activityWriteSources = ['src/app/api/v1/episodes/route.ts'].map(readSource).join('\n');
 
     for (const route of removedUserSocialRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
