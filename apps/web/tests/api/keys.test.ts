@@ -110,8 +110,18 @@ describe('GET /api/v1/keys', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
+  it('returns 403 when the authenticated user is not an admin', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe('Forbidden');
+  });
+
   it('returns empty array when user has no API keys', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findMany.mockResolvedValue([]);
 
     const response = await GET();
@@ -122,7 +132,7 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns list of API keys for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey, mockApiKey2]);
 
     const response = await GET();
@@ -135,7 +145,7 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns only selected fields (no keyHash exposed)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey]);
 
     const response = await GET();
@@ -151,7 +161,7 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('includes revoked keys in the list', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey, mockRevokedApiKey]);
 
     const response = await GET();
@@ -182,8 +192,22 @@ describe('POST /api/v1/keys', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
+  it('returns 403 when the authenticated user is not an admin', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Test Key' }),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe('Forbidden');
+  });
+
   it('returns 400 for invalid input (missing name)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
 
     const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
@@ -197,7 +221,7 @@ describe('POST /api/v1/keys', () => {
   });
 
   it('returns 400 for invalid input (name too long)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
 
 
     const request = createRequest('http://localhost:3000/api/v1/keys', {
@@ -210,7 +234,7 @@ describe('POST /api/v1/keys', () => {
   });
 
   it('returns 400 when user has reached MAX_ACTIVE_KEYS limit (10)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
 
     mockPrisma.apiKey.count.mockResolvedValue(10);
 
@@ -226,7 +250,7 @@ describe('POST /api/v1/keys', () => {
   });
 
   it('creates API key successfully for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
 
     mockPrisma.apiKey.count.mockResolvedValue(3);
 
@@ -261,7 +285,7 @@ describe('POST /api/v1/keys', () => {
   });
 
   it('returns full API key only on creation (shown once)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
 
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
@@ -294,7 +318,7 @@ describe('POST /api/v1/keys', () => {
   });
 
   it('generates API key with sk_sotto_ prefix', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
 
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
@@ -344,8 +368,19 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
+  it('returns 403 when the authenticated user is not an admin', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+
+    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
+    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe('Forbidden');
+  });
+
   it('returns 404 when API key does not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findUnique.mockResolvedValue(null);
 
     const request = createRequest('http://localhost:3000/api/v1/keys/nonexistent', {
@@ -359,7 +394,7 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it("returns 403 when trying to delete another user's API key", async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-2' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-2', role: 'ADMIN' } });
     mockPrisma.apiKey.findUnique.mockResolvedValue({
       userId: 'user-1',
       revokedAt: null,
@@ -374,7 +409,7 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('returns 400 when trying to revoke already revoked key', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findUnique.mockResolvedValue({
       userId: 'user-1',
       revokedAt: new Date('2025-01-08T10:00:00Z'),
@@ -391,7 +426,7 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('revokes API key successfully', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
     mockPrisma.apiKey.findUnique.mockResolvedValue({
       userId: 'user-1',
       revokedAt: null,
