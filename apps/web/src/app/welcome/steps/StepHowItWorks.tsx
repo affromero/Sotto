@@ -7,6 +7,7 @@ import styles from './StepHowItWorks.module.css';
 
 interface Props {
   demoMode: boolean;
+  onBack: () => void;
   onNext: () => void;
 }
 
@@ -94,7 +95,7 @@ function supportsReducedMotion() {
   );
 }
 
-export function StepHowItWorks({ demoMode, onNext }: Props) {
+export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
   const [lit, setLit] = useState(() => (supportsReducedMotion() ? STEP_COUNT : 0));
   const [current, setCurrent] = useState(() => (supportsReducedMotion() ? -1 : -1));
   const [settled, setSettled] = useState(() => supportsReducedMotion());
@@ -181,7 +182,20 @@ export function StepHowItWorks({ demoMode, onNext }: Props) {
           </span>
           sotto
         </div>
-        <div className={styles.kicker}>{demoMode ? 'Hosted preview' : 'Before you begin'}</div>
+        <div className={styles.topRight}>
+          <div className={styles.kicker}>{demoMode ? 'Hosted preview' : 'Before you begin'}</div>
+          <div className={styles.navControls} aria-label="How it works controls">
+            <button className={styles.navButton} type="button" onClick={onBack}>
+              <Glyph name="back" size={13} />
+              Back
+            </button>
+            {!settled ? (
+              <button className={styles.navButton} type="button" onClick={settle}>
+                Skip animation
+              </button>
+            ) : null}
+          </div>
+        </div>
       </header>
 
       <section className={styles.corner} aria-label="Setup overview">

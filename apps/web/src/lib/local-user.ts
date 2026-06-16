@@ -33,6 +33,19 @@ export async function ensureLocalUser() {
 }
 
 /**
+ * The owner row can exist before first-run setup is finished. Treat the
+ * instance as onboarded only after the final welcome save marks the owner done.
+ */
+export async function hasCompletedInitialOnboarding(): Promise<boolean> {
+  const owner = await prisma.user.findUnique({
+    where: { id: LOCAL_USER_ID },
+    select: { hasCompletedOnboarding: true },
+  });
+
+  return owner?.hasCompletedOnboarding ?? false;
+}
+
+/**
  * Create an additional household profile (a regular learner, never the owner).
  * The placeholder email is unique per profile so it satisfies `User.email`'s
  * unique constraint; the learner renames it from settings. An optional preset
@@ -59,7 +72,5 @@ export async function createProfile({
 /** Every profile in the household, owner first then by creation order. */
 export async function listProfiles() {
   const profiles = await prisma.user.findMany({ orderBy: { createdAt: 'asc' } });
-  return profiles.sort((a, b) =>
-    a.id === LOCAL_USER_ID ? -1 : b.id === LOCAL_USER_ID ? 1 : 0
-  );
+  return profiles.sort((a, b) => (a.id === LOCAL_USER_ID ? -1 : b.id === LOCAL_USER_ID ? 1 : 0));
 }

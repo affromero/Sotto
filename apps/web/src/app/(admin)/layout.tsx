@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Newsreader, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import { auth } from '@/lib/auth';
+import { hasCompletedInitialOnboarding } from '@/lib/local-user';
+import { isSelfHosted } from '@/lib/self-hosted';
 import { AdminShell } from './AdminShell';
 
 const newsreader = Newsreader({
@@ -35,6 +37,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (!session?.user) {
     redirect('/auth/login');
+  }
+
+  if (isSelfHosted() && !(await hasCompletedInitialOnboarding())) {
+    redirect('/welcome');
   }
 
   const role = session.user.role;

@@ -185,8 +185,16 @@ describe('welcome hosted-demo mode', () => {
 
     expect(await screen.findByText(/How Sotto works/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Setup progress/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Back$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Skip animation/i })).toBeInTheDocument();
 
-    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /^Back$/i }));
+    expect(await screen.findByText(/First launch/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Skip$/i }));
+    await user.click(screen.getByRole('button', { name: /Get started/i }));
+    await user.click(screen.getByRole('button', { name: /Skip animation/i }));
+    expect(screen.queryByRole('button', { name: /Skip animation/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Get started/i }));
 
     expect(await screen.findByRole('heading', { name: /Who's learning/i })).toBeInTheDocument();
