@@ -38,7 +38,7 @@ export function getNotificationUrl(notification: NotificationData): string | nul
 
     // Settings / BYOK
     case 'KEY_INVALID':
-      return '/settings/api';
+      return '/settings';
 
     // Pipeline failure (admin)
     case 'PIPELINE_FAILURE':

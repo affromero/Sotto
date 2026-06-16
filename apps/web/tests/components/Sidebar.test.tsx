@@ -30,10 +30,11 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Learn')).toBeInTheDocument();
     expect(screen.getByText('Memory')).toBeInTheDocument();
-    expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     // Analytics is admin-only; the old episode surfaces are gone.
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
+    // API key management now lives under Settings → Connect a device, not the sidebar.
+    expect(screen.queryByText('API Keys')).not.toBeInTheDocument();
     expect(screen.queryByText('Create')).not.toBeInTheDocument();
     expect(screen.queryByText('Voices')).not.toBeInTheDocument();
     expect(screen.queryByText('Library')).not.toBeInTheDocument();
@@ -54,7 +55,6 @@ describe('Sidebar', () => {
     render(<Sidebar currentPath="/learn" />);
     expect(screen.getByText('Learn').closest('a')).toHaveAttribute('href', '/learn');
     expect(screen.getByText('Memory').closest('a')).toHaveAttribute('href', '/memory');
-    expect(screen.getByText('API Keys').closest('a')).toHaveAttribute('href', '/settings/api');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });
 
@@ -63,7 +63,7 @@ describe('Sidebar', () => {
     render(<Sidebar currentPath="/learn" user={adminUser} />);
 
     expect(screen.getByText('Admin Panel')).toBeInTheDocument();
-    expect(screen.getByText('API Keys')).toBeInTheDocument();
+    expect(screen.queryByText('API Keys')).not.toBeInTheDocument();
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
   });
 

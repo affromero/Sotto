@@ -12,6 +12,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   if (!session?.user?.id) {
     return errorResponse('Unauthorized', 401);
   }
+  if (session.user.role !== 'ADMIN') {
+    return errorResponse('Forbidden', 403);
+  }
 
   const apiKey = await prisma.apiKey.findUnique({
     where: { id: keyId },

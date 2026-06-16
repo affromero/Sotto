@@ -56,7 +56,7 @@ export default async function LivePage({ searchParams }: PageProps) {
           one.
         </p>
         <div className={styles.gateActions}>
-          <Link href="/settings/api" className={styles.gateLink}>
+          <Link href="/settings" className={styles.gateLink}>
             Add a Google key
           </Link>
           <Link href="/learn" className={styles.gateBack}>
