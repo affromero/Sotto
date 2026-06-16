@@ -151,6 +151,34 @@ export async function getByokKey(userId: string, provider?: TtsProviderId | stri
   }
 }
 
+async function findSharedAdminId(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (user?.role === 'ADMIN') return null;
+
+  const admin = await prisma.user.findFirst({
+    where: { role: 'ADMIN', id: { not: userId } },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  return admin?.id ?? null;
+}
+
+export async function getSharedByokKey(
+  userId: string,
+  provider?: TtsProviderId | string
+): Promise<{ apiKey: string; ownerUserId: string; shared: boolean } | null> {
+  const ownKey = await getByokKey(userId, provider);
+  if (ownKey) return { apiKey: ownKey, ownerUserId: userId, shared: false };
+
+  const adminId = await findSharedAdminId(userId);
+  if (!adminId) return null;
+  const adminKey = await getByokKey(adminId, provider);
+  return adminKey ? { apiKey: adminKey, ownerUserId: adminId, shared: true } : null;
+}
+
 /**
  * Retrieve the extra credentials for a provider.
  */
@@ -225,6 +253,16 @@ export async function hasByokKey(userId: string, provider?: TtsProviderId | stri
   // Any provider
   const count = await prisma.userTtsKey.count({ where: { userId, isValid: true } });
   return count > 0;
+}
+
+export async function hasSharedByokKey(
+  userId: string,
+  provider?: TtsProviderId | string
+): Promise<boolean> {
+  if (await hasByokKey(userId, provider)) return true;
+
+  const adminId = await findSharedAdminId(userId);
+  return adminId ? hasByokKey(adminId, provider) : false;
 }
 
 /**
@@ -354,6 +392,19 @@ export async function getAiKey(
     });
     return null;
   }
+}
+
+export async function getSharedAiKey(
+  userId: string,
+  provider?: AiProviderId
+): Promise<{ apiKey: string; provider: AiProviderId; ownerUserId: string; shared: boolean } | null> {
+  const ownKey = await getAiKey(userId, provider);
+  if (ownKey) return { ...ownKey, ownerUserId: userId, shared: false };
+
+  const adminId = await findSharedAdminId(userId);
+  if (!adminId) return null;
+  const adminKey = await getAiKey(adminId, provider);
+  return adminKey ? { ...adminKey, ownerUserId: adminId, shared: true } : null;
 }
 
 /**

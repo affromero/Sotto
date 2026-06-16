@@ -9,20 +9,15 @@ import {
   getProviderIds,
   type TtsProviderId,
 } from './providers/tts-registry';
+import {
+  normalizeSottoLanguageCode,
+} from './speech-language-support';
+
+export { SOTTO_LANGUAGE_CODES } from './speech-language-support';
 
 // ---------------------------------------------------------------------------
 // Canonical language code set — used by language-detect.ts and all lookups
 // ---------------------------------------------------------------------------
-
-/**
- * All ISO 639-1 codes Sotto supports across any TTS provider.
- * language-detect.ts validates LLM output against this set.
- */
-export const SOTTO_LANGUAGE_CODES: ReadonlySet<string> = new Set([
-  'en', 'es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'zh', 'ar',
-  'hi', 'ru', 'nl', 'sv', 'pl', 'tr', 'da', 'fi', 'no', 'cs',
-  'ro', 'hu', 'el', 'he', 'th', 'vi', 'id', 'ms', 'uk', 'ca',
-]);
 
 // ---------------------------------------------------------------------------
 // Lookup functions
@@ -38,13 +33,14 @@ export function supportsLanguage(
   modelId: string,
   lang: string | null | undefined,
 ): boolean {
-  if (!lang) return true;
+  const normalized = normalizeSottoLanguageCode(lang);
+  if (!normalized) return true;
 
   try {
     const meta = getProviderMeta(providerId);
     const model = meta.models.find((m) => m.id === modelId);
     if (!model) return false;
-    return model.supportedLanguages.has(lang);
+    return model.supportedLanguages.has(normalized);
   } catch {
     return false;
   }
@@ -57,12 +53,14 @@ export function supportsLanguage(
 export function getProvidersForLanguage(
   lang: string,
 ): Array<{ providerId: TtsProviderId; modelId: string; tier: string }> {
+  const normalized = normalizeSottoLanguageCode(lang);
+  if (!normalized) return [];
   const results: Array<{ providerId: TtsProviderId; modelId: string; tier: string }> = [];
 
   for (const pid of getProviderIds()) {
     const meta = getProviderMeta(pid);
     for (const model of meta.models) {
-      if (model.supportedLanguages.has(lang)) {
+      if (model.supportedLanguages.has(normalized)) {
         results.push({ providerId: pid, modelId: model.id, tier: model.tier });
       }
     }
@@ -82,19 +80,21 @@ export function getDefaultModelForLanguage(
   lang: string,
   preferred?: string | null,
 ): string | null {
+  const normalized = normalizeSottoLanguageCode(lang);
+  if (!normalized) return null;
   try {
     const meta = getProviderMeta(providerId);
 
     // Check preferred model first
     if (preferred) {
       const prefModel = meta.models.find((m) => m.id === preferred);
-      if (prefModel?.supportedLanguages.has(lang)) return preferred;
+      if (prefModel?.supportedLanguages.has(normalized)) return preferred;
     }
 
     // Scan all models — prefer higher tier
     const tierOrder: Record<string, number> = { ultra: 3, premium: 2, standard: 1 };
     const compatible = meta.models
-      .filter((m) => m.supportedLanguages.has(lang))
+      .filter((m) => m.supportedLanguages.has(normalized))
       .sort((a, b) => (tierOrder[b.tier] ?? 0) - (tierOrder[a.tier] ?? 0));
 
     return compatible.length > 0 ? compatible[0].id : null;

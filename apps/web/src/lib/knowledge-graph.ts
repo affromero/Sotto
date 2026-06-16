@@ -3,6 +3,7 @@
 // due/weak items that drive the next class's adaptive content and the graph viz.
 import { prisma } from './prisma';
 import { reviewCard } from './srs';
+import { normalizeLearningTargetText } from './learning-targets';
 import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel } from '@sotto/shared';
 
@@ -28,7 +29,7 @@ export async function seedLessonItems(
   classId: string,
   level: CefrLevel,
   vocab: VocabItem[],
-  grammarPoints: string[],
+  grammarPoints: string[]
 ): Promise<void> {
   for (const v of vocab) {
     if (!v.lemma) continue;
@@ -65,7 +66,7 @@ export async function seedLessonItems(
 export async function upsertLiveVocab(
   courseId: string,
   items: VocabItem[],
-  level?: CefrLevel,
+  level?: CefrLevel
 ): Promise<number> {
   const lemmas = items.map((i) => i.lemma).filter(Boolean);
   if (lemmas.length === 0) return 0;
@@ -75,7 +76,7 @@ export async function upsertLiveVocab(
         where: { courseId, lemma: { in: lemmas } },
         select: { lemma: true },
       })
-    ).map((r) => r.lemma),
+    ).map((r) => r.lemma)
   );
 
   let added = 0;
@@ -107,7 +108,7 @@ export async function upsertLiveVocab(
 export async function upsertCourseGrammar(
   courseId: string,
   items: GrammarItem[],
-  level?: CefrLevel,
+  level?: CefrLevel
 ): Promise<number> {
   const keys = items.map((i) => i.key).filter(Boolean);
   if (keys.length === 0) return 0;
@@ -117,7 +118,7 @@ export async function upsertCourseGrammar(
         where: { courseId, topicKey: { in: keys } },
         select: { topicKey: true },
       })
-    ).map((r) => r.topicKey),
+    ).map((r) => r.topicKey)
   );
 
   let added = 0;
@@ -145,24 +146,40 @@ export async function applyReviewOutcome(
   grammarPoints: string[],
   vocabQuality: number,
   grammarQuality: number,
-  now: Date,
+  now: Date
 ): Promise<void> {
-  const vocab = await prisma.learnerVocab.findMany({ where: { courseId, lemma: { in: vocabLemmas } } });
+  const vocab = await prisma.learnerVocab.findMany({
+    where: { courseId, lemma: { in: vocabLemmas } },
+  });
   for (const v of vocab) {
     const u = reviewCard(
-      { ease: v.ease, intervalDays: v.intervalDays, reps: v.reps, lapses: v.lapses, mastery: v.mastery },
+      {
+        ease: v.ease,
+        intervalDays: v.intervalDays,
+        reps: v.reps,
+        lapses: v.lapses,
+        mastery: v.mastery,
+      },
       vocabQuality,
-      now,
+      now
     );
     await prisma.learnerVocab.update({ where: { id: v.id }, data: { ...u, lastReviewed: now } });
   }
 
-  const grammar = await prisma.learnerGrammar.findMany({ where: { courseId, topicKey: { in: grammarPoints } } });
+  const grammar = await prisma.learnerGrammar.findMany({
+    where: { courseId, topicKey: { in: grammarPoints } },
+  });
   for (const g of grammar) {
     const u = reviewCard(
-      { ease: g.ease, intervalDays: g.intervalDays, reps: g.reps, lapses: g.lapses, mastery: g.mastery },
+      {
+        ease: g.ease,
+        intervalDays: g.intervalDays,
+        reps: g.reps,
+        lapses: g.lapses,
+        mastery: g.mastery,
+      },
       grammarQuality,
-      now,
+      now
     );
     await prisma.learnerGrammar.update({ where: { id: g.id }, data: { ...u, lastReviewed: now } });
   }
@@ -178,7 +195,13 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
   const now = new Date();
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
   const candidateLimit = Math.max(limit, limit * 4);
-  const [vocab, grammar] = await Promise.all([
+  const [focusTargets, vocab, grammar] = await Promise.all([
+    prisma.learnerFocusTarget.findMany({
+      where: { courseId, kind: { in: ['WORD', 'PHRASE'] } },
+      orderBy: [{ priorityBoost: 'desc' }, { lastSelectedAt: 'desc' }],
+      take: candidateLimit,
+      select: { normalizedText: true, priorityBoost: true },
+    }),
     prisma.learnerVocab.findMany({
       where: { courseId, ...dueOrWeak },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
@@ -210,10 +233,29 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
       },
     }),
   ]);
+  const focusByText = new Map(
+    focusTargets.map((target) => [target.normalizedText, target.priorityBoost])
+  );
+  const boostedVocab = vocab.map((item) => {
+    const boost = focusByText.get(normalizeLearningTargetText(item.lemma)) ?? 0;
+    if (boost <= 0) return { ...item, actualMastery: item.mastery };
+    return {
+      ...item,
+      actualMastery: item.mastery,
+      mastery: Math.max(0, item.mastery - boost),
+      lapses: item.lapses + 1,
+      dueAt: item.dueAt.getTime() <= now.getTime() ? item.dueAt : now,
+    };
+  });
   return {
-    vocab: rankLearningTargets(vocab, now)
+    vocab: rankLearningTargets(boostedVocab, now)
       .slice(0, limit)
-      .map(({ id, lemma, translation, mastery }) => ({ id, lemma, translation, mastery })),
+      .map(({ id, lemma, translation, actualMastery }) => ({
+        id,
+        lemma,
+        translation,
+        mastery: actualMastery,
+      })),
     grammar: rankLearningTargets(grammar, now)
       .slice(0, limit)
       .map(({ id, topicKey, title, mastery }) => ({ id, topicKey, title, mastery })),
@@ -221,7 +263,14 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
 }
 
 export interface MemoryGraph {
-  nodes: Array<{ id: string; kind: 'vocab' | 'grammar'; label: string; translation?: string; strength: number; due: boolean }>;
+  nodes: Array<{
+    id: string;
+    kind: 'vocab' | 'grammar';
+    label: string;
+    translation?: string;
+    strength: number;
+    due: boolean;
+  }>;
   edges: Array<{ source: string; target: string; type: string; weight: number }>;
 }
 
@@ -239,7 +288,13 @@ export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
     }),
     prisma.vocabEdge.findMany({
       where: { courseId },
-      select: { type: true, weight: true, sourceVocabId: true, targetVocabId: true, grammarId: true },
+      select: {
+        type: true,
+        weight: true,
+        sourceVocabId: true,
+        targetVocabId: true,
+        grammarId: true,
+      },
     }),
   ]);
 
@@ -252,7 +307,13 @@ export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
       strength: v.mastery,
       due: v.dueAt.getTime() <= now,
     })),
-    ...grammar.map((g) => ({ id: g.id, kind: 'grammar' as const, label: g.title, strength: g.mastery, due: false })),
+    ...grammar.map((g) => ({
+      id: g.id,
+      kind: 'grammar' as const,
+      label: g.title,
+      strength: g.mastery,
+      due: false,
+    })),
   ];
 
   const graphEdges = edges

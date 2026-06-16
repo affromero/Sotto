@@ -311,13 +311,9 @@ impl App {
                 sections: Some(sections),
                 cursor,
                 ..
-            } => {
-                if *cursor + 1 < sections.len() {
-                    *cursor += 1;
-                    true
-                } else {
-                    false
-                }
+            } if *cursor + 1 < sections.len() => {
+                *cursor += 1;
+                true
             }
             _ => false,
         };

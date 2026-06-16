@@ -138,7 +138,34 @@ See `docs/05-provider-extension-guide.md` for the exact LLM/STT/TTS contracts an
 
 ---
 
-## 6. What Works By Configuration Level
+## 6. Live Audio Provider Smoke Check
+
+The unit test suite never requires live provider keys. When you do want to verify real provider wiring, run the optional smoke script against whichever keys are present:
+
+```bash
+scripts/run-with-env.sh npm run smoke:audio-providers
+```
+
+If your keys come from a private secret manager, enter that environment first and run the same command there.
+
+The script skips missing providers and fails only providers it actually calls. With the relevant keys, it checks:
+
+| Check | Environment variable |
+|---|---|
+| Pexels visual cue search | `PEXELS_API_KEY` |
+| Cartesia Spanish TTS sample | `CARTESIA_API_KEY` |
+| OpenAI STT on the sample audio | `OPENAI_API_KEY` |
+| ElevenLabs Scribe STT on the sample audio | `ELEVENLABS_API_KEY` |
+
+To reuse your own audio instead of generating a Cartesia sample:
+
+```bash
+SOTTO_AUDIO_SMOKE_FILE=/path/to/sample.mp3 npm run smoke:audio-providers
+```
+
+---
+
+## 7. What Works By Configuration Level
 
 | Configuration | Available |
 |---|---|
@@ -151,7 +178,7 @@ No missing capability should be hidden by an implicit provider fallback.
 
 ---
 
-## 7. Private RSS Smoke Test
+## 8. Private RSS Smoke Test
 
 With the app running:
 
@@ -171,7 +198,7 @@ Expected behavior:
 
 ---
 
-## 8. Development Commands
+## 9. Development Commands
 
 | Command | What it does |
 |---|---|
@@ -182,6 +209,7 @@ Expected behavior:
 | `npm run lint` | run ESLint |
 | `npm run type-check` | run TypeScript checks |
 | `npm run test` | run Vitest |
+| `npm run smoke:audio-providers` | optional live Pexels, TTS, and STT provider checks |
 | `npm run build` | build web app |
 | `npm run ci` | lint, type-check, test, and build |
 | `npm run prisma:push` | push Prisma schema |
@@ -192,7 +220,7 @@ Run `npm run ci` before each commit on this refactor branch.
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### PostgreSQL or Redis port is already in use
 

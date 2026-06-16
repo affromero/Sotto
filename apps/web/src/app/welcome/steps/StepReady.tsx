@@ -21,6 +21,7 @@ import {
   resolveTts,
   resolveStt,
   sttModelProviderId,
+  resolveVisualCue,
   type KeyPost,
 } from '../providerMap';
 import { Glyph } from '../Glyph';
@@ -28,6 +29,7 @@ import t from '../theme.module.css';
 import c from '../components.module.css';
 
 const MAX_ONBOARDING_NOTE_CHARS = 4000;
+const VISUAL_CUE_KEY_ID = 'visual:pexels';
 
 function buildContextNote(sources: Set<string>, contextItems: ContextItem[]) {
   const parts: string[] = [];
@@ -92,6 +94,7 @@ export function StepReady({
   const agentLabel = agent.method === 'cli' && prov.cli ? prov.cli.label : prov.name;
   const ttsName = (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
   const sttName = (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
+  const visualCueName = voice.visualCueProvider === 'pexels' ? 'Pexels cues' : 'Image cues off';
 
   function goHome() {
     router.push('/');
@@ -140,12 +143,22 @@ export function StepReady({
       voice.baseUrls[voice.stt] ?? '',
       voice.sttModel[sttModelProviderId(voice.stt)] ?? ''
     );
+    const visualCue = resolveVisualCue(
+      voice.visualCueProvider,
+      voice.keys[VISUAL_CUE_KEY_ID] ?? ''
+    );
 
     // BYOK keys → the validated settings routes. Surface failures (don't swallow)
     // but don't block onboarding — keys are editable later in Settings.
     const failures: string[] = [];
     const postedKeys = new Set<string>();
-    for (const post of [ai.keyPost, liveTranslateKey, tts.keyPost, stt.keyPost]) {
+    for (const post of [
+      ai.keyPost,
+      liveTranslateKey,
+      tts.keyPost,
+      stt.keyPost,
+      visualCue.keyPost,
+    ]) {
       if (!post) continue;
       const postId = `${post.endpoint}:${post.provider}`;
       if (postedKeys.has(postId)) continue;
@@ -263,7 +276,7 @@ export function StepReady({
             <button
               className={`${c.csItem} ${c.csJump}`}
               onClick={() => onJump(2)}
-              title="Change voice"
+              title="Change pronunciation audio"
               type="button"
             >
               <Glyph name="wave" size={13} />
@@ -277,6 +290,15 @@ export function StepReady({
             >
               <Glyph name="mic" size={13} />
               {sttName}
+            </button>
+            <button
+              className={`${c.csItem} ${c.csJump}`}
+              onClick={() => onJump(2)}
+              title="Change visual cue provider"
+              type="button"
+            >
+              <Glyph name="spark" size={13} />
+              {visualCueName}
             </button>
           </div>
         </div>

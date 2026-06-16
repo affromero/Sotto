@@ -1081,7 +1081,7 @@ export const MODULES: Module[] = [
 export const STEPS = [
   'Begin',
   'Connect agent',
-  'Voice',
+  'Voice & cues',
   'Grant context',
   'Placement',
   'Compose',
@@ -1092,7 +1092,7 @@ export type StepName = (typeof STEPS)[number];
 export const WHISPERS: string[] = [
   "Every course is a conversation. Let's begin yours.",
   'The best tutor teaches in the language of your work.',
-  'A voice you choose — for the listening, and the speaking.',
+  'A voice and memory cues you choose — for listening, speaking, and practice.',
   "Tell me what you love — we'll learn the language for it.",
   "I'll meet you a half-step beyond where you stand.",
   'Every lesson, shaped to the things you care about.',
