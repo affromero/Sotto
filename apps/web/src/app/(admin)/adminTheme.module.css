@@ -710,6 +710,143 @@
 }
 
 /* ---------------- model select cards ---------------- */
+/* ---------------- provider/model picker (admin providers) ---------------- */
+/* Mono section label above the provider grid / model grid. */
+.pickLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 9px;
+}
+.pickLabel + .pickLabel,
+.modelGrid + .pickLabel {
+  margin-top: 18px;
+}
+
+/* Provider chips: logo + name in a responsive grid (replaces the cramped seg row). */
+.provGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+.provChip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 9px 11px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  min-height: 44px;
+  width: 100%;
+}
+.provChip:hover {
+  border-color: var(--ink-soft);
+}
+.provChip.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.provChipLogo {
+  flex-shrink: 0;
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.provChipName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.provChip.on .provChipName {
+  color: var(--accent);
+}
+
+/* tier badge inside a model card */
+.tierBadge {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 20px;
+  padding: 1px 7px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-mute);
+}
+.tierFast {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 40%, transparent);
+}
+.tierBest,
+.tierMax {
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
+/* advanced "learner-available models" disclosure */
+.advToggle {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  min-height: 36px;
+}
+.advWrap {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.advList {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.advRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink);
+  min-height: 36px;
+  padding: 4px 0;
+}
+.advRow input {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.advMeta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  margin-left: 7px;
+}
+.sectionLede {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
 .modelGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
