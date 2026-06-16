@@ -7,7 +7,6 @@ import {
   GraduationCap,
   Brain,
   Settings,
-  Key,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -17,7 +16,6 @@ import styles from './CommandPalette.module.css';
 const NAV_ITEMS = [
   { href: '/learn', label: 'Learn', icon: GraduationCap },
   { href: '/memory', label: 'Memory', icon: Brain },
-  { href: '/settings/api', label: 'API Keys', icon: Key },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

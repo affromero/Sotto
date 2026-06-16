@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { GraduationCap, Network, Settings, Key, Shield } from 'lucide-react';
+import { GraduationCap, Network, Settings, Shield } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import styles from './Sidebar.module.css';
@@ -33,7 +33,6 @@ function getNavItems(): NavItem[] {
     { href: '/memory', label: 'Memory', icon: Network },
   ];
 
-  items.push({ href: '/settings/api', label: 'API Keys', icon: Key });
   items.push({ href: '/settings', label: 'Settings', icon: Settings });
 
   return items;
