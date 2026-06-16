@@ -84,19 +84,14 @@ export async function getSiteConfig(): Promise<SiteConfigData> {
  * Normalize an infra field: trim, and treat empty string as "unset" (null) so the
  * resolver falls back to env rather than to a blank explicit selection.
  */
-function normalizeInfra(
-  value: string | null | undefined
-): string | null | undefined {
+function normalizeInfra(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
   const trimmed = value.trim();
   return trimmed.length === 0 ? null : trimmed;
 }
 
-export async function setSiteConfig(
-  data: Partial<SiteConfigData>,
-  adminId: string
-): Promise<void> {
+export async function setSiteConfig(data: Partial<SiteConfigData>, adminId: string): Promise<void> {
   const infra: Record<string, string | null> = {};
   for (const key of INFRA_KEYS) {
     const normalized = normalizeInfra(data[key]);
@@ -115,4 +110,8 @@ export async function setSiteConfig(
       updatedBy: adminId,
     },
   });
+}
+
+export async function resetSiteConfig(adminId: string): Promise<void> {
+  await setSiteConfig(DEFAULTS, adminId);
 }

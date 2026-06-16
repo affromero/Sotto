@@ -97,6 +97,53 @@
   cursor: progress;
 }
 
+.dangerZone {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-md);
+  background: color-mix(in oklab, var(--color-error, #dc2626) 7%, var(--color-surface));
+  border: 1px solid color-mix(in oklab, var(--color-error, #dc2626) 28%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+
+.dangerTitle {
+  font: var(--text-body-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 4px;
+}
+
+.dangerText {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.resetBtn {
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  font: var(--text-body-sm);
+  font-weight: 700;
+  color: var(--color-error, #dc2626);
+  background: var(--color-surface);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.resetBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.resetBtn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-error, #dc2626) 10%, var(--color-surface));
+}
+
 .rowLabel {
   flex: 1;
 }
@@ -169,4 +216,12 @@
 
 .statusError {
   color: var(--color-error, #dc2626);
+}
+
+@media (max-width: 640px) {
+  .actions,
+  .dangerZone {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
