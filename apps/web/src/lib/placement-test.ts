@@ -1,6 +1,6 @@
 // Adaptive CEFR placement test. The LLM flow: resolve the
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
-// model, parse JSON. A single batch of questions spans A1..B2; the learner's
+// model, parse JSON. A single batch of questions spans A1..C2; the learner's
 // level is the highest band they clear on a staircase.
 import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
@@ -11,7 +11,7 @@ import { logger } from './logger';
 import { CEFR_ORDER } from './cefr-levels';
 import type { CefrLevel } from '@sotto/shared';
 
-export const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2'];
+export const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 export const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
 const PASS_THRESHOLD = 0.7;
 const PER_BAND = 4;

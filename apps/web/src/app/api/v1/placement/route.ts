@@ -107,9 +107,20 @@ export async function POST(request: NextRequest) {
 
     const outcome = scorePlacement(questions, answers);
 
+    // A pending notes deduction means the learner reached this test via the
+    // "verify with a few questions" path, so the level is notes-verified rather
+    // than a cold test.
+    const cachedNotes = await getCachedNotesDeduction(userId, native, target);
+
     // Safe re-take lives in createOrRaiseCourse: keep startLevel, only raise
     // currentLevel, so re-testing never discards progress made through classes.
-    const course = await createOrRaiseCourse(userId, native, target, outcome.level);
+    const course = await createOrRaiseCourse(
+      userId,
+      native,
+      target,
+      outcome.level,
+      cachedNotes ? 'NOTES_VERIFIED' : 'TEST',
+    );
 
     await prisma.placementResult.upsert({
       where: { courseId: course.id },
@@ -125,7 +136,6 @@ export async function POST(request: NextRequest) {
     // If the learner reached this test via notes-based "verify with a few
     // questions", seed the cached materials as the course note + vocabulary,
     // the same personalization the direct "start here" confirm does.
-    const cachedNotes = await getCachedNotesDeduction(userId, native, target);
     if (cachedNotes) {
       const merged = mergeCourseNote(await getCourseNote(course.id), cachedNotes.content);
       await setCourseNote(course.id, merged);

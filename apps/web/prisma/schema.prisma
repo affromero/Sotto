@@ -954,6 +954,16 @@ enum CefrLevel {
   C2
 }
 
+// How a course's level was established. Drives confidence cues in the UI (e.g. a
+// gentle "verify with the test" nudge for a self-selected level). Nullable on
+// Course: legacy courses placed before this field existed read as unknown.
+enum PlacementSource {
+  TEST // adaptive placement test (staircase scored)
+  NOTES // level deduced from uploaded materials, confirmed directly
+  NOTES_VERIFIED // notes deduction confirmed by a short focused test
+  MANUAL // learner selected the level themselves (no test)
+}
+
 // The learner's chosen teaching approach, grounded in second-language-acquisition
 // research. Shapes how content is generated so a learner can switch methods if one
 // is not working for them. See lib/pedagogy.ts for the evidence behind each.
@@ -1023,6 +1033,7 @@ model Course {
   curriculumId  String
   currentLevel  CefrLevel @default(A1) // "you are here"; assigned by placement, advances with mastery
   startLevel    CefrLevel @default(A1) // immutable placement result
+  placementSource PlacementSource? // how the level was set (null = unknown/legacy)
   pedagogy      PedagogyStyle @default(BALANCED) // teaching approach; shapes generation
   activeClassId String? // current in-flight class (gating convenience cache)
   createdAt     DateTime  @default(now())

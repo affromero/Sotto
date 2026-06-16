@@ -52,6 +52,9 @@ export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | '
 // Language learning
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
+// How a course's CEFR level was established (null on legacy courses).
+export type PlacementSource = 'TEST' | 'NOTES' | 'NOTES_VERIFIED' | 'MANUAL';
+
 export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 
 export type ClassStatus =

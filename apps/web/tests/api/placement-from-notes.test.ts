@@ -139,7 +139,7 @@ describe('POST /api/v1/placement/from-notes/confirm', () => {
     const body = await res.json();
     expect(body).toEqual({ courseId: 'course-1', level: 'B1', addedVocabulary: 7 });
 
-    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith('u1', 'en', 'es', 'B1');
+    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith('u1', 'en', 'es', 'B1', 'NOTES');
     expect(mockSetCourseNote).toHaveBeenCalledWith('course-1', 'mis materiales');
     expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
       expect.objectContaining({ courseId: 'course-1', userId: 'u1', level: 'B1', note: 'mis materiales' }),

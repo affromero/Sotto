@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         targetLang: true,
         currentLevel: true,
         startLevel: true,
+        placementSource: true,
         activeClassId: true,
         curriculum: { select: { title: true } },
         placement: { select: { level: true, createdAt: true } },
@@ -54,7 +55,14 @@ export async function POST(request: NextRequest) {
 
     const course = await prisma.course.upsert({
       where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
-      create: { userId, nativeLang: native, targetLang: target, curriculumId: curriculum.id },
+      // Skip-placement start: the learner chose A1 without a test → MANUAL.
+      create: {
+        userId,
+        nativeLang: native,
+        targetLang: target,
+        curriculumId: curriculum.id,
+        placementSource: 'MANUAL',
+      },
       update: {},
     });
 

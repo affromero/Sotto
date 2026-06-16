@@ -15,12 +15,22 @@ vi.mock('@/components/placement/NotesPlacement', () => ({
     </button>
   ),
 }));
+vi.mock('@/components/placement/ManualPlacement', () => ({
+  ManualPlacement: () => <div data-testid="manual-placement">stub-manual</div>,
+}));
 
 describe('PlacementEntry', () => {
-  it('offers both the test and the materials path', () => {
+  it('offers the test, the materials path, and manual selection', () => {
     render(<PlacementEntry native="en" target="es" />);
     expect(screen.getByText('Take the placement test')).toBeInTheDocument();
     expect(screen.getByText('I have materials from my level')).toBeInTheDocument();
+    expect(screen.getByText('I already know my level')).toBeInTheDocument();
+  });
+
+  it('opens the manual level picker when chosen', () => {
+    render(<PlacementEntry native="en" target="es" />);
+    fireEvent.click(screen.getByText('I already know my level'));
+    expect(screen.getByTestId('manual-placement')).toBeInTheDocument();
   });
 
   it('opens the multiple-choice test when chosen', () => {
