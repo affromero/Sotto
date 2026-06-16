@@ -5,6 +5,7 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { LandingCTA } from '@/components/landing/LandingCTA';
 import { GlassBead } from '@/components/landing/GlassBead';
 import { ProductFrame } from '@/components/landing/ProductFrame';
+import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import { Glyph } from '@/app/welcome/Glyph';
 import type { GlyphName } from '@/app/welcome/data';
 import { getPublicGithubUrl } from '@/lib/public-links';
@@ -145,6 +146,43 @@ const RUN_CHIPS: RunChip[] = [
     body: 'Connect your own agent and provider keys. Your courses, audio, and data stay where you put them.',
     icon: 'key',
   },
+];
+
+type ProviderLogoId = Parameters<typeof TtsProviderLogo>[0]['provider'];
+
+interface SupportedProvider {
+  key: string;
+  name: string;
+  logo: ProviderLogoId;
+  capability: string;
+}
+
+const SUPPORTED_PROVIDERS: SupportedProvider[] = [
+  { key: 'claude-code', name: 'Claude Code', logo: 'anthropic', capability: 'Agent' },
+  { key: 'codex', name: 'Codex', logo: 'openai', capability: 'Agent' },
+  { key: 'anthropic', name: 'Anthropic', logo: 'anthropic', capability: 'AI' },
+  { key: 'openai', name: 'OpenAI', logo: 'openai', capability: 'AI · TTS · STT' },
+  { key: 'google', name: 'Google Gemini', logo: 'google', capability: 'AI · Live' },
+  { key: 'xai', name: 'xAI', logo: 'xai', capability: 'AI' },
+  { key: 'deepseek', name: 'DeepSeek', logo: 'deepseek', capability: 'AI' },
+  { key: 'mistral', name: 'Mistral', logo: 'mistral', capability: 'AI · TTS' },
+  { key: 'groq', name: 'Groq', logo: 'groq', capability: 'AI · STT' },
+  { key: 'nvidia', name: 'NVIDIA NIM', logo: 'nvidia', capability: 'AI' },
+  { key: 'together', name: 'Together AI', logo: 'together', capability: 'AI · STT' },
+  { key: 'elevenlabs', name: 'ElevenLabs', logo: 'elevenlabs', capability: 'TTS · STT' },
+  { key: 'cartesia', name: 'Cartesia', logo: 'cartesia', capability: 'TTS · STT' },
+  { key: 'hume', name: 'Hume AI', logo: 'hume', capability: 'TTS' },
+  { key: 'fal', name: 'Fal', logo: 'fal', capability: 'TTS' },
+  { key: 'replicate', name: 'Replicate', logo: 'replicate', capability: 'TTS' },
+  { key: 'minimax', name: 'MiniMax', logo: 'minimax', capability: 'TTS' },
+  { key: 'deepgram', name: 'Deepgram', logo: 'deepgram', capability: 'TTS · STT' },
+  { key: 'rime', name: 'Rime', logo: 'rime', capability: 'TTS' },
+  { key: 'playht', name: 'PlayHT', logo: 'playht', capability: 'TTS' },
+  { key: 'assemblyai', name: 'AssemblyAI', logo: 'assemblyai', capability: 'STT' },
+  { key: 'gladia', name: 'Gladia', logo: 'gladia', capability: 'STT' },
+  { key: 'speechmatics', name: 'Speechmatics', logo: 'speechmatics', capability: 'STT' },
+  { key: 'kokoro', name: 'Kokoro', logo: 'kokoro', capability: 'Local TTS' },
+  { key: 'local', name: 'Local models', logo: 'local', capability: 'AI · TTS · STT' },
 ];
 
 interface WalkProvider {
@@ -371,6 +409,40 @@ export default function LandingPage() {
             <span className={styles.whisperTag}>private by design</span>
             The agent that already knows you, now teaching you to speak.
           </p>
+        </section>
+
+        {/* ---- provider carousel ---- */}
+        <section className={styles.providers} aria-labelledby="providers-title">
+          <div className={styles.providersHead}>
+            <p className={styles.sectionLabel}>Provider choice</p>
+            <h2 id="providers-title" className={styles.providersTitle}>
+              Connect the companies and models <em>you already trust</em>.
+            </h2>
+            <p className={styles.providersCopy}>
+              AI, text-to-speech, speech-to-text, CLI agents, and local models all plug into the
+              same self-hosted learning stack.
+            </p>
+          </div>
+
+          <div className={styles.providerCarousel} aria-label="Supported providers">
+            <div className={styles.providerTrack}>
+              {[...SUPPORTED_PROVIDERS, ...SUPPORTED_PROVIDERS].map((provider, index) => (
+                <div
+                  key={`${provider.key}-${index}`}
+                  className={styles.providerPill}
+                  aria-hidden={index >= SUPPORTED_PROVIDERS.length}
+                >
+                  <span className={styles.providerMark}>
+                    <TtsProviderLogo provider={provider.logo} size={30} />
+                  </span>
+                  <span className={styles.providerText}>
+                    <span className={styles.providerName}>{provider.name}</span>
+                    <span className={styles.providerCapability}>{provider.capability}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* ---- how it works ---- */}
