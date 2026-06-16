@@ -201,8 +201,8 @@ export default function DevelopersPage() {
             </pre>
             <p className={styles.sectionDescription}>
               Generate API keys from your{' '}
-              <a href="/settings" className={styles.link}>
-                Settings
+              <a href="/settings/devices" className={styles.link}>
+                device settings
               </a>{' '}
               page.
             </p>
