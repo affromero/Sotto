@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { BRAND } from '@sotto/shared';
 import { JsonLd } from '@/components/landing/JsonLd';
 import { LandingHeader } from '@/components/landing/LandingHeader';
@@ -10,6 +11,7 @@ import { Glyph } from '@/app/welcome/Glyph';
 import type { GlyphName } from '@/app/welcome/data';
 import { getPublicGithubUrl } from '@/lib/public-links';
 import { isSelfHosted } from '@/lib/self-hosted';
+import { hasCompletedInitialOnboarding } from '@/lib/local-user';
 import styles from './page.module.css';
 
 const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
@@ -383,8 +385,12 @@ function WalkFrameMock({ frame }: { frame: WalkStep['frame'] }) {
   }
 }
 
-export default function LandingPage() {
-  const demoMode = !isSelfHosted();
+export default async function LandingPage() {
+  if (isSelfHosted()) {
+    redirect((await hasCompletedInitialOnboarding()) ? '/learn' : '/welcome');
+  }
+
+  const demoMode = true;
 
   return (
     <div className={styles.root}>

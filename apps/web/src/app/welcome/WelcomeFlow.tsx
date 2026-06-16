@@ -506,7 +506,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       stepView = <StepIntro demoMode={demoMode} onNext={() => go(1)} />;
       break;
     case 1:
-      stepView = <StepHowItWorks demoMode={demoMode} onNext={() => go(2)} />;
+      stepView = <StepHowItWorks demoMode={demoMode} onBack={() => go(0)} onNext={() => go(2)} />;
       break;
     case 2:
       stepView = (

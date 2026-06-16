@@ -2,17 +2,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockUserCreate = vi.fn();
+const mockUserFindUnique = vi.fn();
 const mockUserFindMany = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
       create: (...args: unknown[]) => mockUserCreate(...args),
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       findMany: (...args: unknown[]) => mockUserFindMany(...args),
     },
   },
 }));
 
-import { createProfile, listProfiles, LOCAL_USER_ID } from '@/lib/local-user';
+import {
+  createProfile,
+  hasCompletedInitialOnboarding,
+  listProfiles,
+  LOCAL_USER_ID,
+} from '@/lib/local-user';
 
 describe('createProfile', () => {
   beforeEach(() => {
@@ -64,5 +71,25 @@ describe('listProfiles', () => {
 
     expect(profiles[0].id).toBe(LOCAL_USER_ID);
     expect(profiles).toHaveLength(3);
+  });
+});
+
+describe('hasCompletedInitialOnboarding', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('is false before the owner exists', async () => {
+    mockUserFindUnique.mockResolvedValue(null);
+
+    await expect(hasCompletedInitialOnboarding()).resolves.toBe(false);
+    expect(mockUserFindUnique).toHaveBeenCalledWith({
+      where: { id: LOCAL_USER_ID },
+      select: { hasCompletedOnboarding: true },
+    });
+  });
+
+  it('reflects the owner completion flag', async () => {
+    mockUserFindUnique.mockResolvedValue({ hasCompletedOnboarding: true });
+
+    await expect(hasCompletedInitialOnboarding()).resolves.toBe(true);
   });
 });
