@@ -17,6 +17,7 @@ import { StepContext } from './steps/StepContext';
 import { StepPlacement } from './steps/StepPlacement';
 import { StepCompose } from './steps/StepCompose';
 import { StepReady } from './steps/StepReady';
+import { OnboardingThemeSwitch } from './OnboardingThemeSwitch';
 import t from './theme.module.css';
 
 export interface AgentState {
@@ -63,7 +64,7 @@ export interface ModelMeta {
 
 const EMPTY_MODEL_META: ModelMeta = { ai: {}, tts: {}, stt: {} };
 
-export type ContextItemKind = 'link' | 'text' | 'file';
+export type ContextItemKind = 'link' | 'book' | 'article' | 'music' | 'topic' | 'file' | 'text';
 
 export interface ContextItem {
   id: string;
@@ -144,7 +145,15 @@ function toSingleUnderstoodSet(levels: Iterable<CefrLevel>): Set<CefrLevel> {
 }
 
 function isContextItemKind(value: unknown): value is ContextItemKind {
-  return value === 'link' || value === 'text' || value === 'file';
+  return (
+    value === 'link' ||
+    value === 'book' ||
+    value === 'article' ||
+    value === 'music' ||
+    value === 'topic' ||
+    value === 'file' ||
+    value === 'text'
+  );
 }
 
 function isKnownAvatarSlug(value: unknown): value is string {
@@ -276,8 +285,24 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
           }
         : { ...DEFAULT_AGENT },
     voice: { ...DEFAULT_VOICE },
-    sources: new Set(clamped >= 6 ? ['repos', 'reading', 'notes', 'calendar'] : []),
-    contextItems: [],
+    sources: new Set(),
+    contextItems:
+      clamped >= 6
+        ? [
+            {
+              id: 'ctx-demo-link',
+              kind: 'link',
+              label: 'example.com',
+              value: 'https://example.com/paper',
+            },
+            {
+              id: 'ctx-demo-book',
+              kind: 'book',
+              label: 'Invisible Cities',
+              value: 'Invisible Cities by Italo Calvino',
+            },
+          ]
+        : [],
     understood: new Set<CefrLevel>(clamped >= 7 ? ['B1'] : []),
   };
 }
@@ -441,7 +466,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                     : step === 5
                       ? true
                       : step === 6
-                        ? sources.size + contextItems.length > 0
+                        ? contextItems.length > 0
                         : step === 7
                           ? !!level
                           : false;
@@ -458,7 +483,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [agent.status, contextItems.length, go, language, level, sources.size, step]);
+  }, [agent.status, contextItems.length, go, language, level, step]);
 
   function chooseBaseLang(code: string) {
     setBaseLang(code);
@@ -479,15 +504,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     if (typeof window !== 'undefined' && config.selfHosted) {
       window.localStorage.removeItem(SAVE_KEY);
     }
-  }
-
-  function toggleSource(id: string) {
-    setSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   }
 
   function toggleUnderstood(lvl: CefrLevel) {
@@ -562,8 +578,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     case 6:
       stepView = (
         <StepContext
-          sources={sources}
-          toggle={toggleSource}
           contextItems={contextItems}
           setContextItems={setContextItems}
           demoMode={demoMode}
@@ -643,6 +657,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
             {config.selfHosted ? 'v0 · self hosted' : 'v0 · hosted demo'}
           </div>
         </Link>
+
+        <OnboardingThemeSwitch className={t.railThemeSwitch} />
 
         <nav className={t.stepper} aria-label="Setup progress">
           {STEPS.map((s, i) => {

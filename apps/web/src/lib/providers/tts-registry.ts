@@ -81,13 +81,10 @@ const {
   mistral: LANG_MISTRAL,
   inworld: LANG_INWORLD,
   kokoro: LANG_KOKORO,
+  deepgramAura: LANG_DEEPGRAM_AURA,
+  rimeArcana: LANG_RIME,
+  playhtPlay3Mini: LANG_PLAYHT,
 } = TTS_LANGUAGE_SUPPORT_SETS;
-/** Deepgram Aura-2 — 7 languages (via voice-id suffix) */
-const LANG_DEEPGRAM_AURA: ReadonlySet<string> = new Set(['en','es','de','fr','nl','it','ja']);
-/** Rime Arcana — 9 Sotto languages (Tamil excluded; not a Sotto course language) */
-const LANG_RIME: ReadonlySet<string> = new Set(['en','es','fr','de','hi','he','ja','pt','ar']);
-/** PlayHT Play3.0-mini — Sotto languages PlayHT names (see PLAYHT_LANGUAGE_NAMES) */
-const LANG_PLAYHT: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','cs','hu','el','he','th','id','ms','uk','ca']);
 
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
@@ -100,9 +97,24 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     defaultModel: 'eleven_v3',
     models: [
       { id: 'eleven_v3', displayName: 'Eleven v3', tier: 'premium', supportedLanguages: LANG_ALL },
-      { id: 'eleven_flash_v2_5', displayName: 'Eleven Flash v2.5', tier: 'standard', supportedLanguages: LANG_EL_FLASH },
-      { id: 'eleven_turbo_v2', displayName: 'Eleven Turbo v2', tier: 'standard', supportedLanguages: LANG_EN },
-      { id: 'eleven_multilingual_v2', displayName: 'Eleven Multilingual v2', tier: 'premium', supportedLanguages: LANG_EL_MLV2 },
+      {
+        id: 'eleven_flash_v2_5',
+        displayName: 'Eleven Flash v2.5',
+        tier: 'standard',
+        supportedLanguages: LANG_EL_FLASH,
+      },
+      {
+        id: 'eleven_turbo_v2',
+        displayName: 'Eleven Turbo v2',
+        tier: 'standard',
+        supportedLanguages: LANG_EN,
+      },
+      {
+        id: 'eleven_multilingual_v2',
+        displayName: 'Eleven Multilingual v2',
+        tier: 'premium',
+        supportedLanguages: LANG_EL_MLV2,
+      },
     ],
     supportsAudioTags: true,
     docsUrl: 'https://elevenlabs.io/docs/speech-synthesis/audio-tags',
@@ -138,7 +150,12 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     models: [
       { id: 'tts-1-hd', displayName: 'TTS-1 HD', tier: 'premium', supportedLanguages: LANG_ALL },
       { id: 'tts-1', displayName: 'TTS-1', tier: 'standard', supportedLanguages: LANG_ALL },
-      { id: 'gpt-4o-mini-tts', displayName: 'GPT-4o Mini TTS', tier: 'standard', supportedLanguages: LANG_ALL },
+      {
+        id: 'gpt-4o-mini-tts',
+        displayName: 'GPT-4o Mini TTS',
+        tier: 'standard',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -173,9 +190,24 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     defaultModel: 'sonic-3.5',
     models: [
       { id: 'sonic-3.5', displayName: 'Sonic 3.5', tier: 'premium', supportedLanguages: LANG_ALL },
-      { id: 'sonic-3', displayName: 'Sonic 3', tier: 'premium', supportedLanguages: LANG_CARTESIA_3 },
-      { id: 'sonic-turbo', displayName: 'Sonic Turbo', tier: 'standard', supportedLanguages: LANG_CARTESIA_TURBO },
-      { id: 'sonic-2', displayName: 'Sonic 2 (Legacy)', tier: 'premium', supportedLanguages: LANG_CARTESIA_TURBO },
+      {
+        id: 'sonic-3',
+        displayName: 'Sonic 3',
+        tier: 'premium',
+        supportedLanguages: LANG_CARTESIA_3,
+      },
+      {
+        id: 'sonic-turbo',
+        displayName: 'Sonic Turbo',
+        tier: 'standard',
+        supportedLanguages: LANG_CARTESIA_TURBO,
+      },
+      {
+        id: 'sonic-2',
+        displayName: 'Sonic 2 (Legacy)',
+        tier: 'premium',
+        supportedLanguages: LANG_CARTESIA_TURBO,
+      },
     ],
     supportsAudioTags: true,
     docsUrl: 'https://docs.cartesia.ai/build-with-cartesia/text-to-speech/sonic-formatting',
@@ -212,8 +244,18 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'octave-v2',
     models: [
-      { id: 'octave-v2', displayName: 'Octave V2', tier: 'ultra', supportedLanguages: LANG_HUME_V2 },
-      { id: 'octave-v1', displayName: 'Octave V1', tier: 'ultra', supportedLanguages: LANG_HUME_V1 },
+      {
+        id: 'octave-v2',
+        displayName: 'Octave V2',
+        tier: 'ultra',
+        supportedLanguages: LANG_HUME_V2,
+      },
+      {
+        id: 'octave-v1',
+        displayName: 'Octave V1',
+        tier: 'ultra',
+        supportedLanguages: LANG_HUME_V1,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: 'https://dev.hume.ai/docs/text-to-speech/text-to-speech-guide',
@@ -256,8 +298,18 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'qwen3-tts-1.7b',
     models: [
-      { id: 'qwen3-tts-1.7b', displayName: 'Qwen3 TTS 1.7B', tier: 'premium', supportedLanguages: LANG_QWEN3 },
-      { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard', supportedLanguages: LANG_QWEN3 },
+      {
+        id: 'qwen3-tts-1.7b',
+        displayName: 'Qwen3 TTS 1.7B',
+        tier: 'premium',
+        supportedLanguages: LANG_QWEN3,
+      },
+      {
+        id: 'qwen3-tts-0.6b',
+        displayName: 'Qwen3 TTS 0.6B',
+        tier: 'standard',
+        supportedLanguages: LANG_QWEN3,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -291,13 +343,23 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'speech-02-hd',
     models: [
-      { id: 'speech-02-hd', displayName: 'Speech-02 HD', tier: 'premium', supportedLanguages: LANG_ALL },
-      { id: 'speech-02-turbo', displayName: 'Speech-02 Turbo', tier: 'standard', supportedLanguages: LANG_ALL },
+      {
+        id: 'speech-02-hd',
+        displayName: 'Speech-02 HD',
+        tier: 'premium',
+        supportedLanguages: LANG_ALL,
+      },
+      {
+        id: 'speech-02-turbo',
+        displayName: 'Speech-02 Turbo',
+        tier: 'standard',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
     qualityTier: 'premium',
-    platformCostPerKChar: 0.10,
+    platformCostPerKChar: 0.1,
     modelsWithoutTextContext: [],
     languageDetection: 'auto',
     languageParam: null,
@@ -326,7 +388,12 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 4096,
     defaultModel: 'voxtral-mini-tts-2603',
     models: [
-      { id: 'voxtral-mini-tts-2603', displayName: 'Voxtral Mini TTS', tier: 'premium', supportedLanguages: LANG_MISTRAL },
+      {
+        id: 'voxtral-mini-tts-2603',
+        displayName: 'Voxtral Mini TTS',
+        tier: 'premium',
+        supportedLanguages: LANG_MISTRAL,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -360,9 +427,24 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'inworld-tts-1.5-max',
     models: [
-      { id: 'inworld-tts-1.5-max', displayName: 'Inworld TTS 1.5 Max', tier: 'premium', supportedLanguages: LANG_INWORLD },
-      { id: 'inworld-tts-1.5-mini', displayName: 'Inworld TTS 1.5 Mini', tier: 'standard', supportedLanguages: LANG_INWORLD },
-      { id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'standard', supportedLanguages: LANG_QWEN3 },
+      {
+        id: 'inworld-tts-1.5-max',
+        displayName: 'Inworld TTS 1.5 Max',
+        tier: 'premium',
+        supportedLanguages: LANG_INWORLD,
+      },
+      {
+        id: 'inworld-tts-1.5-mini',
+        displayName: 'Inworld TTS 1.5 Mini',
+        tier: 'standard',
+        supportedLanguages: LANG_INWORLD,
+      },
+      {
+        id: 'qwen3-tts',
+        displayName: 'Qwen3 TTS',
+        tier: 'standard',
+        supportedLanguages: LANG_QWEN3,
+      },
     ],
     supportsAudioTags: true,
     docsUrl: null,
@@ -401,7 +483,12 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 4096,
     defaultModel: 'kokoro',
     models: [
-      { id: 'kokoro', displayName: 'Kokoro 82M', tier: 'standard', supportedLanguages: LANG_KOKORO },
+      {
+        id: 'kokoro',
+        displayName: 'Kokoro 82M',
+        tier: 'standard',
+        supportedLanguages: LANG_KOKORO,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -430,7 +517,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsStreaming: true,
     maxSegmentChars: 2000,
     defaultModel: 'aura-2',
-    models: [{ id: 'aura-2', displayName: 'Aura 2', tier: 'premium', supportedLanguages: LANG_DEEPGRAM_AURA }],
+    models: [
+      {
+        id: 'aura-2',
+        displayName: 'Aura 2',
+        tier: 'premium',
+        supportedLanguages: LANG_DEEPGRAM_AURA,
+      },
+    ],
     supportsAudioTags: false,
     docsUrl: null,
     qualityTier: 'premium',
@@ -465,7 +559,12 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     defaultModel: 'arcana',
     models: [
       { id: 'arcana', displayName: 'Arcana', tier: 'premium', supportedLanguages: LANG_RIME },
-      { id: 'mistv2', displayName: 'Mist v2', tier: 'standard', supportedLanguages: new Set(['en','es','fr','de']) },
+      {
+        id: 'mistv2',
+        displayName: 'Mist v2',
+        tier: 'standard',
+        supportedLanguages: new Set(['en', 'es', 'fr', 'de']),
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -500,8 +599,18 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 20000,
     defaultModel: 'Play3.0-mini',
     models: [
-      { id: 'Play3.0-mini', displayName: 'Play 3.0 Mini', tier: 'premium', supportedLanguages: LANG_PLAYHT },
-      { id: 'PlayDialog', displayName: 'PlayDialog', tier: 'ultra', supportedLanguages: LANG_PLAYHT },
+      {
+        id: 'Play3.0-mini',
+        displayName: 'Play 3.0 Mini',
+        tier: 'premium',
+        supportedLanguages: LANG_PLAYHT,
+      },
+      {
+        id: 'PlayDialog',
+        displayName: 'PlayDialog',
+        tier: 'ultra',
+        supportedLanguages: LANG_PLAYHT,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -543,7 +652,12 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 4096,
     defaultModel: 'local',
     models: [
-      { id: 'local', displayName: 'Local TTS model', tier: 'standard', supportedLanguages: LANG_ALL },
+      {
+        id: 'local',
+        displayName: 'Local TTS model',
+        tier: 'standard',
+        supportedLanguages: LANG_ALL,
+      },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -558,7 +672,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       validate: async () => true,
     },
   },
-
 };
 
 export function getProviderMeta(id: TtsProviderId): TtsProviderMeta {
@@ -630,29 +743,31 @@ export interface TtsProviderClientMeta {
  * Strips `validate()`. Called server-side only — client components receive this as props.
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
-  return Object.values(TTS_PROVIDERS)
-    // Keyless, server-configured local backends have no API-key fields and are
-    // never surfaced in BYOK client metadata, mirroring how the AI registry
-    // excludes the keyless `local` and `claude-code` providers.
-    .filter((p) => p.id !== 'kokoro' && p.id !== 'local')
-    .map((p) => ({
-      id: p.id,
-      displayName: p.displayName,
-      getApiKeyUrl: p.getApiKeyUrl,
-      qualityTier: p.qualityTier,
-      supportsSfx: p.supportsSfx,
-      supportsStreaming: p.supportsStreaming,
-      models: p.models.map((m) => ({
-        id: m.id,
-        displayName: m.displayName,
-        tier: m.tier,
-        supportedLanguages: [...m.supportedLanguages],
-      })),
-      authFields: p.auth.fields,
-      recommended: p.id === 'elevenlabs',
-      languageDetection: p.languageDetection,
-      voicesAreCrossLingual: p.voicesAreCrossLingual,
-    }));
+  return (
+    Object.values(TTS_PROVIDERS)
+      // Keyless, server-configured local backends have no API-key fields and are
+      // never surfaced in BYOK client metadata, mirroring how the AI registry
+      // excludes the keyless `local` and `claude-code` providers.
+      .filter((p) => p.id !== 'kokoro' && p.id !== 'local')
+      .map((p) => ({
+        id: p.id,
+        displayName: p.displayName,
+        getApiKeyUrl: p.getApiKeyUrl,
+        qualityTier: p.qualityTier,
+        supportsSfx: p.supportsSfx,
+        supportsStreaming: p.supportsStreaming,
+        models: p.models.map((m) => ({
+          id: m.id,
+          displayName: m.displayName,
+          tier: m.tier,
+          supportedLanguages: [...m.supportedLanguages],
+        })),
+        authFields: p.auth.fields,
+        recommended: p.id === 'elevenlabs',
+        languageDetection: p.languageDetection,
+        voicesAreCrossLingual: p.voicesAreCrossLingual,
+      }))
+  );
 }
 
 /**

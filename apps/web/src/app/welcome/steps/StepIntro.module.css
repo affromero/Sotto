@@ -92,6 +92,13 @@
   text-transform: uppercase;
 }
 
+.themeSwitch {
+  position: fixed;
+  top: 36px;
+  left: 190px;
+  z-index: 3;
+}
+
 .stage {
   position: absolute;
   inset: 0;
@@ -270,7 +277,7 @@
 
 .replay {
   right: 38px;
-  top: 36px;
+  top: 84px;
   gap: 7px;
   padding: 0 13px;
   opacity: 0;
@@ -353,6 +360,11 @@
 @media (max-width: 760px) {
   .top {
     padding: 28px 26px;
+  }
+
+  .themeSwitch {
+    top: 28px;
+    left: 178px;
   }
 
   .mark {

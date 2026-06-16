@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GlyphName } from '@/components/Glyph';
 import { Glyph } from '../Glyph';
+import { OnboardingThemeSwitch } from '../OnboardingThemeSwitch';
 import styles from './StepHowItWorks.module.css';
 
 interface Props {
@@ -183,6 +184,7 @@ export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
           sotto
         </div>
         <div className={styles.topRight}>
+          <OnboardingThemeSwitch />
           <div className={styles.kicker}>{demoMode ? 'Hosted preview' : 'Before you begin'}</div>
           <div className={styles.navControls} aria-label="How it works controls">
             <button className={styles.navButton} type="button" onClick={onBack}>
