@@ -4,31 +4,39 @@
 #   default_install_hook_types below). /worktree runs this on every worktree.
 # See https://pre-commit.com for more information
 #
-# Two tiers, mirroring CI (.github/workflows/sotto-ci.yml):
+# Two tiers, mirroring CI (.github/workflows/sotto-ci.yml). Every hook sets
+# `stages` explicitly — default_stages proved unreliable for excluding the
+# remote hygiene hooks from the push stage, so scope each hook directly:
 #   pre-commit (fast, every commit): hygiene + lint-staged + tsc + cargo
 #     fmt --check + clippy -D warnings (cargo scoped to tui/ changes).
 #   pre-push (the full gate, every push): vitest + next build + cargo
 #     build --locked + cargo test. Heavy, run once per push.
 default_install_hook_types: [pre-commit, pre-push]
-# Unscoped hooks run on commit only; the push gate opts in via stages.
-default_stages: [pre-commit]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
         exclude: \.snap$
+        stages: [pre-commit]
       - id: end-of-file-fixer
         exclude: \.snap$
+        stages: [pre-commit]
       - id: mixed-line-ending
         args: [--fix, lf]
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
       - id: check-json
         exclude: tsconfig.*\.json$
+        stages: [pre-commit]
       - id: check-added-large-files
         args: [--maxkb=2000]
+        stages: [pre-commit]
       - id: check-merge-conflict
+        stages: [pre-commit]
       - id: check-case-conflict
+        stages: [pre-commit]
 
   - repo: local
     hooks:
@@ -37,6 +45,7 @@ repos:
         name: lint-staged (eslint + prettier + sort-package-json)
         entry: npx lint-staged --allow-empty
         language: system
+        stages: [pre-commit]
         always_run: true
         pass_filenames: false
 
@@ -44,6 +53,7 @@ repos:
         name: typecheck (tsc --noEmit)
         entry: npm run type-check
         language: system
+        stages: [pre-commit]
         always_run: true
         pass_filenames: false
 
@@ -51,6 +61,7 @@ repos:
         name: cargo fmt --check (tui)
         entry: bash -c 'cd tui && cargo fmt --check'
         language: system
+        stages: [pre-commit]
         files: ^tui/
         pass_filenames: false
 
@@ -58,6 +69,7 @@ repos:
         name: cargo clippy -D warnings (tui)
         entry: bash -c 'cd tui && cargo clippy --all-targets -- -D warnings'
         language: system
+        stages: [pre-commit]
         files: ^tui/
         pass_filenames: false
 
