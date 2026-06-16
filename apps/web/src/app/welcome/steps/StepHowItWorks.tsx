@@ -24,64 +24,58 @@ const HOW_STEPS: readonly HowStep[] = [
     phase: 0,
     label: "Who's learning",
     glyph: 'headset',
-    desc: 'Create the learner profile. In a self-hosted instance, the first learner is the admin.',
+    desc: 'Create the learner profile. On self-hosted, the first learner is the admin.',
   },
   {
     n: '02',
     phase: 0,
     label: 'Languages',
     glyph: 'globe',
-    desc: 'Choose your initial language, then the target language Sotto should teach.',
+    desc: 'Choose the language you know and the one Sotto should teach.',
   },
   {
     n: '03',
     phase: 1,
     label: 'Connect agent',
     glyph: 'plug',
-    desc: 'Point Sotto at the agent you already run: Claude, Codex, a local model, or your endpoint.',
+    desc: 'Connect Claude, Codex, a local model, or your own endpoint.',
   },
   {
     n: '04',
     phase: 1,
     label: 'Voice & cues',
     glyph: 'wave',
-    desc: 'Choose the voices that speak and listen, plus the visual cues that help memory.',
+    desc: 'Choose the voices that speak and listen, plus visual memory cues.',
   },
   {
     n: '05',
     phase: 1,
     label: 'Grant context',
     glyph: 'repo',
-    desc: 'Share only what should shape the course: notes, reading, links, repos, files, or goals.',
+    desc: 'Share notes, reading, links, repos, files, or goals.',
   },
   {
     n: '06',
     phase: 2,
     label: 'Placement',
     glyph: 'graph',
-    desc: 'Take a test, upload notes to place directly, answer tailored follow-ups, or set a level by hand.',
+    desc: 'Test, upload notes, answer tailored follow-ups, or set a level by hand.',
   },
   {
     n: '07',
     phase: 2,
     label: 'Compose',
     glyph: 'spark',
-    desc: 'Sotto writes a private course from your level, language pair, context, and stack.',
+    desc: 'Sotto writes a private course from your level, context, and stack.',
   },
   {
     n: '08',
     phase: 2,
     label: 'Mastery',
     glyph: 'check',
-    desc: 'Grammar, reading, listening, speaking, and writing advance only when mastery is shown.',
+    desc: 'Skills advance only when mastery is shown.',
   },
 ];
-
-const PHASES = [
-  { label: 'Who you are', span: 2 },
-  { label: 'What you bring', span: 3 },
-  { label: 'Your course', span: 3 },
-] as const;
 
 const STEP_COUNT = HOW_STEPS.length;
 const START_DELAY_MS = 760;
@@ -241,17 +235,6 @@ export function StepHowItWorks({ demoMode, onNext }: Props) {
               </button>
             );
           })}
-
-          {PHASES.map((phase, index) => (
-            <div
-              className={cx(styles.phase, styles[`phase${index}`])}
-              key={phase.label}
-              aria-hidden="true"
-            >
-              <span className={styles.phaseDot} />
-              {phase.label}
-            </div>
-          ))}
 
           <div className={styles.hub}>
             <span className={cx(styles.bead, styles.hubBead)} aria-hidden="true">
