@@ -526,6 +526,15 @@
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+.voiceChoiceDisabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.voiceChoiceDisabled:hover {
+  border-color: var(--line);
+}
+
 .voiceChipText {
   min-width: 0;
   display: flex;
@@ -553,6 +562,28 @@
   font-size: 9.5px;
   letter-spacing: 0.04em;
   line-height: 1.25;
+}
+
+.vcLang {
+  width: fit-content;
+  margin-top: 4px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--accent);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.vcLangBad {
+  color: #9b2c2c;
+  border-color: rgba(155, 44, 44, 0.28);
+  background: rgba(155, 44, 44, 0.08);
 }
 
 .voiceInlineLink,
@@ -640,6 +671,40 @@
   flex: none;
 }
 
+.voiceReason,
+.compatWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 11px;
+  color: var(--ink-mute);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.voiceReason svg {
+  color: var(--accent);
+  flex: none;
+  margin-top: 1px;
+}
+
+.voiceReasonWarn,
+.compatWarning {
+  color: #7f1d1d;
+}
+
+.voiceReasonWarn svg,
+.compatWarning svg {
+  color: #9b2c2c;
+}
+
+.compatWarning {
+  border: 1px solid rgba(155, 44, 44, 0.28);
+  border-radius: var(--r);
+  background: rgba(155, 44, 44, 0.07);
+  padding: 11px 12px;
+}
+
 /* voice key entry */
 .voiceKey {
   margin-top: 12px;
@@ -699,6 +764,143 @@
 .voiceFoot {
   margin-top: 26px;
   align-items: flex-start;
+}
+
+.learningBlock {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--well);
+  padding: 16px;
+  display: grid;
+  gap: 13px;
+}
+
+.learningHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.learningTitle {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.learningBadge {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--ink-mute);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.learningFlow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.learningStep {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  padding: 10px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.learningStep svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.learningCopy {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.visualChoiceRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.visualChoice {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink-soft);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.visualChoice svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.visualChoice span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.visualChoice strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.visualChoice small {
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+.visualChoiceSel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.visualChoiceSel strong,
+.visualChoiceSel svg {
+  color: var(--accent);
+}
+
+.visualChoice:hover,
+.visualChoice:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .localCheck {
@@ -843,6 +1045,11 @@
 
   .localCheckButton {
     width: 100%;
+  }
+
+  .learningFlow,
+  .visualChoiceRow {
+    grid-template-columns: 1fr;
   }
 }
 

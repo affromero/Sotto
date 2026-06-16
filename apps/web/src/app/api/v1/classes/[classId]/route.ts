@@ -59,7 +59,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           task: p.task,
           guidance: p.guidance,
           response: r
-            ? { text: r.text, overallScore: r.overallScore, corrections: r.corrections, feedback: r.feedback }
+            ? {
+                text: r.text,
+                overallScore: r.overallScore,
+                corrections: r.corrections,
+                feedback: r.feedback,
+              }
             : null,
         };
       }),
@@ -67,6 +72,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       id: cls.id,
+      courseId: cls.courseId,
       status: cls.status,
       order: cls.order,
       passThreshold: cls.passThreshold,
@@ -79,7 +85,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       sections,
     });
   } catch (error: unknown) {
-    logger.error('Failed to load class', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to load class', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to load class', 500);
   }
 }

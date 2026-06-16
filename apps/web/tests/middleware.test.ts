@@ -1,7 +1,7 @@
 /**
- * Middleware tests
+ * Proxy tests
  *
- * Sotto is fully self-hosted with no login, so the middleware does no auth
+ * Sotto is fully self-hosted with no login, so the proxy does no auth
  * gating. It only (a) skips static/SEO assets and (b) steers the managed
  * showcase (SELF_HOSTED=false) into its /welcome demo. Real self-hosted
  * installs pass every request through.
@@ -28,18 +28,18 @@ function isPassThrough(response: Response): boolean {
   return !response.headers.get('location');
 }
 
-async function getMiddleware() {
-  const mod = await import('@/middleware');
-  return mod.middleware;
+async function getProxy() {
+  const mod = await import('@/proxy');
+  return mod.proxy;
 }
 
-describe('Middleware', () => {
-  let middleware: Awaited<ReturnType<typeof getMiddleware>>;
+describe('Proxy', () => {
+  let proxy: Awaited<ReturnType<typeof getProxy>>;
 
   beforeEach(async () => {
     vi.resetModules();
     delete process.env.SELF_HOSTED;
-    middleware = await getMiddleware();
+    proxy = await getProxy();
   });
 
   afterEach(() => {
@@ -58,7 +58,7 @@ describe('Middleware', () => {
 
     for (const path of staticPaths) {
       it(`passes through ${path}`, async () => {
-        const res = await middleware(createRequest(path));
+        const res = await proxy(createRequest(path));
         expect(isPassThrough(res)).toBe(true);
       });
     }
@@ -82,7 +82,7 @@ describe('Middleware', () => {
 
     for (const path of paths) {
       it(`passes through ${path} with no auth redirect`, async () => {
-        const res = await middleware(createRequest(path));
+        const res = await proxy(createRequest(path));
         expect(isPassThrough(res)).toBe(true);
       });
     }
@@ -111,23 +111,23 @@ describe('Middleware', () => {
 
     for (const path of mockRoutes) {
       it(`redirects ${path} to the /welcome demo`, async () => {
-        const res = await middleware(createRequest(path));
+        const res = await proxy(createRequest(path));
         expect(getRedirectLocation(res)).toBe('/welcome');
       });
     }
 
     it('lets /welcome itself render the demo', async () => {
-      const res = await middleware(createRequest('/welcome'));
+      const res = await proxy(createRequest('/welcome'));
       expect(isPassThrough(res)).toBe(true);
     });
 
     it('does not redirect the public landing page', async () => {
-      const res = await middleware(createRequest('/'));
+      const res = await proxy(createRequest('/'));
       expect(isPassThrough(res)).toBe(true);
     });
 
     it('does not redirect the public health route', async () => {
-      const res = await middleware(createRequest('/api/v1/health'));
+      const res = await proxy(createRequest('/api/v1/health'));
       expect(isPassThrough(res)).toBe(true);
     });
   });

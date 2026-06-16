@@ -107,6 +107,7 @@ describe('Sidebar', () => {
     render(<Sidebar currentPath="/learn" isOpen onClose={handleClose} />);
 
     const learnLink = screen.getByText('Learn').closest('a');
+    learnLink?.addEventListener('click', (event) => event.preventDefault());
     if (learnLink) await user.click(learnLink);
 
     expect(handleClose).toHaveBeenCalledTimes(1);

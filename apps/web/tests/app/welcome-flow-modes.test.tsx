@@ -8,7 +8,7 @@ import type { ImgHTMLAttributes } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WelcomeFlow } from '@/app/welcome/WelcomeFlow';
-import type { AgentState, ContextItem } from '@/app/welcome/WelcomeFlow';
+import type { AgentState, ContextItem, VoiceState } from '@/app/welcome/WelcomeFlow';
 import { StepAgent } from '@/app/welcome/steps/StepAgent';
 import { StepContext } from '@/app/welcome/steps/StepContext';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
@@ -286,8 +286,17 @@ describe('welcome hosted-demo mode', () => {
   it('previews voice providers in demo mode without asking for API keys', () => {
     render(
       <StepVoice
-        voice={{ tts: 'elevenlabs', stt: 'deepgram', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
+        voice={{
+          tts: 'elevenlabs',
+          stt: 'deepgram',
+          visualCueProvider: 'pexels',
+          keys: {},
+          baseUrls: {},
+          ttsModel: {},
+          sttModel: {},
+        }}
         demoMode
+        language="es"
         setVoice={vi.fn()}
         onNext={vi.fn()}
         onBack={vi.fn()}
@@ -315,9 +324,45 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByLabelText(/Deepgram API key/i)).not.toBeInTheDocument();
   });
 
+  it('blocks voice providers that do not support the selected course language', () => {
+    render(
+      <StepVoice
+        voice={{
+          tts: 'hume',
+          stt: 'openai',
+          visualCueProvider: 'pexels',
+          keys: {},
+          baseUrls: {},
+          ttsModel: {},
+          sttModel: {},
+        }}
+        demoMode={false}
+        language="uk"
+        setVoice={vi.fn()}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /Hume/i })).toBeDisabled();
+    expect(screen.getByText(/Hume has no speech model for Ukrainian/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Choose voice providers with Ukrainian support before continuing/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeDisabled();
+  });
+
   it('requires a green local endpoint check before continuing with local speech', async () => {
     const user = userEvent.setup();
-    let voice = { tts: 'local', stt: 'local', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} };
+    let voice: VoiceState = {
+      tts: 'local',
+      stt: 'local',
+      visualCueProvider: 'pexels',
+      keys: {},
+      baseUrls: {},
+      ttsModel: {},
+      sttModel: {},
+    };
     const setVoice = vi.fn((updater: (prev: typeof voice) => typeof voice) => {
       voice = updater(voice);
     });
@@ -349,6 +394,7 @@ describe('welcome hosted-demo mode', () => {
       <StepVoice
         voice={voice}
         demoMode={false}
+        language="es"
         setVoice={setVoice}
         onNext={vi.fn()}
         onBack={vi.fn()}
@@ -497,7 +543,15 @@ describe('welcome hosted-demo mode', () => {
         sources={new Set(['reading'])}
         contextItems={[]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
-        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
+        voice={{
+          tts: 'elevenlabs',
+          stt: 'whisper',
+          visualCueProvider: 'pexels',
+          keys: {},
+          baseUrls: {},
+          ttsModel: {},
+          sttModel: {},
+        }}
         config={{ selfHosted: false, isOwner: false }}
         onRestart={vi.fn()}
         onJump={onJump}
@@ -545,7 +599,15 @@ describe('welcome hosted-demo mode', () => {
           },
         ]}
         agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
-        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
+        voice={{
+          tts: 'elevenlabs',
+          stt: 'whisper',
+          visualCueProvider: 'pexels',
+          keys: {},
+          baseUrls: {},
+          ttsModel: {},
+          sttModel: {},
+        }}
         config={{ selfHosted: true, isOwner: false }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
@@ -595,7 +657,15 @@ describe('welcome hosted-demo mode', () => {
           liveTranslationKey: 'AIza-live',
           status: 'connected',
         }}
-        voice={{ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {}, ttsModel: {}, sttModel: {} }}
+        voice={{
+          tts: 'elevenlabs',
+          stt: 'whisper',
+          visualCueProvider: 'pexels',
+          keys: {},
+          baseUrls: {},
+          ttsModel: {},
+          sttModel: {},
+        }}
         config={{ selfHosted: true, isOwner: false }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
@@ -613,6 +683,58 @@ describe('welcome hosted-demo mode', () => {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: 'google', apiKey: 'AIza-live' }),
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/onboarding/save',
+      expect.objectContaining({ method: 'POST', credentials: 'include' })
+    );
+    expect(mockPush).toHaveBeenCalledWith('/learn');
+  });
+
+  it('saves an optional visual cue provider key during self-host setup', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ demo: false, courseId: 'course_1' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <StepReady
+        baseLang="en"
+        language="it"
+        level="A2"
+        sources={new Set(['reading'])}
+        contextItems={[]}
+        agent={{ provider: 'claude', method: 'cli', value: '', model: '', status: 'connected' }}
+        voice={{
+          tts: 'elevenlabs',
+          stt: 'whisper',
+          visualCueProvider: 'pexels',
+          keys: { 'visual:pexels': 'pexels_key_123' },
+          baseUrls: {},
+          ttsModel: {},
+          sttModel: {},
+        }}
+        config={{ selfHosted: true, isOwner: false }}
+        onRestart={vi.fn()}
+        onJump={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /open today's session/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/settings/visual-cues',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'pexels', apiKey: 'pexels_key_123' }),
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(

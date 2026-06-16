@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { isClaudeAvailable } from '@/lib/claude-code-client';
+import { isClaudeAvailable } from '@/lib/agent-availability';
 import { ALL_QUEUE_NAMES } from '@/lib/queue';
 
 export type CheckResult = { status: string; latencyMs?: number; detail?: string };

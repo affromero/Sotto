@@ -16,10 +16,7 @@ const nextConfig = {
     proxyClientMaxBodySize: '150mb',
     viewTransition: true,
   },
-  transpilePackages: [
-    '@sotto/shared',
-    'groundcheck',
-  ],
+  transpilePackages: ['@sotto/shared', 'groundcheck'],
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },
@@ -45,6 +42,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'avatars.githubusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.pexels.com',
       },
     ],
   },

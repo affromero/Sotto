@@ -10,6 +10,7 @@ const {
   mockLearnerVocabUpsert,
   mockClassSectionCreate,
   mockLessonQuestionCreateMany,
+  mockUserFindUnique,
   mockTransaction,
 } = vi.hoisted(() => {
   const episodeCreate = vi.fn();
@@ -19,6 +20,7 @@ const {
   const learnerVocabUpsert = vi.fn();
   const classSectionCreate = vi.fn();
   const lessonQuestionCreateMany = vi.fn();
+  const userFindUnique = vi.fn();
   const transaction = vi.fn();
 
   return {
@@ -29,6 +31,7 @@ const {
     mockLearnerVocabUpsert: learnerVocabUpsert,
     mockClassSectionCreate: classSectionCreate,
     mockLessonQuestionCreateMany: lessonQuestionCreateMany,
+    mockUserFindUnique: userFindUnique,
     mockTransaction: transaction,
   };
 });
@@ -71,6 +74,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     lessonQuestion: {
       createMany: (...args: unknown[]) => mockLessonQuestionCreateMany(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
@@ -212,6 +218,7 @@ const PARAMS: ClassListeningParams = {
 function setupHappyPath() {
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
   mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
+  mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
   mockEpisodeCreate.mockResolvedValue({ id: 'episode-1' });
   mockEpisodeUpdate.mockResolvedValue({});
   mockGenerateScript.mockResolvedValue(SAMPLE_SCRIPT_RESULT);
@@ -247,6 +254,7 @@ function setupHappyPath() {
 describe('generateClassListening', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
   });
 
   describe('happy path', () => {

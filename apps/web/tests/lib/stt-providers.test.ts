@@ -12,11 +12,11 @@ const mockGetByokKey = vi.fn();
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
   getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
-}));
-
-const mockGetAutoModelConfig = vi.fn();
-vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
+  getSharedAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+  getSharedByokKey: async (...args: unknown[]) => {
+    const key = await mockGetByokKey(...args);
+    return key ? { apiKey: key, ownerUserId: args[0] as string, shared: false } : null;
+  },
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -35,6 +35,10 @@ vi.mock('openai', () => ({
 }));
 
 import { createSttProvider, resolveSttProvider, getSttPlatformKey, getConfiguredSttProviderId } from '@/lib/providers/stt';
+import {
+  getDefaultSttModelForLanguage,
+  supportsSttLanguage,
+} from '@/lib/providers/stt-registry';
 import {
   isValidAiProviderId,
   getAiProviderMeta,
@@ -67,6 +71,30 @@ describe('createSttProvider', () => {
     const provider = createSttProvider('elevenlabs');
     expect(provider).toBeDefined();
     expect(provider.transcribe).toBeInstanceOf(Function);
+  });
+
+  it('maps Sotto language codes to ElevenLabs Scribe codes and normalizes the result', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) => {
+      const form = (init as RequestInit).body as FormData;
+      expect(form.get('language_code')).toBe('spa');
+      return new Response(
+        JSON.stringify({
+          text: 'Hola.',
+          language_code: 'spa',
+          words: [{ text: 'Hola.', start: 0, end: 1, type: 'word' }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    try {
+      const provider = createSttProvider('elevenlabs', 'xi-test');
+      const result = await provider.transcribe(Buffer.from('audio'), { language: 'es' });
+      expect(result.language).toBe('es');
+      expect(result.text).toBe('Hola.');
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it('openai provider throws with correct error when not initialized', async () => {
@@ -407,12 +435,6 @@ describe('resolveSttProvider', () => {
     vi.unstubAllEnvs();
     mockGetAiKey.mockReset();
     mockGetByokKey.mockReset();
-    // Default configured STT = openai/whisper-1, matching the seed default so the
-    // existing assertions (provider 'openai' → 'whisper-1') stay valid. Provider
-    // mismatches fall back to the requested provider's registry default.
-    mockGetAutoModelConfig.mockResolvedValue({
-      model: { sttProvider: 'openai', sttModel: 'whisper-1' },
-    });
   });
 
   afterEach(() => {
@@ -468,33 +490,43 @@ describe('resolveSttProvider', () => {
     expect(result.model).toBe('gpt-4o-transcribe');
   });
 
-  it('uses the owner-configured model when no model is requested and the provider matches', async () => {
-    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-key', provider: 'openai' });
-    mockGetAutoModelConfig.mockResolvedValue({
-      model: { sttProvider: 'openai', sttModel: 'gpt-4o-transcribe' },
-    });
-
-    const result = await resolveSttProvider({
-      userId: 'user-1',
-      requestedProvider: 'openai',
-    });
-
-    expect(result.model).toBe('gpt-4o-transcribe');
-  });
-
-  it('falls back to the provider default when the configured STT provider differs', async () => {
-    mockGetAiKey.mockResolvedValue({ apiKey: 'dg-key', provider: 'deepgram' });
-    mockGetAutoModelConfig.mockResolvedValue({
-      model: { sttProvider: 'openai', sttModel: 'gpt-4o-transcribe' },
-    });
+  it('keeps a requested STT model when it supports the requested language', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-key', provider: 'deepgram' });
 
     const result = await resolveSttProvider({
       userId: 'user-1',
       requestedProvider: 'deepgram',
+      requestedModel: 'nova-3',
+      language: 'ar',
     });
 
-    // deepgram's registry default, NOT the configured openai model.
     expect(result.model).toBe('nova-3');
+  });
+
+  it('swaps to a compatible STT model when the requested model lacks the language', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-key', provider: 'deepgram' });
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'deepgram',
+      requestedModel: 'nova-2',
+      language: 'ar',
+    });
+
+    expect(result.model).toBe('nova-3');
+  });
+
+  it('throws before provider calls when no STT model supports the language', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-key', provider: 'deepgram' });
+
+    await expect(
+      resolveSttProvider({
+        userId: 'user-1',
+        requestedProvider: 'deepgram',
+        requestedModel: 'nova-2',
+        language: 'xx',
+      })
+    ).rejects.toThrow('does not support language "xx"');
   });
 
   it('rejects missing provider instead of resolving from DB config', async () => {
@@ -504,7 +536,7 @@ describe('resolveSttProvider', () => {
     expect(mockGetAiKey).not.toHaveBeenCalled();
   });
 
-  it('resolves elevenlabs via getByokKey', async () => {
+  it('resolves elevenlabs via shared BYOK lookup', async () => {
     mockGetByokKey.mockResolvedValue('el-byok-key');
 
     const result = await resolveSttProvider({
@@ -531,5 +563,18 @@ describe('resolveSttProvider', () => {
     expect(result.apiKey).toBe('local');
     expect(result.source).toBe('platform');
     expect(result.model).toBe('whisper-1');
+  });
+});
+
+describe('STT language support metadata', () => {
+  it('reports model-language compatibility', () => {
+    expect(supportsSttLanguage('deepgram', 'nova-2', 'es')).toBe(true);
+    expect(supportsSttLanguage('deepgram', 'nova-2', 'ar')).toBe(false);
+    expect(supportsSttLanguage('deepgram', 'nova-3', 'ar')).toBe(true);
+  });
+
+  it('chooses the strongest compatible model for a provider and language', () => {
+    expect(getDefaultSttModelForLanguage('deepgram', 'ar', 'nova-2')).toBe('nova-3');
+    expect(getDefaultSttModelForLanguage('deepgram', 'xx', 'nova-2')).toBeNull();
   });
 });

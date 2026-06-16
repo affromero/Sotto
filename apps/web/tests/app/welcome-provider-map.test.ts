@@ -12,8 +12,11 @@ import {
   sttModelProviderId,
   resolveAi,
   resolveLiveTranslateKey,
+  resolveWelcomeSttProviderId,
+  resolveWelcomeTtsProviderId,
   resolveTts,
   resolveStt,
+  resolveVisualCue,
 } from '@/app/welcome/providerMap';
 
 describe('resolveAi', () => {
@@ -91,6 +94,20 @@ describe('resolveLiveTranslateKey', () => {
 
   it('does not post an empty optional live conversation key', () => {
     expect(resolveLiveTranslateKey('  ')).toBeNull();
+  });
+});
+
+describe('welcome provider ID normalization', () => {
+  it('keeps welcome TTS IDs aligned with backend TTS provider IDs', () => {
+    expect(resolveWelcomeTtsProviderId('cartesia')).toBe('cartesia');
+    expect(resolveWelcomeTtsProviderId('kokoro')).toBe('kokoro');
+    expect(resolveWelcomeTtsProviderId('unknown')).toBeNull();
+  });
+
+  it('maps welcome STT display IDs to backend STT provider IDs', () => {
+    expect(resolveWelcomeSttProviderId('whisper')).toBe('local');
+    expect(resolveWelcomeSttProviderId('assembly')).toBe('assemblyai');
+    expect(resolveWelcomeSttProviderId('deepgram')).toBe('deepgram');
   });
 });
 
@@ -206,5 +223,19 @@ describe('model provider id helpers', () => {
     expect(sttModelProviderId('assembly')).toBe('assemblyai');
     expect(sttModelProviderId('deepgram')).toBe('deepgram');
     expect(sttModelProviderId('elevenlabs')).toBe('elevenlabs');
+  });
+});
+
+describe('resolveVisualCue', () => {
+  it('routes Pexels to the visual cue key store', () => {
+    expect(resolveVisualCue('pexels', ' pexels-key ')).toEqual({
+      provider: 'pexels',
+      keyPost: { endpoint: 'visual-cues', provider: 'pexels', apiKey: 'pexels-key' },
+    });
+  });
+
+  it('keeps visual cues optional when disabled or blank', () => {
+    expect(resolveVisualCue('off', 'pexels-key')).toEqual({ provider: 'off', keyPost: null });
+    expect(resolveVisualCue('pexels', '  ')).toEqual({ provider: 'pexels', keyPost: null });
   });
 });
