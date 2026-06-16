@@ -188,6 +188,22 @@ describe('resolveStt', () => {
     });
   });
 
+  it('routes a Cartesia Ink STT key to the BYOK store (shared with Cartesia TTS)', () => {
+    const r = resolveStt('cartesia', 'sk_car_k', '');
+    expect(r.keyPost).toEqual({ endpoint: 'byok', provider: 'cartesia', apiKey: 'sk_car_k' });
+    expect(r.preferredSttProvider).toBe('cartesia');
+  });
+
+  it('routes groq/gladia/speechmatics STT keys to the AI-key store', () => {
+    for (const p of ['groq', 'gladia', 'speechmatics']) {
+      expect(resolveStt(p, `${p}_k`, '').keyPost).toEqual({
+        endpoint: 'ai-keys',
+        provider: p,
+        apiKey: `${p}_k`,
+      });
+    }
+  });
+
   it('carries the picked STT model and the resolved provider', () => {
     const r = resolveStt('assembly', 'aai_key', '', 'universal-3-pro');
     expect(r.preferredSttProvider).toBe('assemblyai');

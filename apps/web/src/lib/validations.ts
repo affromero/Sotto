@@ -288,7 +288,7 @@ export const importEpisodeSchema = z.object({
   title: z.string().max(200).optional(),
   topic: z.string().max(5000).optional(),
   sourcePlatform: z.string().min(1).max(50),
-  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai', 'local']).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai', 'cartesia', 'groq', 'gladia', 'speechmatics', 'local']).optional(),
   sttModel: z.string().max(100).optional(),
 });
 

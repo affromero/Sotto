@@ -734,6 +734,38 @@ export const STT_PROVIDERS: VoiceProvider[] = [
     apiLabel: 'API',
     keyHint: 'sk-…',
   },
+  {
+    id: 'groq',
+    name: 'Groq',
+    note: 'Whisper, fastest & cheapest',
+    apiUrl: 'https://console.groq.com/keys',
+    apiLabel: 'API',
+    keyHint: 'gsk_…',
+  },
+  {
+    id: 'cartesia',
+    name: 'Cartesia Ink',
+    note: 'low-latency, word timings',
+    apiUrl: 'https://play.cartesia.ai/keys',
+    apiLabel: 'API',
+    keyHint: 'sk_car_…',
+  },
+  {
+    id: 'gladia',
+    name: 'Gladia',
+    note: '140 languages',
+    apiUrl: 'https://app.gladia.io/',
+    apiLabel: 'API',
+    keyHint: 'gladia_…',
+  },
+  {
+    id: 'speechmatics',
+    name: 'Speechmatics',
+    note: 'enterprise accuracy',
+    apiUrl: 'https://portal.speechmatics.com/',
+    apiLabel: 'API',
+    keyHint: 'sm_…',
+  },
 ];
 
 export const SOURCES: Source[] = [

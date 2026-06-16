@@ -53,6 +53,14 @@ const TOGETHER_WHISPER_CONFIG: WhisperProviderConfig = {
   name: 'Together AI Whisper',
 };
 
+// Groq is OpenAI-compatible at /openai/v1 — reuse the Whisper provider.
+const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
+  baseURL: 'https://api.groq.com/openai/v1',
+  model: getSttProviderMeta('groq').defaultModel,
+  envVar: 'GROQ_API_KEY',
+  name: 'Groq Whisper',
+};
+
 class OpenAIWhisperProvider implements SttProvider {
   private client: any | null = null;
   private initPromise: Promise<void> | null = null;
@@ -558,6 +566,245 @@ class AssemblyAIProvider implements SttProvider {
 }
 
 /**
+ * Cartesia Ink STT provider — synchronous batch /stt with the ink-whisper family.
+ * Word-level timestamps; 99+ languages. The key lives in the TTS/BYOK store.
+ */
+class CartesiaSttProvider implements SttProvider {
+  private apiKey: string;
+  private model: string;
+
+  constructor(apiKey?: string, model?: string) {
+    const key = apiKey || process.env.CARTESIA_API_KEY;
+    if (!key) throw new Error('No Cartesia API key provided — Cartesia STT will not work');
+    this.apiKey = key;
+    this.model = model ?? 'ink-whisper';
+    logger.info('Cartesia STT provider initialized', { model: this.model });
+  }
+
+  async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
+    const startTime = Date.now();
+    const { ext, mime } = detectAudioFormat(audio);
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array(audio)], `audio.${ext}`, { type: mime }));
+    form.append('model', this.model);
+    form.append('timestamp_granularities[]', 'word');
+    if (opts?.language) form.append('language', opts.language);
+
+    const response = await fetch('https://api.cartesia.ai/stt', {
+      method: 'POST',
+      headers: { 'X-API-Key': this.apiKey, 'Cartesia-Version': '2026-03-01' },
+      body: form,
+    });
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Cartesia STT error (${response.status}): ${errorText}`);
+    }
+
+    const data = (await response.json()) as {
+      text: string;
+      language?: string;
+      duration?: number;
+      words?: Array<{ word: string; start: number; end: number }>;
+    };
+    const text = data.text ?? '';
+    const words = data.words?.map((w) => ({ word: w.word, start: w.start, end: w.end }));
+    const lastEnd = words?.length ? words[words.length - 1].end : (data.duration ?? 0);
+    const segments = text ? [{ start: words?.[0]?.start ?? 0, end: lastEnd, text }] : [];
+
+    logger.info('Cartesia transcription complete', {
+      model: this.model,
+      language: data.language,
+      segments: String(segments.length),
+      durationMs: String(Date.now() - startTime),
+    });
+    return { text, segments, words, language: data.language };
+  }
+}
+
+/**
+ * Gladia STT provider — async: upload → submit pre-recorded job → poll for result.
+ * Word timestamps via accurate_words_timestamps; 140 languages.
+ */
+class GladiaProvider implements SttProvider {
+  private apiKey: string;
+  private model: string;
+
+  constructor(apiKey?: string, model?: string) {
+    const key = apiKey || process.env.GLADIA_API_KEY;
+    if (!key) throw new Error('No Gladia API key provided — Gladia STT will not work');
+    this.apiKey = key;
+    this.model = model ?? 'solaria-1';
+  }
+
+  async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
+    const startTime = Date.now();
+    const { ext, mime } = detectAudioFormat(audio);
+
+    const uploadForm = new FormData();
+    uploadForm.append('audio', new File([new Uint8Array(audio)], `audio.${ext}`, { type: mime }));
+    const uploadRes = await fetch('https://api.gladia.io/v2/upload', {
+      method: 'POST',
+      headers: { 'x-gladia-key': this.apiKey },
+      body: uploadForm,
+    });
+    if (!uploadRes.ok) {
+      throw new Error(`Gladia upload error (${uploadRes.status}): ${await uploadRes.text().catch(() => '')}`);
+    }
+    const { audio_url } = (await uploadRes.json()) as { audio_url: string };
+
+    const submitRes = await fetch('https://api.gladia.io/v2/pre-recorded', {
+      method: 'POST',
+      headers: { 'x-gladia-key': this.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio_url,
+        model: this.model,
+        accurate_words_timestamps: true,
+        ...(opts?.language && { language_config: { languages: [opts.language] } }),
+      }),
+    });
+    if (!submitRes.ok) {
+      throw new Error(`Gladia submit error (${submitRes.status}): ${await submitRes.text().catch(() => '')}`);
+    }
+    const submit = (await submitRes.json()) as { id: string; result_url?: string };
+    const pollUrl = submit.result_url ?? `https://api.gladia.io/v2/pre-recorded/${submit.id}`;
+
+    const deadline = Date.now() + 300_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      const pollRes = await fetch(pollUrl, { headers: { 'x-gladia-key': this.apiKey } });
+      if (!pollRes.ok) throw new Error(`Gladia poll error (${pollRes.status})`);
+      const data = (await pollRes.json()) as {
+        status: string;
+        result?: {
+          transcription?: {
+            full_transcript?: string;
+            languages?: string[];
+            utterances?: Array<{
+              text: string;
+              start: number;
+              end: number;
+              words?: Array<{ word: string; start: number; end: number }>;
+            }>;
+          };
+        };
+      };
+      if (data.status === 'error') throw new Error('Gladia transcription failed');
+      if (data.status === 'done') {
+        const tr = data.result?.transcription;
+        const text = tr?.full_transcript ?? '';
+        const segments =
+          tr?.utterances?.map((u) => ({ start: u.start, end: u.end, text: u.text })) ??
+          (text ? [{ start: 0, end: 0, text }] : []);
+        const words = tr?.utterances
+          ?.flatMap((u) => u.words ?? [])
+          .map((w) => ({ word: w.word, start: w.start, end: w.end }));
+        logger.info('Gladia transcription complete', {
+          model: this.model,
+          segments: String(segments.length),
+          durationMs: String(Date.now() - startTime),
+        });
+        return { text, segments, words: words?.length ? words : undefined, language: tr?.languages?.[0] };
+      }
+    }
+    throw new Error('Gladia transcription timed out after 5 minutes');
+  }
+}
+
+/**
+ * Speechmatics STT provider — async: submit job → poll status → fetch transcript.
+ * Word timestamps are always present; reconstruct text from the results array.
+ */
+class SpeechmaticsProvider implements SttProvider {
+  private apiKey: string;
+  private model: string;
+  private base = 'https://eu1.asr.api.speechmatics.com/v2';
+
+  constructor(apiKey?: string, model?: string) {
+    const key = apiKey || process.env.SPEECHMATICS_API_KEY;
+    if (!key) throw new Error('No Speechmatics API key provided — Speechmatics STT will not work');
+    this.apiKey = key;
+    this.model = model ?? 'enhanced';
+  }
+
+  async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
+    const startTime = Date.now();
+    const { ext, mime } = detectAudioFormat(audio);
+    const config = {
+      type: 'transcription',
+      transcription_config: { language: opts?.language ?? 'en', operating_point: this.model },
+    };
+    const form = new FormData();
+    form.append('data_file', new File([new Uint8Array(audio)], `audio.${ext}`, { type: mime }));
+    form.append('config', JSON.stringify(config));
+
+    const submitRes = await fetch(`${this.base}/jobs`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+      body: form,
+    });
+    if (!submitRes.ok) {
+      throw new Error(`Speechmatics submit error (${submitRes.status}): ${await submitRes.text().catch(() => '')}`);
+    }
+    const { id } = (await submitRes.json()) as { id: string };
+
+    const deadline = Date.now() + 300_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      const statusRes = await fetch(`${this.base}/jobs/${id}`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      });
+      if (!statusRes.ok) throw new Error(`Speechmatics poll error (${statusRes.status})`);
+      const status = ((await statusRes.json()) as { job?: { status?: string } }).job?.status;
+      if (status === 'rejected') throw new Error('Speechmatics transcription rejected');
+      if (status === 'done') {
+        const trRes = await fetch(`${this.base}/jobs/${id}/transcript?format=json`, {
+          headers: { Authorization: `Bearer ${this.apiKey}` },
+        });
+        if (!trRes.ok) throw new Error(`Speechmatics transcript error (${trRes.status})`);
+        const tr = (await trRes.json()) as {
+          results?: Array<{
+            type?: string;
+            start_time?: number;
+            end_time?: number;
+            alternatives?: Array<{ content?: string }>;
+          }>;
+          metadata?: { transcription_config?: { language?: string } };
+        };
+        const results = tr.results ?? [];
+        const words = results
+          .filter((r) => r.type === 'word')
+          .map((r) => ({
+            word: r.alternatives?.[0]?.content ?? '',
+            start: r.start_time ?? 0,
+            end: r.end_time ?? 0,
+          }));
+        let text = '';
+        for (const r of results) {
+          const c = r.alternatives?.[0]?.content ?? '';
+          if (!c) continue;
+          text += r.type === 'punctuation' ? c : (text ? ' ' : '') + c;
+        }
+        const segments = text
+          ? [{ start: words[0]?.start ?? 0, end: words[words.length - 1]?.end ?? 0, text }]
+          : [];
+        logger.info('Speechmatics transcription complete', {
+          model: this.model,
+          segments: String(segments.length),
+          durationMs: String(Date.now() - startTime),
+        });
+        return {
+          text,
+          segments,
+          words: words.length ? words : undefined,
+          language: tr.metadata?.transcription_config?.language,
+        };
+      }
+    }
+    throw new Error('Speechmatics transcription timed out after 5 minutes');
+  }
+}
+
+/**
  * Create an STT provider instance
  */
 export function createSttProvider(
@@ -578,6 +825,16 @@ export function createSttProvider(
       return new DeepgramProvider(apiKey, model);
     case 'assemblyai':
       return new AssemblyAIProvider(apiKey, model);
+    case 'cartesia':
+      return new CartesiaSttProvider(apiKey, model);
+    case 'groq': {
+      const config = model ? { ...GROQ_WHISPER_CONFIG, model } : GROQ_WHISPER_CONFIG;
+      return new OpenAIWhisperProvider(apiKey, config);
+    }
+    case 'gladia':
+      return new GladiaProvider(apiKey, model);
+    case 'speechmatics':
+      return new SpeechmaticsProvider(apiKey, model);
     case 'openai': {
       const config = model ? { ...OPENAI_WHISPER_CONFIG, model } : OPENAI_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
@@ -613,6 +870,10 @@ const STT_PLATFORM_ENV: Record<SttProviderId, string> = {
   deepgram: 'DEEPGRAM_API_KEY',
   assemblyai: 'ASSEMBLYAI_API_KEY',
   elevenlabs: 'ELEVENLABS_API_KEY',
+  cartesia: 'CARTESIA_API_KEY',
+  groq: 'GROQ_API_KEY',
+  gladia: 'GLADIA_API_KEY',
+  speechmatics: 'SPEECHMATICS_API_KEY',
   local: 'STT_API_KEY',
 };
 
@@ -708,9 +969,9 @@ async function resolveKeyForProvider(
   userId: string,
   provider: SttProviderId
 ): Promise<string | undefined> {
-  // ElevenLabs keys are stored in UserTtsKey, others in UserAiKey
-  if (provider === 'elevenlabs') {
-    const byokKey = await getByokKey(userId, 'elevenlabs');
+  // ElevenLabs and Cartesia keys are stored in UserTtsKey, others in UserAiKey.
+  if (provider === 'elevenlabs' || provider === 'cartesia') {
+    const byokKey = await getByokKey(userId, provider);
     return byokKey ?? getSttPlatformKey(provider) ?? undefined;
   }
 
