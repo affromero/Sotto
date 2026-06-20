@@ -11,7 +11,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import glob from 'glob';
+import * as globModule from 'glob';
+
+type GlobSync = (
+  pattern: string,
+  options?: { cwd?: string; ignore?: string | string[] }
+) => string[];
+
+const globSync =
+  (globModule as { sync?: GlobSync }).sync ??
+  (globModule as { default: { sync: GlobSync } }).default.sync;
 
 const PROMPTS_DIR = join(__dirname, '../../prompts');
 
@@ -86,25 +95,65 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'live/extract-learning-targets.md': ['LEVEL', 'MAX_GRAMMAR', 'MAX_VOCAB', 'NATIVE', 'TARGET'],
   'exams/exam-feedback.md': ['EXAM_NAME', 'LEVEL', 'OVERALL', 'SECTIONS'],
   'generation/script-generator.md': [
-    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
-    'DEPTH', 'DURATION_TARGET',
-    'ELI5_SECTION', 'EXPERT_SPEAKER', 'FOCUS_AREAS', 'HOST_SPEAKER',
-    'LANGUAGE_INSTRUCTION', 'MIN_REFERENCE_COUNT', 'MIN_SERIOUS_PERCENT',
-    'SERIOUS_RATIO_NOTE', 'SPEAKER_COUNT', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
-    'VOCABULARY_INSTRUCTION', 'VOICE_DELIVERY_GUIDELINES', 'VOICE_REALISM',
-    'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+    'AUDIENCE',
+    'AUDIENCE_GUIDANCE',
+    'AUDIENCE_LEVEL',
+    'BIAS_GUIDANCE',
+    'CONTENT_SAFETY',
+    'DEPTH',
+    'DURATION_TARGET',
+    'ELI5_SECTION',
+    'EXPERT_SPEAKER',
+    'FOCUS_AREAS',
+    'HOST_SPEAKER',
+    'LANGUAGE_INSTRUCTION',
+    'MIN_REFERENCE_COUNT',
+    'MIN_SERIOUS_PERCENT',
+    'SERIOUS_RATIO_NOTE',
+    'SPEAKER_COUNT',
+    'SPEAKER_SECTION',
+    'TONE_GUIDANCE',
+    'VOCABULARY_INSTRUCTION',
+    'VOICE_DELIVERY_GUIDELINES',
+    'VOICE_REALISM',
+    'WORD_COUNT_IDEAL',
+    'WORD_COUNT_MAX',
+    'WORD_COUNT_MIN',
   ].sort(),
   'generation/script-revision-factcheck.md': [
-    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
-    'DEPTH', 'DURATION_TARGET', 'FOCUS_AREAS',
-    'MIN_REFERENCE_COUNT', 'MIN_SERIOUS_PERCENT',
-    'SERIOUS_RATIO_NOTE', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
-    'VOICE_REALISM', 'WEB_SEARCH_GUIDANCE', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+    'AUDIENCE',
+    'AUDIENCE_GUIDANCE',
+    'AUDIENCE_LEVEL',
+    'BIAS_GUIDANCE',
+    'CONTENT_SAFETY',
+    'DEPTH',
+    'DURATION_TARGET',
+    'FOCUS_AREAS',
+    'MIN_REFERENCE_COUNT',
+    'MIN_SERIOUS_PERCENT',
+    'SERIOUS_RATIO_NOTE',
+    'SPEAKER_SECTION',
+    'TONE_GUIDANCE',
+    'VOICE_REALISM',
+    'WEB_SEARCH_GUIDANCE',
+    'WORD_COUNT_IDEAL',
+    'WORD_COUNT_MAX',
+    'WORD_COUNT_MIN',
   ].sort(),
   'generation/script-revision-user.md': [
-    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
-    'DURATION_TARGET', 'FOCUS_AREAS', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
-    'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+    'AUDIENCE',
+    'AUDIENCE_GUIDANCE',
+    'AUDIENCE_LEVEL',
+    'BIAS_GUIDANCE',
+    'CONTENT_SAFETY',
+    'DURATION_TARGET',
+    'FOCUS_AREAS',
+    'SPEAKER_SECTION',
+    'TONE_GUIDANCE',
+    'VOICE_REALISM',
+    'WORD_COUNT_IDEAL',
+    'WORD_COUNT_MAX',
+    'WORD_COUNT_MIN',
   ].sort(),
   'shared/bias-guidance.md': ['SOURCE_BIAS', 'SOURCE_NAME'].sort(),
   'interaction/qa-assistant.md': ['LANGUAGE_LABEL'],
@@ -112,64 +161,118 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'verification/script-verifier-base.md': ['AUDIENCE_LEVEL', 'ATTEMPT_NUMBER'].sort(),
   'verification/script-verifier-previous-feedback.md': ['PREVIOUS_FEEDBACK'],
   'verification/script-verifier-incremental.md': [
-    'CARRIED_CLAIMS', 'CHANGED_LIST', 'UNCHANGED_INDICES',
+    'CARRIED_CLAIMS',
+    'CHANGED_LIST',
+    'UNCHANGED_INDICES',
   ].sort(),
-  'audio/voice-assigner.md': [
-    'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
-  ].sort(),
+  'audio/voice-assigner.md': ['SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG'].sort(),
   'speaking/pronunciation-rubric.md': [
-    'ALIGNMENT_SUMMARY', 'TARGET', 'TARGET_PHRASE', 'TRANSCRIPT',
+    'ALIGNMENT_SUMMARY',
+    'TARGET',
+    'TARGET_PHRASE',
+    'TRANSCRIPT',
   ].sort(),
   'speaking/generate-speaking-prompts.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
+    'COUNT',
+    'LEVEL',
+    'NATIVE',
+    'NOTES',
+    'OBJECTIVE',
+    'TARGET',
+    'VOCAB',
   ].sort(),
-  'audio/tts-tag-converter.md': [
-    'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
-  ].sort(),
+  'audio/tts-tag-converter.md': ['PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON'].sort(),
   'demo/walkthrough.md': [
-    'APP_SELECTORS', 'DURATION_TARGET', 'FEATURES',
-    'INTERCEPTOR_CATALOG', 'PRODUCT_CONTEXT', 'VOICE_COMPARISON',
+    'APP_SELECTORS',
+    'DURATION_TARGET',
+    'FEATURES',
+    'INTERCEPTOR_CATALOG',
+    'PRODUCT_CONTEXT',
+    'VOICE_COMPARISON',
   ].sort(),
   'generation/script-from-outline.md': [
-    'AUDIENCE_GUIDANCE', 'BEATS_JSON', 'CONTENT_SAFETY', 'DRIVING_QUESTION',
-    'DURATION_MINUTES', 'EVIDENCE_JSON', 'LISTENER_PROMISE', 'SOURCES_JSON',
-    'SPEAKERS_JSON', 'THESIS', 'TONE', 'TOPIC',
-    'VOICE_REALISM', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+    'AUDIENCE_GUIDANCE',
+    'BEATS_JSON',
+    'CONTENT_SAFETY',
+    'DRIVING_QUESTION',
+    'DURATION_MINUTES',
+    'EVIDENCE_JSON',
+    'LISTENER_PROMISE',
+    'SOURCES_JSON',
+    'SPEAKERS_JSON',
+    'THESIS',
+    'TONE',
+    'TOPIC',
+    'VOICE_REALISM',
+    'WORD_COUNT_MAX',
+    'WORD_COUNT_MIN',
   ].sort(),
   'planning/creative-outline.md': [
-    'AUDIENCE_LEVEL', 'DURATION_MINUTES', 'EVIDENCE_COUNT', 'EVIDENCE_JSON',
-    'FRAMEWORK', 'FRAMEWORK_INSTRUCTIONS', 'RECOMMENDED_ANGLE',
-    'SOURCE_COUNT', 'SPEAKERS_JSON', 'TONE', 'TOPIC', 'WORD_COUNT',
+    'AUDIENCE_LEVEL',
+    'DURATION_MINUTES',
+    'EVIDENCE_COUNT',
+    'EVIDENCE_JSON',
+    'FRAMEWORK',
+    'FRAMEWORK_INSTRUCTIONS',
+    'RECOMMENDED_ANGLE',
+    'SOURCE_COUNT',
+    'SPEAKERS_JSON',
+    'TONE',
+    'TOPIC',
+    'WORD_COUNT',
   ].sort(),
-  'research/angle-discovery.md': [
-    'EVIDENCE_JSON', 'TOPIC', 'TOPIC_SUMMARY',
-  ].sort(),
-  'research/fact-extraction.md': [
-    'SOURCES_JSON', 'TOPIC',
-  ].sort(),
+  'research/angle-discovery.md': ['EVIDENCE_JSON', 'TOPIC', 'TOPIC_SUMMARY'].sort(),
+  'research/fact-extraction.md': ['SOURCES_JSON', 'TOPIC'].sort(),
   'research/source-discovery.md': [
-    'DEPTH', 'DEPTH_DESCRIPTION', 'MIN_SERIOUS_COUNT',
-    'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
+    'DEPTH',
+    'DEPTH_DESCRIPTION',
+    'MIN_SERIOUS_COUNT',
+    'SOURCE_CONTENT',
+    'SOURCE_COUNT',
+    'TOPIC',
   ].sort(),
   'placement/placement-probe.md': [
-    'COUNT', 'LEVELS', 'NATIVE', 'NOTES', 'PER_BAND', 'SKILLS', 'TARGET',
+    'COUNT',
+    'LEVELS',
+    'NATIVE',
+    'NOTES',
+    'PER_BAND',
+    'SKILLS',
+    'TARGET',
   ].sort(),
   'placement/deduce-from-notes.md': ['CONTENT', 'NATIVE', 'TARGET'].sort(),
   'class/generate-listening-quiz.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'TARGET', 'TRANSCRIPT',
+    'COUNT',
+    'LEVEL',
+    'NATIVE',
+    'NOTES',
+    'TARGET',
+    'TRANSCRIPT',
   ].sort(),
   'class/generate-section-quiz.md': [
-    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'SOURCE', 'TARGET', 'VOCAB',
+    'COUNT',
+    'GRAMMAR_POINTS',
+    'LEVEL',
+    'NATIVE',
+    'NOTES',
+    'OBJECTIVE',
+    'SEED',
+    'SKILL',
+    'SOURCE',
+    'TARGET',
+    'VOCAB',
   ].sort(),
-  'class/level-source.md': [
-    'LEVEL', 'NATIVE', 'SOURCE', 'TARGET', 'TITLE',
-  ].sort(),
+  'class/level-source.md': ['LEVEL', 'NATIVE', 'SOURCE', 'TARGET', 'TITLE'].sort(),
   'writing/generate-writing-prompts.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
+    'COUNT',
+    'LEVEL',
+    'NATIVE',
+    'NOTES',
+    'OBJECTIVE',
+    'TARGET',
+    'VOCAB',
   ].sort(),
-  'writing/grade-writing.md': [
-    'LEVEL', 'NATIVE', 'RESPONSE', 'TARGET', 'TASK',
-  ].sort(),
+  'writing/grade-writing.md': ['LEVEL', 'NATIVE', 'RESPONSE', 'TARGET', 'TASK'].sort(),
   'curriculum/generate-curriculum.md': ['NATIVE', 'TARGET'].sort(),
 };
 
@@ -179,8 +282,9 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 // ── Tests ─────────────────────────────────────────────────────
 
 describe('prompt file existence', () => {
-  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +1 for curriculum/generate-curriculum.md
-    const actual = glob.sync('**/*.md', { cwd: PROMPTS_DIR }).sort();
+  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => {
+    // bumped +1 for curriculum/generate-curriculum.md
+    const actual = globSync('**/*.md', { cwd: PROMPTS_DIR }).sort();
     expect(actual).toHaveLength(EXPECTED_FILES.length);
     expect(actual).toEqual(EXPECTED_FILES.sort());
   });
@@ -193,7 +297,7 @@ describe('prompt file existence', () => {
   });
 
   it('no orphaned .md files outside expected set', () => {
-    const actual = new Set(glob.sync('**/*.md', { cwd: PROMPTS_DIR }));
+    const actual = new Set(globSync('**/*.md', { cwd: PROMPTS_DIR }));
     const expected = new Set(EXPECTED_FILES);
     const orphaned = [...actual].filter((f) => !expected.has(f));
     expect(orphaned).toEqual([]);
@@ -280,7 +384,10 @@ describe('generation templates', () => {
   });
 
   it('revision templates reference original script', () => {
-    for (const file of ['generation/script-revision-factcheck.md', 'generation/script-revision-user.md']) {
+    for (const file of [
+      'generation/script-revision-factcheck.md',
+      'generation/script-revision-user.md',
+    ]) {
       const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
       expect(content.toLowerCase()).toContain('revis');
     }
@@ -290,7 +397,10 @@ describe('generation templates', () => {
 describe('verification templates', () => {
   it('script-verifier parts concatenate into a coherent prompt', () => {
     const base = readFileSync(join(PROMPTS_DIR, 'verification/script-verifier-base.md'), 'utf-8');
-    const output = readFileSync(join(PROMPTS_DIR, 'verification/script-verifier-output-format.md'), 'utf-8');
+    const output = readFileSync(
+      join(PROMPTS_DIR, 'verification/script-verifier-output-format.md'),
+      'utf-8'
+    );
     // Base should set up the task
     expect(base.toLowerCase()).toContain('verif');
     // Output format should describe the JSON response structure
@@ -298,7 +408,10 @@ describe('verification templates', () => {
   });
 
   it('incremental verifier references pre-verified turns', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'verification/script-verifier-incremental.md'), 'utf-8');
+    const content = readFileSync(
+      join(PROMPTS_DIR, 'verification/script-verifier-incremental.md'),
+      'utf-8'
+    );
     expect(content).toContain('Pre-verified');
     expect(content).toContain('{{UNCHANGED_INDICES}}');
   });
