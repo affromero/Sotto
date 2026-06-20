@@ -2,19 +2,6 @@
   "name": "@sotto/mcp",
   "version": "0.1.0",
   "description": "MCP server for creating and managing private Sotto episodes",
-  "type": "module",
-  "bin": {
-    "sotto-mcp": "./dist/index.js"
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsc && chmod 755 dist/index.js",
-    "type-check": "tsc --noEmit"
-  },
   "keywords": [
     "mcp",
     "sotto",
@@ -22,12 +9,25 @@
     "ai"
   ],
   "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "sotto-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && chmod 755 dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
-    "typescript": "^5.7.0"
+    "typescript": "^6.0.3"
   }
 }
