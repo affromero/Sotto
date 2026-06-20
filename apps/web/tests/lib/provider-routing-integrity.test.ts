@@ -19,9 +19,15 @@ type GlobSync = (
   options?: { cwd?: string; ignore?: string | string[] }
 ) => string[];
 
-const globSync =
+const globSyncCandidate =
   (globModule as { sync?: GlobSync }).sync ??
-  (globModule as { default: { sync: GlobSync } }).default.sync;
+  (globModule as unknown as { default?: { sync?: GlobSync } }).default?.sync;
+
+if (!globSyncCandidate) {
+  throw new Error('glob.sync is not available');
+}
+
+const globSync: GlobSync = globSyncCandidate;
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
