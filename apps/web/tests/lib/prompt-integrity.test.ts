@@ -18,9 +18,15 @@ type GlobSync = (
   options?: { cwd?: string; ignore?: string | string[] }
 ) => string[];
 
-const globSync =
+const globSyncCandidate =
   (globModule as { sync?: GlobSync }).sync ??
-  (globModule as { default: { sync: GlobSync } }).default.sync;
+  (globModule as unknown as { default?: { sync?: GlobSync } }).default?.sync;
+
+if (!globSyncCandidate) {
+  throw new Error('glob.sync is not available');
+}
+
+const globSync: GlobSync = globSyncCandidate;
 
 const PROMPTS_DIR = join(__dirname, '../../prompts');
 
