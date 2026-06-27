@@ -43,7 +43,7 @@ export function extractVideoId(url: string): string | null {
 }
 
 // Lazy-loaded to avoid crashing CJS workers — the package only exports ESM
- 
+
 let clientInstance: any = null;
 
 async function getClient() {

@@ -1,0 +1,276 @@
+import type { PlacementSentence } from './data';
+
+export const PLACEMENT_BY_LANG: Record<string, PlacementSentence[]> = {
+  en: [
+    {
+      level: 'A1',
+      text: 'My name is Luca.',
+      gloss: 'Introducing yourself.',
+      glosses: {
+        es: 'Me llamo Luca.',
+        fr: "Je m'appelle Luca.",
+        de: 'Ich heiße Luca.',
+        pt: 'Eu me chamo Luca.',
+        ja: '私の名前はルカです。',
+        zh: '我叫卢卡。',
+        ar: 'اسمي لوكا.',
+        en: 'Introducing yourself.',
+      },
+    },
+    {
+      level: 'A2',
+      text: "I'd like a coffee, please.",
+      gloss: 'Ordering politely.',
+      glosses: {
+        es: 'Quisiera un café, por favor.',
+        fr: "Je voudrais un café, s'il vous plaît.",
+        de: 'Ich hätte gern einen Kaffee, bitte.',
+        pt: 'Eu queria um café, por favor.',
+        ja: 'コーヒーをください。',
+        zh: '请给我一杯咖啡。',
+        ar: 'أريد قهوة من فضلك.',
+        en: 'Ordering politely.',
+      },
+    },
+    {
+      level: 'B1',
+      text: "If I had time, I'd read more.",
+      gloss: 'The conditional mood.',
+      glosses: {
+        es: 'Si tuviera tiempo, leería más.',
+        fr: "Si j'avais le temps, je lirais davantage.",
+        de: 'Wenn ich Zeit hätte, würde ich mehr lesen.',
+        pt: 'Se eu tivesse tempo, leria mais.',
+        ja: '時間があれば、もっと本を読みます。',
+        zh: '如果有时间，我会多读书。',
+        ar: 'لو كان لديّ وقت، لقرأت أكثر.',
+        en: 'The conditional mood.',
+      },
+    },
+    {
+      level: 'B2',
+      text: 'Despite the delay, we arrived.',
+      gloss: "Concession with 'despite'.",
+      glosses: {
+        es: 'A pesar del retraso, llegamos.',
+        fr: 'Malgré le retard, nous sommes arrivés.',
+        de: 'Trotz der Verspätung sind wir angekommen.',
+        pt: 'Apesar do atraso, chegamos.',
+        ja: '遅れたにもかかわらず、到着しました。',
+        zh: '尽管延误了，我们还是到了。',
+        ar: 'رغم التأخير، وصلنا.',
+        en: "Concession with 'despite'.",
+      },
+    },
+    {
+      level: 'C1',
+      text: 'He should have warned us in time.',
+      gloss: 'Past modal regret.',
+      glosses: {
+        es: 'Debería habernos avisado a tiempo.',
+        fr: 'Il aurait dû nous prévenir à temps.',
+        de: 'Er hätte uns rechtzeitig warnen sollen.',
+        pt: 'Ele deveria ter nos avisado a tempo.',
+        ja: '彼は時間どおりに知らせるべきだった。',
+        zh: '他本应及时提醒我们。',
+        ar: 'كان عليه أن يحذّرنا في الوقت المناسب.',
+        en: 'Past modal regret.',
+      },
+    },
+    {
+      level: 'C2',
+      text: 'Though reluctant, he consented to the venture.',
+      gloss: 'Formal register, fronted concession.',
+      glosses: {
+        es: 'Aunque reacio, accedió a la empresa.',
+        fr: "Quoique réticent, il consentit à l'entreprise.",
+        de: 'Wenngleich widerwillig, stimmte er dem Vorhaben zu.',
+        pt: 'Embora relutante, ele consentiu no empreendimento.',
+        ja: '気が進まないながらも、彼はその事業に同意した。',
+        zh: '尽管不情愿，他还是同意了这项事业。',
+        ar: 'مع أنه كان مترددًا، وافق على المشروع.',
+        en: 'Formal register, fronted concession.',
+      },
+    },
+  ],
+  it: [
+    { level: 'A1', text: 'Mi chiamo Luca.', gloss: 'My name is Luca.' },
+    { level: 'A2', text: 'Vorrei un caffè, per favore.', gloss: "I'd like a coffee, please." },
+    {
+      level: 'B1',
+      text: 'Se avessi tempo, leggerei di più.',
+      gloss: "If I had time, I'd read more.",
+    },
+    {
+      level: 'B2',
+      text: 'Nonostante il ritardo, siamo arrivati.',
+      gloss: 'Despite the delay, we arrived.',
+    },
+    {
+      level: 'C1',
+      text: 'Avrebbe dovuto avvisarci per tempo.',
+      gloss: 'He should have warned us in time.',
+    },
+    {
+      level: 'C2',
+      text: "Pur essendo restio, acconsentì all'impresa.",
+      gloss: 'Though reluctant, he consented to the venture.',
+    },
+  ],
+  ja: [
+    { level: 'A1', text: '私は学生です。', gloss: 'I am a student.' },
+    { level: 'A2', text: 'コーヒーをください。', gloss: 'Coffee, please.' },
+    {
+      level: 'B1',
+      text: '時間があれば、もっと本を読みます。',
+      gloss: 'If I have time, I read more.',
+    },
+    {
+      level: 'B2',
+      text: '遅れたにもかかわらず、間に合いました。',
+      gloss: 'Despite being late, we made it.',
+    },
+    {
+      level: 'C1',
+      text: 'もっと早く知らせてくれればよかったのに。',
+      gloss: 'You should have told me sooner.',
+    },
+    {
+      level: 'C2',
+      text: '気が進まないながらも、彼はその計画に同意した。',
+      gloss: 'Reluctant though he was, he agreed to the plan.',
+    },
+  ],
+  fr: [
+    { level: 'A1', text: "Je m'appelle Luc.", gloss: 'My name is Luc.' },
+    {
+      level: 'A2',
+      text: "Je voudrais un café, s'il vous plaît.",
+      gloss: "I'd like a coffee, please.",
+    },
+    {
+      level: 'B1',
+      text: "Si j'avais le temps, je lirais davantage.",
+      gloss: "If I had time, I'd read more.",
+    },
+    {
+      level: 'B2',
+      text: 'Malgré le retard, nous sommes arrivés.',
+      gloss: 'Despite the delay, we arrived.',
+    },
+    {
+      level: 'C1',
+      text: 'Il aurait dû nous prévenir à temps.',
+      gloss: 'He should have warned us in time.',
+    },
+    {
+      level: 'C2',
+      text: "Quoique réticent, il consentit à l'entreprise.",
+      gloss: 'Though reluctant, he consented to the venture.',
+    },
+  ],
+  es: [
+    { level: 'A1', text: 'Me llamo Lucas.', gloss: 'My name is Lucas.' },
+    { level: 'A2', text: 'Quisiera un café, por favor.', gloss: "I'd like a coffee, please." },
+    { level: 'B1', text: 'Si tuviera tiempo, leería más.', gloss: "If I had time, I'd read more." },
+    {
+      level: 'B2',
+      text: 'A pesar del retraso, llegamos.',
+      gloss: 'Despite the delay, we arrived.',
+    },
+    {
+      level: 'C1',
+      text: 'Debería habernos avisado a tiempo.',
+      gloss: 'He should have warned us in time.',
+    },
+    {
+      level: 'C2',
+      text: 'Aun siendo reacio, accedió a la empresa.',
+      gloss: 'Though reluctant, he agreed to the venture.',
+    },
+  ],
+  de: [
+    { level: 'A1', text: 'Ich heiße Lukas.', gloss: 'My name is Lukas.' },
+    {
+      level: 'A2',
+      text: 'Ich hätte gern einen Kaffee, bitte.',
+      gloss: "I'd like a coffee, please.",
+    },
+    {
+      level: 'B1',
+      text: 'Wenn ich Zeit hätte, würde ich mehr lesen.',
+      gloss: "If I had time, I'd read more.",
+    },
+    {
+      level: 'B2',
+      text: 'Trotz der Verspätung sind wir angekommen.',
+      gloss: 'Despite the delay, we arrived.',
+    },
+    {
+      level: 'C1',
+      text: 'Er hätte uns rechtzeitig warnen sollen.',
+      gloss: 'He should have warned us in time.',
+    },
+    {
+      level: 'C2',
+      text: 'Wenngleich widerwillig, stimmte er dem Vorhaben zu.',
+      gloss: 'Though reluctant, he agreed to the venture.',
+    },
+  ],
+  pt: [
+    { level: 'A1', text: 'Eu me chamo Lucas.', gloss: 'My name is Lucas.' },
+    { level: 'A2', text: 'Eu queria um café, por favor.', gloss: "I'd like a coffee, please." },
+    {
+      level: 'B1',
+      text: 'Se eu tivesse tempo, leria mais.',
+      gloss: "If I had time, I'd read more.",
+    },
+    { level: 'B2', text: 'Apesar do atraso, chegamos.', gloss: 'Despite the delay, we arrived.' },
+    {
+      level: 'C1',
+      text: 'Ele deveria ter nos avisado a tempo.',
+      gloss: 'He should have warned us in time.',
+    },
+    {
+      level: 'C2',
+      text: 'Embora relutante, ele consentiu no empreendimento.',
+      gloss: 'Though reluctant, he consented to the venture.',
+    },
+  ],
+  ko: [
+    { level: 'A1', text: '저는 학생이에요.', gloss: 'I am a student.' },
+    { level: 'A2', text: '커피 주세요.', gloss: 'Coffee, please.' },
+    {
+      level: 'B1',
+      text: '시간이 있으면 책을 더 읽어요.',
+      gloss: 'If I have time, I read more books.',
+    },
+    {
+      level: 'B2',
+      text: '늦었음에도 불구하고 우리는 도착했어요.',
+      gloss: 'Despite being late, we arrived.',
+    },
+    { level: 'C1', text: '더 일찍 알려줬어야 했어요.', gloss: 'You should have told us sooner.' },
+    {
+      level: 'C2',
+      text: '내키지 않았지만 그는 그 계획에 동의했다.',
+      gloss: 'Though reluctant, he agreed to the plan.',
+    },
+  ],
+  ar: [
+    { level: 'A1', text: 'اسمي لوكاس.', gloss: 'My name is Lucas.' },
+    { level: 'A2', text: 'أريد قهوة من فضلك.', gloss: "I'd like a coffee, please." },
+    { level: 'B1', text: 'لو كان لديّ وقت، لقرأت أكثر.', gloss: "If I had time, I'd read more." },
+    { level: 'B2', text: 'رغم التأخير، وصلنا.', gloss: 'Despite the delay, we arrived.' },
+    {
+      level: 'C1',
+      text: 'كان ينبغي أن يحذّرنا في الوقت المناسب.',
+      gloss: 'He should have warned us in time.',
+    },
+    {
+      level: 'C2',
+      text: 'مع أنه كان مترددًا، وافق على المشروع.',
+      gloss: 'Though reluctant, he agreed to the venture.',
+    },
+  ],
+};

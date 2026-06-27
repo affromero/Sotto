@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Glyph } from '@/components/Glyph';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
-import shell from '../../adminTheme.module.css';
+import shell from '../../adminTheme.styles';
 
 type LogoProvider = Parameters<typeof TtsProviderLogo>[0]['provider'];
 
@@ -62,7 +62,7 @@ function toKey(provider: string, model: string, composite: boolean): string {
 function parseKey(
   key: string,
   composite: boolean,
-  providers: ProviderOption[],
+  providers: ProviderOption[]
 ): { provider: string; model: string } {
   if (composite) {
     const idx = key.indexOf(':');
@@ -88,6 +88,30 @@ function firstModelKey(providers: ProviderOption[], composite: boolean): string 
 
 function setToArray(set: Set<string>): string[] | null {
   return set.size > 0 ? [...set] : null;
+}
+
+function errorMessageFromResponseBody(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const error = (body as { error?: unknown }).error;
+  if (typeof error === 'string' && error.trim()) return error;
+  if (error && typeof error === 'object') {
+    const fieldErrors = (error as { fieldErrors?: Record<string, string[]> }).fieldErrors;
+    if (fieldErrors) {
+      const messages = Object.values(fieldErrors).flat().filter(Boolean);
+      if (messages.length > 0) return messages.join(' ');
+    }
+    const formErrors = (error as { formErrors?: string[] }).formErrors;
+    if (formErrors?.length) return formErrors.join(' ');
+  }
+  const details = (body as { details?: unknown }).details;
+  if (details && typeof details === 'object') {
+    const fieldErrors = (details as { fieldErrors?: Record<string, string[]> }).fieldErrors;
+    if (fieldErrors) {
+      const messages = Object.values(fieldErrors).flat().filter(Boolean);
+      if (messages.length > 0) return messages.join(' ');
+    }
+  }
+  return fallback;
 }
 
 function tierClass(tier: string): string {
@@ -119,7 +143,7 @@ function useUnifiedModelState(cfg: UnifiedStateConfig) {
 
   const [defaultKey, setDefaultKey] = useState(initialDefaultKey);
   const [included, setIncluded] = useState<Set<string>>(
-    () => new Set(cfg.initialIncluded ?? (initialDefaultKey ? [initialDefaultKey] : [])),
+    () => new Set(cfg.initialIncluded ?? (initialDefaultKey ? [initialDefaultKey] : []))
   );
 
   const setDefault = useCallback((key: string) => {
@@ -144,7 +168,7 @@ function useUnifiedModelState(cfg: UnifiedStateConfig) {
         return next;
       });
     },
-    [defaultKey],
+    [defaultKey]
   );
 
   const reset = useCallback(() => {
@@ -186,7 +210,7 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
 
   const providerData = useMemo(
     () => providers.find((p) => p.id === selectedProvider) ?? providers[0],
-    [providers, selectedProvider],
+    [providers, selectedProvider]
   );
 
   // Cards for the selected provider — a "use configured" card when it has no models.
@@ -223,14 +247,23 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
           return [
             {
               provider: p,
-              model: { id: '', displayName: `${p.displayName} (configured)`, tier: '', price: undefined },
+              model: {
+                id: '',
+                displayName: `${p.displayName} (configured)`,
+                tier: '',
+                price: undefined,
+              },
               key: toKey(p.id, '', compositeIds),
             },
           ];
         }
-        return p.models.map((m) => ({ provider: p, model: m, key: toKey(p.id, m.id, compositeIds) }));
+        return p.models.map((m) => ({
+          provider: p,
+          model: m,
+          key: toKey(p.id, m.id, compositeIds),
+        }));
       }),
-    [providers, compositeIds],
+    [providers, compositeIds]
   );
 
   return (
@@ -379,7 +412,7 @@ function PlatformSection({
 
   const models = useMemo(
     () => aiProviders.find((p) => p.id === provider)?.models ?? [],
-    [aiProviders, provider],
+    [aiProviders, provider]
   );
 
   function handleProvider(newProvider: string) {
@@ -475,21 +508,30 @@ export function ProviderModelConfig({
   const [error, setError] = useState<string | null>(null);
 
   const aiState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.model.aiProvider, model: initialConfig.model.aiModel },
+    initialDefault: {
+      provider: initialConfig.model.aiProvider,
+      model: initialConfig.model.aiModel,
+    },
     initialIncluded: initialConfig.includedModels,
     providers: aiProviders,
     compositeIds: false,
   });
 
   const ttsState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.model.ttsProvider, model: initialConfig.model.ttsModel },
+    initialDefault: {
+      provider: initialConfig.model.ttsProvider,
+      model: initialConfig.model.ttsModel,
+    },
     initialIncluded: initialConfig.includedTtsModels,
     providers: ttsProviders,
     compositeIds: true,
   });
 
   const sttState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.model.sttProvider, model: initialConfig.model.sttModel },
+    initialDefault: {
+      provider: initialConfig.model.sttProvider,
+      model: initialConfig.model.sttModel,
+    },
     initialIncluded: initialConfig.includedSttModels,
     providers: sttProviders,
     compositeIds: true,
@@ -524,8 +566,8 @@ export function ProviderModelConfig({
       });
 
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? 'Failed to save');
+        const data = (await res.json().catch(() => null)) as unknown;
+        throw new Error(errorMessageFromResponseBody(data, 'Failed to save provider changes.'));
       }
 
       setSaved(true);

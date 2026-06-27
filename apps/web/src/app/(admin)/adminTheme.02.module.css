@@ -1,0 +1,421 @@
+/* advanced "learner-available models" disclosure */
+.advToggle {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  min-height: 36px;
+}
+.advWrap {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.advList {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.advRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink);
+  min-height: 36px;
+  padding: 4px 0;
+}
+.advRow input {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.advMeta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  margin-left: 7px;
+}
+.sectionLede {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+.modelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.modelCard {
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 14px 15px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  position: relative;
+  width: 100%;
+}
+.modelCard:hover {
+  border-color: var(--ink-soft);
+}
+.modelCard.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mcName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mcRec {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 20px;
+  padding: 1px 6px;
+}
+.mcNote {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 5px;
+}
+.mcPrice {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  margin-top: 9px;
+}
+.mcCheck {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.modelCard.on .mcCheck {
+  opacity: 1;
+}
+.mcLocal {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ok);
+  border: 1px solid color-mix(in oklab, var(--ok) 40%, transparent);
+  border-radius: 20px;
+  padding: 1px 6px;
+}
+/* ---------------- routing rows ---------------- */
+.routeRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.routeRow:last-child {
+  border-bottom: 0;
+}
+.routeTask {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.routeTask svg {
+  color: var(--ink-mute);
+}
+/* ---------------- system ---------------- */
+.sysGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.meterLine {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--line-strong);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.meterLine i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 5px;
+}
+.svcRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.svcRow:last-child {
+  border-bottom: 0;
+}
+.svcName {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+.svcNote {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-left: auto;
+}
+.logbox {
+  background: var(--voice-bg);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+.updateBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  background: linear-gradient(100deg, var(--accent-soft), transparent);
+  border: 1px solid var(--accent-line);
+}
+.updateBanner svg {
+  color: var(--accent);
+  flex: none;
+}
+.ubText {
+  font-size: 14px;
+  color: var(--ink);
+}
+.ubText b {
+  color: var(--accent);
+}
+.ubSpacer {
+  flex: 1;
+}
+/* ---------------- segmented control (sub-tabs) ---------------- */
+.seg {
+  display: inline-flex;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.seg button {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.seg button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+/* sub-tab strip above an embedded section */
+.subTabs {
+  margin-bottom: 22px;
+}
+/* form controls (select, search, pagination) */
+.uselect {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--well);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.uselect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.searchRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 10px 13px;
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 20px;
+}
+.pageInfo {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+/* explanatory note block */
+.note {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-top: 18px;
+}
+.noteTitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.noteTitle svg {
+  color: var(--accent);
+}
+.note p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 8px 0 0;
+  max-width: 70ch;
+}
+/* ---------------- scrollbars ---------------- */
+.adminMain::-webkit-scrollbar,
+.adminNav::-webkit-scrollbar {
+  width: 10px;
+}
+.adminMain::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 10px;
+  border: 3px solid var(--paper);
+}
+/* ---------------- mobile rail ---------------- */
+.menuButton {
+  display: none;
+}
+.topBar {
+  display: none;
+}
+.overlay {
+  display: none;
+}
+@media (max-width: 820px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .topBar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--voice-bg);
+    color: var(--voice-fg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .menuButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: var(--voice-fg);
+    cursor: pointer;
+  }
+  .adminNav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 248px;
+    z-index: 95;
+    transform: translateX(-100%);
+    transition: transform 0.2s var(--ease);
+  }
+  .adminNav.open {
+    transform: none;
+  }
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 94;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .statGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .panel2col,
+  .sysGrid {
+    grid-template-columns: 1fr;
+  }
+  .adminInner {
+    padding: 22px 16px 70px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adminNav {
+    transition: none;
+  }
+}

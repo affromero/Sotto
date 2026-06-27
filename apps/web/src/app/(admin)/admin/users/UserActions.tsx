@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from '../../adminTheme.module.css';
+import styles from '../../adminTheme.styles';
 
 interface UserActionsProps {
   userId: string;
@@ -9,11 +9,7 @@ interface UserActionsProps {
   isOwnUser: boolean;
 }
 
-export function UserActions({
-  userId,
-  currentRole,
-  isOwnUser,
-}: UserActionsProps) {
+export function UserActions({ userId, currentRole, isOwnUser }: UserActionsProps) {
   const [role, setRole] = useState(currentRole);
   const [isLoading, setIsLoading] = useState(false);
 

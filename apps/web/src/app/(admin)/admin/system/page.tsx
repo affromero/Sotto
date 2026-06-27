@@ -4,7 +4,7 @@ import { DURATION_TOLERANCE_SECONDS } from '@/lib/duration';
 import { Glyph, type GlyphName } from '@/components/Glyph';
 import { fmtInt } from '@/lib/admin/format';
 import { FactoryResetPanel } from './FactoryResetPanel';
-import styles from '../../adminTheme.module.css';
+import styles from '../../adminTheme.styles';
 
 export const metadata = { title: 'System · Sotto admin' };
 

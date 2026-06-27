@@ -32,10 +32,10 @@
       <stop offset="1" stop-color="#FF9CBF"></stop>
     </linearGradient>
     <clipPath id="l-clip"><circle cx="50" cy="50" r="48"></circle></clipPath>
-    
+
   </defs>
 
-  
+
   <g transform="translate(8,17) scale(0.96)">
     <g clip-path="url(#l-clip)">
       <circle cx="50" cy="50" r="48" fill="url(#l-main)"></circle>
@@ -48,6 +48,6 @@
     <circle cx="50" cy="50" r="47.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1"></circle>
   </g>
 
-  
+
   <text class="wm" x="120" y="92" font-size="100" letter-spacing="-2" fill="url(#l-word)">sotto</text>
 </svg>

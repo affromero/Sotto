@@ -11,7 +11,7 @@ import { AreaChart } from '@/components/admin/charts/AreaChart';
 import { ShareBar } from '@/components/admin/charts/ShareBar';
 import { Glyph } from '@/components/Glyph';
 import { GlassOrb } from '@/components/landing/GlassOrb';
-import styles from '../adminTheme.module.css';
+import styles from '../adminTheme.styles';
 
 const WINDOW_DAYS = 30;
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { MemoryGraph } from '@/components/memory/MemoryGraph';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import type { MemoryGraphData } from '@/components/memory/MemoryGraph';
 import styles from './memory.module.css';
 
@@ -90,16 +91,13 @@ export default function MemoryPage() {
     <main className={styles.root}>
       <header className={styles.header}>
         <h1 className={styles.title}>Memory Graph</h1>
-        <p className={styles.subtitle}>
-          Your vocabulary and grammar connections, visualised.
-        </p>
+        <p className={styles.subtitle}>Your vocabulary and grammar connections, visualised.</p>
       </header>
 
       {/* Course states */}
       {coursesState === 'loading' && (
         <div className={styles.statusRow} role="status" aria-live="polite">
-          <span className={styles.spinner} aria-hidden="true" />
-          <span>Loading courses…</span>
+          <SottoSpinner size="small" label="Loading courses" />
         </div>
       )}
 
@@ -146,8 +144,7 @@ export default function MemoryPage() {
           <div className={styles.graphWrapper}>
             {graphState === 'loading' && (
               <div className={styles.graphOverlay} role="status" aria-live="polite">
-                <span className={styles.spinner} aria-hidden="true" />
-                <span>Loading graph…</span>
+                <SottoSpinner size="medium" label="Loading graph" />
               </div>
             )}
 
@@ -157,9 +154,7 @@ export default function MemoryPage() {
               </div>
             )}
 
-            {graphState === 'idle' && graph && (
-              <MemoryGraph graph={graph} />
-            )}
+            {graphState === 'idle' && graph && <MemoryGraph graph={graph} />}
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 ## Voice & Delivery Guidelines:
+
 - Write dialogue that sounds like a REAL conversation, not a lecture
 - Include natural speech patterns: "So here's the thing...", "Wait, really?", "That's fascinating because..."
 - Let speakers occasionally overlap in energy — the HOST can finish the EXPERT's thought, or react mid-explanation

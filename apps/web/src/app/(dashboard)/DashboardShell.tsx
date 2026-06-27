@@ -21,10 +21,16 @@ interface DashboardShellProps {
     role: 'USER' | 'ADMIN';
   };
   hasEpisodes?: boolean;
+  showAgentUsageStatus?: boolean;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ user, hasEpisodes = false, children }: DashboardShellProps) {
+export function DashboardShell({
+  user,
+  hasEpisodes = false,
+  showAgentUsageStatus = true,
+  children,
+}: DashboardShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pushDismissed, setPushDismissed] = useState(() => {
@@ -43,6 +49,7 @@ export function DashboardShell({ user, hasEpisodes = false, children }: Dashboar
         onClose={() => setSidebarOpen(false)}
         hasEpisodes={hasEpisodes}
         hasActivePlayer={hasActivePlayer}
+        showAgentUsageStatus={showAgentUsageStatus}
         user={user}
       />
 

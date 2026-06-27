@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
@@ -31,13 +32,7 @@ interface ScoringResult {
   status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
 }
 
-type PromptPhase =
-  | 'idle'
-  | 'recording'
-  | 'uploading'
-  | 'grading'
-  | 'scored'
-  | 'failed';
+type PromptPhase = 'idle' | 'recording' | 'uploading' | 'grading' | 'scored' | 'failed';
 
 interface PromptState {
   phase: PromptPhase;
@@ -105,10 +100,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
         const form = new FormData();
         form.append('audio', blob, 'recording.webm');
 
-        const res = await fetch(
-          `${endpointBase}/${prompt.id}`,
-          { method: 'POST', body: form }
-        );
+        const res = await fetch(`${endpointBase}/${prompt.id}`, { method: 'POST', body: form });
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -162,10 +154,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
             ...prev,
             phase: data.status === 'SCORED' ? 'scored' : 'failed',
             result: data,
-            error:
-              data.status === 'FAILED'
-                ? 'Scoring failed. Please try again.'
-                : null,
+            error: data.status === 'FAILED' ? 'Scoring failed. Please try again.' : null,
           }));
         } else {
           pollTimerRef.current = setTimeout(() => {
@@ -232,13 +221,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
   }
 
   // ---- Rubric bar ----
-  function RubricBar({
-    label,
-    score,
-  }: {
-    label: string;
-    score: number;
-  }) {
+  function RubricBar({ label, score }: { label: string; score: number }) {
     const pct = Math.round(score * 100);
     return (
       <div className={styles.rubricItem}>
@@ -356,13 +339,21 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
 
           {phase === 'recording' && (
             <>
-              <div className={styles.recordingIndicator} aria-live="polite" aria-label="Recording in progress">
+              <div
+                className={styles.recordingIndicator}
+                aria-live="polite"
+                aria-label="Recording in progress"
+              >
                 <span className={styles.recordingPulse} aria-hidden="true" />
                 <span className={styles.recordingLabel}>
                   Recording
                   {recorder.duration > 0 && (
-                    <span className={styles.recordingTime} aria-label={`${recorder.duration} seconds`}>
-                      {' '}{recorder.duration}s
+                    <span
+                      className={styles.recordingTime}
+                      aria-label={`${recorder.duration} seconds`}
+                    >
+                      {' '}
+                      {recorder.duration}s
                     </span>
                   )}
                 </span>
@@ -389,10 +380,10 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
 
           {isBusy && (
             <div className={styles.busyRow} role="status" aria-live="polite">
-              <span className={styles.spinner} aria-hidden="true" />
-              <span className={styles.busyLabel}>
-                {isUploading ? 'Uploading…' : 'Grading…'}
-              </span>
+              <SottoSpinner
+                size="medium"
+                label={isUploading ? 'Uploading your recording' : 'Grading your speaking'}
+              />
             </div>
           )}
 
@@ -428,9 +419,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
                 className={styles.scoreDial}
                 aria-label={`Overall score: ${Math.round(result.overallScore * 100)} percent`}
               >
-                <span className={styles.scoreNumber}>
-                  {Math.round(result.overallScore * 100)}
-                </span>
+                <span className={styles.scoreNumber}>{Math.round(result.overallScore * 100)}</span>
                 <span className={styles.scoreSuffix}>%</span>
               </div>
               <span className={styles.scoreLabel}>Overall</span>
@@ -450,21 +439,13 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
             <div className={styles.rubricList} aria-label="Skill breakdown">
               {Object.entries(result.rubricScores).map(([key, val]) => {
                 if (typeof val !== 'number') return null;
-                return (
-                  <RubricBar
-                    key={key}
-                    label={RUBRIC_LABELS[key] ?? key}
-                    score={val}
-                  />
-                );
+                return <RubricBar key={key} label={RUBRIC_LABELS[key] ?? key} score={val} />;
               })}
             </div>
           )}
 
           {/* Feedback */}
-          {result.feedback && (
-            <p className={styles.feedback}>{result.feedback}</p>
-          )}
+          {result.feedback && <p className={styles.feedback}>{result.feedback}</p>}
 
           {/* Try again */}
           <button
@@ -501,7 +482,11 @@ export function SpeakingExercise({ endpointBase, prompts }: SpeakingExerciseProp
         </p>
       </header>
 
-      <ol className={styles.promptList} role="list" aria-label={`${prompts.length} speaking prompts`}>
+      <ol
+        className={styles.promptList}
+        role="list"
+        aria-label={`${prompts.length} speaking prompts`}
+      >
         {prompts.map((prompt, idx) => (
           <li key={prompt.id} className={styles.promptItem}>
             <PromptCard

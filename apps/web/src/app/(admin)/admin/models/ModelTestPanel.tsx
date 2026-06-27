@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import type { TestableProvider } from '@/lib/admin/testable-providers';
 import styles from './ModelTestPanel.module.css';
 
@@ -54,7 +55,7 @@ function StatusDot({ status }: { status: TestStatus }) {
         ●
       </span>
     );
-  if (status === 'running') return <span className={styles.spinner} aria-label="Running" />;
+  if (status === 'running') return <SottoSpinner size="small" ariaLabel="Running" />;
   if (status === 'pass')
     return (
       <span className={styles.dotPass} aria-label="Pass">

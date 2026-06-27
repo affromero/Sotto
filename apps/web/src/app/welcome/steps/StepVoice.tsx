@@ -17,7 +17,7 @@ import {
   supportsWelcomeSpeechProviderLanguage,
 } from '@/lib/speech-language-support';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
 

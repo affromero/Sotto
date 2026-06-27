@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
 import { ClassHub } from './ClassHub';
 import { ClassSummary } from './ClassSummary';
@@ -236,8 +237,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   if (view === 'loading') {
     return (
       <div className={styles.fullState} role="status" aria-label="Loading class">
-        <span className={styles.spinner} aria-hidden="true" />
-        <p>Loading your class…</p>
+        <SottoSpinner size="large" label="Loading your class" orientation="stack" />
       </div>
     );
   }
@@ -305,8 +305,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   } else if (view === 'submitting') {
     stage = (
       <div className={styles.stageState} role="status" aria-label="Submitting answers">
-        <span className={styles.spinner} aria-hidden="true" />
-        <p>Grading your class…</p>
+        <SottoSpinner size="large" label="Grading your class" orientation="stack" />
       </div>
     );
   } else if (view === 'hour') {

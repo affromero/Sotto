@@ -1,0 +1,230 @@
+.mockGraphLine {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.5;
+}
+.mockNode {
+  --node: #475569;
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--node);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--node) 18%, transparent);
+}
+.mockNodeA {
+  --node: #4756c4;
+  left: 22%;
+  top: 30%;
+}
+.mockNodeB {
+  --node: #475569;
+  left: 48%;
+  top: 58%;
+}
+.mockNodeC {
+  --node: #0f9b8e;
+  left: 70%;
+  top: 28%;
+}
+.mockNodeD {
+  --node: #475569;
+  left: 82%;
+  top: 64%;
+  width: 9px;
+  height: 9px;
+}
+.mockGraphNote {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin: 0;
+}
+/* ---- download ---- */
+.downloadActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: clamp(28px, 4vh, 40px);
+}
+.downloadPrimary {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--r);
+  padding: 13px 22px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition:
+    transform 0.15s var(--ease),
+    filter 0.2s var(--ease);
+}
+.downloadPrimary:hover {
+  filter: brightness(1.06);
+}
+.downloadPrimary:active {
+  transform: translateY(1px);
+}
+.downloadArrow {
+  display: inline-flex;
+  transition: transform 0.2s var(--ease);
+}
+.downloadPrimary:hover .downloadArrow {
+  transform: translateX(3px);
+}
+.downloadGhost {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 13px 22px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  transition:
+    color 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+.downloadGhost:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+.runChips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.runChip {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.runChipIcon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.runChipLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin: 0;
+}
+.runChipTitle {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+.runChipText {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0;
+  text-wrap: pretty;
+}
+/* ---- responsive scale-up ---- */
+@media (min-width: 560px) {
+  .runChips {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (min-width: 720px) {
+  .skillGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tenetGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .walkStep {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: clamp(32px, 5vw, 64px);
+  }
+
+  /* alternate: even steps put the frame on the left */
+  .walkStep:nth-child(even) .walkText {
+    order: 2;
+  }
+
+  .walkStep:nth-child(even) .walkFrame {
+    order: 1;
+  }
+
+  .footerLinks {
+    margin-left: auto;
+  }
+
+  .footerNote {
+    order: 3;
+  }
+}
+@media (min-width: 1000px) {
+  .skillGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skillCard,
+  .mockSwitch::after,
+  .downloadPrimary,
+  .downloadArrow,
+  .downloadGhost {
+    transition: none;
+  }
+
+  .skillCard:hover {
+    transform: none;
+  }
+
+  .providerCarousel {
+    overflow-x: auto;
+    mask-image: none;
+    scroll-padding-inline: clamp(18px, 5vw, 44px);
+  }
+
+  .providerTrack {
+    animation: none;
+  }
+
+  .downloadPrimary:active {
+    transform: none;
+  }
+
+  .downloadPrimary:hover .downloadArrow {
+    transform: none;
+  }
+}

@@ -1,4 +1,4 @@
-import styles from './Spinner.module.css';
+import { SottoSpinner } from './SottoSpinner';
 
 interface SpinnerProps {
   size?: 'small' | 'medium' | 'large';
@@ -6,11 +6,5 @@ interface SpinnerProps {
 }
 
 export function Spinner({ size = 'medium', color = 'primary' }: SpinnerProps) {
-  return (
-    <span
-      className={`${styles.spinner} ${styles[size]} ${styles[color]}`}
-      role="status"
-      aria-label="Loading"
-    />
-  );
+  return <SottoSpinner size={size} color={color} ariaLabel="Loading" />;
 }

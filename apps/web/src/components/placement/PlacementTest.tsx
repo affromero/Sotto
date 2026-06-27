@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './PlacementTest.module.css';
 
 // ---- Types (mirrors API contract) ----
@@ -163,8 +164,7 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
   if (phase === 'loading') {
     return (
       <div className={styles.center} role="status" aria-live="polite">
-        <div className={styles.spinner} aria-hidden="true" />
-        <p className={styles.loadingText}>Generating your placement test...</p>
+        <SottoSpinner size="large" label="Generating your placement test" orientation="stack" />
       </div>
     );
   }
@@ -290,8 +290,7 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
   if (phase === 'submitting') {
     return (
       <div className={styles.center} role="status" aria-live="polite">
-        <div className={styles.spinner} aria-hidden="true" />
-        <p className={styles.loadingText}>Calculating your level...</p>
+        <SottoSpinner size="large" label="Calculating your level" orientation="stack" />
       </div>
     );
   }

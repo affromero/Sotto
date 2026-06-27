@@ -16,6 +16,24 @@
   border-color: var(--color-border-hover, var(--color-border));
 }
 
+.cardConnected {
+  border-color: color-mix(in oklab, var(--color-success) 34%, var(--color-border));
+  background: color-mix(in oklab, var(--color-success) 5%, var(--color-background));
+}
+
+.cardConnected:hover {
+  border-color: color-mix(in oklab, var(--color-success) 54%, var(--color-border));
+}
+
+.cardInvalid {
+  border-color: color-mix(in oklab, var(--color-error) 32%, var(--color-border));
+  background: color-mix(in oklab, var(--color-error) 4%, var(--color-background));
+}
+
+.cardInvalid:hover {
+  border-color: color-mix(in oklab, var(--color-error) 50%, var(--color-border));
+}
+
 .cardHeader {
   display: flex;
   align-items: center;

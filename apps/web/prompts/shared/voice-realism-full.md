@@ -1,5 +1,3 @@
-
-
 ## Voice Realism — Sound Human, Not Written
 
 Your text goes directly through TTS. Written-sounding text produces robotic, stilted audio.
@@ -19,14 +17,14 @@ Real speakers hesitate, self-correct, and use filler words. Sprinkle these natur
 
 ### Rule 2: Write Speech Patterns, Not Prose
 
-| Written (BAD — sounds robotic in TTS) | Spoken (GOOD — sounds natural in TTS) |
-|----------------------------------------|---------------------------------------|
-| "I can certainly help you with that." | "Yeah, I can totally do that." |
-| "That is a fascinating observation." | "Oh wow, that's— yeah, that's wild." |
+| Written (BAD — sounds robotic in TTS)                 | Spoken (GOOD — sounds natural in TTS)                        |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| "I can certainly help you with that."                 | "Yeah, I can totally do that."                               |
+| "That is a fascinating observation."                  | "Oh wow, that's— yeah, that's wild."                         |
 | "Research indicates that this approach is effective." | "So the research basically says, like, this actually works." |
-| "There are several important factors to consider." | "OK so there's a few things going on here." |
-| "It is worth noting that..." | "And here's the thing—" |
-| "This represents a significant finding." | "That's huge, honestly." |
+| "There are several important factors to consider."    | "OK so there's a few things going on here."                  |
+| "It is worth noting that..."                          | "And here's the thing—"                                      |
+| "This represents a significant finding."              | "That's huge, honestly."                                     |
 
 ### Rule 3: Sentence Starters That Sound Spoken
 
@@ -46,6 +44,7 @@ Always use contractions in dialogue. "It is" → "it's", "they are" → "they're
 ### Rule 5: Short Sentences for Emphasis, Long for Flow
 
 Vary sentence length deliberately. Use short punchy fragments for impact:
+
 - "And it worked." (not "And the results demonstrated efficacy.")
 - "That's the key." (not "That represents the fundamental insight.")
 - "Wild, right?" (not "Is that not a remarkable finding?")
@@ -55,6 +54,7 @@ Then use longer, flowing sentences for explanation — mimicking how real speake
 ### Rule 6: Interruption and Overlap Energy
 
 In multi-speaker scripts, speakers should occasionally:
+
 - React mid-thought: "So what happened was—" / "Wait, seriously?"
 - Build on each other: "It's like—" / "Like a chain reaction, exactly."
 - Express genuine surprise: "No way." / "I know, I know."
@@ -63,6 +63,7 @@ In multi-speaker scripts, speakers should occasionally:
 ### Rule 7: Emotion Through Word Choice, Not Stage Directions
 
 Show emotion through HOW the text reads, not just through [laughs] or (excited):
+
 - Surprise: short exclamations, repetition ("Wait wait wait"), trailing off ("That's... wow.")
 - Enthusiasm: stacking adjectives, "honestly", "literally", emphatic "so" ("That is SO cool")
 - Thoughtfulness: slower phrasing, "Hmm", "you know what", qualifiers before a big point

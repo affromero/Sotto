@@ -1,57 +1,158 @@
 .root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-primary);
+  vertical-align: middle;
+}
+
+.withCopy {
+  align-items: center;
+}
+
+.stacked {
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+
+.stacked .copy {
+  align-items: center;
+  text-align: center;
+}
+
+.small {
+  --mark-size: 28px;
+  --logo-size: 6px;
+}
+
+.medium {
+  --mark-size: 44px;
+  --logo-size: 8px;
+}
+
+.large {
+  --mark-size: 72px;
+  --logo-size: 14px;
+}
+
+.primary {
+  color: var(--color-primary);
+}
+
+.accent {
+  color: var(--color-accent);
+}
+
+.white {
+  color: var(--color-text-inverse);
+}
+
+.mark {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--spinner-size, 40px);
-  height: var(--spinner-size, 40px);
-  color: var(--color-primary);
+  width: var(--mark-size);
+  height: var(--mark-size);
+  flex: 0 0 auto;
 }
 
-/* Rotating dashed arc — matches original Lottie:
-   60px circle, 3px stroke, dash 50 / gap 140, full rotation in 2s */
-.arc {
+.ring {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  animation: spin 2s linear infinite;
-  will-change: transform;
+  overflow: visible;
 }
 
-/* Pulsing center dot — matches original Lottie:
-   8px dot scaling 80%→120%→80%, opacity 40%→100%→40%, 2s loop */
-.dot {
-  width: calc(var(--spinner-size, 40px) * 0.2);
-  height: calc(var(--spinner-size, 40px) * 0.2);
-  border-radius: 50%;
-  background: currentColor;
-  animation: pulse 2s ease-in-out infinite;
-  will-change: transform, opacity;
+.track {
+  stroke: currentColor;
+  opacity: 0.14;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.meter {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s ease;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(0.8);
-    opacity: 0.4;
+.indeterminate .ring {
+  animation: ringRotate 1.4s linear infinite;
+}
+
+.logo {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-heading);
+  font-size: var(--logo-size);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  background: linear-gradient(135deg, #6aa0ff 10%, #ff8fb1 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: logoPulse 1.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.copy {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.label {
+  font: var(--text-body-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.detail {
+  max-width: 34ch;
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.percent {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  line-height: 1.2;
+}
+
+@keyframes ringRotate {
+  to {
+    transform: rotate(360deg);
   }
+}
+
+@keyframes logoPulse {
+  0%,
+  100% {
+    opacity: 0.78;
+    transform: scale(0.94);
+  }
+
   50% {
-    transform: scale(1.2);
     opacity: 1;
+    transform: scale(1.04);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arc {
+  .indeterminate .ring,
+  .logo {
     animation: none;
   }
 
-  .dot {
-    animation: none;
-    opacity: 0.7;
+  .meter {
+    transition: none;
   }
 }

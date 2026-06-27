@@ -6,7 +6,7 @@ import type { CefrLevel } from '../data';
 import type { VoiceState } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 interface ResolvedLine {
   t: 'ctx' | 'ok' | 'plan' | 'done';

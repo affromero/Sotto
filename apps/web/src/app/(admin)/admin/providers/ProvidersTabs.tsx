@@ -8,7 +8,7 @@ import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { ProviderModelConfig, type ProviderModelConfigProps } from './ProviderModelConfig';
 import { ModelTestPanel } from '../models/ModelTestPanel';
-import shell from '../../adminTheme.module.css';
+import shell from '../../adminTheme.styles';
 
 type Tab = 'models' | 'keys' | 'test';
 

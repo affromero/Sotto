@@ -1,8 +1,13 @@
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './loading.module.css';
 
 export default function AdminLoading() {
   return (
     <div className={styles.root} role="status" aria-label="Loading admin">
+      <div className={styles.loader}>
+        <SottoSpinner size="large" label="Loading admin" orientation="stack" />
+      </div>
+
       {/* Header */}
       <div className={`${styles.bone} ${styles.header}`} aria-hidden="true" />
 

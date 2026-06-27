@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GlassOrb } from '@/components/landing/GlassOrb';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './StartNextClass.module.css';
 
 interface StartNextClassProps {
@@ -12,14 +12,27 @@ interface StartNextClassProps {
 
 type Phase = 'idle' | 'generating' | 'done';
 
+interface GenerationProgress {
+  lessonTitle: string | null;
+  stage: string;
+  detail: string;
+  progress: number;
+  currentStep: number;
+  totalSteps: number;
+  elapsedSeconds: number | null;
+  remainingSeconds: number | null;
+}
+
 export function StartNextClass({ courseId, activeClassId }: StartNextClassProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState('');
+  const [generation, setGeneration] = useState<GenerationProgress | null>(null);
   const buttonLabel = activeClassId ? 'Resume class' : 'Take a class';
 
   async function handleContinue() {
     setError('');
+    setGeneration(null);
 
     // If there is already an active class, navigate directly to it.
     if (activeClassId) {
@@ -28,6 +41,8 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     }
 
     setPhase('generating');
+    const controller = new AbortController();
+    const polling = pollGenerationProgress(controller.signal);
 
     try {
       const res = await fetch(`/api/v1/courses/${courseId}/next-class`, { method: 'POST' });
@@ -58,6 +73,27 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     } catch {
       setError('Network error. Please try again.');
       setPhase('idle');
+    } finally {
+      controller.abort();
+      void polling.catch(() => {});
+    }
+  }
+
+  async function pollGenerationProgress(signal: AbortSignal) {
+    while (!signal.aborted) {
+      try {
+        const res = await fetch(`/api/v1/courses/${courseId}/generation`, {
+          cache: 'no-store',
+          signal,
+        });
+        if (res.ok) {
+          setGeneration((await res.json()) as GenerationProgress);
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+      }
+
+      await wait(1500, signal);
     }
   }
 
@@ -70,6 +106,13 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
   }
 
   if (phase === 'generating') {
+    const progress = generation?.progress ?? null;
+    const title = generation?.lessonTitle
+      ? `Generating ${generation.lessonTitle}`
+      : 'Composing your class';
+    const detail =
+      generation?.detail ?? 'Sotto is preparing the questions, audio, and prompts for this class.';
+
     return (
       <div
         className={styles.composing}
@@ -77,9 +120,22 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         aria-live="polite"
         aria-label="Composing your next class, please wait"
       >
-        <GlassOrb size={56} />
-        <span className={styles.composingLabel}>Composing your class...</span>
-        <span className={styles.composingHint}>This can take a minute on the first run.</span>
+        <SottoSpinner
+          size="large"
+          progress={progress}
+          label={title}
+          detail={detail}
+          showPercent
+          orientation="stack"
+          ariaLabel="Composing your next class"
+        />
+        {generation && (
+          <span className={styles.composingMeta}>
+            Step {generation.currentStep || 1} of {generation.totalSteps}
+            {' · '}
+            {timeSummary(generation)}
+          </span>
+        )}
       </div>
     );
   }
@@ -101,4 +157,32 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       </button>
     </div>
   );
+}
+
+function wait(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    const timeout = window.setTimeout(resolve, ms);
+    signal.addEventListener(
+      'abort',
+      () => {
+        window.clearTimeout(timeout);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+function timeSummary(progress: GenerationProgress): string {
+  const elapsed = formatDuration(progress.elapsedSeconds);
+  if (progress.remainingSeconds === null) return `Elapsed ${elapsed}`;
+  return `Elapsed ${elapsed}, about ${formatDuration(progress.remainingSeconds)} left`;
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds === null) return '0:00';
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
 }

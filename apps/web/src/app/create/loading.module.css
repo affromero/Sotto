@@ -10,6 +10,12 @@
   min-height: var(--full-height);
 }
 
+.loader {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-lg) var(--spacing-md) var(--spacing-sm);
+}
+
 .bone {
   background: var(--color-border);
   border-radius: var(--radius-md);
@@ -92,7 +98,15 @@
 }
 
 /* Staggered animation delays */
-.delay1 { animation-delay: 100ms; }
-.delay2 { animation-delay: 200ms; }
-.delay3 { animation-delay: 300ms; }
-.delay4 { animation-delay: 400ms; }
+.delay1 {
+  animation-delay: 100ms;
+}
+.delay2 {
+  animation-delay: 200ms;
+}
+.delay3 {
+  animation-delay: 300ms;
+}
+.delay4 {
+  animation-delay: 400ms;
+}

@@ -12,7 +12,7 @@ import type { CefrLevel } from '../data';
 import type { ContextItem } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 interface Props {
   baseLang: string;

@@ -14,11 +14,7 @@ import { getServerInfra } from '@/lib/server-config';
 import { supportsLanguage } from '@/lib/tts-language-support';
 import { supportsSttLanguage } from '@/lib/providers/stt-registry';
 import { errorResponse } from '@/lib/api-response';
-import {
-  THEME_PREFS_COOKIE,
-  serializeThemePrefs,
-  themePrefsFromUser,
-} from '@/lib/theme-prefs';
+import { THEME_PREFS_COOKIE, serializeThemePrefs, themePrefsFromUser } from '@/lib/theme-prefs';
 import { z } from 'zod';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -51,6 +47,7 @@ const updateUserSchema = z
     preferredSttModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
+    showAgentUsageStatus: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
     // Per-profile appearance (persisted by the ThemeProvider for the active profile)
@@ -100,6 +97,7 @@ export async function GET(request: NextRequest) {
       preferredAiModel: user.preferredAiModel,
       preferredTtsModel: user.preferredTtsModel,
       preferredSttModel: user.preferredSttModel,
+      showAgentUsageStatus: user.showAgentUsageStatus,
     });
   } catch (error: unknown) {
     logger.error('Failed to fetch user', {
@@ -160,10 +158,7 @@ export async function PATCH(request: NextRequest) {
           select: { preferredLanguage: true },
         }),
       ]);
-      const language =
-        validation.data.preferredLanguage ??
-        currentUser?.preferredLanguage ??
-        null;
+      const language = validation.data.preferredLanguage ?? currentUser?.preferredLanguage ?? null;
 
       if (preferredTtsModel) {
         const provider = getConfiguredTtsProviderId() ?? autoConfig.model.ttsProvider;
@@ -314,6 +309,7 @@ export async function PATCH(request: NextRequest) {
       preferredAiModel: updatedUser.preferredAiModel,
       preferredTtsModel: updatedUser.preferredTtsModel,
       preferredSttModel: updatedUser.preferredSttModel,
+      showAgentUsageStatus: updatedUser.showAgentUsageStatus,
     });
 
     // Keep the active profile's appearance cookie in sync so the next load applies
@@ -361,9 +357,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     // Delete orphaned models (no User FK, won't cascade)
-    await Promise.all([
-      prisma.feedback.deleteMany({ where: { userId } }),
-    ]);
+    await Promise.all([prisma.feedback.deleteMany({ where: { userId } })]);
 
     // Delete user — cascades handle all FK-linked records
     await prisma.user.delete({ where: { id: userId } });

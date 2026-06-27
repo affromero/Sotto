@@ -15,18 +15,13 @@ import {
   X,
   ExternalLink,
 } from 'lucide-react';
-import { parseTextWithCitations } from '@/lib/citation-parser';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { ScriptTurn } from '@/lib/script-generator';
 import type { ReferenceData } from '@/types/reference';
 import { wordsToMinutes } from '@/lib/duration';
-import styles from './ScriptEditor.module.css';
-
-interface Highlight {
-  turnIndex: number;
-  text: string;
-  note: string;
-}
+import { renderHighlightedTurnText, type Highlight } from './ScriptEditorHighlights';
+import styles from './ScriptEditor.styles';
 
 interface SelectionPopover {
   turnIndex: number;
@@ -444,55 +439,9 @@ export function ScriptEditor({
     };
   }, [selectionPopover]);
 
-  // Render turn text with highlights applied
   const renderTurnText = useCallback(
-    (turnIndex: number, text: string) => {
-      const turnHighlights = highlights.filter((h) => h.turnIndex === turnIndex);
-      if (turnHighlights.length === 0) {
-        return references.length > 0 ? parseTextWithCitations(text, references) : text;
-      }
-
-      // Build segments by splitting text at highlighted substrings
-      type Segment = { text: string; highlight?: Highlight };
-      const segments: Segment[] = [];
-      let offset = 0;
-
-      // Sort highlights by position in text
-      const positioned = turnHighlights
-        .map((h) => ({ ...h, pos: text.indexOf(h.text, 0) }))
-        .filter((h) => h.pos !== -1)
-        .sort((a, b) => a.pos - b.pos);
-
-      for (const h of positioned) {
-        const pos = text.indexOf(h.text, offset);
-        if (pos === -1) continue;
-        if (pos > offset) {
-          segments.push({ text: text.slice(offset, pos) });
-        }
-        segments.push({ text: h.text, highlight: h });
-        offset = pos + h.text.length;
-      }
-      if (offset < text.length) {
-        segments.push({ text: text.slice(offset) });
-      }
-
-      return segments.map((seg, i) => {
-        const content =
-          references.length > 0 ? parseTextWithCitations(seg.text, references) : seg.text;
-
-        if (seg.highlight) {
-          return (
-            <mark key={i} className={styles.highlightedText} title={seg.highlight.note}>
-              {content}
-              <span className={styles.annotationBadge} aria-label="Has annotation">
-                {highlights.filter((h) => h.turnIndex === turnIndex).indexOf(seg.highlight) + 1}
-              </span>
-            </mark>
-          );
-        }
-        return <span key={i}>{content}</span>;
-      });
-    },
+    (turnIndex: number, text: string) =>
+      renderHighlightedTurnText({ turnIndex, text, highlights, references, styles }),
     [highlights, references]
   );
 
@@ -526,7 +475,7 @@ export function ScriptEditor({
     return (
       <div className={styles.root}>
         <div className={styles.loading}>
-          <div className={styles.spinner} />
+          <SottoSpinner size="large" label="Loading script" orientation="stack" />
         </div>
       </div>
     );

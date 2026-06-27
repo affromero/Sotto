@@ -1,14 +1,22 @@
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './loading.module.css';
 
 export default function CreateLoading() {
   return (
     <div className={styles.root} role="status" aria-label="Loading create page">
+      <div className={styles.loader}>
+        <SottoSpinner size="large" label="Loading create page" orientation="stack" />
+      </div>
+
       {/* Header */}
       <div className={styles.header}>
         <div className={`${styles.bone} ${styles.backButton}`} aria-hidden="true" />
         <div className={styles.titleBlock}>
           <div className={`${styles.bone} ${styles.title}`} aria-hidden="true" />
-          <div className={`${styles.bone} ${styles.subtitle} ${styles.delay1}`} aria-hidden="true" />
+          <div
+            className={`${styles.bone} ${styles.subtitle} ${styles.delay1}`}
+            aria-hidden="true"
+          />
         </div>
       </div>
 
@@ -20,8 +28,14 @@ export default function CreateLoading() {
 
       {/* Chat area */}
       <div className={styles.chatArea}>
-        <div className={`${styles.bone} ${styles.messageBone} ${styles.delay2}`} aria-hidden="true" />
-        <div className={`${styles.bone} ${styles.messageBoneShort} ${styles.delay3}`} aria-hidden="true" />
+        <div
+          className={`${styles.bone} ${styles.messageBone} ${styles.delay2}`}
+          aria-hidden="true"
+        />
+        <div
+          className={`${styles.bone} ${styles.messageBoneShort} ${styles.delay3}`}
+          aria-hidden="true"
+        />
       </div>
 
       {/* Input bar */}

@@ -5,7 +5,7 @@ import { BASE_LANGS, LANGUAGES, PLACEMENT_LEVEL_GUIDES, type CefrLevel } from '.
 import type { ContextItem, ContextItemKind } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 interface Props {
   baseLang: string;

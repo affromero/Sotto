@@ -13,6 +13,12 @@ vi.mock('@/components/notifications/NotificationDropdown', () => ({
   NotificationDropdown: () => <div data-testid="notification-dropdown" />,
 }));
 
+vi.mock('@/components/layout/AgentUsageStatus', () => ({
+  AgentUsageStatus: ({ enabled }: { enabled: boolean }) => (
+    <div data-testid="agent-usage-status" data-enabled={String(enabled)} />
+  ),
+}));
+
 const mockUser = {
   name: 'John Doe',
   email: 'john@example.com',
@@ -77,6 +83,16 @@ describe('Sidebar', () => {
     const switcher = screen.getByTestId('account-switcher');
     expect(switcher).toBeInTheDocument();
     expect(switcher).toHaveAttribute('data-variant', 'dashboard');
+  });
+
+  it('renders agent usage status when enabled', () => {
+    render(<Sidebar currentPath="/learn" showAgentUsageStatus />);
+    expect(screen.getByTestId('agent-usage-status')).toHaveAttribute('data-enabled', 'true');
+  });
+
+  it('passes the disabled preference to agent usage status', () => {
+    render(<Sidebar currentPath="/learn" showAgentUsageStatus={false} />);
+    expect(screen.getByTestId('agent-usage-status')).toHaveAttribute('data-enabled', 'false');
   });
 
   it('renders overlay when open', () => {

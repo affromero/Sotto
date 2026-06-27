@@ -17,18 +17,17 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: \.snap$
         stages: [pre-commit]
       - id: end-of-file-fixer
-        exclude: \.snap$
         stages: [pre-commit]
       - id: mixed-line-ending
         args: [--fix, lf]
         stages: [pre-commit]
       - id: check-yaml
         stages: [pre-commit]
+      - id: check-toml
+        stages: [pre-commit]
       - id: check-json
-        exclude: tsconfig.*\.json$
         stages: [pre-commit]
       - id: check-added-large-files
         args: [--maxkb=2000]
@@ -37,10 +36,62 @@ repos:
         stages: [pre-commit]
       - id: check-case-conflict
         stages: [pre-commit]
+      - id: check-executables-have-shebangs
+        stages: [pre-commit]
+      - id: check-symlinks
+        stages: [pre-commit]
+      - id: destroyed-symlinks
+        stages: [pre-commit]
+      - id: detect-private-key
+        stages: [pre-commit]
 
   - repo: local
     hooks:
       # --- pre-commit: fast checks on every commit ---
+      - id: file-line-count
+        name: file line count (< 1000)
+        entry: scripts/hooks/check_file_line_count.sh
+        language: system
+        stages: [pre-commit]
+        files: ^(apps|packages|services|tui|scripts|extension|e2e)/.*\.(ts|tsx|js|jsx|mjs|cjs|css|rs|swift|py|sh)$
+
+      - id: dir-file-count
+        name: directory file count (new files <= 10)
+        entry: scripts/hooks/check_dir_file_count.sh
+        language: system
+        stages: [pre-commit]
+        files: ^(apps|packages|services|tui|scripts|extension|e2e)/.*\.(ts|tsx|js|jsx|mjs|cjs|rs|swift|py|sh)$
+
+      - id: no-secret-files
+        name: no local env or key files
+        entry: scripts/hooks/check_no_secret_files.sh
+        language: system
+        stages: [pre-commit]
+        files: (^|/)(\.env($|\.)|.*\.(pem|key)$|.*id_rsa.*|.*id_ed25519.*)
+
+      - id: shebang-scripts-executable
+        name: shebang scripts are executable
+        entry: scripts/hooks/check_shebang_executable.sh
+        language: system
+        stages: [pre-commit]
+        files: ^(apps|packages|services|scripts|tui)/.*\.(ts|tsx|js|jsx|mjs|cjs|rs|swift|py|sh)$
+
+      - id: prisma-validate
+        name: prisma validate
+        entry: npx prisma validate --schema=apps/web/prisma/schema.prisma
+        language: system
+        stages: [pre-commit]
+        files: ^apps/web/prisma/schema\.prisma$
+        pass_filenames: false
+
+      - id: speech-config-check
+        name: speech language config check
+        entry: npm run speech:config:check --workspace=@sotto/web
+        language: system
+        stages: [pre-commit]
+        files: ^apps/web/src/lib/speech-language-support\.(config\.jsonc?|schema\.json|ts)$
+        pass_filenames: false
+
       - id: lint-staged
         name: lint-staged (eslint + prettier + sort-package-json)
         entry: npx lint-staged --allow-empty

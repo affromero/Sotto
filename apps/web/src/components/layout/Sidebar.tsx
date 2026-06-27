@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { GraduationCap, Network, Settings, Shield } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
+import { AgentUsageStatus } from '@/components/layout/AgentUsageStatus';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -13,6 +14,7 @@ interface SidebarProps {
   onClose?: () => void;
   hasEpisodes?: boolean;
   hasActivePlayer?: boolean;
+  showAgentUsageStatus?: boolean;
   user?: {
     name?: string | null;
     image?: string | null;
@@ -43,6 +45,7 @@ export function Sidebar({
   isOpen = false,
   onClose,
   hasActivePlayer = false,
+  showAgentUsageStatus = true,
   user,
 }: SidebarProps) {
   const role = user?.role || 'USER';
@@ -83,6 +86,8 @@ export function Sidebar({
             );
           })}
         </nav>
+
+        <AgentUsageStatus enabled={showAgentUsageStatus} />
 
         <div className={styles.notificationSection}>
           <NotificationDropdown />

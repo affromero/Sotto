@@ -11,7 +11,7 @@ import { AreaChart } from '@/components/admin/charts/AreaChart';
 import { ShareBar } from '@/components/admin/charts/ShareBar';
 import { Bars } from '@/components/admin/charts/Bars';
 import { Glyph } from '@/components/Glyph';
-import styles from '../../adminTheme.module.css';
+import styles from '../../adminTheme.styles';
 
 export const metadata = { title: 'Usage & cost · Sotto admin' };
 
@@ -39,7 +39,11 @@ export default async function AdminUsagePage() {
   const categoryRows = byCategory
     .filter((c) => c.usd > 0)
     .slice(0, 8)
-    .map((c, i) => ({ label: prettyCategory(c.category), v: c.usd, color: colorForService(c.category, i) }));
+    .map((c, i) => ({
+      label: prettyCategory(c.category),
+      v: c.usd,
+      color: colorForService(c.category, i),
+    }));
   const learnerRows = byUser.map((u, i) => ({
     label: u.name,
     v: u.usd,
@@ -51,7 +55,9 @@ export default async function AdminUsagePage() {
       <div className={styles.adminHead}>
         <div>
           <h1>Usage &amp; cost</h1>
-          <div className={styles.ahSub}>Last {WINDOW_DAYS} days · all providers · observability only</div>
+          <div className={styles.ahSub}>
+            Last {WINDOW_DAYS} days · all providers · observability only
+          </div>
         </div>
       </div>
 

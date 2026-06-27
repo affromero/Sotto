@@ -2,10 +2,10 @@ import { logger } from '../logger';
 import {
   getDefaultSttModelForLanguage,
   getSttProviderMeta,
-  isValidSttProviderId,
   supportsSttLanguage,
   type SttProviderId,
 } from './stt-registry';
+import { getSttPlatformKey } from './stt/config';
 import { getSharedAiKey, getSharedByokKey } from '../byok';
 import { infra } from '../server-config';
 import { detectAudioFormat } from '../audio-format';
@@ -16,6 +16,7 @@ import {
 } from '../speech-language-support';
 
 export type { SttProviderId } from './stt-registry';
+export { getConfiguredSttProviderId, getSttPlatformKey } from './stt/config';
 
 /**
  * Speech-to-text transcription result
@@ -903,45 +904,6 @@ export function createSttProvider(
     default:
       throw new Error(`Unknown STT provider: "${target}"`);
   }
-}
-
-// ---------------------------------------------------------------------------
-// Platform key mapping — maps STT provider ID → env var value
-// ---------------------------------------------------------------------------
-
-const STT_PLATFORM_ENV: Record<SttProviderId, string> = {
-  openai: 'OPENAI_API_KEY',
-  together: 'TOGETHER_API_KEY',
-  deepgram: 'DEEPGRAM_API_KEY',
-  assemblyai: 'ASSEMBLYAI_API_KEY',
-  elevenlabs: 'ELEVENLABS_API_KEY',
-  cartesia: 'CARTESIA_API_KEY',
-  groq: 'GROQ_API_KEY',
-  gladia: 'GLADIA_API_KEY',
-  speechmatics: 'SPEECHMATICS_API_KEY',
-  local: 'STT_API_KEY',
-};
-
-/**
- * Get the platform API key for a given STT provider.
- * The local provider is keyless — it returns a placeholder so the resolver does
- * not reject it (the local server ignores the key; STT_API_KEY overrides it only
- * when a local server sits behind auth).
- */
-export function getSttPlatformKey(provider: SttProviderId): string | undefined {
-  if (provider === 'local') return process.env.STT_API_KEY?.trim() || 'local';
-  return process.env[STT_PLATFORM_ENV[provider]];
-}
-
-/**
- * Resolve the server-configured STT provider from STT_PROVIDER (validated),
- * defaulting to 'openai'. Used by workers that transcribe with the instance's
- * configured provider rather than a per-request choice — so STT_PROVIDER=local
- * routes transcription to a local Whisper server.
- */
-export function getConfiguredSttProviderId(): SttProviderId {
-  const raw = (infra('sttProvider', 'STT_PROVIDER') ?? '').trim();
-  return isValidSttProviderId(raw) ? raw : 'openai';
 }
 
 // ---------------------------------------------------------------------------

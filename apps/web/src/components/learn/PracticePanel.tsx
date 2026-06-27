@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { PracticeRunner, type PracticeStart } from './PracticeRunner';
 import styles from './PracticePanel.module.css';
 
@@ -150,7 +151,7 @@ export function PracticePanel({
 
       {phase === 'starting' && (
         <div className={styles.startingPanel} role="status" aria-live="polite">
-          <span className={styles.startingDot} aria-hidden="true" />
+          <SottoSpinner size="medium" ariaLabel="Building practice" />
           <div>
             <p className={styles.startingTitle}>Building {kindLabel(selectedKind)} practice</p>
             <p className={styles.startingText}>
