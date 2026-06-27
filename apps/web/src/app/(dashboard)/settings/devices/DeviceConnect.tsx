@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button';
 import { generateQrDataUrl } from '@/lib/qr';
 import styles from './page.module.css';
 
+const REACH_URL_STORAGE_KEY = 'sotto.reachUrl';
+
 interface PairingResult {
   connectUrl: string;
   serverUrl: string;
@@ -12,7 +14,11 @@ interface PairingResult {
   expiresAt: string;
 }
 
-export function DeviceConnect() {
+interface DeviceConnectProps {
+  reachUrl?: string | null;
+}
+
+export function DeviceConnect({ reachUrl }: DeviceConnectProps) {
   const [pairing, setPairing] = useState<PairingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -23,7 +29,14 @@ export function DeviceConnect() {
     setError(null);
     setCopied(false);
     try {
-      const res = await fetch('/api/v1/auth/pair', { method: 'POST' });
+      const storedReachUrl = window.localStorage.getItem(REACH_URL_STORAGE_KEY)?.trim();
+      const configuredReachUrl =
+        storedReachUrl && storedReachUrl.length > 0 ? storedReachUrl : reachUrl?.trim();
+      const res = await fetch('/api/v1/auth/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configuredReachUrl ? { reachUrl: configuredReachUrl } : {}),
+      });
       if (!res.ok) {
         setError('Could not create a pairing code. Try again.');
         return;
@@ -36,7 +49,7 @@ export function DeviceConnect() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [reachUrl]);
 
   const copy = useCallback(async () => {
     if (!pairing) return;

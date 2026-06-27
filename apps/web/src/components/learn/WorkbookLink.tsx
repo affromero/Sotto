@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { PenLine } from 'lucide-react';
+import { CheckCircle2, PenLine } from 'lucide-react';
+import styles from './WorkbookLink.module.css';
 
 interface WorkbookLinkProps {
   className: string;
@@ -47,21 +48,25 @@ function subscribeWorkbookDevice(onStoreChange: () => void): () => void {
 
   subscribers.add(onStoreChange);
 
-  function onPointerDown(event: PointerEvent) {
+  function onPointer(event: PointerEvent) {
     if (event.pointerType !== 'pen' || penSeen) return;
     penSeen = true;
     notifySubscribers();
   }
 
-  window.addEventListener('pointerdown', onPointerDown, { passive: true });
+  window.addEventListener('pointerdown', onPointer, { passive: true });
+  window.addEventListener('pointermove', onPointer, { passive: true });
+  window.addEventListener('pointerover', onPointer, { passive: true });
   return () => {
     subscribers.delete(onStoreChange);
-    window.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('pointerdown', onPointer);
+    window.removeEventListener('pointermove', onPointer);
+    window.removeEventListener('pointerover', onPointer);
   };
 }
 
 function deviceLabel(device: WorkbookDevice): string {
-  if (device === 'pen') return 'Pencil workbook';
+  if (device === 'pen') return 'Pencil ready';
   if (device === 'ipad') return 'iPad workbook';
   if (device === 'touch') return 'Touch workbook';
   return 'Workbook';
@@ -76,12 +81,22 @@ export function WorkbookLink({ className, classTitle, href }: WorkbookLinkProps)
 
   return (
     <Link
-      className={className}
+      className={`${className} ${device === 'pen' ? styles.pencilReady : ''}`}
       href={href}
-      aria-label={`Open ${classTitle} workbook for iPad or PDF annotation`}
+      aria-label={
+        device === 'pen'
+          ? `Open ${classTitle} workbook. Apple Pencil detected and ready.`
+          : `Open ${classTitle} workbook for iPad or PDF annotation`
+      }
     >
       <PenLine size={16} aria-hidden="true" />
-      {deviceLabel(device)}
+      <span>{deviceLabel(device)}</span>
+      {device === 'pen' && (
+        <span className={styles.readyBadge}>
+          <CheckCircle2 size={12} aria-hidden="true" />
+          Ready
+        </span>
+      )}
     </Link>
   );
 }

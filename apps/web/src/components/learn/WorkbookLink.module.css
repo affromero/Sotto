@@ -1,0 +1,25 @@
+.pencilReady {
+  border-color: #1f8f55;
+  background: rgba(31, 143, 85, 0.1);
+  color: #1f6f45;
+}
+
+.pencilReady:hover {
+  border-color: #1f8f55;
+  background: rgba(31, 143, 85, 0.14);
+  color: #1f6f45;
+}
+
+.readyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #dff6e8;
+  color: #0f7a3b;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

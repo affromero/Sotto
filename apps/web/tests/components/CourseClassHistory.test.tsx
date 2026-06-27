@@ -85,7 +85,8 @@ describe('CourseClassHistory', () => {
     Object.defineProperty(event, 'pointerType', { value: 'pen' });
     window.dispatchEvent(event);
 
-    expect(await screen.findByText('Pencil workbook')).toBeInTheDocument();
+    expect(await screen.findByText('Pencil ready')).toBeInTheDocument();
+    expect(await screen.findByText('Ready')).toBeInTheDocument();
   });
 
   it('shows an empty state before the learner starts a class', () => {

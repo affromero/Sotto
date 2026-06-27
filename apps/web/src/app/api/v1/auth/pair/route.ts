@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveReachUrl } from 'thesidedoor/server';
 import { auth } from '@/lib/auth';
 import { createPairingToken } from '@/lib/pairing';
-import { getAppBaseUrl } from '@/lib/urls';
+import { detectTailscaleServeUrl } from '@/lib/tailscale-reach';
 import { pairDeviceSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
 
@@ -21,7 +22,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
 
   const { token, expiresAt } = await createPairingToken(session.user.id, parsed.data.name);
-  const serverUrl = getAppBaseUrl();
+  const detectedServeUrl = parsed.data.reachUrl ? null : await detectTailscaleServeUrl(3000);
+  const serverUrl = resolveReachUrl({
+    configuredUrl: parsed.data.reachUrl ?? detectedServeUrl,
+    headers: request.headers,
+    defaultHost: request.nextUrl.host,
+  });
 
   return NextResponse.json(
     {
@@ -31,6 +37,6 @@ export async function POST(request: NextRequest) {
       connectUrl: `${serverUrl}/connect?token=${encodeURIComponent(token)}`,
       expiresAt: expiresAt.toISOString(),
     },
-    { status: 201 },
+    { status: 201 }
   );
 }

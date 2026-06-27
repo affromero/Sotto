@@ -7,14 +7,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveLearningAi = vi.fn();
-vi.mock('@/lib/learning-ai', () => ({ resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a) }));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+}));
 
 const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/providers/ai', () => ({ createAIProvider: () => ({ generateResponse: mockGenerateResponse }) }));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
+}));
 
 const mockLoadAndRender = vi.fn();
-vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a) }));
-vi.mock('@/lib/course-notes', () => ({ formatNotesForPrompt: (n: string) => (n ? `\nNOTE: ${n}\n` : '') }));
+vi.mock('@/lib/prompt-loader', () => ({
+  loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a),
+}));
+vi.mock('@/lib/course-notes', () => ({
+  formatNotesForPrompt: (n: string) => (n ? `\nNOTE: ${n}\n` : ''),
+}));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -23,8 +31,19 @@ import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 
 const SAMPLE = JSON.stringify([
-  { question: '¿Qué descubrió el científico?', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: 'x', passageRef: 'L1' },
-  { question: '¿Cuándo ocurrió?', options: ['a', 'b', 'c', 'd'], correctIndex: 1, explanation: 'y' },
+  {
+    question: '¿Qué descubrió el científico?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 0,
+    explanation: 'x',
+    passageRef: 'L1',
+  },
+  {
+    question: '¿Cuándo ocurrió?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 1,
+    explanation: 'y',
+  },
 ]);
 
 const BASE: SectionGenParams = {
@@ -45,7 +64,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
   mockLoadAndRender.mockReturnValue('system prompt');
-  mockGenerateResponse.mockResolvedValue({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' });
+  mockGenerateResponse.mockResolvedValue({
+    content: SAMPLE,
+    inputTokens: 10,
+    outputTokens: 20,
+    model: 'm',
+  });
 });
 
 describe('generateSectionQuestions', () => {
@@ -59,7 +83,7 @@ describe('generateSectionQuestions', () => {
     // The {{SOURCE}} placeholder is rendered empty.
     expect(mockLoadAndRender).toHaveBeenCalledWith(
       'class/generate-section-quiz.md',
-      expect.objectContaining({ SOURCE: '' }),
+      expect.objectContaining({ SOURCE: '' })
     );
   });
 
@@ -73,24 +97,61 @@ describe('generateSectionQuestions', () => {
     // The passage is rendered into the {{SOURCE}} block of the prompt.
     expect(mockLoadAndRender).toHaveBeenCalledWith(
       'class/generate-section-quiz.md',
-      expect.objectContaining({ SOURCE: expect.stringContaining(PASSAGE) }),
+      expect.objectContaining({ SOURCE: expect.stringContaining(PASSAGE) })
     );
   });
 
   it('does NOT attach passageText for a GRAMMAR section even if sourceContent is present', async () => {
-    const qs = await generateSectionQuestions({ ...BASE, skill: 'GRAMMAR' as SkillType, sourceContent: PASSAGE });
+    const qs = await generateSectionQuestions({
+      ...BASE,
+      skill: 'GRAMMAR' as SkillType,
+      sourceContent: PASSAGE,
+    });
 
     for (const q of qs) {
       expect(q.passageText).toBeUndefined();
     }
     expect(mockLoadAndRender).toHaveBeenCalledWith(
       'class/generate-section-quiz.md',
-      expect.objectContaining({ SOURCE: '' }),
+      expect.objectContaining({ SOURCE: '' })
     );
   });
 
   it('throws when the model returns no usable questions', async () => {
-    mockGenerateResponse.mockResolvedValue({ content: '[]', inputTokens: 1, outputTokens: 1, model: 'm' });
+    mockGenerateResponse.mockResolvedValue({
+      content: '[]',
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
     await expect(generateSectionQuestions(BASE)).rejects.toThrow(/no usable questions/i);
+  });
+
+  it('accepts a wrapped questions object from stricter JSON providers', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({ questions: JSON.parse(SAMPLE) }),
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
+
+    const qs = await generateSectionQuestions(BASE);
+
+    expect(qs).toHaveLength(2);
+    expect(qs[0].question).toBe('¿Qué descubrió el científico?');
+  });
+
+  it('extracts the first JSON array when a model adds surrounding prose', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: `Here are the questions:\n${SAMPLE}\nDone.`,
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
+
+    const qs = await generateSectionQuestions(BASE);
+
+    expect(qs).toHaveLength(2);
+    expect(qs[1].correctIndex).toBe(1);
   });
 });

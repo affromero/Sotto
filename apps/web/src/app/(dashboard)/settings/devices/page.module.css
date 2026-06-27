@@ -68,6 +68,173 @@
   padding: var(--spacing-lg);
 }
 
+.reachStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.tailscaleCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.tailscaleHead {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+}
+
+.tailscaleReadyIcon,
+.tailscalePendingIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+}
+
+.tailscaleReadyIcon {
+  color: #0f7a3b;
+  background: #dff6e8;
+  border: 1px solid #a8e2bd;
+}
+
+.tailscalePendingIcon {
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+}
+
+.tailscaleTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tailscaleTitle {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin: 0;
+}
+
+.tailscaleText,
+.tailscaleSetupText {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.tailscaleLinkBox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  color: #0f7a3b;
+  background: #f0fbf4;
+  border: 1px solid #bfeacc;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+}
+
+.tailscaleLinkText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tailscaleLinkLabel {
+  font: var(--text-caption);
+  color: #0f7a3b;
+  font-weight: 600;
+}
+
+.tailscaleLink {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  word-break: break-all;
+  text-decoration: none;
+}
+
+.tailscaleLink:hover {
+  text-decoration: underline;
+}
+
+.tailscaleSetup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.tailscaleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.reachQrPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  min-height: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-text-secondary);
+  font: var(--text-body-sm);
+  padding: var(--spacing-lg);
+  text-align: center;
+}
+
+.reachStack :global(.sd-panel) {
+  --sd-bg: var(--color-background);
+  --sd-surface: var(--color-surface);
+  --sd-elevated: var(--color-background);
+  --sd-border: var(--color-border);
+  --sd-text: var(--color-text-primary);
+  --sd-muted: var(--color-text-secondary);
+  --sd-accent: var(--color-primary);
+  --sd-radius: var(--radius-md);
+  --sd-font: var(--font-body);
+  --sd-mono: var(--font-mono);
+}
+
+.reachStack :global(.sd-install-steps) {
+  grid-template-columns: 1fr;
+}
+
+.reachStack :global(.sd-install-os) {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reachStack :global(.sd-install-os ol) {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding-left: 1.35rem;
+}
+
+.reachStack :global(.sd-install-os li) {
+  padding-left: 0.2rem;
+}
+
+.reachStack :global(.sd-install-title) {
+  line-height: 1.25;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -141,6 +308,11 @@
   color: var(--color-error, #b3261e);
 }
 
+.successText {
+  font: var(--text-body-sm);
+  color: #0f7a3b;
+}
+
 .keysSection {
   display: flex;
   flex-direction: column;
@@ -183,5 +355,11 @@
   .qrImage {
     width: 180px;
     height: 180px;
+  }
+}
+
+@media (min-width: 720px) {
+  .reachStack :global(.sd-install-steps) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

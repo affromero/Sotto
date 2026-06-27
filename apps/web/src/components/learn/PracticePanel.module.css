@@ -77,7 +77,9 @@
   border: 1px solid var(--line);
   border-radius: var(--r);
   cursor: pointer;
-  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease);
+  transition:
+    border-color 0.18s var(--ease),
+    transform 0.18s var(--ease);
 }
 
 .kindCard:hover:not(:disabled) {
@@ -116,6 +118,42 @@
   border-radius: var(--r);
 }
 
+.startingPanel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--r);
+}
+
+.startingDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 14%, transparent);
+  animation: practicePulse 1.2s ease-in-out infinite;
+}
+
+.startingTitle {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.startingText {
+  margin: 3px 0 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
 .notice {
   font-family: var(--sans);
   font-size: 14px;
@@ -126,4 +164,22 @@
   font-family: var(--sans);
   font-size: 13px;
   color: var(--bad);
+}
+
+@keyframes practicePulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startingDot {
+    animation: none;
+  }
 }

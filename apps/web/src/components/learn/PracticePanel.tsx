@@ -49,6 +49,7 @@ export function PracticePanel({
   const [start, setStart] = useState<PracticeStart | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [selectedKind, setSelectedKind] = useState<string | null>(null);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -68,6 +69,7 @@ export function PracticePanel({
   const startKind = useCallback(
     async (kind: string, focusTargetId?: string | null) => {
       setPhase('starting');
+      setSelectedKind(kind);
       setError('');
       setMessage('');
       try {
@@ -77,6 +79,11 @@ export function PracticePanel({
           body: JSON.stringify({ kind, ...(focusTargetId ? { focusTargetId } : {}) }),
         });
         const data = (await res.json()) as StartResponse;
+        if (!res.ok) {
+          setError(readPracticeError(data));
+          setPhase('overview');
+          return;
+        }
         if (data.status === 'unavailable') {
           setMessage(
             UNAVAILABLE_COPY[data.reason] ?? 'Practice is not available yet for this skill.'
@@ -141,6 +148,18 @@ export function PracticePanel({
         <p className={styles.subtitle}>Quick, ungated review. Separate from your graded classes.</p>
       </header>
 
+      {phase === 'starting' && (
+        <div className={styles.startingPanel} role="status" aria-live="polite">
+          <span className={styles.startingDot} aria-hidden="true" />
+          <div>
+            <p className={styles.startingTitle}>Building {kindLabel(selectedKind)} practice</p>
+            <p className={styles.startingText}>
+              Sotto is preparing the questions and any audio or prompts this session needs.
+            </p>
+          </div>
+        </div>
+      )}
+
       {phase === 'unavailable' && (
         <p className={styles.notice} role="status">
           {message}{' '}
@@ -183,4 +202,13 @@ export function PracticePanel({
       </ul>
     </div>
   );
+}
+
+function kindLabel(kind: string | null): string {
+  return KINDS.find((item) => item.kind === kind)?.label ?? 'your';
+}
+
+function readPracticeError(data: StartResponse | { error?: unknown }): string {
+  if ('error' in data && typeof data.error === 'string') return data.error;
+  return 'Could not start practice. Try again.';
 }
