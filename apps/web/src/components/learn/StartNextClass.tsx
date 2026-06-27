@@ -78,7 +78,8 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         aria-label="Composing your next class, please wait"
       >
         <GlassOrb size={56} />
-        <span className={styles.composingLabel}>Composing your class…</span>
+        <span className={styles.composingLabel}>Composing your class...</span>
+        <span className={styles.composingHint}>This can take a minute on the first run.</span>
       </div>
     );
   }

@@ -11,9 +11,13 @@ vi.mock('@/lib/auth', () => ({ auth: () => mockAuth() }));
 
 const mockCreatePairingToken = vi.fn();
 const mockRedeemPairingToken = vi.fn();
+const mockDetectTailscaleServeUrl = vi.fn();
 vi.mock('@/lib/pairing', () => ({
   createPairingToken: (...a: unknown[]) => mockCreatePairingToken(...a),
   redeemPairingToken: (...a: unknown[]) => mockRedeemPairingToken(...a),
+}));
+vi.mock('@/lib/tailscale-reach', () => ({
+  detectTailscaleServeUrl: (...a: unknown[]) => mockDetectTailscaleServeUrl(...a),
 }));
 
 const mockApiKeyCreate = vi.fn();
@@ -29,8 +33,6 @@ vi.mock('@/lib/api-keys', () => ({
   generateApiKey: () => ({ key: 'sk_sotto_paired', hash: 'h', prefix: 'sk_sotto_pa' }),
 }));
 
-vi.mock('@/lib/urls', () => ({ getAppBaseUrl: () => 'https://sotto.example' }));
-
 vi.mock('@/lib/api-response', () => ({
   errorResponse: (message: unknown, status: number) =>
     new Response(JSON.stringify({ error: message }), { status }),
@@ -45,7 +47,10 @@ function postReq(path: string, body: unknown): NextRequest {
 }
 
 describe('POST /api/v1/auth/pair (issue)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDetectTailscaleServeUrl.mockResolvedValue(null);
+  });
 
   it('rejects an unauthenticated request with 401', async () => {
     mockAuth.mockResolvedValue(null);
@@ -70,14 +75,57 @@ describe('POST /api/v1/auth/pair (issue)', () => {
     expect(json.connectUrl).toBe('https://sotto.example/connect?token=rawtok');
     expect(mockCreatePairingToken).toHaveBeenCalledWith('user-1', 'My iPad');
   });
+
+  it('uses an explicit reach URL for Tailscale pairing links', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockCreatePairingToken.mockResolvedValue({
+      token: 'rawtok',
+      expiresAt: new Date('2030-01-01T00:00:00Z'),
+    });
+    const { POST } = await import('@/app/api/v1/auth/pair/route');
+    const res = await POST(
+      postReq('/api/v1/auth/pair', { reachUrl: 'https://sotto.tailnet.ts.net/' })
+    );
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.serverUrl).toBe('https://sotto.tailnet.ts.net');
+    expect(json.connectUrl).toBe('https://sotto.tailnet.ts.net/connect?token=rawtok');
+  });
+
+  it('uses a detected Tailscale Serve URL when no reach URL is provided', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockDetectTailscaleServeUrl.mockResolvedValue('https://andres-macbook-pro.tail297718.ts.net');
+    mockCreatePairingToken.mockResolvedValue({
+      token: 'rawtok',
+      expiresAt: new Date('2030-01-01T00:00:00Z'),
+    });
+    const { POST } = await import('@/app/api/v1/auth/pair/route');
+    const res = await POST(postReq('/api/v1/auth/pair', {}));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.serverUrl).toBe('https://andres-macbook-pro.tail297718.ts.net');
+    expect(json.connectUrl).toBe(
+      'https://andres-macbook-pro.tail297718.ts.net/connect?token=rawtok'
+    );
+  });
 });
 
 describe('POST /api/v1/auth/pair/redeem', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDetectTailscaleServeUrl.mockResolvedValue(null);
+  });
 
   it('mints an API key for a valid token', async () => {
     mockRedeemPairingToken.mockResolvedValue({ userId: 'user-1', name: 'iPad' });
-    mockUserFindUnique.mockResolvedValue({ id: 'user-1', name: 'A', email: 'a@x.co', handle: null, image: null, role: 'USER' });
+    mockUserFindUnique.mockResolvedValue({
+      id: 'user-1',
+      name: 'A',
+      email: 'a@x.co',
+      handle: null,
+      image: null,
+      role: 'USER',
+    });
     const { POST } = await import('@/app/api/v1/auth/pair/redeem/route');
     const res = await POST(postReq('/api/v1/auth/pair/redeem', { token: 'rawtoken123' }));
     expect(res.status).toBe(200);

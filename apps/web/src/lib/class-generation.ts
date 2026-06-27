@@ -39,6 +39,73 @@ export interface SectionGenParams {
   sourceContent?: string;
 }
 
+interface RawGeneratedQuestion {
+  question?: unknown;
+  options?: unknown;
+  correctIndex?: unknown;
+  explanation?: unknown;
+  passageRef?: unknown;
+}
+
+interface WrappedGeneratedQuestions {
+  questions?: unknown;
+}
+
+function sanitizeLlmJson(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
+}
+
+function extractFirstJsonArray(text: string): string {
+  const start = text.indexOf('[');
+  if (start === -1) throw new Error('No JSON array found in response');
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '[') depth += 1;
+    if (ch === ']' && --depth === 0) return text.slice(start, i + 1);
+  }
+
+  throw new Error('Unbalanced JSON array in response');
+}
+
+function parseRawQuestions(content: string): RawGeneratedQuestion[] {
+  const cleaned = sanitizeLlmJson(content);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    parsed = JSON.parse(extractFirstJsonArray(cleaned));
+  }
+
+  if (Array.isArray(parsed)) return parsed as RawGeneratedQuestion[];
+  if (parsed && typeof parsed === 'object') {
+    const wrapped = parsed as WrappedGeneratedQuestions;
+    if (Array.isArray(wrapped.questions)) return wrapped.questions as RawGeneratedQuestion[];
+  }
+
+  throw new Error('Class generation returned no question array.');
+}
+
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
   const ai = await resolveLearningAi(p.userId);
 
@@ -67,8 +134,13 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   const provider = createAIProvider(ai.provider);
   const response = await provider.generateResponse(
     systemPrompt,
-    [{ role: 'user', content: `Generate ${QUESTIONS_PER_SECTION} ${p.skill.toLowerCase()} questions.` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.8 },
+    [
+      {
+        role: 'user',
+        content: `Generate ${QUESTIONS_PER_SECTION} ${p.skill.toLowerCase()} questions.`,
+      },
+    ],
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.8 }
   );
 
   logUsage({
@@ -80,10 +152,9 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     userId: p.userId,
   });
 
-  const cleaned = response.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  let raw: GeneratedQuestion[];
+  let raw: RawGeneratedQuestion[];
   try {
-    raw = JSON.parse(cleaned);
+    raw = parseRawQuestions(response.content);
   } catch (err) {
     logger.error('Failed to parse class-section LLM response', {
       error: err instanceof Error ? err.message : String(err),
@@ -97,14 +168,17 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         typeof q.question === 'string' &&
         Array.isArray(q.options) &&
         q.options.length === 4 &&
-        typeof q.correctIndex === 'number',
+        q.options.every((option) => typeof option === 'string') &&
+        Number.isFinite(
+          typeof q.correctIndex === 'number' ? q.correctIndex : Number(q.correctIndex)
+        )
     )
     .map((q) => ({
-      question: q.question,
-      options: q.options.slice(0, 4),
-      correctIndex: Math.max(0, Math.min(3, q.correctIndex)),
-      explanation: q.explanation ?? '',
-      passageRef: q.passageRef,
+      question: q.question as string,
+      options: (q.options as string[]).slice(0, 4),
+      correctIndex: Math.max(0, Math.min(3, Number(q.correctIndex))),
+      explanation: typeof q.explanation === 'string' ? q.explanation : '',
+      passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
       // Sourced READING: attach the leveled passage so the learner reads the
       // real excerpt the questions are about.
       passageText: useSourcePassage ? p.sourceContent : undefined,

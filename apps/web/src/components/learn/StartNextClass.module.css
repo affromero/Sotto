@@ -24,7 +24,9 @@
   font-size: 14.5px;
   cursor: pointer;
   white-space: nowrap;
-  transition: filter 0.18s var(--ease), opacity 0.18s var(--ease);
+  transition:
+    filter 0.18s var(--ease),
+    opacity 0.18s var(--ease);
 }
 
 .button:hover:not(:disabled) {
@@ -41,14 +43,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 22px 0 12px;
+  gap: 10px;
+  min-width: 210px;
+  padding: 18px 20px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: var(--r);
+  text-align: center;
 }
+
 .composingLabel {
   font-family: var(--serif, 'Newsreader', Georgia, serif);
   font-style: italic;
   font-size: 16px;
   color: var(--ink-soft, var(--color-text-secondary));
+}
+
+.composingHint {
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink-mute);
 }
 
 .done {

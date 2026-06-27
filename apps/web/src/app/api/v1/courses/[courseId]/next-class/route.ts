@@ -8,6 +8,9 @@ import { sourcedClassSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+
 /**
  * POST /api/courses/[courseId]/next-class — generate the next gated class.
  * Optional body `{ sourceUrl?, topic? }` builds the class from a real link/paper
