@@ -44,7 +44,11 @@ struct PracticeStartView: View {
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    ProfileToolbarMenu {
+                        dismiss()
+                    }
+
                     Button {
                         Task {
                             let payload = answers.map { SottoPracticeAnswer(itemId: $0.key, selectedIndex: $0.value) }

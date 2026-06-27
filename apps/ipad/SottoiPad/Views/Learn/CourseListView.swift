@@ -17,6 +17,12 @@ struct CourseListView: View {
                         Text("Sotto")
                             .font(.largeTitle.bold())
                             .foregroundStyle(SottoTheme.ink)
+                        if let activeProfile = model.activeProfile {
+                            Text(activeProfile.name)
+                                .font(.callout.bold())
+                                .foregroundStyle(SottoTheme.ink)
+                                .lineLimit(1)
+                        }
                         Text(model.credentials?.serverURL.host() ?? "Self-hosted")
                             .font(.caption.monospaced())
                             .foregroundStyle(SottoTheme.muted)
@@ -24,6 +30,8 @@ struct CourseListView: View {
                     }
 
                     Spacer()
+
+                    ProfileToolbarMenu()
 
                     Button {
                         showingNewCourse = true

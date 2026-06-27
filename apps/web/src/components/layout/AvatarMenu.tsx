@@ -11,6 +11,7 @@ import {
   Smartphone,
   Shield,
   Users,
+  LogOut,
   Sun,
   Moon,
   ChevronDown,
@@ -94,6 +95,20 @@ export function AvatarMenu({ user }: { user: AvatarMenuUser }) {
     } catch {
       /* keep the current profile on failure */
     }
+  }
+
+  async function exitProfile() {
+    setOpen(false);
+    try {
+      await fetch('/api/v1/profiles/switch', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+    } catch {
+      /* The redirect still lands on the picker; stale cookies can be cleared there later. */
+    }
+    router.push('/profiles');
+    router.refresh();
   }
 
   return (
@@ -228,6 +243,14 @@ export function AvatarMenu({ user }: { user: AvatarMenuUser }) {
                 }}
               >
                 <Users size={18} aria-hidden="true" /> Who&rsquo;s learning?
+              </button>
+              <button
+                type="button"
+                className={`${styles.item} ${styles.exitItem}`}
+                role="menuitem"
+                onClick={() => void exitProfile()}
+              >
+                <LogOut size={18} aria-hidden="true" /> Exit profile
               </button>
             </div>
 

@@ -5,12 +5,16 @@ import crypto from 'crypto';
 
 const mockPrismaApiKeyFindUnique = vi.fn();
 const mockPrismaApiKeyUpdate = vi.fn();
+const mockPrismaUserFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     apiKey: {
       findUnique: (...args: unknown[]) => mockPrismaApiKeyFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaApiKeyUpdate(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -207,6 +211,58 @@ describe('api-keys', () => {
       const result = await authenticateRequest(mockRequest);
 
       expect(result).toEqual({ userId: 'user-bearer' });
+    });
+
+    it('uses a validated profile header with a valid API key', async () => {
+      const testKey = 'sk_sotto_profile123';
+      const mockRequest = {
+        headers: {
+          get: vi.fn((name: string) => {
+            if (name === 'authorization') return `Bearer ${testKey}`;
+            if (name === 'x-sotto-profile-id') return 'member-1';
+            return null;
+          }),
+        },
+      } as unknown as NextRequest;
+
+      mockPrismaApiKeyFindUnique.mockResolvedValue({
+        id: 'key-id-profile',
+        userId: 'local-user',
+        revokedAt: null,
+      });
+      mockPrismaUserFindUnique.mockResolvedValue({ id: 'member-1' });
+
+      const result = await authenticateRequest(mockRequest);
+
+      expect(result).toEqual({ userId: 'member-1' });
+      expect(mockPrismaUserFindUnique).toHaveBeenCalledWith({
+        where: { id: 'member-1' },
+        select: { id: true },
+      });
+    });
+
+    it('rejects a stale profile header with a valid API key', async () => {
+      const testKey = 'sk_sotto_staleprofile';
+      const mockRequest = {
+        headers: {
+          get: vi.fn((name: string) => {
+            if (name === 'authorization') return `Bearer ${testKey}`;
+            if (name === 'x-sotto-profile-id') return 'deleted-profile';
+            return null;
+          }),
+        },
+      } as unknown as NextRequest;
+
+      mockPrismaApiKeyFindUnique.mockResolvedValue({
+        id: 'key-id-stale-profile',
+        userId: 'local-user',
+        revokedAt: null,
+      });
+      mockPrismaUserFindUnique.mockResolvedValue(null);
+
+      const result = await authenticateRequest(mockRequest);
+
+      expect(result).toBeNull();
     });
 
     it('ignores Bearer token if not sk_sotto_ prefix', async () => {

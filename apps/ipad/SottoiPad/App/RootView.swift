@@ -6,7 +6,11 @@ struct RootView: View {
     var body: some View {
         ZStack {
             if model.isPaired {
-                CourseListView()
+                if model.hasSelectedProfile {
+                    CourseListView()
+                } else {
+                    ProfileSelectionView()
+                }
             } else {
                 PairingView()
             }
@@ -29,6 +33,7 @@ struct RootView: View {
         .sheet(isPresented: workbookSheetBinding) {
             if let workbook = model.workbook {
                 WorkbookView(response: workbook)
+                    .environmentObject(model)
             }
         }
         .alert("Sotto", isPresented: errorBinding) {

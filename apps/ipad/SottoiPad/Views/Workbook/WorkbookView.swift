@@ -2,6 +2,7 @@ import PencilKit
 import SwiftUI
 
 struct WorkbookView: View {
+    @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dismiss) private var dismiss
     let response: SottoWorksheetResponse
 
@@ -31,8 +32,12 @@ struct WorkbookView: View {
                         dismiss()
                     }
                 }
-                if let pdfUrl = response.worksheetPdfUrl, let url = URL(string: pdfUrl) {
-                    ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    ProfileToolbarMenu {
+                        dismiss()
+                    }
+
+                    if let pdfUrl = response.worksheetPdfUrl, let url = URL(string: pdfUrl) {
                         Link(destination: url) {
                             Label("PDF", systemImage: "doc.richtext")
                         }
