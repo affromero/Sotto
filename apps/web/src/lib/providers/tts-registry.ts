@@ -24,6 +24,8 @@ export interface TtsProviderAuthField {
   key: string;
   label: string;
   placeholder: string;
+  type?: 'password' | 'text' | 'number';
+  optional?: boolean;
 }
 
 export interface TtsModelOption {
@@ -218,7 +220,29 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'language',
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' }],
+      fields: [
+        { key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' },
+        {
+          key: 'adminApiKey',
+          label: 'Admin API Key',
+          placeholder: 'sk_car_admin_... (optional, for usage)',
+          optional: true,
+        },
+        {
+          key: 'monthlyCreditLimit',
+          label: 'Monthly Credit Limit',
+          placeholder: 'Optional, e.g. 1000000',
+          type: 'number',
+          optional: true,
+        },
+        {
+          key: 'billingResetDay',
+          label: 'Billing Reset Day',
+          placeholder: 'Optional, 1-31',
+          type: 'number',
+          optional: true,
+        },
+      ],
       validate: async (creds) => {
         try {
           const res = await fetch('https://api.cartesia.ai/voices?limit=1', {

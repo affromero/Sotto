@@ -24,17 +24,20 @@
 
 .small {
   --mark-size: 28px;
-  --logo-size: 6px;
+  --logo-size: 18px;
+  --ring-shadow: 0 0 7px rgba(106, 160, 255, 0.2);
 }
 
 .medium {
   --mark-size: 44px;
-  --logo-size: 8px;
+  --logo-size: 30px;
+  --ring-shadow: 0 0 10px rgba(106, 160, 255, 0.24);
 }
 
 .large {
   --mark-size: 72px;
-  --logo-size: 14px;
+  --logo-size: 50px;
+  --ring-shadow: 0 0 16px rgba(106, 160, 255, 0.28);
 }
 
 .primary {
@@ -68,13 +71,12 @@
 }
 
 .track {
-  stroke: currentColor;
-  opacity: 0.14;
+  stroke: color-mix(in oklab, currentColor 18%, transparent);
 }
 
 .meter {
-  stroke: currentColor;
   stroke-linecap: round;
+  filter: drop-shadow(var(--ring-shadow));
   transition: stroke-dashoffset 0.35s ease;
 }
 
@@ -85,16 +87,17 @@
 .logo {
   position: relative;
   z-index: 1;
-  font-family: var(--font-heading);
-  font-size: var(--logo-size);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
-  background: linear-gradient(135deg, #6aa0ff 10%, #ff8fb1 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  display: block;
+  width: var(--logo-size);
+  height: var(--logo-size);
+  border-radius: 999px;
+  background-image: url('/brand/sotto-mark.svg');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  box-shadow:
+    0 1px 2px rgba(25, 27, 35, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.38);
   animation: logoPulse 1.8s ease-in-out infinite;
   transform-origin: center;
 }
@@ -136,13 +139,13 @@
 @keyframes logoPulse {
   0%,
   100% {
-    opacity: 0.78;
-    transform: scale(0.94);
+    opacity: 0.86;
+    transform: scale(0.95);
   }
 
   50% {
     opacity: 1;
-    transform: scale(1.04);
+    transform: scale(1.03);
   }
 }
 

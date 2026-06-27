@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { createNextClass, CourseNotFoundError } from '@/lib/class-service';
+import {
+  createNextClass,
+  ClassGenerationCancelledError,
+  CourseNotFoundError,
+} from '@/lib/class-service';
 import { ClassSourceError } from '@/lib/class-source';
 import { sourcedClassSchema } from '@/lib/validations';
 
@@ -39,6 +43,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ classId: result.classId }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof CourseNotFoundError) return errorResponse('Course not found', 404);
+    if (error instanceof ClassGenerationCancelledError) {
+      return errorResponse('Class generation was cancelled.', 409, { cancelled: true });
+    }
     // The source link couldn't be read/leveled — actionable 422, no class created.
     if (error instanceof ClassSourceError) return errorResponse(error.message, 422);
     const message = error instanceof Error ? error.message : 'Failed to create class';

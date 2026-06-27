@@ -47,10 +47,10 @@ cd ~/sotto
 
 Create DNS records at your registrar:
 
-| Type | Host | Value |
-| --- | --- | --- |
-| `A` | `@` | `YOUR_SERVER_IPV4` |
-| `AAAA` | `@` | `YOUR_SERVER_IPV6` if used |
+| Type    | Host  | Value                                              |
+| ------- | ----- | -------------------------------------------------- |
+| `A`     | `@`   | `YOUR_SERVER_IPV4`                                 |
+| `AAAA`  | `@`   | `YOUR_SERVER_IPV6` if used                         |
 | `CNAME` | `www` | `your-domain.example` if you want the www redirect |
 
 Wait until this resolves from your local machine:
@@ -95,6 +95,12 @@ OPENAI_API_KEY=<your key>
 TTS_PROVIDER=elevenlabs
 ELEVENLABS_API_KEY=<your key>
 ```
+
+After setup, users add audio provider keys in the wizard or provider settings.
+ElevenLabs usage works with the normal ElevenLabs key. Cartesia usage needs the
+optional Cartesia admin key in provider settings; the optional monthly limit and
+reset-day fields let Sotto show remaining-credit estimates instead of only
+credits used in the current billing window.
 
 For local media storage:
 
@@ -197,13 +203,13 @@ Also back up the selected storage backend. A database backup without the generat
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| Deploy cannot find env | `SOTTO_ENV_FILE` path or `~/sotto/.env.production` |
-| Caddy reload fails | `sudo caddy validate --config /etc/caddy/Caddyfile` |
-| Health check fails | `docker compose -f docker-compose.app.yml -p sotto-blue logs web --tail 80` and the green equivalent |
-| Workers do not process jobs | `REDIS_URL`, `DATABASE_URL`, and worker logs |
-| Audio is not reachable | storage provider env, bucket CORS, and private stream route authorization |
+| Symptom                     | Check                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Deploy cannot find env      | `SOTTO_ENV_FILE` path or `~/sotto/.env.production`                                                   |
+| Caddy reload fails          | `sudo caddy validate --config /etc/caddy/Caddyfile`                                                  |
+| Health check fails          | `docker compose -f docker-compose.app.yml -p sotto-blue logs web --tail 80` and the green equivalent |
+| Workers do not process jobs | `REDIS_URL`, `DATABASE_URL`, and worker logs                                                         |
+| Audio is not reachable      | storage provider env, bucket CORS, and private stream route authorization                            |
 
 ## Update Flow
 

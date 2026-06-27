@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import styles from './SottoSpinner.module.css';
 
 interface SottoSpinnerProps {
@@ -28,6 +29,7 @@ export function SottoSpinner({
   ariaLabel,
   className,
 }: SottoSpinnerProps) {
+  const gradientId = useId();
   const normalizedProgress = normalizeProgress(progress);
   const percent = normalizedProgress === null ? null : Math.round(normalizedProgress * 100);
   const hasCopy = Boolean(label || detail || (showPercent && percent !== null));
@@ -54,23 +56,29 @@ export function SottoSpinner({
               'aria-valuenow': percent,
             })}
       >
-        <svg className={styles.ring} viewBox="0 0 100 100" fill="none">
-          <circle className={styles.track} cx="50" cy="50" r="42" strokeWidth="8" />
+        <svg className={styles.ring} viewBox="0 0 100 100" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id={gradientId} x1="16" y1="8" x2="84" y2="92">
+              <stop offset="0" stopColor="#6AA0FF" />
+              <stop offset="0.54" stopColor="#8B7BFF" />
+              <stop offset="1" stopColor="#FF8FB1" />
+            </linearGradient>
+          </defs>
+          <circle className={styles.track} cx="50" cy="50" r="43" strokeWidth="7" />
           <circle
             className={styles.meter}
             cx="50"
             cy="50"
-            r="42"
+            r="43"
             pathLength="100"
-            strokeWidth="8"
+            stroke={`url(#${gradientId})`}
+            strokeWidth="7"
             strokeDasharray={percent === null ? '34 66' : '100'}
             strokeDashoffset={percent === null ? '0' : 100 - percent}
             transform="rotate(-90 50 50)"
           />
         </svg>
-        <span className={styles.logo} aria-hidden="true">
-          Sotto
-        </span>
+        <span className={styles.logo} aria-hidden="true" />
       </span>
 
       {hasCopy && (

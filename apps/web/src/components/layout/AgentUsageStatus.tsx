@@ -18,6 +18,7 @@ function shouldShowProvider(provider: AgentUsageProvider): boolean {
   return (
     provider.limitReached ||
     provider.status === 'ready' ||
+    (provider.status === 'action_required' && provider.category === 'audio') ||
     provider.status === 'unavailable' ||
     provider.windows.length > 0 ||
     provider.credits !== null
@@ -26,6 +27,7 @@ function shouldShowProvider(provider: AgentUsageProvider): boolean {
 
 function creditsLabel(provider: AgentUsageProvider): string | null {
   if (!provider.credits) return null;
+  if (provider.credits.label) return provider.credits.label;
   if (provider.credits.unlimited) return 'Credits unlimited';
   if (provider.credits.balance) return `Credits $${provider.credits.balance}`;
   return null;
@@ -74,7 +76,7 @@ export function AgentUsageStatus({ enabled }: AgentUsageStatusProps) {
       <div className={styles.header}>
         <span className={styles.title}>
           <Clock3 className={styles.titleIcon} aria-hidden="true" />
-          Agent time
+          Usage
         </span>
         <Link href="/settings" className={styles.settingsLink}>
           Hide
@@ -107,10 +109,13 @@ export function AgentUsageStatus({ enabled }: AgentUsageStatusProps) {
                       high={80}
                       optimum={0}
                       value={window.usedPercent}
-                      aria-label={`${provider.shortLabel} ${window.label} ${window.usedPercent}% used`}
+                      aria-label={`${provider.shortLabel} ${window.label} ${
+                        window.valueLabel ?? `${window.usedPercent}%`
+                      } used`}
                     />
                     <span className={styles.windowReset}>
-                      {window.usedPercent}% {window.resetIn ? `(${window.resetIn})` : ''}
+                      {window.valueLabel ?? `${window.usedPercent}%`}{' '}
+                      {window.resetIn ? `(${window.resetIn})` : ''}
                     </span>
                   </div>
                 ))}

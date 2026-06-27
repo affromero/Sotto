@@ -66,6 +66,10 @@ struct SottoAPIClient {
         try await get("/api/v1/courses/\(courseId)/generation")
     }
 
+    func cancelClassGeneration(courseId: String) async throws {
+        let _: ClassGenerationCancelResponse = try await delete("/api/v1/courses/\(courseId)/generation")
+    }
+
     func fetchClass(classId: String) async throws -> SottoClassDetail {
         try await get("/api/v1/classes/\(classId)")
     }
@@ -88,6 +92,11 @@ struct SottoAPIClient {
 
     private func get<Response: Decodable>(_ path: String) async throws -> Response {
         let request = try makeRequest(path: path, method: "GET", authorized: true)
+        return try await send(request, acceptedStatuses: [200])
+    }
+
+    private func delete<Response: Decodable>(_ path: String) async throws -> Response {
+        let request = try makeRequest(path: path, method: "DELETE", authorized: true)
         return try await send(request, acceptedStatuses: [200])
     }
 
@@ -183,6 +192,10 @@ private struct SubmitClassRequest: Encodable {
 }
 
 private struct EmptyBody: Encodable {}
+
+private struct ClassGenerationCancelResponse: Decodable {
+    let cancelled: Bool
+}
 
 enum SottoAPIError: LocalizedError {
     case message(String)

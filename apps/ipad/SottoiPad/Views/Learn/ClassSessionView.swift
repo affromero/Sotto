@@ -72,7 +72,14 @@ struct ClassSessionView: View {
             }
             .overlay {
                 if model.isLoading {
-                    LoadingOverlay(operation: model.loadingOperation)
+                    LoadingOverlay(
+                        operation: model.loadingOperation,
+                        onCancel: model.canCancelLoading ? {
+                            Task {
+                                await model.cancelCurrentClassGeneration()
+                            }
+                        } : nil
+                    )
                 }
             }
             .sheet(isPresented: workbookSheetBinding) {

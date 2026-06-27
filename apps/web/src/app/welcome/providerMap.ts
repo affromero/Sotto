@@ -21,6 +21,7 @@ export interface KeyPost {
   endpoint: 'ai-keys' | 'byok' | 'visual-cues';
   provider: string;
   apiKey: string;
+  extra?: Record<string, string>;
 }
 
 export interface AiResolution {
@@ -171,7 +172,8 @@ export function resolveTts(
   ttsId: string,
   apiKey: string,
   baseUrl: string,
-  model?: string
+  model?: string,
+  extra?: Record<string, string>
 ): TtsResolution {
   const resolvedId = resolveWelcomeTtsProviderId(ttsId) ?? ttsId;
 
@@ -186,8 +188,18 @@ export function resolveTts(
   }
 
   const key = clean(apiKey);
+  const cleanedExtra =
+    extra &&
+    Object.fromEntries(
+      Object.entries(extra)
+        .map(([field, value]) => [field, clean(value)])
+        .filter(([, value]) => value)
+    );
+  const usableExtra =
+    cleanedExtra && Object.keys(cleanedExtra).length > 0 ? { extra: cleanedExtra } : {};
+
   return {
-    keyPost: key ? { endpoint: 'byok', provider: resolvedId, apiKey: key } : null,
+    keyPost: key ? { endpoint: 'byok', provider: resolvedId, apiKey: key, ...usableExtra } : null,
     preferredTtsProvider: resolvedId,
     preferredTtsModel: clean(model) || null,
     infra: { ttsProvider: resolvedId },

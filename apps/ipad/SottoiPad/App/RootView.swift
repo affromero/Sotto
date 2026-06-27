@@ -16,7 +16,14 @@ struct RootView: View {
             }
 
             if model.isLoading {
-                LoadingOverlay(operation: model.loadingOperation)
+                LoadingOverlay(
+                    operation: model.loadingOperation,
+                    onCancel: model.canCancelLoading ? {
+                        Task {
+                            await model.cancelCurrentClassGeneration()
+                        }
+                    } : nil
+                )
             }
         }
         .background(SottoTheme.paper)
@@ -79,6 +86,7 @@ struct RootView: View {
 
 struct LoadingOverlay: View {
     let operation: SottoLoadingOperation?
+    let onCancel: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -102,18 +110,18 @@ struct LoadingOverlay: View {
                 }
 
                 if let progress = operation?.progress {
-                    HStack {
-                        if let currentStep = operation?.currentStep, let totalSteps = operation?.totalSteps {
-                            Text("Step \(currentStep) of \(totalSteps)")
-                        } else {
-                            Text("\(Int(progress * 100))%")
-                        }
-                        Spacer()
-                        Text(timeSummary)
-                    }
+                    Text(progressSummary(progress))
                     .font(.caption)
                     .foregroundStyle(SottoTheme.muted)
                     .monospacedDigit()
+                }
+
+                if let onCancel {
+                    Button(role: .destructive, action: onCancel) {
+                        Label("Cancel generation", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
                 }
             }
             .padding(28)
@@ -124,19 +132,12 @@ struct LoadingOverlay: View {
         }
     }
 
-    private var timeSummary: String {
-        let elapsed = formatDuration(operation?.elapsedSeconds)
-        guard let remainingSeconds = operation?.remainingSeconds else {
-            return "Elapsed \(elapsed)"
+    private func progressSummary(_ progress: Double) -> String {
+        let percent = "\(Int(max(0, min(1, progress)) * 100))%"
+        if let currentStep = operation?.currentStep, let totalSteps = operation?.totalSteps {
+            return "Step \(currentStep) of \(totalSteps) / \(percent)"
         }
-        return "Elapsed \(elapsed) / about \(formatDuration(remainingSeconds)) left"
-    }
-
-    private func formatDuration(_ seconds: Int?) -> String {
-        guard let seconds else { return "0:00" }
-        let minutes = max(0, seconds) / 60
-        let remainder = max(0, seconds) % 60
-        return "\(minutes):\(String(format: "%02d", remainder))"
+        return percent
     }
 }
 
@@ -179,25 +180,43 @@ private struct SottoProgressMark: View {
                     )
             }
 
-            VStack(spacing: 4) {
-                Text("Sotto")
-                    .font(.system(size: 22, weight: .bold, design: .serif))
-                    .foregroundStyle(
+            ZStack {
+                Circle()
+                    .fill(
                         LinearGradient(
                             colors: [
                                 Color(red: 0.416, green: 0.627, blue: 1.0),
+                                Color(red: 0.545, green: 0.482, blue: 1.0),
                                 Color(red: 1.0, green: 0.561, blue: 0.694),
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                if let clampedProgress {
-                    Text("\(Int(clampedProgress * 100))%")
-                        .font(.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(SottoTheme.muted)
-                }
+
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                .white.opacity(0.42),
+                                .white.opacity(0.08),
+                                .clear,
+                            ],
+                            center: .topLeading,
+                            startRadius: 0,
+                            endRadius: 58
+                        )
+                    )
+
+                Text("S")
+                    .font(.system(size: 34, weight: .bold, design: .serif))
+                    .foregroundStyle(.white.opacity(0.9))
+
+                Circle()
+                    .stroke(.white.opacity(0.28), lineWidth: 1)
             }
+            .frame(width: 76, height: 76)
+            .shadow(color: SottoTheme.primary.opacity(0.24), radius: 16, y: 8)
             .scaleEffect(reduceMotion ? 1 : (isAnimating ? 1.04 : 0.96))
             .opacity(reduceMotion ? 1 : (isAnimating ? 1 : 0.82))
             .animation(

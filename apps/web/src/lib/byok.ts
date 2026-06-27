@@ -72,6 +72,7 @@ export function decryptApiKey(encoded: string): string {
 export interface ByokCredentials {
   apiKey: string;
   userId?: string;
+  extra?: Record<string, string>;
 }
 
 export interface ByokKeyInfo {
@@ -91,9 +92,12 @@ export async function storeByokKey(
   credentials: ByokCredentials
 ): Promise<void> {
   const encryptedKey = encryptApiKey(credentials.apiKey);
-  const encryptedExtra = credentials.userId
-    ? encryptApiKey(JSON.stringify({ userId: credentials.userId }))
-    : null;
+  const extraData: Record<string, string> = {
+    ...(credentials.extra ?? {}),
+    ...(credentials.userId ? { userId: credentials.userId } : {}),
+  };
+  const encryptedExtra =
+    Object.keys(extraData).length > 0 ? encryptApiKey(JSON.stringify(extraData)) : null;
 
   const label = provider === 'suno' ? 'Suno' : getProviderMeta(provider).displayName;
 
@@ -122,7 +126,10 @@ export async function storeByokKey(
  * Retrieve and decrypt a user's BYOK key for a specific provider.
  * Returns null if the user has no key for that provider.
  */
-export async function getByokKey(userId: string, provider?: TtsProviderId | string): Promise<string | null> {
+export async function getByokKey(
+  userId: string,
+  provider?: TtsProviderId | string
+): Promise<string | null> {
   // Legacy: no provider arg → query elevenlabs (backward compat)
   const targetProvider = provider ?? 'elevenlabs';
 
@@ -203,7 +210,10 @@ export async function getByokExtraData(
 /**
  * Remove a user's BYOK key for a specific provider.
  */
-export async function removeByokKey(userId: string, provider?: TtsProviderId | 'suno'): Promise<void> {
+export async function removeByokKey(
+  userId: string,
+  provider?: TtsProviderId | 'suno'
+): Promise<void> {
   const targetProvider = provider ?? 'elevenlabs';
 
   await prisma.userTtsKey
@@ -242,7 +252,10 @@ export async function listByokProviders(userId: string): Promise<ByokKeyInfo[]> 
 /**
  * Check if a user has any BYOK key configured.
  */
-export async function hasByokKey(userId: string, provider?: TtsProviderId | string): Promise<boolean> {
+export async function hasByokKey(
+  userId: string,
+  provider?: TtsProviderId | string
+): Promise<boolean> {
   if (provider) {
     const count = await prisma.userTtsKey.count({
       where: { userId, provider, isValid: true },
@@ -397,7 +410,12 @@ export async function getAiKey(
 export async function getSharedAiKey(
   userId: string,
   provider?: AiProviderId
-): Promise<{ apiKey: string; provider: AiProviderId; ownerUserId: string; shared: boolean } | null> {
+): Promise<{
+  apiKey: string;
+  provider: AiProviderId;
+  ownerUserId: string;
+  shared: boolean;
+} | null> {
   const ownKey = await getAiKey(userId, provider);
   if (ownKey) return { ...ownKey, ownerUserId: userId, shared: false };
 
@@ -455,10 +473,7 @@ export async function listAiProviders(userId: string): Promise<AiKeyInfo[]> {
 /**
  * Validate an AI BYOK key against the provider's API.
  */
-export async function validateAiKey(
-  provider: AiProviderId,
-  apiKey: string
-): Promise<boolean> {
+export async function validateAiKey(provider: AiProviderId, apiKey: string): Promise<boolean> {
   return validateAiProviderCredentials(provider, { apiKey });
 }
 

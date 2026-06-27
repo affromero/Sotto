@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockCourseFindFirst = vi.fn();
 const mockCourseClassFindFirst = vi.fn();
+const mockCourseClassFindUnique = vi.fn();
 const mockCourseClassFindMany = vi.fn();
 const mockCourseClassCreate = vi.fn();
 const mockCourseClassUpdate = vi.fn();
@@ -25,6 +26,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     courseClass: {
       findFirst: (...args: unknown[]) => mockCourseClassFindFirst(...args),
+      findUnique: (...args: unknown[]) => mockCourseClassFindUnique(...args),
       findMany: (...args: unknown[]) => mockCourseClassFindMany(...args),
       create: (...args: unknown[]) => mockCourseClassCreate(...args),
       update: (...args: unknown[]) => mockCourseClassUpdate(...args),
@@ -65,7 +67,9 @@ vi.mock('@/lib/knowledge-graph', () => ({
 }));
 
 vi.mock('@/lib/class-listening-generator', () => ({
-  generateClassListening: vi.fn().mockResolvedValue({ sectionId: 'section-listening', episodeId: 'episode-listening' }),
+  generateClassListening: vi
+    .fn()
+    .mockResolvedValue({ sectionId: 'section-listening', episodeId: 'episode-listening' }),
 }));
 
 vi.mock('@/lib/class-speaking-generator', () => ({
@@ -88,6 +92,7 @@ import {
   getClassForUser,
   submitClass,
   regenerateFailedSections,
+  ClassGenerationCancelledError,
   CourseNotFoundError,
 } from '@/lib/class-service';
 
@@ -115,11 +120,41 @@ const SAMPLE_COURSE = {
 };
 
 const SAMPLE_QUESTIONS = [
-  { question: 'Q1?', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: 'Exp1', passageRef: null },
-  { question: 'Q2?', options: ['a', 'b', 'c', 'd'], correctIndex: 1, explanation: 'Exp2', passageRef: null },
-  { question: 'Q3?', options: ['a', 'b', 'c', 'd'], correctIndex: 2, explanation: 'Exp3', passageRef: null },
-  { question: 'Q4?', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: 'Exp4', passageRef: null },
-  { question: 'Q5?', options: ['a', 'b', 'c', 'd'], correctIndex: 1, explanation: 'Exp5', passageRef: null },
+  {
+    question: 'Q1?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 0,
+    explanation: 'Exp1',
+    passageRef: null,
+  },
+  {
+    question: 'Q2?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 1,
+    explanation: 'Exp2',
+    passageRef: null,
+  },
+  {
+    question: 'Q3?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 2,
+    explanation: 'Exp3',
+    passageRef: null,
+  },
+  {
+    question: 'Q4?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 0,
+    explanation: 'Exp4',
+    passageRef: null,
+  },
+  {
+    question: 'Q5?',
+    options: ['a', 'b', 'c', 'd'],
+    correctIndex: 1,
+    explanation: 'Exp5',
+    passageRef: null,
+  },
 ];
 
 // ---- createNextClass ----
@@ -130,10 +165,15 @@ describe('createNextClass', () => {
     // Default: $transaction runs all ops (each op is already a resolved promise from mocked methods)
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
-    mockClassSectionCreate.mockResolvedValue({ id: 'section-x', seed: 'course-1-GRAMMAR-1', skill: 'GRAMMAR' });
+    mockClassSectionCreate.mockResolvedValue({
+      id: 'section-x',
+      seed: 'course-1-GRAMMAR-1',
+      skill: 'GRAMMAR',
+    });
     mockLessonQuestionCreate.mockResolvedValue({});
     mockClassSectionUpdate.mockResolvedValue({});
     mockCourseClassCreate.mockResolvedValue({ id: 'class-new' });
+    mockCourseClassFindUnique.mockResolvedValue({ status: 'GENERATING' });
     mockCourseClassUpdate.mockResolvedValue({});
     mockCourseUpdate.mockResolvedValue({});
   });
@@ -181,7 +221,7 @@ describe('createNextClass', () => {
     expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(2);
     // Should have updated course.activeClassId
     expect(mockCourseUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ activeClassId: 'class-new' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ activeClassId: 'class-new' }) })
     );
   });
 
@@ -194,8 +234,20 @@ describe('createNextClass', () => {
 
     await expect(createNextClass('course-1', 'u1')).rejects.toThrow('AI failure');
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'class-new' } }),
+      expect.objectContaining({ where: { id: 'class-new' } })
     );
+  });
+
+  it('stops cleanly when the generated class is cancelled midway', async () => {
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockCourseClassFindUnique.mockResolvedValue(null);
+
+    await expect(createNextClass('course-1', 'u1')).rejects.toBeInstanceOf(
+      ClassGenerationCancelledError
+    );
+    expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
   });
 
   describe('sourced mode', () => {
@@ -215,22 +267,27 @@ describe('createNextClass', () => {
         sourceUrl: 'https://example.com/a',
       });
 
-      const result = await createNextClass('course-1', 'u1', { sourceUrl: 'https://example.com/a' });
+      const result = await createNextClass('course-1', 'u1', {
+        sourceUrl: 'https://example.com/a',
+      });
 
       expect(result.kind).toBe('created');
       // Source prepared at the LEARNER's current level, not the lesson level.
       expect(mockPrepareClassSource).toHaveBeenCalledWith(
-        expect.objectContaining({ url: 'https://example.com/a', level: 'B1', targetLang: 'es' }),
+        expect.objectContaining({ url: 'https://example.com/a', level: 'B1', targetLang: 'es' })
       );
       // The class records what it was built from.
       expect(mockCourseClassCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ sourceUrl: 'https://example.com/a', sourceTitle: 'Real Article' }),
-        }),
+          data: expect.objectContaining({
+            sourceUrl: 'https://example.com/a',
+            sourceTitle: 'Real Article',
+          }),
+        })
       );
       // The leveled passage is threaded into section generation.
       expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceContent: 'Ein angepasster Artikeltext.', level: 'B1' }),
+        expect.objectContaining({ sourceContent: 'Ein angepasster Artikeltext.', level: 'B1' })
       );
     });
 
@@ -240,10 +297,12 @@ describe('createNextClass', () => {
       expect(result.kind).toBe('created');
       expect(mockPrepareClassSource).not.toHaveBeenCalled();
       expect(mockCourseClassCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ sourceTitle: 'Mars rovers', sourceUrl: null }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ sourceTitle: 'Mars rovers', sourceUrl: null }),
+        })
       );
       expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
-        expect.objectContaining({ objective: 'Mars rovers', level: 'B1', sourceContent: undefined }),
+        expect.objectContaining({ objective: 'Mars rovers', level: 'B1', sourceContent: undefined })
       );
     });
 
@@ -252,7 +311,7 @@ describe('createNextClass', () => {
       mockPrepareClassSource.mockRejectedValue(new ClassSourceError('Could not read that link.'));
 
       await expect(
-        createNextClass('course-1', 'u1', { sourceUrl: 'https://paywalled.com/x' }),
+        createNextClass('course-1', 'u1', { sourceUrl: 'https://paywalled.com/x' })
       ).rejects.toBeInstanceOf(ClassSourceError);
       // Source prep happens BEFORE class creation, so nothing was persisted.
       expect(mockCourseClassCreate).not.toHaveBeenCalled();
@@ -400,7 +459,7 @@ describe('submitClass', () => {
       expect.objectContaining({
         where: { id: 'course-1' },
         data: { activeClassId: null },
-      }),
+      })
     );
   });
 
@@ -421,7 +480,7 @@ describe('submitClass', () => {
     // we verify the update mock was invoked at all and the outer courseClass.update (status update)
     // happens within the transaction block — we rely on the status value in the final update.
     expect(mockCourseClassUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'PASSED' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PASSED' }) })
     );
   });
 
@@ -431,7 +490,7 @@ describe('submitClass', () => {
     await submitClass('class-1', 'u1', allWrong);
 
     expect(mockCourseClassUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) })
     );
   });
 
@@ -446,13 +505,20 @@ describe('submitClass', () => {
     expect(result!.passedSections).toBe(0);
   });
 
-  function makeSpeakingClass(prompts: Array<{ id: string; recordings: Array<{ status: string; overallScore: number | null }> }>) {
+  function makeSpeakingClass(
+    prompts: Array<{
+      id: string;
+      recordings: Array<{ status: string; overallScore: number | null }>;
+    }>
+  ) {
     return {
       id: 'class-1',
       courseId: 'course-1',
       passThreshold: 0.5,
       lesson: SAMPLE_LESSON,
-      sections: [{ id: 'sec-speaking', skill: 'SPEAKING', passThreshold: 0.6, questions: [], prompts }],
+      sections: [
+        { id: 'sec-speaking', skill: 'SPEAKING', passThreshold: 0.6, questions: [], prompts },
+      ],
     };
   }
 
@@ -461,7 +527,7 @@ describe('submitClass', () => {
       makeSpeakingClass([
         { id: 'p1', recordings: [{ status: 'SCORED', overallScore: 0.9 }] },
         { id: 'p2', recordings: [{ status: 'SCORED', overallScore: 0.7 }] },
-      ]),
+      ])
     );
 
     const result = await submitClass('class-1', 'u1', []);
@@ -476,7 +542,7 @@ describe('submitClass', () => {
       makeSpeakingClass([
         { id: 'p1', recordings: [{ status: 'SCORED', overallScore: 0.9 }] },
         { id: 'p2', recordings: [] },
-      ]),
+      ])
     );
 
     const result = await submitClass('class-1', 'u1', []);
@@ -549,7 +615,7 @@ describe('regenerateFailedSections', () => {
       expect.objectContaining({
         where: { id: 'sec-grammar' },
         data: expect.objectContaining({ attempt: 2, seed: 'class-1-GRAMMAR-2' }),
-      }),
+      })
     );
   });
 
@@ -559,7 +625,7 @@ describe('regenerateFailedSections', () => {
     await regenerateFailedSections('class-1', 'u1');
 
     expect(mockLessonQuestionDeleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { sectionId: 'sec-grammar' } }),
+      expect.objectContaining({ where: { sectionId: 'sec-grammar' } })
     );
     expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(1);
     // New questions should be created inside $transaction
@@ -575,7 +641,7 @@ describe('regenerateFailedSections', () => {
       expect.objectContaining({
         where: { id: 'class-1' },
         data: expect.objectContaining({ status: 'IN_PROGRESS', failedAt: null }),
-      }),
+      })
     );
   });
 
@@ -594,10 +660,14 @@ describe('regenerateFailedSections', () => {
     expect(result).toBe(true);
     expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(2);
     expect(mockClassSectionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ attempt: 3, seed: 'class-1-GRAMMAR-3' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ attempt: 3, seed: 'class-1-GRAMMAR-3' }),
+      })
     );
     expect(mockClassSectionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ attempt: 3, seed: 'class-1-READING-3' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ attempt: 3, seed: 'class-1-READING-3' }),
+      })
     );
   });
 
@@ -611,14 +681,14 @@ describe('regenerateFailedSections', () => {
 
     expect(result).toBe(true);
     expect(mockSpeakingRecordingDeleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { sectionId: 'sec-speaking' } }),
+      expect.objectContaining({ where: { sectionId: 'sec-speaking' } })
     );
     // A speaking section has no MC questions to regenerate.
     expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
     expect(mockClassSectionUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ attempt: 2, seed: 'class-1-SPEAKING-2', status: 'READY' }),
-      }),
+      })
     );
   });
 });
@@ -638,7 +708,7 @@ describe('getClassForUser', () => {
     expect(mockCourseClassFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'class-1', course: { userId: 'u1' } },
-      }),
+      })
     );
   });
 
