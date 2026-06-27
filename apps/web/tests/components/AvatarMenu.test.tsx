@@ -8,8 +8,7 @@ const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }));
 
 vi.mock('next/image', () => ({
-  default: ({ src, alt }: { src: string; alt: string }) =>
-    React.createElement('img', { src, alt }),
+  default: ({ src, alt }: { src: string; alt: string }) => React.createElement('img', { src, alt }),
 }));
 
 import { AvatarMenu } from '@/components/layout/AvatarMenu';
@@ -69,6 +68,7 @@ describe('AvatarMenu', () => {
     expect(screen.getByText('owner')).toBeInTheDocument();
     expect(screen.getByText('Admin console')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /who.s learning/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /exit profile/i })).toBeInTheDocument();
     // Switch face for the other profile appears once the household loads.
     expect(await screen.findByRole('button', { name: /switch to lena/i })).toBeInTheDocument();
   });
@@ -85,6 +85,21 @@ describe('AvatarMenu', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/profiles/switch',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ profileId: 'lena' }) })
+    );
+  });
+
+  it('exits the active profile and routes to the profile picker', async () => {
+    const fetchMock = mockFetch();
+    const user = userEvent.setup();
+    render(<AvatarMenu user={owner} />);
+
+    await user.click(screen.getByRole('button', { name: /open your menu/i }));
+    await user.click(screen.getByRole('menuitem', { name: /exit profile/i }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/profiles'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/profiles/switch',
+      expect.objectContaining({ method: 'DELETE' })
     );
   });
 

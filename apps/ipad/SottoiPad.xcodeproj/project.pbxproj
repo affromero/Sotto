@@ -19,6 +19,7 @@
 		A1000000000000000000000A /* ClassSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* ClassSessionView.swift */; };
 		A1000000000000000000000B /* PracticeStartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PracticeStartView.swift */; };
 		A1000000000000000000000C /* WorkbookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* WorkbookView.swift */; };
+		A1000000000000000000000D /* ProfileSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* ProfileSelectionView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		A2000000000000000000000B /* PracticeStartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeStartView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000C /* WorkbookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbookView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000000E /* ProfileSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSelectionView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				A4000000000000000000000A /* Pairing */,
+				A4000000000000000000000E /* Profile */,
 				A4000000000000000000000B /* Learn */,
 				A4000000000000000000000C /* Practice */,
 				A4000000000000000000000D /* Workbook */,
@@ -147,6 +150,14 @@
 				A2000000000000000000000A /* ClassSessionView.swift */,
 			);
 			path = Learn;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000E /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000E /* ProfileSelectionView.swift */,
+			);
+			path = Profile;
 			sourceTree = "<group>";
 		};
 		A4000000000000000000000C /* Practice */ = {
@@ -245,6 +256,7 @@
 				A1000000000000000000000A /* ClassSessionView.swift in Sources */,
 				A1000000000000000000000B /* PracticeStartView.swift in Sources */,
 				A1000000000000000000000C /* WorkbookView.swift in Sources */,
+				A1000000000000000000000D /* ProfileSelectionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

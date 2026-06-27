@@ -4,6 +4,7 @@ struct SottoCredentials: Codable, Equatable {
     let serverURL: URL
     let apiKey: String
     let user: SottoUser?
+    let selectedProfile: SottoProfile?
 }
 
 struct SottoUser: Codable, Equatable {
@@ -17,6 +18,26 @@ struct SottoUser: Codable, Equatable {
 struct PairingRedeemResponse: Decodable {
     let token: String
     let user: SottoUser?
+}
+
+struct SottoProfileListResponse: Decodable {
+    let profiles: [SottoProfile]
+}
+
+struct SottoProfile: Codable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let avatarUrl: String
+    let isOwner: Bool
+    let role: String
+    let courseCount: Int?
+    let primaryCourse: SottoProfileCourse?
+    let isActive: Bool?
+}
+
+struct SottoProfileCourse: Codable, Equatable {
+    let targetLang: String
+    let level: String
 }
 
 struct SottoCourseListResponse: Decodable {

@@ -5,6 +5,7 @@ import { logger } from './logger';
 import type { NextRequest } from 'next/server';
 
 const KEY_PREFIX = 'sk_sotto_';
+const PROFILE_HEADER = 'x-sotto-profile-id';
 
 export function generateApiKey(): { key: string; hash: string; prefix: string } {
   const randomBytes = crypto.randomBytes(32).toString('hex');
@@ -31,12 +32,17 @@ export async function validateApiKey(key: string): Promise<{ userId: string } | 
   }
 
   // Update lastUsedAt (fire and forget)
-  prisma.apiKey.update({
-    where: { id: apiKey.id },
-    data: { lastUsedAt: new Date() },
-  }).catch((err) => {
-    logger.warn('Failed to update API key lastUsedAt', { keyId: apiKey.id, error: err instanceof Error ? err.message : String(err) });
-  });
+  prisma.apiKey
+    .update({
+      where: { id: apiKey.id },
+      data: { lastUsedAt: new Date() },
+    })
+    .catch((err) => {
+      logger.warn('Failed to update API key lastUsedAt', {
+        keyId: apiKey.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
   return { userId: apiKey.userId };
 }
@@ -49,7 +55,21 @@ export async function authenticateRequest(
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     if (token.startsWith(KEY_PREFIX)) {
-      return validateApiKey(token);
+      const apiKeyAuth = await validateApiKey(token);
+      if (!apiKeyAuth) return null;
+
+      const requestedProfileId = request.headers.get(PROFILE_HEADER)?.trim();
+      if (!requestedProfileId) return apiKeyAuth;
+
+      // Native/tablet clients carry one paired API key and choose a household
+      // profile separately. Match the passwordless local picker, but fail closed
+      // if the selected profile no longer exists.
+      const profile = await prisma.user.findUnique({
+        where: { id: requestedProfileId },
+        select: { id: true },
+      });
+
+      return profile ? { userId: profile.id } : null;
     }
   }
 

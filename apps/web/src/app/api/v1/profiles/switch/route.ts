@@ -3,11 +3,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/local-user';
 import { switchProfileSchema } from '@/lib/validations';
-import {
-  THEME_PREFS_COOKIE,
-  serializeThemePrefs,
-  themePrefsFromUser,
-} from '@/lib/theme-prefs';
+import { THEME_PREFS_COOKIE, serializeThemePrefs, themePrefsFromUser } from '@/lib/theme-prefs';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 
@@ -64,5 +60,27 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : String(error),
     });
     return errorResponse('Failed to switch profile', 500);
+  }
+}
+
+/**
+ * Exit the currently selected household profile. This does not revoke API keys,
+ * delete data, or sign out of a server account; it only clears the local active
+ * profile cookie so the next app load returns to the household picker.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const authed = await authenticateRequest(request);
+    if (!authed) return errorResponse('Unauthorized', 401);
+
+    const response = NextResponse.json({ ok: true });
+    response.cookies.delete(ACTIVE_PROFILE_COOKIE);
+    response.cookies.delete(THEME_PREFS_COOKIE);
+    return response;
+  } catch (error: unknown) {
+    logger.error('Failed to exit profile', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return errorResponse('Failed to exit profile', 500);
   }
 }

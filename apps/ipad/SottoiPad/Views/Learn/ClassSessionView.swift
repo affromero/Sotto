@@ -46,6 +46,10 @@ struct ClassSessionView: View {
                     }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
+                    ProfileToolbarMenu {
+                        dismiss()
+                    }
+
                     Button {
                         let classId = currentClass.id
                         Task {
@@ -74,6 +78,7 @@ struct ClassSessionView: View {
             .sheet(isPresented: workbookSheetBinding) {
                 if let workbook = model.workbook {
                     WorkbookView(response: workbook)
+                        .environmentObject(model)
                 }
             }
         }

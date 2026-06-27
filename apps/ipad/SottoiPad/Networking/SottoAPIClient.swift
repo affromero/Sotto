@@ -3,12 +3,31 @@ import Foundation
 struct SottoAPIClient {
     let serverURL: URL
     let apiKey: String?
+    let profileId: String?
+
+    init(serverURL: URL, apiKey: String?, profileId: String? = nil) {
+        self.serverURL = serverURL
+        self.apiKey = apiKey
+        self.profileId = profileId
+    }
 
     func redeemPairingToken(_ token: String) async throws -> PairingRedeemResponse {
         try await post(
             "/api/v1/auth/pair/redeem",
             body: PairingRedeemRequest(token: token),
             authorized: false
+        )
+    }
+
+    func listProfiles() async throws -> [SottoProfile] {
+        let response: SottoProfileListResponse = try await get("/api/v1/profiles")
+        return response.profiles
+    }
+
+    func createProfile(name: String, avatarSlug: String?) async throws -> SottoProfile {
+        try await post(
+            "/api/v1/profiles",
+            body: CreateProfileRequest(name: name, avatarSlug: avatarSlug)
         )
     }
 
@@ -96,6 +115,9 @@ struct SottoAPIClient {
 
         if authorized, let apiKey {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            if let profileId {
+                request.setValue(profileId, forHTTPHeaderField: "X-Sotto-Profile-Id")
+            }
         }
 
         return request
@@ -136,6 +158,11 @@ struct SottoAPIClient {
 
 private struct PairingRedeemRequest: Encodable {
     let token: String
+}
+
+private struct CreateProfileRequest: Encodable {
+    let name: String
+    let avatarSlug: String?
 }
 
 private struct StartPracticeRequest: Encodable {

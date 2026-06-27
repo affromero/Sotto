@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 final class SottoAppModel: ObservableObject {
     @Published private(set) var credentials: SottoCredentials?
+    @Published private(set) var profiles: [SottoProfile] = []
     @Published private(set) var courses: [SottoCourse] = []
     @Published var selectedClass: SottoClassDetail?
     @Published var practiceStart: SottoPracticeStart?
@@ -21,6 +22,14 @@ final class SottoAppModel: ObservableObject {
 
     var isPaired: Bool {
         credentials != nil
+    }
+
+    var hasSelectedProfile: Bool {
+        credentials?.selectedProfile != nil
+    }
+
+    var activeProfile: SottoProfile? {
+        credentials?.selectedProfile
     }
 
     func pair(with scannedValue: String) async {
@@ -48,17 +57,13 @@ final class SottoAppModel: ObservableObject {
             let nextCredentials = SottoCredentials(
                 serverURL: pairing.serverURL,
                 apiKey: response.token,
-                user: response.user
+                user: response.user,
+                selectedProfile: nil
             )
             try credentialStore.save(nextCredentials)
             credentials = nextCredentials
-            courses = []
-            selectedClass = nil
-            practiceStart = nil
-            classResult = nil
-            practiceResult = nil
-            workbook = nil
-            await loadCourses()
+            resetLearnerState()
+            await loadProfiles()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -69,17 +74,98 @@ final class SottoAppModel: ObservableObject {
     func signOut() {
         try? credentialStore.delete()
         credentials = nil
+        profiles = []
+        resetLearnerState()
+        errorMessage = nil
+    }
+
+    func clearSelectedProfile() {
+        guard let credentials else { return }
+        let nextCredentials = SottoCredentials(
+            serverURL: credentials.serverURL,
+            apiKey: credentials.apiKey,
+            user: credentials.user,
+            selectedProfile: nil
+        )
+        try? credentialStore.save(nextCredentials)
+        self.credentials = nextCredentials
+        resetLearnerState()
+        errorMessage = nil
+    }
+
+    func loadProfiles() async {
+        guard let client = makeClient(usesSelectedProfile: false) else { return }
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            profiles = try await client.listProfiles()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    func selectProfile(_ profile: SottoProfile) async {
+        guard let credentials else { return }
+        let selected = profiles.first { $0.id == profile.id } ?? profile
+        let nextCredentials = SottoCredentials(
+            serverURL: credentials.serverURL,
+            apiKey: credentials.apiKey,
+            user: credentials.user,
+            selectedProfile: selected
+        )
+
+        do {
+            try credentialStore.save(nextCredentials)
+            self.credentials = nextCredentials
+            resetLearnerState()
+            await loadCourses()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func createProfile(name: String, avatarSlug: String?) async {
+        guard let client = makeClient(usesSelectedProfile: false) else { return }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Enter a profile name."
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let created = try await client.createProfile(name: trimmedName, avatarSlug: avatarSlug)
+            if let refreshedProfiles = try? await client.listProfiles() {
+                profiles = refreshedProfiles
+            } else if !profiles.contains(where: { $0.id == created.id }) {
+                profiles.append(created)
+            }
+            isLoading = false
+            await selectProfile(profiles.first { $0.id == created.id } ?? created)
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    private func resetLearnerState() {
         courses = []
         selectedClass = nil
         practiceStart = nil
         classResult = nil
         practiceResult = nil
         workbook = nil
-        errorMessage = nil
     }
 
     func loadCourses() async {
-        guard let client = makeClient() else { return }
+        guard hasSelectedProfile, let client = makeClient() else { return }
         isLoading = true
         errorMessage = nil
 
@@ -224,9 +310,13 @@ final class SottoAppModel: ObservableObject {
         await openWorkbook(for: activeClassId)
     }
 
-    private func makeClient() -> SottoAPIClient? {
+    private func makeClient(usesSelectedProfile: Bool = true) -> SottoAPIClient? {
         guard let credentials else { return nil }
-        return SottoAPIClient(serverURL: credentials.serverURL, apiKey: credentials.apiKey)
+        return SottoAPIClient(
+            serverURL: credentials.serverURL,
+            apiKey: credentials.apiKey,
+            profileId: usesSelectedProfile ? credentials.selectedProfile?.id : nil
+        )
     }
 
     private func startClassGenerationPolling(
