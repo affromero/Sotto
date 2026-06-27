@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse, printParseErrorCode } from 'jsonc-parser';
-import { format } from 'prettier';
+import { format, resolveConfig } from 'prettier';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configDir = join(__dirname, '..', 'src', 'lib');
@@ -21,7 +21,8 @@ if (errors.length > 0) {
   throw new Error(`Invalid speech language support JSONC:\n${formatted}`);
 }
 
-const output = await format(JSON.stringify(parsed, null, 2), { parser: 'json' });
+const prettierConfig = (await resolveConfig(outputPath)) ?? {};
+const output = await format(JSON.stringify(parsed, null, 2), { ...prettierConfig, parser: 'json' });
 
 if (checkOnly) {
   const current = readFileSync(outputPath, 'utf8');
