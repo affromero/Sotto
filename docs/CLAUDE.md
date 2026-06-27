@@ -4,13 +4,15 @@ User-facing documentation for self-hosting, deploying, developing, and extending
 
 ## Docs
 
-| File | Purpose |
-|---|---|
-| `01-technical-architecture.md` | System architecture and data model |
-| `02-hosting-infrastructure.md` | Self-hosting infrastructure and topology |
-| `03-self-host-deployment.md` | Deployment guide |
-| `04-local-development.md` | Local OSS setup (no Doppler) |
+| File                             | Purpose                                             |
+| -------------------------------- | --------------------------------------------------- |
+| `01-technical-architecture.md`   | System architecture and data model                  |
+| `02-hosting-infrastructure.md`   | Self-hosting infrastructure and topology            |
+| `03-self-host-deployment.md`     | Deployment guide                                    |
+| `04-local-development.md`        | Local OSS setup (no Doppler)                        |
 | `05-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
+| `06-user-flows.md`               | End-to-end self-hosted learner and operator flows   |
+| `07-architecture-diagrams.md`    | Mermaid diagrams for architecture and API flows     |
 
 ## Rules
 
