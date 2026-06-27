@@ -27,14 +27,23 @@ export async function POST(request: NextRequest) {
     return errorResponse('Invalid request', 400, { details: parsed.error.flatten() });
   }
 
-  const { provider, apiKey } = parsed.data;
+  const { provider, apiKey, userId, adminApiKey, monthlyCreditLimit, billingResetDay } =
+    parsed.data;
 
   const isValid = await validateByokKey(provider, { apiKey });
   if (!isValid) {
     return errorResponse(`Invalid ${provider} credentials. Please check and try again.`, 422);
   }
 
-  await storeByokKey(authed.userId, provider, { apiKey });
+  await storeByokKey(authed.userId, provider, {
+    apiKey,
+    userId,
+    extra: {
+      ...(adminApiKey ? { adminApiKey } : {}),
+      ...(monthlyCreditLimit ? { monthlyCreditLimit } : {}),
+      ...(billingResetDay ? { billingResetDay } : {}),
+    },
+  });
   return NextResponse.json({ success: true });
 }
 

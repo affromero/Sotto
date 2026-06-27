@@ -222,6 +222,20 @@ export const refreshPicksSchema = z.object({
 /**
  * BYOK API key validation (multi-provider)
  */
+const optionalPositiveIntegerString = z
+  .string()
+  .trim()
+  .regex(/^[1-9]\d*$/)
+  .max(32)
+  .optional();
+
+const optionalBillingResetDayString = z
+  .string()
+  .trim()
+  .regex(/^[1-9]\d?$/)
+  .refine((value) => Number(value) >= 1 && Number(value) <= 31)
+  .optional();
+
 export const byokSchema = z.object({
   provider: z.enum([
     'elevenlabs',
@@ -239,6 +253,10 @@ export const byokSchema = z.object({
     'suno',
   ]),
   apiKey: z.string().min(10).max(500),
+  userId: z.string().trim().min(1).max(500).optional(),
+  adminApiKey: z.string().trim().min(10).max(500).optional(),
+  monthlyCreditLimit: optionalPositiveIntegerString,
+  billingResetDay: optionalBillingResetDayString,
 });
 
 export const byokProviderSchema = byokSchema.pick({ provider: true });

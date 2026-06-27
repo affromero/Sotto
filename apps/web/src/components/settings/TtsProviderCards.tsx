@@ -281,7 +281,7 @@ export function TtsProviderCards({
                   <Input
                     key={field.key}
                     label={field.label}
-                    type="password"
+                    type={field.type ?? 'password'}
                     value={fieldValues[`${provider.id}-${field.key}`] || ''}
                     onChange={(e) =>
                       setFieldValues((prev) => ({
@@ -289,7 +289,9 @@ export function TtsProviderCards({
                         [`${provider.id}-${field.key}`]: e.target.value,
                       }))
                     }
-                    placeholder={field.placeholder}
+                    placeholder={
+                      field.optional ? `${field.placeholder} · optional` : field.placeholder
+                    }
                   />
                 ))}
                 <div className={styles.keyFormActions}>

@@ -16,6 +16,12 @@ import type { SkillType, CefrLevel } from '@sotto/shared';
 const MC_SKILLS: SkillType[] = ['GRAMMAR', 'READING'];
 
 export class CourseNotFoundError extends Error {}
+export class ClassGenerationCancelledError extends Error {
+  constructor(classId: string) {
+    super(`Class generation was cancelled for ${classId}`);
+    this.name = 'ClassGenerationCancelledError';
+  }
+}
 
 interface LessonLike {
   id: string;
@@ -30,8 +36,37 @@ interface LessonLike {
 function lessonInputs(lesson: LessonLike) {
   return {
     grammarPoints: (Array.isArray(lesson.grammarPoints) ? lesson.grammarPoints : []) as string[],
-    targetVocab: (Array.isArray(lesson.targetVocab) ? lesson.targetVocab : []) as Array<{ lemma: string; gloss: string }>,
+    targetVocab: (Array.isArray(lesson.targetVocab) ? lesson.targetVocab : []) as Array<{
+      lemma: string;
+      gloss: string;
+    }>,
   };
+}
+
+async function assertClassStillGenerating(classId: string) {
+  const cls = await prisma.courseClass.findUnique({
+    where: { id: classId },
+    select: { status: true },
+  });
+
+  if (!cls || cls.status !== 'GENERATING') {
+    throw new ClassGenerationCancelledError(classId);
+  }
+}
+
+async function rethrowIfGenerationWasCancelled(classId: string, error: unknown) {
+  if (error instanceof ClassGenerationCancelledError) throw error;
+
+  const cls = await prisma.courseClass
+    .findUnique({
+      where: { id: classId },
+      select: { status: true },
+    })
+    .catch(() => null);
+
+  if (!cls || cls.status !== 'GENERATING') {
+    throw new ClassGenerationCancelledError(classId);
+  }
 }
 
 /** Optional overrides for a sourced class: level/objective adapt to the learner +
@@ -50,12 +85,21 @@ async function buildSection(
   nativeLang: string,
   targetLang: string,
   note: string,
-  over?: SectionOverride,
+  over?: SectionOverride
 ): Promise<void> {
+  await assertClassStillGenerating(classId);
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
   const section = await prisma.classSection.create({
-    data: { classId, skill, attempt: 1, seed: `${classId}-${skill}-1`, spec: { lessonSlug: lesson.slug }, status: 'GENERATING' },
+    data: {
+      classId,
+      skill,
+      attempt: 1,
+      seed: `${classId}-${skill}-1`,
+      spec: { lessonSlug: lesson.slug },
+      status: 'GENERATING',
+    },
   });
+  await assertClassStillGenerating(classId);
   const questions = await generateSectionQuestions({
     userId,
     skill,
@@ -69,6 +113,7 @@ async function buildSection(
     note,
     sourceContent: over?.sourceContent,
   });
+  await assertClassStillGenerating(classId);
   await prisma.$transaction([
     ...questions.map((q, i) =>
       prisma.lessonQuestion.create({
@@ -83,10 +128,14 @@ async function buildSection(
           passageRef: q.passageRef ?? null,
           passageText: q.passageText ?? null,
         },
-      }),
+      })
     ),
-    prisma.classSection.update({ where: { id: section.id }, data: { status: 'READY', generatedAt: new Date() } }),
+    prisma.classSection.update({
+      where: { id: section.id },
+      data: { status: 'READY', generatedAt: new Date() },
+    }),
   ]);
+  await assertClassStillGenerating(classId);
 }
 
 export type NextClassResult =
@@ -105,7 +154,7 @@ export interface SourcedClassOpts {
 export async function createNextClass(
   courseId: string,
   userId: string,
-  opts?: SourcedClassOpts,
+  opts?: SourcedClassOpts
 ): Promise<NextClassResult> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
@@ -120,7 +169,10 @@ export async function createNextClass(
   });
   if (active) return { kind: 'gated', activeClassId: active.id, status: active.status };
 
-  const passed = await prisma.courseClass.findMany({ where: { courseId, status: 'PASSED' }, select: { lessonId: true } });
+  const passed = await prisma.courseClass.findMany({
+    where: { courseId, status: 'PASSED' },
+    select: { lessonId: true },
+  });
   const passedSet = new Set(passed.map((p) => p.lessonId));
   const lesson = course.curriculum.lessons.find((l) => !passedSet.has(l.id));
   if (!lesson) return { kind: 'done' };
@@ -133,7 +185,11 @@ export async function createNextClass(
   let sourceTitle: string | null = null;
   let sourceUrl: string | null = null;
   let override: SectionOverride | undefined;
-  let listeningSource: { sourceContent?: string; sourceMetadata?: PreparedClassSource['sourceMetadata']; sourceUrl?: string } = {};
+  let listeningSource: {
+    sourceContent?: string;
+    sourceMetadata?: PreparedClassSource['sourceMetadata'];
+    sourceUrl?: string;
+  } = {};
 
   if (opts?.sourceUrl) {
     prepared = await prepareClassSource({
@@ -145,8 +201,16 @@ export async function createNextClass(
     });
     sourceTitle = prepared.title;
     sourceUrl = prepared.sourceUrl;
-    override = { level: course.currentLevel, objective: prepared.title ?? lesson.objective, sourceContent: prepared.leveledContent };
-    listeningSource = { sourceContent: prepared.leveledContent, sourceMetadata: prepared.sourceMetadata, sourceUrl: prepared.sourceUrl };
+    override = {
+      level: course.currentLevel,
+      objective: prepared.title ?? lesson.objective,
+      sourceContent: prepared.leveledContent,
+    };
+    listeningSource = {
+      sourceContent: prepared.leveledContent,
+      sourceMetadata: prepared.sourceMetadata,
+      sourceUrl: prepared.sourceUrl,
+    };
   } else if (opts?.topic) {
     // Topic mode: no extracted text; the listening script web-searches the topic
     // for citations, and sections are built about the topic at the learner's level.
@@ -155,28 +219,50 @@ export async function createNextClass(
   }
 
   const cls = await prisma.courseClass.create({
-    data: { courseId, lessonId: lesson.id, order: lesson.order, status: 'GENERATING', sourceUrl, sourceTitle },
+    data: {
+      courseId,
+      lessonId: lesson.id,
+      order: lesson.order,
+      status: 'GENERATING',
+      sourceUrl,
+      sourceTitle,
+    },
   });
 
   const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
+  await assertClassStillGenerating(cls.id);
 
   try {
     for (const skill of MC_SKILLS) {
-      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang, note, override);
+      await buildSection(
+        cls.id,
+        userId,
+        skill,
+        lesson,
+        course.nativeLang,
+        course.targetLang,
+        note,
+        override
+      );
     }
   } catch (err) {
+    await rethrowIfGenerationWasCancelled(cls.id, err);
     // Roll back the half-built class so the learner can retry cleanly.
     await prisma.courseClass.delete({ where: { id: cls.id } }).catch(() => {});
     throw err;
   }
+  await assertClassStillGenerating(cls.id);
 
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
   await seedLessonItems(courseId, cls.id, lesson.level as CefrLevel, targetVocab, grammarPoints);
+  await assertClassStillGenerating(cls.id);
   const due = await getDueItems(courseId);
+  await assertClassStillGenerating(cls.id);
 
   // Adaptive listening section — non-blocking: a TTS/AI hiccup must not
   // prevent the learner from accessing their MC sections.
   try {
+    await assertClassStillGenerating(cls.id);
     await generateClassListening({
       userId,
       classId: cls.id,
@@ -191,7 +277,9 @@ export async function createNextClass(
       sourceMetadata: listeningSource.sourceMetadata,
       sourceUrl: listeningSource.sourceUrl,
     });
+    await assertClassStillGenerating(cls.id);
   } catch (err) {
+    await rethrowIfGenerationWasCancelled(cls.id, err);
     logger.warn('generateClassListening failed; continuing without listening section', {
       classId: cls.id,
       error: err instanceof Error ? err.message : String(err),
@@ -200,6 +288,7 @@ export async function createNextClass(
 
   // Speaking section — non-blocking, same rationale as the listening section.
   try {
+    await assertClassStillGenerating(cls.id);
     await generateClassSpeaking({
       userId,
       classId: cls.id,
@@ -210,7 +299,9 @@ export async function createNextClass(
       targetVocab,
       note,
     });
+    await assertClassStillGenerating(cls.id);
   } catch (err) {
+    await rethrowIfGenerationWasCancelled(cls.id, err);
     logger.warn('generateClassSpeaking failed; continuing without speaking section', {
       classId: cls.id,
       error: err instanceof Error ? err.message : String(err),
@@ -219,6 +310,7 @@ export async function createNextClass(
 
   // Writing section — non-blocking, same rationale as listening/speaking.
   try {
+    await assertClassStillGenerating(cls.id);
     await generateClassWriting({
       userId,
       classId: cls.id,
@@ -229,13 +321,16 @@ export async function createNextClass(
       targetVocab,
       note,
     });
+    await assertClassStillGenerating(cls.id);
   } catch (err) {
+    await rethrowIfGenerationWasCancelled(cls.id, err);
     logger.warn('generateClassWriting failed; continuing without writing section', {
       classId: cls.id,
       error: err instanceof Error ? err.message : String(err),
     });
   }
 
+  await assertClassStillGenerating(cls.id);
   await prisma.courseClass.update({
     where: { id: cls.id },
     data: {
@@ -304,7 +399,7 @@ export interface SubmitResult {
 export async function submitClass(
   classId: string,
   userId: string,
-  answers: Array<{ questionId: string; selectedIndex: number }>,
+  answers: Array<{ questionId: string; selectedIndex: number }>
 ): Promise<SubmitResult | null> {
   const cls = await prisma.courseClass.findFirst({
     where: { id: classId, course: { userId } },
@@ -322,7 +417,12 @@ export async function submitClass(
   if (!cls) return null;
 
   const answerMap = new Map(answers.map((a) => [a.questionId, a.selectedIndex]));
-  const graded: Array<{ sectionId: string; questionId: string; selectedIndex: number; isCorrect: boolean }> = [];
+  const graded: Array<{
+    sectionId: string;
+    questionId: string;
+    selectedIndex: number;
+    isCorrect: boolean;
+  }> = [];
   const sectionResults: SubmitResult['sections'] = [];
   let passedSections = 0;
 
@@ -334,11 +434,13 @@ export async function submitClass(
         const scored = p.recordings.find((r) => r.status === 'SCORED' && r.overallScore != null);
         return scored?.overallScore ?? 0;
       });
-      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+      score =
+        promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
     } else if (s.skill === 'WRITING') {
       // Average the latest response score per writing prompt; ungraded prompts count as 0.
       const promptScores = s.writingPrompts.map((p) => p.responses[0]?.overallScore ?? 0);
-      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+      score =
+        promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
     } else {
       let correct = 0;
       for (const q of s.questions) {
@@ -364,7 +466,7 @@ export async function submitClass(
       prisma.classSection.update({
         where: { id: r.id },
         data: { score: r.score, passed: r.passed, status: r.passed ? 'PASSED' : 'FAILED' },
-      }),
+      })
     ),
     prisma.classSubmission.upsert({
       where: { classId },
@@ -374,7 +476,12 @@ export async function submitClass(
         overallScore,
         passed: classPassed,
         answers: {
-          create: graded.map((g) => ({ sectionId: g.sectionId, questionId: g.questionId, selectedIndex: g.selectedIndex, isCorrect: g.isCorrect })),
+          create: graded.map((g) => ({
+            sectionId: g.sectionId,
+            questionId: g.questionId,
+            selectedIndex: g.selectedIndex,
+            isCorrect: g.isCorrect,
+          })),
         },
       },
       update: {
@@ -383,13 +490,22 @@ export async function submitClass(
         submittedAt: now,
         answers: {
           deleteMany: {},
-          create: graded.map((g) => ({ sectionId: g.sectionId, questionId: g.questionId, selectedIndex: g.selectedIndex, isCorrect: g.isCorrect })),
+          create: graded.map((g) => ({
+            sectionId: g.sectionId,
+            questionId: g.questionId,
+            selectedIndex: g.selectedIndex,
+            isCorrect: g.isCorrect,
+          })),
         },
       },
     }),
     prisma.courseClass.update({
       where: { id: classId },
-      data: { status: classPassed ? 'PASSED' : 'FAILED', submittedAt: now, ...(classPassed ? { passedAt: now } : { failedAt: now }) },
+      data: {
+        status: classPassed ? 'PASSED' : 'FAILED',
+        submittedAt: now,
+        ...(classPassed ? { passedAt: now } : { failedAt: now }),
+      },
     }),
   ]);
 
@@ -407,10 +523,16 @@ export async function submitClass(
     grammarPoints,
     readingScore,
     grammarScore,
-    now,
+    now
   );
 
-  return { passed: classPassed, overallScore, passedSections, totalSections, sections: sectionResults };
+  return {
+    passed: classPassed,
+    overallScore,
+    passedSections,
+    totalSections,
+    sections: sectionResults,
+  };
 }
 
 // Regenerate the FAILED sections of a class in a different form. In-place:
@@ -474,12 +596,18 @@ export async function regenerateFailedSections(classId: string, userId: string):
             passageRef: q.passageRef ?? null,
             passageText: q.passageText ?? null,
           },
-        }),
+        })
       ),
-      prisma.classSection.update({ where: { id: s.id }, data: { status: 'READY', generatedAt: new Date() } }),
+      prisma.classSection.update({
+        where: { id: s.id },
+        data: { status: 'READY', generatedAt: new Date() },
+      }),
     ]);
   }
 
-  await prisma.courseClass.update({ where: { id: classId }, data: { status: 'IN_PROGRESS', failedAt: null } });
+  await prisma.courseClass.update({
+    where: { id: classId },
+    data: { status: 'IN_PROGRESS', failedAt: null },
+  });
   return true;
 }

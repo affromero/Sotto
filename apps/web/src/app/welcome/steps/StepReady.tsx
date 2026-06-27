@@ -31,6 +31,9 @@ import c from '../components.styles';
 
 const MAX_ONBOARDING_NOTE_CHARS = 4000;
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
+const CARTESIA_ADMIN_KEY_ID = 'cartesia:adminApiKey';
+const CARTESIA_MONTHLY_LIMIT_ID = 'cartesia:monthlyCreditLimit';
+const CARTESIA_RESET_DAY_ID = 'cartesia:billingResetDay';
 
 function contextKindLabel(item: ContextItem) {
   if (item.kind === 'article') return 'article/news';
@@ -115,7 +118,11 @@ export function StepReady({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: post.provider, apiKey: post.apiKey }),
+        body: JSON.stringify({
+          provider: post.provider,
+          apiKey: post.apiKey,
+          ...(post.extra ?? {}),
+        }),
       });
       return res.ok;
     } catch {
@@ -144,7 +151,20 @@ export function StepReady({
       voice.tts,
       voice.keys[voice.tts] ?? '',
       voice.baseUrls[voice.tts] ?? '',
-      voice.ttsModel[voice.tts] ?? ''
+      voice.ttsModel[voice.tts] ?? '',
+      voice.tts === 'cartesia'
+        ? {
+            ...(voice.keys[CARTESIA_ADMIN_KEY_ID]?.trim()
+              ? { adminApiKey: voice.keys[CARTESIA_ADMIN_KEY_ID].trim() }
+              : {}),
+            ...(voice.keys[CARTESIA_MONTHLY_LIMIT_ID]?.trim()
+              ? { monthlyCreditLimit: voice.keys[CARTESIA_MONTHLY_LIMIT_ID].trim() }
+              : {}),
+            ...(voice.keys[CARTESIA_RESET_DAY_ID]?.trim()
+              ? { billingResetDay: voice.keys[CARTESIA_RESET_DAY_ID].trim() }
+              : {}),
+          }
+        : undefined
     );
     const stt = resolveStt(
       voice.stt,

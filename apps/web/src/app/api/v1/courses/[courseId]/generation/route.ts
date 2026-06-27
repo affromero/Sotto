@@ -187,3 +187,39 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     updatedAt: cls.updatedAt.toISOString(),
   });
 }
+
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const authed = await authenticateRequest(request);
+  if (!authed) return errorResponse('Unauthorized', 401);
+
+  const { courseId } = await params;
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, userId: authed.userId },
+    select: {
+      id: true,
+      classes: {
+        where: { status: 'GENERATING' },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!course) return errorResponse('Course not found', 404);
+
+  const cls = course.classes[0];
+  if (!cls) {
+    return NextResponse.json({ cancelled: false });
+  }
+
+  await prisma.$transaction([
+    prisma.course.updateMany({
+      where: { id: courseId, userId: authed.userId, activeClassId: cls.id },
+      data: { activeClassId: null },
+    }),
+    prisma.courseClass.deleteMany({ where: { id: cls.id, courseId } }),
+  ]);
+
+  return NextResponse.json({ cancelled: true, classId: cls.id });
+}

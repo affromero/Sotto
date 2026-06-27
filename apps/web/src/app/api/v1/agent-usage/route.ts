@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const usage = await getAgentUsageStatus();
+  const usage = await getAgentUsageStatus(authResult.userId);
   return NextResponse.json(usage);
 }

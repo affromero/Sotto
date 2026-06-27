@@ -68,7 +68,7 @@
     "react-dom": "^19.2.3",
     "resend": "^6.14.0",
     "styled-jsx": "^5.1.7",
-    "thesidedoor": "^0.1.0",
+    "thesidedoor": "0.1.0",
     "typescript": "^6.0.3",
     "web-push": "^3.6.7",
     "zod": "^4.4.3"

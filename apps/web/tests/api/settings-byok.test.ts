@@ -126,6 +126,38 @@ describe('POST /api/v1/settings/byok', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
+    expect(mockStoreByokKey).toHaveBeenCalledWith('user-1', 'elevenlabs', {
+      apiKey: 'sk-eleven-test-123456',
+      userId: undefined,
+      extra: {},
+    });
+  });
+
+  it('stores optional Cartesia usage metadata with the provider key', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockValidateByokKey.mockResolvedValue(true);
+    mockStoreByokKey.mockResolvedValue(undefined);
+
+    const response = await POST(
+      createRequest('POST', {
+        provider: 'cartesia',
+        apiKey: 'sk-car-test-123456',
+        adminApiKey: 'sk-car-admin-test-123456',
+        monthlyCreditLimit: '1000000',
+        billingResetDay: '1',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockStoreByokKey).toHaveBeenCalledWith('user-1', 'cartesia', {
+      apiKey: 'sk-car-test-123456',
+      userId: undefined,
+      extra: {
+        adminApiKey: 'sk-car-admin-test-123456',
+        monthlyCreditLimit: '1000000',
+        billingResetDay: '1',
+      },
+    });
   });
 });
 

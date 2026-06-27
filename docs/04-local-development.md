@@ -8,12 +8,12 @@
 
 ## 1. Prerequisites
 
-| Tool | Version | Why |
-|---|---|---|
-| Node.js | 20+ | Next.js, workers, scripts |
-| Docker Desktop or Docker Engine | Current stable | PostgreSQL and Redis |
-| FFmpeg | 6+ | Audio stitching and normalization |
-| Git | 2.40+ | Source control |
+| Tool                            | Version        | Why                               |
+| ------------------------------- | -------------- | --------------------------------- |
+| Node.js                         | 20+            | Next.js, workers, scripts         |
+| Docker Desktop or Docker Engine | Current stable | PostgreSQL and Redis              |
+| FFmpeg                          | 6+             | Audio stitching and normalization |
+| Git                             | 2.40+          | Source control                    |
 
 Optional:
 
@@ -103,6 +103,12 @@ STT_PROVIDER="openai"
 OPENAI_API_KEY="sk-..."
 ```
 
+The dashboard usage widget can show audio provider credits from the keys users
+add in the wizard or provider settings. ElevenLabs usage works with the normal
+ElevenLabs key. Cartesia usage needs the optional Cartesia admin key; the
+optional monthly limit and reset-day fields let Sotto show credits remaining
+instead of only credits used.
+
 ### 5.3 Local Agent
 
 Use a local agent for script generation and a selected TTS provider for audio:
@@ -150,11 +156,11 @@ If your keys come from a private secret manager, enter that environment first an
 
 The script skips missing providers and fails only providers it actually calls. With the relevant keys, it checks:
 
-| Check | Environment variable |
-|---|---|
-| Pexels visual cue search | `PEXELS_API_KEY` |
-| Cartesia Spanish TTS sample | `CARTESIA_API_KEY` |
-| OpenAI STT on the sample audio | `OPENAI_API_KEY` |
+| Check                                     | Environment variable |
+| ----------------------------------------- | -------------------- |
+| Pexels visual cue search                  | `PEXELS_API_KEY`     |
+| Cartesia Spanish TTS sample               | `CARTESIA_API_KEY`   |
+| OpenAI STT on the sample audio            | `OPENAI_API_KEY`     |
 | ElevenLabs Scribe STT on the sample audio | `ELEVENLABS_API_KEY` |
 
 To reuse your own audio instead of generating a Cartesia sample:
@@ -167,12 +173,12 @@ SOTTO_AUDIO_SMOKE_FILE=/path/to/sample.mp3 npm run smoke:audio-providers
 
 ## 7. What Works By Configuration Level
 
-| Configuration | Available |
-|---|---|
-| local DB + Redis + storage | app shell, dashboard, settings, local library metadata |
-| plus selected LLM or local agent | discovery, scripting, Q&A text paths |
-| plus selected TTS | end-to-end audio generation |
-| plus selected STT | meeting/audio transcription |
+| Configuration                    | Available                                              |
+| -------------------------------- | ------------------------------------------------------ |
+| local DB + Redis + storage       | app shell, dashboard, settings, local library metadata |
+| plus selected LLM or local agent | discovery, scripting, Q&A text paths                   |
+| plus selected TTS                | end-to-end audio generation                            |
+| plus selected STT                | meeting/audio transcription                            |
 
 No missing capability should be hidden by an implicit provider fallback.
 
@@ -200,21 +206,21 @@ Expected behavior:
 
 ## 9. Development Commands
 
-| Command | What it does |
-|---|---|
-| `npm run setup` | bootstrap local OSS development |
-| `npm run dev` | start web app and workers |
-| `npm run dev:web` | start web app only |
-| `npm run dev:workers` | start workers only |
-| `npm run lint` | run ESLint |
-| `npm run type-check` | run TypeScript checks |
-| `npm run test` | run Vitest |
+| Command                         | What it does                                       |
+| ------------------------------- | -------------------------------------------------- |
+| `npm run setup`                 | bootstrap local OSS development                    |
+| `npm run dev`                   | start web app and workers                          |
+| `npm run dev:web`               | start web app only                                 |
+| `npm run dev:workers`           | start workers only                                 |
+| `npm run lint`                  | run ESLint                                         |
+| `npm run type-check`            | run TypeScript checks                              |
+| `npm run test`                  | run Vitest                                         |
 | `npm run smoke:audio-providers` | optional live Pexels, TTS, and STT provider checks |
-| `npm run build` | build web app |
-| `npm run ci` | lint, type-check, test, and build |
-| `npm run prisma:push` | push Prisma schema |
-| `npm run prisma:generate` | generate Prisma client |
-| `npm run prisma:studio` | open Prisma Studio |
+| `npm run build`                 | build web app                                      |
+| `npm run ci`                    | lint, type-check, test, and build                  |
+| `npm run prisma:push`           | push Prisma schema                                 |
+| `npm run prisma:generate`       | generate Prisma client                             |
+| `npm run prisma:studio`         | open Prisma Studio                                 |
 
 Run `npm run ci` before each commit on this refactor branch.
 

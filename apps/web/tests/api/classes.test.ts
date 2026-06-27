@@ -4,9 +4,26 @@ import { NextRequest } from 'next/server';
 // ---- Mocks ----
 
 const mockAuthenticateRequest = vi.fn();
+const mockCourseFindFirst = vi.fn();
+const mockCourseUpdateMany = vi.fn();
+const mockCourseClassDeleteMany = vi.fn();
+const mockTransaction = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    course: {
+      findFirst: (...args: unknown[]) => mockCourseFindFirst(...args),
+      updateMany: (...args: unknown[]) => mockCourseUpdateMany(...args),
+    },
+    courseClass: {
+      deleteMany: (...args: unknown[]) => mockCourseClassDeleteMany(...args),
+    },
+    $transaction: (...args: unknown[]) => mockTransaction(...args),
+  },
 }));
 
 const mockGetClassForUser = vi.fn();
@@ -16,12 +33,14 @@ const mockCreateNextClass = vi.fn();
 
 vi.mock('@/lib/class-service', () => {
   class CourseNotFoundError extends Error {}
+  class ClassGenerationCancelledError extends Error {}
   return {
     getClassForUser: (...args: unknown[]) => mockGetClassForUser(...args),
     submitClass: (...args: unknown[]) => mockSubmitClass(...args),
     regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
     createNextClass: (...args: unknown[]) => mockCreateNextClass(...args),
     CourseNotFoundError,
+    ClassGenerationCancelledError,
   };
 });
 
@@ -33,7 +52,8 @@ vi.mock('@/lib/logger', () => ({
 import { GET, POST } from '@/app/api/v1/classes/[classId]/route';
 import { POST as POSTSubmit } from '@/app/api/v1/classes/[classId]/submit/route';
 import { POST as POSTNextClass } from '@/app/api/v1/courses/[courseId]/next-class/route';
-import { CourseNotFoundError } from '@/lib/class-service';
+import { DELETE as DELETEGeneration } from '@/app/api/v1/courses/[courseId]/generation/route';
+import { ClassGenerationCancelledError, CourseNotFoundError } from '@/lib/class-service';
 
 // ---- Helpers ----
 
@@ -70,8 +90,24 @@ const SAMPLE_CLASS_UNSUBMITTED = {
       score: null,
       passed: null,
       questions: [
-        { id: 'q1', order: 1, question: 'Q1?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 0, explanation: 'Exp1' },
-        { id: 'q2', order: 2, question: 'Q2?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 1, explanation: 'Exp2' },
+        {
+          id: 'q1',
+          order: 1,
+          question: 'Q1?',
+          options: ['a', 'b', 'c', 'd'],
+          passageRef: null,
+          correctIndex: 0,
+          explanation: 'Exp1',
+        },
+        {
+          id: 'q2',
+          order: 2,
+          question: 'Q2?',
+          options: ['a', 'b', 'c', 'd'],
+          passageRef: null,
+          correctIndex: 1,
+          explanation: 'Exp2',
+        },
       ],
       prompts: [],
       writingPrompts: [],
@@ -92,7 +128,14 @@ const SAMPLE_CLASS_SPEAKING = {
       passed: null,
       questions: [],
       prompts: [
-        { id: 'p1', order: 1, targetPhrase: 'Hola', translation: 'Hello', ipa: 'ˈola', referenceTtsUrl: 'https://r2/ref.mp3' },
+        {
+          id: 'p1',
+          order: 1,
+          targetPhrase: 'Hola',
+          translation: 'Hello',
+          ipa: 'ˈola',
+          referenceTtsUrl: 'https://r2/ref.mp3',
+        },
       ],
       writingPrompts: [],
     },
@@ -112,7 +155,15 @@ const SAMPLE_CLASS_LISTENING = {
       passed: null,
       episode: { id: 'pod-1', audioUrl: 'https://r2/listen.mp3', title: 'Listening' },
       questions: [
-        { id: 'l1', order: 1, question: 'What did they discuss?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 0, explanation: 'E' },
+        {
+          id: 'l1',
+          order: 1,
+          question: 'What did they discuss?',
+          options: ['a', 'b', 'c', 'd'],
+          passageRef: null,
+          correctIndex: 0,
+          explanation: 'E',
+        },
       ],
       prompts: [],
       writingPrompts: [],
@@ -140,7 +191,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(401);
@@ -153,7 +204,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(404);
@@ -164,7 +215,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(200);
@@ -185,7 +236,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(200);
@@ -205,7 +256,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(200);
@@ -222,7 +273,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(200);
@@ -239,7 +290,7 @@ describe('GET /api/v1/classes/[classId]', () => {
 
     const res = await GET(
       makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     const body = await res.json();
@@ -264,7 +315,7 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
 
     const res = await POST(
       makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(401);
@@ -275,7 +326,7 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
 
     const res = await POST(
       makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(200);
@@ -288,7 +339,7 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
 
     const res = await POST(
       makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(400);
@@ -320,8 +371,10 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
-      classParams('class-1'),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
+        answers: VALID_ANSWERS,
+      }),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(401);
@@ -330,7 +383,7 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
   it('returns 400 when answers array is empty', async () => {
     const res = await POSTSubmit(
       makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: [] }),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(400);
@@ -340,7 +393,7 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
   it('returns 400 when answers field is missing', async () => {
     const res = await POSTSubmit(
       makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {}),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(400);
@@ -351,8 +404,10 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
     mockSubmitClass.mockResolvedValue(null);
 
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
-      classParams('class-1'),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
+        answers: VALID_ANSWERS,
+      }),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(404);
@@ -362,8 +417,10 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
     mockSubmitClass.mockResolvedValue(SUBMIT_RESULT);
 
     const res = await POSTSubmit(
-      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: VALID_ANSWERS }),
-      classParams('class-1'),
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
+        answers: VALID_ANSWERS,
+      }),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(200);
@@ -379,7 +436,7 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
       makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
         answers: [{ questionId: 'q1', selectedIndex: 5 }],
       }),
-      classParams('class-1'),
+      classParams('class-1')
     );
 
     expect(res.status).toBe(400);
@@ -400,7 +457,7 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
 
     const res = await POSTNextClass(
       makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1'),
+      courseParams('course-1')
     );
 
     expect(res.status).toBe(401);
@@ -411,7 +468,7 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
 
     const res = await POSTNextClass(
       makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1'),
+      courseParams('course-1')
     );
 
     expect(res.status).toBe(201);
@@ -428,7 +485,7 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
 
     const res = await POSTNextClass(
       makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1'),
+      courseParams('course-1')
     );
 
     expect(res.status).toBe(409);
@@ -442,7 +499,7 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
 
     const res = await POSTNextClass(
       makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1'),
+      courseParams('course-1')
     );
 
     expect(res.status).toBe(200);
@@ -455,7 +512,7 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
 
     const res = await POSTNextClass(
       makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1'),
+      courseParams('course-1')
     );
 
     expect(res.status).toBe(404);
@@ -463,14 +520,98 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
     expect(body.error).toMatch(/course not found/i);
   });
 
+  it('returns 409 when generation is cancelled', async () => {
+    mockCreateNextClass.mockRejectedValue(new ClassGenerationCancelledError('class-new'));
+
+    const res = await POSTNextClass(
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.cancelled).toBe(true);
+  });
+
   it('returns 500 on unexpected errors', async () => {
     mockCreateNextClass.mockRejectedValue(new Error('AI meltdown'));
 
     const res = await POSTNextClass(
       makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1'),
+      courseParams('course-1')
     );
 
     expect(res.status).toBe(500);
+  });
+});
+
+// ---- DELETE /api/v1/courses/[courseId]/generation ----
+
+describe('DELETE /api/v1/courses/[courseId]/generation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+    mockCourseUpdateMany.mockResolvedValue({ count: 1 });
+    mockCourseClassDeleteMany.mockResolvedValue({ count: 1 });
+    mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+
+    const res = await DELETEGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 404 when the course is missing', async () => {
+    mockCourseFindFirst.mockResolvedValue(null);
+
+    const res = await DELETEGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('deletes the current generating class and clears activeClassId', async () => {
+    mockCourseFindFirst.mockResolvedValue({
+      id: 'course-1',
+      classes: [{ id: 'class-generating' }],
+    });
+
+    const res = await DELETEGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ cancelled: true, classId: 'class-generating' });
+    expect(mockCourseUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'course-1', userId: 'u1', activeClassId: 'class-generating' },
+      data: { activeClassId: null },
+    });
+    expect(mockCourseClassDeleteMany).toHaveBeenCalledWith({
+      where: { id: 'class-generating', courseId: 'course-1' },
+    });
+  });
+
+  it('is a no-op when no class is generating', async () => {
+    mockCourseFindFirst.mockResolvedValue({ id: 'course-1', classes: [] });
+
+    const res = await DELETEGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ cancelled: false });
+    expect(mockTransaction).not.toHaveBeenCalled();
   });
 });

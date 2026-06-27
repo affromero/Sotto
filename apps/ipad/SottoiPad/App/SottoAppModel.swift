@@ -12,9 +12,12 @@ final class SottoAppModel: ObservableObject {
     @Published var workbook: SottoWorksheetResponse?
     @Published var isLoading = false
     @Published var loadingOperation: SottoLoadingOperation?
+    @Published private(set) var canCancelLoading = false
     @Published var errorMessage: String?
 
     private let credentialStore = CredentialStore()
+    private var activeClassGenerationCourseId: String?
+    private var cancelledClassGenerationCourseId: String?
 
     init() {
         credentials = try? credentialStore.load()
@@ -49,6 +52,7 @@ final class SottoAppModel: ObservableObject {
         }
 
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -76,6 +80,9 @@ final class SottoAppModel: ObservableObject {
         credentials = nil
         profiles = []
         resetLearnerState()
+        canCancelLoading = false
+        activeClassGenerationCourseId = nil
+        cancelledClassGenerationCourseId = nil
         errorMessage = nil
     }
 
@@ -96,6 +103,7 @@ final class SottoAppModel: ObservableObject {
     func loadProfiles() async {
         guard let client = makeClient(usesSelectedProfile: false) else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -136,6 +144,7 @@ final class SottoAppModel: ObservableObject {
         }
 
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -167,6 +176,7 @@ final class SottoAppModel: ObservableObject {
     func loadCourses() async {
         guard hasSelectedProfile, let client = makeClient() else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -204,6 +214,9 @@ final class SottoAppModel: ObservableObject {
     func startOrResumeClass(for course: SottoCourse) async {
         guard let client = makeClient() else { return }
         isLoading = true
+        canCancelLoading = true
+        activeClassGenerationCourseId = course.id
+        cancelledClassGenerationCourseId = nil
         let startedAt = Date()
         loadingOperation = classGenerationOperation(
             progress: nil,
@@ -214,15 +227,42 @@ final class SottoAppModel: ObservableObject {
         let progressTask = startClassGenerationPolling(client: client, course: course, startedAt: startedAt)
         defer {
             progressTask.cancel()
+            if activeClassGenerationCourseId == course.id {
+                activeClassGenerationCourseId = nil
+            }
+            canCancelLoading = false
             loadingOperation = nil
             isLoading = false
         }
 
         do {
             let classId = try await client.startNextClass(courseId: course.id)
+            guard !isClassGenerationCancelled(course.id) else { return }
             selectedClass = try await client.fetchClass(classId: classId)
             classResult = nil
         } catch {
+            if isClassGenerationCancelled(course.id) {
+                return
+            }
+
+            do {
+                if let classId = try await waitForGeneratedClassAfterRequestFailure(
+                    client: client,
+                    course: course,
+                    startedAt: startedAt,
+                    originalError: error
+                ) {
+                    guard !isClassGenerationCancelled(course.id) else { return }
+                    selectedClass = try await client.fetchClass(classId: classId)
+                    classResult = nil
+                    return
+                }
+            } catch {
+                if isClassGenerationCancelled(course.id) {
+                    return
+                }
+            }
+
             errorMessage = error.localizedDescription
         }
 
@@ -231,6 +271,7 @@ final class SottoAppModel: ObservableObject {
     func openClass(_ classId: String) async {
         guard let client = makeClient() else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -246,6 +287,7 @@ final class SottoAppModel: ObservableObject {
     func startFullCatchUp(for course: SottoCourse) async {
         guard let client = makeClient() else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -261,6 +303,7 @@ final class SottoAppModel: ObservableObject {
     func submitClassAnswers(_ answers: [SottoSubmitAnswer]) async {
         guard let client = makeClient(), let selectedClass else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -277,6 +320,7 @@ final class SottoAppModel: ObservableObject {
     func submitPracticeAnswers(_ answers: [SottoPracticeAnswer]) async {
         guard let client = makeClient(), let practiceStart else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -291,6 +335,7 @@ final class SottoAppModel: ObservableObject {
     func openWorkbook(for classId: String) async {
         guard let client = makeClient() else { return }
         isLoading = true
+        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -310,6 +355,35 @@ final class SottoAppModel: ObservableObject {
         await openWorkbook(for: activeClassId)
     }
 
+    func cancelCurrentClassGeneration() async {
+        guard let courseId = activeClassGenerationCourseId, let client = makeClient() else { return }
+
+        cancelledClassGenerationCourseId = courseId
+        canCancelLoading = false
+        loadingOperation = SottoLoadingOperation(
+            title: "Cancelling class generation",
+            detail: "Stopping the current class build and clearing the retry state.",
+            progress: nil,
+            currentStep: nil,
+            totalSteps: nil,
+            elapsedSeconds: nil,
+            remainingSeconds: nil
+        )
+
+        do {
+            try await client.cancelClassGeneration(courseId: courseId)
+            courses = try await client.listCourses()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        if activeClassGenerationCourseId == courseId {
+            activeClassGenerationCourseId = nil
+        }
+        loadingOperation = nil
+        isLoading = false
+    }
+
     private func makeClient(usesSelectedProfile: Bool = true) -> SottoAPIClient? {
         guard let credentials else { return nil }
         return SottoAPIClient(
@@ -317,6 +391,44 @@ final class SottoAppModel: ObservableObject {
             apiKey: credentials.apiKey,
             profileId: usesSelectedProfile ? credentials.selectedProfile?.id : nil
         )
+    }
+
+    private func isClassGenerationCancelled(_ courseId: String) -> Bool {
+        cancelledClassGenerationCourseId == courseId
+    }
+
+    private func waitForGeneratedClassAfterRequestFailure(
+        client: SottoAPIClient,
+        course: SottoCourse,
+        startedAt: Date,
+        originalError: Error
+    ) async throws -> String? {
+        let deadline = Date().addingTimeInterval(900)
+
+        while !Task.isCancelled && !isClassGenerationCancelled(course.id) {
+            let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
+            let progress = try? await client.fetchClassGenerationProgress(courseId: course.id)
+
+            loadingOperation = classGenerationOperation(
+                progress: progress,
+                course: course,
+                elapsedSeconds: elapsedSeconds
+            )
+
+            if let progress, let classId = progress.classId {
+                if progress.status != "GENERATING" && progress.status != "IDLE" {
+                    return classId
+                }
+            }
+
+            if progress?.status == "IDLE" || Date() >= deadline {
+                throw originalError
+            }
+
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+        }
+
+        return nil
     }
 
     private func startClassGenerationPolling(

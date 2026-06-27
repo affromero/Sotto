@@ -26,6 +26,7 @@ describe('GET /api/v1/agent-usage', () => {
       providers: [
         {
           id: 'claude-code',
+          category: 'agent',
           label: 'Claude Code',
           shortLabel: 'Claude',
           planLabel: 'Max',
@@ -59,7 +60,7 @@ describe('GET /api/v1/agent-usage', () => {
 
     expect(response.status).toBe(200);
     expect(mockAuthenticateRequest).toHaveBeenCalledOnce();
-    expect(mockGetAgentUsageStatus).toHaveBeenCalledOnce();
+    expect(mockGetAgentUsageStatus).toHaveBeenCalledWith('user-1');
     expect(body.providers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

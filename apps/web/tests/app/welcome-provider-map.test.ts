@@ -176,6 +176,25 @@ describe('resolveTts', () => {
     expect(r.preferredTtsModel).toBe('sonic-3.5');
   });
 
+  it('routes optional Cartesia usage metadata with the BYOK key', () => {
+    const r = resolveTts('cartesia', 'sk_car_x', '', 'sonic-3.5', {
+      adminApiKey: ' sk_car_admin_x ',
+      monthlyCreditLimit: '1000000',
+      billingResetDay: '1',
+    });
+
+    expect(r.keyPost).toEqual({
+      endpoint: 'byok',
+      provider: 'cartesia',
+      apiKey: 'sk_car_x',
+      extra: {
+        adminApiKey: 'sk_car_admin_x',
+        monthlyCreditLimit: '1000000',
+        billingResetDay: '1',
+      },
+    });
+  });
+
   it('leaves preferredTtsModel null for keyless local providers', () => {
     expect(resolveTts('kokoro', '', '').preferredTtsModel).toBeNull();
   });

@@ -20,6 +20,9 @@ import t from '../theme.module.css';
 import c from '../components.styles';
 
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
+const CARTESIA_ADMIN_KEY_ID = 'cartesia:adminApiKey';
+const CARTESIA_MONTHLY_LIMIT_ID = 'cartesia:monthlyCreditLimit';
+const CARTESIA_RESET_DAY_ID = 'cartesia:billingResetDay';
 
 function displayLanguageName(code: string): string {
   return (
@@ -237,6 +240,48 @@ function VoicePicker({
               </select>
             </div>
           )}
+          {kind === 'tts' && sel.id === 'cartesia' ? (
+            <>
+              <div className={c.vkRow}>
+                <span className={c.vkLabel}>
+                  <Glyph name="key" size={13} /> Cartesia admin key
+                </span>
+                <input
+                  className={c.vkInput}
+                  type="password"
+                  placeholder="sk_car_admin_... (optional, for usage)"
+                  value={keys[CARTESIA_ADMIN_KEY_ID] ?? ''}
+                  onChange={(event) => onKey(CARTESIA_ADMIN_KEY_ID, event.target.value)}
+                  aria-label="Cartesia admin API key for usage"
+                />
+              </div>
+              <div className={c.vkRow}>
+                <span className={c.vkLabel}>
+                  <Glyph name="clock" size={13} /> Cartesia credits
+                </span>
+                <input
+                  className={c.vkInput}
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="Monthly limit (optional)"
+                  value={keys[CARTESIA_MONTHLY_LIMIT_ID] ?? ''}
+                  onChange={(event) => onKey(CARTESIA_MONTHLY_LIMIT_ID, event.target.value)}
+                  aria-label="Cartesia monthly credit limit"
+                />
+                <input
+                  className={c.vkInput}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={31}
+                  placeholder="Reset day"
+                  value={keys[CARTESIA_RESET_DAY_ID] ?? ''}
+                  onChange={(event) => onKey(CARTESIA_RESET_DAY_ID, event.target.value)}
+                  aria-label="Cartesia billing reset day"
+                />
+              </div>
+            </>
+          ) : null}
           <div className={c.vkNote}>
             {k.trim()
               ? `Saved to your config · ${sel.note} · edit anytime in admin providers`
