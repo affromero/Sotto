@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './ManualPlacement.module.css';
 
 interface ManualPlacementProps {
@@ -58,8 +59,7 @@ export function ManualPlacement({ native, target }: ManualPlacementProps) {
   if (phase === 'submitting') {
     return (
       <div className={styles.center} role="status" aria-live="polite">
-        <div className={styles.spinner} aria-hidden="true" />
-        <p className={styles.loadingText}>Setting up your course...</p>
+        <SottoSpinner size="large" label="Setting up your course" orientation="stack" />
       </div>
     );
   }

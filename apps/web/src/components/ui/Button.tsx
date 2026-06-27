@@ -1,3 +1,4 @@
+import { SottoSpinner } from './SottoSpinner';
 import styles from './Button.module.css';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -18,13 +19,15 @@ export function Button({
   className,
   ...props
 }: ButtonProps) {
+  const spinnerColor = variant === 'primary' || variant === 'danger' ? 'white' : 'primary';
+
   return (
     <button
       className={`${styles.button} ${styles[variant]} ${styles[size]} ${fullWidth ? styles.fullWidth : ''} ${className || ''}`}
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <span className={styles.spinner} />}
+      {loading && <SottoSpinner size="small" color={spinnerColor} ariaLabel="Loading" />}
       {children}
     </button>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -41,8 +41,25 @@ export function AiProviderCards({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>>({});
+  const [status, setStatus] = useState<
+    Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>
+  >({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const connectedSystemProviders = useMemo(
+    () => systemProviders?.filter((provider) => provider.available) ?? [],
+    [systemProviders]
+  );
+  const unavailableSystemProviders = useMemo(
+    () => systemProviders?.filter((provider) => !provider.available) ?? [],
+    [systemProviders]
+  );
+  const sortedProviderMeta = useMemo(() => {
+    return [...providerMeta].sort((a, b) => {
+      const aRank = configured.get(a.id) ? 0 : configured.has(a.id) ? 1 : 2;
+      const bRank = configured.get(b.id) ? 0 : configured.has(b.id) ? 1 : 2;
+      return aRank - bRank;
+    });
+  }, [configured, providerMeta]);
 
   const handleSaveKey = async (providerId: string) => {
     const apiKey = fieldValues[providerId]?.trim();
@@ -113,15 +130,36 @@ export function AiProviderCards({
 
   return (
     <div className={styles.grid}>
-      {providerMeta.map((provider) => {
+      {connectedSystemProviders.map((sp) => (
+        <div key={sp.id} className={`${styles.card} ${styles.cardConnected}`}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardHeaderLeft}>
+              <Glyph name="plug" size={28} />
+              <div className={styles.cardInfo}>
+                <span className={styles.cardNameRow}>
+                  <span className={styles.cardName}>{sp.label}</span>
+                  <Badge variant="system">System</Badge>
+                </span>
+                <span className={styles.cardQuality}>{sp.description}</span>
+              </div>
+            </div>
+            <span className={styles.statusConnected}>Connected</span>
+          </div>
+        </div>
+      ))}
+
+      {sortedProviderMeta.map((provider) => {
         const isConfigured = configured.has(provider.id);
         const isValid = configured.get(provider.id) ?? true;
         const isExpanded = expandedId === provider.id;
         const isSaving = savingId === provider.id;
         const modelNames = provider.models.map((m) => m.displayName).join(' · ');
+        const cardClassName = isConfigured
+          ? `${styles.card} ${isValid ? styles.cardConnected : styles.cardInvalid}`
+          : styles.card;
 
         return (
-          <div key={provider.id} className={styles.card}>
+          <div key={provider.id} className={cardClassName}>
             <div className={styles.cardHeader}>
               <div className={styles.cardHeaderLeft}>
                 <TtsProviderLogo provider={provider.id} size={28} />
@@ -233,7 +271,7 @@ export function AiProviderCards({
         );
       })}
 
-      {systemProviders?.map((sp) => (
+      {unavailableSystemProviders.map((sp) => (
         <div key={sp.id} className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardHeaderLeft}>

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './NotesPlacement.module.css';
 
 interface NotesPlacementProps {
@@ -51,10 +52,15 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       if (text.trim()) form.set('content', text.trim());
       for (const file of files) form.append('files', file);
 
-      const res = await fetch('/api/v1/placement/from-notes/upload', { method: 'POST', body: form });
+      const res = await fetch('/api/v1/placement/from-notes/upload', {
+        method: 'POST',
+        body: form,
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setErrorMessage(body.error ?? 'Could not read your materials. Try a different file or paste some text.');
+        setErrorMessage(
+          body.error ?? 'Could not read your materials. Try a different file or paste some text.'
+        );
         setPhase('error');
         return;
       }
@@ -90,10 +96,11 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
   if (phase === 'deducing' || phase === 'confirming') {
     return (
       <div className={styles.center} role="status" aria-live="polite">
-        <div className={styles.spinner} aria-hidden="true" />
-        <p className={styles.loadingText}>
-          {phase === 'deducing' ? 'Reading your materials...' : 'Setting up your course...'}
-        </p>
+        <SottoSpinner
+          size="large"
+          label={phase === 'deducing' ? 'Reading your materials' : 'Setting up your course'}
+          orientation="stack"
+        />
       </div>
     );
   }
@@ -113,11 +120,18 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
     const confidencePct = Math.round(deduction.confidence * 100);
     return (
       <div className={styles.result} aria-live="polite">
-        <div className={styles.levelBadge} aria-label={`Estimated level: ${deduction.deducedLevel}`}>
+        <div
+          className={styles.levelBadge}
+          aria-label={`Estimated level: ${deduction.deducedLevel}`}
+        >
           <span className={styles.levelCode}>{deduction.deducedLevel}</span>
-          <span className={styles.levelLabel}>{LEVEL_DESCRIPTIONS[deduction.deducedLevel] ?? 'Your level'}</span>
+          <span className={styles.levelLabel}>
+            {LEVEL_DESCRIPTIONS[deduction.deducedLevel] ?? 'Your level'}
+          </span>
         </div>
-        <p className={styles.rationale}>{deduction.rationale || 'Estimated from the materials you shared.'}</p>
+        <p className={styles.rationale}>
+          {deduction.rationale || 'Estimated from the materials you shared.'}
+        </p>
         <p className={styles.confidence}>Confidence: {confidencePct}%</p>
 
         <div className={styles.actions}>

@@ -12,7 +12,7 @@ import type { GlyphName } from '@/app/welcome/data';
 import { getPublicGithubUrl } from '@/lib/public-links';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { hasCompletedInitialOnboarding } from '@/lib/local-user';
-import styles from './page.module.css';
+import styles from './page.styles';
 
 const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
 

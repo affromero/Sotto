@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './ResolutionPrompt.module.css';
 
 interface ResolutionPromptProps {
@@ -9,7 +10,11 @@ interface ResolutionPromptProps {
   canIncorporate?: boolean;
 }
 
-export function ResolutionPrompt({ onResolve, isLoading = false, canIncorporate = true }: ResolutionPromptProps) {
+export function ResolutionPrompt({
+  onResolve,
+  isLoading = false,
+  canIncorporate = true,
+}: ResolutionPromptProps) {
   const [step, setStep] = useState<'initial' | 'followup'>('initial');
 
   function handleYes() {
@@ -45,7 +50,7 @@ export function ResolutionPrompt({ onResolve, isLoading = false, canIncorporate 
               disabled={isLoading}
               aria-label="Yes, that helped"
             >
-              {isLoading && <span className={styles.spinner} />}
+              {isLoading && <SottoSpinner size="small" color="white" ariaLabel="Loading" />}
               Yes, that helped
             </button>
             <button
@@ -71,7 +76,7 @@ export function ResolutionPrompt({ onResolve, isLoading = false, canIncorporate 
               disabled={isLoading}
               aria-label="Yes, update the lesson"
             >
-              {isLoading && <span className={styles.spinner} />}
+              {isLoading && <SottoSpinner size="small" color="white" ariaLabel="Loading" />}
               Yes, update
             </button>
             <button

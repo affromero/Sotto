@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, ScoreDial } from './ClassWidgets';
@@ -223,10 +224,10 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
           </>
         ) : isBusy ? (
           <div className={styles.busyRow} role="status" aria-live="polite">
-            <span className={styles.spinner} aria-hidden="true" />
-            <span className={styles.recHint}>
-              {phase === 'uploading' ? 'uploading…' : 'grading…'}
-            </span>
+            <SottoSpinner
+              size="medium"
+              label={phase === 'uploading' ? 'Uploading your recording' : 'Grading your speaking'}
+            />
           </div>
         ) : phase === 'scored' && result ? (
           <div className={styles.scoredZone}>

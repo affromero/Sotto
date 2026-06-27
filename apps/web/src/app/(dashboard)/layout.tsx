@@ -35,9 +35,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const userId = session.user.id as string;
-  const episodeCount = await prisma.episode.count({
-    where: { userId, deletedAt: null },
-  });
+  const [episodeCount, usagePrefs] = await Promise.all([
+    prisma.episode.count({
+      where: { userId, deletedAt: null },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { showAgentUsageStatus: true },
+    }),
+  ]);
 
   return (
     <DashboardShell
@@ -49,6 +55,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         role: session.user.role,
       }}
       hasEpisodes={episodeCount > 0}
+      showAgentUsageStatus={usagePrefs?.showAgentUsageStatus ?? true}
     >
       {children}
       <InstallPrompt />

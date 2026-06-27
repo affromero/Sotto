@@ -1,0 +1,849 @@
+/*
+ * components.module.css — step-specific styling for the welcome onboarding flow.
+ * References CSS custom properties defined in theme.module.css on .root.
+ */
+/* ---------- from / "I speak" selector ---------- */
+.fromRow {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.fromLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  flex: none;
+  white-space: nowrap;
+}
+.fromChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fromChip {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition:
+    border-color 0.18s,
+    color 0.18s,
+    background 0.18s;
+  min-height: 44px;
+}
+.fromChip:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.fromChipSel {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.learnLabel {
+  margin-top: 22px;
+  display: block;
+}
+/* ---------- language grid ---------- */
+.langGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .langGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.langChip {
+  position: relative;
+  text-align: left;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 16px 16px 14px;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--ease),
+    border-color 0.2s,
+    background 0.2s,
+    opacity 0.2s;
+  overflow: hidden;
+  min-height: 44px;
+}
+.langChip:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+.langNative {
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.langEn {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-top: 8px;
+}
+.langHi {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--accent);
+  margin-top: 12px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.25s var(--ease);
+}
+.langChip:hover .langHi,
+.langChipSel .langHi {
+  opacity: 1;
+  transform: none;
+}
+.langChipSel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.langTick {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--accent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.2s var(--ease);
+}
+.langChipSel .langTick {
+  opacity: 1;
+  transform: none;
+}
+/* ---------- admin learner setup ---------- */
+.profileSetup {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+@media (max-width: 680px) {
+  .profileSetup {
+    grid-template-columns: 1fr;
+  }
+}
+.ownerPreview {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.ownerAvatar {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 32px rgba(30, 33, 40, 0.18);
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+.ownerAvatar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 48%);
+  pointer-events: none;
+}
+.ownerAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ownerAvatar::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+.ownerName {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ownerMeta {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.profileFields {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+}
+.profileNameInput {
+  width: 100%;
+  min-height: 46px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 0 13px;
+  font: inherit;
+}
+.profileNameInput::placeholder {
+  color: var(--ink-mute);
+}
+.profileNameInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.onboardingAvatarGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(58px, 1fr));
+  gap: 10px;
+}
+.avatarChoice {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 58px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--paper);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    border-color 0.18s,
+    transform 0.18s var(--ease),
+    box-shadow 0.18s;
+}
+.avatarChoice:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+.avatarChoiceImage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  background: var(--paper);
+}
+.avatarChoiceImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatarChoiceSel {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* ---------- provider grid ---------- */
+.providerGrid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .providerGrid {
+    grid-template-columns: 1fr;
+  }
+}
+.providerCard {
+  text-align: left;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px 14px 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.15s var(--ease);
+  min-height: 44px;
+}
+.providerSelect {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+.providerSelect:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.providerCard:hover {
+  border-color: var(--line-strong);
+}
+.providerCardSel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.pico {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  color: var(--ink);
+}
+.providerCardSel .pico {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pname {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pmeta {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  margin-top: 3px;
+  letter-spacing: 0.02em;
+}
+.providerLink {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r);
+  text-decoration: none;
+  padding: 0 10px;
+}
+.providerLink:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+/* connect box */
+.connect {
+  margin-top: 14px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  animation: stepIn 0.4s var(--ease) both;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@keyframes stepIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* method tabs */
+.methodTabs {
+  display: flex;
+  gap: 6px;
+}
+.methodTab {
+  flex: 1;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 11px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    border-color 0.18s,
+    color 0.18s,
+    background 0.18s;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.methodTab:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.methodTabOn {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.mtag {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  border-radius: 20px;
+  padding: 2px 6px;
+  opacity: 0.85;
+}
+/* CLI detect row */
+.cliDetect {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 13px;
+  background: var(--paper);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r);
+  padding: 13px 15px;
+}
+.cliIco {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cliName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cliPath {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  margin-top: 3px;
+  letter-spacing: 0.01em;
+}
+/* field row */
+.field {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.fieldInput {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 12px 14px;
+}
+.fieldInput::placeholder {
+  color: var(--ink-mute);
+}
+.fieldInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.fieldLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 6px;
+}
+/* status pill */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  border-radius: 20px;
+  align-self: flex-start;
+}
+.statusPillVerifying {
+  color: var(--ink-soft);
+}
+.statusPillConnected {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--ink-soft);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.locknote {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-mute);
+  font-size: 12.5px;
+}
+.locknote svg {
+  color: var(--accent);
+  flex: none;
+}
+/* ---------- voice (STT/TTS) step ---------- */
+.voiceBlock {
+  margin-top: 26px;
+}
+.voiceHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.voiceSub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.voicePills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.voiceChoice {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: var(--sans);
+  min-height: 58px;
+  padding: 11px 14px;
+  text-align: left;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    box-shadow 0.18s;
+}
+.voiceChoice:hover {
+  border-color: var(--line-strong);
+}
+.voiceChoice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.voiceChoiceSel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.voiceChoiceDisabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+.voiceChoiceDisabled:hover {
+  border-color: var(--line);
+}
+.voiceChipText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.voiceChipName {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.voiceChoiceSel .voiceChipName {
+  color: var(--accent);
+}
+.voiceChipNote {
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+}
+.vcLang {
+  width: fit-content;
+  margin-top: 4px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--accent);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.vcLangBad {
+  color: #9b2c2c;
+  border-color: rgba(155, 44, 44, 0.28);
+  background: rgba(155, 44, 44, 0.08);
+}
+.voiceInlineLink,
+.vkActionLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--paper);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.voiceInlineLink:hover,
+.vkActionLink:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.voiceInlineLink {
+  min-height: 28px;
+  padding: 0 9px;
+}
+.vkActionLink {
+  min-height: 44px;
+  padding: 0 12px;
+}
+.voiceInlineLink:focus-visible,
+.vkActionLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.vcLocal {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 1px 5px 1px 4px;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.vcLocal svg {
+  flex: none;
+}
+.voiceChoice:not(.voiceChoiceSel) .vcLocal {
+  color: var(--ink-mute);
+}
+.vcSet {
+  display: flex;
+  color: var(--accent);
+}
+.voiceNote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+  color: var(--ink-mute);
+  font-size: 12.5px;
+}
+.voiceNote svg {
+  color: var(--accent);
+  flex: none;
+}
+.voiceReason,
+.compatWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 11px;
+  color: var(--ink-mute);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.voiceReason svg {
+  color: var(--accent);
+  flex: none;
+  margin-top: 1px;
+}
+.voiceReasonWarn,
+.compatWarning {
+  color: #7f1d1d;
+}
+.voiceReasonWarn svg,
+.compatWarning svg {
+  color: #9b2c2c;
+}
+.compatWarning {
+  border: 1px solid rgba(155, 44, 44, 0.28);
+  border-radius: var(--r);
+  background: rgba(155, 44, 44, 0.07);
+  padding: 11px 12px;
+}
+/* voice key entry */
+.voiceKey {
+  margin-top: 12px;
+}
+.vkRow {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vkLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  padding-top: 11px;
+}
+.vkLabel svg {
+  color: var(--accent);
+}
+.vkInput {
+  flex: 1;
+  min-width: 200px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--well);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 11px 13px;
+}
+.vkInput::placeholder {
+  color: var(--ink-mute);
+}
+.vkInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.vkNote {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-top: 8px;
+}
+.voiceFoot {
+  margin-top: 26px;
+  align-items: flex-start;
+}
+.learningBlock {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--well);
+  padding: 16px;
+  display: grid;
+  gap: 13px;
+}
+.learningHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.learningTitle {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+.learningBadge {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--ink-mute);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

@@ -28,7 +28,7 @@
   border-radius: var(--radius-full);
   background: radial-gradient(
     circle at 40% 35%,
-    #FBBF24 0%,
+    #fbbf24 0%,
     var(--color-primary) 45%,
     var(--color-primary-hover) 100%
   );
@@ -42,7 +42,10 @@
   color: var(--color-text-inverse);
   position: relative;
   z-index: 2;
-  transition: background 0.4s ease, transform 0.4s ease, box-shadow 0.4s ease;
+  transition:
+    background 0.4s ease,
+    transform 0.4s ease,
+    box-shadow 0.4s ease;
   /* border-radius animated intentionally — element is small (44–64px),
      paint cost is negligible. No compositable alternative without SVG. */
   will-change: transform;
@@ -78,7 +81,7 @@
 
 /* Orb inner content: spinner */
 .orbLottie {
-  --spinner-size: 36px;
+  color: var(--color-text-inverse);
 }
 
 /* Orb percentage text */
@@ -92,12 +95,7 @@
 /* State variants — snap to circle, swap gradient */
 .orbError .orb {
   border-radius: var(--radius-full);
-  background: radial-gradient(
-    circle at 40% 35%,
-    #FCA5A5 0%,
-    #EF4444 45%,
-    #B91C1C 100%
-  );
+  background: radial-gradient(circle at 40% 35%, #fca5a5 0%, #ef4444 45%, #b91c1c 100%);
   box-shadow:
     inset 0 0 12px rgba(252, 165, 165, 0.4),
     0 0 20px rgba(239, 68, 68, 0.25),
@@ -116,12 +114,7 @@
 
 .orbDone .orb {
   border-radius: var(--radius-full);
-  background: radial-gradient(
-    circle at 40% 35%,
-    #6EE7B7 0%,
-    #10B981 45%,
-    #047857 100%
-  );
+  background: radial-gradient(circle at 40% 35%, #6ee7b7 0%, #10b981 45%, #047857 100%);
   box-shadow:
     inset 0 0 12px rgba(110, 231, 183, 0.4),
     0 0 20px rgba(16, 185, 129, 0.25),
@@ -132,12 +125,7 @@
 
 /* Dark mode — warmer/lighter gradient for contrast on dark backgrounds */
 :global([data-theme='dark']) .orb {
-  background: radial-gradient(
-    circle at 40% 35%,
-    #F6AD55 0%,
-    #E8890F 45%,
-    #C46A0A 100%
-  );
+  background: radial-gradient(circle at 40% 35%, #f6ad55 0%, #e8890f 45%, #c46a0a 100%);
   box-shadow:
     inset 0 0 12px rgba(246, 173, 85, 0.4),
     0 0 20px rgba(232, 137, 15, 0.3),
@@ -145,12 +133,7 @@
 }
 
 :global([data-theme='dark']) .orbError .orb {
-  background: radial-gradient(
-    circle at 40% 35%,
-    #FCA5A5 0%,
-    #F87171 45%,
-    #DC2626 100%
-  );
+  background: radial-gradient(circle at 40% 35%, #fca5a5 0%, #f87171 45%, #dc2626 100%);
   box-shadow:
     inset 0 0 12px rgba(252, 165, 165, 0.4),
     0 0 20px rgba(248, 113, 113, 0.3),
@@ -158,12 +141,7 @@
 }
 
 :global([data-theme='dark']) .orbDone .orb {
-  background: radial-gradient(
-    circle at 40% 35%,
-    #6EE7B7 0%,
-    #34D399 45%,
-    #059669 100%
-  );
+  background: radial-gradient(circle at 40% 35%, #6ee7b7 0%, #34d399 45%, #059669 100%);
   box-shadow:
     inset 0 0 12px rgba(110, 231, 183, 0.4),
     0 0 20px rgba(52, 211, 153, 0.3),
@@ -300,7 +278,10 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background 0.3s ease,
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .dot_completed {
@@ -373,15 +354,26 @@
 /* ============================================ */
 
 @keyframes blobMorph {
-  0%   { border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%; }
-  25%  { border-radius: 45% 55% 40% 60% / 55% 45% 60% 40%; }
-  50%  { border-radius: 55% 45% 60% 40% / 40% 60% 45% 55%; }
-  75%  { border-radius: 40% 60% 45% 55% / 60% 40% 55% 45%; }
-  100% { border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%; }
+  0% {
+    border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%;
+  }
+  25% {
+    border-radius: 45% 55% 40% 60% / 55% 45% 60% 40%;
+  }
+  50% {
+    border-radius: 55% 45% 60% 40% / 40% 60% 45% 55%;
+  }
+  75% {
+    border-radius: 40% 60% 45% 55% / 60% 40% 55% 45%;
+  }
+  100% {
+    border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%;
+  }
 }
 
 @keyframes breathe {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -403,7 +395,8 @@
 }
 
 @keyframes dotPulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 3px rgba(63, 79, 176, 0.2);
   }
   50% {

@@ -4,7 +4,7 @@ import { BASE_LANGS, LANGUAGES } from '../data';
 import type { FlowState } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 interface Props {
   state: FlowState;

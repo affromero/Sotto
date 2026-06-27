@@ -21,9 +21,9 @@ function esc(val: unknown): string {
   if (Array.isArray(val)) {
     // Check if it's a simple string array (Prisma String[]) vs a JSON array (Prisma Json)
     if (val.length === 0) return "'{}'";
-    if (val.every(v => typeof v === 'string' || typeof v === 'number')) {
+    if (val.every((v) => typeof v === 'string' || typeof v === 'number')) {
       // PostgreSQL text[] literal
-      const items = val.map(v => `"${String(v).replace(/"/g, '\\"').replace(/'/g, "''")}"`);
+      const items = val.map((v) => `"${String(v).replace(/"/g, '\\"').replace(/'/g, "''")}"`);
       return `'{${items.join(',')}}'`;
     }
     // JSON array → jsonb
@@ -35,11 +35,11 @@ function esc(val: unknown): string {
 
 function insertRow(table: string, row: Record<string, unknown>, userIdRemap = false): string {
   const cols = Object.keys(row);
-  const vals = cols.map(col => {
+  const vals = cols.map((col) => {
     if (userIdRemap && col === 'userId') return '(SELECT id FROM _user_map)';
     return esc(row[col]);
   });
-  return `INSERT INTO "${table}" (${cols.map(c => `"${c}"`).join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT DO NOTHING;`;
+  return `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT DO NOTHING;`;
 }
 
 async function main() {
@@ -50,23 +50,33 @@ async function main() {
     orderBy: { createdAt: 'asc' },
   });
 
-  const episodeIds = episodes.map(p => p.id);
+  const episodeIds = episodes.map((p) => p.id);
 
   const [scripts, segments, references, versions, discoveries, interactions] = await Promise.all([
     prisma.script.findMany({ where: { episodeId: { in: episodeIds } } }),
-    prisma.segment.findMany({ where: { episodeId: { in: episodeIds } }, orderBy: { order: 'asc' } }),
+    prisma.segment.findMany({
+      where: { episodeId: { in: episodeIds } },
+      orderBy: { order: 'asc' },
+    }),
     prisma.reference.findMany({ where: { episodeId: { in: episodeIds } } }),
-    prisma.episodeVersion.findMany({ where: { episodeId: { in: episodeIds } }, include: { segments: true } }),
-    prisma.discovery.findMany({ where: { episodeId: { in: episodeIds } }, include: { messages: true } }),
+    prisma.episodeVersion.findMany({
+      where: { episodeId: { in: episodeIds } },
+      include: { segments: true },
+    }),
+    prisma.discovery.findMany({
+      where: { episodeId: { in: episodeIds } },
+      include: { messages: true },
+    }),
     prisma.interaction.findMany({ where: { episodeId: { in: episodeIds } } }),
   ]);
 
   // Also fetch tags for these episodes
-  const episodeTags = await prisma.episodeTag.findMany({ where: { episodeId: { in: episodeIds } } });
-  const tagIds = [...new Set(episodeTags.map(pt => pt.tagId))];
-  const tags = tagIds.length > 0
-    ? await prisma.tag.findMany({ where: { id: { in: tagIds } } })
-    : [];
+  const episodeTags = await prisma.episodeTag.findMany({
+    where: { episodeId: { in: episodeIds } },
+  });
+  const tagIds = [...new Set(episodeTags.map((pt) => pt.tagId))];
+  const tags =
+    tagIds.length > 0 ? await prisma.tag.findMany({ where: { id: { in: tagIds } } }) : [];
 
   // Build SQL
   const lines: string[] = [];
@@ -92,12 +102,16 @@ async function main() {
     updatedAt: user.updatedAt,
   };
   const userCols = Object.keys(userRow);
-  const userVals = userCols.map(c => esc(userRow[c]));
-  lines.push(`INSERT INTO "User" (${userCols.map(c => `"${c}"`).join(', ')}) VALUES (${userVals.join(', ')}) ON CONFLICT ("email") DO NOTHING;`);
+  const userVals = userCols.map((c) => esc(userRow[c]));
+  lines.push(
+    `INSERT INTO "User" (${userCols.map((c) => `"${c}"`).join(', ')}) VALUES (${userVals.join(', ')}) ON CONFLICT ("email") DO NOTHING;`
+  );
   lines.push('');
 
   lines.push(`-- Resolve target user by email`);
-  lines.push(`CREATE TEMP TABLE _user_map AS SELECT id FROM "User" WHERE email = '${LOCAL_USER_EMAIL}';`);
+  lines.push(
+    `CREATE TEMP TABLE _user_map AS SELECT id FROM "User" WHERE email = '${LOCAL_USER_EMAIL}';`
+  );
   lines.push('');
 
   // Tags (ON CONFLICT DO NOTHING since tags may already exist)
@@ -150,12 +164,12 @@ async function main() {
   if (versions.length > 0) {
     lines.push('-- Episode Versions');
     for (const v of versions) {
-      const { segments: vSegs, ...vRow } = v;
+      const { segments: _segments, ...vRow } = v;
       lines.push(insertRow('EpisodeVersion', vRow));
     }
     lines.push('');
 
-    const allVersionSegments = versions.flatMap(v => v.segments);
+    const allVersionSegments = versions.flatMap((v) => v.segments);
     if (allVersionSegments.length > 0) {
       lines.push('-- Episode Version Segments');
       for (const vs of allVersionSegments) {
@@ -170,12 +184,12 @@ async function main() {
   if (discoveries.length > 0) {
     lines.push('-- Discoveries');
     for (const d of discoveries) {
-      const { messages, ...dRow } = d;
+      const { messages: _messages, ...dRow } = d;
       lines.push(insertRow('Discovery', dRow, true));
     }
     lines.push('');
 
-    const allMessages = discoveries.flatMap(d => d.messages);
+    const allMessages = discoveries.flatMap((d) => d.messages);
     if (allMessages.length > 0) {
       lines.push('-- Discovery Messages');
       for (const m of allMessages) {
@@ -210,7 +224,7 @@ async function main() {
   lines.push('');
   lines.push('COMMIT;');
 
-  console.log(lines.join('\n'));
+  process.stdout.write(`${lines.join('\n')}\n`);
   await prisma.$disconnect();
 }
 

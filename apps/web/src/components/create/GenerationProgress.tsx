@@ -94,7 +94,7 @@ export function GenerationProgress({
       : progress;
 
   return (
-    <div className={styles.root} role="progressbar" aria-label="Lesson generation progress">
+    <div className={styles.root} role="status" aria-label="Lesson generation progress">
       {/* Animated orb */}
       <div
         className={`${styles.orbWrap} ${
@@ -121,10 +121,14 @@ export function GenerationProgress({
             <Pause size={24} strokeWidth={2} aria-hidden="true" />
           ) : isDone ? (
             <Check size={24} strokeWidth={2.5} aria-hidden="true" />
-          ) : derivedProgress !== undefined && isActive ? (
-            <span className={styles.orbPercent}>{Math.round(derivedProgress)}%</span>
           ) : (
-            <SottoSpinner className={styles.orbLottie} />
+            <SottoSpinner
+              size="medium"
+              color="white"
+              progress={isActive && derivedProgress !== undefined ? derivedProgress / 100 : null}
+              ariaLabel="Generation progress"
+              className={styles.orbLottie}
+            />
           )}
         </div>
       </div>
@@ -195,18 +199,6 @@ export function GenerationProgress({
           );
         })}
       </ol>
-
-      {/* Progress bar (when percentage is available) */}
-      {isActive && derivedProgress !== undefined && (
-        <div className={styles.progressWrap}>
-          <div className={styles.progressTrack}>
-            <div
-              className={styles.progressFill}
-              style={{ width: `${Math.min(Math.max(derivedProgress, 0), 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Error message */}
       {currentState === 'error' && error && (

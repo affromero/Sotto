@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './SourcedClassEntry.module.css';
 
 interface SourcedClassEntryProps {
@@ -98,7 +99,7 @@ export function SourcedClassEntry({ courseId, activeClassId }: SourcedClassEntry
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         if (res.status === 422) {
           setError(
-            body.error ?? 'That link did not have enough readable text to build a class from.',
+            body.error ?? 'That link did not have enough readable text to build a class from.'
           );
         } else {
           setError(body.error ?? 'Something went wrong. Please try again.');
@@ -109,7 +110,7 @@ export function SourcedClassEntry({ courseId, activeClassId }: SourcedClassEntry
         setPhase('idle');
       }
     },
-    [activeClassId, courseId, router],
+    [activeClassId, courseId, router]
   );
 
   function handleSubmitLink(e: React.FormEvent) {
@@ -152,8 +153,12 @@ export function SourcedClassEntry({ courseId, activeClassId }: SourcedClassEntry
 
       {busy ? (
         <div className={styles.loading} role="status" aria-live="polite">
-          <span className={styles.spinner} aria-hidden="true" />
-          <p className={styles.loadingText}>Reading your source and leveling it for you…</p>
+          <SottoSpinner
+            size="medium"
+            label="Reading your source"
+            detail="Sotto is leveling it for your next class."
+            orientation="stack"
+          />
         </div>
       ) : (
         <>

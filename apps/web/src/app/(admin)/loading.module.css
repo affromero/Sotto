@@ -9,6 +9,12 @@
   gap: 18px;
 }
 
+.loader {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 2px;
+}
+
 .bone {
   background: var(--line-strong, rgba(0, 0, 0, 0.12));
   border-radius: 9px;

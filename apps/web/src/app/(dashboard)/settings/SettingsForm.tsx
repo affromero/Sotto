@@ -67,6 +67,7 @@ interface SettingsFormProps {
   initialPreferredAiModel: string | null;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
+  initialShowAgentUsageStatus: boolean;
 }
 
 function languageName(code: string | null): string {
@@ -109,6 +110,7 @@ export function SettingsForm({
   initialPreferredAiModel,
   initialEmailNotifications,
   initialPushNotifications,
+  initialShowAgentUsageStatus,
 }: SettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -117,6 +119,7 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
+  const [showAgentUsageStatus, setShowAgentUsageStatus] = useState(initialShowAgentUsageStatus);
   const {
     pushState,
     subscribe: pushSubscribe,
@@ -137,16 +140,14 @@ export function SettingsForm({
   const isAdmin = role === 'ADMIN';
   const activeSpeechLanguage = preferredLanguage ?? speechLanguage;
   const activeSpeechLanguageName = languageName(activeSpeechLanguage);
-  const selectedTtsProviderMeta = speechTtsProviderMeta.find((provider) => provider.id === selectedTtsProvider);
-  const selectedSttProviderMeta = sttProviderMeta.find((provider) => provider.id === selectedSttProvider);
-  const ttsModels = compatibleModels(
-    selectedTtsProviderMeta?.models ?? [],
-    activeSpeechLanguage
+  const selectedTtsProviderMeta = speechTtsProviderMeta.find(
+    (provider) => provider.id === selectedTtsProvider
   );
-  const sttModels = compatibleModels(
-    selectedSttProviderMeta?.models ?? [],
-    activeSpeechLanguage
+  const selectedSttProviderMeta = sttProviderMeta.find(
+    (provider) => provider.id === selectedSttProvider
   );
+  const ttsModels = compatibleModels(selectedTtsProviderMeta?.models ?? [], activeSpeechLanguage);
+  const sttModels = compatibleModels(selectedSttProviderMeta?.models ?? [], activeSpeechLanguage);
   const [preferredTtsModel, setPreferredTtsModel] = useState(initialPreferredTtsModel ?? '');
   const [preferredSttModel, setPreferredSttModel] = useState(initialPreferredSttModel ?? '');
   const [speechSaving, setSpeechSaving] = useState(false);
@@ -175,7 +176,6 @@ export function SettingsForm({
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
   const [interestsResetting, setInterestsResetting] = useState(false);
-
 
   const handleInterestsChange = (tagIds: string[], custom: CustomTag[]) => {
     setInterestIds(tagIds);
@@ -383,7 +383,11 @@ export function SettingsForm({
             </div>
           </div>
 
-          <div className={styles.animalPicker} role="radiogroup" aria-label="Choose a preset avatar">
+          <div
+            className={styles.animalPicker}
+            role="radiogroup"
+            aria-label="Choose a preset avatar"
+          >
             {ANIMAL_AVATARS.map((a) => {
               const src = `/avatars/${a.slug}.png`;
               const selected = avatarUrl === src;
@@ -488,9 +492,9 @@ export function SettingsForm({
           <div className={styles.accessBanner} role="alert">
             <strong>Text-to-speech provider unavailable.</strong>
             <span>
-              {providerLabel(selectedTtsProvider, speechTtsProviderMeta)} is selected for this install,
-              but your profile cannot use it yet. Tell an admin to enable learner access or switch
-              the install to another provider.
+              {providerLabel(selectedTtsProvider, speechTtsProviderMeta)} is selected for this
+              install, but your profile cannot use it yet. Tell an admin to enable learner access or
+              switch the install to another provider.
             </span>
           </div>
         ) : null}
@@ -518,7 +522,9 @@ export function SettingsForm({
             <select
               id="preferredTtsModel"
               className={styles.modelSelect}
-              value={ttsModels.some((model) => model.id === preferredTtsModel) ? preferredTtsModel : ''}
+              value={
+                ttsModels.some((model) => model.id === preferredTtsModel) ? preferredTtsModel : ''
+              }
               onChange={(event) => setPreferredTtsModel(event.target.value)}
               disabled={!ttsProviderAvailable || ttsModels.length === 0}
               aria-label="Preferred text-to-speech model"
@@ -548,7 +554,9 @@ export function SettingsForm({
             <select
               id="preferredSttModel"
               className={styles.modelSelect}
-              value={sttModels.some((model) => model.id === preferredSttModel) ? preferredSttModel : ''}
+              value={
+                sttModels.some((model) => model.id === preferredSttModel) ? preferredSttModel : ''
+              }
               onChange={(event) => setPreferredSttModel(event.target.value)}
               disabled={!sttProviderAvailable || sttModels.length === 0}
               aria-label="Preferred speech-to-text model"
@@ -589,7 +597,8 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Interests</h2>
         <p className={styles.interestsDescription}>
-          Select topics you want to study. Sotto uses these to suggest sourced-class topics on things that interest you.
+          Select topics you want to study. Sotto uses these to suggest sourced-class topics on
+          things that interest you.
         </p>
         <InterestGrid
           categories={interestCategories}
@@ -697,6 +706,30 @@ export function SettingsForm({
                 }
               }}
               aria-label="Toggle push notifications"
+            />
+          </label>
+          <label className={styles.toggleRow}>
+            <div className={styles.toggleInfo}>
+              <span className={styles.toggleLabel}>Agent Usage Status</span>
+              <span className={styles.toggleDescription}>
+                Show Claude Code and Codex time windows in the dashboard sidebar
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              className={styles.toggle}
+              checked={showAgentUsageStatus}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setShowAgentUsageStatus(checked);
+                await fetch('/api/v1/users/me', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ showAgentUsageStatus: checked }),
+                });
+                router.refresh();
+              }}
+              aria-label="Toggle agent usage status"
             />
           </label>
         </div>

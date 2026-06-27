@@ -14,6 +14,7 @@ Examples: "the psychology of dreams", "theories about consciousness", "emerging 
 Examples: "proof that the earth is flat", "how aliens built the pyramids", "the real illuminati agenda", "evidence that vaccines cause autism"
 
 ## Important distinctions:
+
 - Opinion pieces and creative topics should WARN, not REJECT — they can be made with relaxed verification
 - Topics about controversial but legitimate research should PROCEED — the controversy is itself well-documented
 - "Explain both sides of X" topics should PROCEED — presenting perspectives is journalism
@@ -21,13 +22,15 @@ Examples: "proof that the earth is flat", "how aliens built the pyramids", "the 
 - Only REJECT topics that would require the AI to fabricate evidence or promote proven misinformation
 
 ## For WARN and REJECT verdicts, provide a suggestion:
+
 Suggest how to reframe the topic to make it more verifiable. Be specific and constructive.
 
 ## Output format (JSON only):
+
 {
-  "verdict": "proceed" | "warn" | "reject",
-  "reason": "Brief explanation (1-2 sentences)",
-  "suggestion": "Reframed topic suggestion" | null
+"verdict": "proceed" | "warn" | "reject",
+"reason": "Brief explanation (1-2 sentences)",
+"suggestion": "Reframed topic suggestion" | null
 }
 
 Return ONLY the JSON object.

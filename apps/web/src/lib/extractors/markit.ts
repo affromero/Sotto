@@ -3,7 +3,7 @@ import { countWords, MAX_CONTENT_LENGTH } from './html';
 import type { ExtractedContent } from './types';
 
 // Lazy-loaded to avoid crashing CJS workers — the package only exports ESM
- 
+
 let markitInstance: any = null;
 
 const PDF_EXTENSIONS = new Set(['.pdf']);
@@ -39,7 +39,10 @@ export async function extractViaMarkit(
 
   const result = await markit.convert(buffer, { extension: info.extension });
   const markdown = (result.markdown || '').substring(0, MAX_CONTENT_LENGTH);
-  const text = markdown.replace(/[#*_`>\[\]()~|-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = markdown
+    .replace(/[#*_`>\[\]()~|-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const truncatedText = text.substring(0, MAX_CONTENT_LENGTH);
   const wordCount = countWords(truncatedText);
 

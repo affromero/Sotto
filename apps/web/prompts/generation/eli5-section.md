@@ -1,4 +1,5 @@
 ## ELI5 Depth — Explain Like I'm 5:
+
 - Use the simplest possible language — imagine explaining to a curious 5-year-old
 - Rely heavily on analogies, metaphors, and comparisons to everyday objects/experiences
 - Break complex ideas into tiny, digestible pieces

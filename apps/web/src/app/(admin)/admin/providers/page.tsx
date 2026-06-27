@@ -8,7 +8,7 @@ import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getTestableProviders } from '@/lib/admin/testable-providers';
 import { Glyph } from '@/components/Glyph';
 import { ProvidersTabs } from './ProvidersTabs';
-import styles from '../../adminTheme.module.css';
+import styles from '../../adminTheme.styles';
 
 export const metadata = { title: 'Providers & models · Sotto admin' };
 

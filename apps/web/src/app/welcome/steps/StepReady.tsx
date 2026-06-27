@@ -24,9 +24,10 @@ import {
   resolveVisualCue,
   type KeyPost,
 } from '../providerMap';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 const MAX_ONBOARDING_NOTE_CHARS = 4000;
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
@@ -351,7 +352,7 @@ export function StepReady({
         >
           {loading ? (
             <>
-              <span className={c.loadingSpinner} aria-hidden="true" />
+              <SottoSpinner size="small" color="white" ariaLabel="Setting up" />
               Setting up…
             </>
           ) : demoComplete ? (

@@ -22,57 +22,50 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [
-    user,
-    userInterests,
-    categories,
-    byokKeys,
-    aiKeys,
-    latestCourse,
-    autoConfig,
-    infra,
-  ] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        name: true,
-        email: true,
-        image: true,
-        role: true,
-        preferredLanguage: true,
-        preferredTtsModel: true,
-        preferredSttModel: true,
-        preferredAiModel: true,
-        emailNotifications: true,
-        pushNotifications: true,
-      },
-    }),
-    prisma.userInterest.findMany({
-      where: { userId, weight: { gt: 0 } },
-      select: { tagId: true },
-    }),
-    prisma.tag.findMany({
-      where: { slug: { in: ONBOARDING_TAG_SLUGS } },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        children: {
-          select: { id: true, name: true, slug: true },
-          orderBy: { name: 'asc' },
+  const [user, userInterests, categories, byokKeys, aiKeys, latestCourse, autoConfig, infra] =
+    await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          name: true,
+          email: true,
+          image: true,
+          role: true,
+          preferredLanguage: true,
+          preferredTtsModel: true,
+          preferredSttModel: true,
+          preferredAiModel: true,
+          emailNotifications: true,
+          pushNotifications: true,
+          showAgentUsageStatus: true,
         },
-      },
-    }),
-    listByokProviders(userId),
-    listAiProviders(userId),
-    prisma.course.findFirst({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      select: { targetLang: true },
-    }),
-    getAutoModelConfig(),
-    getServerInfra(),
-  ]);
+      }),
+      prisma.userInterest.findMany({
+        where: { userId, weight: { gt: 0 } },
+        select: { tagId: true },
+      }),
+      prisma.tag.findMany({
+        where: { slug: { in: ONBOARDING_TAG_SLUGS } },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          children: {
+            select: { id: true, name: true, slug: true },
+            orderBy: { name: 'asc' },
+          },
+        },
+      }),
+      listByokProviders(userId),
+      listAiProviders(userId),
+      prisma.course.findFirst({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        select: { targetLang: true },
+      }),
+      getAutoModelConfig(),
+      getServerInfra(),
+    ]);
 
   if (!user) return null;
 
@@ -193,6 +186,7 @@ export default async function SettingsPage() {
         sttProviderMeta={sttProviderMeta}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
+        initialShowAgentUsageStatus={user.showAgentUsageStatus}
       />
 
       <CourseManagement courses={managedCourses} />

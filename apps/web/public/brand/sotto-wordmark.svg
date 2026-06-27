@@ -6,7 +6,7 @@
       <stop offset="0.72" stop-color="#FFD4E6"></stop>
       <stop offset="1" stop-color="#FF9CBF"></stop>
     </linearGradient>
-    
+
   </defs>
   <text class="wm" x="4" y="98" font-size="108" letter-spacing="-2" fill="url(#w-grad)">sotto</text>
 </svg>

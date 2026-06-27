@@ -28,8 +28,8 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getProviderForModel: vi.fn((id: string) =>
     id.includes('claude') ? 'anthropic' : id.includes('gpt') ? 'openai' : null
   ),
-  isValidModelId: vi.fn((id: string) =>
-    id.includes('claude') || id.includes('gpt') || id.includes('llama')
+  isValidModelId: vi.fn(
+    (id: string) => id.includes('claude') || id.includes('gpt') || id.includes('llama')
   ),
   getAllAiProviderMeta: vi.fn(() => []),
   getAiProviderMeta: vi.fn(() => ({ models: [] })),
@@ -59,7 +59,9 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 
 vi.mock('@/lib/providers/stt-registry', () => ({
   getSttProviderMeta: vi.fn(() => ({
-    models: [{ id: 'whisper-1', displayName: 'Whisper', supportedLanguages: new Set(['en', 'es']) }],
+    models: [
+      { id: 'whisper-1', displayName: 'Whisper', supportedLanguages: new Set(['en', 'es']) },
+    ],
   })),
   isValidSttProviderId: vi.fn((id: string) => id === 'openai'),
   supportsSttLanguage: vi.fn((_provider: string, _model: string, language: string) =>
@@ -126,6 +128,7 @@ const mockUser = {
   preferredAiModel: null,
   preferredTtsModel: null,
   preferredSttModel: null,
+  showAgentUsageStatus: true,
 };
 
 const mockUserMinimal = {
@@ -141,6 +144,7 @@ const mockUserMinimal = {
   preferredAiModel: null,
   preferredTtsModel: null,
   preferredSttModel: null,
+  showAgentUsageStatus: true,
 };
 
 describe('GET /api/v1/users/me', () => {
@@ -174,6 +178,7 @@ describe('GET /api/v1/users/me', () => {
     expect(body.name).toBe('Alice Johnson');
     expect(body.email).toBe('alice@example.com');
     expect(body.role).toBe('ADMIN');
+    expect(body.showAgentUsageStatus).toBe(true);
   });
 
   it('returns the real role for a non-owner learner profile', async () => {
@@ -211,7 +216,6 @@ describe('GET /api/v1/users/me', () => {
     expect(response.status).toBe(404);
     expect(body).toMatchObject({ error: 'User not found' });
   });
-
 });
 
 describe('PATCH /api/v1/users/me', () => {
@@ -425,6 +429,25 @@ describe('PATCH /api/v1/users/me', () => {
     expect(response.headers.getSetCookie().some((c) => c.startsWith('sotto_theme='))).toBe(true);
   });
 
+  it('updates agent usage status visibility', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      showAgentUsageStatus: false,
+    });
+
+    const response = await PATCH(createPatchRequest({ showAgentUsageStatus: false }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.showAgentUsageStatus).toBe(false);
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ showAgentUsageStatus: false }),
+      })
+    );
+  });
+
   it('rejects an invalid accent color', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
@@ -449,5 +472,4 @@ describe('PATCH /api/v1/users/me', () => {
     const response = await PATCH(createPatchRequest({ image: 'not-an-image' }));
     expect(response.status).toBe(400);
   });
-
 });

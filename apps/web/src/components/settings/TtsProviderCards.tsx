@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { normalizeSottoLanguageCode, SOTTO_LANGUAGE_CODES } from '@/lib/speech-language-support';
@@ -80,10 +80,22 @@ export function TtsProviderCards({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>>({});
+  const [status, setStatus] = useState<
+    Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>
+  >({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const sortedProviderMeta = useMemo(() => {
+    return [...providerMeta].sort((a, b) => {
+      const aRank = configured.get(a.id) ? 0 : configured.has(a.id) ? 1 : 2;
+      const bRank = configured.get(b.id) ? 0 : configured.has(b.id) ? 1 : 2;
+      return aRank - bRank;
+    });
+  }, [configured, providerMeta]);
 
-  const handleSaveKey = async (providerId: string, authFields: TtsProviderClientMeta['authFields']) => {
+  const handleSaveKey = async (
+    providerId: string,
+    authFields: TtsProviderClientMeta['authFields']
+  ) => {
     const apiKey = fieldValues[`${providerId}-apiKey`]?.trim();
     if (!apiKey) return;
 
@@ -162,7 +174,7 @@ export function TtsProviderCards({
 
   return (
     <div className={styles.grid}>
-      {providerMeta.map((provider) => {
+      {sortedProviderMeta.map((provider) => {
         const isConfigured = configured.has(provider.id);
         const isValid = configured.get(provider.id) ?? true;
         const isExpanded = expandedId === provider.id;
@@ -170,9 +182,12 @@ export function TtsProviderCards({
         const qualityLabel = QUALITY_LABELS[provider.qualityTier] ?? provider.qualityTier;
         const modelCount = provider.models.length;
         const languageSummary = summarizeLanguageSupport(provider, preferredLanguage);
+        const cardClassName = isConfigured
+          ? `${styles.card} ${isValid ? styles.cardConnected : styles.cardInvalid}`
+          : styles.card;
 
         return (
-          <div key={provider.id} className={styles.card}>
+          <div key={provider.id} className={cardClassName}>
             <div className={styles.cardHeader}>
               <div className={styles.cardHeaderLeft}>
                 <TtsProviderLogo provider={provider.id} size={28} />
@@ -195,9 +210,7 @@ export function TtsProviderCards({
                     {languageSummary.label}
                   </span>
                   <div className={styles.capabilityRow}>
-                    {provider.supportsSfx && (
-                      <span className={styles.capabilityPill}>SFX</span>
-                    )}
+                    {provider.supportsSfx && <span className={styles.capabilityPill}>SFX</span>}
                     {provider.supportsStreaming && (
                       <span className={styles.capabilityPill}>Streaming</span>
                     )}

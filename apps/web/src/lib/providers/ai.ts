@@ -14,8 +14,14 @@ import { getServerInfra, infra } from '../server-config';
  */
 const REASONING_MODEL_MIN_TOKENS = 16384;
 
-export interface TextContentPart { type: 'text'; text: string }
-export interface ImageContentPart { type: 'image_url'; url: string }
+export interface TextContentPart {
+  type: 'text';
+  text: string;
+}
+export interface ImageContentPart {
+  type: 'image_url';
+  url: string;
+}
 export type ContentPart = TextContentPart | ImageContentPart;
 
 export interface ChatMessage {
@@ -26,11 +32,14 @@ export interface ChatMessage {
 /** Extract plain text from message content for moderation. */
 function textOf(content: string | ContentPart[]): string {
   if (typeof content === 'string') return content;
-  return content.filter((p) => p.type === 'text').map((p) => (p as TextContentPart).text).join('\n');
+  return content
+    .filter((p) => p.type === 'text')
+    .map((p) => (p as TextContentPart).text)
+    .join('\n');
 }
 
 /** Convert ChatMessage[] to OpenAI Chat Completions format (images → image_url). */
- 
+
 function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
   return [
     { role: 'system', content: system },
@@ -38,7 +47,7 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
       if (typeof m.content === 'string') return { role: m.role, content: m.content };
       return {
         role: m.role,
-         
+
         content: m.content.map((p): any =>
           p.type === 'text'
             ? { type: 'text', text: p.text }
@@ -50,13 +59,13 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
 }
 
 /** Convert ChatMessage[] to OpenAI Responses API format (input_text / input_image). */
- 
+
 function toResponsesInput(messages: ChatMessage[]): any[] {
   return messages.map((m) => {
     if (typeof m.content === 'string') return { role: m.role, content: m.content };
     return {
       role: m.role,
-       
+
       content: m.content.map((p): any =>
         p.type === 'text'
           ? { type: 'input_text', text: p.text }
@@ -163,7 +172,7 @@ class OpenAIProvider implements AIProvider {
     if (opts?.useWebSearch) {
       return withRetry('[OpenAI:Responses]', async () => {
         // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
-         
+
         const response = await (client as any).responses.create({
           model,
           instructions: system,
@@ -195,29 +204,37 @@ class OpenAIProvider implements AIProvider {
         max_completion_tokens: effectiveTokens,
         temperature: opts?.temperature,
         messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema ? {
-          response_format: {
-            type: 'json_schema' as const,
-            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
-          },
-        } : {}),
+        ...(opts?.jsonSchema
+          ? {
+              response_format: {
+                type: 'json_schema' as const,
+                json_schema: {
+                  name: opts.jsonSchema.name,
+                  schema: opts.jsonSchema.schema,
+                  strict: true,
+                },
+              },
+            }
+          : {}),
       });
 
       const choice = response.choices[0];
       const content = choice?.message?.content || '';
-       
+
       if (!content && (choice as any)?.finish_reason === 'length') {
-         
         const details = (response.usage as any)?.completion_tokens_details;
-        logger.warn('[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget', {
-          model,
-          max_completion_tokens: String(effectiveTokens),
-          completion_tokens: String(response.usage?.completion_tokens || 0),
-          reasoning_tokens: String(details?.reasoning_tokens ?? 'n/a'),
-        });
+        logger.warn(
+          '[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget',
+          {
+            model,
+            max_completion_tokens: String(effectiveTokens),
+            completion_tokens: String(response.usage?.completion_tokens || 0),
+            reasoning_tokens: String(details?.reasoning_tokens ?? 'n/a'),
+          }
+        );
         throw new Error(
           `OpenAI model "${model}" produced no visible output (finish_reason=length). ` +
-          `Reasoning used all ${effectiveTokens} tokens. Increase max_completion_tokens or use a non-reasoning model.`
+            `Reasoning used all ${effectiveTokens} tokens. Increase max_completion_tokens or use a non-reasoning model.`
         );
       }
       return {
@@ -245,20 +262,19 @@ class OpenAIProvider implements AIProvider {
 
     // web_search_preview requires the Responses API (not Chat Completions)
     if (opts?.useWebSearch) {
-       
-      const stream: any = await withRetry('[OpenAI:Responses:stream]', () => (client as any).responses.create({
-        model,
-        instructions: system,
-        input: toResponsesInput(messages),
-        tools: [{ type: 'web_search_preview' }],
-        max_output_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        stream: true,
-      }));
+      const stream: any = await withRetry('[OpenAI:Responses:stream]', () =>
+        (client as any).responses.create({
+          model,
+          instructions: system,
+          input: toResponsesInput(messages),
+          tools: [{ type: 'web_search_preview' }],
+          max_output_tokens: opts?.maxTokens || 4096,
+          temperature: opts?.temperature,
+          stream: true,
+        })
+      );
       for await (const event of stream) {
-         
         if ((event as any).type === 'response.output_text.delta') {
-           
           yield (event as any).delta;
         }
       }
@@ -270,19 +286,21 @@ class OpenAIProvider implements AIProvider {
       ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
       : requestedTokens;
 
-    const stream = await withRetry('[OpenAI:ChatCompletions:stream]', () => client.chat.completions.create({
-      model,
-      max_completion_tokens: effectiveTokens,
-      temperature: opts?.temperature,
-      messages: toOpenAiMessages(system, messages),
-      stream: true,
-    }));
+    const stream = await withRetry('[OpenAI:ChatCompletions:stream]', () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: effectiveTokens,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        stream: true,
+      })
+    );
 
     let yieldedAny = false;
     let lastFinishReason: string | null = null;
     for await (const chunk of stream) {
       const choice = chunk.choices[0];
-       
+
       const finishReason = (choice as any)?.finish_reason as string | null;
       if (finishReason) lastFinishReason = finishReason;
       const delta = choice?.delta?.content;
@@ -300,7 +318,7 @@ class OpenAIProvider implements AIProvider {
         });
         throw new Error(
           `OpenAI model "${model}" streamed no visible output (finish_reason=length). ` +
-          `Reasoning likely consumed all ${effectiveTokens} tokens.`
+            `Reasoning likely consumed all ${effectiveTokens} tokens.`
         );
       }
       logger.warn('[OpenAI] Stream produced 0 visible bytes', {
@@ -325,7 +343,9 @@ class GoogleProvider implements AIProvider {
     return new OpenAI({
       apiKey,
       maxRetries: 0,
-      baseURL: process.env.GOOGLE_AI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      baseURL:
+        process.env.GOOGLE_AI_BASE_URL ||
+        'https://generativelanguage.googleapis.com/v1beta/openai/',
     });
   }
 
@@ -348,12 +368,18 @@ class GoogleProvider implements AIProvider {
         max_completion_tokens: opts?.maxTokens || 4096,
         temperature: opts?.temperature,
         messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema ? {
-          response_format: {
-            type: 'json_schema' as const,
-            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
-          },
-        } : {}),
+        ...(opts?.jsonSchema
+          ? {
+              response_format: {
+                type: 'json_schema' as const,
+                json_schema: {
+                  name: opts.jsonSchema.name,
+                  schema: opts.jsonSchema.schema,
+                  strict: true,
+                },
+              },
+            }
+          : {}),
       });
 
       const content = response.choices[0]?.message?.content || '';
@@ -379,13 +405,15 @@ class GoogleProvider implements AIProvider {
     const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.GOOGLE_AI_MODEL || 'gemini-3.1-flash-lite-preview';
 
-    const stream = await withRetry('[Google:ChatCompletions:stream]', () => client.chat.completions.create({
-      model,
-      max_completion_tokens: opts?.maxTokens || 4096,
-      temperature: opts?.temperature,
-      messages: toOpenAiMessages(system, messages),
-      stream: true,
-    }));
+    const stream = await withRetry('[Google:ChatCompletions:stream]', () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        stream: true,
+      })
+    );
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
@@ -435,7 +463,11 @@ class OpenAiCompatibleProvider implements AIProvider {
           ? {
               response_format: {
                 type: 'json_schema' as const,
-                json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+                json_schema: {
+                  name: opts.jsonSchema.name,
+                  schema: opts.jsonSchema.schema,
+                  strict: true,
+                },
               },
             }
           : {}),
@@ -484,10 +516,18 @@ class OpenAiCompatibleProvider implements AIProvider {
 // baseURL + env key per OpenAI-compatible LLM provider; default model from registry.
 const OPENAI_COMPATIBLE_LLMS: Record<string, { label: string; envKey: string; baseURL: string }> = {
   xai: { label: 'xAI', envKey: 'XAI_API_KEY', baseURL: 'https://api.x.ai/v1' },
-  deepseek: { label: 'DeepSeek', envKey: 'DEEPSEEK_API_KEY', baseURL: 'https://api.deepseek.com/v1' },
+  deepseek: {
+    label: 'DeepSeek',
+    envKey: 'DEEPSEEK_API_KEY',
+    baseURL: 'https://api.deepseek.com/v1',
+  },
   mistral: { label: 'Mistral', envKey: 'MISTRAL_API_KEY', baseURL: 'https://api.mistral.ai/v1' },
   groq: { label: 'Groq', envKey: 'GROQ_API_KEY', baseURL: 'https://api.groq.com/openai/v1' },
-  nvidia: { label: 'NVIDIA', envKey: 'NVIDIA_API_KEY', baseURL: 'https://integrate.api.nvidia.com/v1' },
+  nvidia: {
+    label: 'NVIDIA',
+    envKey: 'NVIDIA_API_KEY',
+    baseURL: 'https://integrate.api.nvidia.com/v1',
+  },
 };
 
 /**
@@ -507,13 +547,17 @@ class LocalProvider implements AIProvider {
     const baseURL = infra('aiBaseUrl', 'AI_BASE_URL');
     if (!baseURL) {
       throw new Error(
-        'AI_BASE_URL is not set. Point it at your local OpenAI-compatible server (e.g. http://localhost:11434/v1 for Ollama).',
+        'AI_BASE_URL is not set. Point it at your local OpenAI-compatible server (e.g. http://localhost:11434/v1 for Ollama).'
       );
     }
     const { default: OpenAI } = await import('openai');
     // AI_API_KEY is a secret — never sourced from DB config; env-only (or 'local').
     // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
-    return new OpenAI({ apiKey: process.env.AI_API_KEY?.trim() || 'local', maxRetries: 0, baseURL });
+    return new OpenAI({
+      apiKey: process.env.AI_API_KEY?.trim() || 'local',
+      maxRetries: 0,
+      baseURL,
+    });
   }
 
   private resolveModel(optsModel?: string): string {
@@ -521,7 +565,7 @@ class LocalProvider implements AIProvider {
     const model = raw.startsWith('local:') ? raw.slice('local:'.length) : raw;
     if (!model) {
       throw new Error(
-        'No local model configured. Set AI_MODEL to the model your local server serves (e.g. "qwen3", "gemma3", "llama3.3").',
+        'No local model configured. Set AI_MODEL to the model your local server serves (e.g. "qwen3", "gemma3", "llama3.3").'
       );
     }
     return model;
@@ -546,12 +590,18 @@ class LocalProvider implements AIProvider {
         max_completion_tokens: opts?.maxTokens || 4096,
         temperature: opts?.temperature,
         messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema ? {
-          response_format: {
-            type: 'json_schema' as const,
-            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
-          },
-        } : {}),
+        ...(opts?.jsonSchema
+          ? {
+              response_format: {
+                type: 'json_schema' as const,
+                json_schema: {
+                  name: opts.jsonSchema.name,
+                  schema: opts.jsonSchema.schema,
+                  strict: true,
+                },
+              },
+            }
+          : {}),
       });
 
       const content = response.choices[0]?.message?.content || '';
@@ -577,13 +627,15 @@ class LocalProvider implements AIProvider {
     const client = await this.getClient();
     const model = this.resolveModel(opts?.model);
 
-    const stream = await withRetry('[Local:ChatCompletions:stream]', () => client.chat.completions.create({
-      model,
-      max_completion_tokens: opts?.maxTokens || 4096,
-      temperature: opts?.temperature,
-      messages: toOpenAiMessages(system, messages),
-      stream: true,
-    }));
+    const stream = await withRetry('[Local:ChatCompletions:stream]', () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        stream: true,
+      })
+    );
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
@@ -644,7 +696,9 @@ class CodexLazyProvider implements AIProvider {
 
 export function createAIProvider(type: string): AIProvider {
   if (!type) {
-    throw new Error('AI provider type is required. Pass an explicit provider from the AI registry.');
+    throw new Error(
+      'AI provider type is required. Pass an explicit provider from the AI registry.'
+    );
   }
 
   switch (type) {
@@ -672,7 +726,9 @@ export function createAIProvider(type: string): AIProvider {
       });
     }
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`);
+      throw new Error(
+        `Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`
+      );
   }
 }
 

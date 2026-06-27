@@ -12,7 +12,7 @@ import type { GlyphName } from '@/components/Glyph';
 import { Glyph } from '../Glyph';
 import type { ContextItem, ContextItemKind } from '../WelcomeFlow';
 import t from '../theme.module.css';
-import c from '../components.module.css';
+import c from '../components.styles';
 
 interface Props {
   contextItems: ContextItem[];

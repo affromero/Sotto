@@ -24,9 +24,14 @@ describe('StartNextClass', () => {
   });
 
   it('labels the primary action as taking a class when no class is active', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      jsonResponse({ classId: 'class-1' }, 201)
-    );
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === '/api/v1/courses/course-1/next-class') {
+        return Promise.resolve(jsonResponse({ classId: 'class-1' }, 201));
+      }
+
+      return Promise.resolve({ ok: false, json: async () => ({}) } as Response);
+    });
+
     render(<StartNextClass courseId="course-1" activeClassId={null} />);
 
     fireEvent.click(screen.getByRole('button', { name: /take a class at this level/i }));
