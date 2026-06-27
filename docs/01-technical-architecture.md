@@ -2,7 +2,7 @@
 
 > **Date**: 2026-06-13
 >
-> **Diagrams**: [06-architecture-diagrams.md](./06-architecture-diagrams.md) renders every flow below as Mermaid.
+> **Diagrams**: [07-architecture-diagrams.md](./07-architecture-diagrams.md) renders every flow below as Mermaid.
 >
 > **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
 
@@ -46,17 +46,17 @@ Sotto may run on a VPS or managed infrastructure, but the self-hosted product mu
 
 ## 2. Monorepo
 
-| Path | Responsibility |
-|---|---|
-| `apps/web` | Next.js app, `/api/v1` routes, Prisma schema, workers, tests |
-| `apps/desktop` | Tauri desktop shell, built outside the npm workspaces |
-| `tui/` | Rust + ratatui headless terminal client (the `sotto` binary), built outside the npm workspaces; consumes `/api/v1` over HTTP with a progenitor-generated client |
-| `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers; also emits the OpenAPI contract the `tui/` client is generated from |
-| `packages/mcp` | MCP integration surface for local agents |
-| `packages/groundcheck` | Reference verification standard package |
-| `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
-| `e2e` | Playwright end-to-end tests |
-| `scripts` | Setup, launch, recording, migration, and release automation |
+| Path                   | Responsibility                                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`             | Next.js app, `/api/v1` routes, Prisma schema, workers, tests                                                                                                    |
+| `apps/desktop`         | Tauri desktop shell, built outside the npm workspaces                                                                                                           |
+| `tui/`                 | Rust + ratatui headless terminal client (the `sotto` binary), built outside the npm workspaces; consumes `/api/v1` over HTTP with a progenitor-generated client |
+| `packages/shared`      | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers; also emits the OpenAPI contract the `tui/` client is generated from         |
+| `packages/mcp`         | MCP integration surface for local agents                                                                                                                        |
+| `packages/groundcheck` | Reference verification standard package                                                                                                                         |
+| `services/local-tts`   | Keyless Kokoro TTS sidecar for local listening and speaking audio                                                                                               |
+| `e2e`                  | Playwright end-to-end tests                                                                                                                                     |
+| `scripts`              | Setup, launch, recording, migration, and release automation                                                                                                     |
 
 Root scripts proxy the primary web commands to `@sotto/web`.
 
@@ -66,20 +66,20 @@ Root scripts proxy the primary web commands to `@sotto/web`.
 
 The active data model is learner and course oriented. Important groups:
 
-| Group | Models |
-|---|---|
-| Identity | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`) |
-| Curriculum | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle` |
-| Enrollment | `Course`, `CourseNote`, `PlacementResult` |
-| Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer` |
-| Speaking | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus` |
-| Writing | `WritingPrompt`, `WritingResponse` |
-| Practice | `PracticeSession`, `PracticeKind`, `PracticeStatus` |
-| Mock exams | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution` |
-| Memory graph | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType` |
+| Group               | Models                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| Identity            | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`)            |
+| Curriculum          | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle`                                                |
+| Enrollment          | `Course`, `CourseNote`, `PlacementResult`                                                           |
+| Classes             | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`                 |
+| Speaking            | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus`                                        |
+| Writing             | `WritingPrompt`, `WritingResponse`                                                                  |
+| Practice            | `PracticeSession`, `PracticeKind`, `PracticeStatus`                                                 |
+| Mock exams          | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution` |
+| Memory graph        | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType`                                           |
 | Reused audio engine | `Episode`, `EpisodeSegment`, `EpisodeVersion`, interaction/reference models used by listening audio |
-| Provider config | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings |
-| Operations | queue/job metadata, reports, audit/admin records, usage and cost records |
+| Provider config     | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings                          |
+| Operations          | queue/job metadata, reports, audit/admin records, usage and cost records                            |
 
 `Episode` is the audio engine the listening skill reuses — script generation, verification, TTS, stitching, playback, and references — backing listening sections, listening practice, and exam listening.
 
@@ -233,14 +233,14 @@ Agent outputs should be treated as private learner data. Logs must avoid leaking
 
 Sotto supports learning context, not public content distribution. Current input types should feed course generation, practice, or the memory graph:
 
-| Input | Trigger | Output |
-|---|---|---|
-| Placement | learner starts a language pair | `Course` and `PlacementResult` |
-| Course note | learner edits goals/background/interests | personalization for placement, classes, and practice |
-| Sourced class | learner provides a URL or topic | CEFR-leveled class with verified references where available |
-| Agent context | local agent/MCP/API ingestion | private learning context for the learner's course |
-| Live conversation | learner finishes a Gemini Live session | target-language vocabulary extracted into the memory graph |
-| Practice/exam attempts | learner submits answers, recordings, or writing | SRS updates, scores, feedback, mock band |
+| Input                  | Trigger                                         | Output                                                      |
+| ---------------------- | ----------------------------------------------- | ----------------------------------------------------------- |
+| Placement              | learner starts a language pair                  | `Course` and `PlacementResult`                              |
+| Course note            | learner edits goals/background/interests        | personalization for placement, classes, and practice        |
+| Sourced class          | learner provides a URL or topic                 | CEFR-leveled class with verified references where available |
+| Agent context          | local agent/MCP/API ingestion                   | private learning context for the learner's course           |
+| Live conversation      | learner finishes a Gemini Live session          | target-language vocabulary extracted into the memory graph  |
+| Practice/exam attempts | learner submits answers, recordings, or writing | SRS updates, scores, feedback, mock band                    |
 
 Common requirements:
 
@@ -258,30 +258,30 @@ Do not describe meeting recap, news briefing, public feed, or bot workflow surfa
 
 The current learning API surface is under `/api/v1`:
 
-| Endpoint | Purpose |
-|---|---|
-| `/api/v1/placement` | Generate and submit placement, then create a course |
-| `/api/v1/courses` | List and create learner courses |
-| `/api/v1/courses/[courseId]/next-class` | Generate the next gated class, optionally from a source URL or topic |
-| `/api/v1/courses/[courseId]/graph` | Fetch memory graph vocabulary, grammar, and edges |
-| `/api/v1/courses/[courseId]/topics` | Suggest sourced-class topics from learner interests |
-| `/api/v1/courses/[courseId]/notes` | Read and update course-scoped learner notes |
-| `/api/v1/courses/[courseId]/practice` | Inspect due counts and start ungated practice |
-| `/api/v1/classes/[classId]` | Fetch or regenerate class sections |
-| `/api/v1/classes/[classId]/submit` | Submit a class and advance on mastery |
-| `/api/v1/classes/[classId]/speaking/[promptId]` | Upload a class speaking recording |
-| `/api/v1/classes/[classId]/writing/[promptId]` | Submit and score class writing |
-| `/api/v1/classes/[classId]/worksheet` | Fetch or generate worksheet PDF |
-| `/api/v1/practice/[sessionId]/submit` | Submit ungated practice and update SRS |
-| `/api/v1/practice/[sessionId]/speaking/[promptId]` | Upload/poll practice speaking |
-| `/api/v1/practice/[sessionId]/writing/[promptId]` | Submit and score practice writing |
-| `/api/v1/exams` | Start a mock exam |
-| `/api/v1/exams/[examId]` | Fetch exam sections |
-| `/api/v1/exams/[examId]/submit` | Submit and score exam answers |
-| `/api/v1/exams/[examId]/speaking/[promptId]` | Upload/poll exam speaking |
-| `/api/v1/exams/[examId]/writing/[promptId]` | Submit and score exam writing |
-| `/api/v1/live-translate/token` | Mint a BYOK Google Live token without exposing the key |
-| `/api/v1/live-translate/session` | Store live conversation transcript and extract vocabulary |
+| Endpoint                                           | Purpose                                                              |
+| -------------------------------------------------- | -------------------------------------------------------------------- |
+| `/api/v1/placement`                                | Generate and submit placement, then create a course                  |
+| `/api/v1/courses`                                  | List and create learner courses                                      |
+| `/api/v1/courses/[courseId]/next-class`            | Generate the next gated class, optionally from a source URL or topic |
+| `/api/v1/courses/[courseId]/graph`                 | Fetch memory graph vocabulary, grammar, and edges                    |
+| `/api/v1/courses/[courseId]/topics`                | Suggest sourced-class topics from learner interests                  |
+| `/api/v1/courses/[courseId]/notes`                 | Read and update course-scoped learner notes                          |
+| `/api/v1/courses/[courseId]/practice`              | Inspect due counts and start ungated practice                        |
+| `/api/v1/classes/[classId]`                        | Fetch or regenerate class sections                                   |
+| `/api/v1/classes/[classId]/submit`                 | Submit a class and advance on mastery                                |
+| `/api/v1/classes/[classId]/speaking/[promptId]`    | Upload a class speaking recording                                    |
+| `/api/v1/classes/[classId]/writing/[promptId]`     | Submit and score class writing                                       |
+| `/api/v1/classes/[classId]/worksheet`              | Fetch or generate worksheet PDF                                      |
+| `/api/v1/practice/[sessionId]/submit`              | Submit ungated practice and update SRS                               |
+| `/api/v1/practice/[sessionId]/speaking/[promptId]` | Upload/poll practice speaking                                        |
+| `/api/v1/practice/[sessionId]/writing/[promptId]`  | Submit and score practice writing                                    |
+| `/api/v1/exams`                                    | Start a mock exam                                                    |
+| `/api/v1/exams/[examId]`                           | Fetch exam sections                                                  |
+| `/api/v1/exams/[examId]/submit`                    | Submit and score exam answers                                        |
+| `/api/v1/exams/[examId]/speaking/[promptId]`       | Upload/poll exam speaking                                            |
+| `/api/v1/exams/[examId]/writing/[promptId]`        | Submit and score exam writing                                        |
+| `/api/v1/live-translate/token`                     | Mint a BYOK Google Live token without exposing the key               |
+| `/api/v1/live-translate/session`                   | Store live conversation transcript and extract vocabulary            |
 
 Existing `/api/v1/episodes/*` routes may still be used by the reused audio engine and player components. They should not be documented as the primary product surface.
 
@@ -291,11 +291,11 @@ Existing `/api/v1/episodes/*` routes may still be used by the reused audio engin
 
 Local storage is the default for OSS.
 
-| Deployment | Storage |
-|---|---|
-| Local OSS | local filesystem under `.sotto/storage` |
-| VPS self-hosted | local volume or S3-compatible storage |
-| Managed infrastructure, if offered | S3/R2-compatible storage |
+| Deployment                         | Storage                                 |
+| ---------------------------------- | --------------------------------------- |
+| Local OSS                          | local filesystem under `.sotto/storage` |
+| VPS self-hosted                    | local volume or S3-compatible storage   |
+| Managed infrastructure, if offered | S3/R2-compatible storage                |
 
 Storage rules:
 

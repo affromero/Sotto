@@ -30,7 +30,7 @@ Open source language learning you run yourself, with a full **[CEFR](https://www
 
 <br/>
 
-[**Quick Start**](#quick-start) · [**Why Sotto**](#why-sotto) · [**What You Get**](#what-you-get) · [**Compare**](#how-sotto-compares) · [**Self-host**](#self-host) · [**BYOK**](#bring-your-own-claude--codex)
+[**Quick Start**](#quick-start) · [**Use Cases**](docs/06-user-flows.md) · [**Why Sotto**](#why-sotto) · [**What You Get**](#what-you-get) · [**Compare**](#how-sotto-compares) · [**Self-host**](#self-host) · [**BYOK**](#bring-your-own-claude--codex)
 
 <sub>Open source language learning for the context you choose to share.</sub>
 
@@ -60,6 +60,8 @@ The installer pulls the pre-built images, asks how to connect your AI (an API ke
 3. Start your first class gated by mastery, or sharpen one skill in ungated practice
 
 Manage it from `~/.sotto`: `docker compose logs -f`, `docker compose down`.
+
+For the full self-hosted journey, see [User Flows](docs/06-user-flows.md): start the stack, create a course, take a class, use the iPad workbook, connect devices, and maintain the deployment.
 
 ---
 
@@ -332,7 +334,7 @@ sotto                         # launch the TUI against your server
 - **Contextual Q&A:** pause a listening segment and ask a question; the answer streams back inline.
 - **Accounts:** `sotto accounts`, `sotto switch`, `sotto logout`, and `sotto whoami` manage multiple servers/profiles (stored in `~/.config/sotto`), plus an in TUI switcher.
 
-The typed client is generated from the same Zod schemas the web app uses (`packages/shared` -> OpenAPI -> [progenitor](https://github.com/oxidecomputer/progenitor)), so the contract never drifts. See [`tui/CLAUDE.md`](tui/CLAUDE.md) and [§9 of the architecture diagrams](docs/06-architecture-diagrams.md).
+The typed client is generated from the same Zod schemas the web app uses (`packages/shared` -> OpenAPI -> [progenitor](https://github.com/oxidecomputer/progenitor)), so the contract never drifts. See [`tui/CLAUDE.md`](tui/CLAUDE.md) and [§9 of the architecture diagrams](docs/07-architecture-diagrams.md).
 
 ---
 
