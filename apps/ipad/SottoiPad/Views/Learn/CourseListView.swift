@@ -310,6 +310,7 @@ private struct CourseRow: View {
 
 private struct CourseDetailPane: View {
     @EnvironmentObject private var model: SottoAppModel
+    @Environment(\.openURL) private var openURL
     let course: SottoCourse
 
     private var generation: SottoLoadingOperation? {
@@ -320,22 +321,23 @@ private struct CourseDetailPane: View {
         model.classGenerationErrors[course.id]
     }
 
+    private var courseTitle: String {
+        course.curriculum?.title ?? "\(languageName(course.targetLang)) for \(languageName(course.nativeLang)) speakers"
+    }
+
+    private var isManualPlacement: Bool {
+        course.placementSource == "MANUAL"
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(course.curriculum?.title ?? "Course")
-                        .font(.system(size: 48, weight: .bold, design: .serif))
-                        .foregroundStyle(SottoTheme.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 12) {
-                        StatPill(title: "From", value: course.nativeLang.uppercased())
-                        StatPill(title: "To", value: course.targetLang.uppercased())
-                        StatPill(title: "Level", value: course.currentLevel)
-                        StatPill(title: "Placement", value: course.placementSource)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 22) {
+                CourseHeroPanel(
+                    title: courseTitle,
+                    course: course,
+                    isManualPlacement: isManualPlacement,
+                    onPlacement: openPlacement
+                )
 
                 if let generation {
                     ClassGenerationStatusPanel(operation: generation) {
@@ -349,42 +351,25 @@ private struct CourseDetailPane: View {
                     }
                 }
 
-                HStack(spacing: 14) {
-                    Button {
-                        Task {
-                            if let activeClassId = course.activeClassId {
-                                await model.openClass(activeClassId)
-                            } else {
-                                await model.startOrResumeClass(for: course)
-                            }
-                        }
-                    } label: {
-                        Label(primaryActionTitle, systemImage: primaryActionIcon)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(SottoPrimaryButtonStyle())
-                    .disabled(generation != nil)
+                CourseActionGrid(
+                    primaryTitle: primaryActionTitle,
+                    primaryIcon: primaryActionIcon,
+                    generating: generation != nil,
+                    onPrimary: startOrResumeClass,
+                    onPractice: startPractice,
+                    onLive: openLive,
+                    onExam: openExam,
+                    onPlacement: openPlacement,
+                    onWorkbook: openWorkbook
+                )
 
-                    Button {
-                        Task {
-                            await model.startFullCatchUp(for: course)
-                        }
-                    } label: {
-                        Label("Full catch-up", systemImage: "arrow.triangle.2.circlepath")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(SottoSecondaryButtonStyle())
+                SourcedClassPanel(course: course, activeClassId: course.activeClassId)
 
-                    Button {
-                        Task {
-                            await model.openWorkbook(for: course)
-                        }
-                    } label: {
-                        Label("Workbook", systemImage: "pencil.and.scribble")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(SottoSecondaryButtonStyle())
-                }
+                TeachingApproachPanel(course: course)
+
+                CourseNotesEditor(course: course)
+
+                CourseClassHistoryPanel(course: course)
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text(statusTitle)
@@ -405,7 +390,7 @@ private struct CourseDetailPane: View {
                 )
             }
             .padding(44)
-            .frame(maxWidth: 980, alignment: .leading)
+            .frame(maxWidth: 1060, alignment: .leading)
         }
         .background(SottoTheme.paper)
     }
@@ -433,6 +418,56 @@ private struct CourseDetailPane: View {
             return "The background class build did not finish cleanly. Retry when the server is reachable."
         }
         return course.activeClassId == nil ? "Use Take class to generate the first class. The workbook becomes available as soon as that class exists." : "Resume the active class before Sotto creates another one. The workbook button opens the current worksheet with Apple Pencil notes."
+    }
+
+    private func startOrResumeClass() {
+        Task {
+            if let activeClassId = course.activeClassId {
+                await model.openClass(activeClassId)
+            } else {
+                await model.startOrResumeClass(for: course)
+            }
+        }
+    }
+
+    private func startPractice(_ kind: String) {
+        Task {
+            await model.startPractice(courseId: course.id, kind: kind)
+        }
+    }
+
+    private func openWorkbook() {
+        Task {
+            await model.openWorkbook(for: course)
+        }
+    }
+
+    private func openLive() {
+        openWeb(path: "/learn/live", queryItems: [URLQueryItem(name: "course", value: course.id)])
+    }
+
+    private func openExam() {
+        openWeb(path: "/learn/exams", queryItems: [URLQueryItem(name: "course", value: course.id)])
+    }
+
+    private func openPlacement() {
+        openWeb(
+            path: "/learn/placement",
+            queryItems: [
+                URLQueryItem(name: "native", value: course.nativeLang),
+                URLQueryItem(name: "target", value: course.targetLang),
+            ]
+        )
+    }
+
+    private func openWeb(path: String, queryItems: [URLQueryItem] = []) {
+        guard let base = model.credentials?.serverURL,
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false)
+        else { return }
+        components.path = path
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
+        guard let url = components.url else { return }
+        openURL(url)
     }
 }
 
@@ -557,30 +592,6 @@ private struct EmptyCourseState: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SottoTheme.paper)
-    }
-}
-
-private struct StatPill: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title.uppercased())
-                .font(.caption2.bold())
-                .foregroundStyle(SottoTheme.muted)
-            Text(value)
-                .font(.headline)
-                .foregroundStyle(SottoTheme.ink)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(SottoTheme.line)
-        )
     }
 }
 

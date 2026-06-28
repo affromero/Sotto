@@ -55,12 +55,160 @@ struct SottoCourse: Decodable, Identifiable, Equatable {
     let currentLevel: String
     let startLevel: String
     let placementSource: String
+    let pedagogy: SottoPedagogyStyle
     let activeClassId: String?
     let curriculum: SottoCurriculum?
+    let classes: [SottoCourseClassSummary]
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case nativeLang
+        case targetLang
+        case currentLevel
+        case startLevel
+        case placementSource
+        case pedagogy
+        case activeClassId
+        case curriculum
+        case classes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        nativeLang = try container.decode(String.self, forKey: .nativeLang)
+        targetLang = try container.decode(String.self, forKey: .targetLang)
+        currentLevel = try container.decode(String.self, forKey: .currentLevel)
+        startLevel = try container.decode(String.self, forKey: .startLevel)
+        placementSource = try container.decodeIfPresent(String.self, forKey: .placementSource) ?? "UNKNOWN"
+        pedagogy = try container.decodeIfPresent(SottoPedagogyStyle.self, forKey: .pedagogy) ?? .balanced
+        activeClassId = try container.decodeIfPresent(String.self, forKey: .activeClassId)
+        curriculum = try container.decodeIfPresent(SottoCurriculum.self, forKey: .curriculum)
+        classes = try container.decodeIfPresent([SottoCourseClassSummary].self, forKey: .classes) ?? []
+    }
 }
 
 struct SottoCurriculum: Decodable, Equatable {
     let title: String?
+}
+
+enum SottoPedagogyStyle: String, Codable, CaseIterable, Identifiable, Equatable {
+    case balanced = "BALANCED"
+    case immersion = "IMMERSION"
+    case grammar = "GRAMMAR"
+    case communication = "COMMUNICATION"
+    case intensive = "INTENSIVE"
+
+    var id: String { rawValue }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = SottoPedagogyStyle(rawValue: rawValue) ?? .balanced
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    var label: String {
+        switch self {
+        case .balanced:
+            return "Balanced"
+        case .immersion:
+            return "Immersion"
+        case .grammar:
+            return "Grammar-first"
+        case .communication:
+            return "Conversation-first"
+        case .intensive:
+            return "Intensive review"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .balanced:
+            return "A well-rounded mix. The default if you are not sure."
+        case .immersion:
+            return "Mostly target language, learn from context, meaning first."
+        case .grammar:
+            return "Clear rules and patterns explained up front, then practice."
+        case .communication:
+            return "Realistic tasks and speaking, fluency over perfection."
+        case .intensive:
+            return "Heavy recall and spaced repetition of weak items."
+        }
+    }
+
+    var basis: String {
+        switch self {
+        case .balanced:
+            return "Combines comprehensible input, focus on form, and retrieval practice."
+        case .immersion:
+            return "Krashen's input hypothesis: comprehensible input, i+1."
+        case .grammar:
+            return "Focus on form and explicit, deductive instruction."
+        case .communication:
+            return "Swain's output hypothesis and communicative language teaching."
+        case .intensive:
+            return "The testing effect and spaced repetition."
+        }
+    }
+}
+
+struct SottoCourseClassSummary: Decodable, Identifiable, Equatable {
+    let id: String
+    let order: Int
+    let status: String
+    let attempt: Int
+    let sourceTitle: String?
+    let createdAt: String?
+    let submittedAt: String?
+    let passedAt: String?
+    let failedAt: String?
+    let lesson: SottoCourseLessonSummary
+    let submission: SottoCourseSubmissionSummary?
+}
+
+struct SottoCourseLessonSummary: Decodable, Equatable {
+    let title: String
+    let level: String
+}
+
+struct SottoCourseSubmissionSummary: Decodable, Equatable {
+    let overallScore: Double?
+    let passed: Bool?
+    let submittedAt: String?
+}
+
+struct SottoTopicSuggestion: Decodable, Identifiable, Equatable {
+    var id: String { query }
+
+    let label: String
+    let query: String
+}
+
+struct SottoCourseTopicsResponse: Decodable, Equatable {
+    let topics: [SottoTopicSuggestion]
+}
+
+struct SottoCourseNotesResponse: Decodable, Equatable {
+    let body: String?
+    let addedVocabulary: Int?
+    let imported: Int?
+    let failed: Int?
+}
+
+struct SottoCoursePedagogyResponse: Decodable, Equatable {
+    let pedagogy: SottoPedagogyStyle
+}
+
+enum SottoClassGenerationSource: Equatable {
+    case curriculum
+    case sourceUrl(String)
+    case topic(String)
 }
 
 struct NextClassCreatedResponse: Decodable {

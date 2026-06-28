@@ -66,10 +66,13 @@ struct SottoAPIClient {
         throw SottoAPIError.message("Sotto did not return a class to open.")
     }
 
-    func startNextClassGeneration(courseId: String) async throws {
+    func startNextClassGeneration(
+        courseId: String,
+        source: SottoClassGenerationSource = .curriculum
+    ) async throws {
         let _: NextClassBackgroundResponse = try await post(
             "/api/v1/courses/\(courseId)/next-class?background=1",
-            body: EmptyBody(),
+            body: NextClassGenerationRequest(source: source),
             acceptedStatuses: [202]
         )
     }
@@ -108,6 +111,30 @@ struct SottoAPIClient {
 
     func startPractice(courseId: String, kind: String) async throws -> SottoPracticeStart {
         try await post("/api/v1/courses/\(courseId)/practice", body: StartPracticeRequest(kind: kind))
+    }
+
+    func fetchCourseTopics(courseId: String) async throws -> [SottoTopicSuggestion] {
+        let response: SottoCourseTopicsResponse = try await get("/api/v1/courses/\(courseId)/topics")
+        return response.topics
+    }
+
+    func fetchCourseNotes(courseId: String) async throws -> SottoCourseNotesResponse {
+        try await get("/api/v1/courses/\(courseId)/notes")
+    }
+
+    func saveCourseNotes(courseId: String, body: String) async throws -> SottoCourseNotesResponse {
+        try await put("/api/v1/courses/\(courseId)/notes", body: CourseNotesRequest(body: body))
+    }
+
+    func updateCoursePedagogy(
+        courseId: String,
+        pedagogy: SottoPedagogyStyle
+    ) async throws -> SottoPedagogyStyle {
+        let response: SottoCoursePedagogyResponse = try await patch(
+            "/api/v1/courses/\(courseId)/pedagogy",
+            body: CoursePedagogyRequest(pedagogy: pedagogy)
+        )
+        return response.pedagogy
     }
 
     func submitPractice(sessionId: String, answers: [SottoPracticeAnswer]) async throws -> SottoPracticeSubmitResult {
@@ -184,6 +211,28 @@ struct SottoAPIClient {
         acceptedStatuses: Set<Int> = [200, 201]
     ) async throws -> Response {
         var request = try makeRequest(path: path, method: "POST", authorized: authorized)
+        request.httpBody = try JSONEncoder().encode(body)
+        return try await send(request, acceptedStatuses: acceptedStatuses)
+    }
+
+    private func put<Body: Encodable, Response: Decodable>(
+        _ path: String,
+        body: Body,
+        authorized: Bool = true,
+        acceptedStatuses: Set<Int> = [200]
+    ) async throws -> Response {
+        var request = try makeRequest(path: path, method: "PUT", authorized: authorized)
+        request.httpBody = try JSONEncoder().encode(body)
+        return try await send(request, acceptedStatuses: acceptedStatuses)
+    }
+
+    private func patch<Body: Encodable, Response: Decodable>(
+        _ path: String,
+        body: Body,
+        authorized: Bool = true,
+        acceptedStatuses: Set<Int> = [200]
+    ) async throws -> Response {
+        var request = try makeRequest(path: path, method: "PATCH", authorized: authorized)
         request.httpBody = try JSONEncoder().encode(body)
         return try await send(request, acceptedStatuses: acceptedStatuses)
     }
@@ -285,6 +334,33 @@ private struct StartPracticeRequest: Encodable {
 private struct CreateCourseRequest: Encodable {
     let native: String
     let target: String
+}
+
+private struct NextClassGenerationRequest: Encodable {
+    let sourceUrl: String?
+    let topic: String?
+
+    init(source: SottoClassGenerationSource) {
+        switch source {
+        case .curriculum:
+            sourceUrl = nil
+            topic = nil
+        case let .sourceUrl(value):
+            sourceUrl = value
+            topic = nil
+        case let .topic(value):
+            sourceUrl = nil
+            topic = value
+        }
+    }
+}
+
+private struct CourseNotesRequest: Encodable {
+    let body: String
+}
+
+private struct CoursePedagogyRequest: Encodable {
+    let pedagogy: SottoPedagogyStyle
 }
 
 private struct SubmitPracticeRequest: Encodable {

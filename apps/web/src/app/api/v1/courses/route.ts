@@ -25,9 +25,26 @@ export async function GET(request: NextRequest) {
         currentLevel: true,
         startLevel: true,
         placementSource: true,
+        pedagogy: true,
         activeClassId: true,
         curriculum: { select: { title: true } },
         placement: { select: { level: true, createdAt: true } },
+        classes: {
+          orderBy: [{ createdAt: 'desc' }],
+          select: {
+            id: true,
+            order: true,
+            status: true,
+            attempt: true,
+            sourceTitle: true,
+            createdAt: true,
+            submittedAt: true,
+            passedAt: true,
+            failedAt: true,
+            lesson: { select: { title: true, level: true } },
+            submission: { select: { overallScore: true, passed: true, submittedAt: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -54,7 +71,7 @@ export async function GET(request: NextRequest) {
         activeLevel && cefrRank(activeLevel) >= cefrRank(course.currentLevel)
           ? course.activeClassId
           : null;
-      return { ...course, activeClassId };
+      return { ...course, activeClassId, classes: course.classes ?? [] };
     });
 
     return NextResponse.json({ courses: sanitizedCourses });
