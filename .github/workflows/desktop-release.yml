@@ -2,6 +2,8 @@ name: Desktop launcher release
 
 # Builds Sotto Host (apps/desktop) for macOS, Windows, and Linux and publishes the
 # installers to R2 — the bucket that sotto.fm uses for /download desktop assets.
+# Each build publishes both a release-version path and a short-commit path, so
+# users can pin a desktop build without requiring a package version bump.
 # Trigger by pushing a tag like `v0.1` or `desktop-v0.1.0`, or run manually.
 on:
   push:
@@ -73,6 +75,7 @@ jobs:
           esac
 
           echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$(git rev-parse --short=8 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Normalize desktop artifacts
         shell: bash
@@ -80,12 +83,14 @@ jobs:
           set -euo pipefail
 
           RELEASE_VERSION="${{ steps.release_version.outputs.version }}"
+          SHORT_SHA="${{ steps.release_version.outputs.short_sha }}"
           BUNDLE_DIR="apps/desktop/src-tauri/target/release/bundle"
           ARTIFACT_ROOT="$RUNNER_TEMP/sotto-desktop-downloads"
           VERSION_DIR="$ARTIFACT_ROOT/download/desktop/$RELEASE_VERSION/${{ matrix.slug }}"
+          SHA_DIR="$ARTIFACT_ROOT/download/desktop/$SHORT_SHA/${{ matrix.slug }}"
           LATEST_DIR="$ARTIFACT_ROOT/download/desktop/latest/${{ matrix.slug }}"
 
-          mkdir -p "$VERSION_DIR" "$LATEST_DIR"
+          mkdir -p "$VERSION_DIR" "$SHA_DIR" "$LATEST_DIR"
 
           files=()
           case "${{ matrix.slug }}" in
@@ -156,11 +161,11 @@ jobs:
           done
           cp "$primary" "$VERSION_DIR/$fixed_name"
 
-          node - "$VERSION_DIR/manifest.json" "$RELEASE_VERSION" "${{ matrix.slug }}" "$fixed_name" "$content_type" <<'NODE'
+          node - "$VERSION_DIR/manifest.json" "$RELEASE_VERSION" "$SHORT_SHA" "$GITHUB_SHA" "${{ matrix.slug }}" "$fixed_name" "$content_type" <<'NODE'
           const fs = require('fs');
           const path = require('path');
 
-          const [manifestPath, version, platform, primaryFilename, contentType] = process.argv.slice(2);
+          const [manifestPath, version, shortSha, commitSha, platform, primaryFilename, contentType] = process.argv.slice(2);
           const dir = path.dirname(manifestPath);
           const fileNames = fs.readdirSync(dir).filter((name) => name !== 'manifest.json').sort();
           const files = fileNames.map((filename) => {
@@ -172,6 +177,7 @@ jobs:
 
           const manifest = {
             version,
+            commit: { short: shortSha, sha: commitSha },
             platform,
             primary: { ...primary, contentType },
             files,
@@ -182,6 +188,7 @@ jobs:
           NODE
 
           cp -R "$VERSION_DIR"/. "$LATEST_DIR"/
+          cp -R "$VERSION_DIR"/. "$SHA_DIR"/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -235,4 +242,6 @@ jobs:
             Sotto Host desktop installers.
 
             The same files are published for the website download links under
-            `/download/desktop/<version>/<platform>/` and `/download/desktop/latest/<platform>/`.
+            `/download/desktop/<version>/<platform>/`,
+            `/download/desktop/<short-sha>/<platform>/`, and
+            `/download/desktop/latest/<platform>/`.

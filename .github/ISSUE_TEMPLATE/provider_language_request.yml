@@ -1,0 +1,74 @@
+name: Provider or language request
+description: Request support for a language, speech provider, voice, AI model, or local runtime
+title: '[Provider/Language]: '
+labels: ['enhancement', 'provider-request']
+body:
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Request type
+      options:
+        - Language or locale
+        - Speech-to-text provider
+        - Text-to-speech provider or voice
+        - AI model or provider
+        - Local/self-hosted runtime
+        - Visual cue/image provider
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: language
+    attributes:
+      label: Language or locale
+      description: Include locale/script if it matters.
+      placeholder: e.g. Spanish (Mexico), Arabic (MSA), Japanese, Catalan
+    validations:
+      required: false
+  - type: input
+    id: provider
+    attributes:
+      label: Provider, model, runtime, or voice
+      description: Use the exact provider/model/voice ID if you know it.
+      placeholder: e.g. OpenAI gpt-4.1-mini, ElevenLabs voice ID, Piper es_MX, Ollama qwen3:8b
+    validations:
+      required: false
+  - type: input
+    id: official-docs
+    attributes:
+      label: Official documentation or source
+      description: Link to provider docs, model card, voice docs, pricing, or language support matrix.
+      placeholder: https://...
+    validations:
+      required: false
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Why is this needed?
+      description: Describe the learner, teacher, class, homework, or self-hosting workflow this unlocks.
+      placeholder: e.g. I teach Catalan and need TTS voices that work for homework prompts without a live tutoring call.
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Where would you use it?
+      options:
+        - Public web app at sotto.fm
+        - Self-hosted Docker Compose
+        - Desktop host app
+        - Local dev or contributor setup
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: testing
+    attributes:
+      label: Testing help
+      options:
+        - label: I can test this provider/language in my own Sotto setup
+          required: false
+        - label: I can provide non-private sample text or audio for verification
+          required: false
+        - label: I checked existing issues and did not find a duplicate request
+          required: false

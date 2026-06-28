@@ -23,14 +23,18 @@ const GITHUB_RELEASE_EXTENSIONS: Record<DesktopPlatform, string> = {
   windows: 'msi',
   linux: 'AppImage',
 };
+const COMMIT_SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
 
 function isDesktopPlatform(value: string): value is DesktopPlatform {
   return PLATFORMS.has(value as DesktopPlatform);
 }
 
 function normalizeVersion(value: string | null): string {
-  if (!value || value === 'latest') return 'latest';
-  return value.startsWith('v') ? value : `v${value}`;
+  const version = value?.trim();
+  if (!version || version === 'latest') return 'latest';
+  if (version.startsWith('v')) return version;
+  if (COMMIT_SHA_PATTERN.test(version)) return version.toLowerCase();
+  return `v${version}`;
 }
 
 function getDesktopDownloadBaseUrl(): string | null {
@@ -75,8 +79,23 @@ function getGithubReleaseDownloadUrl(version: string, platform: DesktopPlatform)
   )}`;
 }
 
-function redirectToGithubRelease(version: string, platform: DesktopPlatform): NextResponse {
+function canUseGithubReleaseFallback(version: string): boolean {
+  return version === 'latest' || version.startsWith('v');
+}
+
+function redirectToGithubRelease(version: string, platform: DesktopPlatform): NextResponse | null {
+  if (!canUseGithubReleaseFallback(version)) return null;
   return NextResponse.redirect(getGithubReleaseDownloadUrl(version, platform), 307);
+}
+
+function desktopBuildMissingResponse(version: string, platform: DesktopPlatform): NextResponse {
+  return (
+    redirectToGithubRelease(version, platform) ??
+    NextResponse.json(
+      { error: 'Desktop build has not been published yet.', platform, version },
+      { status: 404 }
+    )
+  );
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -90,7 +109,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const version = normalizeVersion(request.nextUrl.searchParams.get('version'));
 
   if (!baseUrl) {
-    return redirectToGithubRelease(version, platform);
+    return desktopBuildMissingResponse(version, platform);
   }
 
   const manifestUrl = getManifestUrl(baseUrl, version, platform);
@@ -99,18 +118,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     manifestResponse = await fetch(manifestUrl, { next: { revalidate: 300 } });
   } catch {
-    return redirectToGithubRelease(version, platform);
+    return desktopBuildMissingResponse(version, platform);
   }
 
   if (!manifestResponse.ok) {
-    return redirectToGithubRelease(version, platform);
+    return desktopBuildMissingResponse(version, platform);
   }
 
   const manifest = (await manifestResponse.json()) as DesktopDownloadManifest;
   const downloadUrl = resolveDownloadUrl(manifestUrl, manifest);
 
   if (!downloadUrl) {
-    return redirectToGithubRelease(version, platform);
+    return desktopBuildMissingResponse(version, platform);
   }
 
   return NextResponse.redirect(downloadUrl, 307);

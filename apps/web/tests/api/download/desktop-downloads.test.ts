@@ -73,6 +73,28 @@ describe('desktop download redirects', () => {
     );
   });
 
+  it('supports commit-hash download channels without adding a version prefix', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        version: 'v0.1',
+        commit: { short: '6b2b9122' },
+        primary: { href: 'sotto-host-v0.1-mac.dmg' },
+      })
+    );
+    global.fetch = fetchMock;
+
+    const response = await GET(request('/download/mac?version=6B2B9122'), params('mac'));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://cdn.sotto.fm/download/desktop/6b2b9122/mac/manifest.json',
+      { next: { revalidate: 300 } }
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://cdn.sotto.fm/download/desktop/6b2b9122/mac/sotto-host-v0.1-mac.dmg'
+    );
+  });
+
   it('falls back to the GitHub release asset when a CDN manifest is missing', async () => {
     global.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
 
@@ -96,6 +118,19 @@ describe('desktop download redirects', () => {
     expect(response.headers.get('location')).toBe(
       'https://github.com/affromero/Sotto/releases/download/v0.1/sotto-host-v0.1-windows.msi'
     );
+  });
+
+  it('does not invent a GitHub release fallback for missing commit-hash builds', async () => {
+    global.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
+
+    const response = await GET(request('/download/linux?version=6b2b9122'), params('linux'));
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Desktop build has not been published yet.',
+      platform: 'linux',
+      version: '6b2b9122',
+    });
   });
 
   it('rejects unsupported platforms', async () => {

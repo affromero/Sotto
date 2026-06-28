@@ -27,6 +27,7 @@
     "speech:config:check": "npm run speech:config:check --workspace=@sotto/web",
     "start": "npm run start --workspace=@sotto/web",
     "start:workers": "npm run start:workers --workspace=@sotto/web",
+    "support:bundle": "scripts/support/bundle.sh",
     "test": "npm run test --workspace=@sotto/web",
     "test:coverage": "npm run test:coverage --workspace=@sotto/web",
     "test:smoke": "npm run test:smoke --workspace=@sotto/web",
