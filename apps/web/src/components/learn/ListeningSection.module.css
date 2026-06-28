@@ -292,3 +292,27 @@
 .lqOptDim {
   opacity: 0.5;
 }
+
+.listenWhy {
+  margin-top: 12px;
+  border-left: 2px solid var(--accent);
+  padding: 2px 0 2px 14px;
+}
+
+.listenWhy p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.feedbackLink {
+  display: inline-flex;
+  margin-top: 9px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}

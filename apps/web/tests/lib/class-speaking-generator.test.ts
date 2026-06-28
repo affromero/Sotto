@@ -2,20 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Hoisted mock handles ----
 
-const {
-  mockClassSectionCreate,
-  mockSpeakingPromptCreateMany,
-  mockUserFindUnique,
-} = vi.hoisted(() => {
-  const classSectionCreate = vi.fn();
-  const speakingPromptCreateMany = vi.fn();
-  const userFindUnique = vi.fn();
-  return {
-    mockClassSectionCreate: classSectionCreate,
-    mockSpeakingPromptCreateMany: speakingPromptCreateMany,
-    mockUserFindUnique: userFindUnique,
-  };
-});
+const { mockClassSectionCreate, mockSpeakingPromptCreateMany, mockUserFindUnique } = vi.hoisted(
+  () => {
+    const classSectionCreate = vi.fn();
+    const speakingPromptCreateMany = vi.fn();
+    const userFindUnique = vi.fn();
+    return {
+      mockClassSectionCreate: classSectionCreate,
+      mockSpeakingPromptCreateMany: speakingPromptCreateMany,
+      mockUserFindUnique: userFindUnique,
+    };
+  }
+);
 
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
@@ -97,7 +95,11 @@ import type { ClassSpeakingParams } from '@/lib/class-speaking-generator';
 // ---- Fixtures ----
 
 const SAMPLE_PHRASES_JSON = JSON.stringify([
-  { targetPhrase: 'Hola, ¿cómo estás?', translation: 'Hello, how are you?', ipa: 'ˈola ˈkomo esˈtas' },
+  {
+    targetPhrase: 'Hola, ¿cómo estás?',
+    translation: 'Hello, how are you?',
+    ipa: 'ˈola ˈkomo esˈtas',
+  },
   { targetPhrase: 'Me llamo Ana.', translation: 'My name is Ana.', ipa: 'me ˈʎamo ˈana' },
   { targetPhrase: 'Buenos días.', translation: 'Good morning.', ipa: 'ˈbwenos ˈdias' },
   { targetPhrase: 'Hasta luego.', translation: 'See you later.', ipa: 'ˈasta ˈlweɣo' },
@@ -189,7 +191,7 @@ describe('generateClassSpeaking', () => {
             spec: { objective: 'Practice everyday greetings' },
             generatedAt: expect.any(Date),
           }),
-        }),
+        })
       );
     });
 
@@ -201,12 +203,28 @@ describe('generateClassSpeaking', () => {
       expect(mockSpeakingPromptCreateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.arrayContaining([
-            expect.objectContaining({ sectionId: 'section-1', order: 1, targetPhrase: 'Hola, ¿cómo estás?' }),
-            expect.objectContaining({ sectionId: 'section-1', order: 2, targetPhrase: 'Me llamo Ana.' }),
-            expect.objectContaining({ sectionId: 'section-1', order: 3, targetPhrase: 'Buenos días.' }),
-            expect.objectContaining({ sectionId: 'section-1', order: 4, targetPhrase: 'Hasta luego.' }),
+            expect.objectContaining({
+              sectionId: 'section-1',
+              order: 1,
+              targetPhrase: 'Hola, ¿cómo estás?',
+            }),
+            expect.objectContaining({
+              sectionId: 'section-1',
+              order: 2,
+              targetPhrase: 'Me llamo Ana.',
+            }),
+            expect.objectContaining({
+              sectionId: 'section-1',
+              order: 3,
+              targetPhrase: 'Buenos días.',
+            }),
+            expect.objectContaining({
+              sectionId: 'section-1',
+              order: 4,
+              targetPhrase: 'Hasta luego.',
+            }),
           ]),
-        }),
+        })
       );
     });
 
@@ -223,7 +241,7 @@ describe('generateClassSpeaking', () => {
           NATIVE: 'en',
           TARGET: 'es',
           OBJECTIVE: 'Practice everyday greetings',
-        }),
+        })
       );
     });
 
@@ -237,14 +255,14 @@ describe('generateClassSpeaking', () => {
           category: 'class-speaking-prompts',
           userId: 'u1',
           model: 'm',
-        }),
+        })
       );
     });
 
     it('includes reference TTS URLs in prompt rows when TTS is available', async () => {
       setupHappyPath({ withTts: true });
       mockUploadFile.mockImplementation((_key: string, _buf: Buffer, _ct: string) =>
-        Promise.resolve('https://r2.example.com/ref.mp3'),
+        Promise.resolve('https://r2.example.com/ref.mp3')
       );
 
       await generateClassSpeaking(PARAMS);
@@ -254,15 +272,15 @@ describe('generateClassSpeaking', () => {
       expect(firstPrompt.referenceTtsUrl).toBe('https://r2.example.com/ref.mp3');
     });
 
-    it('uploads reference audio to speaking-ref/<classId>/<index>.mp3', async () => {
+    it('uploads reference audio to speaking-ref/<classId>-<attempt>/<index>.mp3', async () => {
       setupHappyPath({ withTts: true });
 
       await generateClassSpeaking(PARAMS);
 
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'speaking-ref/class-1/0.mp3',
+        'speaking-ref/class-1-1/0.mp3',
         expect.any(Buffer),
-        'audio/mpeg',
+        'audio/mpeg'
       );
     });
   });
@@ -381,7 +399,7 @@ describe('generateClassSpeaking', () => {
           data: expect.arrayContaining([
             expect.objectContaining({ targetPhrase: 'Hola, ¿cómo estás?' }),
           ]),
-        }),
+        })
       );
     });
   });
@@ -431,7 +449,7 @@ describe('composeSpeakingPrompts', () => {
     expect(mockUploadFile).toHaveBeenCalledWith(
       expect.stringContaining('speaking-ref/practice-1/'),
       expect.anything(),
-      'audio/mpeg',
+      'audio/mpeg'
     );
   });
 });

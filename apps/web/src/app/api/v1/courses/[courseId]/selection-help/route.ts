@@ -16,36 +16,77 @@ const selectionHelpSchema = z.object({
   contextText: z.string().trim().max(2000).nullable().optional(),
 });
 
-const SELECTION_HELP_JSON_SCHEMA = {
-  name: 'selection_help_examples',
-  schema: {
-    type: 'object',
-    properties: {
-      examples: {
-        type: 'array',
-        minItems: 3,
-        maxItems: 3,
-        items: {
-          type: 'object',
-          properties: {
-            sentence: { type: 'string' },
-            note: { type: 'string' },
-          },
-          required: ['sentence', 'note'],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ['examples'],
-    additionalProperties: false,
-  },
-} as const;
+interface RawSelectionExample {
+  sentence?: unknown;
+  note?: unknown;
+}
+
+function sanitizeLlmJson(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
+}
+
+function extractFirstJsonValue(text: string): string {
+  const objectStart = text.indexOf('{');
+  const arrayStart = text.indexOf('[');
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
+  if (starts.length === 0) throw new Error('No JSON object or array found in response');
+
+  const start = Math.min(...starts);
+  const stack: string[] = [];
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') {
+      stack.push('}');
+      continue;
+    }
+    if (ch === '[') {
+      stack.push(']');
+      continue;
+    }
+    if (stack.length > 0 && ch === stack[stack.length - 1]) {
+      stack.pop();
+      if (stack.length === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  throw new Error('Unbalanced JSON response');
+}
 
 function parseExamples(content: string): Array<{ sentence: string; note: string }> {
-  const parsed = JSON.parse(content) as {
-    examples?: Array<{ sentence?: unknown; note?: unknown }>;
-  };
-  const examples = Array.isArray(parsed.examples) ? parsed.examples : [];
+  const cleaned = sanitizeLlmJson(content);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    parsed = JSON.parse(extractFirstJsonValue(cleaned));
+  }
+
+  const examples: RawSelectionExample[] = Array.isArray(parsed)
+    ? (parsed as RawSelectionExample[])
+    : parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as { examples?: unknown }).examples)
+      ? (parsed as { examples: RawSelectionExample[] }).examples
+      : [];
   return examples
     .filter((example) => typeof example.sentence === 'string' && typeof example.note === 'string')
     .map((example) => ({
@@ -117,7 +158,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         apiKeyOverride: ai.apiKey,
         maxTokens: 1200,
         temperature: 0.4,
-        jsonSchema: SELECTION_HELP_JSON_SCHEMA,
       }
     );
 
@@ -136,7 +176,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         courseId,
         count: String(examples.length),
       });
-      return errorResponse('Could not build examples for that selection', 500);
+      return errorResponse(
+        'Could not build examples for that selection. Try a shorter phrase.',
+        422
+      );
     }
 
     return NextResponse.json({ text: parsed.data.text, examples });
@@ -144,6 +187,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     logger.error('Failed to generate selection help', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return errorResponse('Failed to generate selection help', 500);
+    return errorResponse('Selection help is unavailable right now.', 500);
   }
 }

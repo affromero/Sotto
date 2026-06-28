@@ -162,6 +162,17 @@ const SAMPLE_CLASS_SPEAKING = {
           translation: 'Hello',
           ipa: 'ˈola',
           referenceTtsUrl: 'https://r2/ref.mp3',
+          recordings: [
+            {
+              id: 'rec-1',
+              status: 'SCORED',
+              transcript: 'Hola',
+              overallScore: 0.91,
+              rubricScores: { accuracy: 0.93, fluency: 0.89, completeness: 0.92 },
+              phonemeScores: [{ op: 'match', expected: 'hola', actual: 'hola' }],
+              feedback: 'Clear pronunciation.',
+            },
+          ],
         },
       ],
       writingPrompts: [],
@@ -282,7 +293,15 @@ describe('GET /api/v1/classes/[classId]', () => {
       targetPhrase: 'Hola',
       translation: 'Hello',
       referenceTtsUrl: 'https://r2/ref.mp3',
-      latestRecording: null,
+      latestRecording: {
+        id: 'rec-1',
+        status: 'SCORED',
+        transcript: 'Hola',
+        overallScore: 0.91,
+        rubricScores: { accuracy: 0.93, fluency: 0.89, completeness: 0.92 },
+        phonemeScores: [{ op: 'match', expected: 'hola', actual: 'hola' }],
+        feedback: 'Clear pronunciation.',
+      },
     });
   });
 

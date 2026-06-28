@@ -16,7 +16,7 @@ import type { ReferenceData } from '@/types/reference';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, DotRail, MasteryMeter, type DotState } from './ClassWidgets';
 import { LearningSelectionMenu } from './LearningSelectionMenu';
-import type { ClassQuestion } from './classTypes';
+import type { ClassFeedbackNote, ClassQuestion } from './classTypes';
 import styles from './GrammarSection.module.css';
 
 interface GrammarSectionProps {
@@ -35,6 +35,8 @@ interface GrammarSectionProps {
   onAnswer: (questionId: string, selectedIndex: number) => void;
   /** Report the running 0..100 score for the rail/meter. */
   onScore: (score: number) => void;
+  onFeedback?: (note: ClassFeedbackNote) => void;
+  feedbackHref?: string;
   onContinue: () => void;
 }
 
@@ -62,6 +64,8 @@ export function GrammarSection({
   references = [],
   onAnswer,
   onScore,
+  onFeedback,
+  feedbackHref = '#feedback-clinic',
   onContinue,
 }: GrammarSectionProps) {
   const total = questions.length;
@@ -93,6 +97,18 @@ export function GrammarSection({
     if (!cur || picked[cur.id] !== undefined) return;
     setPicked((prev) => ({ ...prev, [cur.id]: optIndex }));
     onAnswer(cur.id, optIndex);
+    if (cur.explanation) {
+      const correct = cur.correctIndex !== undefined && optIndex === cur.correctIndex;
+      onFeedback?.({
+        id: `${skill}:${cur.id}`,
+        skill,
+        title: correct ? `${copy.eyebrow}: right choice` : `${copy.eyebrow}: review this`,
+        body: cur.explanation,
+        score: correct ? 1 : 0,
+        returnHref: '#class-active-stage',
+        tone: correct ? 'good' : 'review',
+      });
+    }
   }
 
   function next() {
@@ -110,6 +126,10 @@ export function GrammarSection({
   const copy = SKILL_COPY[skill];
   const curPicked = cur ? picked[cur.id] : undefined;
   const curCorrect = cur?.correctIndex !== undefined && curPicked === cur.correctIndex;
+  const sharedReadingPassage =
+    skill === 'READING'
+      ? questions.find((q) => q.passageText?.trim())?.passageText?.trim()
+      : undefined;
 
   return (
     <div className={styles.root}>
@@ -125,9 +145,25 @@ export function GrammarSection({
 
         <DotRail states={dotStates} countLabel={`${correctCount}/${total} correct`} />
 
+        {sharedReadingPassage && !done && (
+          <LearningSelectionMenu
+            courseId={courseId}
+            sourceType="CLASS"
+            sourceId={sourceId}
+            sourceLabel={copy.eyebrow}
+          >
+            <article
+              className={`${styles.readingPassage} ${guardStyles.guarded}`}
+              {...learningTextGuardProps<HTMLElement>()}
+            >
+              {parseTextWithCitations(sharedReadingPassage, references)}
+            </article>
+          </LearningSelectionMenu>
+        )}
+
         {!done && cur ? (
-          <div className={styles.drillCard} key={cur.id}>
-            {cur.passageText ? (
+          <div className={styles.drillCard} id={`question-${cur.id}`} key={cur.id}>
+            {!sharedReadingPassage && cur.passageText ? (
               <LearningSelectionMenu
                 courseId={courseId}
                 sourceType="CLASS"
@@ -227,6 +263,9 @@ export function GrammarSection({
                       : 'Not quite'}
                 </div>
                 <p>{cur.explanation}</p>
+                <a className={styles.feedbackLink} href={feedbackHref}>
+                  Go to Feedback Clinic
+                </a>
               </div>
             )}
 

@@ -32,6 +32,8 @@ interface WritingSectionProps {
   prompts: WritingPromptData[];
   /** Reports the running average 0..100 score upward (class gate / rail). */
   onScore?: (score: number) => void;
+  onFeedback?: (promptId: string, response: WritingResponse) => void;
+  feedbackHref?: string;
   /** Class-flow gating. When `onContinue` is set, the gated ContinueBar is
    *  rendered; in practice these are omitted (the runner owns "Finish"). */
   gate?: number; // 0..100
@@ -128,9 +130,19 @@ interface PromptCardProps {
   index: number;
   total: number;
   onScored: (promptId: string, overall: number) => void;
+  onFeedback?: (promptId: string, response: WritingResponse) => void;
+  feedbackHref: string;
 }
 
-function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCardProps) {
+function PromptCard({
+  endpointBase,
+  prompt,
+  index,
+  total,
+  onScored,
+  onFeedback,
+  feedbackHref,
+}: PromptCardProps) {
   const [text, setText] = useState(prompt.response?.text ?? '');
   const [phase, setPhase] = useState<CardPhase>(prompt.response ? 'checked' : 'editing');
   const [result, setResult] = useState<WritingResponse | null>(prompt.response);
@@ -162,6 +174,7 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
       setResult(graded);
       setPhase('checked');
       onScored(prompt.id, Math.round((graded.overallScore ?? 0) * 100));
+      onFeedback?.(prompt.id, graded);
     } catch {
       setError('Network error. Please try again.');
       setPhase('error');
@@ -178,7 +191,11 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
   const showEditor = phase === 'editing' || phase === 'checking' || phase === 'error';
 
   return (
-    <article className={styles.card} aria-label={`Writing prompt ${index + 1} of ${total}`}>
+    <article
+      className={styles.card}
+      id={`writing-prompt-${prompt.id}`}
+      aria-label={`Writing prompt ${index + 1} of ${total}`}
+    >
       <div className={styles.writePrompt}>
         <div className={styles.writeFrom}>Prompt {index + 1}</div>
         <div
@@ -252,6 +269,9 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
                     : `${issueCount} correction${issueCount > 1 ? 's' : ''} · hover to see why`}
                 </span>
               </p>
+              <a className={styles.feedbackLink} href={feedbackHref}>
+                Go to Feedback Clinic
+              </a>
             </div>
 
             <div className={styles.cactions}>
@@ -273,6 +293,8 @@ export function WritingSection({
   endpointBase,
   prompts,
   onScore,
+  onFeedback,
+  feedbackHref = '#feedback-clinic',
   gate,
   nextName = null,
   onContinue,
@@ -338,6 +360,8 @@ export function WritingSection({
               index={idx}
               total={prompts.length}
               onScored={handleScored}
+              onFeedback={onFeedback}
+              feedbackHref={feedbackHref}
             />
           </li>
         ))}

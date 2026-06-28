@@ -1,8 +1,7 @@
 /**
  * Unit tests for src/lib/class-generation.ts.
- * Verifies MCQ generation and, for sourced READING sections, that the leveled
- * passage flows into the prompt ({{SOURCE}}) and onto each returned question
- * (passageText). Curriculum sections (no sourceContent) behave as before.
+ * Verifies MCQ generation and that READING sections carry a full passage:
+ * generated for curriculum classes, sourced from {{SOURCE}} for sourced classes.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -30,7 +29,10 @@ import { generateSectionQuestions } from '@/lib/class-generation';
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 
-const SAMPLE = JSON.stringify([
+const GENERATED_PASSAGE =
+  'En el laboratorio, la científica Marta encontró una nota antigua y decidió investigar.';
+
+const SAMPLE_QUESTIONS = [
   {
     question: '¿Qué descubrió el científico?',
     options: ['a', 'b', 'c', 'd'],
@@ -44,7 +46,13 @@ const SAMPLE = JSON.stringify([
     correctIndex: 1,
     explanation: 'y',
   },
-]);
+];
+
+const SAMPLE_ARRAY = JSON.stringify(SAMPLE_QUESTIONS);
+const SAMPLE = JSON.stringify({
+  passage: GENERATED_PASSAGE,
+  questions: SAMPLE_QUESTIONS,
+});
 
 const BASE: SectionGenParams = {
   userId: 'u1',
@@ -73,13 +81,12 @@ beforeEach(() => {
 });
 
 describe('generateSectionQuestions', () => {
-  it('returns parsed MCQs for a curriculum READING section without a passage', async () => {
+  it('returns parsed MCQs for a curriculum READING section with a generated passage', async () => {
     const qs = await generateSectionQuestions(BASE);
 
     expect(qs).toHaveLength(2);
     expect(qs[0]).toMatchObject({ question: expect.any(String), correctIndex: 0 });
-    // No source → no passageText attached.
-    expect(qs[0].passageText).toBeUndefined();
+    expect(qs[0].passageText).toBe(GENERATED_PASSAGE);
     // The {{SOURCE}} placeholder is rendered empty.
     expect(mockLoadAndRender).toHaveBeenCalledWith(
       'class/generate-section-quiz.md',
@@ -119,7 +126,7 @@ describe('generateSectionQuestions', () => {
 
   it('throws when the model returns no usable questions', async () => {
     mockGenerateResponse.mockResolvedValue({
-      content: '[]',
+      content: JSON.stringify({ passage: GENERATED_PASSAGE, questions: [] }),
       inputTokens: 1,
       outputTokens: 1,
       model: 'm',
@@ -129,7 +136,7 @@ describe('generateSectionQuestions', () => {
 
   it('accepts a wrapped questions object from stricter JSON providers', async () => {
     mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify({ questions: JSON.parse(SAMPLE) }),
+      content: SAMPLE,
       inputTokens: 1,
       outputTokens: 1,
       model: 'm',
@@ -143,16 +150,27 @@ describe('generateSectionQuestions', () => {
 
   it('extracts the first JSON array when a model adds surrounding prose', async () => {
     mockGenerateResponse.mockResolvedValue({
-      content: `Here are the questions:\n${SAMPLE}\nDone.`,
+      content: `Here are the questions:\n${SAMPLE_ARRAY}\nDone.`,
       inputTokens: 1,
       outputTokens: 1,
       model: 'm',
     });
 
-    const qs = await generateSectionQuestions(BASE);
+    const qs = await generateSectionQuestions({ ...BASE, skill: 'GRAMMAR' as SkillType });
 
     expect(qs).toHaveLength(2);
     expect(qs[1].correctIndex).toBe(1);
+  });
+
+  it('rejects curriculum READING output that has questions but no passage', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: SAMPLE_ARRAY,
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
+
+    await expect(generateSectionQuestions(BASE)).rejects.toThrow(/malformed output/i);
   });
 
   it('retries with stricter JSON instructions when the first response is malformed', async () => {
@@ -175,7 +193,7 @@ describe('generateSectionQuestions', () => {
     expect(qs).toHaveLength(2);
     expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
     expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
-      'Return ONLY a valid JSON array'
+      'Return ONLY a valid JSON object matching the schema'
     );
     expect(mockGenerateResponse.mock.calls[0][2]).toMatchObject({
       jsonSchema: expect.objectContaining({ name: 'class_section_questions' }),
@@ -198,7 +216,7 @@ describe('generateSectionQuestions', () => {
         model: 'm',
       })
       .mockResolvedValueOnce({
-        content: JSON.stringify({ questions: JSON.parse(SAMPLE) }),
+        content: SAMPLE,
         inputTokens: 3,
         outputTokens: 3,
         model: 'm',

@@ -75,6 +75,28 @@
   padding: 28px 26px;
 }
 
+.readingPassage {
+  margin: 18px 0 16px;
+  padding: 24px 26px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(248, 248, 242, 0.96),
+      rgba(235, 247, 242, 0.94) 54%,
+      rgba(248, 241, 229, 0.94)
+    ),
+    var(--paper);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--accent);
+  border-radius: var(--r);
+  box-shadow: 0 16px 38px rgba(41, 35, 26, 0.08);
+  font-family: var(--serif);
+  font-size: clamp(18px, 2.3vw, 23px);
+  line-height: 1.65;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
 .passage {
   margin: 0 0 18px;
   padding: 16px 18px;
@@ -223,6 +245,17 @@
   font-size: 14.5px;
   line-height: 1.55;
   color: var(--ink);
+}
+
+.feedbackLink {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
 
 /* ---- inline actions (Next / See result) ---- */

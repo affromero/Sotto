@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
 import { ClassHub } from './ClassHub';
-import { ClassSummary } from './ClassSummary';
+import { ClassSummary, FeedbackClinic } from './ClassSummary';
 import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
@@ -28,9 +28,12 @@ import {
   skillLabel,
   classRefToReferenceData,
   type ClassData,
+  type ClassFeedbackNote,
   type ClassReference,
   type ClassSection,
+  type ClassSpeakingRecording,
   type ClassSubmitResult,
+  type WritingResponse,
 } from './classTypes';
 import styles from './ClassShell.module.css';
 
@@ -66,11 +69,33 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   const [scores, setScores] = useState<Record<string, number>>({});
   // selected option index per questionId, accumulated across all sections
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [feedbackNotes, setFeedbackNotes] = useState<ClassFeedbackNote[]>([]);
+  const [liveSpeakingRecordings, setLiveSpeakingRecordings] = useState<
+    Record<string, ClassSpeakingRecording>
+  >({});
+  const [liveWritingResponses, setLiveWritingResponses] = useState<Record<string, WritingResponse>>(
+    {}
+  );
 
   const [result, setResult] = useState<ClassSubmitResult | null>(null);
   const [regenerating, setRegenerating] = useState(false);
 
   const sections = useMemo(() => (cls ? orderSections(cls.sections) : []), [cls]);
+  const feedbackSections = useMemo(
+    () =>
+      sections.map((section) => ({
+        ...section,
+        prompts: section.prompts.map((prompt) => ({
+          ...prompt,
+          latestRecording: liveSpeakingRecordings[prompt.id] ?? prompt.latestRecording,
+        })),
+        writingPrompts: section.writingPrompts.map((prompt) => ({
+          ...prompt,
+          response: liveWritingResponses[prompt.id] ?? prompt.response,
+        })),
+      })),
+    [liveSpeakingRecordings, liveWritingResponses, sections]
+  );
   const gate = cls ? Math.round(cls.passThreshold * 100) : 70;
 
   // The class's verified sources live on the LISTENING episode (sourced classes).
@@ -151,6 +176,51 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     setAnswers((prev) => ({ ...prev, [questionId]: selectedIndex }));
   }
 
+  const upsertFeedbackNote = useCallback((note: ClassFeedbackNote) => {
+    setFeedbackNotes((prev) => [note, ...prev.filter((item) => item.id !== note.id)].slice(0, 12));
+  }, []);
+
+  const recordSpeakingFeedback = useCallback(
+    (promptId: string, recording: ClassSpeakingRecording) => {
+      setLiveSpeakingRecordings((prev) => ({ ...prev, [promptId]: recording }));
+      const prompt = sections
+        .flatMap((section) => section.prompts)
+        .find((item) => item.id === promptId);
+      upsertFeedbackNote({
+        id: `SPEAKING:${promptId}`,
+        skill: 'SPEAKING',
+        title: prompt ? `Speaking: ${prompt.targetPhrase}` : 'Speaking feedback',
+        body:
+          recording.feedback ??
+          (recording.transcript ? `You said: "${recording.transcript}"` : 'Pronunciation scored.'),
+        score: recording.overallScore,
+        returnHref: '#class-active-stage',
+        tone:
+          typeof recording.overallScore === 'number' &&
+          recording.overallScore >= (cls?.passThreshold ?? 0.7)
+            ? 'good'
+            : 'review',
+      });
+    },
+    [cls?.passThreshold, sections, upsertFeedbackNote]
+  );
+
+  const recordWritingFeedback = useCallback(
+    (promptId: string, response: WritingResponse) => {
+      setLiveWritingResponses((prev) => ({ ...prev, [promptId]: response }));
+      upsertFeedbackNote({
+        id: `WRITING:${promptId}`,
+        skill: 'WRITING',
+        title: 'Writing feedback',
+        body: response.feedback,
+        score: response.overallScore,
+        returnHref: '#class-active-stage',
+        tone: response.overallScore >= (cls?.passThreshold ?? 0.7) ? 'good' : 'review',
+      });
+    },
+    [cls?.passThreshold, upsertFeedbackNote]
+  );
+
   function beginHour() {
     setView('hour');
     setSegIdx(0);
@@ -218,6 +288,9 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       }
       setAnswers({});
       setScores({});
+      setFeedbackNotes([]);
+      setLiveSpeakingRecordings({});
+      setLiveWritingResponses({});
       setResult(null);
       setSegIdx(0);
       setCurScore(0);
@@ -245,6 +318,9 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       }
       setAnswers({});
       setScores({});
+      setFeedbackNotes([]);
+      setLiveSpeakingRecordings({});
+      setLiveWritingResponses({});
       setResult(null);
       setSegIdx(0);
       setCurScore(0);
@@ -300,6 +376,14 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   // ---- stage content ----
   let stage: React.ReactNode = null;
   const nextName = segIdx < sections.length - 1 ? skillLabel(sections[segIdx + 1].skill) : null;
+  const activeSection = sections[segIdx];
+  const hasLiveFeedback =
+    feedbackNotes.length > 0 ||
+    feedbackSections.some(
+      (section) =>
+        section.prompts.some((prompt) => prompt.latestRecording?.status === 'SCORED') ||
+        section.writingPrompts.some((prompt) => prompt.response)
+    );
 
   const sourcesPanel =
     classReferences.length > 0 || cls.sourceUrl ? (
@@ -333,12 +417,12 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     stage = (
       <>
         <ClassSummary
-          courseId={cls.courseId}
           lesson={cls.lesson}
           order={cls.order}
           result={result}
-          sections={sections}
+          sections={feedbackSections}
           vocabulary={cls.vocabulary}
+          feedbackNotes={feedbackNotes}
           regenerating={regenerating}
           onRetryFailed={() => void handleRetryFailed()}
         />
@@ -367,6 +451,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             references={passageReferences}
             onAnswer={recordAnswer}
             onScore={setCurScore}
+            onFeedback={upsertFeedbackNote}
+            feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
           />
         );
@@ -382,6 +468,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             nextName={nextName}
             onAnswer={recordAnswer}
             onScore={setCurScore}
+            onFeedback={upsertFeedbackNote}
+            feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
           />
         );
@@ -394,6 +482,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             gate={gate}
             nextName={nextName}
             onScore={setCurScore}
+            onFeedback={recordSpeakingFeedback}
+            feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
           />
         );
@@ -406,6 +496,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             gate={gate}
             nextName={nextName}
             onScore={setCurScore}
+            onFeedback={recordWritingFeedback}
+            feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
           />
         );
@@ -461,7 +553,19 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
               {errorMessage}
             </p>
           )}
-          {stage}
+          <div id="class-active-stage">{stage}</div>
+          {view === 'hour' && hasLiveFeedback && (
+            <FeedbackClinic
+              result={null}
+              sections={feedbackSections}
+              vocabulary={cls.vocabulary}
+              feedbackNotes={feedbackNotes}
+              returnHref="#class-active-stage"
+              returnLabel={
+                activeSection ? `Back to ${skillLabel(activeSection.skill)}` : 'Back to class'
+              }
+            />
+          )}
         </div>
       </main>
     </div>

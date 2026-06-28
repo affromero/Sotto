@@ -17,7 +17,7 @@ import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, ScoreDial } from './ClassWidgets';
-import type { ClassSpeakingPrompt } from './classTypes';
+import type { ClassSpeakingPrompt, ClassSpeakingRecording } from './classTypes';
 import styles from './SpeakingSection.module.css';
 
 const POLL_INTERVAL_MS = 1500;
@@ -65,6 +65,8 @@ interface SpeakingSectionProps {
   nextName: string | null;
   /** Report the running 0..100 average overall score upward. */
   onScore: (score: number) => void;
+  onFeedback?: (promptId: string, recording: ClassSpeakingRecording) => void;
+  feedbackHref?: string;
   onContinue: () => void;
 }
 
@@ -75,10 +77,18 @@ interface PromptCardProps {
   prompt: ClassSpeakingPrompt;
   index: number;
   total: number;
-  onScored: (promptId: string, overall: number) => void;
+  onScored: (promptId: string, result: ScoringResult) => void;
+  feedbackHref: string;
 }
 
-function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCardProps) {
+function PromptCard({
+  endpointBase,
+  prompt,
+  index,
+  total,
+  onScored,
+  feedbackHref,
+}: PromptCardProps) {
   const [state, setState] = useState<CardState>({
     phase: 'idle',
     recordingId: null,
@@ -154,7 +164,7 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
               error: data.status === 'FAILED' ? 'Scoring failed. Please try again.' : null,
             }));
             if (data.status === 'SCORED' && typeof data.overallScore === 'number') {
-              onScored(prompt.id, Math.round(data.overallScore * 100));
+              onScored(prompt.id, data);
             }
           } else {
             pollTimerRef.current = setTimeout(() => void tick(), POLL_INTERVAL_MS);
@@ -200,7 +210,11 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
     result?.phonemeScores?.filter((token) => token.op !== 'match').slice(0, 4) ?? [];
 
   return (
-    <article className={styles.speakCard} aria-label={`Speaking prompt ${index + 1} of ${total}`}>
+    <article
+      className={styles.speakCard}
+      id={`speaking-prompt-${prompt.id}`}
+      aria-label={`Speaking prompt ${index + 1} of ${total}`}
+    >
       <div className={styles.speakTarget} lang="auto">
         {prompt.targetPhrase}
       </div>
@@ -324,6 +338,9 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
                 ? 'Clear enough to be understood.'
                 : 'A little muddy. Give it another take.')}
           </div>
+          <a className={styles.feedbackLink} href={feedbackHref}>
+            Go to Feedback Clinic
+          </a>
           <button
             type="button"
             className={`${styles.btn} ${styles.btnGhost}`}
@@ -345,6 +362,8 @@ export function SpeakingSection({
   gate,
   nextName,
   onScore,
+  onFeedback,
+  feedbackHref = '#feedback-clinic',
   onContinue,
 }: SpeakingSectionProps) {
   const [idx, setIdx] = useState(0);
@@ -368,9 +387,22 @@ export function SpeakingSection({
     onScore(overall);
   }, [overall, onScore]);
 
-  const handleScored = useCallback((promptId: string, value: number) => {
-    setScores((prev) => ({ ...prev, [promptId]: value }));
-  }, []);
+  const handleScored = useCallback(
+    (promptId: string, result: ScoringResult) => {
+      const value = Math.round((result.overallScore ?? 0) * 100);
+      setScores((prev) => ({ ...prev, [promptId]: value }));
+      onFeedback?.(promptId, {
+        id: result.recordingId,
+        status: result.status,
+        transcript: result.transcript,
+        overallScore: result.overallScore,
+        rubricScores: result.rubricScores,
+        phonemeScores: result.phonemeScores,
+        feedback: result.feedback,
+      });
+    },
+    [onFeedback]
+  );
 
   if (total === 0) {
     return (
@@ -416,6 +448,7 @@ export function SpeakingSection({
             index={idx}
             total={total}
             onScored={handleScored}
+            feedbackHref={feedbackHref}
           />
         )}
 

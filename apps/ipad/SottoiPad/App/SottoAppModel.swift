@@ -511,6 +511,36 @@ final class SottoAppModel: ObservableObject {
         )
     }
 
+    func uploadClassSpeakingRecording(
+        classId: String,
+        promptId: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before recording speaking feedback.")
+        }
+        return try await client.uploadClassSpeakingRecording(
+            classId: classId,
+            promptId: promptId,
+            audioURL: audioURL
+        )
+    }
+
+    func pollClassSpeakingRecording(
+        classId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before checking speaking feedback.")
+        }
+        return try await client.pollClassSpeakingRecording(
+            classId: classId,
+            promptId: promptId,
+            recordingId: recordingId
+        )
+    }
+
     func cancelCurrentClassGeneration() async {
         guard let courseId = activeClassGenerationCourseId else { return }
         await cancelClassGeneration(for: courseId)

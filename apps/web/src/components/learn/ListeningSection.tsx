@@ -16,7 +16,12 @@ import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, MasteryMeter } from './ClassWidgets';
 import { LearningSelectionMenu } from './LearningSelectionMenu';
-import { fmtClock, type ClassQuestion, type ClassSectionEpisode } from './classTypes';
+import {
+  fmtClock,
+  type ClassFeedbackNote,
+  type ClassQuestion,
+  type ClassSectionEpisode,
+} from './classTypes';
 import styles from './ListeningSection.module.css';
 
 const BAR_COUNT = 56;
@@ -44,6 +49,8 @@ interface ListeningSectionProps {
   nextName: string | null;
   onAnswer: (questionId: string, selectedIndex: number) => void;
   onScore: (score: number) => void;
+  onFeedback?: (note: ClassFeedbackNote) => void;
+  feedbackHref?: string;
   onContinue: () => void;
 }
 
@@ -56,6 +63,8 @@ export function ListeningSection({
   nextName,
   onAnswer,
   onScore,
+  onFeedback,
+  feedbackHref = '#feedback-clinic',
   onContinue,
 }: ListeningSectionProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -100,8 +109,21 @@ export function ListeningSection({
 
   function pick(questionId: string, optIndex: number) {
     if (picked[questionId] !== undefined) return;
+    const question = questions.find((q) => q.id === questionId);
     setPicked((prev) => ({ ...prev, [questionId]: optIndex }));
     onAnswer(questionId, optIndex);
+    if (question?.explanation) {
+      const correct = question.correctIndex !== undefined && optIndex === question.correctIndex;
+      onFeedback?.({
+        id: `LISTENING:${question.id}`,
+        skill: 'LISTENING',
+        title: correct ? 'Listening: heard it' : 'Listening: review this',
+        body: question.explanation,
+        score: correct ? 1 : 0,
+        returnHref: '#class-active-stage',
+        tone: correct ? 'good' : 'review',
+      });
+    }
   }
 
   const playedTo = duration > 0 ? elapsed / duration : 0;
@@ -196,7 +218,7 @@ export function ListeningSection({
           {questions.map((q) => {
             const sel = picked[q.id];
             return (
-              <div className={styles.lq} key={q.id}>
+              <div className={styles.lq} id={`question-${q.id}`} key={q.id}>
                 <LearningSelectionMenu
                   courseId={courseId}
                   sourceType="CLASS"
@@ -256,6 +278,14 @@ export function ListeningSection({
                     );
                   })}
                 </div>
+                {sel !== undefined && q.explanation && (
+                  <div className={styles.listenWhy}>
+                    <p>{q.explanation}</p>
+                    <a className={styles.feedbackLink} href={feedbackHref}>
+                      Go to Feedback Clinic
+                    </a>
+                  </div>
+                )}
               </div>
             );
           })}

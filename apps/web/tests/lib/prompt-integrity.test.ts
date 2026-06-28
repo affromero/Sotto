@@ -54,6 +54,7 @@ const EXPECTED_FILES = [
   'topic-assessor.md',
   'placement/placement-probe.md',
   'placement/deduce-from-notes.md',
+  'class/generate-class-intro.md',
   'class/generate-listening-quiz.md',
   'class/generate-section-quiz.md',
   'class/level-source.md',
@@ -87,6 +88,7 @@ const EXPECTED_FILES = [
   'writing/generate-writing-prompts.md',
   'writing/grade-writing.md',
   'curriculum/generate-curriculum.md',
+  'curriculum/generate-level-lessons.md',
   'live/extract-vocab.md',
   'live/extract-learning-targets.md',
   'exams/exam-feedback.md',
@@ -180,6 +182,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'speaking/generate-speaking-prompts.md': [
     'COUNT',
+    'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
     'NOTES',
@@ -249,6 +252,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'placement/deduce-from-notes.md': ['CONTENT', 'NATIVE', 'TARGET'].sort(),
   'class/generate-listening-quiz.md': [
     'COUNT',
+    'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
     'NOTES',
@@ -258,6 +262,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/generate-section-quiz.md': [
     'COUNT',
     'GRAMMAR_POINTS',
+    'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
     'NOTES',
@@ -268,9 +273,22 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'TARGET',
     'VOCAB',
   ].sort(),
+  'class/generate-class-intro.md': [
+    'GRAMMAR_POINTS',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'NOTES',
+    'OBJECTIVE',
+    'SOURCE',
+    'TARGET',
+    'TITLE',
+    'VOCAB',
+  ].sort(),
   'class/level-source.md': ['LEVEL', 'NATIVE', 'SOURCE', 'TARGET', 'TITLE'].sort(),
   'writing/generate-writing-prompts.md': [
     'COUNT',
+    'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
     'NOTES',
@@ -280,6 +298,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'writing/grade-writing.md': ['LEVEL', 'NATIVE', 'RESPONSE', 'TARGET', 'TASK'].sort(),
   'curriculum/generate-curriculum.md': ['NATIVE', 'TARGET'].sort(),
+  'curriculum/generate-level-lessons.md': ['LEVEL', 'NATIVE', 'TARGET'].sort(),
 };
 
 // Templates that are static (no placeholders)

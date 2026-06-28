@@ -313,6 +313,16 @@
   margin-top: 8px;
 }
 
+.feedbackLink {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  white-space: nowrap;
+}
+
 /* ---- actions ---- */
 .cactions {
   margin-top: 22px;
@@ -374,7 +384,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .btn {
-    transition: filter 0.2s, color 0.2s;
+    transition:
+      filter 0.2s,
+      color 0.2s;
   }
   .btn:active {
     transform: none;

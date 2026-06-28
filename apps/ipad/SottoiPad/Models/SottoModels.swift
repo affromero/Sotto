@@ -262,6 +262,20 @@ struct SottoSpeakingRecording: Decodable, Equatable {
     let feedback: String?
 }
 
+struct SottoSpeakingUploadResponse: Decodable, Equatable {
+    let recordingId: String
+    let status: String
+}
+
+struct SottoSpeakingPollResponse: Decodable, Equatable {
+    let status: String
+    let transcript: String?
+    let overallScore: Double?
+    let rubricScores: [String: Double]?
+    let feedback: String?
+    let phonemeScores: [SottoSpeakingAlignmentToken]?
+}
+
 struct SottoSpeakingAlignmentToken: Decodable, Equatable {
     let op: String
     let expected: String?
