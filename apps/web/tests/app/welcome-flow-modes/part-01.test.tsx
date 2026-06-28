@@ -675,7 +675,7 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByText('Include')).not.toBeInTheDocument();
   });
 
-  it('shows a teacher-style brief from extracted context before composing', async () => {
+  it('shows a practice brief from extracted context before composing', async () => {
     const user = userEvent.setup();
     const onNext = vi.fn();
     const onBack = vi.fn();
@@ -704,8 +704,8 @@ describe('welcome hosted-demo mode', () => {
       />
     );
 
-    expect(screen.getByRole('heading', { name: /Review the teaching brief/i })).toBeInTheDocument();
-    expect(screen.getByText(/Teacher read/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Review the practice brief/i })).toBeInTheDocument();
+    expect(screen.getByText(/Practice read/i)).toBeInTheDocument();
     expect(screen.getAllByText(/CEFR B1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Distributed systems/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Radio Ambulante/i).length).toBeGreaterThan(0);

@@ -21,17 +21,19 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     description: '2 min overview of all platform features',
     metadata: {
       topic:
-        'Sotto: open-source, self-hostable language learning — context-aware CEFR courses taught through the AI agent you already use, in the context of your work and interests, with BYOK keys and full data ownership',
+        'Sotto: open-source, self-hostable language learning for private rehearsal before class, tutoring, or real conversation, not another AI language chatbot, with context-aware CEFR courses, BYOK keys, and full data ownership',
       depth: 'quick_overview',
       audience: 'Potential learners discovering Sotto for the first time',
       audienceLevel: 'beginner',
       tone: 'casual',
       focusAreas: [
-        'Context-aware language courses built around your own projects and interests',
+        'Private, low-pressure rehearsal before live speaking',
+        'Structured learning loops instead of another blank AI chat window',
+        'Context-aware language courses built around your own projects, interests, and practice situations',
         'Mastery-gated CEFR grammar, reading, listening, and speaking modules',
         'Connect Claude Code, Codex, or another local agent via MCP',
         'Adaptive listening lessons generated from your topics',
-        'Pronunciation feedback with speaking exercises',
+        'Pronunciation feedback with speaking exercises learners can repeat privately',
         'Personal vocabulary memory graph with spaced-repetition review',
         'Bring your own keys (BYOK) for self-hosted usage',
       ],
@@ -51,7 +53,7 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     description: '1 min update on recent changes',
     metadata: {
       topic:
-        "What's New on Sotto — latest language-learning features, BYOK, and self-hosting improvements",
+        "What's New on Sotto — latest private-rehearsal language-learning features, not-another-chatbot workflows, BYOK, and self-hosting improvements",
       depth: 'quick_overview',
       audience: 'Existing Sotto users who want to stay up-to-date',
       audienceLevel: 'intermediate',
@@ -59,7 +61,8 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
       focusAreas: [
         'Recent feature releases',
         'Platform improvements',
-        'Language-learning and course workflow improvements',
+        'Structured practice surfaces that reduce AI chatbot fatigue',
+        'Language-learning, rehearsal, and course workflow improvements',
       ],
       durationTarget: 1,
       speakers: [

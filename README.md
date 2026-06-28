@@ -4,9 +4,9 @@
 
 # Sotto
 
-### Learn a language, taught in your own context.
+### Practice a language before the pressure of speaking.
 
-Open source language learning you run yourself, with a full **[CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course** built around _your_ work and interests.<br/>Your progress, your data, your models, on a stack **you** control.
+Open source language-learning infrastructure you run yourself, with a full **[CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course** built around _your_ work, interests, and the situations you want to rehearse.<br/>Your progress, your data, your models, on a stack **you** control.
 
 <br/>
 
@@ -32,7 +32,7 @@ Open source language learning you run yourself, with a full **[CEFR](https://www
 
 [**Quick Start**](#quick-start) · [**Use Cases**](docs/06-user-flows.md) · [**Why Sotto**](#why-sotto) · [**What You Get**](#what-you-get) · [**Compare**](#how-sotto-compares) · [**Self-host**](#self-host) · [**BYOK**](#bring-your-own-claude--codex)
 
-<sub>Open source language learning for the context you choose to share.</sub>
+<sub>Private language rehearsal for the context you choose to share.</sub>
 
 <br/>
 <br/>
@@ -69,11 +69,17 @@ For the full self-hosted journey, see [User Flows](docs/06-user-flows.md): start
 
 Every serious language app is closed, hosted, and subscription-funded. Your progress, your vocabulary, and the model that teaches you all live on someone else's servers.
 
-**Sotto inverts that.** You run the whole stack, connect your own Claude or Codex and the context you choose to share, and it builds a course around your work and interests. Your data never leaves infrastructure you control.
+The social side is its own barrier. Private tutoring, classroom speaking, and conversation exchange can be valuable, but they also put learners on the spot with a stranger or a room waiting. Sotto gives them a private rehearsal loop first.
+
+There is also learning-tool fatigue. Sotto should not feel like another AI language chatbot with an empty prompt box. It wraps the models you already run in a structured course, practice, memory, and teacher follow-up loop.
+
+**Sotto inverts that.** You run the whole stack, connect your own Claude or Codex and the context you choose to share, and it builds a course around your work, interests, and practice situations. Your data never leaves infrastructure you control.
 
 > **The differentiators**
 >
 > - **Taught in your own context:** connect your agent and grant the context you choose: notes, goals, and what you're working on. Lessons, readings, and listening are drawn from _that_, not generic content.
+> - **Low-pressure rehearsal:** repeat speaking, writing, and listening practice privately before you try it with a teacher, tutor, classmate, or stranger.
+> - **Not another AI chatbot:** learners get classes, prompts, recordings, rubrics, review queues, and memory practice instead of another blank chat window.
 > - **You own the learning stack:** run it with your keys, your database, and your files. No Sotto account holds your progress hostage.
 > - **Pedagogy over gamification:** mastery gates use [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect); adaptive listening uses [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's _i+1_); the memory graph uses [SM-2](https://super-memory.com/english/ol/sm2.htm) [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition). Progress is measured by demonstrated mastery, not streaks.
 > - **Bring your own stack:** LLM, TTS, STT via explicit provider selection, BYOK, or a keyless local agent. You pay your providers directly; nothing is billed through the build you run.
@@ -89,16 +95,16 @@ A complete CEFR course across **five graded skills**, on a stack you control:
 | **Grammar**   | Multiple-choice drills with elaborative feedback from your connected LLM                    |
 | **Reading**   | Graded passages with comprehension checks + vocabulary extraction                           |
 | **Listening** | An adaptive audio episode generated + narrated by your TTS, seeded with your due vocabulary |
-| **Speaking**  | Record → STT → pronunciation scoring with a rubric                                          |
+| **Speaking**  | Record when ready → STT → pronunciation scoring with a rubric                               |
 | **Writing**   | Free-text tasks graded synchronously with inline AI corrections (old → new + why)           |
 
 The rest of the loop:
 
 - **Classes gated by mastery:** you cannot advance until you pass; failed sections regenerate in a similar form without copying the old one.
-- **Ungated practice:** drill any single skill on your own time, driven by spaced repetition and separate from the graded classes.
+- **Ungated practice:** drill any single skill on your own time, driven by spaced repetition and separate from the graded classes. Use it as private rehearsal before live interaction, not as a human replacement.
 - **Personal memory graph:** a per course, [Obsidian](https://obsidian.md/) style vocabulary and grammar graph with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition that drives review, seeds the listening episode, and renders as an interactive [Cytoscape](https://js.cytoscape.org/) visualization.
 - **Sourced classes:** build a class from a real article, paper, or YouTube link, or from a topic in your interests. Sotto extracts it, levels it to your CEFR, and teaches from it with verified `[N]` citations.
-- **Live conversation:** speak and hear real time translation in either direction through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live). New words you hit feed straight into your memory graph. Runs on your own Google key in Settings, and stays hidden until you add one.
+- **Live conversation:** when you are ready, speak and hear real time translation in either direction through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live). New words you hit feed straight into your memory graph. Runs on your own Google key in Settings, and stays hidden until you add one.
 - **Practice exams:** full, multi section mock exams modeled on each language's flagship ([Goethe-Zertifikat](https://www.goethe.de/en/spr/kup/prf.html), [DELE](https://examenes.cervantes.es/), [Cambridge English](https://www.cambridgeenglish.org/), or a generic CEFR mock), with a mock band and feedback by section. Practice only, never an official score, and never changes your level.
 - **Notes that shape the course:** tell Sotto your goals and background once; it threads through placement, classes, and practice.
 - **Flexible language pairs:** English to German, English to Spanish, and Spanish to English ship as hand authored reference curricula that set the quality bar; other selected native to target pairs are composed by your configured model or agent on demand and cached per pair.
@@ -301,7 +307,9 @@ The product runs on your own stack: you run it, then reach it from anywhere.
 - **Terminal.** `sotto` is a headless Rust + ratatui client. Learn from a tmux pane while you code, with native audio playback and mic recording. See [Terminal client](#terminal-client-sotto) below.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
-**One learner, no login.** An instance you run is yours alone. Open it and you are in, with no sign up, accounts, or passwords to manage. Your courses, progress, vocabulary graph, and keys live entirely on your own stack.
+**One owner, local profiles.** A self-hosted instance starts with one owner and no login ceremony. The owner can add isolated learner profiles, switch between them, and keep each learner's courses, progress, vocabulary graph, and keys on the same controlled stack.
+
+**Teacher-run mode is the natural classroom shape.** The current profile model already points there: a teacher self-hosts Sotto, creates one profile per student, and keeps practice data on school-controlled infrastructure. The next product layer should add teacher-authored homework, class-prep scenarios, per-student follow-up queues, and reviewable AI feedback so Sotto prepares students between lessons without replacing the teacher.
 
 ---
 
@@ -365,6 +373,8 @@ The full learning loop ships today and runs on your own stack:
 - **Households + your devices:** first account becomes owner, invite your family, isolated learner accounts; desktop launcher (Sotto Host), installable PWA on any device, one command secure tunnel.
 - **Terminal client:** `sotto`, a Rust + ratatui headless client with in terminal audio playback and recording; the full learning loop over `/api/v1`.
 - **iPad workbooks:** PDF workbooks for any class; generated by the web app, ready for GoodNotes style annotation, and linked back into the exact web class sections.
+
+**Planned teacher mode:** a teacher-run self-hosted deployment where profiles are students, homework is assigned as private rehearsal, and follow-up summaries make it easy to prepare the next class for each student. This should be teacher-controlled by design: teachers set the goals, sources, rubrics, and review path; Sotto handles repetition and evidence capture.
 
 **Planned optional managed offering:** hosted infrastructure for non technical learners, including workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and can still run on your stack.
 

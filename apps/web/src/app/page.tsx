@@ -30,22 +30,22 @@ const STEPS: Step[] = [
   {
     num: '01',
     label: 'Connect',
-    title: 'Bring your own agent',
-    body: 'Point Sotto at the Claude or Codex you already run, with your own keys. No new account to teach, no provider trap. The model that knows your work teaches the language.',
+    title: 'Bring your own companion',
+    body: 'Point Sotto at the Claude, Codex, or local model you already run. No stranger, no forced small talk, no new platform account between you and practice.',
     icon: 'plug',
   },
   {
     num: '02',
-    label: 'Grant context',
-    title: 'Choose what it may read',
-    body: 'Hand it your repositories, papers, notes, the things you actually care about. You decide the scope, line by line. Nothing leaves your machine unless you say so.',
+    label: 'Set the frame',
+    title: 'Choose what practice is about',
+    body: 'Give it the notes, sources, goals, and situations you want to rehearse. You decide the scope, line by line. Nothing leaves your machine unless you say so.',
     icon: 'key',
   },
   {
     num: '03',
-    label: 'Progress',
-    title: 'A course gated by mastery',
-    body: 'Get placed at the right CEFR level, then advance only as you demonstrate it. Grammar, reading, listening, speaking, and writing, drawn from your own world.',
+    label: 'Rehearse',
+    title: 'Practice before it is live',
+    body: 'Get placed at the right CEFR level, then rehearse grammar, reading, listening, speaking, and writing privately before class, tutoring, or real conversation.',
     icon: 'gate',
   },
 ];
@@ -78,8 +78,8 @@ const SKILLS: Skill[] = [
   },
   {
     label: 'Speaking',
-    name: 'Pronunciation feedback',
-    body: 'Record a phrase; get phoneme-level feedback through your own STT and TTS.',
+    name: 'Pressure-free rehearsal',
+    body: 'Practice a phrase when you are ready; get pronunciation feedback without a live person waiting.',
     icon: 'mic',
   },
   {
@@ -121,6 +121,33 @@ const TENETS: Tenet[] = [
     title: 'Open, run it yourself',
     body: 'The whole thing is open source and runs on infrastructure you control. Read it, audit it, host it.',
     icon: 'repo',
+  },
+];
+
+const PRESSURE_POINTS: Tenet[] = [
+  {
+    label: 'No performance',
+    title: 'Start without small talk',
+    body: 'Open a practice session around a concrete situation and repeat it as many times as needed before a real person is involved.',
+    icon: 'mic',
+  },
+  {
+    label: 'No penalty',
+    title: 'Mistakes stay private',
+    body: 'Record, rewrite, retry, and ask for slower examples without turning every mistake into a social moment.',
+    icon: 'shield',
+  },
+  {
+    label: 'No chatbot fatigue',
+    title: 'More than a chat box',
+    body: 'Sotto adds practice plans, CEFR classes, recordings, rubrics, and memory review around the tools you already run instead of asking learners to adopt another generic AI chat thread.',
+    icon: 'plug',
+  },
+  {
+    label: 'No replacement claim',
+    title: 'Made to support teachers',
+    body: 'A teacher-run instance can make profiles student spaces for assigned rehearsal and follow-up. Humans still own judgment, nuance, culture, and live interaction.',
+    icon: 'book',
   },
 ];
 
@@ -222,7 +249,7 @@ const WALK_STEPS: WalkStep[] = [
     label: 'Connect',
     title: 'Connect your',
     titleAccent: 'agent',
-    body: 'Pick the Claude, Codex, or local model you already run. Sotto reuses your installed CLI, so there is nothing new to paste and nothing to proxy through us.',
+    body: 'Pick the Claude, Codex, or local model you already run. Sotto reuses your installed CLI, so private rehearsal stays on the stack you control.',
     caption: 'Agent, reuse the CLI you already run',
     frame: 'agent',
   },
@@ -231,7 +258,7 @@ const WALK_STEPS: WalkStep[] = [
     label: 'Grant context',
     title: 'Grant the',
     titleAccent: 'context',
-    body: 'Choose what it may read, source by source. Your repositories, reading list, notes, calendar. Every lesson is drawn from the world you share, and nothing leaves your machine.',
+    body: 'Choose what it may read, source by source. Notes, reading, goals, and the situations you want to rehearse. Every lesson is drawn from what you share, and nothing leaves your machine.',
     caption: 'Context, you decide the scope',
     frame: 'context',
   },
@@ -249,7 +276,7 @@ const WALK_STEPS: WalkStep[] = [
     label: 'Learn',
     title: 'Learn across',
     titleAccent: 'five skills',
-    body: 'Grammar, reading, listening, speaking, and writing, each gated by mastery. Every word you meet joins a vocabulary memory graph that is entirely yours.',
+    body: 'Grammar, reading, listening, speaking, and writing, each gated by mastery. Private practice prepares you for the human parts instead of pretending to replace them.',
     caption: 'Class hub, five skills and one memory',
     frame: 'skills',
   },
@@ -407,15 +434,15 @@ export default async function LandingPage() {
             Open source · run it yourself
           </p>
           <h1 id="hero-title" className={styles.heroTitle}>
-            Learn a language, <em>taught in your own context.</em>
+            Practice a language before <em>the pressure of speaking.</em>
           </h1>
           <p className={styles.lede}>{BRAND.subline}</p>
 
           <LandingCTA withGhost demoMode={demoMode} />
 
           <p className={styles.whisper}>
-            <span className={styles.whisperTag}>private by design</span>
-            The agent that knows your work now teaches you to speak.
+            <span className={styles.whisperTag}>private rehearsal</span>
+            Build confidence before class, tutoring, or real conversation.
           </p>
         </section>
 
@@ -428,7 +455,7 @@ export default async function LandingPage() {
             </h2>
             <p className={styles.providersCopy}>
               LLMs, speech generation, speech recognition, CLI agents, and local models all plug
-              into the same stack you run.
+              into the same private rehearsal stack you run.
             </p>
           </div>
 
@@ -458,7 +485,7 @@ export default async function LandingPage() {
           <header className={styles.sectionHead}>
             <p className={styles.sectionLabel}>How it works</p>
             <h2 id="how-title" className={styles.sectionTitle}>
-              Three steps, and the course is <em>yours</em>.
+              Three steps from anxiety to <em>rehearsal</em>.
             </h2>
           </header>
 
@@ -481,6 +508,34 @@ export default async function LandingPage() {
           </ol>
         </section>
 
+        {/* ---- pressure relief ---- */}
+        <section className={styles.section} aria-labelledby="pressure-title">
+          <header className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>Pressure relief</p>
+            <h2 id="pressure-title" className={styles.sectionTitle}>
+              Built for the part people avoid: <em>being put on the spot</em>.
+            </h2>
+            <p className={styles.sectionLede}>
+              Private tutoring and conversation practice can be useful, but the social load is real.
+              Sotto gives learners a rehearsal room first, then helps them bring stronger questions
+              and cleaner attempts back to humans.
+            </p>
+          </header>
+
+          <div className={styles.tenetGrid}>
+            {PRESSURE_POINTS.map((point) => (
+              <article key={point.label} className={styles.tenet}>
+                <div className={styles.tenetIcon} aria-hidden="true">
+                  <Glyph name={point.icon} size={20} />
+                </div>
+                <p className={styles.tenetLabel}>{point.label}</p>
+                <h3 className={styles.tenetTitle}>{point.title}</h3>
+                <p className={styles.tenetText}>{point.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
         {/* ---- five skills + memory ---- */}
         <section className={styles.section} aria-labelledby="skills-title">
           <header className={styles.sectionHead}>
@@ -490,7 +545,8 @@ export default async function LandingPage() {
             </h2>
             <p className={styles.sectionLede}>
               Grammar, reading, listening, speaking, and writing, each gated by demonstrated
-              mastery, all feeding a vocabulary memory graph that is entirely yours.
+              mastery, all feeding a vocabulary memory graph that is entirely yours. It is a
+              practice companion, not a replacement for human instruction.
             </p>
           </header>
 
@@ -513,11 +569,11 @@ export default async function LandingPage() {
           <header className={styles.sectionHead}>
             <p className={styles.sectionLabel}>Step by step</p>
             <h2 id="walk-title" className={styles.sectionTitle}>
-              From your agent to your first <em>class</em>.
+              From your agent to your first <em>rehearsal</em>.
             </h2>
             <p className={styles.sectionLede}>
-              Four steps, start to finish. Each one is the real screen you will see, drawn in the
-              same calm interface you learn in.
+              Four steps, start to finish. Each one keeps the learner in control of pace, context,
+              and how much social pressure they take on.
             </p>
           </header>
 
@@ -592,8 +648,8 @@ export default async function LandingPage() {
               Get Sotto on <em>your own stack</em>.
             </h2>
             <p className={styles.sectionLede}>
-              Run the whole thing on your computer in one click, or host it on a server for the
-              household. Your courses, audio, and data stay where you put them.
+              Run the whole rehearsal loop on your computer in one click, or host it on a server for
+              the household. Your courses, audio, and data stay where you put them.
             </p>
           </header>
 
@@ -635,10 +691,10 @@ export default async function LandingPage() {
             {BRAND.cta}
           </p>
           <h2 id="convert-title" className={styles.convertTitle}>
-            Place. Practice. <em>Progress.</em>
+            Practice. Rehearse. <em>Progress.</em>
           </h2>
           <p className={styles.sectionLede}>
-            Connect the agent you already own and take the first class today.
+            Connect the agent you already own and start with a private rehearsal today.
           </p>
 
           <LandingCTA demoMode={demoMode} />

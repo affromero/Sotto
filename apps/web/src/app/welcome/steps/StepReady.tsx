@@ -254,7 +254,7 @@ export function StepReady({
       </h1>
       <p className={t.lede}>
         {config.selfHosted
-          ? 'Gated by mastery, drawn from your world, running on your keys. Pick up where the agent left off. It remembers everything because the memory is yours.'
+          ? 'Gated by mastery, drawn from your world, running on your keys. Start with private rehearsal, then bring stronger attempts back to class, tutoring, or real conversation.'
           : 'This is the hosted preview of a course drawn from mock context and gated by mastery. No profile, source connection, key, or course record is created.'}
       </p>
 

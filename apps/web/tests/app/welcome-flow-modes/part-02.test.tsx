@@ -233,7 +233,7 @@ describe('welcome hosted-demo mode', () => {
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
     expect(
-      await screen.findByRole('heading', { name: /Review the teaching brief/i })
+      await screen.findByRole('heading', { name: /Review the practice brief/i })
     ).toBeInTheDocument();
     expect(screen.getAllByText(/example.com/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Invisible Cities/i).length).toBeGreaterThan(0);
