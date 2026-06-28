@@ -179,6 +179,7 @@ describe('resolveTts', () => {
   it('routes optional Cartesia usage metadata with the BYOK key', () => {
     const r = resolveTts('cartesia', 'sk_car_x', '', 'sonic-3.5', {
       adminApiKey: ' sk_car_admin_x ',
+      usagePlan: 'pro',
       monthlyCreditLimit: '1000000',
       billingResetDay: '1',
     });
@@ -189,6 +190,7 @@ describe('resolveTts', () => {
       apiKey: 'sk_car_x',
       extra: {
         adminApiKey: 'sk_car_admin_x',
+        usagePlan: 'pro',
         monthlyCreditLimit: '1000000',
         billingResetDay: '1',
       },

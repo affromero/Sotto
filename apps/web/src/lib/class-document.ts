@@ -2,15 +2,27 @@
 // worksheet page and PDF worker render this single shape. The learner variant
 // strips answer-key fields (correctIndex/explanation); the answer-key variant
 // keeps them so a teacher/self-hoster can print a key.
-import type { ClassDocument, ClassDocumentSection } from '@sotto/shared';
+import type { ClassDocument, ClassDocumentIntro, ClassDocumentSection } from '@sotto/shared';
 import { generateQrDataUrl } from './qr';
 
 const SKILL_META: Record<string, { title: string; instructions: string }> = {
   GRAMMAR: { title: 'Grammar', instructions: 'Choose the correct option for each item.' },
-  READING: { title: 'Reading', instructions: 'Read the passage, then choose the best answer for each item.' },
-  LISTENING: { title: 'Listening', instructions: 'Scan the code to play the audio, then choose the best answer.' },
-  SPEAKING: { title: 'Speaking', instructions: 'Scan the code to record. Say each phrase aloud and check your pronunciation.' },
-  WRITING: { title: 'Writing', instructions: 'Draft your response with Apple Pencil, then scan to submit and get feedback.' },
+  READING: {
+    title: 'Reading',
+    instructions: 'Read the passage, then choose the best answer for each item.',
+  },
+  LISTENING: {
+    title: 'Listening',
+    instructions: 'Scan the code to play the audio, then choose the best answer.',
+  },
+  SPEAKING: {
+    title: 'Speaking',
+    instructions: 'Scan the code to record. Say each phrase aloud and check your pronunciation.',
+  },
+  WRITING: {
+    title: 'Writing',
+    instructions: 'Draft your response with Apple Pencil, then scan to submit and get feedback.',
+  },
 };
 
 // Sections that have an in-app counterpart worth deep-linking from print.
@@ -21,6 +33,7 @@ export interface BuildClassDocumentInput {
   nativeLang: string;
   targetLang: string;
   lesson: { title: string; level: string; objective: string };
+  intro?: ClassDocumentIntro | null;
   sections: Array<{
     id: string;
     skill: string;
@@ -58,7 +71,7 @@ export interface BuildClassDocumentOptions {
 
 export async function buildClassDocument(
   cls: BuildClassDocumentInput,
-  opts: BuildClassDocumentOptions,
+  opts: BuildClassDocumentOptions
 ): Promise<ClassDocument> {
   const sections: ClassDocumentSection[] = await Promise.all(
     cls.sections.map(async (s) => {
@@ -99,7 +112,7 @@ export async function buildClassDocument(
         appLink,
         qrDataUrl,
       };
-    }),
+    })
   );
 
   return {
@@ -110,6 +123,7 @@ export async function buildClassDocument(
     nativeLang: cls.nativeLang,
     targetLang: cls.targetLang,
     isAnswerKey: opts.isAnswerKey,
+    intro: cls.intro ?? null,
     sections,
   };
 }

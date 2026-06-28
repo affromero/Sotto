@@ -30,6 +30,42 @@ export interface ClassDocumentWritingPrompt {
   guidance?: string | null;
 }
 
+export interface ClassDocumentIntroVisuals {
+  timeline: {
+    title: string;
+    steps: string[];
+  } | null;
+  contrast: {
+    title: string;
+    leftLabel: string;
+    leftItems: string[];
+    rightLabel: string;
+    rightItems: string[];
+  } | null;
+  callouts: Array<{
+    label: string;
+    text: string;
+    tone: 'blue' | 'teal' | 'rose' | 'amber';
+  }>;
+  links: Array<{
+    label: string;
+    url: string;
+  }>;
+}
+
+export interface ClassDocumentIntro {
+  purpose: string;
+  about: string;
+  focus: string[];
+  examples: Array<{
+    target: string;
+    meaning: string;
+    note: string;
+  }>;
+  tips: string[];
+  visuals?: ClassDocumentIntroVisuals;
+}
+
 export interface ClassDocumentSection {
   id: string;
   skill: SkillType;
@@ -53,5 +89,6 @@ export interface ClassDocument {
   nativeLang: string;
   targetLang: string;
   isAnswerKey: boolean;
+  intro?: ClassDocumentIntro | null;
   sections: ClassDocumentSection[];
 }

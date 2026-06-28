@@ -33,8 +33,28 @@ const TIER_RANK: Record<string, number> = {
   standard: 1,
 };
 
+const CUSTOM_ALLOWANCE_PRESET = 'custom';
+
 function languageName(code: string): string {
   return LANGUAGE_DISPLAY[code as keyof typeof LANGUAGE_DISPLAY] ?? code.toUpperCase();
+}
+
+function fieldKey(providerId: string, key: string): string {
+  return `${providerId}-${key}`;
+}
+
+function formatAllowanceLimit(value: number, unitLabel: string): string {
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)} ${unitLabel}/month`;
+}
+
+function isAllowanceField(provider: TtsProviderClientMeta, key: string): boolean {
+  const allowance = provider.usageAllowance;
+  if (!allowance) return false;
+  return (
+    key === allowance.planField ||
+    key === allowance.allowanceField ||
+    key === allowance.resetDayField
+  );
 }
 
 function summarizeLanguageSupport(
@@ -92,23 +112,89 @@ export function TtsProviderCards({
     });
   }, [configured, providerMeta]);
 
-  const handleSaveKey = async (
-    providerId: string,
-    authFields: TtsProviderClientMeta['authFields']
-  ) => {
-    const apiKey = fieldValues[`${providerId}-apiKey`]?.trim();
-    if (!apiKey) return;
+  const updateFieldValue = (providerId: string, key: string, value: string) => {
+    setFieldValues((prev) => ({
+      ...prev,
+      [fieldKey(providerId, key)]: value,
+    }));
+  };
+
+  const handleAllowancePresetChange = (provider: TtsProviderClientMeta, presetId: string): void => {
+    const allowance = provider.usageAllowance;
+    if (!allowance) return;
+    const preset = allowance.presets.find((item) => item.id === presetId);
+
+    setFieldValues((prev) => {
+      const next = {
+        ...prev,
+        [fieldKey(provider.id, allowance.planField)]: presetId,
+      };
+      if (preset) {
+        delete next[fieldKey(provider.id, allowance.allowanceField)];
+      } else if (presetId !== CUSTOM_ALLOWANCE_PRESET) {
+        delete next[fieldKey(provider.id, allowance.allowanceField)];
+      }
+      return next;
+    });
+  };
+
+  const hasPendingChanges = (provider: TtsProviderClientMeta): boolean => {
+    return (
+      provider.authFields.some((field) => fieldValues[fieldKey(provider.id, field.key)]?.trim()) ||
+      Boolean(
+        provider.usageAllowance &&
+        [
+          provider.usageAllowance.planField,
+          provider.usageAllowance.allowanceField,
+          provider.usageAllowance.resetDayField,
+        ].some((key) => fieldValues[fieldKey(provider.id, key)]?.trim())
+      )
+    );
+  };
+
+  const handleSaveKey = async (provider: TtsProviderClientMeta) => {
+    const providerId = provider.id;
+    const authFields = provider.authFields;
+    const apiKey = fieldValues[fieldKey(providerId, 'apiKey')]?.trim();
+    const isConfigured = configured.has(providerId);
+    const hasExtraField =
+      authFields.some(
+        (field) =>
+          field.key !== 'apiKey' &&
+          !isAllowanceField(provider, field.key) &&
+          fieldValues[fieldKey(providerId, field.key)]?.trim()
+      ) ||
+      Boolean(
+        provider.usageAllowance &&
+        [
+          provider.usageAllowance.planField,
+          provider.usageAllowance.allowanceField,
+          provider.usageAllowance.resetDayField,
+        ].some((key) => fieldValues[fieldKey(providerId, key)]?.trim())
+      );
+    if (!apiKey && (!isConfigured || !hasExtraField)) return;
 
     setSavingId(providerId);
     setStatus((prev) => ({ ...prev, [providerId]: 'validating' }));
     setErrors((prev) => ({ ...prev, [providerId]: '' }));
 
     try {
-      const body: Record<string, string> = { provider: providerId, apiKey };
+      const body: Record<string, string> = { provider: providerId };
+      if (apiKey) body.apiKey = apiKey;
       for (const field of authFields) {
-        if (field.key !== 'apiKey') {
-          const val = fieldValues[`${providerId}-${field.key}`]?.trim();
+        if (field.key !== 'apiKey' && !isAllowanceField(provider, field.key)) {
+          const val = fieldValues[fieldKey(providerId, field.key)]?.trim();
           if (val) body[field.key] = val;
+        }
+      }
+      if (provider.usageAllowance) {
+        for (const key of [
+          provider.usageAllowance.planField,
+          provider.usageAllowance.allowanceField,
+          provider.usageAllowance.resetDayField,
+        ]) {
+          const val = fieldValues[fieldKey(providerId, key)]?.trim();
+          if (val) body[key] = val;
         }
       }
 
@@ -133,7 +219,12 @@ export function TtsProviderCards({
       setFieldValues((prev) => {
         const next = { ...prev };
         for (const field of authFields) {
-          delete next[`${providerId}-${field.key}`];
+          delete next[fieldKey(providerId, field.key)];
+        }
+        if (provider.usageAllowance) {
+          delete next[fieldKey(providerId, provider.usageAllowance.planField)];
+          delete next[fieldKey(providerId, provider.usageAllowance.allowanceField)];
+          delete next[fieldKey(providerId, provider.usageAllowance.resetDayField)];
         }
         return next;
       });
@@ -182,6 +273,21 @@ export function TtsProviderCards({
         const qualityLabel = QUALITY_LABELS[provider.qualityTier] ?? provider.qualityTier;
         const modelCount = provider.models.length;
         const languageSummary = summarizeLanguageSupport(provider, preferredLanguage);
+        const allowance = provider.usageAllowance;
+        const visibleAuthFields = provider.authFields.filter(
+          (field) => !isAllowanceField(provider, field.key)
+        );
+        const allowanceField = allowance
+          ? provider.authFields.find((field) => field.key === allowance.allowanceField)
+          : null;
+        const resetDayField = allowance
+          ? provider.authFields.find((field) => field.key === allowance.resetDayField)
+          : null;
+        const selectedUsagePlan = allowance
+          ? fieldValues[fieldKey(provider.id, allowance.planField)] || ''
+          : '';
+        const showCustomAllowance =
+          Boolean(allowance) && selectedUsagePlan === CUSTOM_ALLOWANCE_PRESET;
         const cardClassName = isConfigured
           ? `${styles.card} ${isValid ? styles.cardConnected : styles.cardInvalid}`
           : styles.card;
@@ -218,7 +324,7 @@ export function TtsProviderCards({
                 </div>
               </div>
               {status[provider.id] === 'validating' ? (
-                <span className={styles.statusValidating}>Validating key...</span>
+                <span className={styles.statusValidating}>Saving...</span>
               ) : isConfigured ? (
                 isValid ? (
                   <span className={styles.statusConnected}>Connected</span>
@@ -237,7 +343,7 @@ export function TtsProviderCards({
                   className={styles.addKeyBtn}
                   onClick={() => setExpandedId(provider.id)}
                 >
-                  Update Key
+                  {provider.authFields.length > 1 ? 'Manage credentials' : 'Replace Key'}
                 </button>
                 <Button
                   variant="ghost"
@@ -277,37 +383,88 @@ export function TtsProviderCards({
 
             {isExpanded && (
               <div className={styles.keyForm}>
-                {provider.authFields.map((field) => (
+                {visibleAuthFields.map((field) => (
                   <Input
                     key={field.key}
                     label={field.label}
                     type={field.type ?? 'password'}
-                    value={fieldValues[`${provider.id}-${field.key}`] || ''}
-                    onChange={(e) =>
-                      setFieldValues((prev) => ({
-                        ...prev,
-                        [`${provider.id}-${field.key}`]: e.target.value,
-                      }))
-                    }
+                    value={fieldValues[fieldKey(provider.id, field.key)] || ''}
+                    onChange={(e) => updateFieldValue(provider.id, field.key, e.target.value)}
                     placeholder={
-                      field.optional ? `${field.placeholder} · optional` : field.placeholder
+                      isConfigured && field.key === 'apiKey'
+                        ? 'Leave blank to keep the current API key'
+                        : field.optional
+                          ? `${field.placeholder} · optional`
+                          : field.placeholder
+                    }
+                    helperText={
+                      isConfigured && field.key === 'apiKey'
+                        ? 'Only enter this if you want to replace the existing provider key.'
+                        : undefined
                     }
                   />
                 ))}
+                {allowance ? (
+                  <div className={styles.allowanceFields}>
+                    <label className={styles.selectField}>
+                      <span className={styles.fieldLabel}>Usage plan</span>
+                      <select
+                        className={styles.selectInput}
+                        value={selectedUsagePlan}
+                        onChange={(event) =>
+                          handleAllowancePresetChange(provider, event.target.value)
+                        }
+                      >
+                        <option value="">Plan preset</option>
+                        {allowance.presets.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.label} -{' '}
+                            {formatAllowanceLimit(preset.monthlyLimit, allowance.unitLabel)}
+                          </option>
+                        ))}
+                        <option value={CUSTOM_ALLOWANCE_PRESET}>Custom monthly limit</option>
+                      </select>
+                    </label>
+                    {showCustomAllowance ? (
+                      <Input
+                        label={allowanceField?.label ?? 'Monthly limit'}
+                        type="number"
+                        value={fieldValues[fieldKey(provider.id, allowance.allowanceField)] || ''}
+                        onChange={(e) =>
+                          updateFieldValue(provider.id, allowance.allowanceField, e.target.value)
+                        }
+                        placeholder={allowanceField?.placeholder ?? 'Monthly limit'}
+                      />
+                    ) : null}
+                    <Input
+                      label={resetDayField?.label ?? 'Billing reset day'}
+                      type="number"
+                      value={fieldValues[fieldKey(provider.id, allowance.resetDayField)] || ''}
+                      onChange={(e) =>
+                        updateFieldValue(provider.id, allowance.resetDayField, e.target.value)
+                      }
+                      placeholder={resetDayField?.placeholder ?? '1-31'}
+                    />
+                  </div>
+                ) : null}
                 <div className={styles.keyFormActions}>
                   <Button
-                    onClick={() => handleSaveKey(provider.id, provider.authFields)}
+                    onClick={() => handleSaveKey(provider)}
                     loading={isSaving}
-                    disabled={savingId !== null || !fieldValues[`${provider.id}-apiKey`]?.trim()}
+                    disabled={
+                      savingId !== null ||
+                      (!isConfigured && !fieldValues[fieldKey(provider.id, 'apiKey')]?.trim()) ||
+                      (isConfigured && !hasPendingChanges(provider))
+                    }
                   >
-                    Save Key
+                    {isConfigured ? 'Save changes' : 'Save key'}
                   </Button>
                   <Button variant="ghost" onClick={() => setExpandedId(null)}>
                     Cancel
                   </Button>
                 </div>
                 {status[provider.id] === 'saved' && (
-                  <span className={styles.feedbackSuccess}>Key saved and validated.</span>
+                  <span className={styles.feedbackSuccess}>Credentials saved.</span>
                 )}
                 {status[provider.id] === 'error' && (
                   <span className={styles.feedbackError}>{errors[provider.id]}</span>

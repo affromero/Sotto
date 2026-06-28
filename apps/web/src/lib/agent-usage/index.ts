@@ -24,6 +24,7 @@ import {
   parseCartesiaCreditUsagePayload,
   resetCartesiaUsageCacheForTests,
   resolveCartesiaBillingWindow,
+  resolveCartesiaUsageAllowance,
 } from './providers/cartesia';
 import { ERROR_CACHE_TTL_MS, formatUsageDuration, nowIso } from './utils';
 
@@ -52,6 +53,7 @@ export {
   parseCodexUsagePayload,
   parseElevenLabsSubscriptionPayload,
   resolveCartesiaBillingWindow,
+  resolveCartesiaUsageAllowance,
 };
 
 export async function getAgentUsageStatus(userId: string): Promise<AgentUsageStatus> {

@@ -105,9 +105,10 @@ OPENAI_API_KEY="sk-..."
 
 The dashboard usage widget can show audio provider credits from the keys users
 add in the wizard or provider settings. ElevenLabs usage works with the normal
-ElevenLabs key. Cartesia usage needs the optional Cartesia admin key; the
-optional monthly limit and reset-day fields let Sotto show credits remaining
-instead of only credits used.
+ElevenLabs key. Cartesia usage needs the optional Cartesia admin key from
+the wizard, provider settings, or `CARTESIA_ADMIN_API_KEY`; a plan preset or
+custom monthly limit plus reset day lets Sotto show credits remaining instead
+of only credits used.
 
 ### 5.3 Local Agent
 

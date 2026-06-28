@@ -319,6 +319,50 @@
   color: var(--ink-soft);
 }
 
+.transcriptBlock {
+  margin: 16px auto 0;
+  max-width: 520px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.transcriptLabel {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.transcript {
+  margin: 5px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.soundFocus {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.soundChip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 10%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--bad) 28%, var(--line));
+  border-radius: 999px;
+  padding: 5px 9px;
+}
+
 .speakOverall {
   margin-top: 22px;
   display: flex;
@@ -395,7 +439,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .btn {
-    transition: filter 0.2s, border-color 0.2s, color 0.2s;
+    transition:
+      filter 0.2s,
+      border-color 0.2s,
+      color 0.2s;
   }
   .btn:active {
     transform: none;

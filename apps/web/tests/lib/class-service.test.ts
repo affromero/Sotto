@@ -56,6 +56,9 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockGenerateSectionQuestions = vi.fn();
 const mockGenerateClassIntro = vi.fn();
+const mockGenerateClassListening = vi.fn();
+const mockGenerateClassSpeaking = vi.fn();
+const mockGenerateClassWriting = vi.fn();
 const mockEnsureCurriculumHasLevelLessons = vi.fn();
 
 vi.mock('@/lib/class-generation', () => ({
@@ -82,13 +85,15 @@ vi.mock('@/lib/knowledge-graph', () => ({
 }));
 
 vi.mock('@/lib/class-listening-generator', () => ({
-  generateClassListening: vi
-    .fn()
-    .mockResolvedValue({ sectionId: 'section-listening', episodeId: 'episode-listening' }),
+  generateClassListening: (...args: unknown[]) => mockGenerateClassListening(...args),
 }));
 
 vi.mock('@/lib/class-speaking-generator', () => ({
-  generateClassSpeaking: vi.fn().mockResolvedValue({ sectionId: 'section-speaking' }),
+  generateClassSpeaking: (...args: unknown[]) => mockGenerateClassSpeaking(...args),
+}));
+
+vi.mock('@/lib/class-writing-generator', () => ({
+  generateClassWriting: (...args: unknown[]) => mockGenerateClassWriting(...args),
 }));
 
 vi.mock('@/lib/course-notes', () => ({
@@ -196,6 +201,12 @@ describe('createNextClass', () => {
     // Default: $transaction runs all ops (each op is already a resolved promise from mocked methods)
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
+    mockGenerateClassListening.mockResolvedValue({
+      sectionId: 'section-listening',
+      episodeId: 'episode-listening',
+    });
+    mockGenerateClassSpeaking.mockResolvedValue({ sectionId: 'section-speaking' });
+    mockGenerateClassWriting.mockResolvedValue({ sectionId: 'section-writing' });
     mockGenerateClassIntro.mockResolvedValue({
       purpose: 'Purpose',
       about: 'About',
@@ -317,6 +328,21 @@ describe('createNextClass', () => {
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'class-new' } })
     );
+  });
+
+  it('cleans up the half-built class when a required listening section fails', async () => {
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockGenerateClassListening.mockRejectedValue(new Error('TTS unavailable'));
+    mockCourseClassDelete.mockResolvedValue({});
+
+    await expect(createNextClass('course-1', 'u1')).rejects.toThrow('TTS unavailable');
+    expect(mockCourseClassDelete).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'class-new' } })
+    );
+    expect(mockGenerateClassSpeaking).not.toHaveBeenCalled();
+    expect(mockGenerateClassWriting).not.toHaveBeenCalled();
   });
 
   it('stops cleanly when the generated class is cancelled midway', async () => {
@@ -669,6 +695,12 @@ describe('regenerateCurrentClass', () => {
     vi.clearAllMocks();
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
+    mockGenerateClassListening.mockResolvedValue({
+      sectionId: 'section-listening',
+      episodeId: 'episode-listening',
+    });
+    mockGenerateClassSpeaking.mockResolvedValue({ sectionId: 'section-speaking' });
+    mockGenerateClassWriting.mockResolvedValue({ sectionId: 'section-writing' });
     mockGenerateClassIntro.mockResolvedValue({
       purpose: 'Purpose',
       about: 'About',

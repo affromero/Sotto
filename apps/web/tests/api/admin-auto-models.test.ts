@@ -40,6 +40,36 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   }),
 }));
 
+vi.mock('@/lib/providers/tts-registry', () => ({
+  getProviderIds: vi.fn(() => [
+    'elevenlabs',
+    'openai',
+    'cartesia',
+    'hume',
+    'fal',
+    'replicate',
+    'minimax',
+    'mistral',
+    'kokoro',
+    'local',
+  ]),
+}));
+
+vi.mock('@/lib/providers/stt-registry', () => ({
+  getSttProviderIds: vi.fn(() => [
+    'openai',
+    'elevenlabs',
+    'together',
+    'deepgram',
+    'assemblyai',
+    'cartesia',
+    'groq',
+    'gladia',
+    'speechmatics',
+    'local',
+  ]),
+}));
+
 vi.mock('@/lib/api-response', () => ({
   errorResponse: (message: unknown, status: number) =>
     new Response(JSON.stringify({ error: message }), {
@@ -179,6 +209,20 @@ describe('PATCH /api/v1/admin/auto-models', () => {
         ttsModel: 'local',
         sttProvider: 'local',
         sttModel: 'whisper-local',
+      },
+    };
+
+    const response = await PATCH(patchRequest(body));
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
+  });
+
+  it('accepts newer STT providers from the registry', async () => {
+    const body = {
+      model: {
+        sttProvider: 'cartesia',
+        sttModel: 'ink-whisper',
       },
     };
 

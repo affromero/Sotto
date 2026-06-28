@@ -97,6 +97,118 @@
   color: var(--ink);
 }
 
+.visualDeck {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 12px;
+}
+
+.timelineFigure,
+.contrastFigure {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.46), transparent), var(--well);
+  overflow: hidden;
+}
+
+.timelineFigure figcaption,
+.contrastFigure figcaption {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.timelineFigure ol {
+  list-style: none;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.timelineFigure li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: center;
+  position: relative;
+}
+
+.timelineFigure li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 30px;
+  bottom: -10px;
+  width: 2px;
+  background: color-mix(in oklab, #2a8c78 44%, transparent);
+}
+
+.timelineFigure li span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #2a8c78;
+  color: #f4fffb;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.timelineFigure li p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.36;
+  color: var(--ink);
+}
+
+.contrastGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.contrastGrid > div {
+  padding: 14px;
+  min-width: 0;
+}
+
+.contrastGrid > div:first-child {
+  border-right: 1px solid var(--line);
+  background: color-mix(in oklab, var(--accent) 9%, transparent);
+}
+
+.contrastGrid > div:last-child {
+  background: color-mix(in oklab, #c65f3d 10%, transparent);
+}
+
+.contrastGrid b {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.contrastGrid ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.43;
+}
+
+.contrastGrid li + li {
+  margin-top: 6px;
+}
+
 .introNumber {
   min-width: 28px;
   font-family: var(--mono);
@@ -138,8 +250,6 @@
 }
 
 .example {
-  display: grid;
-  gap: 3px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
 }
@@ -154,11 +264,29 @@
   color: var(--ink);
 }
 
+.example summary {
+  display: grid;
+  gap: 3px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.example summary::-webkit-details-marker {
+  display: none;
+}
+
 .example span,
 .example small {
   color: var(--ink-soft);
   font-size: 13.5px;
   line-height: 1.45;
+}
+
+.example small {
+  display: block;
+  margin-top: 5px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in oklab, var(--accent) 34%, transparent);
 }
 
 .tipLine {
@@ -171,16 +299,70 @@
 .tipLine span {
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 7px 9px;
+  padding: 9px 10px;
   font-size: 12.5px;
   line-height: 1.35;
   color: var(--ink-soft);
   background: color-mix(in oklab, var(--well) 72%, transparent);
+  max-width: 36ch;
+}
+
+.tipLine b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+
+.tone_blue {
+  border-color: color-mix(in oklab, var(--accent) 35%, transparent) !important;
+}
+
+.tone_teal {
+  border-color: color-mix(in oklab, #2a8c78 38%, transparent) !important;
+  background: color-mix(in oklab, #2a8c78 10%, transparent) !important;
+}
+
+.tone_rose {
+  border-color: color-mix(in oklab, #c64f70 35%, transparent) !important;
+  background: color-mix(in oklab, #c64f70 9%, transparent) !important;
+}
+
+.tone_amber {
+  border-color: color-mix(in oklab, #b98024 38%, transparent) !important;
+  background: color-mix(in oklab, #b98024 11%, transparent) !important;
+}
+
+.linkStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linkStrip a {
+  color: var(--ink);
+  border-bottom: 1px solid var(--accent-line);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 @media (max-width: 760px) {
+  .visualDeck,
   .introGrid {
     grid-template-columns: 1fr;
+  }
+
+  .contrastGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .contrastGrid > div:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 }
 

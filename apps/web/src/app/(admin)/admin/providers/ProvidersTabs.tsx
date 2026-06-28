@@ -17,7 +17,13 @@ interface ProviderKeyConfigProps {
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
   ttsProviderMeta: TtsProviderClientMeta[];
-  aiSystemProviders: Array<{ id: string; label: string; description: string; available: boolean }>;
+  aiSystemProviders: Array<{
+    id: string;
+    label: string;
+    description: string;
+    available: boolean;
+    disabled: boolean;
+  }>;
 }
 
 interface ProvidersTabsProps {

@@ -98,9 +98,13 @@ ELEVENLABS_API_KEY=<your key>
 
 After setup, users add audio provider keys in the wizard or provider settings.
 ElevenLabs usage works with the normal ElevenLabs key. Cartesia usage needs the
-optional Cartesia admin key in provider settings; the optional monthly limit and
-reset-day fields let Sotto show remaining-credit estimates instead of only
-credits used in the current billing window.
+optional Cartesia admin key in the wizard, provider settings, or
+`CARTESIA_ADMIN_API_KEY`.
+Set a plan preset (`free`, `pro`, `startup`, `scale`, or `custom`) with
+`CARTESIA_USAGE_PLAN`, or set `CARTESIA_MONTHLY_CREDIT_LIMIT` directly. The
+optional reset-day setting (`CARTESIA_BILLING_RESET_DAY`) lets Sotto show
+remaining-credit estimates instead of only credits used in the current billing
+window.
 
 For local media storage:
 

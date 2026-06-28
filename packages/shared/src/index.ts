@@ -48,6 +48,8 @@ export type { ReferenceData, VerificationLayerResult } from './types/reference';
 
 export type {
   ClassDocument,
+  ClassDocumentIntro,
+  ClassDocumentIntroVisuals,
   ClassDocumentSection,
   ClassDocumentQuestion,
   ClassDocumentPrompt,

@@ -422,13 +422,17 @@ final class SottoAppModel: ObservableObject {
     }
 
     func startFullCatchUp(for course: SottoCourse) async {
+        await startPractice(courseId: course.id, kind: "FULL")
+    }
+
+    func startPractice(courseId: String, kind: String) async {
         guard let client = makeClient() else { return }
         isLoading = true
         canCancelLoading = false
         errorMessage = nil
 
         do {
-            practiceStart = try await client.startPractice(courseId: course.id, kind: "FULL")
+            practiceStart = try await client.startPractice(courseId: courseId, kind: kind)
             practiceResult = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -490,6 +494,21 @@ final class SottoAppModel: ObservableObject {
             return
         }
         await openWorkbook(for: activeClassId)
+    }
+
+    func fetchSelectionHelp(
+        courseId: String,
+        text: String,
+        contextText: String?
+    ) async throws -> SottoSelectionHelpResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before asking for class help.")
+        }
+        return try await client.fetchSelectionHelp(
+            courseId: courseId,
+            text: text,
+            contextText: contextText
+        )
     }
 
     func cancelCurrentClassGeneration() async {

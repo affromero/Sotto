@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { WorksheetPdfPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { buildClassDocument } from '@/lib/class-document';
+import { classIntroFromSeed } from '@/lib/classes/class-intro';
 import { renderWorksheetHtml } from '@/lib/worksheet-html';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
@@ -17,7 +18,15 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
     where: { id: classId },
     include: {
       course: { select: { nativeLang: true, targetLang: true } },
-      lesson: { select: { title: true, level: true, objective: true } },
+      lesson: {
+        select: {
+          title: true,
+          level: true,
+          objective: true,
+          grammarPoints: true,
+          targetVocab: true,
+        },
+      },
       sections: {
         include: {
           questions: { orderBy: { order: 'asc' } },
@@ -34,6 +43,23 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
 
   await job.updateProgress(15);
 
+  const grammarPoints = Array.isArray(cls.lesson.grammarPoints)
+    ? (cls.lesson.grammarPoints as string[])
+    : [];
+  const targetVocab = Array.isArray(cls.lesson.targetVocab)
+    ? (cls.lesson.targetVocab as Array<{ lemma: string; gloss: string; pos?: string }>)
+    : [];
+  const intro = classIntroFromSeed(cls.adaptiveSeed, {
+    level: cls.lesson.level,
+    nativeLang: cls.course.nativeLang,
+    targetLang: cls.course.targetLang,
+    title: cls.lesson.title,
+    objective: cls.lesson.objective,
+    grammarPoints,
+    targetVocab,
+    sourceTitle: cls.sourceTitle,
+  });
+
   const input = {
     id: cls.id,
     nativeLang: cls.course.nativeLang,
@@ -43,6 +69,7 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
       level: cls.lesson?.level ?? '',
       objective: cls.lesson?.objective ?? '',
     },
+    intro,
     sections: cls.sections.map((s) => ({
       id: s.id,
       skill: s.skill,

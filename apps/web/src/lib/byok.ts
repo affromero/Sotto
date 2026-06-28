@@ -208,6 +208,66 @@ export async function getByokExtraData(
 }
 
 /**
+ * Retrieve the household owner's extra BYOK credentials for a non-admin user.
+ * Returns null for admins or when no separate admin profile exists.
+ */
+export async function getSharedAdminByokExtraData(
+  userId: string,
+  provider: TtsProviderId
+): Promise<Record<string, string> | null> {
+  const adminId = await findSharedAdminId(userId);
+  return adminId ? getByokExtraData(adminId, provider) : null;
+}
+
+/**
+ * Update encrypted extra credential data without replacing the primary provider API key.
+ */
+export async function updateByokExtraData(
+  userId: string,
+  provider: TtsProviderId | 'suno',
+  extra: Record<string, string | null>
+): Promise<boolean> {
+  const record = await prisma.userTtsKey.findUnique({
+    where: { userId_provider: { userId, provider } },
+    select: { extraData: true },
+  });
+
+  if (!record) return false;
+
+  let currentExtra: Record<string, string> = {};
+  if (record.extraData) {
+    try {
+      currentExtra = JSON.parse(decryptApiKey(record.extraData));
+    } catch (error) {
+      logger.warn('Failed to decrypt existing BYOK extraData before update', {
+        userId,
+        provider,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const nextExtra = { ...currentExtra };
+  for (const [key, value] of Object.entries(extra)) {
+    if (value === null) {
+      delete nextExtra[key];
+    } else {
+      nextExtra[key] = value;
+    }
+  }
+  const encryptedExtra =
+    Object.keys(nextExtra).length > 0 ? encryptApiKey(JSON.stringify(nextExtra)) : null;
+
+  await prisma.userTtsKey.update({
+    where: { userId_provider: { userId, provider } },
+    data: { extraData: encryptedExtra },
+  });
+
+  logger.info('Updated BYOK extra data', { userId, provider });
+  return true;
+}
+
+/**
  * Remove a user's BYOK key for a specific provider.
  */
 export async function removeByokKey(

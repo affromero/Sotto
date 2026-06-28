@@ -9,8 +9,12 @@ import {
   getProviderForModel,
   isValidModelId,
 } from '@/lib/providers/ai-registry';
+import { getProviderIds, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { getSttProviderIds, type SttProviderId } from '@/lib/providers/stt-registry';
 
 const aiProviderEnum = getAiProviderIds() as [AiProviderId, ...AiProviderId[]];
+const ttsProviderEnum = getProviderIds() as [TtsProviderId, ...TtsProviderId[]];
+const sttProviderEnum = getSttProviderIds() as [SttProviderId, ...SttProviderId[]];
 
 export async function GET() {
   const adminId = await requireAdmin();
@@ -25,24 +29,9 @@ export async function GET() {
 const modelSchema = z.object({
   aiProvider: z.enum(aiProviderEnum).optional(),
   aiModel: z.string().min(1).optional(),
-  ttsProvider: z
-    .enum([
-      'elevenlabs',
-      'openai',
-      'cartesia',
-      'hume',
-      'fal',
-      'replicate',
-      'minimax',
-      'mistral',
-      'kokoro',
-      'local',
-    ])
-    .optional(),
+  ttsProvider: z.enum(ttsProviderEnum).optional(),
   ttsModel: z.string().min(1).optional(),
-  sttProvider: z
-    .enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai', 'local'])
-    .optional(),
+  sttProvider: z.enum(sttProviderEnum).optional(),
   sttModel: z.string().min(1).optional(),
 });
 

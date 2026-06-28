@@ -18,6 +18,10 @@
 		A10000000000000000000008 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PairingView.swift */; };
 		A10000000000000000000009 /* CourseListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* CourseListView.swift */; };
 		A1000000000000000000000A /* ClassSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* ClassSessionView.swift */; };
+		A10000000000000000000010 /* ClassSessionIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ClassSessionIntroView.swift */; };
+		A10000000000000000000011 /* ClassSessionSectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* ClassSessionSectionViews.swift */; };
+		A10000000000000000000012 /* ClassSessionSelectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* ClassSessionSelectionViews.swift */; };
+		A10000000000000000000013 /* ClassPDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ClassPDFExporter.swift */; };
 		A1000000000000000000000B /* PracticeStartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PracticeStartView.swift */; };
 		A1000000000000000000000C /* WorkbookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* WorkbookView.swift */; };
 		A1000000000000000000000D /* ProfileSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* ProfileSelectionView.swift */; };
@@ -36,6 +40,10 @@
 		A20000000000000000000008 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* CourseListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseListView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* ClassSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionView.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* ClassSessionIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionIntroView.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* ClassSessionSectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionSectionViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* ClassSessionSelectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionSelectionViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* ClassPDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassPDFExporter.swift; sourceTree = "<group>"; };
 		A2000000000000000000000B /* PracticeStartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeStartView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000C /* WorkbookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbookView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -151,6 +159,10 @@
 			children = (
 				A20000000000000000000009 /* CourseListView.swift */,
 				A2000000000000000000000A /* ClassSessionView.swift */,
+				A20000000000000000000010 /* ClassSessionIntroView.swift */,
+				A20000000000000000000011 /* ClassSessionSectionViews.swift */,
+				A20000000000000000000012 /* ClassSessionSelectionViews.swift */,
+				A20000000000000000000013 /* ClassPDFExporter.swift */,
 			);
 			path = Learn;
 			sourceTree = "<group>";
@@ -258,6 +270,10 @@
 				A10000000000000000000008 /* PairingView.swift in Sources */,
 				A10000000000000000000009 /* CourseListView.swift in Sources */,
 				A1000000000000000000000A /* ClassSessionView.swift in Sources */,
+				A10000000000000000000010 /* ClassSessionIntroView.swift in Sources */,
+				A10000000000000000000011 /* ClassSessionSectionViews.swift in Sources */,
+				A10000000000000000000012 /* ClassSessionSelectionViews.swift in Sources */,
+				A10000000000000000000013 /* ClassPDFExporter.swift in Sources */,
 				A1000000000000000000000B /* PracticeStartView.swift in Sources */,
 				A1000000000000000000000C /* WorkbookView.swift in Sources */,
 				A1000000000000000000000D /* ProfileSelectionView.swift in Sources */,
@@ -317,7 +333,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -371,7 +387,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -388,7 +404,7 @@
 				DEVELOPMENT_TEAM = X6V9878QBS;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SottoiPad/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -417,7 +433,7 @@
 				DEVELOPMENT_TEAM = X6V9878QBS;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SottoiPad/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

@@ -19,6 +19,7 @@ interface SystemProvider {
   label: string;
   description: string;
   available: boolean;
+  disabled?: boolean;
 }
 
 interface AiProviderCardsProps {
@@ -45,13 +46,28 @@ export function AiProviderCards({
     Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>
   >({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [systemDisabled, setSystemDisabled] = useState<Map<string, boolean>>(
+    new Map((systemProviders ?? []).map((provider) => [provider.id, provider.disabled ?? false]))
+  );
+  const effectiveSystemProviders = useMemo(
+    () =>
+      (systemProviders ?? []).map((provider) => ({
+        ...provider,
+        disabled: systemDisabled.get(provider.id) ?? provider.disabled ?? false,
+      })),
+    [systemProviders, systemDisabled]
+  );
   const connectedSystemProviders = useMemo(
-    () => systemProviders?.filter((provider) => provider.available) ?? [],
-    [systemProviders]
+    () => effectiveSystemProviders.filter((provider) => provider.available && !provider.disabled),
+    [effectiveSystemProviders]
+  );
+  const disabledSystemProviders = useMemo(
+    () => effectiveSystemProviders.filter((provider) => provider.disabled),
+    [effectiveSystemProviders]
   );
   const unavailableSystemProviders = useMemo(
-    () => systemProviders?.filter((provider) => !provider.available) ?? [],
-    [systemProviders]
+    () => effectiveSystemProviders.filter((provider) => !provider.available && !provider.disabled),
+    [effectiveSystemProviders]
   );
   const sortedProviderMeta = useMemo(() => {
     return [...providerMeta].sort((a, b) => {
@@ -128,6 +144,38 @@ export function AiProviderCards({
     }
   };
 
+  const handleToggleSystemProvider = async (providerId: string, enabled: boolean) => {
+    setSavingId(providerId);
+    setErrors((prev) => ({ ...prev, [providerId]: '' }));
+    try {
+      const res = await fetch('/api/v1/admin/system-ai-providers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId, enabled }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const message =
+          data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
+            ? data.error
+            : 'Failed to update provider';
+        setErrors((prev) => ({ ...prev, [providerId]: message }));
+        setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
+        return;
+      }
+
+      setSystemDisabled((prev) => new Map(prev).set(providerId, !enabled));
+      setStatus((prev) => ({ ...prev, [providerId]: 'saved' }));
+      setTimeout(() => setStatus((prev) => ({ ...prev, [providerId]: 'idle' })), 3000);
+    } catch {
+      setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
+      setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className={styles.grid}>
       {connectedSystemProviders.map((sp) => (
@@ -144,6 +192,56 @@ export function AiProviderCards({
               </div>
             </div>
             <span className={styles.statusConnected}>Connected</span>
+          </div>
+          <div className={styles.cardActions}>
+            <Button
+              variant="ghost"
+              onClick={() => handleToggleSystemProvider(sp.id, false)}
+              loading={savingId === sp.id}
+              disabled={savingId !== null}
+            >
+              Disable
+            </Button>
+            {status[sp.id] === 'saved' && (
+              <span className={styles.feedbackSuccess}>Provider updated.</span>
+            )}
+            {status[sp.id] === 'error' && (
+              <span className={styles.feedbackError}>{errors[sp.id]}</span>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {disabledSystemProviders.map((sp) => (
+        <div key={sp.id} className={`${styles.card} ${styles.cardDisabled}`}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardHeaderLeft}>
+              <Glyph name="plug" size={28} />
+              <div className={styles.cardInfo}>
+                <span className={styles.cardNameRow}>
+                  <span className={styles.cardName}>{sp.label}</span>
+                  <Badge variant="system">System</Badge>
+                </span>
+                <span className={styles.cardQuality}>{sp.description}</span>
+              </div>
+            </div>
+            <span className={styles.statusDisabled}>Disabled</span>
+          </div>
+          <div className={styles.cardActions}>
+            <button
+              type="button"
+              className={styles.addKeyBtn}
+              onClick={() => handleToggleSystemProvider(sp.id, true)}
+              disabled={savingId !== null}
+            >
+              Enable
+            </button>
+            {status[sp.id] === 'saved' && (
+              <span className={styles.feedbackSuccess}>Provider updated.</span>
+            )}
+            {status[sp.id] === 'error' && (
+              <span className={styles.feedbackError}>{errors[sp.id]}</span>
+            )}
           </div>
         </div>
       ))}

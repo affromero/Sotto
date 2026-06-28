@@ -16,13 +16,16 @@ import {
   SOTTO_LANGUAGE_CODES,
   supportsWelcomeSpeechProviderLanguage,
 } from '@/lib/speech-language-support';
+import { CARTESIA_USAGE_ALLOWANCE } from '@/lib/provider-usage/allowances';
 import t from '../theme.module.css';
 import c from '../components.styles';
 
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
 const CARTESIA_ADMIN_KEY_ID = 'cartesia:adminApiKey';
+const CARTESIA_USAGE_PLAN_ID = 'cartesia:usagePlan';
 const CARTESIA_MONTHLY_LIMIT_ID = 'cartesia:monthlyCreditLimit';
 const CARTESIA_RESET_DAY_ID = 'cartesia:billingResetDay';
+const CUSTOM_USAGE_PLAN_ID = 'custom';
 
 function displayLanguageName(code: string): string {
   return (
@@ -30,6 +33,10 @@ function displayLanguageName(code: string): string {
     LANGUAGE_DISPLAY[code as keyof typeof LANGUAGE_DISPLAY] ??
     code.toUpperCase()
   );
+}
+
+function formatMonthlyAllowance(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
 }
 
 interface VoicePickerProps {
@@ -81,6 +88,11 @@ function VoicePicker({
     : 'Choose a course language first; Sotto checks model-language fit before any provider call.';
   const k = keys[sel.id] ?? '';
   const bu = baseUrls[sel.id] ?? '';
+  const cartesiaMonthlyLimit = keys[CARTESIA_MONTHLY_LIMIT_ID]?.trim() ?? '';
+  const cartesiaUsagePlan = keys[CARTESIA_USAGE_PLAN_ID]?.trim() ?? '';
+  const cartesiaPlanSelectValue =
+    cartesiaUsagePlan || (cartesiaMonthlyLimit ? CUSTOM_USAGE_PLAN_ID : '');
+  const showCustomCartesiaLimit = cartesiaPlanSelectValue === CUSTOM_USAGE_PLAN_ID;
   const selectedLinkLabel = sel.apiLabel === 'API' ? 'Get key' : (sel.apiLabel ?? 'Get key');
   const selectedLinkAria =
     sel.apiLabel === 'Docs' ? `Open ${sel.name} docs page` : `Open ${sel.name} API page`;
@@ -259,15 +271,31 @@ function VoicePicker({
                 <span className={c.vkLabel}>
                   <Glyph name="clock" size={13} /> Cartesia credits
                 </span>
-                <input
+                <select
                   className={c.vkInput}
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Monthly limit (optional)"
-                  value={keys[CARTESIA_MONTHLY_LIMIT_ID] ?? ''}
-                  onChange={(event) => onKey(CARTESIA_MONTHLY_LIMIT_ID, event.target.value)}
-                  aria-label="Cartesia monthly credit limit"
-                />
+                  value={cartesiaPlanSelectValue}
+                  onChange={(event) => {
+                    const presetId = event.target.value;
+                    onKey(CARTESIA_USAGE_PLAN_ID, presetId);
+                    const preset = CARTESIA_USAGE_ALLOWANCE.presets.find(
+                      (item) => item.id === presetId
+                    );
+                    if (preset) {
+                      onKey(CARTESIA_MONTHLY_LIMIT_ID, '');
+                    } else if (!presetId) {
+                      onKey(CARTESIA_MONTHLY_LIMIT_ID, '');
+                    }
+                  }}
+                  aria-label="Cartesia usage plan"
+                >
+                  <option value="">Plan preset (optional)</option>
+                  {CARTESIA_USAGE_ALLOWANCE.presets.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label} - {formatMonthlyAllowance(preset.monthlyLimit)} credits/mo
+                    </option>
+                  ))}
+                  <option value={CUSTOM_USAGE_PLAN_ID}>Custom monthly limit</option>
+                </select>
                 <input
                   className={c.vkInput}
                   type="number"
@@ -280,6 +308,22 @@ function VoicePicker({
                   aria-label="Cartesia billing reset day"
                 />
               </div>
+              {showCustomCartesiaLimit ? (
+                <div className={c.vkRow}>
+                  <span className={c.vkLabel}>
+                    <Glyph name="spark" size={13} /> Monthly limit
+                  </span>
+                  <input
+                    className={c.vkInput}
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="Credits per month"
+                    value={keys[CARTESIA_MONTHLY_LIMIT_ID] ?? ''}
+                    onChange={(event) => onKey(CARTESIA_MONTHLY_LIMIT_ID, event.target.value)}
+                    aria-label="Cartesia custom monthly credit limit"
+                  />
+                </div>
+              ) : null}
             </>
           ) : null}
           <div className={c.vkNote}>

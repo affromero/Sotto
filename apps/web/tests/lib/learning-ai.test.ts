@@ -25,6 +25,8 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 const mockGetAutoModelConfig = vi.fn();
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
+  resolveDisabledSystemAiProviders: (config: { disabledSystemProviders?: string[] }) =>
+    new Set(config.disabledSystemProviders ?? []),
 }));
 
 import { resolveLearningAi } from '@/lib/learning-ai';
@@ -32,8 +34,15 @@ import { resolveLearningAi } from '@/lib/learning-ai';
 // Default: configured AI provider differs from the BYOK provider, so the BYOK
 // branch falls back to the provider's registry default model. Individual tests
 // override this to exercise the configured-model path.
-function stubAutoConfig(aiProvider = 'anthropic', aiModel = 'claude-sonnet-4-6') {
-  mockGetAutoModelConfig.mockResolvedValue({ model: { aiProvider, aiModel } });
+function stubAutoConfig(
+  aiProvider = 'anthropic',
+  aiModel = 'claude-sonnet-4-6',
+  disabledSystemProviders: string[] = []
+) {
+  mockGetAutoModelConfig.mockResolvedValue({
+    model: { aiProvider, aiModel },
+    disabledSystemProviders,
+  });
 }
 
 describe('resolveLearningAi', () => {
@@ -109,13 +118,23 @@ describe('resolveLearningAi', () => {
     mockGetAiKey.mockResolvedValue(null);
     vi.stubEnv('AI_PROVIDER', 'claude-code');
     stubAutoConfig('claude-code', 'opus');
-    mockGetProviderForModel.mockImplementation((id: string) => (id === 'opus' ? 'claude-code' : null));
+    mockGetProviderForModel.mockImplementation((id: string) =>
+      id === 'opus' ? 'claude-code' : null
+    );
     mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'sonnet' });
 
     const resolved = await resolveLearningAi('user-1');
 
     // The configured claude-code model wins over the registry default.
     expect(resolved).toEqual({ provider: 'claude-code', model: 'opus' });
+  });
+
+  it('does not use claude-code when the admin disabled it', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', 'claude-code');
+    stubAutoConfig('anthropic', 'claude-sonnet-4-6', ['claude-code']);
+
+    await expect(resolveLearningAi('user-1')).rejects.toThrow(/Claude Code is disabled/);
   });
 
   it('falls back to a keyless local server when no BYOK key and AI_PROVIDER=local', async () => {
@@ -154,6 +173,8 @@ describe('resolveLearningAi', () => {
     mockGetAiKey.mockResolvedValue(null);
     vi.stubEnv('AI_PROVIDER', 'openai');
 
-    await expect(resolveLearningAi('user-1')).rejects.toThrow(/AI_PROVIDER=claude-code|add an API key/i);
+    await expect(resolveLearningAi('user-1')).rejects.toThrow(
+      /AI_PROVIDER=claude-code|add an API key/i
+    );
   });
 });

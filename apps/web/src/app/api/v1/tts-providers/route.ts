@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
       key: f.key,
       label: f.label,
       placeholder: f.placeholder,
+      type: f.type,
+      optional: f.optional,
     })),
+    usageAllowance: meta.usageAllowance,
   }));
 
   // If authenticated, also include which providers the user has keys for

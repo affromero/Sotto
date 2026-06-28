@@ -315,7 +315,7 @@ Sotto is one learning system with deliberately different surfaces. The web app i
 | **iPad workbook PDF**         | GoodNotes-style study, handwriting, review, and class handoff        | Apple Pencil or stylus on a paginated PDF                     | Paper-like cover and class map, full-page passages, ruled answer space, writing prompts, speaking prep lines, QR cards, and deep links back into the exact web class section |
 | **Terminal client (`sotto`)** | Keyboard-first study while coding or working in a shell              | Rust + ratatui, shortcuts, native audio playback, mic capture | Dense single-pane flow, tmux-friendly navigation, local profile switching, and the same `/api/v1` class/practice/exam loop without a browser                                 |
 
-The workbook is intentionally not a web page in disguise. It is generated from the same class contract, but the layout optimizes for Pencil space, page rhythm, and offline annotation. The web class remains the source of truth for audio, recording, grading, regeneration, and progress.
+The workbook is intentionally not a web page in disguise. It is generated from the same class contract, but the layout optimizes for Pencil space, page rhythm, and offline annotation. The native iPad app targets iPadOS 18+ so Sotto can use the modern PencilKit toolbar APIs; generated workbook PDFs can still be exported to GoodNotes or another annotation app. The web class remains the source of truth for audio, recording, grading, regeneration, and progress.
 
 ---
 

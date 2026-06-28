@@ -110,6 +110,17 @@ struct SottoAPIClient {
         try await get("/api/v1/classes/\(classId)/worksheet")
     }
 
+    func fetchSelectionHelp(
+        courseId: String,
+        text: String,
+        contextText: String?
+    ) async throws -> SottoSelectionHelpResponse {
+        try await post(
+            "/api/v1/courses/\(courseId)/selection-help",
+            body: SelectionHelpRequest(text: text, contextText: contextText)
+        )
+    }
+
     func submitClass(classId: String, answers: [SottoSubmitAnswer]) async throws -> SottoClassSubmitResult {
         try await post("/api/v1/classes/\(classId)/submit", body: SubmitClassRequest(answers: answers))
     }
@@ -216,6 +227,11 @@ private struct SubmitPracticeRequest: Encodable {
 
 private struct SubmitClassRequest: Encodable {
     let answers: [SottoSubmitAnswer]
+}
+
+private struct SelectionHelpRequest: Encodable {
+    let text: String
+    let contextText: String?
 }
 
 private struct RegenerateClassRequest: Encodable {

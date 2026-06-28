@@ -35,6 +35,11 @@ export interface AutoModelConfigUpdate {
   includedSttModels?: string[] | null;
 }
 
+export const SYSTEM_AI_PROVIDER_IDS = ['claude-code', 'codex'] as const;
+export type SystemAiProviderId = (typeof SYSTEM_AI_PROVIDER_IDS)[number];
+
+const DISABLED_SYSTEM_AI_PROVIDER_PREFIX = '__disabled-system-ai-provider:';
+
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 
 // Seed values for fresh installs — derived from registry, not hardcoded.
@@ -45,7 +50,9 @@ const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 function seeds() {
   return {
     aiProvider: 'anthropic' as const,
-    aiModel: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')?.id ?? getAiProviderMeta('anthropic').defaultModel,
+    aiModel:
+      getAiProviderMeta('anthropic').models.find((m) => m.tier === 'balanced')?.id ??
+      getAiProviderMeta('anthropic').defaultModel,
     ttsProvider: 'openai' as const,
     ttsModel: getProviderMeta('openai').defaultModel,
     sttProvider: 'openai' as const,
@@ -141,22 +148,35 @@ function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
   if (m?.aiProvider && m.aiModel && getProviderForModel(m.aiModel) !== m.aiProvider) {
     throw new Error(`AI model "${m.aiModel}" does not belong to provider "${m.aiProvider}".`);
   }
-  if (m?.ttsProvider && m.ttsModel && !getProviderMeta(m.ttsProvider).models.some((x) => x.id === m.ttsModel)) {
+  if (
+    m?.ttsProvider &&
+    m.ttsModel &&
+    !getProviderMeta(m.ttsProvider).models.some((x) => x.id === m.ttsModel)
+  ) {
     throw new Error(`TTS model "${m.ttsModel}" is not a model of provider "${m.ttsProvider}".`);
   }
-  if (m?.sttProvider && m.sttModel && !getSttProviderMeta(m.sttProvider).models.some((x) => x.id === m.sttModel)) {
+  if (
+    m?.sttProvider &&
+    m.sttModel &&
+    !getSttProviderMeta(m.sttProvider).models.some((x) => x.id === m.sttModel)
+  ) {
     throw new Error(`STT model "${m.sttModel}" is not a model of provider "${m.sttProvider}".`);
   }
   const p = data.platform;
   if (p?.aiProvider && p.aiModel && getProviderForModel(p.aiModel) !== p.aiProvider) {
-    throw new Error(`Platform AI model "${p.aiModel}" does not belong to provider "${p.aiProvider}".`);
+    throw new Error(
+      `Platform AI model "${p.aiModel}" does not belong to provider "${p.aiProvider}".`
+    );
   }
 }
 
 /**
  * Update the auto model configuration (admin only).
  */
-export async function setAutoModelConfig(data: AutoModelConfigUpdate, adminId: string): Promise<void> {
+export async function setAutoModelConfig(
+  data: AutoModelConfigUpdate,
+  adminId: string
+): Promise<void> {
   assertModelProviderPairs(data);
 
   const update: Record<string, string | string[] | null> = { updatedBy: adminId };
@@ -192,6 +212,48 @@ export async function setAutoModelConfig(data: AutoModelConfigUpdate, adminId: s
  */
 export function resolveIncludedModels(config: AutoModelConfigData): string[] {
   return config.includedModels ?? [config.model.aiModel];
+}
+
+export function disabledSystemAiProviderKey(providerId: SystemAiProviderId): string {
+  return `${DISABLED_SYSTEM_AI_PROVIDER_PREFIX}${providerId}`;
+}
+
+export function resolveDisabledSystemAiProviders(
+  config: AutoModelConfigData
+): Set<SystemAiProviderId> {
+  const disabled = new Set<SystemAiProviderId>();
+  for (const entry of config.includedModels ?? []) {
+    if (!entry.startsWith(DISABLED_SYSTEM_AI_PROVIDER_PREFIX)) continue;
+    const providerId = entry.slice(DISABLED_SYSTEM_AI_PROVIDER_PREFIX.length);
+    if (SYSTEM_AI_PROVIDER_IDS.includes(providerId as SystemAiProviderId)) {
+      disabled.add(providerId as SystemAiProviderId);
+    }
+  }
+  return disabled;
+}
+
+export async function setSystemAiProviderEnabled(
+  providerId: SystemAiProviderId,
+  enabled: boolean,
+  adminId: string
+): Promise<void> {
+  const config = await getAutoModelConfig();
+  if (!enabled && config.model.aiProvider === providerId) {
+    throw new Error(`Change the default AI provider before disabling ${providerId}.`);
+  }
+  if (!enabled && config.platform.aiProvider === providerId) {
+    throw new Error(`Change the platform AI provider before disabling ${providerId}.`);
+  }
+
+  const included = new Set(config.includedModels ?? resolveIncludedModels(config));
+  const disabledKey = disabledSystemAiProviderKey(providerId);
+  if (enabled) {
+    included.delete(disabledKey);
+  } else {
+    included.add(disabledKey);
+  }
+
+  await setAutoModelConfig({ includedModels: [...included] }, adminId);
 }
 
 /**

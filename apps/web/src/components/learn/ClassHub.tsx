@@ -46,6 +46,7 @@ export function ClassHub({
 }: ClassHubProps) {
   const doneCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
   const totalSkills = sections.length;
+  const visuals = intro.visuals;
 
   return (
     <div className={styles.root}>
@@ -69,6 +70,46 @@ export function ClassHub({
               <span className={styles.introNumber}>02</span>
               <p>{intro.about}</p>
             </div>
+            {(visuals?.timeline || visuals?.contrast) && (
+              <div className={styles.visualDeck}>
+                {visuals.timeline && visuals.timeline.steps.length >= 2 && (
+                  <figure className={styles.timelineFigure}>
+                    <figcaption>{visuals.timeline.title}</figcaption>
+                    <ol>
+                      {visuals.timeline.steps.map((step, index) => (
+                        <li key={`${step}-${index}`}>
+                          <span>{String(index + 1).padStart(2, '0')}</span>
+                          <p>{step}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </figure>
+                )}
+                {visuals.contrast && (
+                  <figure className={styles.contrastFigure}>
+                    <figcaption>{visuals.contrast.title}</figcaption>
+                    <div className={styles.contrastGrid}>
+                      <div>
+                        <b>{visuals.contrast.leftLabel}</b>
+                        <ul>
+                          {visuals.contrast.leftItems.map((item, index) => (
+                            <li key={`${item}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <b>{visuals.contrast.rightLabel}</b>
+                        <ul>
+                          {visuals.contrast.rightItems.map((item, index) => (
+                            <li key={`${item}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </figure>
+                )}
+              </div>
+            )}
             <div className={styles.introGrid}>
               <div className={styles.introPanel}>
                 <span className={styles.introNumber}>03</span>
@@ -82,20 +123,48 @@ export function ClassHub({
                 <span className={styles.introNumber}>04</span>
                 <div className={styles.exampleList}>
                   {intro.examples.map((example, index) => (
-                    <div className={styles.example} key={`${example.target}-${index}`}>
-                      <b>{example.target}</b>
-                      <span>{example.meaning}</span>
+                    <details
+                      className={styles.example}
+                      key={`${example.target}-${index}`}
+                      open={index === 0}
+                    >
+                      <summary>
+                        <b>{example.target}</b>
+                        <span>{example.meaning}</span>
+                      </summary>
                       <small>{example.note}</small>
-                    </div>
+                    </details>
                   ))}
                 </div>
               </div>
             </div>
             <div className={styles.tipLine}>
-              {intro.tips.map((tip, index) => (
-                <span key={`${tip}-${index}`}>{tip}</span>
+              {(visuals?.callouts?.length
+                ? visuals.callouts
+                : intro.tips.map((tip, index) => ({
+                    label: `Tip ${index + 1}`,
+                    text: tip,
+                    tone: 'blue' as const,
+                  }))
+              ).map((callout, index) => (
+                <span
+                  className={styles[`tone_${callout.tone}`]}
+                  key={`${callout.label}-${callout.text}-${index}`}
+                >
+                  <b>{callout.label}</b>
+                  {callout.text}
+                </span>
               ))}
             </div>
+            {visuals?.links && visuals.links.length > 0 && (
+              <div className={styles.linkStrip}>
+                {visuals.links.map((link) => (
+                  <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </LearningSelectionMenu>
 
@@ -154,7 +223,7 @@ export function ClassHub({
               className={`${styles.btn} ${styles.btnSecondary}`}
               href={`/classes/${classId}/worksheet`}
             >
-              <ClassGlyph name="pen" size={17} /> iPad workbook
+              <ClassGlyph name="pen" size={17} /> Export / print
             </a>
             <button
               type="button"

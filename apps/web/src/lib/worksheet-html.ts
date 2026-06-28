@@ -1,11 +1,12 @@
 // Pure function - no imports beyond the ClassDocument type.
 // Returns a standalone, page-based HTML workbook for iPad PDF annotation.
-import type { ClassDocument, ClassDocumentSection } from '@sotto/shared';
+import type { ClassDocument, ClassDocumentIntro, ClassDocumentSection } from '@sotto/shared';
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 export function renderWorksheetHtml(doc: ClassDocument): string {
   const sectionsHtml = doc.sections.map(renderSection).join('\n');
+  const introHtml = doc.intro ? renderIntro(doc.intro) : '';
   const tocHtml = doc.sections
     .map(
       (section, index) => `
@@ -13,7 +14,7 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
           <span class="toc-index">${String(index + 1).padStart(2, '0')}</span>
           <span class="toc-title">${escapeHtml(section.title)}</span>
           <span class="toc-skill">${escapeHtml(section.skill.toLowerCase())}</span>
-        </li>`,
+        </li>`
     )
     .join('\n');
 
@@ -234,6 +235,159 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
       display: grid;
       gap: 7mm;
     }
+    .intro-lead {
+      display: grid;
+      gap: 4mm;
+      margin-top: 8mm;
+      margin-bottom: 8mm;
+    }
+    .intro-purpose {
+      margin: 0;
+      font-family: "Newsreader", Georgia, serif;
+      font-size: 19pt;
+      line-height: 1.18;
+      color: #172033;
+    }
+    .intro-about {
+      margin: 0;
+      color: #3c4658;
+      font-size: 11pt;
+      line-height: 1.55;
+    }
+    .intro-visuals,
+    .intro-columns,
+    .callouts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5mm;
+      margin-top: 6mm;
+    }
+    .timeline,
+    .contrast,
+    .callout {
+      border: 1px solid rgba(23, 32, 51, 0.16);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.84);
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .timeline figcaption,
+    .contrast figcaption,
+    .intro-columns h3,
+    .callout b {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 8pt;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #172033;
+      font-weight: 800;
+    }
+    .timeline,
+    .contrast {
+      margin: 0;
+      overflow: hidden;
+    }
+    .timeline figcaption,
+    .contrast figcaption {
+      display: block;
+      padding: 4mm;
+      border-bottom: 1px solid rgba(23, 32, 51, 0.12);
+    }
+    .timeline ol {
+      list-style: none;
+      margin: 0;
+      padding: 4mm;
+      display: grid;
+      gap: 3mm;
+    }
+    .timeline li {
+      display: grid;
+      grid-template-columns: 9mm 1fr;
+      gap: 3mm;
+      align-items: center;
+    }
+    .timeline-index {
+      width: 8mm;
+      height: 8mm;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #2a8c78;
+      color: #fff;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 7pt;
+      font-weight: 800;
+    }
+    .timeline p,
+    .contrast li,
+    .intro-columns li,
+    .example-note,
+    .callout {
+      font-size: 9.5pt;
+      line-height: 1.42;
+      color: #3c4658;
+    }
+    .timeline p {
+      margin: 0;
+      color: #172033;
+    }
+    .contrast-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .contrast-side {
+      padding: 4mm;
+    }
+    .contrast-side:first-child {
+      border-right: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(63, 79, 176, 0.07);
+    }
+    .contrast-side:last-child {
+      background: rgba(185, 128, 36, 0.08);
+    }
+    .contrast-side b,
+    .example-target {
+      display: block;
+      color: #172033;
+      font-weight: 800;
+      margin-bottom: 2mm;
+    }
+    .contrast ul,
+    .intro-columns ul {
+      margin: 0;
+      padding-left: 5mm;
+    }
+    .intro-columns h3 {
+      margin: 0 0 3mm;
+    }
+    .example {
+      padding-bottom: 3mm;
+      border-bottom: 1px solid rgba(23, 32, 51, 0.12);
+    }
+    .example + .example {
+      margin-top: 3mm;
+    }
+    .example p {
+      margin: 0;
+      color: #3c4658;
+      font-size: 9.5pt;
+      line-height: 1.42;
+    }
+    .example-note {
+      display: block;
+      margin-top: 1mm;
+    }
+    .callouts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .callout {
+      margin: 0;
+      padding: 4mm;
+    }
+    .callout b {
+      display: block;
+      margin-bottom: 1mm;
+    }
     .question {
       break-inside: avoid;
       page-break-inside: avoid;
@@ -431,6 +585,8 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
       </div>
     </section>
 
+    ${introHtml}
+
     <section class="page">
       <header class="page-head">
         <div>
@@ -447,6 +603,81 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
   </main>
 </body>
 </html>`;
+}
+
+function renderIntro(intro: ClassDocumentIntro): string {
+  const visuals = intro.visuals;
+  const timelineHtml =
+    visuals?.timeline && visuals.timeline.steps.length >= 2
+      ? `<figure class="timeline">
+          <figcaption>${escapeHtml(visuals.timeline.title)}</figcaption>
+          <ol>${visuals.timeline.steps
+            .map(
+              (step, index) =>
+                `<li><span class="timeline-index">${index + 1}</span><p>${escapeHtml(step)}</p></li>`
+            )
+            .join('')}</ol>
+        </figure>`
+      : '';
+  const contrastHtml = visuals?.contrast
+    ? `<figure class="contrast">
+        <figcaption>${escapeHtml(visuals.contrast.title)}</figcaption>
+        <div class="contrast-grid">
+          <div class="contrast-side">
+            <b>${escapeHtml(visuals.contrast.leftLabel)}</b>
+            <ul>${visuals.contrast.leftItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+          </div>
+          <div class="contrast-side">
+            <b>${escapeHtml(visuals.contrast.rightLabel)}</b>
+            <ul>${visuals.contrast.rightItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+          </div>
+        </div>
+      </figure>`
+    : '';
+  const focusHtml = intro.focus.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const examplesHtml = intro.examples
+    .map(
+      (example) => `<article class="example">
+        <span class="example-target">${escapeHtml(example.target)}</span>
+        <p>${escapeHtml(example.meaning)}</p>
+        <small class="example-note">${escapeHtml(example.note)}</small>
+      </article>`
+    )
+    .join('');
+  const callouts = visuals?.callouts?.length
+    ? visuals.callouts
+    : intro.tips.map((tip, index) => ({ label: `Tip ${index + 1}`, text: tip }));
+  const calloutsHtml = callouts
+    .map(
+      (callout) =>
+        `<p class="callout"><b>${escapeHtml(callout.label)}</b>${escapeHtml(callout.text)}</p>`
+    )
+    .join('');
+
+  return `<section class="page">
+    <header class="page-head">
+      <div>
+        <span class="section-label">Brief</span>
+        <h2 class="section-title">Remember this</h2>
+      </div>
+    </header>
+    <div class="intro-lead">
+      <p class="intro-purpose">${escapeHtml(intro.purpose)}</p>
+      <p class="intro-about">${escapeHtml(intro.about)}</p>
+    </div>
+    ${timelineHtml || contrastHtml ? `<div class="intro-visuals">${timelineHtml}${contrastHtml}</div>` : ''}
+    <div class="intro-columns">
+      <section>
+        <h3>Focus</h3>
+        <ul>${focusHtml}</ul>
+      </section>
+      <section>
+        <h3>Examples</h3>
+        ${examplesHtml}
+      </section>
+    </div>
+    ${calloutsHtml ? `<div class="callouts">${calloutsHtml}</div>` : ''}
+  </section>`;
 }
 
 function renderSection(section: ClassDocumentSection): string {
@@ -514,7 +745,10 @@ function renderPrompt(p: ClassDocumentSection['prompts'][number], index: number)
   </article>`;
 }
 
-function renderWritingPrompt(p: ClassDocumentSection['writingPrompts'][number], index: number): string {
+function renderWritingPrompt(
+  p: ClassDocumentSection['writingPrompts'][number],
+  index: number
+): string {
   const guidanceHtml = p.guidance ? `<p class="guidance">${escapeHtml(p.guidance)}</p>` : '';
   return `<article class="writing-task">
     <p class="writing-title">${index + 1}. ${escapeHtml(p.task)}</p>
@@ -539,13 +773,16 @@ function renderAnswerKey(sections: ClassDocumentSection[]): string {
       section.questions
         .filter((q) => typeof q.correctIndex === 'number')
         .map((q, index) => {
-          const answer = q.correctIndex == null ? '' : OPTION_LETTERS[q.correctIndex] ?? String(q.correctIndex + 1);
+          const answer =
+            q.correctIndex == null
+              ? ''
+              : (OPTION_LETTERS[q.correctIndex] ?? String(q.correctIndex + 1));
           return `<li>
             <span class="toc-index">${escapeHtml(section.title)} ${index + 1}</span>
             <span class="toc-title">${escapeHtml(answer)}</span>
             <span class="toc-skill">${q.explanation ? escapeHtml(q.explanation) : ''}</span>
           </li>`;
-        }),
+        })
     )
     .join('\n');
 

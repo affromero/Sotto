@@ -66,6 +66,27 @@ export interface ClassSpeakingPrompt {
   translation: string;
   ipa?: string | null;
   referenceTtsUrl?: string | null;
+  latestRecording?: ClassSpeakingRecording | null;
+}
+
+export interface ClassSpeakingAlignmentToken {
+  op: 'match' | 'substitute' | 'delete' | 'insert';
+  expected?: string;
+  actual?: string;
+}
+
+export interface ClassSpeakingRecording {
+  id: string;
+  status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
+  transcript?: string | null;
+  overallScore?: number | null;
+  rubricScores?: {
+    accuracy?: number;
+    fluency?: number;
+    completeness?: number;
+  } | null;
+  phonemeScores?: ClassSpeakingAlignmentToken[] | null;
+  feedback?: string | null;
 }
 
 export interface ClassSectionEpisode {
@@ -95,12 +116,42 @@ export interface ClassIntroExample {
   note: string;
 }
 
+export interface ClassIntroVisuals {
+  timeline: {
+    title: string;
+    steps: string[];
+  } | null;
+  contrast: {
+    title: string;
+    leftLabel: string;
+    leftItems: string[];
+    rightLabel: string;
+    rightItems: string[];
+  } | null;
+  callouts: Array<{
+    label: string;
+    text: string;
+    tone: 'blue' | 'teal' | 'rose' | 'amber';
+  }>;
+  links: Array<{
+    label: string;
+    url: string;
+  }>;
+}
+
 export interface ClassIntroData {
   purpose: string;
   about: string;
   focus: string[];
   examples: ClassIntroExample[];
   tips: string[];
+  visuals?: ClassIntroVisuals;
+}
+
+export interface ClassVocabularyItem {
+  lemma: string;
+  gloss: string;
+  pos?: string | null;
 }
 
 export interface ClassData {
@@ -115,6 +166,7 @@ export interface ClassData {
   sourceTitle: string | null;
   lesson: { title: string; level: string; objective: string };
   intro: ClassIntroData;
+  vocabulary: ClassVocabularyItem[];
   submitted: boolean;
   submission: { passed: boolean; overallScore: number } | null;
   sections: ClassSection[];

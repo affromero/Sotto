@@ -24,7 +24,7 @@ function langLabel(code: string): string {
 }
 
 interface PracticePageProps {
-  searchParams?: Promise<{ course?: string; target?: string; auto?: string }>;
+  searchParams?: Promise<{ course?: string; target?: string; auto?: string; kind?: string }>;
 }
 
 export default async function PracticePage({ searchParams }: PracticePageProps) {
@@ -67,6 +67,7 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
               courseName={course.curriculum?.title ?? langLabel(course.targetLang)}
               initialFocusTargetId={params.course === course.id ? (params.target ?? null) : null}
               initialAutoMode={params.course === course.id ? (params.auto ?? null) : null}
+              initialKind={params.course === course.id ? (params.kind ?? null) : null}
             />
           ))}
         </div>
