@@ -35,6 +35,12 @@ function estimateRemainingSeconds(elapsedSeconds: number | null, progress: numbe
   return Math.max(0, estimatedTotal - elapsedSeconds);
 }
 
+function isListeningAudioStillRendering(episode: SectionProgress['episode']): boolean {
+  return Boolean(
+    episode && !episode.audioUrl && episode.status !== 'READY' && episode.status !== 'FAILED'
+  );
+}
+
 function describeProgress(status: string, sections: SectionProgress[]) {
   const sectionBySkill = new Map(sections.map((section) => [section.skill, section]));
   const readyCount = EXPECTED_SKILLS.filter(
@@ -54,6 +60,15 @@ function describeProgress(status: string, sections: SectionProgress[]) {
   }
 
   if (status !== 'GENERATING' && !listeningAudioReady) {
+    if (!isListeningAudioStillRendering(listening?.episode)) {
+      return {
+        stage: 'Class needs attention',
+        detail: 'Listening audio is missing. Open this class to regenerate it if needed.',
+        progress: 1,
+        currentStep: TOTAL_STEPS,
+      };
+    }
+
     return {
       stage: 'Rendering listening audio',
       detail:

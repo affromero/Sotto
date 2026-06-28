@@ -785,6 +785,43 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
     expect(body.detail).toMatch(/stitching/i);
     expect(body.progress).toBeLessThan(1);
   });
+
+  it('reports a stuck class when listening audio is ready but audioUrl is missing', async () => {
+    mockCourseFindFirst.mockResolvedValue({
+      id: 'course-1',
+      classes: [
+        {
+          id: 'class-1',
+          status: 'AVAILABLE',
+          createdAt: new Date(Date.now() - 60_000),
+          updatedAt: new Date(),
+          lesson: { title: 'Past events' },
+          sections: [
+            { skill: 'GRAMMAR', status: 'READY', episode: null },
+            { skill: 'READING', status: 'READY', episode: null },
+            {
+              skill: 'LISTENING',
+              status: 'READY',
+              episode: { status: 'READY', audioUrl: null },
+            },
+            { skill: 'SPEAKING', status: 'READY', episode: null },
+            { skill: 'WRITING', status: 'READY', episode: null },
+          ],
+        },
+      ],
+    });
+
+    const res = await GETGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.stage).toBe('Class needs attention');
+    expect(body.detail).toMatch(/open this class/i);
+    expect(body.progress).toBe(1);
+  });
 });
 
 // ---- DELETE /api/v1/courses/[courseId]/generation ----

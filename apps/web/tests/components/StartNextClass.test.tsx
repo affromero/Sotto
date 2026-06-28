@@ -98,7 +98,7 @@ describe('StartNextClass', () => {
       if (url === '/api/v1/courses/course-1/generation') {
         return Promise.resolve(
           jsonResponse({
-            status: 'AVAILABLE',
+            status: 'GENERATING',
             classId: 'class-active',
             lessonTitle: 'Greetings',
             stage: 'Rendering listening audio',
@@ -123,6 +123,34 @@ describe('StartNextClass', () => {
     expect(mockPush).not.toHaveBeenCalled();
 
     unmount();
+  });
+
+  it('opens a non-generating active class even when presentation material is incomplete', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === '/api/v1/courses/course-1/generation') {
+        return Promise.resolve(
+          jsonResponse({
+            status: 'AVAILABLE',
+            classId: 'class-active',
+            lessonTitle: 'Greetings',
+            stage: 'Class needs attention',
+            detail: 'Open the class to review missing material.',
+            progress: 1,
+            currentStep: 6,
+            totalSteps: 6,
+            elapsedSeconds: 30,
+          })
+        );
+      }
+
+      return Promise.resolve({ ok: false, json: async () => ({}) } as Response);
+    });
+
+    render(<StartNextClass courseId="course-1" activeClassId="class-active" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /resume active class/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/learn/class/class-active'));
   });
 
   it('lets learners cancel an in-progress class generation', async () => {
