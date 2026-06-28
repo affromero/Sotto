@@ -1,7 +1,8 @@
 # Publishes the open-source Sotto images to GHCR.
 #
-# Unlike deploy.yml (which builds on the server), this builds a PUBLIC image:
-# it initializes only the public groundcheck submodule.
+# Unlike deploy.yml (which builds on the server), this builds the public
+# self-host images used by curl|bash. It needs the private learning-model
+# submodule during the build, so it uses the same deploy key as CI.
 # The curl|bash installer pulls these images.
 name: Publish OSS image
 
@@ -26,12 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: false
-
-      # Public submodule only (no SSH key needed).
-      - name: Init public submodule
-        run: |
-          git submodule update --init packages/groundcheck
+          submodules: recursive
+          ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
 
       - uses: docker/setup-buildx-action@v4
 
@@ -59,6 +56,7 @@ jobs:
             ghcr.io/affromero/sotto-web:latest
             ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
             ${{ github.ref_type == 'tag' && format('ghcr.io/affromero/sotto-web:{0}', github.ref_name) || '' }}
+            ${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' && format('ghcr.io/affromero/sotto-web:{0}', inputs.tag) || '' }}
           cache-from: type=gha,scope=sotto-web
           cache-to: type=gha,mode=max,scope=sotto-web
 
@@ -72,5 +70,6 @@ jobs:
             ghcr.io/affromero/sotto-workers:latest
             ghcr.io/affromero/sotto-workers:${{ steps.sha.outputs.short }}
             ${{ github.ref_type == 'tag' && format('ghcr.io/affromero/sotto-workers:{0}', github.ref_name) || '' }}
+            ${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' && format('ghcr.io/affromero/sotto-workers:{0}', inputs.tag) || '' }}
           cache-from: type=gha,scope=sotto-workers
           cache-to: type=gha,mode=max,scope=sotto-workers
