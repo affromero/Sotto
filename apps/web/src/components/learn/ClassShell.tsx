@@ -13,7 +13,7 @@
  * task card + textarea + inline corrections.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
@@ -29,7 +29,6 @@ import {
   skillLabel,
   classRefToReferenceData,
   classPresentationIssues,
-  classPresentationNeedsRegeneration,
   type ClassData,
   type ClassFeedbackNote,
   type ClassReference,
@@ -68,9 +67,18 @@ function wait(ms: number): Promise<void> {
 }
 
 function shouldReturnToLearn(errorMessage: string): boolean {
-  return (
-    errorMessage.includes('missing required presentation material') ||
-    errorMessage.includes('required material was ready')
+  return errorMessage.includes('required material was ready');
+}
+
+function canExplicitlyRegenerate(errorMessage: string): boolean {
+  return errorMessage.includes('missing required presentation material');
+}
+
+function isClassPresentationStillRendering(cls: ClassData): boolean {
+  const listening = cls.sections.find((section) => section.skill === 'LISTENING');
+  const episode = listening?.episode;
+  return Boolean(
+    episode && !episode.audioUrl && episode.status !== 'READY' && episode.status !== 'FAILED'
   );
 }
 
@@ -98,7 +106,6 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   const [result, setResult] = useState<ClassSubmitResult | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
-  const attemptedAutoRefreshRef = useRef(false);
 
   const sections = useMemo(() => (cls ? orderSections(cls.sections) : []), [cls]);
   const feedbackSections = useMemo(
@@ -229,24 +236,13 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     try {
       let data = await fetchClassData();
 
-      const issues = classPresentationIssues(data);
-      if (!data.submitted && (issues.length > 0 || data.status === 'GENERATING')) {
-        const needsRegeneration = classPresentationNeedsRegeneration(data);
+      if (
+        !data.submitted &&
+        (data.status === 'GENERATING' || isClassPresentationStillRendering(data))
+      ) {
         setAutoRefreshing(true);
         setView('loading');
         resetClassProgress();
-        if (needsRegeneration && data.status !== 'GENERATING') {
-          if (!attemptedAutoRefreshRef.current) {
-            attemptedAutoRefreshRef.current = true;
-            await regenerateWholeClass();
-          } else {
-            setErrorMessage(
-              `This class is missing required presentation material: ${issues.join(' ')}`
-            );
-            setView('error');
-            return;
-          }
-        }
         data = await waitForClassRefresh();
       }
 
@@ -266,13 +262,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     } finally {
       setAutoRefreshing(false);
     }
-  }, [
-    applyLoadedClass,
-    fetchClassData,
-    regenerateWholeClass,
-    resetClassProgress,
-    waitForClassRefresh,
-  ]);
+  }, [applyLoadedClass, fetchClassData, resetClassProgress, waitForClassRefresh]);
 
   useEffect(() => {
     void (async () => {
@@ -415,7 +405,6 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     setErrorMessage('');
     try {
       await regenerateWholeClass();
-      attemptedAutoRefreshRef.current = true;
       resetClassProgress();
       setView('loading');
       const data = await waitForClassRefresh();
@@ -446,7 +435,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       <div className={styles.fullState} role="status" aria-label="Loading class">
         <SottoSpinner
           size="large"
-          label={autoRefreshing ? 'Refreshing this class' : 'Loading your class'}
+          label={autoRefreshing ? 'Preparing this class' : 'Loading your class'}
           orientation="stack"
         />
       </div>
@@ -455,15 +444,28 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
   if (view === 'error' || !cls) {
     const returnToLearn = shouldReturnToLearn(errorMessage);
+    const canRegenerate = canExplicitlyRegenerate(errorMessage);
+    const backToLearn = returnToLearn || canRegenerate;
 
     return (
       <div className={styles.fullState} role="alert">
         <p>{errorMessage || 'An unexpected error occurred.'}</p>
+        {canRegenerate ? (
+          <button
+            type="button"
+            className={styles.retryBtn}
+            onClick={() => void handleRegenerateClass()}
+            disabled={regenerating}
+            aria-busy={regenerating}
+          >
+            {regenerating ? 'Regenerating...' : 'Regenerate class'}
+          </button>
+        ) : null}
         <button
           type="button"
           className={styles.retryBtn}
           onClick={() => {
-            if (returnToLearn) {
+            if (backToLearn) {
               router.push('/learn');
               return;
             }
@@ -472,7 +474,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             void loadClass();
           }}
         >
-          {returnToLearn ? 'View progress in Learn' : 'Try again'}
+          {returnToLearn ? 'View progress in Learn' : canRegenerate ? 'Back to Learn' : 'Try again'}
         </button>
       </div>
     );
