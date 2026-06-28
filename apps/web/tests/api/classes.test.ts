@@ -570,6 +570,33 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
     expect(body.classId).toBe('class-new');
   });
 
+  it('returns 202 immediately for background class generation', async () => {
+    mockCourseFindFirst.mockResolvedValue({ id: 'course-1' });
+    mockCreateNextClass.mockResolvedValue({ kind: 'created', classId: 'class-new' });
+
+    const res = await POSTNextClass(
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class?background=1', 'POST'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(202);
+    const body = await res.json();
+    expect(body.started).toBe(true);
+    expect(mockCreateNextClass).toHaveBeenCalledWith('course-1', 'u1', {});
+  });
+
+  it('returns 404 for background class generation when the course is missing', async () => {
+    mockCourseFindFirst.mockResolvedValue(null);
+
+    const res = await POSTNextClass(
+      makeRequest('http://localhost/api/v1/courses/course-1/next-class?background=1', 'POST'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(404);
+    expect(mockCreateNextClass).not.toHaveBeenCalled();
+  });
+
   it('returns 409 with activeClassId and status when gated', async () => {
     mockCreateNextClass.mockResolvedValue({
       kind: 'gated',

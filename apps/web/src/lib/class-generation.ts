@@ -10,6 +10,7 @@ import { classLanguagePolicy } from './classes/class-language-policy';
 import type { SkillType } from '@sotto/shared';
 
 const QUESTIONS_PER_SECTION = 5;
+const MAX_GENERATION_ATTEMPTS = 2;
 
 export interface GeneratedQuestion {
   question: string;
@@ -107,6 +108,45 @@ function parseRawQuestions(content: string): RawGeneratedQuestion[] {
   throw new Error('Class generation returned no question array.');
 }
 
+function buildUserPrompt(skill: SkillType, attempt: number, previousError?: string): string {
+  const base = `Generate ${QUESTIONS_PER_SECTION} ${skill.toLowerCase()} questions.`;
+  if (attempt === 1) return base;
+  return [
+    base,
+    '',
+    `The previous response could not be used: ${previousError ?? 'invalid JSON'}.`,
+    'Return ONLY a valid JSON array. Do not include markdown fences, prose, comments, trailing commas, or unescaped quotation marks inside string values.',
+  ].join('\n');
+}
+
+function normalizeQuestions(
+  raw: RawGeneratedQuestion[],
+  useSourcePassage: boolean,
+  sourceContent?: string
+): GeneratedQuestion[] {
+  return raw
+    .filter(
+      (q) =>
+        typeof q.question === 'string' &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        q.options.every((option) => typeof option === 'string') &&
+        Number.isFinite(
+          typeof q.correctIndex === 'number' ? q.correctIndex : Number(q.correctIndex)
+        )
+    )
+    .map((q) => ({
+      question: q.question as string,
+      options: (q.options as string[]).slice(0, 4),
+      correctIndex: Math.max(0, Math.min(3, Number(q.correctIndex))),
+      explanation: typeof q.explanation === 'string' ? q.explanation : '',
+      passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
+      // Sourced READING: attach the leveled passage so the learner reads the
+      // real excerpt the questions are about.
+      passageText: useSourcePassage ? sourceContent : undefined,
+    }));
+}
+
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
   const ai = await resolveLearningAi(p.userId);
 
@@ -138,60 +178,50 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   });
 
   const provider = createAIProvider(ai.provider);
-  const response = await provider.generateResponse(
-    systemPrompt,
-    [
-      {
-        role: 'user',
-        content: `Generate ${QUESTIONS_PER_SECTION} ${p.skill.toLowerCase()} questions.`,
-      },
-    ],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.8 }
-  );
+  let lastError = 'invalid class-section output';
 
-  logUsage({
-    service: ai.provider,
-    model: response.model,
-    category: 'class-section',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId: p.userId,
-  });
+  for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const response = await provider.generateResponse(
+      systemPrompt,
+      [
+        {
+          role: 'user',
+          content: buildUserPrompt(p.skill, attempt, lastError),
+        },
+      ],
+      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.8 }
+    );
 
-  let raw: RawGeneratedQuestion[];
-  try {
-    raw = parseRawQuestions(response.content);
-  } catch (err) {
-    logger.error('Failed to parse class-section LLM response', {
-      error: err instanceof Error ? err.message : String(err),
+    logUsage({
+      service: ai.provider,
+      model: response.model,
+      category: 'class-section',
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+      userId: p.userId,
     });
-    throw new Error('Class generation returned malformed output.');
+
+    try {
+      const raw = parseRawQuestions(response.content);
+      const questions = normalizeQuestions(raw, useSourcePassage, p.sourceContent);
+      if (questions.length > 0) return questions;
+      lastError = 'response contained no usable questions';
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+
+    if (attempt < MAX_GENERATION_ATTEMPTS) {
+      logger.warn('Retrying class-section generation after unusable LLM response', {
+        skill: p.skill,
+        error: lastError,
+      });
+    }
   }
 
-  const questions = raw
-    .filter(
-      (q) =>
-        typeof q.question === 'string' &&
-        Array.isArray(q.options) &&
-        q.options.length === 4 &&
-        q.options.every((option) => typeof option === 'string') &&
-        Number.isFinite(
-          typeof q.correctIndex === 'number' ? q.correctIndex : Number(q.correctIndex)
-        )
-    )
-    .map((q) => ({
-      question: q.question as string,
-      options: (q.options as string[]).slice(0, 4),
-      correctIndex: Math.max(0, Math.min(3, Number(q.correctIndex))),
-      explanation: typeof q.explanation === 'string' ? q.explanation : '',
-      passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
-      // Sourced READING: attach the leveled passage so the learner reads the
-      // real excerpt the questions are about.
-      passageText: useSourcePassage ? p.sourceContent : undefined,
-    }));
-
-  if (questions.length === 0) {
-    throw new Error('Class generation produced no usable questions.');
-  }
-  return questions;
+  logger.error('Failed to parse class-section LLM response', { error: lastError });
+  throw new Error(
+    lastError === 'response contained no usable questions'
+      ? 'Class generation produced no usable questions.'
+      : 'Class generation returned malformed output.'
+  );
 }

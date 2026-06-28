@@ -11,6 +11,7 @@
 		A10000000000000000000002 /* SottoAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SottoAppModel.swift */; };
 		A10000000000000000000003 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* RootView.swift */; };
 		A10000000000000000000004 /* SottoTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SottoTheme.swift */; };
+		A1000000000000000000000F /* SottoBrandMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* SottoBrandMark.swift */; };
 		A10000000000000000000005 /* SottoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SottoModels.swift */; };
 		A10000000000000000000006 /* SottoAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* SottoAPIClient.swift */; };
 		A10000000000000000000007 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* CredentialStore.swift */; };
@@ -28,6 +29,7 @@
 		A20000000000000000000002 /* SottoAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoAppModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* SottoTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoTheme.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* SottoBrandMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoBrandMark.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SottoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* SottoAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoAPIClient.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000004 /* SottoTheme.swift */,
+				A2000000000000000000000F /* SottoBrandMark.swift */,
 			);
 			path = Design;
 			sourceTree = "<group>";
@@ -248,6 +251,7 @@
 				A10000000000000000000002 /* SottoAppModel.swift in Sources */,
 				A10000000000000000000003 /* RootView.swift in Sources */,
 				A10000000000000000000004 /* SottoTheme.swift in Sources */,
+				A1000000000000000000000F /* SottoBrandMark.swift in Sources */,
 				A10000000000000000000005 /* SottoModels.swift in Sources */,
 				A10000000000000000000006 /* SottoAPIClient.swift in Sources */,
 				A10000000000000000000007 /* CredentialStore.swift in Sources */,
