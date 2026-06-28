@@ -354,12 +354,36 @@ final class SottoAppModel: ObservableObject {
         errorMessage = nil
 
         do {
-            selectedClass = try await client.fetchClass(classId: classId)
+            var classDetail = try await client.fetchClass(classId: classId)
+            let issues = classPresentationIssues(classDetail)
+            if !classDetail.submitted && !issues.isEmpty {
+                loadingOperation = SottoLoadingOperation(
+                    title: "Refreshing class",
+                    detail: "Replacing an older generated class with the complete class format.",
+                    progress: nil,
+                    currentStep: nil,
+                    totalSteps: nil,
+                    elapsedSeconds: nil,
+                    remainingSeconds: nil
+                )
+                try await client.regenerateClass(classId: classId)
+                classDetail = try await client.fetchClass(classId: classId)
+            }
+
+            let remainingIssues = classDetail.submitted ? [] : classPresentationIssues(classDetail)
+            if !remainingIssues.isEmpty {
+                throw SottoAPIError.message(
+                    "This class is missing required presentation material: \(remainingIssues.joined(separator: " "))"
+                )
+            }
+
+            selectedClass = classDetail
             classResult = nil
         } catch {
             errorMessage = error.localizedDescription
         }
 
+        loadingOperation = nil
         isLoading = false
     }
 
@@ -718,6 +742,38 @@ private enum PairingScan {
 
         self = .serverURL(url)
     }
+}
+
+private let requiredClassSkills = ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"]
+
+private func classPresentationIssues(_ classDetail: SottoClassDetail) -> [String] {
+    var issues: [String] = []
+    let sectionsBySkill = classDetail.sections.reduce(into: [String: SottoClassSection]()) { result, section in
+        result[section.skill.uppercased()] = section
+    }
+
+    for skill in requiredClassSkills where sectionsBySkill[skill] == nil {
+        issues.append("Missing \(classSkillLabel(skill)) section.")
+    }
+
+    if let reading = sectionsBySkill["READING"],
+       !reading.questions.contains(where: { ($0.passageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }) {
+        issues.append("Reading section has no full reading passage.")
+    }
+
+    if let listening = sectionsBySkill["LISTENING"], listening.episode == nil {
+        issues.append("Listening section has no audio episode.")
+    }
+
+    if let speaking = sectionsBySkill["SPEAKING"], speaking.prompts.isEmpty {
+        issues.append("Speaking section has no speaking prompts.")
+    }
+
+    if let writing = sectionsBySkill["WRITING"], writing.writingPrompts.isEmpty {
+        issues.append("Writing section has no writing prompts.")
+    }
+
+    return issues
 }
 
 private struct PairingPayload {

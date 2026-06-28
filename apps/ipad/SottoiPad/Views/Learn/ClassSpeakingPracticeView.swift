@@ -63,15 +63,22 @@ private struct ClassSpeakingPromptCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    SelectableLearnerText(
-                        prompt.targetPhrase,
+                    SpeakingPromptTextBlock(
+                        label: "Say this",
+                        text: prompt.targetPhrase,
                         font: LearnerTextFonts.headline,
-                        color: UIColor(SottoTheme.ink),
-                        onExamples: onSelectionHelp
+                        color: SottoTheme.ink,
+                        emphasized: true,
+                        onSelectionHelp: onSelectionHelp
                     )
-                    Text(prompt.translation)
-                        .font(.callout)
-                        .foregroundStyle(SottoTheme.muted)
+                    SpeakingPromptTextBlock(
+                        label: "Meaning / cue",
+                        text: prompt.translation,
+                        font: LearnerTextFonts.callout,
+                        color: SottoTheme.muted,
+                        emphasized: false,
+                        onSelectionHelp: onSelectionHelp
+                    )
                     if let ipa = prompt.ipa, !ipa.isEmpty {
                         Text(ipa)
                             .font(.caption.monospaced())
@@ -146,7 +153,7 @@ private struct ClassSpeakingPromptCard: View {
 
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setActive(true)
 
             let url = FileManager.default.temporaryDirectory
@@ -231,6 +238,39 @@ private struct ClassSpeakingPromptCard: View {
                 continuation.resume(returning: granted)
             }
         }
+    }
+}
+
+private struct SpeakingPromptTextBlock: View {
+    let label: String
+    let text: String
+    let font: UIFont
+    let color: Color
+    let emphasized: Bool
+    let onSelectionHelp: (String, String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption.bold())
+                .foregroundStyle(SottoTheme.primary)
+                .textCase(.uppercase)
+                .tracking(0.8)
+            SelectableLearnerText(
+                text,
+                font: font,
+                color: UIColor(color),
+                onExamples: onSelectionHelp
+            )
+        }
+        .padding(emphasized ? 12 : 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(emphasized ? SottoTheme.paper : SottoTheme.paper.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(emphasized ? SottoTheme.primary.opacity(0.25) : SottoTheme.line)
+        )
     }
 }
 

@@ -215,10 +215,16 @@ function PromptCard({
       id={`speaking-prompt-${prompt.id}`}
       aria-label={`Speaking prompt ${index + 1} of ${total}`}
     >
-      <div className={styles.speakTarget} lang="auto">
-        {prompt.targetPhrase}
+      <div className={styles.promptBlock}>
+        <div className={styles.promptLabel}>Say this</div>
+        <div className={styles.speakTarget} lang="auto">
+          {prompt.targetPhrase}
+        </div>
       </div>
-      <div className={styles.speakEn}>{prompt.translation}</div>
+      <div className={styles.cueBlock}>
+        <div className={styles.promptLabel}>Meaning / cue</div>
+        <div className={styles.speakEn}>{prompt.translation}</div>
+      </div>
       {prompt.ipa && (
         <div className={styles.speakIpa} aria-label={`Pronunciation: ${prompt.ipa}`}>
           {prompt.ipa}
