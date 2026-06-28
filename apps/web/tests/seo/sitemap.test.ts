@@ -16,6 +16,7 @@ describe('sitemap', () => {
 
     expect(urls).toContain('https://selfhost.example.com');
     expect(urls).toContain('https://selfhost.example.com/about');
+    expect(urls).toContain('https://selfhost.example.com/download');
     expect(urls).toContain('https://selfhost.example.com/privacy');
     expect(urls.some((url) => url.startsWith('https://sotto.fm'))).toBe(false);
   });

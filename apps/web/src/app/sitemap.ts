@@ -9,6 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     '',
     '/about',
+    '/download',
     '/join',
     '/terms',
     '/privacy',
