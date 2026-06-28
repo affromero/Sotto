@@ -171,7 +171,13 @@ export async function composeListeningContent(
       await addJob(verifyClassReferencesQueue, JobType.VERIFY_CLASS_REFERENCES, { episodeId });
     }
 
-    // Step 5: queue audio generation segments
+    // Step 5: queue audio generation segments. Class listening audio uses the
+    // same worker path as normal episodes, so it must enter GENERATING_AUDIO
+    // before the segment jobs run.
+    await prisma.episode.update({
+      where: { id: episodeId },
+      data: { status: 'GENERATING_AUDIO' },
+    });
     await createSegmentsAndQueueAudio(episodeId, result.turns);
 
     // Step 6: log usage

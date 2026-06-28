@@ -205,10 +205,11 @@ export function buildFallbackClassIntro(p: Omit<ClassIntroParams, 'userId'>): Cl
 function completeIntro(
   intro: Omit<ClassIntro, 'visuals'> & { visuals?: ParsedIntroVisuals }
 ): ClassIntro {
-  const derived = deriveIntroVisuals(intro);
-  const normalized = normalizeVisuals(intro.visuals);
+  const cleanIntro = { ...intro, examples: intro.examples.filter(isUsefulExample) };
+  const derived = deriveIntroVisuals(cleanIntro);
+  const normalized = normalizeVisuals(cleanIntro.visuals);
   return {
-    ...intro,
+    ...cleanIntro,
     visuals: normalized ? { ...derived, ...normalized } : derived,
   };
 }
@@ -220,21 +221,70 @@ function normalizeVisuals(visuals: ParsedIntroVisuals): ClassIntroVisuals | unde
     timeline: visuals.timeline
       ? { title: visuals.timeline.title, steps: visuals.timeline.steps.slice(0, 6) }
       : null,
-    contrast: visuals.contrast
-      ? {
-          title: visuals.contrast.title,
-          leftLabel: visuals.contrast.leftLabel,
-          leftItems: visuals.contrast.leftItems.slice(0, 5),
-          rightLabel: visuals.contrast.rightLabel,
-          rightItems: visuals.contrast.rightItems.slice(0, 5),
-        }
-      : null,
+    contrast: normalizeContrast(visuals.contrast ?? null),
     callouts: (visuals.callouts ?? []).slice(0, 4).map((callout) => ({
       label: callout.label,
       text: callout.text,
       tone: callout.tone ?? 'blue',
     })),
     links: (visuals.links ?? []).slice(0, 3),
+  };
+}
+
+function textKey(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+    .trim();
+}
+
+function wordCount(value: string): number {
+  return textKey(value).split(/\s+/).filter(Boolean).length;
+}
+
+function isUsefulExample(example: ClassIntroExample): boolean {
+  const target = textKey(example.target);
+  const meaning = textKey(example.meaning);
+  const note = textKey(example.note);
+  if (!target || !meaning || !note) return false;
+  const allSame = new Set([target, meaning, note]).size === 1;
+  if (allSame) return false;
+  const hasPhrase = wordCount(example.target) >= 3;
+  const hasTeachingNote = note !== target && note !== meaning && wordCount(example.note) >= 4;
+  return hasPhrase || hasTeachingNote;
+}
+
+function meaningfulItems(label: string, items: string[]): string[] {
+  const labelKey = textKey(label);
+  const seen = new Set<string>();
+  return items
+    .map((item) => item.trim())
+    .filter((item) => {
+      const key = textKey(item);
+      if (!key || key === labelKey || seen.has(key)) return false;
+      seen.add(key);
+      return wordCount(item) >= 2;
+    })
+    .slice(0, 5);
+}
+
+function normalizeContrast(
+  contrast: NonNullable<ParsedIntroVisuals>['contrast'] | null
+): ClassIntroVisuals['contrast'] {
+  if (!contrast) return null;
+
+  const leftItems = meaningfulItems(contrast.leftLabel, contrast.leftItems);
+  const rightItems = meaningfulItems(contrast.rightLabel, contrast.rightItems);
+  if (leftItems.length === 0 || rightItems.length === 0) return null;
+  if (textKey(contrast.leftLabel) === textKey(contrast.rightLabel)) return null;
+
+  return {
+    title: contrast.title,
+    leftLabel: contrast.leftLabel,
+    leftItems,
+    rightLabel: contrast.rightLabel,
+    rightItems,
   };
 }
 
@@ -306,13 +356,13 @@ function deriveContrast(intro: Omit<ClassIntro, 'visuals'>): ClassIntroVisuals['
 
   const examples = intro.examples.slice(0, 2);
   if (examples.length >= 2) {
-    return {
+    return normalizeContrast({
       title: 'Compare the examples',
       leftLabel: examples[0].target,
       leftItems: [examples[0].meaning, examples[0].note],
       rightLabel: examples[1].target,
       rightItems: [examples[1].meaning, examples[1].note],
-    };
+    });
   }
 
   return null;

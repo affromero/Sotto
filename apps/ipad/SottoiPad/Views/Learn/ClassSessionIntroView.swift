@@ -112,24 +112,43 @@ struct ClassSkillMap: View {
     let sections: [SottoClassSection]
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
-                HStack(spacing: 0) {
+        ZStack(alignment: .topLeading) {
+            SkillConnectorTrack(count: sections.count)
+                .frame(height: 44)
+
+            HStack(spacing: 0) {
+                ForEach(sections) { section in
                     SkillNode(section: section)
-                    if index < sections.count - 1 {
-                        Rectangle()
-                            .fill(SottoTheme.line)
-                            .frame(height: 2)
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, 8)
-                    }
+                        .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
         }
+        .frame(minHeight: 96)
         .padding(14)
         .background(SottoTheme.surface.opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+private struct SkillConnectorTrack: View {
+    let count: Int
+
+    var body: some View {
+        GeometryReader { proxy in
+            Path { path in
+                guard count > 1 else { return }
+                let cellWidth = proxy.size.width / CGFloat(count)
+                let y: CGFloat = 22
+                for index in 0 ..< (count - 1) {
+                    let start = cellWidth * CGFloat(index) + cellWidth / 2 + 28
+                    let end = cellWidth * CGFloat(index + 1) + cellWidth / 2 - 28
+                    guard end > start else { continue }
+                    path.move(to: CGPoint(x: start, y: y))
+                    path.addLine(to: CGPoint(x: end, y: y))
+                }
+            }
+            .stroke(SottoTheme.line, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        }
     }
 }
 
@@ -346,46 +365,48 @@ struct ClassIntroBlock: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Examples")
-                        .font(.caption.bold())
-                        .foregroundStyle(SottoTheme.muted)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: 12) {
-                            ForEach(intro.examples, id: \.target) { example in
-                                VStack(alignment: .leading, spacing: 5) {
-                                    SelectableLearnerText(
-                                        example.target,
-                                        font: LearnerTextFonts.headline,
-                                        color: UIColor(SottoTheme.ink),
-                                        onExamples: onSelectionHelp
-                                    )
-                                    SelectableLearnerText(
-                                        example.meaning,
-                                        font: LearnerTextFonts.callout,
-                                        color: UIColor(SottoTheme.muted),
-                                        onExamples: onSelectionHelp
-                                    )
-                                    SelectableLearnerText(
-                                        example.note,
-                                        font: LearnerTextFonts.caption,
-                                        color: UIColor(SottoTheme.muted),
-                                        onExamples: onSelectionHelp
+                if !intro.examples.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Examples")
+                            .font(.caption.bold())
+                            .foregroundStyle(SottoTheme.muted)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .top, spacing: 12) {
+                                ForEach(intro.examples, id: \.target) { example in
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        SelectableLearnerText(
+                                            example.target,
+                                            font: LearnerTextFonts.headline,
+                                            color: UIColor(SottoTheme.ink),
+                                            onExamples: onSelectionHelp
+                                        )
+                                        SelectableLearnerText(
+                                            example.meaning,
+                                            font: LearnerTextFonts.callout,
+                                            color: UIColor(SottoTheme.muted),
+                                            onExamples: onSelectionHelp
+                                        )
+                                        SelectableLearnerText(
+                                            example.note,
+                                            font: LearnerTextFonts.caption,
+                                            color: UIColor(SottoTheme.muted),
+                                            onExamples: onSelectionHelp
+                                        )
+                                    }
+                                    .padding(14)
+                                    .frame(width: 280, alignment: .leading)
+                                    .background(SottoTheme.paper)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(SottoTheme.line)
                                     )
                                 }
-                                .padding(14)
-                                .frame(width: 280, alignment: .leading)
-                                .background(SottoTheme.paper)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(SottoTheme.line)
-                                )
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             let callouts = intro.visuals?.callouts.isEmpty == false

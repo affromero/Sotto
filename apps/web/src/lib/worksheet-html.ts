@@ -644,6 +644,12 @@ function renderIntro(intro: ClassDocumentIntro): string {
       </article>`
     )
     .join('');
+  const examplesColumnHtml = examplesHtml
+    ? `<section>
+        <h3>Examples</h3>
+        ${examplesHtml}
+      </section>`
+    : '';
   const callouts = visuals?.callouts?.length
     ? visuals.callouts
     : intro.tips.map((tip, index) => ({ label: `Tip ${index + 1}`, text: tip }));
@@ -671,10 +677,7 @@ function renderIntro(intro: ClassDocumentIntro): string {
         <h3>Focus</h3>
         <ul>${focusHtml}</ul>
       </section>
-      <section>
-        <h3>Examples</h3>
-        ${examplesHtml}
-      </section>
+      ${examplesColumnHtml}
     </div>
     ${calloutsHtml ? `<div class="callouts">${calloutsHtml}</div>` : ''}
   </section>`;

@@ -56,11 +56,13 @@ enum ClassPDFExporter {
                     contrast.rightItems.forEach { writer.writeLine("• \($0)", style: .small) }
                 }
 
-                writer.writeSubsection("Examples")
-                intro.examples.forEach { example in
-                    writer.writeLine(example.target, style: .label)
-                    writer.writeLine(example.meaning, style: .small)
-                    writer.writeLine(example.note, style: .smallMuted)
+                if !intro.examples.isEmpty {
+                    writer.writeSubsection("Examples")
+                    intro.examples.forEach { example in
+                        writer.writeLine(example.target, style: .label)
+                        writer.writeLine(example.meaning, style: .small)
+                        writer.writeLine(example.note, style: .smallMuted)
+                    }
                 }
             }
 

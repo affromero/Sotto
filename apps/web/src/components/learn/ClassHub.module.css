@@ -224,6 +224,10 @@
   gap: 12px;
 }
 
+.introGridSolo {
+  grid-template-columns: 1fr;
+}
+
 .introPanel {
   border-top: 1px solid var(--line);
   padding-top: 14px;
@@ -423,14 +427,31 @@
 }
 
 .segSeq {
-  display: flex;
-  align-items: stretch;
-  padding: 20px 22px;
+  --track-inset: 68px;
+  display: grid;
+  grid-template-columns: repeat(var(--skill-count), minmax(86px, 1fr));
+  position: relative;
+  padding: 20px 22px 18px;
   gap: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.segSeq::before {
+  content: '';
+  position: absolute;
+  top: 41px;
+  left: var(--track-inset);
+  right: var(--track-inset);
+  height: 2px;
+  background: var(--line-strong);
+}
+
+.segSeq:has(.segChip:only-child)::before {
+  display: none;
 }
 
 .segChip {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -438,6 +459,8 @@
   text-align: center;
   position: relative;
   padding: 0 6px;
+  min-width: 86px;
+  z-index: 1;
 }
 
 .segChipIco {
@@ -450,6 +473,7 @@
   border: 1px solid var(--line-strong);
   color: var(--ink-soft);
   background: var(--paper);
+  z-index: 1;
 }
 
 .segChipDone .segChipIco {
@@ -464,25 +488,24 @@
   color: var(--ink);
 }
 
-.segConn {
-  position: absolute;
-  top: 21px;
-  left: calc(50% + 30px);
-  width: calc(100% - 60px);
-  height: 1px;
-  background: var(--line-strong);
-}
-
-.segChip:last-child .segConn {
-  display: none;
-}
-
 .hourFoot {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 0 22px 22px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .segSeq {
+    --track-inset: 58px;
+    grid-template-columns: repeat(var(--skill-count), minmax(78px, 1fr));
+    padding-inline: 16px;
+  }
+
+  .segChip {
+    min-width: 78px;
+  }
 }
 
 .hourProg {

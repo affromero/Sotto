@@ -14,6 +14,10 @@ const DEFAULT_TOTAL_SECONDS = 240;
 interface SectionProgress {
   skill: string;
   status: string;
+  episode?: {
+    status: string;
+    audioUrl: string | null;
+  } | null;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -36,13 +40,28 @@ function describeProgress(status: string, sections: SectionProgress[]) {
   const readyCount = EXPECTED_SKILLS.filter(
     (skill) => sectionBySkill.get(skill)?.status === 'READY'
   ).length;
+  const listening = sectionBySkill.get('LISTENING');
+  const listeningAudioReady =
+    listening?.episode === undefined || listening.episode === null || !!listening.episode.audioUrl;
 
-  if (status !== 'GENERATING') {
+  if (status !== 'GENERATING' && listeningAudioReady) {
     return {
       stage: 'Class ready',
       detail: 'Opening the generated class.',
       progress: 1,
       currentStep: TOTAL_STEPS,
+    };
+  }
+
+  if (status !== 'GENERATING' && !listeningAudioReady) {
+    return {
+      stage: 'Rendering listening audio',
+      detail:
+        listening?.episode?.status === 'STITCHING'
+          ? 'Stitching the listening scene into one playable file.'
+          : 'Generating the listening scene audio.',
+      progress: listening?.episode?.status === 'STITCHING' ? 0.94 : 0.9,
+      currentStep: 3,
     };
   }
 
@@ -138,7 +157,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           lesson: { select: { title: true } },
           sections: {
             orderBy: [{ createdAt: 'asc' }],
-            select: { skill: true, status: true },
+            select: {
+              skill: true,
+              status: true,
+              episode: { select: { status: true, audioUrl: true } },
+            },
           },
         },
       },
@@ -167,6 +190,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const sections = cls.sections.map((section) => ({
     skill: section.skill,
     status: section.status,
+    episode: section.episode,
   }));
   const described = describeProgress(cls.status, sections);
   const elapsedSeconds = Math.max(0, Math.round((Date.now() - cls.createdAt.getTime()) / 1000));
