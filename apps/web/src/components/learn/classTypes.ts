@@ -205,6 +205,14 @@ export const SKILL_LABELS: Record<string, string> = {
   WRITING: 'Writing',
 };
 
+export const REQUIRED_CLASS_SKILLS: ClassSkill[] = [
+  'GRAMMAR',
+  'READING',
+  'LISTENING',
+  'SPEAKING',
+  'WRITING',
+];
+
 export const SKILL_GLYPH: Record<string, 'gate' | 'book' | 'wave' | 'mic' | 'pen'> = {
   GRAMMAR: 'gate',
   READING: 'book',
@@ -215,6 +223,39 @@ export const SKILL_GLYPH: Record<string, 'gate' | 'book' | 'wave' | 'mic' | 'pen
 
 export function skillLabel(skill: string): string {
   return SKILL_LABELS[skill] ?? skill;
+}
+
+export function classPresentationIssues(cls: ClassData): string[] {
+  const issues: string[] = [];
+  const sectionsBySkill = new Map(cls.sections.map((section) => [section.skill, section]));
+
+  for (const skill of REQUIRED_CLASS_SKILLS) {
+    if (!sectionsBySkill.has(skill)) {
+      issues.push(`Missing ${skillLabel(skill)} section.`);
+    }
+  }
+
+  const reading = sectionsBySkill.get('READING');
+  if (reading && !reading.questions.some((question) => question.passageText?.trim())) {
+    issues.push('Reading section has no full reading passage.');
+  }
+
+  const listening = sectionsBySkill.get('LISTENING');
+  if (listening && !listening.episode) {
+    issues.push('Listening section has no audio episode.');
+  }
+
+  const speaking = sectionsBySkill.get('SPEAKING');
+  if (speaking && speaking.prompts.length === 0) {
+    issues.push('Speaking section has no speaking prompts.');
+  }
+
+  const writing = sectionsBySkill.get('WRITING');
+  if (writing && writing.writingPrompts.length === 0) {
+    issues.push('Writing section has no writing prompts.');
+  }
+
+  return issues;
 }
 
 /** Format seconds as m:ss. */

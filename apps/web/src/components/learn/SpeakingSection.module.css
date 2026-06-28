@@ -71,6 +71,38 @@
   text-align: center;
 }
 
+.promptBlock,
+.cueBlock {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.promptBlock {
+  padding: 18px 20px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-left: 5px solid var(--accent);
+  border-radius: var(--r);
+}
+
+.cueBlock {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.promptLabel {
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .speakTarget {
   font-family: var(--serif);
   font-size: 30px;
@@ -80,9 +112,15 @@
 }
 
 .speakEn {
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.45;
   color: var(--ink-mute);
-  margin-top: 8px;
+}
+
+@media (max-width: 520px) {
+  .speakTarget {
+    font-size: 24px;
+  }
 }
 
 .speakIpa {
