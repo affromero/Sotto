@@ -96,19 +96,27 @@ export async function POST(request: NextRequest) {
     const { native, target } = parsed.data;
     if (native === target) return errorResponse('Native and target languages must differ.', 400);
 
+    const existingCourse = await prisma.course.findUnique({
+      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
+      select: { id: true },
+    });
+    if (existingCourse) {
+      return errorResponse('A course for this language pair already exists.', 409, {
+        courseId: existingCourse.id,
+      });
+    }
+
     const curriculum = await getOrCreateCurriculum(userId, native, target);
 
-    const course = await prisma.course.upsert({
-      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
-      // Skip-placement start: the learner chose A1 without a test → MANUAL.
-      create: {
+    const course = await prisma.course.create({
+      // Skip-placement start: the learner chose A1 without a test -> MANUAL.
+      data: {
         userId,
         nativeLang: native,
         targetLang: target,
         curriculumId: curriculum.id,
         placementSource: 'MANUAL',
       },
-      update: {},
     });
 
     return NextResponse.json({ course }, { status: 201 });

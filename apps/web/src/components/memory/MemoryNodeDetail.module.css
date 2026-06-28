@@ -1,18 +1,18 @@
-/* MemoryNodeDetail — floating panel anchored at bottom-right of the graph */
+/* MemoryNodeDetail - floating selected-node panel */
 
 .root {
   position: absolute;
   bottom: var(--spacing-md);
   right: var(--spacing-md);
-  width: min(280px, calc(100% - var(--spacing-xl)));
-  background: var(--color-surface);
+  width: min(340px, calc(100% - var(--spacing-xl)));
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  gap: 0;
   overflow: hidden;
+  backdrop-filter: blur(18px);
   animation: slideUp 200ms var(--ease-out-expo) both;
   z-index: 10;
 }
@@ -22,8 +22,6 @@
     animation: none;
   }
 }
-
-/* Header */
 
 .header {
   padding: var(--spacing-md);
@@ -43,11 +41,11 @@
 .kindBadge {
   display: inline-flex;
   align-items: center;
-  height: 20px;
+  min-height: 22px;
   padding: 0 var(--spacing-sm);
   border-radius: var(--radius-full);
   font: var(--text-overline);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -65,15 +63,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: none;
   background: transparent;
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .closeButton:hover {
@@ -81,7 +81,8 @@
   color: var(--color-text-primary);
 }
 
-.closeButton:focus-visible {
+.closeButton:focus-visible,
+.practiceButton:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
@@ -97,8 +98,6 @@
   color: var(--color-text-secondary);
   font-style: italic;
 }
-
-/* Body */
 
 .body {
   padding: var(--spacing-md);
@@ -125,31 +124,75 @@
   color: var(--color-text-primary);
 }
 
-.masteryBarTrack {
+.masteryMeter {
   width: 100%;
-  height: 6px;
+  height: 8px;
+  border: 0;
+}
+
+.masteryMeter::-webkit-meter-bar {
+  border: 0;
+  border-radius: var(--radius-full);
   background: var(--color-surface-sunken);
-  border-radius: var(--radius-full);
-  overflow: hidden;
 }
 
-.masteryBarFill {
-  height: 100%;
+.masteryMeter::-webkit-meter-optimum-value,
+.masteryMeter::-webkit-meter-suboptimum-value,
+.masteryMeter::-webkit-meter-even-less-good-value {
+  border-radius: var(--radius-full);
   background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: width var(--transition-base);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .masteryBarFill {
-    transition: none;
-  }
+.masteryMeter::-moz-meter-bar {
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin: var(--spacing-xs) 0 0;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.facts div {
+  min-width: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+}
+
+.facts dt {
+  margin: 0 0 2px;
+  font: var(--text-overline);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.facts dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
 }
 
 .dueIndicator {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
+  margin: 0;
   font: var(--text-caption);
   color: var(--color-error);
   font-weight: 600;
@@ -164,10 +207,8 @@
   border-radius: var(--radius-full);
 }
 
-/* Footer */
-
 .footer {
-  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  padding: 0 var(--spacing-md) var(--spacing-md);
 }
 
 .practiceButton {
@@ -175,15 +216,16 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 44px;
+  min-height: 44px;
   background: var(--color-primary);
   color: var(--color-text-inverse);
   border: none;
   border-radius: var(--radius-lg);
   font: var(--text-label);
-  font-size: var(--font-size-base);
   cursor: pointer;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .practiceButton:hover {
@@ -191,7 +233,14 @@
   box-shadow: var(--shadow-primary-glow);
 }
 
-.practiceButton:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

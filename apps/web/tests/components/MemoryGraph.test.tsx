@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryGraph } from '@/components/memory/MemoryGraph';
 import type { MemoryGraphData } from '@/components/memory/MemoryGraph';
 
@@ -40,7 +40,9 @@ vi.mock('@/components/memory/MemoryNodeDetail', () => ({
   MemoryNodeDetail: ({ node, onClose }: { node: { label: string }; onClose: () => void }) => (
     <div data-testid="node-detail">
       <span>{node.label}</span>
-      <button onClick={onClose} type="button">Close</button>
+      <button onClick={onClose} type="button">
+        Close
+      </button>
     </div>
   ),
 }));
@@ -56,12 +58,10 @@ const smallGraph: MemoryGraphData = {
     { id: 'n1', kind: 'vocab', label: 'Hund', translation: 'dog', strength: 0.8, due: false },
     { id: 'n2', kind: 'grammar', label: 'Nominativ', strength: 0.4, due: true },
   ],
-  edges: [
-    { source: 'n1', target: 'n2', type: 'related', weight: 0.5 },
-  ],
+  edges: [{ source: 'n1', target: 'n2', type: 'related', weight: 0.5 }],
 };
 
-// Build a graph that exceeds the MAX_NODES cap (400)
+// Build a graph that exceeds the MAX_NODES cap (520)
 function buildLargeGraph(count: number): MemoryGraphData {
   return {
     nodes: Array.from({ length: count }, (_, i) => ({
@@ -101,13 +101,9 @@ describe('MemoryGraph', () => {
   it('renders the empty-state placeholder when nodes is empty, without calling cytoscape()', () => {
     render(<MemoryGraph graph={emptyGraph} />);
 
-    expect(
-      screen.getByText(/your memory graph is empty/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/your memory graph is empty/i)).toBeInTheDocument();
 
-    expect(
-      screen.getByText(/complete a class to start building it/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/complete a class to start building it/i)).toBeInTheDocument();
 
     // cytoscape() must NOT be called for an empty graph
     expect(cytoscapeMock).not.toHaveBeenCalled();
@@ -130,18 +126,34 @@ describe('MemoryGraph', () => {
   });
 
   it('shows the truncation note and hidden-count when nodes exceed the cap', () => {
-    const total = 450;
+    const total = 570;
     const largeGraph = buildLargeGraph(total);
     render(<MemoryGraph graph={largeGraph} />);
 
     const note = screen.getByRole('note');
     expect(note).toBeInTheDocument();
-    // Should mention the hidden count (450 - 400 = 50)
+    // Should mention the hidden count (570 - 520 = 50)
     expect(note.textContent).toMatch(/50 more/i);
   });
 
   it('does not render MemoryNodeDetail when no node is selected', () => {
     render(<MemoryGraph graph={smallGraph} />);
     expect(screen.queryByTestId('node-detail')).not.toBeInTheDocument();
+  });
+
+  it('keeps the canvas mounted when filters hide every node', () => {
+    const weakOnlyGraph: MemoryGraphData = {
+      nodes: [
+        { id: 'n1', kind: 'vocab', label: 'Hund', translation: 'dog', strength: 0.1, due: true },
+        { id: 'n2', kind: 'grammar', label: 'Nominativ', strength: 0.2, due: true },
+      ],
+      edges: [],
+    };
+
+    render(<MemoryGraph graph={weakOnlyGraph} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Strong' }));
+
+    expect(screen.getByRole('img', { name: /memory graph/i })).toBeInTheDocument();
+    expect(screen.getByText(/no nodes in this view/i)).toBeInTheDocument();
   });
 });

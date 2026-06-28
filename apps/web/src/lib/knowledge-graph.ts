@@ -270,21 +270,67 @@ export interface MemoryGraph {
     translation?: string;
     strength: number;
     due: boolean;
+    createdAt: string | null;
+    updatedAt: string | null;
+    dueAt: string | null;
+    lastReviewed: string | null;
+    cefrLevel: CefrLevel | null;
+    reviewCount: number;
+    lapseCount: number;
+    partOfSpeech?: string | null;
+    pronunciation?: string | null;
+    topicKey?: string;
   }>;
-  edges: Array<{ source: string; target: string; type: string; weight: number }>;
+  edges: Array<{
+    source: string;
+    target: string;
+    type: string;
+    weight: number;
+    createdAt: string | null;
+  }>;
 }
 
-/** Whole course graph for the Obsidian-style visualization (rendered in a later phase). */
+function toIsoDate(value: Date | null | undefined): string | null {
+  return value ? value.toISOString() : null;
+}
+
+/** Whole course graph for the learner-facing memory visualization. */
 export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
   const now = Date.now();
   const [vocab, grammar, edges] = await Promise.all([
     prisma.learnerVocab.findMany({
       where: { courseId },
-      select: { id: true, lemma: true, translation: true, mastery: true, dueAt: true },
+      select: {
+        id: true,
+        lemma: true,
+        translation: true,
+        partOfSpeech: true,
+        pronunciation: true,
+        mastery: true,
+        dueAt: true,
+        reps: true,
+        lapses: true,
+        lastReviewed: true,
+        cefrLevel: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     }),
     prisma.learnerGrammar.findMany({
       where: { courseId },
-      select: { id: true, topicKey: true, title: true, mastery: true },
+      select: {
+        id: true,
+        topicKey: true,
+        title: true,
+        mastery: true,
+        dueAt: true,
+        reps: true,
+        lapses: true,
+        lastReviewed: true,
+        cefrLevel: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     }),
     prisma.vocabEdge.findMany({
       where: { courseId },
@@ -294,6 +340,7 @@ export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
         sourceVocabId: true,
         targetVocabId: true,
         grammarId: true,
+        createdAt: true,
       },
     }),
   ]);
@@ -304,15 +351,32 @@ export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
       kind: 'vocab' as const,
       label: v.lemma,
       translation: v.translation,
+      partOfSpeech: v.partOfSpeech,
+      pronunciation: v.pronunciation,
       strength: v.mastery,
-      due: v.dueAt.getTime() <= now,
+      due: v.dueAt ? v.dueAt.getTime() <= now : false,
+      createdAt: toIsoDate(v.createdAt),
+      updatedAt: toIsoDate(v.updatedAt),
+      dueAt: toIsoDate(v.dueAt),
+      lastReviewed: toIsoDate(v.lastReviewed),
+      cefrLevel: v.cefrLevel,
+      reviewCount: v.reps ?? 0,
+      lapseCount: v.lapses ?? 0,
     })),
     ...grammar.map((g) => ({
       id: g.id,
       kind: 'grammar' as const,
       label: g.title,
+      topicKey: g.topicKey,
       strength: g.mastery,
-      due: false,
+      due: g.dueAt ? g.dueAt.getTime() <= now : false,
+      createdAt: toIsoDate(g.createdAt),
+      updatedAt: toIsoDate(g.updatedAt),
+      dueAt: toIsoDate(g.dueAt),
+      lastReviewed: toIsoDate(g.lastReviewed),
+      cefrLevel: g.cefrLevel,
+      reviewCount: g.reps ?? 0,
+      lapseCount: g.lapses ?? 0,
     })),
   ];
 
@@ -322,6 +386,7 @@ export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
       target: e.targetVocabId ?? e.grammarId ?? '',
       type: e.type as string,
       weight: e.weight,
+      createdAt: toIsoDate(e.createdAt),
     }))
     .filter((e) => e.source && e.target);
 

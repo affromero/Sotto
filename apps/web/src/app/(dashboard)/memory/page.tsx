@@ -87,6 +87,8 @@ export default function MemoryPage() {
     void loadGraph(selectedCourseId);
   }, [selectedCourseId, loadGraph]);
 
+  const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? null;
+
   return (
     <main className={styles.root}>
       <header className={styles.header}>
@@ -154,7 +156,13 @@ export default function MemoryPage() {
               </div>
             )}
 
-            {graphState === 'idle' && graph && <MemoryGraph graph={graph} />}
+            {graphState === 'idle' && graph && (
+              <MemoryGraph
+                graph={graph}
+                courseId={selectedCourseId ?? undefined}
+                courseTitle={selectedCourse ? courseLabel(selectedCourse) : undefined}
+              />
+            )}
           </div>
         </div>
       )}

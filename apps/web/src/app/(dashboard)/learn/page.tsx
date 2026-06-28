@@ -7,7 +7,7 @@ import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import { PedagogySelector } from '@/components/learn/PedagogySelector';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
-import { langLabel } from '@/lib/languages';
+import { LANG_LABELS, langLabel } from '@/lib/languages';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +23,9 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+const COURSE_TARGETS = Object.keys(LANG_LABELS).sort((a, b) =>
+  langLabel(a).localeCompare(langLabel(b))
+);
 
 function levelLabel(level: string): string {
   return LEVEL_LABELS[level] ?? level;
@@ -74,6 +77,13 @@ export default async function LearnPage() {
     },
     orderBy: { createdAt: 'desc' },
   });
+  const primaryNativeLang = courses[0]?.nativeLang ?? 'en';
+  const existingTargets = new Set(
+    courses
+      .filter((course) => course.nativeLang === primaryNativeLang)
+      .map((course) => course.targetLang)
+  );
+  const newCourseTargets = COURSE_TARGETS.filter((code) => code !== primaryNativeLang);
 
   return (
     <main className={styles.root}>
@@ -204,6 +214,13 @@ export default async function LearnPage() {
                   >
                     {isManualPlacement ? 'Confirm level' : 'Retake placement'}
                   </Link>
+                  <Link
+                    href="/settings#course-mgmt-heading"
+                    className={styles.practiceLink}
+                    aria-label={`Manage or remove ${courseTitle}`}
+                  >
+                    Manage
+                  </Link>
                 </div>
                 <div className={styles.sourcedRow}>
                   <SourcedClassEntry courseId={course.id} activeClassId={activeClassId} />
@@ -223,11 +240,41 @@ export default async function LearnPage() {
         </ul>
       )}
 
-      <div className={styles.newCourse}>
-        <Link href="/learn/placement" className={styles.newCourseLink}>
-          + Start a new course
-        </Link>
-      </div>
+      <section className={styles.newCourse} aria-labelledby="new-course-heading">
+        <div className={styles.newCourseCopy}>
+          <h2 id="new-course-heading" className={styles.newCourseTitle}>
+            Start another language
+          </h2>
+          <p className={styles.newCourseText}>
+            Choose a new target language from {langLabel(primaryNativeLang)}. Existing courses stay
+            locked to one graph; retake placement inside that course if you want to recalibrate.
+          </p>
+        </div>
+        <div className={styles.languageGrid}>
+          {newCourseTargets.map((target) => {
+            const exists = existingTargets.has(target);
+            const label = langLabel(target);
+            return exists ? (
+              <span
+                key={target}
+                className={styles.languageUnavailable}
+                aria-label={`${label} already has a course`}
+              >
+                {label}
+                <small>Current</small>
+              </span>
+            ) : (
+              <Link
+                key={target}
+                href={`/learn/placement?native=${primaryNativeLang}&target=${target}`}
+                className={styles.newCourseLink}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </main>
   );
 }
