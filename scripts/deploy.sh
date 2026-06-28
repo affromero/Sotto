@@ -101,6 +101,23 @@ render_caddy_config() {
   printf '%s\n' "$rendered" | remove_optional_markers
 }
 
+cleanup_stale_caddy_configs() {
+  local target_path="$1"
+  local target_dir target_base legacy_site_name
+  target_dir="$(dirname "$target_path")"
+  target_base="$(basename "$target_path")"
+  legacy_site_name="sotto"".fm"
+
+  if [ "$target_dir" != "/etc/caddy/conf.d" ]; then
+    return
+  fi
+
+  sudo find "$target_dir" -maxdepth 1 -type f \
+    \( -name "sotto.conf" -o -name "$legacy_site_name" -o -name "sotto.conf.disabled.*" -o -name "$legacy_site_name.disabled.*" \) \
+    ! -name "$target_base" \
+    -exec rm -f {} +
+}
+
 # --- Slot resolution ---
 
 if [ -f "$SLOT_FILE" ]; then
@@ -173,6 +190,12 @@ echo ""
 echo "=== Syncing Caddy config ==="
 TMP_CADDY="$(mktemp)"
 render_caddy_config "$APP_DOMAIN" "$WWW_DOMAIN" > "$TMP_CADDY"
+if grep -q "__SOTTO_\|__sotto_" "$TMP_CADDY"; then
+  echo "ERROR: rendered Caddy config still contains Sotto placeholders."
+  rm -f "$TMP_CADDY"
+  exit 1
+fi
+cleanup_stale_caddy_configs "$CADDY_SITE_PATH"
 sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
 rm -f "$TMP_CADDY"
 sudo caddy validate --config /etc/caddy/Caddyfile
