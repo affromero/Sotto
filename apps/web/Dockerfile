@@ -13,6 +13,7 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/groundcheck/package.json ./packages/groundcheck/
+COPY packages/learning-model/package.json ./packages/learning-model/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
@@ -26,6 +27,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY packages/shared ./packages/shared/
 COPY packages/groundcheck ./packages/groundcheck/
+COPY packages/learning-model ./packages/learning-model/
 COPY apps/web ./apps/web/
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY tsconfig.base.json ./
