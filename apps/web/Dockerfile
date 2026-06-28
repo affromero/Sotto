@@ -89,7 +89,6 @@ COPY --chown=sotto:sotto accounting/ledger ./accounting/ledger/
 # Copy Prisma schema and generated client for runtime
 COPY --from=builder --chown=sotto:sotto /app/apps/web/prisma ./apps/web/prisma
 COPY --from=builder --chown=sotto:sotto /app/apps/web/src/generated ./apps/web/src/generated
-COPY --from=deps --chown=sotto:sotto /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=sotto:sotto /app/node_modules/@prisma ./node_modules/@prisma
 
 USER sotto
