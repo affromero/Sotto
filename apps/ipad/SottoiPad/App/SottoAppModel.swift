@@ -356,7 +356,8 @@ final class SottoAppModel: ObservableObject {
         do {
             var classDetail = try await client.fetchClass(classId: classId)
             let issues = classPresentationIssues(classDetail)
-            if !classDetail.submitted && !issues.isEmpty {
+            if !classDetail.submitted && (!issues.isEmpty || classDetail.status == "GENERATING") {
+                let startedAt = Date()
                 loadingOperation = SottoLoadingOperation(
                     title: "Refreshing class",
                     detail: "Replacing an older generated class with the complete class format.",
@@ -366,8 +367,16 @@ final class SottoAppModel: ObservableObject {
                     elapsedSeconds: nil,
                     remainingSeconds: nil
                 )
-                try await client.regenerateClass(classId: classId)
-                classDetail = try await client.fetchClass(classId: classId)
+                if classDetail.status != "GENERATING" {
+                    try await client.startClassRegeneration(classId: classId)
+                }
+                classDetail = try await waitForRefreshedClass(
+                    client: client,
+                    classId: classId,
+                    courseId: classDetail.courseId,
+                    startedAt: startedAt,
+                    initialIssues: issues
+                )
             }
 
             let remainingIssues = classDetail.submitted ? [] : classPresentationIssues(classDetail)
@@ -387,6 +396,93 @@ final class SottoAppModel: ObservableObject {
         isLoading = false
     }
 
+    private func waitForRefreshedClass(
+        client: SottoAPIClient,
+        classId: String,
+        courseId: String,
+        startedAt: Date,
+        initialIssues: [String]
+    ) async throws -> SottoClassDetail {
+        let deadline = startedAt.addingTimeInterval(900)
+        var lastIssues = initialIssues
+
+        while !Task.isCancelled {
+            let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
+            let progress = try? await client.fetchClassGenerationProgress(courseId: courseId)
+            loadingOperation = classRefreshOperation(
+                progress: progress,
+                elapsedSeconds: elapsedSeconds,
+                issues: lastIssues
+            )
+
+            let classDetail = try await client.fetchClass(classId: classId)
+            let issues = classDetail.submitted ? [] : classPresentationIssues(classDetail)
+            lastIssues = issues
+
+            if classDetail.status == "FAILED" {
+                let detail = issues.isEmpty ? "generation failed." : issues.joined(separator: " ")
+                throw SottoAPIError.message(
+                    "Class refresh failed: \(detail)"
+                )
+            }
+
+            if classDetail.status != "GENERATING", issues.isEmpty {
+                return classDetail
+            }
+
+            if Date() >= deadline {
+                let detail: String
+                if lastIssues.isEmpty {
+                    detail = "class is still incomplete."
+                } else {
+                    detail = lastIssues.joined(separator: " ")
+                }
+                throw SottoAPIError.message(
+                    "Class refresh timed out before required material was ready: \(detail)"
+                )
+            }
+
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+
+        throw SottoAPIError.message("Class refresh was cancelled.")
+    }
+
+    private func classRefreshOperation(
+        progress: SottoGenerationProgress?,
+        elapsedSeconds: Int,
+        issues: [String]
+    ) -> SottoLoadingOperation {
+        if let progress {
+            return SottoLoadingOperation(
+                title: progress.lessonTitle.map { "Refreshing \($0)" } ?? "Refreshing class",
+                detail: "\(progress.stage). \(progress.detail)",
+                progress: max(0, min(1, progress.progress)),
+                currentStep: progress.currentStep == 0 ? nil : progress.currentStep,
+                totalSteps: progress.totalSteps,
+                elapsedSeconds: progress.elapsedSeconds ?? elapsedSeconds,
+                remainingSeconds: progress.remainingSeconds
+            )
+        }
+
+        let detail: String
+        if issues.isEmpty {
+            detail = "Waiting for the refreshed class to replace the older format."
+        } else {
+            detail = issues.joined(separator: " ")
+        }
+
+        return SottoLoadingOperation(
+            title: "Refreshing class",
+            detail: detail,
+            progress: min(0.95, max(0.08, Double(elapsedSeconds) / 420.0)),
+            currentStep: nil,
+            totalSteps: nil,
+            elapsedSeconds: elapsedSeconds,
+            remainingSeconds: max(0, 420 - elapsedSeconds)
+        )
+    }
+
     func regenerateSelectedClass() async {
         guard let client = makeClient(), let selectedClass else { return }
         isLoading = true
@@ -403,8 +499,15 @@ final class SottoAppModel: ObservableObject {
         errorMessage = nil
 
         do {
-            try await client.regenerateClass(classId: selectedClass.id)
-            self.selectedClass = try await client.fetchClass(classId: selectedClass.id)
+            let startedAt = Date()
+            try await client.startClassRegeneration(classId: selectedClass.id)
+            self.selectedClass = try await waitForRefreshedClass(
+                client: client,
+                classId: selectedClass.id,
+                courseId: selectedClass.courseId,
+                startedAt: startedAt,
+                initialIssues: []
+            )
             classResult = nil
             courses = try await client.listCourses()
             refreshAgentUsageInBackground()

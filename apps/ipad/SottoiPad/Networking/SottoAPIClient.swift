@@ -94,6 +94,14 @@ struct SottoAPIClient {
         )
     }
 
+    func startClassRegeneration(classId: String) async throws {
+        let _: NextClassBackgroundResponse = try await post(
+            "/api/v1/classes/\(classId)?background=1",
+            body: RegenerateClassRequest(scope: "class"),
+            acceptedStatuses: [202]
+        )
+    }
+
     func deleteClass(classId: String) async throws {
         let _: DeleteClassResponse = try await delete("/api/v1/classes/\(classId)")
     }

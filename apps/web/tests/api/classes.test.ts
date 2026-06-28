@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockCourseFindFirst = vi.fn();
 const mockCourseUpdateMany = vi.fn();
+const mockCourseClassFindFirst = vi.fn();
 const mockCourseClassDeleteMany = vi.fn();
 const mockTransaction = vi.fn();
 
@@ -20,6 +21,7 @@ vi.mock('@/lib/prisma', () => ({
       updateMany: (...args: unknown[]) => mockCourseUpdateMany(...args),
     },
     courseClass: {
+      findFirst: (...args: unknown[]) => mockCourseClassFindFirst(...args),
       deleteMany: (...args: unknown[]) => mockCourseClassDeleteMany(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
@@ -402,6 +404,53 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
     expect(mockRegenerateFailedSections).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body).toEqual({ regenerated: true, scope: 'class' });
+  });
+
+  it('starts current class regeneration in the background when requested', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({ status: 'AVAILABLE' });
+    mockRegenerateCurrentClass.mockResolvedValue(true);
+
+    const res = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1?background=1', 'POST', {
+        scope: 'class',
+      }),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(202);
+    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith('class-1', 'u1');
+    const body = await res.json();
+    expect(body).toEqual({ started: true, scope: 'class', status: 'AVAILABLE' });
+  });
+
+  it('does not start a duplicate background regeneration for a generating class', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({ status: 'GENERATING' });
+
+    const res = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1?background=1', 'POST', {
+        scope: 'class',
+      }),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(202);
+    expect(mockRegenerateCurrentClass).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body).toEqual({ started: true, scope: 'class', status: 'GENERATING' });
+  });
+
+  it('rejects background current class regeneration for a missing class', async () => {
+    mockCourseClassFindFirst.mockResolvedValue(null);
+
+    const res = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1?background=1', 'POST', {
+        scope: 'class',
+      }),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockRegenerateCurrentClass).not.toHaveBeenCalled();
   });
 
   it('returns 400 when there are no failed sections to regenerate', async () => {
