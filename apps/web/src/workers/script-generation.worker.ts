@@ -1,11 +1,21 @@
 import { Job } from 'bullmq';
 import { GenerateScriptPayload, addJob, JobType, compileScriptQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
+import {
+  generateScript,
+  generateScriptWithUserFeedback,
+  type SourceMetadata,
+} from '@/lib/script-generator';
 import { extractContent } from '@/lib/extractors';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  getCheapestModelForProvider,
+  getProviderForModel,
+  providerRequiresAiKey,
+  resolveAiModelAndProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
@@ -35,17 +45,25 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
-    await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-      episodeId,
-      userId,
-    }, { jobId: `compile-${episodeId}-${Date.now()}` });
+    await addJob(
+      compileScriptQueue,
+      JobType.COMPILE_SCRIPT,
+      {
+        episodeId,
+        userId,
+      },
+      { jobId: `compile-${episodeId}-${Date.now()}` }
+    );
 
     await job.updateProgress(100);
     return;
   }
 
   const [episode, discovery] = await Promise.all([
-    prisma.episode.findUniqueOrThrow({ where: { id: episodeId }, select: { aiModel: true, verificationMode: true, source: true, language: true } }),
+    prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
+      select: { aiModel: true, verificationMode: true, source: true, language: true },
+    }),
     prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
@@ -63,10 +81,10 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   });
 
   const providerAiKey =
-    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for script generation.`);
   }
 
@@ -80,7 +98,10 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       job.data.sourceUrls.slice(0, 5).map((url) => extractContent(url))
     );
     const extractedTexts = results
-      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof extractContent>>> => r.status === 'fulfilled')
+      .filter(
+        (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof extractContent>>> =>
+          r.status === 'fulfilled'
+      )
       .map((r) => r.value.text)
       .filter(Boolean);
 
@@ -111,10 +132,14 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     : requestedDuration;
 
   // Cap speakers to the uniform safety limit.
-  const requestedSpeakers = discovery.speakers as Array<{ name: string; description: string }> | null;
-  const cappedSpeakers = requestedSpeakers && requestedSpeakers.length > genFeatures.maxSpeakers
-    ? requestedSpeakers.slice(0, genFeatures.maxSpeakers)
-    : requestedSpeakers;
+  const requestedSpeakers = discovery.speakers as Array<{
+    name: string;
+    description: string;
+  }> | null;
+  const cappedSpeakers =
+    requestedSpeakers && requestedSpeakers.length > genFeatures.maxSpeakers
+      ? requestedSpeakers.slice(0, genFeatures.maxSpeakers)
+      : requestedSpeakers;
 
   const hasUserFeedback = job.data.userFeedback && job.data.previousTurns;
 
@@ -173,12 +198,18 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     const entryNumbers = new Set(result.vocabulary.map((v) => v.number));
     for (const num of markerNumbers) {
       if (!entryNumbers.has(num)) {
-        logger.warn('Vocabulary marker without matching entry', { episodeId, markerNumber: String(num) });
+        logger.warn('Vocabulary marker without matching entry', {
+          episodeId,
+          markerNumber: String(num),
+        });
       }
     }
     for (const num of entryNumbers) {
       if (!markerNumbers.has(num)) {
-        logger.warn('Vocabulary entry without matching marker in script', { episodeId, entryNumber: String(num) });
+        logger.warn('Vocabulary entry without matching marker in script', {
+          episodeId,
+          entryNumber: String(num),
+        });
       }
     }
   }
@@ -234,7 +265,10 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   }
 
   if (result.places.length > 0) {
-    logger.info('Places extracted from script', { episodeId, places: result.places.map((p) => p.name) });
+    logger.info('Places extracted from script', {
+      episodeId,
+      places: result.places.map((p) => p.name),
+    });
   }
 
   // Collect all tag slugs upfront for a single batched lookup
@@ -252,7 +286,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Detect language from script text
   const fullText = result.turns.map((t: { text: string }) => t.text).join(' ');
-  const languageDetectionModel = getCheapestModelForProvider(provider as AiProviderId);
+  const languageDetectionModel =
+    getCheapestModelForProvider(provider as AiProviderId) ??
+    (!providerRequiresAiKey(provider) ? model : null);
   if (!languageDetectionModel) {
     throw new Error(`Language detection model is not configured for provider "${provider}".`);
   }
@@ -303,7 +339,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
           where: { episodeId_tagId: { episodeId, tagId } },
           update: {},
           create: { episodeId, tagId },
-        }),
+        })
       );
     }
   }
@@ -314,7 +350,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     where: { id: episodeId },
     data: {
       status: 'COMPILING',
-      aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
+      aiProvider: getProviderForModel(model) ?? provider,
       aiModel: model,
       language: episode.language ?? detectedLanguage ?? undefined,
     },
@@ -322,10 +358,15 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   await invalidateEpisodeCache(episodeId);
   await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
-  await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-    episodeId,
-    userId,
-  }, { jobId: `compile-${episodeId}-${Date.now()}` });
+  await addJob(
+    compileScriptQueue,
+    JobType.COMPILE_SCRIPT,
+    {
+      episodeId,
+      userId,
+    },
+    { jobId: `compile-${episodeId}-${Date.now()}` }
+  );
 
   logger.info('Script queued for compilation', {
     episodeId,

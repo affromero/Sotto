@@ -96,6 +96,8 @@ vi.mock('@/lib/generation-features', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -196,7 +198,7 @@ describe('processInteraction', () => {
         expect.objectContaining({
           apiKeyOverride: 'anthropic-key',
           model: 'claude-haiku-4-5-20251001',
-        }),
+        })
       );
     });
 
@@ -220,7 +222,7 @@ describe('processInteraction', () => {
         expect.objectContaining({
           apiKeyOverride: 'openai-key',
           model: 'gpt-5-mini',
-        }),
+        })
       );
     });
 
@@ -230,7 +232,7 @@ describe('processInteraction', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processInteraction(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI key for provider "openai" is required for interactions.',
+        'AI key for provider "openai" is required for interactions.'
       );
       expect(mockCreateAIProvider).not.toHaveBeenCalled();
       expect(mockGenerateResponse).not.toHaveBeenCalled();
@@ -240,7 +242,7 @@ describe('processInteraction', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processInteraction(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI model is required for interactions when no AI key is configured.',
+        'AI model is required for interactions when no AI key is configured.'
       );
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockCreateAIProvider).not.toHaveBeenCalled();
@@ -248,7 +250,10 @@ describe('processInteraction', () => {
     });
 
     it('allows local claude-code models without provider keys', async () => {
-      mockPrismaEpisodeFindUnique.mockResolvedValue({ language: null, aiModel: 'claude-code:sonnet' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
+        language: null,
+        aiModel: 'claude-code:sonnet',
+      });
       mockResolveAiModelAndProvider.mockResolvedValue({
         model: 'claude-code:sonnet',
         provider: 'claude-code',
@@ -265,7 +270,7 @@ describe('processInteraction', () => {
         expect.objectContaining({
           apiKeyOverride: undefined,
           model: 'claude-code:sonnet',
-        }),
+        })
       );
     });
   });
@@ -497,7 +502,6 @@ describe('processInteraction', () => {
         },
       });
     });
-
   });
 
   describe('API usage logging', () => {
@@ -557,7 +561,9 @@ describe('processInteraction', () => {
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
 
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(([progress]) => progress as number);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([progress]) => progress as number
+      );
       for (let i = 1; i < calls.length; i++) {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }

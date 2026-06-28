@@ -1,7 +1,7 @@
 import type { EpisodeSummary } from './types/episode';
 import {
   AI_PROVIDER_DISPLAY,
-  AI_MODEL_SHORT_DISPLAY,
+  getAiModelShortLabel,
   getTtsProviderLabel,
   getTtsModelLabel,
   getLanguageLabel,
@@ -18,7 +18,7 @@ export function getContentBadgeLabel(
 ): string {
   if (episode.source === 'IMPORT') {
     return episode.sourcePlatform
-      ? SOURCE_PLATFORM_LABELS[episode.sourcePlatform] ?? 'Imported'
+      ? (SOURCE_PLATFORM_LABELS[episode.sourcePlatform] ?? 'Imported')
       : 'Imported';
   }
   return 'AI-Generated';
@@ -53,9 +53,7 @@ export function getEpisodeBadges(
     const providerShort = episode.aiProvider
       ? AI_PROVIDER_DISPLAY[episode.aiProvider]?.shortLabel
       : null;
-    const modelShort = episode.aiModel
-      ? AI_MODEL_SHORT_DISPLAY[episode.aiModel]
-      : null;
+    const modelShort = getAiModelShortLabel(episode.aiModel);
 
     let aiLabel: string | null = null;
     if (providerShort && modelShort) {

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getCheapestModelForProvider, getAiProviderIdsWithPricing, isValidModelId, resolveAiModelAndProvider, getModelContextWindow, getModelMaxOutputTokens, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  getCheapestModelForProvider,
+  getAiProviderIdsWithPricing,
+  isValidModelId,
+  resolveAiModelAndProvider,
+  getModelContextWindow,
+  getModelMaxOutputTokens,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -27,6 +35,7 @@ describe('getCheapestModelForProvider', () => {
     expect(getCheapestModelForProvider('assemblyai')).toBeNull();
     expect(getCheapestModelForProvider('together')).toBeNull();
     expect(getCheapestModelForProvider('local')).toBeNull();
+    expect(getCheapestModelForProvider('codex')).toBeNull();
   });
 
   it('returns null for unknown provider', () => {
@@ -54,6 +63,16 @@ describe('isValidModelId', () => {
 
   it('returns false for unknown model', () => {
     expect(isValidModelId('gpt-99-turbo')).toBe(false);
+  });
+
+  it('accepts dynamic CLI model selectors', () => {
+    expect(isValidModelId('claude-code:claude-fable-5#effort=xhigh')).toBe(true);
+    expect(isValidModelId('codex:gpt-5.5#effort=high')).toBe(true);
+    expect(isValidModelId('codex')).toBe(true);
+  });
+
+  it('rejects CLI selectors with unknown effort levels', () => {
+    expect(isValidModelId('codex:gpt-5.5#effort=extreme')).toBe(false);
   });
 
   it('returns false for empty string', () => {
@@ -148,6 +167,15 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
 
     expect(result.provider).toBe('claude-code');
     expect(result.model).toBe('claude-code:sonnet');
+  });
+
+  it('keeps codex composite models routed to local Codex', async () => {
+    const result = await resolveAiModelAndProvider({
+      episodeAiModel: 'codex:gpt-5.5#effort=xhigh',
+    });
+
+    expect(result.provider).toBe('codex');
+    expect(result.model).toBe('codex:gpt-5.5#effort=xhigh');
   });
 
   it('keeps local: prefixed models routed to the local provider without registry lookup', async () => {

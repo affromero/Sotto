@@ -121,6 +121,29 @@ describe('claude-code-client', () => {
         inputTokens: 0,
         outputTokens: 0,
       });
+
+      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(args).toEqual(expect.arrayContaining(['--model', 'opus']));
+    });
+
+    it('passes encoded effort through to the claude CLI', async () => {
+      const { executeClaudeCode } = await import('@/lib/claude-code-client');
+
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+
+      const promise = executeClaudeCode('System', 'Prompt', {
+        model: 'claude-code:claude-fable-5#effort=xhigh',
+      });
+
+      proc._stdout.emit('data', Buffer.from('ok'));
+      proc.emit('close', 0);
+      await promise;
+
+      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(args).toEqual(
+        expect.arrayContaining(['--model', 'claude-fable-5', '--effort', 'xhigh'])
+      );
     });
 
     it('trims whitespace from stdout', async () => {
@@ -199,7 +222,6 @@ describe('claude-code-client', () => {
 
       vi.useRealTimers();
     });
-
   });
 
   describe('streamClaudeCode', () => {

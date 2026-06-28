@@ -8,7 +8,11 @@ import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  providerRequiresAiKey,
+  resolveAiModelAndProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
@@ -20,7 +24,10 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   await job.updateProgress(10);
 
   const [episode, user] = await Promise.all([
-    prisma.episode.findUnique({ where: { id: episodeId }, select: { language: true, aiModel: true } }),
+    prisma.episode.findUnique({
+      where: { id: episodeId },
+      select: { language: true, aiModel: true },
+    }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
   ]);
 
@@ -36,10 +43,10 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   });
 
   const providerAiKey =
-    episode?.aiModel && provider !== 'claude-code'
+    episode?.aiModel && providerRequiresAiKey(provider)
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (episode?.aiModel && provider !== 'claude-code' && !providerAiKey) {
+  if (episode?.aiModel && providerRequiresAiKey(provider) && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for interactions.`);
   }
 
@@ -90,17 +97,25 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   const responseLanguage = user?.preferredLanguage || episode?.language || 'en';
   const languageLabel = getLanguageLabel(responseLanguage) || 'English';
 
-  const systemPrompt = loadAndRender('interaction/qa-assistant.md', { LANGUAGE_LABEL: languageLabel }) + VOICE_REALISM_SHORT + CONTENT_SAFETY_INSTRUCTIONS + INPUT_SANITIZATION_INSTRUCTIONS;
+  const systemPrompt =
+    loadAndRender('interaction/qa-assistant.md', { LANGUAGE_LABEL: languageLabel }) +
+    VOICE_REALISM_SHORT +
+    CONTENT_SAFETY_INSTRUCTIONS +
+    INPUT_SANITIZATION_INSTRUCTIONS;
 
   let response;
   try {
     const ai = createAIProvider(provider);
-    response = await ai.generateResponse(systemPrompt, [
-      {
-        role: 'user',
-        content: `Recent episode context:\n${recentContext}\n\nUser's question: ${question}`,
-      },
-    ], { apiKeyOverride: providerAiKey?.apiKey, model });
+    response = await ai.generateResponse(
+      systemPrompt,
+      [
+        {
+          role: 'user',
+          content: `Recent episode context:\n${recentContext}\n\nUser's question: ${question}`,
+        },
+      ],
+      { apiKeyOverride: providerAiKey?.apiKey, model }
+    );
   } catch (err) {
     if (err instanceof ContentModerationError) {
       // Content policy violation — mark interaction failed, don't retry
@@ -108,7 +123,10 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
         where: { id: interactionId },
         data: { answer: 'Unable to answer — content policy violation.', status: 'ANSWERED' },
       });
-      logger.warn('Interaction blocked by content moderation', { interactionId, categories: err.categories });
+      logger.warn('Interaction blocked by content moderation', {
+        interactionId,
+        categories: err.categories,
+      });
       return;
     }
     throw err;

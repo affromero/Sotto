@@ -150,6 +150,8 @@ STT_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 ```
 
+Use `AI_PROVIDER=codex` for Codex CLI. CLI model options are discovered from saved setup selections, environment lists such as `CLAUDE_CODE_MODELS` and `CODEX_MODELS`, and local CLI config. Reasoning effort options use `CLAUDE_CODE_EFFORTS` or `CODEX_MODEL_REASONING_EFFORTS`, with per-selection IDs stored as `claude-code:<model>#effort=<level>` or `codex:<model>#effort=<level>`.
+
 Fully local path:
 
 ```bash

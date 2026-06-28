@@ -33,15 +33,11 @@ interface CreatePrivateIngestionEpisodeParams {
   discovery: PrivateIngestionDiscovery;
   jobPriority: number;
   jobIdPrefix: string;
-  writeIngestionRecord: (
-    tx: PrivateIngestionTransaction,
-    episodeId: string
-  ) => Promise<void>;
+  writeIngestionRecord: (tx: PrivateIngestionTransaction, episodeId: string) => Promise<void>;
 }
 
 function resolveAiProvider(aiModel?: string): string | null {
   if (!aiModel) return null;
-  if (aiModel.startsWith('claude-code:')) return 'claude-code';
   return getProviderForModel(aiModel);
 }
 

@@ -7,7 +7,11 @@ import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  providerRequiresAiKey,
+  resolveAiModelAndProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
@@ -33,14 +37,19 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
 
-    await addJob(scriptWritingQueue, JobType.WRITE_SCRIPT, {
-      episodeId,
-      userId,
-      discoveryId,
-      dossierId,
-      outlineId: existingOutline.id,
-      useAdminCredits,
-    }, { jobId: `write-${episodeId}-${Date.now()}` });
+    await addJob(
+      scriptWritingQueue,
+      JobType.WRITE_SCRIPT,
+      {
+        episodeId,
+        userId,
+        discoveryId,
+        dossierId,
+        outlineId: existingOutline.id,
+        useAdminCredits,
+      },
+      { jobId: `write-${episodeId}-${Date.now()}` }
+    );
 
     await job.updateProgress(100);
     return;
@@ -83,10 +92,10 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   });
 
   const providerAiKey =
-    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for creative planning.`);
   }
 
@@ -125,7 +134,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
       listenerPromise: outline.listenerPromise,
       thesis: outline.thesis,
       narrativeFramework: outline.narrativeFramework,
-      hook: outline.beats.find(b => b.purpose === 'hook')?.summary || '',
+      hook: outline.beats.find((b) => b.purpose === 'hook')?.summary || '',
       beats: outline.beats as unknown as Prisma.InputJsonValue,
       tensionCurve: outline.tensionCurve as unknown as Prisma.InputJsonValue,
       bannedAngles: outline.bannedAngles,
@@ -149,8 +158,10 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
     userId,
   });
 
-  await logPipelineStageComplete(episodeId, 'creative-planning',
-    `framework=${outline.narrativeFramework} beats=${outline.beats.length}`,
+  await logPipelineStageComplete(
+    episodeId,
+    'creative-planning',
+    `framework=${outline.narrativeFramework} beats=${outline.beats.length}`
   );
 
   // Chain to script writing
@@ -161,14 +172,19 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   await invalidateEpisodeCache(episodeId);
   await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
 
-  await addJob(scriptWritingQueue, JobType.WRITE_SCRIPT, {
-    episodeId,
-    userId,
-    discoveryId,
-    dossierId,
-    outlineId: savedOutline.id,
-    useAdminCredits,
-  }, { jobId: `write-${episodeId}-${Date.now()}` });
+  await addJob(
+    scriptWritingQueue,
+    JobType.WRITE_SCRIPT,
+    {
+      episodeId,
+      userId,
+      discoveryId,
+      dossierId,
+      outlineId: savedOutline.id,
+      useAdminCredits,
+    },
+    { jobId: `write-${episodeId}-${Date.now()}` }
+  );
 
   logger.info('Creative planning complete, queued script writing', {
     episodeId,

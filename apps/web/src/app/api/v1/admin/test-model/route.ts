@@ -62,7 +62,7 @@ async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } 
       const voiceId = getTestVoiceId(id);
       const audio = await withTimeout(
         tts.generateSpeech({ text: `${BRAND.name} — ${BRAND.tagline}`, voiceId }),
-        5_000,
+        5_000
       );
       return { audio, provider: id };
     } catch {
@@ -82,7 +82,11 @@ function detectAudioMime(buf: Buffer): string {
   // FLAC: fLaC header
   if (buf[0] === 0x66 && buf[1] === 0x4c && buf[2] === 0x61 && buf[3] === 0x43) return 'audio/flac';
   // MP3: ID3 tag or sync word
-  if ((buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0)) return 'audio/mpeg';
+  if (
+    (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) ||
+    (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0)
+  )
+    return 'audio/mpeg';
   return 'audio/mpeg';
 }
 
@@ -133,9 +137,7 @@ function classifyError(error: Error): string {
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), ms)
-    ),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
   ]);
 }
 
@@ -172,7 +174,7 @@ export async function POST(request: NextRequest) {
       }
 
       const aiProvider = createAIProvider(provider);
-      const timeoutMs = provider === 'claude-code' ? 60_000 : 15_000;
+      const timeoutMs = provider === 'claude-code' || provider === 'codex' ? 60_000 : 15_000;
       const result = await withTimeout(
         aiProvider.generateResponse('', [{ role: 'user', content: 'Say hello in one word.' }], {
           model,
@@ -250,7 +252,12 @@ export async function POST(request: NextRequest) {
       if (keySource === 'byok') {
         if (provider === 'local') {
           sttKey = process.env.STT_API_KEY?.trim() || 'local';
-        } else if (provider === 'openai' || provider === 'together' || provider === 'deepgram' || provider === 'assemblyai') {
+        } else if (
+          provider === 'openai' ||
+          provider === 'together' ||
+          provider === 'deepgram' ||
+          provider === 'assemblyai'
+        ) {
           const keyData = await getAiKey(adminId, provider as AiProviderId);
           if (!keyData) {
             return NextResponse.json({
@@ -305,7 +312,6 @@ export async function POST(request: NextRequest) {
         ttsSource,
       });
     }
-
 
     return errorResponse('Invalid type', 400);
   } catch (error) {

@@ -15,17 +15,23 @@ describe('getAiPricing', () => {
   it('returns pricing for known OpenAI model', () => {
     const pricing = getAiPricing('gpt-5-nano');
     expect(pricing.inputPerMTok).toBe(0.05);
-    expect(pricing.outputPerMTok).toBe(0.40);
+    expect(pricing.outputPerMTok).toBe(0.4);
   });
 
   it('returns pricing for known Google model', () => {
     const pricing = getAiPricing('gemini-3.1-flash-lite-preview');
     expect(pricing.inputPerMTok).toBe(0.25);
-    expect(pricing.outputPerMTok).toBe(1.50);
+    expect(pricing.outputPerMTok).toBe(1.5);
   });
 
   it('returns zero pricing for claude-code models', () => {
     const pricing = getAiPricing('claude-code:haiku');
+    expect(pricing.inputPerMTok).toBe(0);
+    expect(pricing.outputPerMTok).toBe(0);
+  });
+
+  it('returns zero pricing for Codex configured-default effort selectors', () => {
+    const pricing = getAiPricing('codex#effort=xhigh');
     expect(pricing.inputPerMTok).toBe(0);
     expect(pricing.outputPerMTok).toBe(0);
   });

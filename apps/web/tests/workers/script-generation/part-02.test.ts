@@ -154,6 +154,16 @@ const mockGetCheapestModelForProvider = vi.fn((provider: string) => {
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
   getCheapestModelForProvider: (provider: string) => mockGetCheapestModelForProvider(provider),
+  getProviderForModel: (model: string) =>
+    model === 'codex' || model.startsWith('codex:')
+      ? 'codex'
+      : model.startsWith('claude-code:')
+        ? 'claude-code'
+        : model.startsWith('local:')
+          ? 'local'
+          : 'anthropic',
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 vi.mock('@/lib/pipeline-events', () => ({

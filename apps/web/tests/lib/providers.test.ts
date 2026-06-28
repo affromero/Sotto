@@ -217,11 +217,10 @@ describe('Provider Factories', () => {
         [{ role: 'user', content: 'hello' }],
         { model: 'claude-code:opus' }
       );
-      expect(mockExecuteClaudeCode).toHaveBeenCalledWith(
-        'system',
-        'hello',
-        { model: 'opus', useWebSearch: undefined }
-      );
+      expect(mockExecuteClaudeCode).toHaveBeenCalledWith('system', 'hello', {
+        model: 'claude-code:opus',
+        useWebSearch: undefined,
+      });
       expect(result).toEqual({
         content: 'claude-code',
         inputTokens: 3,

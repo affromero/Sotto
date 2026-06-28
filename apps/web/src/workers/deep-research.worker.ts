@@ -6,7 +6,11 @@ import { buildResearchDossier, type BuildDossierParams } from '@/lib/research-ag
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  providerRequiresAiKey,
+  resolveAiModelAndProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
@@ -32,13 +36,18 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
 
-    await addJob(creativePlanningQueue, JobType.CREATIVE_PLANNING, {
-      episodeId,
-      userId,
-      discoveryId,
-      dossierId: existingDossier.id,
-      useAdminCredits,
-    }, { jobId: `plan-${episodeId}-${Date.now()}` });
+    await addJob(
+      creativePlanningQueue,
+      JobType.CREATIVE_PLANNING,
+      {
+        episodeId,
+        userId,
+        discoveryId,
+        dossierId: existingDossier.id,
+        useAdminCredits,
+      },
+      { jobId: `plan-${episodeId}-${Date.now()}` }
+    );
 
     await job.updateProgress(100);
     return;
@@ -81,10 +90,10 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   });
 
   const providerAiKey =
-    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for deep research.`);
   }
 
@@ -95,8 +104,8 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
 
   // Extract discovery summary from chat messages
   const discoverySummary = discovery.messages
-    .filter(m => m.role === 'user')
-    .map(m => m.content)
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content)
     .join(' ')
     .slice(0, 2000);
 
@@ -151,8 +160,10 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
     userId,
   });
 
-  await logPipelineStageComplete(episodeId, 'deep-research',
-    `mode=${mode} sources=${dossier.sources.length} evidence=${dossier.evidence.length} gaps=${dossier.gaps.length}`,
+  await logPipelineStageComplete(
+    episodeId,
+    'deep-research',
+    `mode=${mode} sources=${dossier.sources.length} evidence=${dossier.evidence.length} gaps=${dossier.gaps.length}`
   );
 
   // Chain to creative planning
@@ -163,13 +174,18 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   await invalidateEpisodeCache(episodeId);
   await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
 
-  await addJob(creativePlanningQueue, JobType.CREATIVE_PLANNING, {
-    episodeId,
-    userId,
-    discoveryId,
-    dossierId: savedDossier.id,
-    useAdminCredits,
-  }, { jobId: `plan-${episodeId}-${Date.now()}` });
+  await addJob(
+    creativePlanningQueue,
+    JobType.CREATIVE_PLANNING,
+    {
+      episodeId,
+      userId,
+      discoveryId,
+      dossierId: savedDossier.id,
+      useAdminCredits,
+    },
+    { jobId: `plan-${episodeId}-${Date.now()}` }
+  );
 
   logger.info('Deep research complete, queued creative planning', {
     episodeId,

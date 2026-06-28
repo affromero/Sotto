@@ -32,10 +32,12 @@ export function StepAgent({
   const liveTranslationKey = agent.liveTranslationKey ?? '';
 
   // Model options for the current method. key: claude → anthropic, codex → openai.
-  // cli: the keyless local agent backend (claude-code, models haiku/sonnet/opus).
+  // cli: the matching keyless local agent backend (claude-code or codex).
   const aiRegistryId =
     agent.method === 'cli'
-      ? 'claude-code'
+      ? agent.provider === 'codex'
+        ? 'codex'
+        : 'claude-code'
       : agent.method === 'key'
         ? aiModelProviderId(agent.provider)
         : null;

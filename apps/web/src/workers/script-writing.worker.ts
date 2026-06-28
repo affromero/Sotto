@@ -8,7 +8,13 @@ import type { Beat } from '@/lib/creative-director';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  getCheapestModelForProvider,
+  getProviderForModel,
+  providerRequiresAiKey,
+  resolveAiModelAndProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { logger } from '@/lib/logger';
@@ -36,10 +42,15 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
-    await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-      episodeId,
-      userId,
-    }, { jobId: `compile-${episodeId}-${Date.now()}` });
+    await addJob(
+      compileScriptQueue,
+      JobType.COMPILE_SCRIPT,
+      {
+        episodeId,
+        userId,
+      },
+      { jobId: `compile-${episodeId}-${Date.now()}` }
+    );
 
     await job.updateProgress(100);
     return;
@@ -58,8 +69,13 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     prisma.discovery.findUniqueOrThrow({
       where: { id: discoveryId },
       select: {
-        topic: true, depth: true, tone: true, audience: true,
-        audienceLevel: true, durationTarget: true, speakers: true,
+        topic: true,
+        depth: true,
+        tone: true,
+        audience: true,
+        audienceLevel: true,
+        durationTarget: true,
+        speakers: true,
       },
     }),
     prisma.episode.findUniqueOrThrow({
@@ -81,10 +97,10 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   });
 
   const providerAiKey =
-    episode.aiModel && provider !== 'claude-code' && !useAdminCredits
+    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
       ? await getAiKey(userId, provider as AiProviderId)
       : aiKey;
-  if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
     throw new Error(`AI key for provider "${provider}" is required for script writing.`);
   }
 
@@ -165,7 +181,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     where: { slug: { in: [...allTagSlugs] } },
     select: { id: true, slug: true },
   });
-  const tagsBySlug = new Map(existingTags.map(t => [t.slug, t.id]));
+  const tagsBySlug = new Map(existingTags.map((t) => [t.slug, t.id]));
 
   const tagUpserts: Promise<unknown>[] = [];
   for (const slug of allTagSlugs) {
@@ -176,15 +192,20 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
           where: { episodeId_tagId: { episodeId, tagId } },
           update: {},
           create: { episodeId, tagId },
-        }),
+        })
       );
     }
   }
   await Promise.all(tagUpserts);
 
   // Detect language
-  const sampleText = result.turns.slice(0, 5).map(t => t.text).join(' ');
-  const languageDetectionModel = getCheapestModelForProvider(provider as AiProviderId);
+  const sampleText = result.turns
+    .slice(0, 5)
+    .map((t) => t.text)
+    .join(' ');
+  const languageDetectionModel =
+    getCheapestModelForProvider(provider as AiProviderId) ??
+    (!providerRequiresAiKey(provider) ? model : null);
   if (!languageDetectionModel) {
     throw new Error(`Language detection model is not configured for provider "${provider}".`);
   }
@@ -206,8 +227,10 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     userId,
   });
 
-  await logPipelineStageComplete(episodeId, 'script-writing',
-    `turns=${result.turns.length} refs=${result.references.length}`,
+  await logPipelineStageComplete(
+    episodeId,
+    'script-writing',
+    `turns=${result.turns.length} refs=${result.references.length}`
   );
 
   // Chain to compile/QC
@@ -215,7 +238,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     where: { id: episodeId },
     data: {
       status: 'COMPILING',
-      aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
+      aiProvider: getProviderForModel(model) ?? provider,
       aiModel: model,
       language: detectedLanguage ?? undefined,
     },
@@ -223,10 +246,15 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   await invalidateEpisodeCache(episodeId);
   await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
 
-  await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
-    episodeId,
-    userId,
-  }, { jobId: `compile-${episodeId}-${Date.now()}` });
+  await addJob(
+    compileScriptQueue,
+    JobType.COMPILE_SCRIPT,
+    {
+      episodeId,
+      userId,
+    },
+    { jobId: `compile-${episodeId}-${Date.now()}` }
+  );
 
   logger.info('Script writing complete, queued compilation', {
     episodeId,

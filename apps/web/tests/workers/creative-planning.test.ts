@@ -17,7 +17,8 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockPrismaCreativeOutlineCreate(...args),
     },
     researchDossier: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaResearchDossierFindUniqueOrThrow(...args),
+      findUniqueOrThrow: (...args: unknown[]) =>
+        mockPrismaResearchDossierFindUniqueOrThrow(...args),
     },
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
@@ -50,6 +51,8 @@ const { mockResolveAiModelAndProvider } = vi.hoisted(() => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: mockResolveAiModelAndProvider,
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 const { mockCreateCreativeOutline } = vi.hoisted(() => ({
@@ -132,8 +135,18 @@ describe('processCreativePlanning', () => {
     mockPrismaCreativeOutlineFindUnique.mockResolvedValue(null);
     mockPrismaCreativeOutlineCreate.mockResolvedValue({ id: 'outline-001' });
     mockPrismaResearchDossierFindUniqueOrThrow.mockResolvedValue({
-      sources: [{ sourceId: 'source-1', title: 'Source A', authors: 'Author', year: 2024, type: 'WEB' }],
-      evidence: [{ evidenceId: 'ev-1', claim: 'Claim A', claimType: 'fact', sourceIds: ['source-1'], confidence: 0.9 }],
+      sources: [
+        { sourceId: 'source-1', title: 'Source A', authors: 'Author', year: 2024, type: 'WEB' },
+      ],
+      evidence: [
+        {
+          evidenceId: 'ev-1',
+          claim: 'Claim A',
+          claimType: 'fact',
+          sourceIds: ['source-1'],
+          confidence: 0.9,
+        },
+      ],
       recommendedAngle: 'Focus on private workflows.',
     });
     mockPrismaDiscoveryFindUniqueOrThrow.mockResolvedValue({
@@ -200,7 +213,7 @@ describe('processCreativePlanning', () => {
           apiKeyOverride: 'anthropic-key',
           model: 'claude-haiku-4-5-20251001',
           provider: 'anthropic',
-        }),
+        })
       );
     });
 
@@ -222,7 +235,7 @@ describe('processCreativePlanning', () => {
           apiKeyOverride: 'openai-key',
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
     });
 
@@ -232,7 +245,7 @@ describe('processCreativePlanning', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processCreativePlanning(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI key for provider "openai" is required for creative planning.',
+        'AI key for provider "openai" is required for creative planning.'
       );
       expect(mockCreateCreativeOutline).not.toHaveBeenCalled();
     });
@@ -241,7 +254,7 @@ describe('processCreativePlanning', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processCreativePlanning(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI model is required for creative planning when no AI key is configured.',
+        'AI model is required for creative planning when no AI key is configured.'
       );
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockCreateCreativeOutline).not.toHaveBeenCalled();
@@ -263,13 +276,13 @@ describe('processCreativePlanning', () => {
           apiKeyOverride: undefined,
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
     });
 
     it('rejects admin-credit routes without an explicit model', async () => {
       await expect(
-        processCreativePlanning(createMockJob({ ...defaultPayload, useAdminCredits: true })),
+        processCreativePlanning(createMockJob({ ...defaultPayload, useAdminCredits: true }))
       ).rejects.toThrow('AI model is required for creative planning when no AI key is configured.');
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -292,7 +305,7 @@ describe('processCreativePlanning', () => {
           apiKeyOverride: undefined,
           model: 'claude-code:sonnet',
           provider: 'claude-code',
-        }),
+        })
       );
     });
 
@@ -315,7 +328,7 @@ describe('processCreativePlanning', () => {
           outlineId: 'outline-001',
           useAdminCredits: undefined,
         },
-        { jobId: expect.stringMatching(/^write-episode-001-/) },
+        { jobId: expect.stringMatching(/^write-episode-001-/) }
       );
     });
   });

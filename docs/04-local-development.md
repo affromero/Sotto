@@ -120,7 +120,21 @@ TTS_PROVIDER="openai"
 OPENAI_API_KEY="sk-..."
 ```
 
-Local agent CLIs must be installed and authenticated outside Sotto. Sotto should detect missing CLIs and report a setup error instead of choosing another provider.
+Use `AI_PROVIDER="codex"` for Codex CLI. Local agent CLIs must be installed and authenticated outside Sotto. Sotto should detect missing CLIs and report a setup error instead of choosing another provider.
+
+The model picker is populated dynamically from saved wizard/admin selections, environment lists, and local CLI config. Add new CLI models without code changes:
+
+```env
+CLAUDE_CODE_MODEL="opus"
+CLAUDE_CODE_MODELS="opus,sonnet,haiku,claude-fable-5"
+CLAUDE_CODE_EFFORT="xhigh"
+CLAUDE_CODE_EFFORTS="low,medium,high,xhigh,max"
+
+CODEX_MODEL="gpt-5.5"
+CODEX_MODELS="gpt-5.5,gpt-5.6"
+CODEX_MODEL_REASONING_EFFORT="xhigh"
+CODEX_MODEL_REASONING_EFFORTS="low,medium,high,xhigh,max"
+```
 
 ### 5.4 Totally Local Models
 

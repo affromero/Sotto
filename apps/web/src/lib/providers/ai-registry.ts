@@ -8,6 +8,7 @@
  */
 import { STATIC_PRICING, type ModelPricing as PricetokenModelPricing } from 'pricetoken';
 import { logger } from '../logger';
+import { getAgentModelDisplayName, getAgentProviderForModelId } from '../agent-models/id';
 
 // ---------------------------------------------------------------------------
 // Pricetoken lookup — static offline pricing for 36+ models
@@ -43,7 +44,23 @@ export function getPricetokenModelInfo(modelId: string): {
   };
 }
 
-export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'codex' | 'local' | 'together' | 'deepgram' | 'assemblyai' | 'groq' | 'gladia' | 'speechmatics' | 'xai' | 'deepseek' | 'mistral' | 'nvidia';
+export type AiProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'google'
+  | 'claude-code'
+  | 'codex'
+  | 'local'
+  | 'together'
+  | 'deepgram'
+  | 'assemblyai'
+  | 'groq'
+  | 'gladia'
+  | 'speechmatics'
+  | 'xai'
+  | 'deepseek'
+  | 'mistral'
+  | 'nvidia';
 
 export interface AiProviderAuthField {
   key: string;
@@ -97,9 +114,30 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', contextWindow: 200_000, maxOutputTokens: 128_000 },
+      {
+        id: 'claude-haiku-4-5-20251001',
+        displayName: 'Claude Haiku 4.5',
+        shortDisplayName: 'Haiku 4.5',
+        tier: 'fast',
+        contextWindow: 200_000,
+        maxOutputTokens: 64_000,
+      },
+      {
+        id: 'claude-sonnet-4-6',
+        displayName: 'Claude Sonnet 4.6',
+        shortDisplayName: 'Sonnet 4.6',
+        tier: 'balanced',
+        contextWindow: 200_000,
+        maxOutputTokens: 64_000,
+      },
+      {
+        id: 'claude-opus-4-6',
+        displayName: 'Claude Opus 4.6',
+        shortDisplayName: 'Opus 4.6',
+        tier: 'best',
+        contextWindow: 200_000,
+        maxOutputTokens: 128_000,
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
@@ -134,14 +172,78 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gpt-5.4',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4-nano', displayName: 'GPT-5.4 Nano', shortDisplayName: '5.4 Nano', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4-mini', displayName: 'GPT-5.4 Mini', shortDisplayName: '5.4 Mini', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4', displayName: 'GPT-5.4', shortDisplayName: '5.4', tier: 'balanced', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4-pro', displayName: 'GPT-5.4 Pro', shortDisplayName: '5.4 Pro', tier: 'best', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
+      {
+        id: 'gpt-5-nano',
+        displayName: 'GPT-5 Nano',
+        shortDisplayName: '5 Nano',
+        tier: 'fast',
+        contextWindow: 400_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5-mini',
+        displayName: 'GPT-5 Mini',
+        shortDisplayName: '5 Mini',
+        tier: 'fast',
+        contextWindow: 400_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5',
+        displayName: 'GPT-5',
+        shortDisplayName: '5',
+        tier: 'balanced',
+        contextWindow: 400_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5.2',
+        displayName: 'GPT-5.2',
+        shortDisplayName: '5.2',
+        tier: 'best',
+        contextWindow: 400_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5.4-nano',
+        displayName: 'GPT-5.4 Nano',
+        shortDisplayName: '5.4 Nano',
+        tier: 'fast',
+        contextWindow: 400_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5.4-mini',
+        displayName: 'GPT-5.4 Mini',
+        shortDisplayName: '5.4 Mini',
+        tier: 'fast',
+        contextWindow: 400_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5.4',
+        displayName: 'GPT-5.4',
+        shortDisplayName: '5.4',
+        tier: 'balanced',
+        contextWindow: 1_050_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
+      {
+        id: 'gpt-5.4-pro',
+        displayName: 'GPT-5.4 Pro',
+        shortDisplayName: '5.4 Pro',
+        tier: 'best',
+        contextWindow: 1_050_000,
+        maxOutputTokens: 128_000,
+        isReasoning: true,
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -165,9 +267,30 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'opus',
     getApiKeyUrl: '',
     models: [
-      { id: 'haiku', displayName: 'Haiku', shortDisplayName: 'Haiku 4.5', tier: 'fast', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', contextWindow: 200_000, maxOutputTokens: 128_000 },
+      {
+        id: 'haiku',
+        displayName: 'Haiku',
+        shortDisplayName: 'Haiku 4.5',
+        tier: 'fast',
+        contextWindow: 200_000,
+        maxOutputTokens: 64_000,
+      },
+      {
+        id: 'sonnet',
+        displayName: 'Sonnet',
+        shortDisplayName: 'Sonnet 4.6',
+        tier: 'balanced',
+        contextWindow: 200_000,
+        maxOutputTokens: 64_000,
+      },
+      {
+        id: 'opus',
+        displayName: 'Opus',
+        shortDisplayName: 'Opus 4.6',
+        tier: 'best',
+        contextWindow: 200_000,
+        maxOutputTokens: 128_000,
+      },
     ],
     auth: {
       fields: [],
@@ -182,7 +305,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'codex',
     displayName: 'Codex (CLI)',
     shortLabel: 'Codex',
-    defaultModel: '',
+    defaultModel: 'codex',
     getApiKeyUrl: '',
     models: [],
     auth: {
@@ -285,9 +408,34 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'llama-3.1-8b-instant',
     getApiKeyUrl: 'https://console.groq.com/keys',
     models: [
-      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B Instant', shortDisplayName: 'Llama 8B', tier: 'fast', contextWindow: 131_072, maxOutputTokens: 131_072, pricing: { inputPerMTok: 0.05, outputPerMTok: 0.08 } },
-      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B Versatile', shortDisplayName: 'Llama 70B', tier: 'balanced', contextWindow: 131_072, maxOutputTokens: 32_768, pricing: { inputPerMTok: 0.59, outputPerMTok: 0.79 } },
-      { id: 'openai/gpt-oss-120b', displayName: 'GPT-OSS 120B', shortDisplayName: 'GPT-OSS 120B', tier: 'best', contextWindow: 131_072, maxOutputTokens: 65_536, isReasoning: true, pricing: { inputPerMTok: 0.15, outputPerMTok: 0.60 } },
+      {
+        id: 'llama-3.1-8b-instant',
+        displayName: 'Llama 3.1 8B Instant',
+        shortDisplayName: 'Llama 8B',
+        tier: 'fast',
+        contextWindow: 131_072,
+        maxOutputTokens: 131_072,
+        pricing: { inputPerMTok: 0.05, outputPerMTok: 0.08 },
+      },
+      {
+        id: 'llama-3.3-70b-versatile',
+        displayName: 'Llama 3.3 70B Versatile',
+        shortDisplayName: 'Llama 70B',
+        tier: 'balanced',
+        contextWindow: 131_072,
+        maxOutputTokens: 32_768,
+        pricing: { inputPerMTok: 0.59, outputPerMTok: 0.79 },
+      },
+      {
+        id: 'openai/gpt-oss-120b',
+        displayName: 'GPT-OSS 120B',
+        shortDisplayName: 'GPT-OSS 120B',
+        tier: 'best',
+        contextWindow: 131_072,
+        maxOutputTokens: 65_536,
+        isReasoning: true,
+        pricing: { inputPerMTok: 0.15, outputPerMTok: 0.6 },
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
@@ -313,8 +461,25 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'grok-4-fast',
     getApiKeyUrl: 'https://console.x.ai/',
     models: [
-      { id: 'grok-4-fast', displayName: 'Grok 4 Fast', shortDisplayName: 'Grok 4 Fast', tier: 'balanced', contextWindow: 1_000_000, maxOutputTokens: 32_768, pricing: { inputPerMTok: 1.25, outputPerMTok: 2.50 } },
-      { id: 'grok-4', displayName: 'Grok 4', shortDisplayName: 'Grok 4', tier: 'best', contextWindow: 1_000_000, maxOutputTokens: 32_768, isReasoning: true, pricing: { inputPerMTok: 1.25, outputPerMTok: 2.50 } },
+      {
+        id: 'grok-4-fast',
+        displayName: 'Grok 4 Fast',
+        shortDisplayName: 'Grok 4 Fast',
+        tier: 'balanced',
+        contextWindow: 1_000_000,
+        maxOutputTokens: 32_768,
+        pricing: { inputPerMTok: 1.25, outputPerMTok: 2.5 },
+      },
+      {
+        id: 'grok-4',
+        displayName: 'Grok 4',
+        shortDisplayName: 'Grok 4',
+        tier: 'best',
+        contextWindow: 1_000_000,
+        maxOutputTokens: 32_768,
+        isReasoning: true,
+        pricing: { inputPerMTok: 1.25, outputPerMTok: 2.5 },
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xai-...' }],
@@ -340,8 +505,25 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'deepseek-v4-flash',
     getApiKeyUrl: 'https://platform.deepseek.com/api_keys',
     models: [
-      { id: 'deepseek-v4-flash', displayName: 'DeepSeek V4 Flash', shortDisplayName: 'V4 Flash', tier: 'balanced', contextWindow: 1_000_000, maxOutputTokens: 65_536, pricing: { inputPerMTok: 0.14, outputPerMTok: 0.28 } },
-      { id: 'deepseek-v4-pro', displayName: 'DeepSeek V4 Pro', shortDisplayName: 'V4 Pro', tier: 'best', contextWindow: 1_000_000, maxOutputTokens: 65_536, isReasoning: true, pricing: { inputPerMTok: 0.435, outputPerMTok: 0.87 } },
+      {
+        id: 'deepseek-v4-flash',
+        displayName: 'DeepSeek V4 Flash',
+        shortDisplayName: 'V4 Flash',
+        tier: 'balanced',
+        contextWindow: 1_000_000,
+        maxOutputTokens: 65_536,
+        pricing: { inputPerMTok: 0.14, outputPerMTok: 0.28 },
+      },
+      {
+        id: 'deepseek-v4-pro',
+        displayName: 'DeepSeek V4 Pro',
+        shortDisplayName: 'V4 Pro',
+        tier: 'best',
+        contextWindow: 1_000_000,
+        maxOutputTokens: 65_536,
+        isReasoning: true,
+        pricing: { inputPerMTok: 0.435, outputPerMTok: 0.87 },
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -367,9 +549,33 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'mistral-small-latest',
     getApiKeyUrl: 'https://console.mistral.ai/api-keys',
     models: [
-      { id: 'mistral-small-latest', displayName: 'Mistral Small', shortDisplayName: 'Small', tier: 'fast', contextWindow: 128_000, maxOutputTokens: 16_384, pricing: { inputPerMTok: 0.15, outputPerMTok: 0.60 } },
-      { id: 'mistral-medium-latest', displayName: 'Mistral Medium', shortDisplayName: 'Medium', tier: 'balanced', contextWindow: 131_072, maxOutputTokens: 16_384, pricing: { inputPerMTok: 0.40, outputPerMTok: 2.00 } },
-      { id: 'mistral-large-latest', displayName: 'Mistral Large', shortDisplayName: 'Large', tier: 'best', contextWindow: 256_000, maxOutputTokens: 32_768, pricing: { inputPerMTok: 0.50, outputPerMTok: 1.50 } },
+      {
+        id: 'mistral-small-latest',
+        displayName: 'Mistral Small',
+        shortDisplayName: 'Small',
+        tier: 'fast',
+        contextWindow: 128_000,
+        maxOutputTokens: 16_384,
+        pricing: { inputPerMTok: 0.15, outputPerMTok: 0.6 },
+      },
+      {
+        id: 'mistral-medium-latest',
+        displayName: 'Mistral Medium',
+        shortDisplayName: 'Medium',
+        tier: 'balanced',
+        contextWindow: 131_072,
+        maxOutputTokens: 16_384,
+        pricing: { inputPerMTok: 0.4, outputPerMTok: 2.0 },
+      },
+      {
+        id: 'mistral-large-latest',
+        displayName: 'Mistral Large',
+        shortDisplayName: 'Large',
+        tier: 'best',
+        contextWindow: 256_000,
+        maxOutputTokens: 32_768,
+        pricing: { inputPerMTok: 0.5, outputPerMTok: 1.5 },
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Mistral API key' }],
@@ -395,8 +601,24 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'nvidia/llama-3.3-nemotron-super-49b-v1',
     getApiKeyUrl: 'https://build.nvidia.com/',
     models: [
-      { id: 'nvidia/llama-3.3-nemotron-super-49b-v1', displayName: 'Nemotron Super 49B', shortDisplayName: 'Nemotron 49B', tier: 'balanced', contextWindow: 131_072, maxOutputTokens: 65_536, isReasoning: true },
-      { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', displayName: 'Nemotron Ultra 253B', shortDisplayName: 'Nemotron 253B', tier: 'best', contextWindow: 131_072, maxOutputTokens: 32_768, isReasoning: true },
+      {
+        id: 'nvidia/llama-3.3-nemotron-super-49b-v1',
+        displayName: 'Nemotron Super 49B',
+        shortDisplayName: 'Nemotron 49B',
+        tier: 'balanced',
+        contextWindow: 131_072,
+        maxOutputTokens: 65_536,
+        isReasoning: true,
+      },
+      {
+        id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+        displayName: 'Nemotron Ultra 253B',
+        shortDisplayName: 'Nemotron 253B',
+        tier: 'best',
+        contextWindow: 131_072,
+        maxOutputTokens: 32_768,
+        isReasoning: true,
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'nvapi-...' }],
@@ -465,16 +687,33 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gemini-3.1-flash-lite-preview',
     getApiKeyUrl: 'https://aistudio.google.com/apikey',
     models: [
-      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite', shortDisplayName: 'Flash Lite 3.1', tier: 'fast', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
-      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', shortDisplayName: 'Pro 3.1', tier: 'balanced', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
+      {
+        id: 'gemini-3.1-flash-lite-preview',
+        displayName: 'Gemini 3.1 Flash Lite',
+        shortDisplayName: 'Flash Lite 3.1',
+        tier: 'fast',
+        contextWindow: 1_000_000,
+        maxOutputTokens: 64_000,
+      },
+      {
+        id: 'gemini-3.1-pro-preview',
+        displayName: 'Gemini 3.1 Pro',
+        shortDisplayName: 'Pro 3.1',
+        tier: 'balanced',
+        contextWindow: 1_000_000,
+        maxOutputTokens: 64_000,
+      },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'AIza...' }],
       validate: async (creds) => {
         try {
-          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
+          const res = await fetch(
+            'https://generativelanguage.googleapis.com/v1beta/openai/models',
+            {
+              headers: { Authorization: `Bearer ${creds.apiKey}` },
+            }
+          );
           return res.ok;
         } catch {
           return false;
@@ -497,9 +736,9 @@ for (const provider of Object.values(AI_PROVIDERS)) {
   }
 }
 // gemini-3.1-flash-lite-preview is not in pricetoken's catalog (preview model)
-const flashLite = AI_PROVIDERS.google.models.find(m => m.id === 'gemini-3.1-flash-lite-preview');
+const flashLite = AI_PROVIDERS.google.models.find((m) => m.id === 'gemini-3.1-flash-lite-preview');
 if (flashLite && !flashLite.pricing) {
-  flashLite.pricing = { inputPerMTok: 0.25, outputPerMTok: 1.50 };
+  flashLite.pricing = { inputPerMTok: 0.25, outputPerMTok: 1.5 };
 }
 
 /**
@@ -529,9 +768,7 @@ export function getAiProviderIds(): AiProviderId[] {
 }
 
 export function getAiProviderIdsWithPricing(): AiProviderId[] {
-  return getAiProviderIds().filter(id =>
-    AI_PROVIDERS[id].models.some(m => m.pricing)
-  );
+  return getAiProviderIds().filter((id) => AI_PROVIDERS[id].models.some((m) => m.pricing));
 }
 
 export function isValidAiProviderId(id: string): id is AiProviderId {
@@ -543,6 +780,8 @@ export function isValidAiProviderId(id: string): id is AiProviderId {
  * Returns the raw ID if no match is found.
  */
 export function getAiModelDisplayName(modelId: string): string {
+  const agentLabel = getAgentModelDisplayName(modelId);
+  if (agentLabel) return agentLabel;
   for (const provider of Object.values(AI_PROVIDERS)) {
     const model = provider.models.find((m) => m.id === modelId);
     if (model) return model.displayName;
@@ -564,16 +803,31 @@ export interface AiProviderClientMeta {
   badge: 'optional' | 'free' | null;
 }
 
-const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'>, { description: string; badge: 'optional' | 'free' | null }> = {
+const AI_CLIENT_DESCRIPTIONS: Record<
+  Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'>,
+  { description: string; badge: 'optional' | 'free' | null }
+> = {
   anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
   openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
   google: { description: 'Gemini models with 1M context window', badge: 'optional' },
   together: { description: 'Cheap Whisper STT at $0.0015/min', badge: 'optional' },
   deepgram: { description: 'Nova-3 STT — high accuracy with $200 free credits', badge: 'optional' },
-  assemblyai: { description: 'Universal-2 STT — 99 languages with $50 free credits', badge: 'optional' },
-  groq: { description: 'Fastest inference — Llama & GPT-OSS LLMs, plus Whisper STT', badge: 'optional' },
-  gladia: { description: 'Solaria STT — 140 languages with accurate word timings', badge: 'optional' },
-  speechmatics: { description: 'Enhanced STT — enterprise accuracy across 80+ languages', badge: 'optional' },
+  assemblyai: {
+    description: 'Universal-2 STT — 99 languages with $50 free credits',
+    badge: 'optional',
+  },
+  groq: {
+    description: 'Fastest inference — Llama & GPT-OSS LLMs, plus Whisper STT',
+    badge: 'optional',
+  },
+  gladia: {
+    description: 'Solaria STT — 140 languages with accurate word timings',
+    badge: 'optional',
+  },
+  speechmatics: {
+    description: 'Enhanced STT — enterprise accuracy across 80+ languages',
+    badge: 'optional',
+  },
   xai: { description: 'Grok 4 with a 1M-token context window', badge: 'optional' },
   deepseek: { description: 'DeepSeek V4 — frontier quality at ~1/10 the cost', badge: 'optional' },
   mistral: { description: 'Mistral Small/Medium/Large open-weight LLMs', badge: 'optional' },
@@ -587,7 +841,10 @@ const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'code
  */
 export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
   return Object.values(AI_PROVIDERS)
-    .filter((p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'> } => p.id !== 'claude-code' && p.id !== 'codex' && p.id !== 'local')
+    .filter(
+      (p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code' | 'codex' | 'local'> } =>
+        p.id !== 'claude-code' && p.id !== 'codex' && p.id !== 'local'
+    )
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
@@ -618,6 +875,8 @@ export function isReasoningModel(modelId: string): boolean {
  * Returns null if the model is not found in any provider.
  */
 export function getProviderForModel(modelId: string): AiProviderId | null {
+  const agentProvider = getAgentProviderForModelId(modelId);
+  if (agentProvider) return agentProvider;
   for (const provider of Object.values(AI_PROVIDERS)) {
     if (provider.models.some((m) => m.id === modelId)) {
       return provider.id;
@@ -631,6 +890,14 @@ export function getProviderForModel(modelId: string): AiProviderId | null {
  */
 export function isValidModelId(modelId: string): boolean {
   return getProviderForModel(modelId) !== null;
+}
+
+/**
+ * Providers that execute through local/server infrastructure rather than a
+ * user-provided hosted API key.
+ */
+export function providerRequiresAiKey(providerId: string | null | undefined): boolean {
+  return providerId !== 'claude-code' && providerId !== 'codex' && providerId !== 'local';
 }
 
 /**
@@ -648,10 +915,6 @@ export async function resolveAiModelAndProvider(opts: {
 }): Promise<{ model: string; provider: string }> {
   // 1. Episode-level model override — only use if the model is in the registry
   if (opts.episodeAiModel) {
-    if (opts.episodeAiModel.startsWith('claude-code:')) {
-      return { model: opts.episodeAiModel, provider: 'claude-code' };
-    }
-
     // Local OpenAI-compatible model (e.g. "local:qwen3") — routed by prefix, not
     // the registry, since the served model name is host-defined.
     if (opts.episodeAiModel.startsWith('local:')) {

@@ -46,6 +46,8 @@ const { mockResolveAiModelAndProvider } = vi.hoisted(() => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: mockResolveAiModelAndProvider,
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 const { mockBuildResearchDossier } = vi.hoisted(() => ({
@@ -171,7 +173,7 @@ describe('processDeepResearch', () => {
           apiKeyOverride: 'anthropic-key',
           model: 'claude-haiku-4-5-20251001',
           provider: 'anthropic',
-        }),
+        })
       );
     });
 
@@ -197,7 +199,7 @@ describe('processDeepResearch', () => {
           apiKeyOverride: 'openai-key',
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
     });
 
@@ -211,7 +213,7 @@ describe('processDeepResearch', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processDeepResearch(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI key for provider "openai" is required for deep research.',
+        'AI key for provider "openai" is required for deep research.'
       );
       expect(mockBuildResearchDossier).not.toHaveBeenCalled();
     });
@@ -220,7 +222,7 @@ describe('processDeepResearch', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processDeepResearch(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI model is required for deep research when no AI key is configured.',
+        'AI model is required for deep research when no AI key is configured.'
       );
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockBuildResearchDossier).not.toHaveBeenCalled();
@@ -246,13 +248,13 @@ describe('processDeepResearch', () => {
           apiKeyOverride: undefined,
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
     });
 
     it('rejects admin-credit routes without an explicit model', async () => {
       await expect(
-        processDeepResearch(createMockJob({ ...defaultPayload, useAdminCredits: true })),
+        processDeepResearch(createMockJob({ ...defaultPayload, useAdminCredits: true }))
       ).rejects.toThrow('AI model is required for deep research when no AI key is configured.');
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -279,7 +281,7 @@ describe('processDeepResearch', () => {
           apiKeyOverride: undefined,
           model: 'claude-code:sonnet',
           provider: 'claude-code',
-        }),
+        })
       );
     });
 
@@ -301,7 +303,7 @@ describe('processDeepResearch', () => {
           dossierId: 'dossier-001',
           useAdminCredits: undefined,
         },
-        { jobId: expect.stringMatching(/^plan-episode-001-/) },
+        { jobId: expect.stringMatching(/^plan-episode-001-/) }
       );
     });
   });

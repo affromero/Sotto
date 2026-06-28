@@ -29,11 +29,14 @@ vi.mock('@/lib/providers/ai-registry', () => ({
     'anthropic',
     'openai',
     'claude-code',
+    'codex',
     'together',
     'deepgram',
     'assemblyai',
   ]),
   getProviderForModel: vi.fn((id: string) => {
+    if (id.startsWith('claude-code:')) return 'claude-code';
+    if (id === 'codex' || id.startsWith('codex:')) return 'codex';
     if (id.startsWith('claude')) return 'anthropic';
     if (id.startsWith('gpt')) return 'openai';
     return null;
@@ -187,6 +190,21 @@ describe('PATCH /api/v1/admin/auto-models', () => {
     expect(response.status).toBe(200);
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
     await expect(response.json()).resolves.toEqual(config);
+  });
+
+  it('accepts dynamically addressed CLI model selectors', async () => {
+    const body = {
+      model: {
+        aiProvider: 'codex',
+        aiModel: 'codex:gpt-5.5#effort=xhigh',
+      },
+      includedModels: ['codex:gpt-5.5#effort=xhigh', 'claude-code:claude-fable-5#effort=high'],
+    };
+
+    const response = await PATCH(patchRequest(body));
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
   });
 
   it('accepts null to clear unified included lists', async () => {

@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getClaudeSshHost, isClaudeAvailable } from './agent-availability';
 import { buildAgentInvocation } from './agent-invocation';
+import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
 
@@ -39,10 +40,10 @@ function ensureClaudeHome(): string | undefined {
       writeFileSync(
         /* turbopackIgnore: true */ join(
           /* turbopackIgnore: true */ claudeDir,
-          '.credentials.json',
+          '.credentials.json'
         ),
         credsJson,
-        { mode: 0o600 },
+        { mode: 0o600 }
       );
       _claudeHome = runtimeDir;
       logger.info('claude-code: initialized writable home from CLAUDE_CODE_CREDENTIALS_JSON', {
@@ -71,13 +72,28 @@ interface ClaudeCodeOptions {
   model?: string;
   timeoutMs?: number;
   useWebSearch?: boolean;
+  effort?: AgentEffortLevel;
 }
 
 function buildArgs(model: string, systemPrompt: string, opts?: ClaudeCodeOptions): string[] {
   const args = ['-p', '--model', model, '--output-format', 'text'];
+  if (opts?.effort) args.push('--effort', opts.effort);
   if (systemPrompt) args.push('--system-prompt', systemPrompt);
   if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
   return args;
+}
+
+function resolveSelection(opts?: ClaudeCodeOptions): { model: string; effort?: AgentEffortLevel } {
+  const selected = opts?.model || process.env.CLAUDE_CODE_MODEL || CLAUDE_CODE_DEFAULT_MODEL;
+  const parsed = parseAgentModelId(selected, 'claude-code');
+  const model = parsed?.model || CLAUDE_CODE_DEFAULT_MODEL;
+  const effort =
+    opts?.effort ??
+    parsed?.effort ??
+    parseAgentModelId(`claude-code:${model}#effort=${process.env.CLAUDE_CODE_EFFORT ?? ''}`)
+      ?.effort ??
+    undefined;
+  return effort ? { model, effort } : { model };
 }
 
 /**
@@ -89,13 +105,15 @@ export async function executeClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): Promise<ClaudeCodeResponse> {
-  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || CLAUDE_CODE_DEFAULT_MODEL;
+  const selection = resolveSelection(opts);
+  const model = selection.model;
   const timeoutMs = opts?.timeoutMs || 600_000;
 
-  const args = buildArgs(model, systemPrompt, opts);
+  const args = buildArgs(model, systemPrompt, { ...opts, effort: selection.effort });
 
   logger.info('claude-code: executing', {
     model,
+    effort: selection.effort ?? '(configured default)',
     promptLength: String(prompt.length),
     webSearch: String(!!opts?.useWebSearch),
   });
@@ -173,15 +191,18 @@ export async function* streamClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): AsyncGenerator<string> {
-  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || CLAUDE_CODE_DEFAULT_MODEL;
+  const selection = resolveSelection(opts);
+  const model = selection.model;
   const timeoutMs = opts?.timeoutMs || 600_000;
 
   const args = ['-p', '--model', model, '--output-format', 'stream-json', '--verbose'];
+  if (selection.effort) args.push('--effort', selection.effort);
   if (systemPrompt) args.push('--system-prompt', systemPrompt);
   if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
 
   logger.info('claude-code: streaming', {
     model,
+    effort: selection.effort ?? '(configured default)',
     promptLength: String(prompt.length),
     webSearch: String(!!opts?.useWebSearch),
   });

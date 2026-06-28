@@ -109,7 +109,8 @@ export function sttModelProviderId(wizardId: string): string {
 /**
  * AI agent → backend.
  *   claude+key → BYOK anthropic;  codex+key → BYOK openai;  google+key → BYOK google
- *   *+cli      → keyless infra aiProvider=claude-code (the local-agent generation backend)
+ *   claude+cli → keyless infra aiProvider=claude-code
+ *   codex+cli  → keyless infra aiProvider=codex
  *   local/custom+url → infra aiProvider=local (+ base URL, + model)
  */
 export function resolveAi(
@@ -135,14 +136,14 @@ export function resolveAi(
   }
 
   if (method === 'cli') {
-    // The CLI backend is the keyless local agent (claude-code). The picked model
-    // is a claude-code model id (haiku/sonnet/opus); it drives generation via
-    // AutoModelConfig + infra.aiModel once persisted.
+    // The CLI backend is the keyless local agent. The picked model is already a
+    // routable agent model id (for example claude-code:sonnet or codex:gpt-5.5).
+    const cliProvider = provider === 'codex' ? 'codex' : 'claude-code';
     return {
       keyPost: null,
-      preferredAiProvider: 'claude-code',
-      preferredAiModel: m || null,
-      infra: { aiProvider: 'claude-code', ...(m && { aiModel: m }) },
+      preferredAiProvider: cliProvider,
+      preferredAiModel: m || (cliProvider === 'codex' ? 'codex' : null),
+      infra: { aiProvider: cliProvider, ...(m && { aiModel: m }) },
     };
   }
 

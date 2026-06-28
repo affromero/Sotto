@@ -1,16 +1,20 @@
 import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
 import { serializeMessages } from '../agent-messages';
+import { formatAgentModelId, parseAgentModelId } from '../agent-models/id';
 
 /** Extract plain text from ChatMessage content (string or ContentPart[]). */
 function textOf(content: ChatMessage['content']): string {
   if (typeof content === 'string') return content;
-  return content.filter((p) => p.type === 'text').map((p) => (p as TextContentPart).text).join('\n');
+  return content
+    .filter((p) => p.type === 'text')
+    .map((p) => (p as TextContentPart).text)
+    .join('\n');
 }
 
 function reportedModelFor(model?: string): string {
-  const selected = (model || process.env.CODEX_MODEL || '').trim();
-  const bare = selected.startsWith('codex:') ? selected.slice('codex:'.length) : selected;
-  return bare ? `codex:${bare}` : 'codex';
+  const selected = model && model !== 'codex' ? model : process.env.CODEX_MODEL;
+  const parsed = parseAgentModelId(selected, 'codex');
+  return formatAgentModelId('codex', parsed?.model ?? null, parsed?.effort);
 }
 
 /**
@@ -26,7 +30,9 @@ export class CodexProvider implements AIProvider {
   ): Promise<AIResponse> {
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     const { executeCodex } = await import('../codex-client');
-    const result = await executeCodex(system, serializeMessages(textMessages), { model: opts?.model });
+    const result = await executeCodex(system, serializeMessages(textMessages), {
+      model: opts?.model,
+    });
     return { ...result, model: reportedModelFor(opts?.model) };
   }
 

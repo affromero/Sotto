@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  // Validate model ID against registry (claude-code:* models are exempt)
-  if (parsed.data.aiModel && !parsed.data.aiModel.startsWith('claude-code:')) {
+  // Validate model ID against registry or dynamic CLI model id support.
+  if (parsed.data.aiModel) {
     if (!isValidModelId(parsed.data.aiModel)) {
       return errorResponse(
         `Unknown AI model: "${parsed.data.aiModel}". Check /api/ai-models for available models.`,
