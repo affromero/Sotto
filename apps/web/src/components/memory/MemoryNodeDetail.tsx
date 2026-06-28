@@ -1,30 +1,42 @@
 'use client';
 
+import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { MemoryNode } from './MemoryGraph';
 import styles from './MemoryNodeDetail.module.css';
 
 interface MemoryNodeDetailProps {
   node: MemoryNode;
+  courseId?: string;
   onClose: () => void;
+  formatDate?: (value: string | null | undefined) => string;
 }
 
-export function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProps) {
+const defaultFormatDate = (value: string | null | undefined): string => {
+  if (!value) return 'Never';
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return 'Never';
+  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(new Date(ms));
+};
+
+export function MemoryNodeDetail({
+  node,
+  courseId,
+  onClose,
+  formatDate = defaultFormatDate,
+}: MemoryNodeDetailProps) {
   const router = useRouter();
   const masteryPercent = Math.round(node.strength * 100);
   const kindLabel = node.kind === 'vocab' ? 'Vocabulary' : 'Grammar';
+  const practiceKind = node.kind === 'vocab' ? 'VOCAB' : 'GRAMMAR';
 
   function handlePractice() {
-    // Navigate to the learn page; the caller can later wire the exact exercise route.
-    router.push('/learn');
+    const courseParam = courseId ? `course=${encodeURIComponent(courseId)}&` : '';
+    router.push(`/learn/practice?${courseParam}kind=${practiceKind}`);
   }
 
   return (
-    <aside
-      className={styles.root}
-      aria-label={`Details for ${node.label}`}
-      role="complementary"
-    >
+    <aside className={styles.root} aria-label={`Details for ${node.label}`} role="complementary">
       <header className={styles.header}>
         <div className={styles.titleRow}>
           <span
@@ -39,27 +51,12 @@ export function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProps) {
             onClick={onClose}
             aria-label="Close node detail"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M4 4l8 8M12 4l-8 8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
         <h2 className={styles.label}>{node.label}</h2>
-        {node.translation && (
-          <p className={styles.translation}>{node.translation}</p>
-        )}
+        {node.translation && <p className={styles.translation}>{node.translation}</p>}
       </header>
 
       <div className={styles.body}>
@@ -67,19 +64,43 @@ export function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProps) {
           <span className={styles.masteryLabel}>Mastery</span>
           <span className={styles.masteryPercent}>{masteryPercent}%</span>
         </div>
-        <div
-          className={styles.masteryBarTrack}
-          role="meter"
+        <meter
+          className={styles.masteryMeter}
+          min={0}
+          max={100}
+          value={masteryPercent}
           aria-label={`Mastery: ${masteryPercent}%`}
-          aria-valuenow={masteryPercent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div
-            className={styles.masteryBarFill}
-            style={{ width: `${masteryPercent}%` }}
-          />
-        </div>
+        />
+
+        <dl className={styles.facts}>
+          <div>
+            <dt>Level</dt>
+            <dd>{node.cefrLevel ?? 'Open'}</dd>
+          </div>
+          <div>
+            <dt>Reviews</dt>
+            <dd>{node.reviewCount ?? 0}</dd>
+          </div>
+          <div>
+            <dt>Lapses</dt>
+            <dd>{node.lapseCount ?? 0}</dd>
+          </div>
+          <div>
+            <dt>Last</dt>
+            <dd>{formatDate(node.lastReviewed)}</dd>
+          </div>
+          <div>
+            <dt>Due</dt>
+            <dd>{formatDate(node.dueAt)}</dd>
+          </div>
+          <div>
+            <dt>Added</dt>
+            <dd>{formatDate(node.createdAt)}</dd>
+          </div>
+        </dl>
+
+        {node.partOfSpeech && <p className={styles.note}>{node.partOfSpeech}</p>}
+        {node.pronunciation && <p className={styles.note}>{node.pronunciation}</p>}
 
         {node.due && (
           <p className={styles.dueIndicator} role="status" aria-live="polite">
@@ -88,18 +109,16 @@ export function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProps) {
         )}
       </div>
 
-      {node.due && (
-        <footer className={styles.footer}>
-          <button
-            type="button"
-            className={styles.practiceButton}
-            onClick={handlePractice}
-            aria-label={`Practice ${node.label} now`}
-          >
-            Practice now
-          </button>
-        </footer>
-      )}
+      <footer className={styles.footer}>
+        <button
+          type="button"
+          className={styles.practiceButton}
+          onClick={handlePractice}
+          aria-label={`Practice ${node.label} now`}
+        >
+          Practice {node.kind === 'vocab' ? 'vocab' : 'grammar'}
+        </button>
+      </footer>
     </aside>
   );
 }

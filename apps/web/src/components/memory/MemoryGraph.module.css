@@ -1,32 +1,462 @@
-/* MemoryGraph — Cytoscape canvas wrapper + overlay chrome */
+/* MemoryGraph - interactive atlas: Cytoscape canvas + timeline + insight controls */
 
 .root {
   position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
-  /* Reserve space for the truncation note below the canvas */
+  gap: var(--spacing-md);
+}
+
+.commandDeck {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.metricRail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-border);
+}
+
+.metric {
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-primary) 8%);
+}
+
+.metricValue {
+  font-family: var(--font-mono);
+  font-size: clamp(1.35rem, 5vw, 2.35rem);
+  line-height: 1;
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.metricLabel,
+.controlLabel,
+.insightCount {
+  font: var(--text-overline);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: var(--spacing-sm);
 }
 
-.canvas {
-  width: 100%;
-  height: 420px;
+.timelinePanel,
+.segmentGroup,
+.controlCluster {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
+}
+
+.timelinePanel {
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 112px;
+}
+
+.timelineTop,
+.timelineControls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.timelineTop {
+  justify-content: space-between;
+}
+
+.timelineDate {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+}
+
+.timelineRange {
+  min-width: 0;
+  flex: 1;
+  accent-color: var(--color-primary);
+}
+
+.timelineMeta {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.segmentGroup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 4px;
+}
+
+.segmentGroup + .segmentGroup {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segmentButton {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--text-label);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.segmentButton:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.segmentButtonActive {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-sm);
+}
+
+.controlCluster {
+  flex-wrap: wrap;
+}
+
+.toggleLabel {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-sm);
+  font: var(--text-label);
+  color: var(--color-text-primary);
+}
+
+.toggleLabel input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+}
+
+.layoutSelect {
+  min-width: 150px;
+  height: 44px;
+  padding: 0 var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+  font-size: max(16px, var(--font-size-sm));
+}
+
+.iconButton {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.iconButton:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-surface-hover);
+  transform: translateY(-1px);
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.iconButton:focus-visible,
+.segmentButton:focus-visible,
+.layoutSelect:focus-visible,
+.toggleLabel input:focus-visible,
+.insightButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+.canvasShell {
+  position: relative;
+  min-height: 470px;
   overflow: hidden;
-  /* Cytoscape renders to a <canvas> element inside this div */
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 9%, transparent),
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at 85% 20%,
+      color-mix(in srgb, #147d64 13%, transparent),
+      transparent 32%
+    ),
+    var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 
-@media (min-width: 768px) {
-  .canvas {
-    height: 560px;
-  }
+.canvasAtmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-border) 45%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at 50% 45%, black 0%, transparent 78%);
+  opacity: 0.55;
 }
 
-/* Empty state */
+.canvas {
+  position: absolute;
+  inset: 0;
+  min-height: 470px;
+  overflow: hidden;
+}
 
+.stageHud {
+  position: absolute;
+  left: var(--spacing-sm);
+  bottom: var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  max-width: calc(100% - var(--spacing-xl));
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  color: var(--color-text-secondary);
+  font: var(--text-caption);
+  backdrop-filter: blur(12px);
+  z-index: 4;
+}
+
+.stageHud span + span::before {
+  content: '/';
+  margin-right: var(--spacing-xs);
+  color: var(--color-text-tertiary);
+}
+
+.insightPanel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+.insightBlock {
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.insightHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.insightTitle {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
+}
+
+.insightList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-border);
+}
+
+.insightButton {
+  width: 100%;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.insightButton:hover {
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+}
+
+.insightName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--text-label);
+}
+
+.insightMeta {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.insightEmpty {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.legendList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.legendList li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 32px;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.legendDot,
+.legendShape {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  justify-self: center;
+  border: 4px solid;
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, currentColor 80%, #1e2128 20%);
+}
+
+.legendDot {
+  border-radius: 999px;
+}
+
+.legendDue {
+  color: #c2410c;
+  border-color: #dc2626;
+}
+
+.legendStrong {
+  color: #147d64;
+  border-color: #147d64;
+}
+
+.legendShapeRow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.legendShape {
+  width: 18px;
+  height: 18px;
+}
+
+.legendVocab {
+  border-radius: 999px;
+  color: #3f4fb0;
+  border-color: #eef0f6;
+}
+
+.legendGrammar {
+  border-radius: 6px;
+  color: #2a3550;
+  border-color: #eef0f6;
+}
+
+.legendScale {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.legendScale span {
+  display: inline-block;
+  border-radius: 999px;
+  background: #3f4fb0;
+  border: 2px solid #eef0f6;
+}
+
+.legendScale span:first-child {
+  width: 12px;
+  height: 12px;
+}
+
+.legendScale span:last-child {
+  width: 24px;
+  height: 24px;
+}
+
+.filteredEmpty,
 .empty {
   display: flex;
   flex-direction: column;
@@ -34,11 +464,18 @@
   justify-content: center;
   text-align: center;
   gap: var(--spacing-xs);
-  height: 240px;
+  min-height: 300px;
   background: var(--color-surface);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
+}
+
+.filteredEmpty {
+  position: absolute;
+  inset: var(--spacing-md);
+  min-height: auto;
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
 }
 
 .emptyHeading {
@@ -49,14 +486,58 @@
 .emptyBody {
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
-  max-width: 300px;
+  max-width: 320px;
 }
-
-/* Truncation note */
 
 .truncationNote {
   font: var(--text-caption);
   color: var(--color-text-tertiary);
   text-align: right;
   padding: 0 var(--spacing-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmentButton,
+  .iconButton {
+    transition: none;
+  }
+
+  .iconButton:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .metricRail {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .controls {
+    grid-template-columns: minmax(280px, 1.2fr) minmax(260px, 0.9fr);
+  }
+
+  .timelinePanel {
+    grid-row: span 2;
+  }
+
+  .controlCluster {
+    grid-column: 2;
+  }
+
+  .canvasShell,
+  .canvas {
+    min-height: 620px;
+  }
+}
+
+@media (min-width: 1120px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: stretch;
+  }
+
+  .insightPanel {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
 }

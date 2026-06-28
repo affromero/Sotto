@@ -4,7 +4,8 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockGetOrCreateCurriculum = vi.fn();
 const mockCourseFindMany = vi.fn();
-const mockCourseUpsert = vi.fn();
+const mockCourseFindUnique = vi.fn();
+const mockCourseCreate = vi.fn();
 const mockCourseClassFindMany = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
@@ -19,7 +20,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     course: {
       findMany: (...args: unknown[]) => mockCourseFindMany(...args),
-      upsert: (...args: unknown[]) => mockCourseUpsert(...args),
+      findUnique: (...args: unknown[]) => mockCourseFindUnique(...args),
+      create: (...args: unknown[]) => mockCourseCreate(...args),
     },
     courseClass: {
       findMany: (...args: unknown[]) => mockCourseClassFindMany(...args),
@@ -196,7 +198,8 @@ describe('POST /api/v1/courses', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
     mockGetOrCreateCurriculum.mockResolvedValue({ id: 'cur-1' });
-    mockCourseUpsert.mockResolvedValue({
+    mockCourseFindUnique.mockResolvedValue(null);
+    mockCourseCreate.mockResolvedValue({
       id: 'course-new',
       nativeLang: 'en',
       targetLang: 'de',
@@ -215,35 +218,35 @@ describe('POST /api/v1/courses', () => {
 
     expect(response.status).toBe(401);
     expect(body.error).toBe('Unauthorized');
-    expect(mockCourseUpsert).not.toHaveBeenCalled();
+    expect(mockCourseCreate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when native and target are the same language', async () => {
     const response = await POST(makePostRequest({ native: 'en', target: 'en' }));
 
     expect(response.status).toBe(400);
-    expect(mockCourseUpsert).not.toHaveBeenCalled();
+    expect(mockCourseCreate).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing native field', async () => {
     const response = await POST(makePostRequest({ target: 'de' }));
 
     expect(response.status).toBe(400);
-    expect(mockCourseUpsert).not.toHaveBeenCalled();
+    expect(mockCourseCreate).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing target field', async () => {
     const response = await POST(makePostRequest({ native: 'en' }));
 
     expect(response.status).toBe(400);
-    expect(mockCourseUpsert).not.toHaveBeenCalled();
+    expect(mockCourseCreate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the body is empty', async () => {
     const response = await POST(makePostRequest({}));
 
     expect(response.status).toBe(400);
-    expect(mockCourseUpsert).not.toHaveBeenCalled();
+    expect(mockCourseCreate).not.toHaveBeenCalled();
   });
 
   it('creates a course and returns 201', async () => {
@@ -262,19 +265,34 @@ describe('POST /api/v1/courses', () => {
     expect(mockGetOrCreateCurriculum).toHaveBeenCalledWith('u1', 'en', 'de');
   });
 
-  it('upserts the course with userId_nativeLang_targetLang composite key', async () => {
+  it('blocks creating a duplicate course for the same language pair', async () => {
+    mockCourseFindUnique.mockResolvedValueOnce({ id: 'course-existing' });
+
+    const response = await POST(makePostRequest({ native: 'en', target: 'de' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe('A course for this language pair already exists.');
+    expect(body.courseId).toBe('course-existing');
+    expect(mockGetOrCreateCurriculum).not.toHaveBeenCalled();
+    expect(mockCourseCreate).not.toHaveBeenCalled();
+  });
+
+  it('checks the composite language-pair key before creating', async () => {
     await POST(makePostRequest({ native: 'en', target: 'de' }));
 
-    expect(mockCourseUpsert).toHaveBeenCalledWith({
+    expect(mockCourseFindUnique).toHaveBeenCalledWith({
       where: { userId_nativeLang_targetLang: { userId: 'u1', nativeLang: 'en', targetLang: 'de' } },
-      create: expect.objectContaining({
+      select: { id: true },
+    });
+    expect(mockCourseCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
         userId: 'u1',
         nativeLang: 'en',
         targetLang: 'de',
         curriculumId: 'cur-1',
         placementSource: 'MANUAL',
       }),
-      update: {},
     });
   });
 
@@ -287,7 +305,8 @@ describe('POST /api/v1/courses', () => {
       vi.clearAllMocks();
       mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
       mockGetOrCreateCurriculum.mockResolvedValue({ id: 'cur-1' });
-      mockCourseUpsert.mockResolvedValue({
+      mockCourseFindUnique.mockResolvedValue(null);
+      mockCourseCreate.mockResolvedValue({
         id: 'course-x',
         nativeLang: native,
         targetLang: target,
@@ -301,8 +320,8 @@ describe('POST /api/v1/courses', () => {
   it('does not set a currentLevel on create (A1 course starts without a placed level)', async () => {
     await POST(makePostRequest({ native: 'en', target: 'de' }));
 
-    const call = mockCourseUpsert.mock.calls[0][0];
-    expect(call.create).not.toHaveProperty('currentLevel');
-    expect(call.create).not.toHaveProperty('startLevel');
+    const call = mockCourseCreate.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty('currentLevel');
+    expect(call.data).not.toHaveProperty('startLevel');
   });
 });
