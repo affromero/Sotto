@@ -12,7 +12,7 @@ __SOTTO_APP_DOMAIN__ {
 		# either an old slot or a new slot while the app health route migrates.
 		health_uri /api/health
 		health_interval 5s
-		health_timeout 3s
+		health_timeout 10s
 		health_status 200
 	}
 
@@ -45,7 +45,7 @@ __SOTTO_WWW_DOMAIN__ {
 			lb_policy first
 			health_uri /api/health
 			health_interval 5s
-			health_timeout 3s
+			health_timeout 10s
 			health_status 200
 		}
 	}
