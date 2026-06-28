@@ -364,28 +364,24 @@ final class SottoAppModel: ObservableObject {
 
         do {
             var classDetail = try await client.fetchClass(classId: classId)
-            let issues = classPresentationIssues(classDetail)
-            if !classDetail.submitted && (!issues.isEmpty || classDetail.status == "GENERATING") {
-                let needsRegeneration = classPresentationNeedsRegeneration(classDetail)
+            if !classDetail.submitted,
+               classDetail.status == "GENERATING" || isClassPresentationStillRendering(classDetail) {
                 let startedAt = Date()
                 loadingOperation = SottoLoadingOperation(
-                    title: "Refreshing class",
-                    detail: "Replacing an older generated class with the complete class format.",
+                    title: "Preparing class",
+                    detail: "Waiting for the class material to finish rendering.",
                     progress: nil,
                     currentStep: nil,
                     totalSteps: nil,
                     elapsedSeconds: nil,
                     remainingSeconds: nil
                 )
-                if needsRegeneration, classDetail.status != "GENERATING" {
-                    try await client.startClassRegeneration(classId: classId)
-                }
                 classDetail = try await waitForRefreshedClass(
                     client: client,
                     classId: classId,
                     courseId: classDetail.courseId,
                     startedAt: startedAt,
-                    initialIssues: issues
+                    initialIssues: classPresentationIssues(classDetail)
                 )
             }
 
@@ -440,6 +436,14 @@ final class SottoAppModel: ObservableObject {
                 return classDetail
             }
 
+            if classDetail.status != "GENERATING",
+               !issues.isEmpty,
+               !isClassPresentationStillRendering(classDetail) {
+                throw SottoAPIError.message(
+                    "This class is missing required presentation material: \(issues.joined(separator: " "))"
+                )
+            }
+
             if Date() >= deadline {
                 let detail: String
                 if lastIssues.isEmpty {
@@ -465,7 +469,7 @@ final class SottoAppModel: ObservableObject {
     ) -> SottoLoadingOperation {
         if let progress {
             return SottoLoadingOperation(
-                title: progress.lessonTitle.map { "Refreshing \($0)" } ?? "Refreshing class",
+                title: progress.lessonTitle.map { "Preparing \($0)" } ?? "Preparing class",
                 detail: "\(progress.stage). \(progress.detail)",
                 progress: max(0, min(1, progress.progress)),
                 currentStep: progress.currentStep == 0 ? nil : progress.currentStep,
@@ -477,13 +481,13 @@ final class SottoAppModel: ObservableObject {
 
         let detail: String
         if issues.isEmpty {
-            detail = "Waiting for the refreshed class to replace the older format."
+            detail = "Waiting for the class material to finish rendering."
         } else {
             detail = issues.joined(separator: " ")
         }
 
         return SottoLoadingOperation(
-            title: "Refreshing class",
+            title: "Preparing class",
             detail: detail,
             progress: min(0.95, max(0.08, Double(elapsedSeconds) / 420.0)),
             currentStep: nil,
@@ -924,34 +928,10 @@ private func classPresentationIssues(_ classDetail: SottoClassDetail) -> [String
     return issues
 }
 
-private func classPresentationNeedsRegeneration(_ classDetail: SottoClassDetail) -> Bool {
-    let sectionsBySkill = classDetail.sections.reduce(into: [String: SottoClassSection]()) { result, section in
-        result[section.skill.uppercased()] = section
-    }
-
-    for skill in requiredClassSkills where sectionsBySkill[skill] == nil {
-        return true
-    }
-
-    if let reading = sectionsBySkill["READING"],
-       !reading.questions.contains(where: { ($0.passageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }) {
-        return true
-    }
-
-    guard let listeningEpisode = sectionsBySkill["LISTENING"]?.episode,
-          listeningEpisode.status != "FAILED" else {
-        return true
-    }
-
-    if let speaking = sectionsBySkill["SPEAKING"], speaking.prompts.isEmpty {
-        return true
-    }
-
-    if let writing = sectionsBySkill["WRITING"], writing.writingPrompts.isEmpty {
-        return true
-    }
-
-    return false
+private func isClassPresentationStillRendering(_ classDetail: SottoClassDetail) -> Bool {
+    let listening = classDetail.sections.first { $0.skill.uppercased() == "LISTENING" }
+    guard let episode = listening?.episode, episode.audioUrl == nil else { return false }
+    return episode.status != "READY" && episode.status != "FAILED"
 }
 
 private struct PairingPayload {

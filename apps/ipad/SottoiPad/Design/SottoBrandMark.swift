@@ -59,19 +59,69 @@ struct SottoBrandMark: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    .white.opacity(0.42),
-                                    .white.opacity(0.08),
-                                    .clear,
+                                    Color(red: 0.357, green: 0.553, blue: 0.937).opacity(0.95),
+                                    Color(red: 0.357, green: 0.553, blue: 0.937).opacity(0.0),
                                 ],
-                                center: .topLeading,
+                                center: UnitPoint(x: 0.28, y: 0.72),
                                 startRadius: 0,
-                                endRadius: max(12, logoSize * 0.76)
+                                endRadius: max(12, logoSize * 0.6)
                             )
                         )
 
-                    Text("S")
-                        .font(.system(size: max(8, logoSize * 0.45), weight: .bold, design: .serif))
-                        .foregroundStyle(.white.opacity(0.9))
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.561, blue: 0.694).opacity(0.95),
+                                    Color(red: 1.0, green: 0.561, blue: 0.694).opacity(0.0),
+                                ],
+                                center: UnitPoint(x: 0.72, y: 0.76),
+                                startRadius: 0,
+                                endRadius: max(12, logoSize * 0.55)
+                            )
+                        )
+
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.137, green: 0.141, blue: 0.306).opacity(0.48),
+                                    Color(red: 0.137, green: 0.141, blue: 0.306).opacity(0.0),
+                                ],
+                                center: .bottom,
+                                startRadius: 0,
+                                endRadius: max(12, logoSize * 0.65)
+                            )
+                        )
+
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    .white.opacity(0.95),
+                                    .white.opacity(0.22),
+                                    .clear,
+                                ],
+                                center: UnitPoint(x: 0.34, y: 0.26),
+                                startRadius: 0,
+                                endRadius: max(12, logoSize * 0.42)
+                            )
+                        )
+
+                    Ellipse()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    .white.opacity(0.95),
+                                    .white.opacity(0.0),
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: max(3, logoSize * 0.18)
+                            )
+                        )
+                        .frame(width: logoSize * 0.27, height: logoSize * 0.17)
+                        .offset(x: -logoSize * 0.16, y: -logoSize * 0.26)
 
                     Circle()
                         .stroke(.white.opacity(0.28), lineWidth: max(0.5, logoSize * 0.013))
