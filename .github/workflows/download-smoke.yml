@@ -1,0 +1,77 @@
+name: Download smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site URL to smoke test
+        required: false
+        default: https://sotto.fm
+        type: string
+      version:
+        description: Optional desktop version or commit hash channel
+        required: false
+        type: string
+  workflow_run:
+    workflows: ['Desktop launcher release']
+    types: [completed]
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || 'https://sotto.fm' }}
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Normalize inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="${BASE_URL%/}"
+          echo "BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+          if [ -n "${VERSION:-}" ]; then
+            echo "VERSION_SUFFIX=?version=$VERSION" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_SUFFIX=" >> "$GITHUB_ENV"
+          fi
+
+      - name: Check version endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 20 "$BASE_URL/api/version" -o version.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const version = JSON.parse(fs.readFileSync('version.json', 'utf8'));
+          if (!version.current || !version.commit || !version.desktop?.downloads) {
+            console.error(version);
+            throw new Error('/api/version is missing current, commit, or desktop downloads');
+          }
+          console.log(`Sotto ${version.current} (${version.commit})`);
+          NODE
+
+      - name: Check install script
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 20 "$BASE_URL/install.sh" -o install.sh
+          grep -Eq '^#!/usr/bin/env bash|^#!/bin/bash' install.sh
+
+      - name: Check desktop downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          for platform in mac windows linux; do
+            url="$BASE_URL/download/$platform$VERSION_SUFFIX"
+            code="$(curl -fsSIL -o /dev/null -w '%{http_code}' --max-time 60 "$url")"
+            if [ "$code" != "200" ]; then
+              echo "$url returned HTTP $code" >&2
+              exit 1
+            fi
+            echo "$platform download OK"
+          done

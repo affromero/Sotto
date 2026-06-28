@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an improvement or new workflow
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the learner, teacher, or self-hosting workflow that is hard today.
+      placeholder: e.g. I want to assign speaking homework to students without exposing them to a live tutoring call.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like Sotto to do?
+    validations:
+      required: false
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who is this for?
+      options:
+        - Learners
+        - Teachers
+        - Self-hosters
+        - Maintainers or contributors
+        - Other
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or other tools you tried.
+    validations:
+      required: false

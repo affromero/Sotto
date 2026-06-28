@@ -1,0 +1,147 @@
+name: Bug report
+description: Report something broken so it can be reproduced and fixed
+title: '[Bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Sotto can run on the public site, self-hosted Docker, local dev, or through the desktop host. The version or commit, provider/model, and logs are the fastest way to make a report actionable.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+      placeholder: |
+        e.g. Speaking practice accepts the answer but never returns feedback. I expected pronunciation feedback and a next-step prompt.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact language pair, course/class, prompt, file, or homework flow if relevant.
+      placeholder: |
+        1. Create a Spanish course from English notes
+        2. Start the first speaking exercise
+        3. Record an answer
+        4. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: 'For web/self-host, run: curl -s http://localhost:3000/api/version. On sotto.fm, use https://sotto.fm/api/version.'
+      placeholder: e.g. v0.1, 6b2b9122
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running Sotto?
+      options:
+        - Public web app at sotto.fm
+        - Self-hosted Docker Compose
+        - Desktop host app
+        - Local dev (npm run dev)
+        - Other (describe above)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Onboarding or placement
+        - Course generation
+        - Teacher mode, classes, or homework
+        - Speaking, pronunciation, STT, or TTS
+        - AI provider, model, or BYOK setup
+        - Desktop app or downloads
+        - Self-host install or update
+        - UI, accessibility, or layout
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: ai-provider
+    attributes:
+      label: AI provider
+      description: Found in settings/admin config or your setup wizard choice.
+      options:
+        - Anthropic
+        - OpenAI
+        - Google Gemini
+        - Claude Code CLI
+        - OpenAI Codex CLI
+        - Ollama
+        - llama.cpp
+        - vLLM
+        - Not sure
+        - Not relevant
+    validations:
+      required: false
+  - type: input
+    id: ai-model
+    attributes:
+      label: AI model ID
+      description: The exact configured model is useful for generation, grading, and feedback bugs.
+      placeholder: e.g. claude-haiku-4-5, gpt-4.1-mini, gemini-2.5-flash, qwen3:8b
+    validations:
+      required: false
+  - type: input
+    id: speech-provider
+    attributes:
+      label: Speech provider or voice
+      description: Include STT/TTS provider, voice, and language if the issue touches audio.
+      placeholder: e.g. ElevenLabs voice X, OpenAI TTS, local TTS, browser STT, not relevant
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: OS and architecture
+      placeholder: e.g. Ubuntu 24.04 x86_64, macOS 15 arm64, Windows 11
+    validations:
+      required: false
+  - type: input
+    id: browser
+    attributes:
+      label: Browser or desktop version
+      placeholder: e.g. Firefox 128, Chrome 126, Safari 18, Sotto Host v0.1
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Prefer attaching the redacted support bundle:
+        `npm run support:bundle -- --lines 200`
+
+        If you paste logs manually, include only the failure window. Remove API keys, auth tokens, private student text, or personal data before posting.
+
+        Self-host install:
+        `cd ~/.sotto && docker compose logs --tail=200 --timestamps`
+
+        Production-style deploy:
+        `docker compose -f docker-compose.app.yml -p sotto-blue logs --tail=200 --timestamps web`
+        `docker compose -f docker-compose.app.yml -p sotto-green logs --tail=200 --timestamps web`
+        `docker compose -f docker-compose.workers.yml logs --tail=200 --timestamps`
+
+        Health:
+        `curl -s http://localhost:3000/api/health`
+        `curl -s http://localhost:3000/api/version`
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find a duplicate
+          required: false
+        - label: I removed secrets and private learner/student content from logs
+          required: true

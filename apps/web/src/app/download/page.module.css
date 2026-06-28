@@ -4,6 +4,35 @@
   padding: var(--spacing-xl, 48px) var(--spacing-lg) var(--spacing-2xl, 64px);
 }
 
+.topNav {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: var(--spacing-lg, 32px);
+}
+
+.homeLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--spacing-sm, 12px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.homeLink:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
 .hero {
   text-align: center;
   margin-bottom: var(--spacing-xl, 48px);
@@ -58,7 +87,9 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   text-decoration: none;
-  transition: transform 150ms ease, border-color 150ms ease;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease;
   min-height: 44px;
 }
 

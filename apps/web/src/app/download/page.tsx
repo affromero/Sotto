@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { DownloadOptions } from './DownloadOptions';
 import styles from './page.module.css';
 
@@ -11,6 +12,12 @@ export const metadata: Metadata = {
 export default function DownloadPage() {
   return (
     <main className={styles.main}>
+      <nav className={styles.topNav} aria-label="Download page">
+        <Link href="/" className={styles.homeLink}>
+          Back to home
+        </Link>
+      </nav>
+
       <header className={styles.hero}>
         <h1 className={styles.title}>Get Sotto</h1>
         <p className={styles.subtitle}>
