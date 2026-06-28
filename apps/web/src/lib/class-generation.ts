@@ -11,6 +11,40 @@ import type { SkillType } from '@sotto/shared';
 
 const QUESTIONS_PER_SECTION = 5;
 const MAX_GENERATION_ATTEMPTS = 2;
+const LOGGED_OUTPUT_SNIPPET_CHARS = 500;
+
+const CLASS_SECTION_QUIZ_JSON_SCHEMA = {
+  name: 'class_section_questions',
+  schema: {
+    type: 'object',
+    properties: {
+      questions: {
+        type: 'array',
+        minItems: 1,
+        maxItems: QUESTIONS_PER_SECTION,
+        items: {
+          type: 'object',
+          properties: {
+            question: { type: 'string' },
+            options: {
+              type: 'array',
+              minItems: 4,
+              maxItems: 4,
+              items: { type: 'string' },
+            },
+            correctIndex: { type: 'integer', minimum: 0, maximum: 3 },
+            explanation: { type: 'string' },
+            passageRef: { type: 'string' },
+          },
+          required: ['question', 'options', 'correctIndex', 'explanation', 'passageRef'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['questions'],
+    additionalProperties: false,
+  },
+} as const;
 
 export interface GeneratedQuestion {
   question: string;
@@ -119,6 +153,27 @@ function buildUserPrompt(skill: SkillType, attempt: number, previousError?: stri
   ].join('\n');
 }
 
+function loggedOutputSnippet(content: string): string {
+  return sanitizeLlmJson(content).replace(/\s+/g, ' ').slice(0, LOGGED_OUTPUT_SNIPPET_CHARS);
+}
+
+function buildRepairPrompt(content: string, previousError: string): string {
+  return [
+    'Repair the malformed response below into ONLY valid JSON matching the class_section_questions schema.',
+    `Parser error: ${previousError}`,
+    '',
+    'Rules:',
+    '- Preserve the educational meaning where possible.',
+    `- Return at most ${QUESTIONS_PER_SECTION} questions.`,
+    '- Each question must have exactly 4 options and a 0-based correctIndex.',
+    '- Include passageRef as an empty string when there is no passage.',
+    '- No markdown fences, prose, comments, or trailing commas.',
+    '',
+    'Malformed response:',
+    content,
+  ].join('\n');
+}
+
 function normalizeQuestions(
   raw: RawGeneratedQuestion[],
   useSourcePassage: boolean,
@@ -179,6 +234,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
 
   const provider = createAIProvider(ai.provider);
   let lastError = 'invalid class-section output';
+  let lastMalformedContent = '';
 
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
     const response = await provider.generateResponse(
@@ -189,7 +245,13 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           content: buildUserPrompt(p.skill, attempt, lastError),
         },
       ],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.8 }
+      {
+        model: ai.model,
+        apiKeyOverride: ai.apiKey,
+        maxTokens: 4096,
+        temperature: 0.8,
+        jsonSchema: CLASS_SECTION_QUIZ_JSON_SCHEMA,
+      }
     );
 
     logUsage({
@@ -206,21 +268,70 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       const questions = normalizeQuestions(raw, useSourcePassage, p.sourceContent);
       if (questions.length > 0) return questions;
       lastError = 'response contained no usable questions';
+      lastMalformedContent = '';
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
+      lastMalformedContent = response.content;
     }
 
     if (attempt < MAX_GENERATION_ATTEMPTS) {
       logger.warn('Retrying class-section generation after unusable LLM response', {
         skill: p.skill,
         error: lastError,
+        outputSnippet: loggedOutputSnippet(response.content),
       });
     }
   }
 
-  logger.error('Failed to parse class-section LLM response', { error: lastError });
+  if (lastMalformedContent) {
+    logger.warn('Repairing malformed class-section LLM response', {
+      skill: p.skill,
+      error: lastError,
+      outputSnippet: loggedOutputSnippet(lastMalformedContent),
+    });
+
+    try {
+      const repairResponse = await provider.generateResponse(
+        [
+          systemPrompt,
+          '',
+          'You are repairing malformed JSON. Return ONLY valid JSON matching the provided schema.',
+        ].join('\n'),
+        [{ role: 'user', content: buildRepairPrompt(lastMalformedContent, lastError) }],
+        {
+          model: ai.model,
+          apiKeyOverride: ai.apiKey,
+          maxTokens: 4096,
+          temperature: 0,
+          jsonSchema: CLASS_SECTION_QUIZ_JSON_SCHEMA,
+        }
+      );
+
+      logUsage({
+        service: ai.provider,
+        model: repairResponse.model,
+        category: 'class-section-repair',
+        inputTokens: repairResponse.inputTokens,
+        outputTokens: repairResponse.outputTokens,
+        userId: p.userId,
+      });
+
+      const raw = parseRawQuestions(repairResponse.content);
+      const questions = normalizeQuestions(raw, useSourcePassage, p.sourceContent);
+      if (questions.length > 0) return questions;
+      lastError = 'repaired response contained no usable questions';
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  logger.error('Failed to parse class-section LLM response', {
+    error: lastError,
+    outputSnippet: lastMalformedContent ? loggedOutputSnippet(lastMalformedContent) : undefined,
+  });
   throw new Error(
-    lastError === 'response contained no usable questions'
+    lastError === 'response contained no usable questions' ||
+      lastError === 'repaired response contained no usable questions'
       ? 'Class generation produced no usable questions.'
       : 'Class generation returned malformed output.'
   );
