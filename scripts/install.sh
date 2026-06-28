@@ -151,7 +151,7 @@ info "Waiting for the database..."
 for _ in $(seq 1 30); do $DC exec -T postgres pg_isready -U sotto -d sotto >/dev/null 2>&1 && break; sleep 2; done
 
 info "Creating the schema and seeding the language curriculum..."
-$DC run --rm workers sh -c "cd /app/apps/web && npx prisma db push --schema=prisma/schema.prisma --skip-generate --accept-data-loss && npx tsx prisma/seed-curriculum.ts" \
+$DC run --rm workers sh -c "cd /app/apps/web && npx prisma db push --config=/app/prisma.config.ts --accept-data-loss && npx tsx prisma/seed-curriculum.ts" \
   || fail "Database initialization failed. Check '$DC logs' and re-run."
 
 info "Starting Sotto..."
