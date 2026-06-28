@@ -11,6 +11,7 @@
  * single-skill practice lives on the separate /learn/practice route.
  */
 
+import type { CSSProperties } from 'react';
 import { ClassGlyph } from './ClassGlyph';
 import { LearningSelectionMenu } from './LearningSelectionMenu';
 import { SKILL_GLYPH, skillLabel, type ClassIntroData, type ClassSection } from './classTypes';
@@ -47,6 +48,8 @@ export function ClassHub({
   const doneCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
   const totalSkills = sections.length;
   const visuals = intro.visuals;
+  const hasExamples = intro.examples.length > 0;
+  const sequenceStyle = { '--skill-count': Math.max(totalSkills, 1) } as CSSProperties;
 
   return (
     <div className={styles.root}>
@@ -110,7 +113,7 @@ export function ClassHub({
                 )}
               </div>
             )}
-            <div className={styles.introGrid}>
+            <div className={`${styles.introGrid} ${hasExamples ? '' : styles.introGridSolo}`}>
               <div className={styles.introPanel}>
                 <span className={styles.introNumber}>03</span>
                 <ul>
@@ -119,24 +122,26 @@ export function ClassHub({
                   ))}
                 </ul>
               </div>
-              <div className={styles.introPanel}>
-                <span className={styles.introNumber}>04</span>
-                <div className={styles.exampleList}>
-                  {intro.examples.map((example, index) => (
-                    <details
-                      className={styles.example}
-                      key={`${example.target}-${index}`}
-                      open={index === 0}
-                    >
-                      <summary>
-                        <b>{example.target}</b>
-                        <span>{example.meaning}</span>
-                      </summary>
-                      <small>{example.note}</small>
-                    </details>
-                  ))}
+              {hasExamples && (
+                <div className={styles.introPanel}>
+                  <span className={styles.introNumber}>04</span>
+                  <div className={styles.exampleList}>
+                    {intro.examples.map((example, index) => (
+                      <details
+                        className={styles.example}
+                        key={`${example.target}-${index}`}
+                        open={index === 0}
+                      >
+                        <summary>
+                          <b>{example.target}</b>
+                          <span>{example.meaning}</span>
+                        </summary>
+                        <small>{example.note}</small>
+                      </details>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <div className={styles.tipLine}>
               {(visuals?.callouts?.length
@@ -181,12 +186,11 @@ export function ClassHub({
             </span>
           </div>
 
-          <div className={styles.segSeq}>
+          <div className={styles.segSeq} style={sequenceStyle}>
             {sections.map((s) => {
               const done = (scores[s.id] ?? 0) > 0;
               return (
                 <div className={`${styles.segChip} ${done ? styles.segChipDone : ''}`} key={s.id}>
-                  <div className={styles.segConn} aria-hidden="true" />
                   <div className={styles.segChipIco}>
                     <ClassGlyph
                       name={done ? 'check' : (SKILL_GLYPH[s.skill] ?? 'gate')}

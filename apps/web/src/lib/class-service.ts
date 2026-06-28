@@ -622,6 +622,7 @@ export async function getClassForUser(classId: string, userId: string) {
             select: {
               id: true,
               audioUrl: true,
+              status: true,
               title: true,
               // Sourced-class sources: render via ReferenceList with verification badges.
               references: {

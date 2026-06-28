@@ -47,6 +47,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ? {
             id: s.episode.id,
             audioUrl: s.episode.audioUrl,
+            status: s.episode.status,
             title: s.episode.title,
             // Sourced-class sources: surfaced for the Sources panel + citation tooltips.
             references: s.episode.references,

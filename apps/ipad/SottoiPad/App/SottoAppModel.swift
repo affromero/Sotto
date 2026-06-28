@@ -357,6 +357,7 @@ final class SottoAppModel: ObservableObject {
             var classDetail = try await client.fetchClass(classId: classId)
             let issues = classPresentationIssues(classDetail)
             if !classDetail.submitted && (!issues.isEmpty || classDetail.status == "GENERATING") {
+                let needsRegeneration = classPresentationNeedsRegeneration(classDetail)
                 let startedAt = Date()
                 loadingOperation = SottoLoadingOperation(
                     title: "Refreshing class",
@@ -367,7 +368,7 @@ final class SottoAppModel: ObservableObject {
                     elapsedSeconds: nil,
                     remainingSeconds: nil
                 )
-                if classDetail.status != "GENERATING" {
+                if needsRegeneration, classDetail.status != "GENERATING" {
                     try await client.startClassRegeneration(classId: classId)
                 }
                 classDetail = try await waitForRefreshedClass(
@@ -866,6 +867,8 @@ private func classPresentationIssues(_ classDetail: SottoClassDetail) -> [String
 
     if let listening = sectionsBySkill["LISTENING"], listening.episode == nil {
         issues.append("Listening section has no audio episode.")
+    } else if let listening = sectionsBySkill["LISTENING"], listening.episode?.audioUrl == nil {
+        issues.append("Listening section audio is not ready yet.")
     }
 
     if let speaking = sectionsBySkill["SPEAKING"], speaking.prompts.isEmpty {
@@ -877,6 +880,36 @@ private func classPresentationIssues(_ classDetail: SottoClassDetail) -> [String
     }
 
     return issues
+}
+
+private func classPresentationNeedsRegeneration(_ classDetail: SottoClassDetail) -> Bool {
+    let sectionsBySkill = classDetail.sections.reduce(into: [String: SottoClassSection]()) { result, section in
+        result[section.skill.uppercased()] = section
+    }
+
+    for skill in requiredClassSkills where sectionsBySkill[skill] == nil {
+        return true
+    }
+
+    if let reading = sectionsBySkill["READING"],
+       !reading.questions.contains(where: { ($0.passageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }) {
+        return true
+    }
+
+    guard let listeningEpisode = sectionsBySkill["LISTENING"]?.episode,
+          listeningEpisode.status != "FAILED" else {
+        return true
+    }
+
+    if let speaking = sectionsBySkill["SPEAKING"], speaking.prompts.isEmpty {
+        return true
+    }
+
+    if let writing = sectionsBySkill["WRITING"], writing.writingPrompts.isEmpty {
+        return true
+    }
+
+    return false
 }
 
 private struct PairingPayload {

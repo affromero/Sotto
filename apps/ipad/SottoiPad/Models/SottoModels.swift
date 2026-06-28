@@ -228,6 +228,7 @@ struct SottoClassSection: Decodable, Identifiable, Equatable {
 struct SottoClassEpisode: Decodable, Equatable {
     let id: String
     let audioUrl: String?
+    let status: String
     let title: String
 }
 

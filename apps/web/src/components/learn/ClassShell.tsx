@@ -28,6 +28,7 @@ import {
   skillLabel,
   classRefToReferenceData,
   classPresentationIssues,
+  classPresentationNeedsRegeneration,
   type ClassData,
   type ClassFeedbackNote,
   type ClassReference,
@@ -221,12 +222,21 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
       const issues = classPresentationIssues(data);
       if (!data.submitted && (issues.length > 0 || data.status === 'GENERATING')) {
+        const needsRegeneration = classPresentationNeedsRegeneration(data);
         setAutoRefreshing(true);
         setView('loading');
         resetClassProgress();
-        if (data.status !== 'GENERATING' && !attemptedAutoRefreshRef.current) {
-          attemptedAutoRefreshRef.current = true;
-          await regenerateWholeClass();
+        if (needsRegeneration && data.status !== 'GENERATING') {
+          if (!attemptedAutoRefreshRef.current) {
+            attemptedAutoRefreshRef.current = true;
+            await regenerateWholeClass();
+          } else {
+            setErrorMessage(
+              `This class is missing required presentation material: ${issues.join(' ')}`
+            );
+            setView('error');
+            return;
+          }
         }
         data = await waitForClassRefresh();
       }

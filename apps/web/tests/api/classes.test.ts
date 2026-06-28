@@ -58,7 +58,10 @@ vi.mock('@/lib/logger', () => ({
 import { DELETE as DELETEClass, GET, POST } from '@/app/api/v1/classes/[classId]/route';
 import { POST as POSTSubmit } from '@/app/api/v1/classes/[classId]/submit/route';
 import { POST as POSTNextClass } from '@/app/api/v1/courses/[courseId]/next-class/route';
-import { DELETE as DELETEGeneration } from '@/app/api/v1/courses/[courseId]/generation/route';
+import {
+  DELETE as DELETEGeneration,
+  GET as GETGeneration,
+} from '@/app/api/v1/courses/[courseId]/generation/route';
 import { ClassGenerationCancelledError, CourseNotFoundError } from '@/lib/class-service';
 
 // ---- Helpers ----
@@ -196,6 +199,7 @@ const SAMPLE_CLASS_LISTENING = {
       episode: {
         id: 'pod-1',
         audioUrl: 'https://r2/listen.mp3',
+        status: 'READY',
         title: 'Listening',
         references: [],
       },
@@ -320,6 +324,7 @@ describe('GET /api/v1/classes/[classId]', () => {
     expect(body.sections[0].episode).toMatchObject({
       id: 'pod-1',
       audioUrl: 'https://r2/listen.mp3',
+      status: 'READY',
       title: 'Listening',
     });
   });
@@ -733,6 +738,52 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
     );
 
     expect(res.status).toBe(500);
+  });
+});
+
+// ---- GET /api/v1/courses/[courseId]/generation ----
+
+describe('GET /api/v1/courses/[courseId]/generation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+  });
+
+  it('reports pending listening audio when the class is available but audioUrl is missing', async () => {
+    mockCourseFindFirst.mockResolvedValue({
+      id: 'course-1',
+      classes: [
+        {
+          id: 'class-1',
+          status: 'AVAILABLE',
+          createdAt: new Date(Date.now() - 60_000),
+          updatedAt: new Date(),
+          lesson: { title: 'Past events' },
+          sections: [
+            { skill: 'GRAMMAR', status: 'READY', episode: null },
+            { skill: 'READING', status: 'READY', episode: null },
+            {
+              skill: 'LISTENING',
+              status: 'READY',
+              episode: { status: 'STITCHING', audioUrl: null },
+            },
+            { skill: 'SPEAKING', status: 'READY', episode: null },
+            { skill: 'WRITING', status: 'READY', episode: null },
+          ],
+        },
+      ],
+    });
+
+    const res = await GETGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
+      courseParams('course-1')
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.stage).toBe('Rendering listening audio');
+    expect(body.detail).toMatch(/stitching/i);
+    expect(body.progress).toBeLessThan(1);
   });
 });
 

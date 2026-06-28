@@ -37,8 +37,12 @@ const {
 });
 
 const { mockGenerateScript } = vi.hoisted(() => ({ mockGenerateScript: vi.fn() }));
-const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({ mockCreateSegmentsAndQueueAudio: vi.fn() }));
-const { mockPersistGeneratedReferences } = vi.hoisted(() => ({ mockPersistGeneratedReferences: vi.fn() }));
+const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({
+  mockCreateSegmentsAndQueueAudio: vi.fn(),
+}));
+const { mockPersistGeneratedReferences } = vi.hoisted(() => ({
+  mockPersistGeneratedReferences: vi.fn(),
+}));
 const { mockAddJob } = vi.hoisted(() => ({ mockAddJob: vi.fn() }));
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
@@ -224,13 +228,15 @@ function setupHappyPath() {
   mockGenerateScript.mockResolvedValue(SAMPLE_SCRIPT_RESULT);
 
   // $transaction receives a callback; execute it with a tx proxy that delegates to the mocks
-  mockTransaction.mockImplementation(async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
-    const tx = {
-      script: { create: (...args: unknown[]) => mockScriptCreate(...args) },
-      vocabularyEntry: { createMany: (...args: unknown[]) => mockVocabEntryCreateMany(...args) },
-    };
-    return cb(tx);
-  });
+  mockTransaction.mockImplementation(
+    async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
+      const tx = {
+        script: { create: (...args: unknown[]) => mockScriptCreate(...args) },
+        vocabularyEntry: { createMany: (...args: unknown[]) => mockVocabEntryCreateMany(...args) },
+      };
+      return cb(tx);
+    }
+  );
 
   mockScriptCreate.mockResolvedValue({});
   mockVocabEntryCreateMany.mockResolvedValue({ count: SAMPLE_VOCABULARY.length });
@@ -280,7 +286,7 @@ describe('generateClassListening', () => {
             language: 'es',
             status: 'PENDING',
           }),
-        }),
+        })
       );
     });
 
@@ -293,7 +299,7 @@ describe('generateClassListening', () => {
       expect(mockEpisodeCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ ttsProvider: 'kokoro' }),
-        }),
+        })
       );
     });
 
@@ -308,7 +314,7 @@ describe('generateClassListening', () => {
           languageMode: 'conversational_mix',
           forLearning: true,
           mustIncludeVocabulary: PARAMS.mustIncludeVocab,
-        }),
+        })
       );
     });
 
@@ -325,15 +331,19 @@ describe('generateClassListening', () => {
             turns: SAMPLE_TURNS,
             markdown: SAMPLE_SCRIPT_RESULT.markdown,
           }),
-        }),
+        })
       );
       expect(mockVocabEntryCreateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.arrayContaining([
             expect.objectContaining({ episodeId: 'episode-1', word: 'hola', translation: 'hello' }),
-            expect.objectContaining({ episodeId: 'episode-1', word: 'gracias', translation: 'thank you' }),
+            expect.objectContaining({
+              episodeId: 'episode-1',
+              word: 'gracias',
+              translation: 'thank you',
+            }),
           ]),
-        }),
+        })
       );
     });
 
@@ -343,6 +353,20 @@ describe('generateClassListening', () => {
       await generateClassListening(PARAMS);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-1', SAMPLE_TURNS);
+    });
+
+    it('marks the episode as generating audio before queueing segment audio', async () => {
+      setupHappyPath();
+
+      await generateClassListening(PARAMS);
+
+      expect(mockEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-1' },
+        data: { status: 'GENERATING_AUDIO' },
+      });
+      expect(mockEpisodeUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+        mockCreateSegmentsAndQueueAudio.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+      );
     });
 
     it('upserts each generated vocabulary word into learnerVocab', async () => {
@@ -362,7 +386,7 @@ describe('generateClassListening', () => {
               firstSeenClassId: 'class-1',
             }),
             update: {},
-          }),
+          })
         );
       }
     });
@@ -380,7 +404,7 @@ describe('generateClassListening', () => {
             status: 'READY',
             episodeId: 'episode-1',
           }),
-        }),
+        })
       );
     });
 
@@ -400,7 +424,7 @@ describe('generateClassListening', () => {
               correctIndex: 0,
             }),
           ]),
-        }),
+        })
       );
     });
 
@@ -411,10 +435,18 @@ describe('generateClassListening', () => {
 
       expect(mockLogUsage).toHaveBeenCalledTimes(2);
       expect(mockLogUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'class-listening-script', userId: 'u1', episodeId: 'episode-1' }),
+        expect.objectContaining({
+          category: 'class-listening-script',
+          userId: 'u1',
+          episodeId: 'episode-1',
+        })
       );
       expect(mockLogUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'class-listening-quiz', userId: 'u1', episodeId: 'episode-1' }),
+        expect.objectContaining({
+          category: 'class-listening-quiz',
+          userId: 'u1',
+          episodeId: 'episode-1',
+        })
       );
     });
   });
@@ -447,7 +479,7 @@ describe('generateClassListening', () => {
 
       await expect(generateClassListening(PARAMS)).rejects.toThrow('AI timeout');
       expect(mockEpisodeUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'episode-1' }, data: { status: 'FAILED' } }),
+        expect.objectContaining({ where: { id: 'episode-1' }, data: { status: 'FAILED' } })
       );
     });
 
@@ -463,7 +495,7 @@ describe('generateClassListening', () => {
       await expect(generateClassListening(PARAMS)).rejects.toThrow(/malformed output/);
       // Episode should be marked FAILED on error
       expect(mockEpisodeUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: 'FAILED' } }),
+        expect.objectContaining({ data: { status: 'FAILED' } })
       );
     });
 
@@ -510,7 +542,7 @@ describe('generateClassListening', () => {
       expect(mockLearnerVocabUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { courseId_lemma: { courseId: 'course-1', lemma: 'gracias' } },
-        }),
+        })
       );
     });
   });
@@ -556,7 +588,7 @@ describe('composeListeningContent', () => {
     expect(mockLearnerVocabUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({ firstSeenClassId: null }),
-      }),
+      })
     );
   });
 
@@ -567,7 +599,7 @@ describe('composeListeningContent', () => {
       await composeListeningContent(CONTENT_PARAMS);
 
       expect(mockGenerateScript).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceContent: undefined, webSearchEnabled: true }),
+        expect.objectContaining({ sourceContent: undefined, webSearchEnabled: true })
       );
       // Empty references → persistGeneratedReferences is a no-op caller-side and
       // the verify-class-references job is never enqueued.
@@ -599,7 +631,10 @@ describe('composeListeningContent', () => {
 
     it('passes sourceContent + sourceMetadata and disables web search', async () => {
       setupHappyPath();
-      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+      mockGenerateScript.mockResolvedValue({
+        ...SAMPLE_SCRIPT_RESULT,
+        references: SOURCED_REFERENCES,
+      });
 
       await composeListeningContent(SOURCED_PARAMS);
 
@@ -608,13 +643,16 @@ describe('composeListeningContent', () => {
           sourceContent: SOURCED_PARAMS.sourceContent,
           sourceMetadata: SOURCED_PARAMS.sourceMetadata,
           webSearchEnabled: false,
-        }),
+        })
       );
     });
 
     it('persists the generated references and enqueues the verify-class-references job', async () => {
       setupHappyPath();
-      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+      mockGenerateScript.mockResolvedValue({
+        ...SAMPLE_SCRIPT_RESULT,
+        references: SOURCED_REFERENCES,
+      });
 
       await composeListeningContent(SOURCED_PARAMS);
 
@@ -622,13 +660,16 @@ describe('composeListeningContent', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'verify-class-references' }),
         'verify_class_references',
-        { episodeId: 'episode-1' },
+        { episodeId: 'episode-1' }
       );
     });
 
     it('still creates segments exactly once (no double-queue)', async () => {
       setupHappyPath();
-      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+      mockGenerateScript.mockResolvedValue({
+        ...SAMPLE_SCRIPT_RESULT,
+        references: SOURCED_REFERENCES,
+      });
 
       await composeListeningContent(SOURCED_PARAMS);
 

@@ -92,6 +92,7 @@ export interface ClassSpeakingRecording {
 export interface ClassSectionEpisode {
   id: string;
   audioUrl: string | null;
+  status: string;
   title: string;
   /** The class's verified sources (sourced classes); empty for curriculum classes. */
   references: ClassReference[];
@@ -243,6 +244,8 @@ export function classPresentationIssues(cls: ClassData): string[] {
   const listening = sectionsBySkill.get('LISTENING');
   if (listening && !listening.episode) {
     issues.push('Listening section has no audio episode.');
+  } else if (listening?.episode && !listening.episode.audioUrl) {
+    issues.push('Listening section audio is not ready yet.');
   }
 
   const speaking = sectionsBySkill.get('SPEAKING');
@@ -256,6 +259,36 @@ export function classPresentationIssues(cls: ClassData): string[] {
   }
 
   return issues;
+}
+
+export function classPresentationNeedsRegeneration(cls: ClassData): boolean {
+  const sectionsBySkill = new Map(cls.sections.map((section) => [section.skill, section]));
+
+  for (const skill of REQUIRED_CLASS_SKILLS) {
+    if (!sectionsBySkill.has(skill)) return true;
+  }
+
+  const reading = sectionsBySkill.get('READING');
+  if (reading && !reading.questions.some((question) => question.passageText?.trim())) {
+    return true;
+  }
+
+  const listening = sectionsBySkill.get('LISTENING');
+  if (!listening?.episode || listening.episode.status === 'FAILED') {
+    return true;
+  }
+
+  const speaking = sectionsBySkill.get('SPEAKING');
+  if (speaking && speaking.prompts.length === 0) {
+    return true;
+  }
+
+  const writing = sectionsBySkill.get('WRITING');
+  if (writing && writing.writingPrompts.length === 0) {
+    return true;
+  }
+
+  return false;
 }
 
 /** Format seconds as m:ss. */
