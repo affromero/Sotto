@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
 import { ClassHub } from './ClassHub';
@@ -66,7 +67,15 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function shouldReturnToLearn(errorMessage: string): boolean {
+  return (
+    errorMessage.includes('missing required presentation material') ||
+    errorMessage.includes('required material was ready')
+  );
+}
+
 export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
+  const router = useRouter();
   const [view, setView] = useState<View>('loading');
   const [cls, setCls] = useState<ClassData | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -445,6 +454,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   }
 
   if (view === 'error' || !cls) {
+    const returnToLearn = shouldReturnToLearn(errorMessage);
+
     return (
       <div className={styles.fullState} role="alert">
         <p>{errorMessage || 'An unexpected error occurred.'}</p>
@@ -452,12 +463,16 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
           type="button"
           className={styles.retryBtn}
           onClick={() => {
+            if (returnToLearn) {
+              router.push('/learn');
+              return;
+            }
             setView('loading');
             setErrorMessage('');
             void loadClass();
           }}
         >
-          Try again
+          {returnToLearn ? 'View progress in Learn' : 'Try again'}
         </button>
       </div>
     );

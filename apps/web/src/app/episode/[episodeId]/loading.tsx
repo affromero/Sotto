@@ -1,8 +1,13 @@
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './loading.module.css';
 
 export default function EpisodeLoading() {
   return (
     <div className={styles.root} role="status" aria-label="Loading lesson">
+      <div className={styles.loader}>
+        <SottoSpinner size="large" label="Loading lesson" orientation="stack" />
+      </div>
+
       {/* Back link */}
       <div className={`${styles.bone} ${styles.backLink}`} aria-hidden="true" />
 
@@ -12,9 +17,18 @@ export default function EpisodeLoading() {
 
       {/* Creator row */}
       <div className={styles.creatorRow}>
-        <div className={`${styles.bone} ${styles.creatorAvatar} ${styles.delay1}`} aria-hidden="true" />
-        <div className={`${styles.bone} ${styles.creatorName} ${styles.delay2}`} aria-hidden="true" />
-        <div className={`${styles.bone} ${styles.creatorDate} ${styles.delay3}`} aria-hidden="true" />
+        <div
+          className={`${styles.bone} ${styles.creatorAvatar} ${styles.delay1}`}
+          aria-hidden="true"
+        />
+        <div
+          className={`${styles.bone} ${styles.creatorName} ${styles.delay2}`}
+          aria-hidden="true"
+        />
+        <div
+          className={`${styles.bone} ${styles.creatorDate} ${styles.delay3}`}
+          aria-hidden="true"
+        />
       </div>
 
       {/* Player section */}
