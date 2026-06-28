@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
 import {
   deleteClassForUser,
   getClassForUser,
@@ -11,6 +12,18 @@ import {
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
 
 type RouteParams = { params: Promise<{ classId: string }> };
+
+function wantsBackgroundRegeneration(request: NextRequest): boolean {
+  return (
+    request.nextUrl.searchParams.get('background') === '1' ||
+    request.headers.get('prefer')?.toLowerCase().includes('respond-async') === true
+  );
+}
+
+function logBackgroundRegenerationFailure(error: unknown, classId: string): void {
+  const message = error instanceof Error ? error.message : 'Failed to regenerate class';
+  logger.error('Background class regeneration failed', { classId, error: message });
+}
 
 /** GET /api/classes/[classId] — class with sections + questions (answers stripped until submitted). */
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -147,6 +160,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = (await request.json().catch(() => ({}))) as { scope?: unknown };
 
     if (body.scope === 'class') {
+      if (wantsBackgroundRegeneration(request)) {
+        const cls = await prisma.courseClass.findFirst({
+          where: { id: classId, course: { userId: authed.userId } },
+          select: { status: true },
+        });
+        if (!cls || cls.status === 'PASSED') {
+          return errorResponse('Class not found or already passed.', 400);
+        }
+        if (cls.status !== 'GENERATING') {
+          void regenerateCurrentClass(classId, authed.userId).catch((error: unknown) => {
+            logBackgroundRegenerationFailure(error, classId);
+          });
+        }
+        return NextResponse.json(
+          { started: true, scope: 'class', status: cls.status },
+          { status: 202 }
+        );
+      }
+
       const ok = await regenerateCurrentClass(classId, authed.userId);
       if (!ok) return errorResponse('Class not found or already passed.', 400);
       return NextResponse.json({ regenerated: true, scope: 'class' });

@@ -54,8 +54,15 @@ const SKILL_ORDER: Record<string, number> = {
   WRITING: 4,
 };
 
+const CLASS_REFRESH_POLL_INTERVAL_MS = 2000;
+const CLASS_REFRESH_TIMEOUT_MS = 10 * 60 * 1000;
+
 function orderSections(sections: ClassSection[]): ClassSection[] {
   return [...sections].sort((a, b) => (SKILL_ORDER[a.skill] ?? 99) - (SKILL_ORDER[b.skill] ?? 99));
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
@@ -124,10 +131,21 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     setCurScore(0);
   }, []);
 
+  const fetchClassData = useCallback(async (): Promise<ClassData> => {
+    const res = await fetch(`/api/v1/classes/${classId}`);
+    if (res.status === 404) {
+      throw new Error('Class not found.');
+    }
+    if (!res.ok) {
+      throw new Error('Failed to load class. Please refresh.');
+    }
+    return (await res.json()) as ClassData;
+  }, [classId]);
+
   const regenerateWholeClass = useCallback(async () => {
-    const res = await fetch(`/api/v1/classes/${classId}`, {
+    const res = await fetch(`/api/v1/classes/${classId}?background=1`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Prefer: 'respond-async' },
       body: JSON.stringify({ scope: 'class' }),
     });
     if (!res.ok) {
@@ -172,36 +190,45 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     [initialSectionId]
   );
 
+  const waitForClassRefresh = useCallback(async (): Promise<ClassData> => {
+    const startedAt = Date.now();
+    let lastIssues: string[] = [];
+
+    while (Date.now() - startedAt < CLASS_REFRESH_TIMEOUT_MS) {
+      await wait(CLASS_REFRESH_POLL_INTERVAL_MS);
+      const data = await fetchClassData();
+      const issues = data.submitted ? [] : classPresentationIssues(data);
+      lastIssues = issues;
+
+      if (data.status === 'FAILED') {
+        throw new Error(`Class refresh failed: ${issues.join(' ') || 'generation failed.'}`);
+      }
+      if (data.status !== 'GENERATING' && issues.length === 0) {
+        return data;
+      }
+    }
+
+    throw new Error(
+      `Class refresh timed out before required material was ready: ${
+        lastIssues.join(' ') || 'class is still incomplete.'
+      }`
+    );
+  }, [fetchClassData]);
+
   const loadClass = useCallback(async () => {
     try {
-      const res = await fetch(`/api/v1/classes/${classId}`);
-      if (res.status === 404) {
-        setErrorMessage('Class not found.');
-        setView('error');
-        return;
-      }
-      if (!res.ok) {
-        setErrorMessage('Failed to load class. Please refresh.');
-        setView('error');
-        return;
-      }
-      let data = (await res.json()) as ClassData;
+      let data = await fetchClassData();
 
       const issues = classPresentationIssues(data);
-      if (!data.submitted && issues.length > 0 && !attemptedAutoRefreshRef.current) {
-        attemptedAutoRefreshRef.current = true;
+      if (!data.submitted && (issues.length > 0 || data.status === 'GENERATING')) {
         setAutoRefreshing(true);
         setView('loading');
         resetClassProgress();
-        await regenerateWholeClass();
-
-        const refreshed = await fetch(`/api/v1/classes/${classId}`);
-        if (!refreshed.ok) {
-          setErrorMessage('Class regenerated, but the refreshed class could not be loaded.');
-          setView('error');
-          return;
+        if (data.status !== 'GENERATING' && !attemptedAutoRefreshRef.current) {
+          attemptedAutoRefreshRef.current = true;
+          await regenerateWholeClass();
         }
-        data = (await refreshed.json()) as ClassData;
+        data = await waitForClassRefresh();
       }
 
       const remainingIssues = !data.submitted ? classPresentationIssues(data) : [];
@@ -220,7 +247,13 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     } finally {
       setAutoRefreshing(false);
     }
-  }, [applyLoadedClass, classId, regenerateWholeClass, resetClassProgress]);
+  }, [
+    applyLoadedClass,
+    fetchClassData,
+    regenerateWholeClass,
+    resetClassProgress,
+    waitForClassRefresh,
+  ]);
 
   useEffect(() => {
     void (async () => {
@@ -363,12 +396,14 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     setErrorMessage('');
     try {
       await regenerateWholeClass();
-      attemptedAutoRefreshRef.current = false;
+      attemptedAutoRefreshRef.current = true;
       resetClassProgress();
       setView('loading');
-      await loadClass();
-    } catch {
-      setErrorMessage('Network error. Please try again.');
+      const data = await waitForClassRefresh();
+      applyLoadedClass(data);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Network error. Please try again.');
+      setView('error');
     } finally {
       setRegenerating(false);
     }
