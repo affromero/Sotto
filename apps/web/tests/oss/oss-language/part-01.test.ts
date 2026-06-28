@@ -459,10 +459,17 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps server deployment self-hosted and env-file driven', () => {
     const deploySource = readFileSync(resolve(repoRoot, 'scripts/deploy.sh'), 'utf8');
+    const installerSource = readFileSync(resolve(repoRoot, 'scripts/install.sh'), 'utf8');
+    const publicInstallerSource = readFileSync(
+      resolve(repoRoot, 'apps/web/public/install.sh'),
+      'utf8'
+    );
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');
     const caddyTemplate = readFileSync(resolve(repoRoot, 'Caddyfile'), 'utf8');
     const deploymentSources = [deploySource, setupServerSource, caddyTemplate].join('\n');
 
+    expect(publicInstallerSource).toBe(installerSource);
+    expect(installerSource).toContain('https://sotto.fm/install.sh');
     expect(deploySource).toContain('ENV_FILE="${SOTTO_ENV_FILE:-$REPO_ROOT/.env.production}"');
     expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
     expect(deploySource).toContain('render_caddy_config');
@@ -475,6 +482,7 @@ describe('open-source language-learning OSS surfaces', () => {
     );
     expect(caddyTemplate).toContain('__SOTTO_APP_DOMAIN__');
     expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_WWW');
+    expect(caddyTemplate).toContain('health_uri /api/health');
     expect(deploymentSources).not.toContain('doppler');
     expect(deploymentSources).not.toContain('Doppler');
     expect(deploymentSources).not.toContain('dashboard.doppler.com');
