@@ -177,5 +177,42 @@ describe('generateSectionQuestions', () => {
     expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
       'Return ONLY a valid JSON array'
     );
+    expect(mockGenerateResponse.mock.calls[0][2]).toMatchObject({
+      jsonSchema: expect.objectContaining({ name: 'class_section_questions' }),
+    });
+  });
+
+  it('repairs malformed JSON after generation retries are exhausted', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({
+        content: '[{"question":"broken"',
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'm',
+      })
+      .mockResolvedValueOnce({
+        content:
+          '[{"question":"still broken","options":["a","b","c","d"],"correctIndex":0,"explanation":"x",}]',
+        inputTokens: 2,
+        outputTokens: 2,
+        model: 'm',
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({ questions: JSON.parse(SAMPLE) }),
+        inputTokens: 3,
+        outputTokens: 3,
+        model: 'm',
+      });
+
+    const qs = await generateSectionQuestions(BASE);
+
+    expect(qs).toHaveLength(2);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(3);
+    expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
+    expect(mockGenerateResponse.mock.calls[2][1][0].content).toContain('Malformed response:');
+    expect(mockGenerateResponse.mock.calls[2][2]).toMatchObject({
+      temperature: 0,
+      jsonSchema: expect.objectContaining({ name: 'class_section_questions' }),
+    });
   });
 });

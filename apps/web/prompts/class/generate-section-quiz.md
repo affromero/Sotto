@@ -23,7 +23,7 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 
 ## Output
 
-Return ONLY a JSON array — no markdown fences, no preamble. Each element:
+Return ONLY valid JSON — no markdown fences, no preamble. Prefer a bare JSON array; schema-constrained providers may return `{ "questions": [...] }`. Each question:
 
 ```
 {
@@ -31,6 +31,6 @@ Return ONLY a JSON array — no markdown fences, no preamble. Each element:
   "options": ["…", "…", "…", "…"],
   "correctIndex": 0,
   "explanation": "…",
-  "passageRef": "…(reading passage; omit for grammar)"
+  "passageRef": "…(reading passage; empty string for grammar)"
 }
 ```
