@@ -205,14 +205,14 @@ export function StepContextReview({
         <span className={t.eyebrowIdx}>07 ·</span> Read context
       </div>
       <h1 className={t.title}>
-        Review the <em>teaching brief</em>.
+        Review the <em>practice brief</em>.
       </h1>
       <p className={t.lede}>
-        Before composing, Sotto reads only the context you gave it and turns that into a teacher
-        brief: what to lean on, how hard to push, and where the first lessons should begin.
+        Before composing, Sotto reads only the context you gave it and turns that into a practice
+        brief: what to rehearse, how hard to push, and where the first lessons should begin.
       </p>
 
-      <section className={c.reviewShell} aria-label="Context teaching brief">
+      <section className={c.reviewShell} aria-label="Context practice brief">
         <div className={c.reviewPanel}>
           <div className={c.reviewPanelHead}>
             <span className={c.reviewKicker}>Extracted context</span>
@@ -242,7 +242,7 @@ export function StepContextReview({
 
         <div className={c.reviewPanel}>
           <div className={c.reviewPanelHead}>
-            <span className={c.reviewKicker}>Teacher read</span>
+            <span className={c.reviewKicker}>Practice read</span>
             <span className={c.reviewCount}>CEFR {lvl}</span>
           </div>
           <p className={c.reviewDiagnosis}>

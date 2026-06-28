@@ -47,7 +47,7 @@ const HOW_STEPS: readonly HowStep[] = [
     phase: 1,
     label: 'Voice & cues',
     glyph: 'wave',
-    desc: 'Choose the voices that speak and listen, plus visual memory cues.',
+    desc: 'Choose the voices that speak and listen, plus visual memory cues for private rehearsal.',
   },
   {
     n: '05',
@@ -75,7 +75,7 @@ const HOW_STEPS: readonly HowStep[] = [
     phase: 2,
     label: 'Mastery',
     glyph: 'check',
-    desc: 'Skills advance only when mastery is shown.',
+    desc: 'Skills advance only when mastery is shown; practice stays separate from teacher judgment.',
   },
 ];
 
@@ -203,9 +203,9 @@ export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
       <section className={styles.corner} aria-label="Setup overview">
         <div className={styles.eyebrow}>How Sotto works</div>
         <p className={styles.lede}>
-          Sotto isn&apos;t a model or a service. It&apos;s the scaffolding. Bring an agent and a
-          little of your world, and it composes a language course only you could have. This is the
-          whole path, before you take the first step.
+          Sotto isn&apos;t a model or a replacement teacher. It&apos;s private scaffolding for
+          practice. Bring an agent and a little of your world, and it composes a language course
+          only you could have. This is the whole path, before you take the first step.
         </p>
       </section>
 
