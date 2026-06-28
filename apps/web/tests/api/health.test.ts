@@ -42,6 +42,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 import { GET } from '@/app/api/v1/health/route';
+import { GET as GET_LEGACY } from '@/app/api/health/route';
 
 describe('GET /api/v1/health', () => {
   let originalFetch: typeof globalThis.fetch;
@@ -81,6 +82,17 @@ describe('GET /api/v1/health', () => {
     expect(body.version).toBeDefined();
     expect(body.oauth).toBeUndefined();
     expect(body.vapid).toBeUndefined();
+  });
+
+  it('keeps /api/health as a legacy blue-green health alias', async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const response = await GET_LEGACY();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe('healthy');
+    expect(body.version).toBeDefined();
   });
 
   it('returns only status and timestamp for non-admin users', async () => {

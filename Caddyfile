@@ -8,7 +8,9 @@
 __SOTTO_APP_DOMAIN__ {
 	reverse_proxy localhost:3000 localhost:3010 {
 		lb_policy first
-		health_uri /api/v1/health
+		# Keep this on the legacy health alias so blue-green deploys can proxy
+		# either an old slot or a new slot while the app health route migrates.
+		health_uri /api/health
 		health_interval 5s
 		health_timeout 3s
 		health_status 200
@@ -41,7 +43,7 @@ __SOTTO_WWW_DOMAIN__ {
 	handle /api/v1/telegram/webhook {
 		reverse_proxy localhost:3000 localhost:3010 {
 			lb_policy first
-			health_uri /api/v1/health
+			health_uri /api/health
 			health_interval 5s
 			health_timeout 3s
 			health_status 200
