@@ -9,6 +9,7 @@ import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getPlatformTtsKey } from '@/lib/tts-generation';
+import { getAgentModelOptions } from '@/lib/agent-models';
 
 export type TestableProvider = {
   category: 'ai' | 'tts' | 'stt';
@@ -29,9 +30,9 @@ export interface TestableProviders {
   stt: TestableProvider[];
 }
 
-function isClaudeCliAvailable(): boolean {
+function isCliAvailable(command: string): boolean {
   try {
-    execSync('claude --version', { stdio: 'ignore', timeout: 3000 });
+    execSync(`${command} --version`, { stdio: 'ignore', timeout: 3000 });
     return true;
   } catch {
     return false;
@@ -48,7 +49,9 @@ function hasPlatformKey(category: TestableProvider['category'], providerId: stri
       case 'google':
         return !!process.env.GOOGLE_AI_API_KEY;
       case 'claude-code':
-        return isClaudeCliAvailable();
+        return isCliAvailable('claude');
+      case 'codex':
+        return isCliAvailable('codex');
       default:
         return false;
     }
@@ -115,16 +118,18 @@ export async function getTestableProviders(userId: string): Promise<TestableProv
       .filter((p) => p.hasPlatformKey || p.hasByokKey);
 
   const ai = withKeyFlags(
-    getAllAiProviderMeta().flatMap((p) =>
-      p.models.map((m) => ({
+    getAllAiProviderMeta().flatMap((p) => {
+      const models =
+        p.id === 'claude-code' || p.id === 'codex' ? getAgentModelOptions(p.id) : p.models;
+      return models.map((m) => ({
         category: 'ai' as const,
         providerId: p.id,
         providerName: p.displayName,
         modelId: m.id,
         modelName: m.displayName,
         tier: m.tier,
-      }))
-    )
+      }));
+    })
   );
 
   const tts = withKeyFlags(

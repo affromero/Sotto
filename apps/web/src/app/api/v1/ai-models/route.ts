@@ -11,7 +11,8 @@ import {
   resolveDisabledSystemAiProviders,
   resolveIncludedModels,
 } from '@/lib/auto-model-config';
-import { isClaudeAvailable } from '@/lib/agent-availability';
+import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
+import { getAgentModelOptions } from '@/lib/agent-models';
 
 import { errorResponse } from '@/lib/api-response';
 
@@ -30,13 +31,20 @@ for (const p of getAllAiProviderMeta()) {
   if (p.platformEnvKey) PLATFORM_PROVIDER_ENV[p.id] = p.platformEnvKey;
 }
 
-const CLAUDE_CODE_MODELS = getAiProviderMeta('claude-code').models.map((m) => ({
-  id: `claude-code:${m.id}`,
-  displayName: m.displayName,
-  tier: m.tier,
-  isDefault: false,
-  group: 'Claude Code (Local)',
-}));
+function agentModelRows(
+  provider: 'claude-code' | 'codex',
+  group: string,
+  autoConfig: Awaited<ReturnType<typeof getAutoModelConfig>>
+) {
+  return getAgentModelOptions(provider, { autoConfig }).map((m) => ({
+    id: m.id,
+    displayName: m.displayName,
+    tier: m.tier,
+    isDefault: autoConfig.model.aiProvider === provider && m.id === autoConfig.model.aiModel,
+    group,
+    hint: group,
+  }));
+}
 
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
@@ -44,15 +52,22 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const [aiKeys, claudeAvailable, autoConfig] = await Promise.all([
+  const [aiKeys, claudeAvailable, codexAvailable, autoConfig] = await Promise.all([
     listAiProviders(authResult.userId),
     isClaudeAvailable(),
+    isCodexAvailable(),
     getAutoModelConfig(),
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const disabledSystemProviders = resolveDisabledSystemAiProviders(autoConfig);
   const claudeCodeModels =
-    claudeAvailable && !disabledSystemProviders.has('claude-code') ? CLAUDE_CODE_MODELS : [];
+    claudeAvailable && !disabledSystemProviders.has('claude-code')
+      ? agentModelRows('claude-code', 'Claude Code (Local)', autoConfig)
+      : [];
+  const codexModels =
+    codexAvailable && !disabledSystemProviders.has('codex')
+      ? agentModelRows('codex', 'Codex (Local)', autoConfig)
+      : [];
   const isByok = validKeys.length > 0;
   const includedModelIds = new Set(resolveIncludedModels(autoConfig));
   const modelsById = new Map<
@@ -68,7 +83,9 @@ export async function GET(request: NextRequest) {
   >();
 
   for (const provider of getAllAiProviderMeta()) {
-    if (provider.id === 'claude-code' || provider.id === 'local') continue;
+    if (provider.id === 'claude-code' || provider.id === 'codex' || provider.id === 'local') {
+      continue;
+    }
     if (!process.env[PLATFORM_PROVIDER_ENV[provider.id] ?? '']) continue;
     for (const model of provider.models) {
       if (!includedModelIds.has(model.id)) continue;
@@ -103,7 +120,7 @@ export async function GET(request: NextRequest) {
       provider: validKeys[0]?.provider ?? autoConfig.model.aiProvider,
       readOnly: false,
       isByok,
-      models: sortModels([...modelsById.values(), ...claudeCodeModels]),
+      models: sortModels([...modelsById.values(), ...claudeCodeModels, ...codexModels]),
     },
     { headers: CACHE_HEADERS }
   );

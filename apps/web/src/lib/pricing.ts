@@ -8,7 +8,12 @@
  */
 import { STATIC_PRICING } from 'pricetoken';
 import { logger } from './logger';
-import { getAllAiProviderMeta, getAiProviderMeta, getCheapestModelForProvider, isValidModelId } from './providers/ai-registry';
+import {
+  getAllAiProviderMeta,
+  getAiProviderMeta,
+  getCheapestModelForProvider,
+  isValidModelId,
+} from './providers/ai-registry';
 
 export interface ModelPricing {
   inputPerMTok: number;
@@ -48,6 +53,14 @@ let activePricing: Record<string, ModelPricing> = { ...AI_PRICING };
 const FALLBACK_PRICING: ModelPricing = { inputPerMTok: 3.0, outputPerMTok: 15.0 };
 
 export function getAiPricing(model: string): ModelPricing {
+  if (
+    model.startsWith('claude-code:') ||
+    model === 'codex' ||
+    model.startsWith('codex:') ||
+    model.startsWith('codex#')
+  ) {
+    return { inputPerMTok: 0, outputPerMTok: 0 };
+  }
   const pricing = activePricing[model];
   if (!pricing) {
     logger.warn('Unknown model for pricing lookup, using Sonnet 4.6 fallback', { model });
@@ -67,7 +80,15 @@ export function getAiCost(model: string, inputTokens: number, outputTokens: numb
 export function getCheapestModel(): string {
   let cheapest: { model: string; cost: number } | null = null;
   for (const [model, pricing] of Object.entries(activePricing)) {
-    if (model.startsWith('text-embedding') || model.startsWith('claude-code:') || model === 'codex') continue;
+    if (
+      model.startsWith('text-embedding') ||
+      model.startsWith('claude-code:') ||
+      model === 'codex' ||
+      model.startsWith('codex:') ||
+      model.startsWith('codex#')
+    ) {
+      continue;
+    }
     if (!isValidModelId(model)) continue;
     const totalCost = pricing.inputPerMTok + pricing.outputPerMTok;
     if (!cheapest || totalCost < cheapest.cost) {
@@ -109,7 +130,12 @@ export async function getAllCurrentPricing(): Promise<
   try {
     const { getLatestPricingFromDb } = await import('./pricing-fetcher');
     const dbPricing = await getLatestPricingFromDb();
-    const result: Array<{ modelId: string; inputPerMTok: number; outputPerMTok: number; source: string }> = [];
+    const result: Array<{
+      modelId: string;
+      inputPerMTok: number;
+      outputPerMTok: number;
+      source: string;
+    }> = [];
 
     // Include all models from the active pricing map
     for (const [modelId, pricing] of Object.entries(activePricing)) {

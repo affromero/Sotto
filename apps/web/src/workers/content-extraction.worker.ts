@@ -8,7 +8,11 @@ import { markEpisodeFailed } from '@/lib/pipeline-resume';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  providerRequiresAiKey,
+  resolveAiModelAndProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { analyzeBias } from '@/lib/media-bias';
@@ -35,12 +39,17 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
 
-    await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
-      episodeId,
-      userId,
-      discoveryId: existingDiscovery.id,
-      useAdminCredits,
-    }, { jobId: `research-${episodeId}-${Date.now()}` });
+    await addJob(
+      deepResearchQueue,
+      JobType.DEEP_RESEARCH,
+      {
+        episodeId,
+        userId,
+        discoveryId: existingDiscovery.id,
+        useAdminCredits,
+      },
+      { jobId: `research-${episodeId}-${Date.now()}` }
+    );
 
     await job.updateProgress(100);
     return;
@@ -55,27 +64,29 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
     // Fail gracefully when extraction returns empty content (e.g., YouTube with no transcript)
     if (!urlContent.trim() && !sourceText?.trim()) {
-      const reason = extracted.sourceType === 'youtube'
-        ? `No transcript available for this YouTube video`
-        : `Could not extract content from ${sourceUrl}`;
+      const reason =
+        extracted.sourceType === 'youtube'
+          ? `No transcript available for this YouTube video`
+          : `Could not extract content from ${sourceUrl}`;
       throw new Error(reason);
     }
 
-    content = content
-      ? `${content}\n\n---\n\n## Referenced Article\n\n${urlContent}`
-      : urlContent;
-    sourceMetadata = JSON.parse(JSON.stringify({
-      title: extracted.title,
-      author: extracted.author,
-      publishedDate: extracted.publishedDate,
-      siteName: extracted.siteName,
-      wordCount: extracted.wordCount,
-      sourceType: extracted.sourceType,
-      extractionMethod: extracted.extractionMethod,
-      ...(extracted.tables && extracted.tables.length > 0 && { tables: extracted.tables }),
-      ...(extracted.figures && extracted.figures.length > 0 && { figures: extracted.figures }),
-      ...(extracted.keyStatistics && extracted.keyStatistics.length > 0 && { keyStatistics: extracted.keyStatistics }),
-    }));
+    content = content ? `${content}\n\n---\n\n## Referenced Article\n\n${urlContent}` : urlContent;
+    sourceMetadata = JSON.parse(
+      JSON.stringify({
+        title: extracted.title,
+        author: extracted.author,
+        publishedDate: extracted.publishedDate,
+        siteName: extracted.siteName,
+        wordCount: extracted.wordCount,
+        sourceType: extracted.sourceType,
+        extractionMethod: extracted.extractionMethod,
+        ...(extracted.tables && extracted.tables.length > 0 && { tables: extracted.tables }),
+        ...(extracted.figures && extracted.figures.length > 0 && { figures: extracted.figures }),
+        ...(extracted.keyStatistics &&
+          extracted.keyStatistics.length > 0 && { keyStatistics: extracted.keyStatistics }),
+      })
+    );
   }
 
   // Fetch topic/depth/focusAreas in one query for bias analysis + feasibility check
@@ -124,7 +135,9 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
       const initialAiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
       if (!episode.aiModel && !initialAiKey) {
-        throw new Error('AI model is required for topic feasibility assessment when no AI key is configured.');
+        throw new Error(
+          'AI model is required for topic feasibility assessment when no AI key is configured.'
+        );
       }
 
       const { model, provider } = await resolveAiModelAndProvider({
@@ -133,11 +146,18 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       });
 
       const providerAiKey =
-        episode.aiModel && provider !== 'claude-code' && !useAdminCredits
+        episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
           ? await getAiKey(userId, provider as AiProviderId)
           : initialAiKey;
-      if (episode.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
-        throw new Error(`AI key for provider "${provider}" is required for topic feasibility assessment.`);
+      if (
+        episode.aiModel &&
+        providerRequiresAiKey(provider) &&
+        !useAdminCredits &&
+        !providerAiKey
+      ) {
+        throw new Error(
+          `AI key for provider "${provider}" is required for topic feasibility assessment.`
+        );
       }
 
       const assessment = await assessTopicFeasibility({
@@ -169,9 +189,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       });
 
       if (assessment.verdict === 'reject') {
-        const suggestion = assessment.suggestion
-          ? ` Try: "${assessment.suggestion}"`
-          : '';
+        const suggestion = assessment.suggestion ? ` Try: "${assessment.suggestion}"` : '';
         await markEpisodeFailed(episodeId, {
           failureReason: `This topic can't produce a well-sourced episode: ${assessment.reason}${suggestion}`,
           technicalError: `Topic assessment rejected: ${assessment.reason}`,
@@ -205,12 +223,17 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
 
   // Chain to deep research
-  await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
-    episodeId,
-    userId,
-    discoveryId: discovery.id,
-    useAdminCredits,
-  }, { jobId: `research-${episodeId}` });
+  await addJob(
+    deepResearchQueue,
+    JobType.DEEP_RESEARCH,
+    {
+      episodeId,
+      userId,
+      discoveryId: discovery.id,
+      useAdminCredits,
+    },
+    { jobId: `research-${episodeId}` }
+  );
 
   await logPipelineStageComplete(episodeId, 'content-extraction');
   await job.updateProgress(100);

@@ -75,6 +75,8 @@ const { mockResolveAiModelAndProvider } = vi.hoisted(() => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 const mockLogUsage = vi.fn();
@@ -89,13 +91,17 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-
 import { POST } from '@/app/api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate/route';
 
 function createRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/v1/episodes/episode-001/interact/interaction-001/incorporate'), {
-    method: 'POST',
-  });
+  return new NextRequest(
+    new URL(
+      'http://localhost:3000/api/v1/episodes/episode-001/interact/interaction-001/incorporate'
+    ),
+    {
+      method: 'POST',
+    }
+  );
 }
 
 function createParams(episodeId = 'episode-001', interactionId = 'interaction-001') {
@@ -160,7 +166,10 @@ describe('POST /api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate
     const body = await response.json();
 
     expect(response.status).toBe(202);
-    expect(body).toMatchObject({ status: 'incorporating', generatedText: 'Generated incorporation segment.' });
+    expect(body).toMatchObject({
+      status: 'incorporating',
+      generatedText: 'Generated incorporation segment.',
+    });
     expect(mockGetAiKey).toHaveBeenCalledTimes(1);
     expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
@@ -174,7 +183,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate
       expect.objectContaining({
         apiKeyOverride: 'anthropic-key',
         model: 'claude-haiku-4-5-20251001',
-      }),
+      })
     );
     expect(mockAddJob).toHaveBeenCalledWith(
       { name: 'segment-regeneration' },
@@ -185,7 +194,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate
         insertAfterOrder: 2,
         newText: 'Generated incorporation segment.',
         speaker: 'EXPERT',
-      }),
+      })
     );
   });
 
@@ -210,7 +219,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate
       expect.objectContaining({
         apiKeyOverride: 'openai-key',
         model: 'gpt-5-mini',
-      }),
+      })
     );
   });
 
@@ -271,7 +280,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate
       expect.objectContaining({
         apiKeyOverride: undefined,
         model: 'claude-code:sonnet',
-      }),
+      })
     );
   });
 });

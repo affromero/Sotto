@@ -85,6 +85,7 @@ export {
   LANGUAGE_DISPLAY,
   getAiProviderLabel,
   getAiModelLabel,
+  getAiModelShortLabel,
   getTtsProviderLabel,
   getTtsModelLabel,
   getLanguageLabel,

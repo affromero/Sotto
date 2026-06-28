@@ -3,6 +3,8 @@ import { isSelfHosted } from '@/lib/self-hosted';
 import { getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
+import { getAgentModelOptions } from '@/lib/agent-models';
 
 export const metadata = {
   title: 'Welcome to Sotto',
@@ -14,7 +16,8 @@ export const metadata = {
  * backend provider ids the wizard maps to (AI key → anthropic/openai; cloud TTS;
  * cloud STT). Built server-side from the provider registries — never hardcoded.
  */
-function buildModelMeta(): ModelMeta {
+async function buildModelMeta(): Promise<ModelMeta> {
+  const autoConfig = await getAutoModelConfig().catch(() => undefined);
   const opt = <T extends { id: string; displayName: string }>(models: T[]) =>
     models.map((m) => ({ id: m.id, label: m.displayName }));
   return {
@@ -22,7 +25,8 @@ function buildModelMeta(): ModelMeta {
       anthropic: opt(getAiProviderMeta('anthropic').models),
       openai: opt(getAiProviderMeta('openai').models),
       // Backs the CLI (claude-code) model picker: haiku/sonnet/opus.
-      'claude-code': opt(getAiProviderMeta('claude-code').models),
+      'claude-code': opt(getAgentModelOptions('claude-code', { autoConfig })),
+      codex: opt(getAgentModelOptions('codex', { autoConfig })),
       // Cloud LLM cards.
       xai: opt(getAiProviderMeta('xai').models),
       deepseek: opt(getAiProviderMeta('deepseek').models),
@@ -52,11 +56,11 @@ function buildModelMeta(): ModelMeta {
   };
 }
 
-export default function WelcomePage() {
+export default async function WelcomePage() {
   return (
     <WelcomeFlow
       initialConfig={{ selfHosted: isSelfHosted(), isOwner: false }}
-      modelMeta={buildModelMeta()}
+      modelMeta={await buildModelMeta()}
     />
   );
 }

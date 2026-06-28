@@ -82,7 +82,7 @@ export const LANGUAGE_DISPLAY: Record<string, string> = {
 import { STATIC_PRICING } from 'pricetoken';
 
 // Derive OpenAI model display names from pricetoken (auto-updates with new models)
-const openaiModels = STATIC_PRICING.filter(m => m.provider === 'openai');
+const openaiModels = STATIC_PRICING.filter((m) => m.provider === 'openai');
 const openaiDisplay: Record<string, string> = {};
 const openaiShortDisplay: Record<string, string> = {};
 for (const m of openaiModels) {
@@ -173,8 +173,8 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   'speech-02-hd': 'Speech-02 HD',
   'speech-02-turbo': 'Speech-02 Turbo',
   'octave-v2': 'Octave V2',
-  'eleven_flash_v2_5': 'Flash v2.5',
-  'eleven_turbo_v2': 'Turbo v2',
+  eleven_flash_v2_5: 'Flash v2.5',
+  eleven_turbo_v2: 'Turbo v2',
   'tts-1': 'TTS-1',
   'gpt-4o-mini-tts': 'GPT-4o Mini TTS',
   'inworld-tts-1.5-max': 'Inworld 1.5 Max',
@@ -188,6 +188,33 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   local: 'Local TTS',
 };
 
+function titleAgentModel(raw: string): string {
+  return raw
+    .replace(
+      /(^|[-_/\s])([a-z0-9])/g,
+      (_match: string, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`
+    )
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getAgentModelDisplay(modelId: string, short: boolean): string | null {
+  const [base, fragment] = modelId.split('#', 2);
+  const effort = fragment ? new URLSearchParams(fragment).get('effort') : null;
+  const effortSuffix = effort ? ` (${effort} effort)` : '';
+  if (base === 'codex') return `Codex configured default${effortSuffix}`;
+  if (base.startsWith('codex:')) {
+    const model = titleAgentModel(base.slice('codex:'.length));
+    return short ? `${model}${effortSuffix}` : `Codex ${model}${effortSuffix}`;
+  }
+  if (base.startsWith('claude-code:')) {
+    const model = titleAgentModel(base.slice('claude-code:'.length));
+    return short ? `${model}${effortSuffix}` : `Claude Code ${model}${effortSuffix}`;
+  }
+  return null;
+}
+
 export function getAiProviderLabel(id: string | null | undefined): string | null {
   if (!id) return null;
   return AI_PROVIDER_DISPLAY[id]?.shortLabel ?? id;
@@ -195,7 +222,12 @@ export function getAiProviderLabel(id: string | null | undefined): string | null
 
 export function getAiModelLabel(modelId: string | null | undefined): string | null {
   if (!modelId) return null;
-  return AI_MODEL_DISPLAY[modelId] ?? modelId;
+  return AI_MODEL_DISPLAY[modelId] ?? getAgentModelDisplay(modelId, false) ?? modelId;
+}
+
+export function getAiModelShortLabel(modelId: string | null | undefined): string | null {
+  if (!modelId) return null;
+  return AI_MODEL_SHORT_DISPLAY[modelId] ?? getAgentModelDisplay(modelId, true) ?? modelId;
 }
 
 export function getTtsProviderLabel(id: string | null | undefined): string | null {

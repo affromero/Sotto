@@ -113,6 +113,8 @@ const mockResolveAiModelAndProvider = vi.fn().mockResolvedValue({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 vi.mock('@/lib/media-bias', () => ({
@@ -304,8 +306,23 @@ describe('processContentExtraction', () => {
         wordCount: 2,
         sourceType: 'html',
         extractionMethod: 'readability',
-        tables: [{ caption: 'Q1-Q4', headers: ['Quarter', 'Revenue'], rows: [['Q1', '$10M']], sourceLabel: null }],
-        figures: [{ url: 'https://example.com/chart.png', caption: 'Figure 1', altText: null, sourceLabel: null, mimeType: 'image/png' }],
+        tables: [
+          {
+            caption: 'Q1-Q4',
+            headers: ['Quarter', 'Revenue'],
+            rows: [['Q1', '$10M']],
+            sourceLabel: null,
+          },
+        ],
+        figures: [
+          {
+            url: 'https://example.com/chart.png',
+            caption: 'Figure 1',
+            altText: null,
+            sourceLabel: null,
+            mimeType: 'image/png',
+          },
+        ],
       });
 
       const job = createMockJob({
@@ -318,8 +335,23 @@ describe('processContentExtraction', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             sourceMetadata: expect.objectContaining({
-              tables: [{ caption: 'Q1-Q4', headers: ['Quarter', 'Revenue'], rows: [['Q1', '$10M']], sourceLabel: null }],
-              figures: [{ url: 'https://example.com/chart.png', caption: 'Figure 1', altText: null, sourceLabel: null, mimeType: 'image/png' }],
+              tables: [
+                {
+                  caption: 'Q1-Q4',
+                  headers: ['Quarter', 'Revenue'],
+                  rows: [['Q1', '$10M']],
+                  sourceLabel: null,
+                },
+              ],
+              figures: [
+                {
+                  url: 'https://example.com/chart.png',
+                  caption: 'Figure 1',
+                  altText: null,
+                  sourceLabel: null,
+                  mimeType: 'image/png',
+                },
+              ],
             }),
           }),
         })
@@ -457,13 +489,11 @@ describe('processContentExtraction', () => {
 
   describe('topic feasibility AI routing', () => {
     beforeEach(() => {
-      mockPrismaDiscoveryFindUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          topic: 'Private episode infrastructure',
-          depth: 'standard',
-          focusAreas: [],
-        });
+      mockPrismaDiscoveryFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        topic: 'Private episode infrastructure',
+        depth: 'standard',
+        focusAreas: [],
+      });
     });
 
     it('uses the episode model owner and matching provider key', async () => {
@@ -485,7 +515,7 @@ describe('processContentExtraction', () => {
           apiKeyOverride: 'provider-key',
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
       expect(mockLogUsage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -493,18 +523,22 @@ describe('processContentExtraction', () => {
           category: 'topic_assessment',
           episodeId: 'episode-001',
           userId: 'user-001',
-        }),
+        })
       );
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
       mockGetAiKey.mockResolvedValue(null);
 
-      await expect(processContentExtraction(createMockJob({
-        ...defaultPayload,
-        sourceText: 'Source material',
-      }))).rejects.toThrow(
-        'AI key for provider "openai" is required for topic feasibility assessment.',
+      await expect(
+        processContentExtraction(
+          createMockJob({
+            ...defaultPayload,
+            sourceText: 'Source material',
+          })
+        )
+      ).rejects.toThrow(
+        'AI key for provider "openai" is required for topic feasibility assessment.'
       );
 
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
@@ -512,11 +546,13 @@ describe('processContentExtraction', () => {
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
-      await processContentExtraction(createMockJob({
-        ...defaultPayload,
-        sourceText: 'Source material',
-        useAdminCredits: true,
-      }));
+      await processContentExtraction(
+        createMockJob({
+          ...defaultPayload,
+          sourceText: 'Source material',
+          useAdminCredits: true,
+        })
+      );
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
@@ -528,7 +564,7 @@ describe('processContentExtraction', () => {
           apiKeyOverride: undefined,
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
     });
 
@@ -545,10 +581,12 @@ describe('processContentExtraction', () => {
         provider: 'anthropic',
       });
 
-      await processContentExtraction(createMockJob({
-        ...defaultPayload,
-        sourceText: 'Source material',
-      }));
+      await processContentExtraction(
+        createMockJob({
+          ...defaultPayload,
+          sourceText: 'Source material',
+        })
+      );
 
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
@@ -561,7 +599,7 @@ describe('processContentExtraction', () => {
           apiKeyOverride: 'anthropic-key',
           model: 'claude-haiku-4-5-20251001',
           provider: 'anthropic',
-        }),
+        })
       );
     });
 
@@ -573,11 +611,15 @@ describe('processContentExtraction', () => {
       });
       mockGetAiKey.mockResolvedValue(null);
 
-      await expect(processContentExtraction(createMockJob({
-        ...defaultPayload,
-        sourceText: 'Source material',
-      }))).rejects.toThrow(
-        'AI model is required for topic feasibility assessment when no AI key is configured.',
+      await expect(
+        processContentExtraction(
+          createMockJob({
+            ...defaultPayload,
+            sourceText: 'Source material',
+          })
+        )
+      ).rejects.toThrow(
+        'AI model is required for topic feasibility assessment when no AI key is configured.'
       );
 
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -595,10 +637,12 @@ describe('processContentExtraction', () => {
         provider: 'claude-code',
       });
 
-      await processContentExtraction(createMockJob({
-        ...defaultPayload,
-        sourceText: 'Source material',
-      }));
+      await processContentExtraction(
+        createMockJob({
+          ...defaultPayload,
+          sourceText: 'Source material',
+        })
+      );
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
@@ -606,7 +650,7 @@ describe('processContentExtraction', () => {
           apiKeyOverride: undefined,
           model: 'claude-code:opus',
           provider: 'claude-code',
-        }),
+        })
       );
     });
   });
@@ -633,7 +677,9 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockInvalidateEpisodeCache).toHaveBeenCalledWith('episode-001');
-      expect(mockPublishEpisodeStatus).toHaveBeenCalledWith('episode-001', { status: 'RESEARCHING' });
+      expect(mockPublishEpisodeStatus).toHaveBeenCalledWith('episode-001', {
+        status: 'RESEARCHING',
+      });
     });
   });
 
@@ -651,12 +697,17 @@ describe('processContentExtraction', () => {
       });
       await processContentExtraction(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'deep-research' }, 'deep_research', {
-        episodeId: 'episode-001',
-        userId: 'user-001',
-        discoveryId: 'discovery-abc',
-        useAdminCredits: undefined,
-      }, { jobId: expect.any(String) });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'deep-research' },
+        'deep_research',
+        {
+          episodeId: 'episode-001',
+          userId: 'user-001',
+          discoveryId: 'discovery-abc',
+          useAdminCredits: undefined,
+        },
+        { jobId: expect.any(String) }
+      );
     });
   });
 
@@ -726,7 +777,7 @@ describe('processContentExtraction', () => {
           episodeId: 'episode-001',
           discoveryId: 'discovery-existing',
         }),
-        { jobId: expect.any(String) },
+        { jobId: expect.any(String) }
       );
     });
 
@@ -743,7 +794,9 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockInvalidateEpisodeCache).toHaveBeenCalledWith('episode-001');
-      expect(mockPublishEpisodeStatus).toHaveBeenCalledWith('episode-001', { status: 'RESEARCHING' });
+      expect(mockPublishEpisodeStatus).toHaveBeenCalledWith('episode-001', {
+        status: 'RESEARCHING',
+      });
     });
 
     it('proceeds normally when sourceContent is null', async () => {
@@ -777,9 +830,16 @@ describe('processContentExtraction', () => {
   describe('empty content detection', () => {
     it('throws when URL extraction returns empty content and no sourceText', async () => {
       mockExtractContent.mockResolvedValue({
-        text: '', markdown: '', title: null, description: null,
-        siteName: null, author: null, publishedDate: null,
-        wordCount: 0, sourceType: 'html', extractionMethod: 'readability',
+        text: '',
+        markdown: '',
+        title: null,
+        description: null,
+        siteName: null,
+        author: null,
+        publishedDate: null,
+        wordCount: 0,
+        sourceType: 'html',
+        extractionMethod: 'readability',
       });
 
       const job = createMockJob({
@@ -794,10 +854,16 @@ describe('processContentExtraction', () => {
 
     it('throws YouTube-specific message when transcript is empty', async () => {
       mockExtractContent.mockResolvedValue({
-        text: '', markdown: '', title: null,
+        text: '',
+        markdown: '',
+        title: null,
         description: 'No transcript available for this video',
-        siteName: 'YouTube', author: null, publishedDate: null,
-        wordCount: 0, sourceType: 'youtube', extractionMethod: 'summarize-core',
+        siteName: 'YouTube',
+        author: null,
+        publishedDate: null,
+        wordCount: 0,
+        sourceType: 'youtube',
+        extractionMethod: 'summarize-core',
       });
 
       const job = createMockJob({
@@ -812,9 +878,16 @@ describe('processContentExtraction', () => {
 
     it('succeeds when sourceText is provided even if URL extraction is empty', async () => {
       mockExtractContent.mockResolvedValue({
-        text: '', markdown: '', title: null, description: null,
-        siteName: null, author: null, publishedDate: null,
-        wordCount: 0, sourceType: 'html', extractionMethod: 'readability',
+        text: '',
+        markdown: '',
+        title: null,
+        description: null,
+        siteName: null,
+        author: null,
+        publishedDate: null,
+        wordCount: 0,
+        sourceType: 'html',
+        extractionMethod: 'readability',
       });
 
       const job = createMockJob({

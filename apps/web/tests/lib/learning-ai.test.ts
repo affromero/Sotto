@@ -50,7 +50,15 @@ describe('resolveLearningAi', () => {
     vi.clearAllMocks();
     stubAutoConfig();
     mockGetProviderForModel.mockImplementation((id: string) =>
-      id?.startsWith('claude') ? 'anthropic' : id?.startsWith('gpt') ? 'openai' : null
+      id?.startsWith('claude-code:')
+        ? 'claude-code'
+        : id?.startsWith('codex')
+          ? 'codex'
+          : id?.startsWith('claude')
+            ? 'anthropic'
+            : id?.startsWith('gpt')
+              ? 'openai'
+              : null
     );
   });
 
@@ -126,7 +134,28 @@ describe('resolveLearningAi', () => {
     const resolved = await resolveLearningAi('user-1');
 
     // The configured claude-code model wins over the registry default.
-    expect(resolved).toEqual({ provider: 'claude-code', model: 'opus' });
+    expect(resolved).toEqual({ provider: 'claude-code', model: 'claude-code:opus' });
+  });
+
+  it('uses the owner-configured codex model and effort when AI_PROVIDER=codex', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', 'codex');
+    stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
+
+    const resolved = await resolveLearningAi('user-1');
+
+    expect(resolved).toEqual({ provider: 'codex', model: 'codex:gpt-5.5#effort=xhigh' });
+    expect(resolved.apiKey).toBeUndefined();
+  });
+
+  it('uses CODEX_MODEL when Codex is selected without an owner model', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', 'codex');
+    vi.stubEnv('CODEX_MODEL', 'gpt-5.5');
+
+    const resolved = await resolveLearningAi('user-1');
+
+    expect(resolved).toEqual({ provider: 'codex', model: 'codex:gpt-5.5' });
   });
 
   it('does not use claude-code when the admin disabled it', async () => {

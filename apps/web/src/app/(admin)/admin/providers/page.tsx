@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getAutoModelConfig, resolveDisabledSystemAiProviders } from '@/lib/auto-model-config';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
+import { getAgentModelOptions } from '@/lib/agent-models';
 import { getAllAiProviderClientMeta, getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
@@ -30,6 +31,10 @@ export default async function AdminProvidersPage() {
   }));
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const disabledSystemAiProviders = resolveDisabledSystemAiProviders(config);
+  const agentModels = {
+    'claude-code': getAgentModelOptions('claude-code', { autoConfig: config }),
+    codex: getAgentModelOptions('codex', { autoConfig: config }),
+  };
   const aiSystemProviders = [
     {
       id: 'claude-code',
@@ -56,14 +61,16 @@ export default async function AdminProvidersPage() {
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
-      models: p.models.map((m) => ({
-        id: m.id,
-        displayName: m.displayName,
-        tier: m.tier,
-        price: m.pricing
-          ? `$${m.pricing.inputPerMTok}/$${m.pricing.outputPerMTok} per MTok`
-          : undefined,
-      })),
+      models: (p.id === 'claude-code' || p.id === 'codex' ? agentModels[p.id] : p.models).map(
+        (m) => ({
+          id: m.id,
+          displayName: m.displayName,
+          tier: m.tier,
+          price: m.pricing
+            ? `$${m.pricing.inputPerMTok}/$${m.pricing.outputPerMTok} per MTok`
+            : undefined,
+        })
+      ),
     }));
 
   const ttsProviders = getAllProviderMeta().map((p) => ({

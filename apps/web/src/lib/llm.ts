@@ -9,7 +9,10 @@ type LlmContent = string | ContentPart[];
 /** Extract plain text from content (string or ContentPart[]). */
 function extractText(content: LlmContent): string {
   if (typeof content === 'string') return content;
-  return content.filter((p) => p.type === 'text').map((p) => (p as { text: string }).text).join('\n');
+  return content
+    .filter((p) => p.type === 'text')
+    .map((p) => (p as { text: string }).text)
+    .join('\n');
 }
 
 /** Convert ContentPart[] to Anthropic's ContentBlockParam[]. */
@@ -63,11 +66,12 @@ export async function generateResponse(
   if (options?.model?.startsWith('claude-code:')) {
     const { executeClaudeCode } = await import('./claude-code-client');
     const { serializeMessages } = await import('./agent-messages');
-    const ccModel = options.model.split(':')[1] || 'opus';
-    const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
+    const hasWebSearch = options?.tools?.some(
+      (t) => (t as { type: string }).type === 'web_search_20250305'
+    );
     const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
     const result = await executeClaudeCode(systemPrompt, serializeMessages(textMessages), {
-      model: ccModel,
+      model: options.model,
       useWebSearch: hasWebSearch,
     });
     return { ...result, model: options.model };
@@ -116,7 +120,7 @@ export async function generateResponse(
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
       const hasWebSearch = options?.tools?.some(
-        (t) => (t as { type: string }).type === 'web_search_20250305',
+        (t) => (t as { type: string }).type === 'web_search_20250305'
       );
       return ai.generateResponse(systemPrompt, messages, {
         maxTokens: options?.maxTokens,
@@ -149,11 +153,13 @@ export async function generateResponse(
       system: systemPrompt,
       messages: anthropicMessages,
       ...(options?.tools?.length ? { tools: options.tools } : {}),
-      ...(options?.jsonSchema ? {
-        output_config: {
-          format: { type: 'json_schema' as const, schema: options.jsonSchema.schema },
-        },
-      } : {}),
+      ...(options?.jsonSchema
+        ? {
+            output_config: {
+              format: { type: 'json_schema' as const, schema: options.jsonSchema.schema },
+            },
+          }
+        : {}),
     })
   );
 
@@ -164,15 +170,19 @@ export async function generateResponse(
 
   // Soft-block: log flagged output but don't throw (educational content may discuss sensitive topics)
   if (!options?.skipModeration && content) {
-    moderateContent(content).then((result) => {
-      if (result.flagged) {
-        logger.warn('LLM output flagged by moderation', {
-          categories: result.blockedCategories.join(','),
+    moderateContent(content)
+      .then((result) => {
+        if (result.flagged) {
+          logger.warn('LLM output flagged by moderation', {
+            categories: result.blockedCategories.join(','),
+          });
+        }
+      })
+      .catch((err) => {
+        logger.warn('Output moderation check failed', {
+          error: err instanceof Error ? err.message : String(err),
         });
-      }
-    }).catch((err) => {
-      logger.warn('Output moderation check failed', { error: err instanceof Error ? err.message : String(err) });
-    });
+      });
   }
 
   return {
@@ -211,11 +221,12 @@ export async function* streamResponse(
   if (options?.model?.startsWith('claude-code:')) {
     const { streamClaudeCode } = await import('./claude-code-client');
     const { serializeMessages } = await import('./agent-messages');
-    const ccModel = options.model.split(':')[1] || 'opus';
-    const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
+    const hasWebSearch = options?.tools?.some(
+      (t) => (t as { type: string }).type === 'web_search_20250305'
+    );
     const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
     yield* streamClaudeCode(systemPrompt, serializeMessages(textMessages), {
-      model: ccModel,
+      model: options.model,
       useWebSearch: hasWebSearch,
     });
     options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
@@ -262,7 +273,7 @@ export async function* streamResponse(
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
       const hasWebSearch = options?.tools?.some(
-        (t) => (t as { type: string }).type === 'web_search_20250305',
+        (t) => (t as { type: string }).type === 'web_search_20250305'
       );
       yield* ai.streamResponse(systemPrompt, messages, {
         maxTokens: options?.maxTokens,

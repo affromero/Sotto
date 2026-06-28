@@ -2,7 +2,7 @@
  * providerMap: the welcome wizard's display IDs -> real backend registry/infra
  * IDs, plus per-key store routing. Guards the translation the persistence layer
  * depends on (whisper->local, assembly->assemblyai, claude/codex->anthropic/
- * openai or keyless claude-code, ElevenLabs STT key -> BYOK store).
+ * openai or keyless local CLIs, ElevenLabs STT key -> BYOK store).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -68,10 +68,28 @@ describe('resolveAi', () => {
   });
 
   it('carries the picked claude-code model for the CLI method', () => {
-    const r = resolveAi('claude', 'cli', '', 'opus');
+    const r = resolveAi('claude', 'cli', '', 'claude-code:opus#effort=xhigh');
     expect(r.preferredAiProvider).toBe('claude-code');
-    expect(r.preferredAiModel).toBe('opus');
-    expect(r.infra).toEqual({ aiProvider: 'claude-code', aiModel: 'opus' });
+    expect(r.preferredAiModel).toBe('claude-code:opus#effort=xhigh');
+    expect(r.infra).toEqual({
+      aiProvider: 'claude-code',
+      aiModel: 'claude-code:opus#effort=xhigh',
+    });
+  });
+
+  it('maps codex + cli to the keyless Codex backend', () => {
+    const r = resolveAi('codex', 'cli', '', 'codex:gpt-5.5#effort=xhigh');
+    expect(r.keyPost).toBeNull();
+    expect(r.preferredAiProvider).toBe('codex');
+    expect(r.preferredAiModel).toBe('codex:gpt-5.5#effort=xhigh');
+    expect(r.infra).toEqual({ aiProvider: 'codex', aiModel: 'codex:gpt-5.5#effort=xhigh' });
+  });
+
+  it('uses the Codex configured-default sentinel when no CLI model is picked', () => {
+    const r = resolveAi('codex', 'cli', '', '');
+    expect(r.preferredAiProvider).toBe('codex');
+    expect(r.preferredAiModel).toBe('codex');
+    expect(r.infra).toEqual({ aiProvider: 'codex' });
   });
 
   it('maps a local/custom URL to the local provider with base URL + model', () => {

@@ -21,10 +21,12 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockPrismaScriptCreate(...args),
     },
     researchDossier: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaResearchDossierFindUniqueOrThrow(...args),
+      findUniqueOrThrow: (...args: unknown[]) =>
+        mockPrismaResearchDossierFindUniqueOrThrow(...args),
     },
     creativeOutline: {
-      findUniqueOrThrow: (...args: unknown[]) => mockPrismaCreativeOutlineFindUniqueOrThrow(...args),
+      findUniqueOrThrow: (...args: unknown[]) =>
+        mockPrismaCreativeOutlineFindUniqueOrThrow(...args),
     },
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
@@ -72,6 +74,16 @@ const mockGetCheapestModelForProvider = vi.fn((provider: string) => {
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: mockResolveAiModelAndProvider,
   getCheapestModelForProvider: (provider: string) => mockGetCheapestModelForProvider(provider),
+  getProviderForModel: (model: string) =>
+    model === 'codex' || model.startsWith('codex:')
+      ? 'codex'
+      : model.startsWith('claude-code:')
+        ? 'claude-code'
+        : model.startsWith('local:')
+          ? 'local'
+          : 'anthropic',
+  providerRequiresAiKey: (provider: string) =>
+    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
 
 const { mockWriteScript } = vi.hoisted(() => ({
@@ -160,8 +172,18 @@ describe('processScriptWriting', () => {
 
     mockPrismaScriptFindUnique.mockResolvedValue(null);
     mockPrismaResearchDossierFindUniqueOrThrow.mockResolvedValue({
-      sources: [{ sourceId: 'source-1', title: 'Source A', authors: 'Author', year: 2024, type: 'WEB' }],
-      evidence: [{ evidenceId: 'ev-1', claim: 'Claim A', claimType: 'fact', sourceIds: ['source-1'], confidence: 0.9 }],
+      sources: [
+        { sourceId: 'source-1', title: 'Source A', authors: 'Author', year: 2024, type: 'WEB' },
+      ],
+      evidence: [
+        {
+          evidenceId: 'ev-1',
+          claim: 'Claim A',
+          claimType: 'fact',
+          sourceIds: ['source-1'],
+          confidence: 0.9,
+        },
+      ],
     });
     mockPrismaCreativeOutlineFindUniqueOrThrow.mockResolvedValue({
       drivingQuestion: 'What changed?',
@@ -232,16 +254,13 @@ describe('processScriptWriting', () => {
           apiKeyOverride: 'anthropic-key',
           model: 'claude-haiku-4-5-20251001',
           provider: 'anthropic',
-        }),
+        })
       );
-      expect(mockDetectLanguage).toHaveBeenCalledWith(
-        expect.stringContaining('Hello world.'),
-        {
-          providerType: 'anthropic',
-          model: 'claude-haiku-4-5-20251001',
-          apiKeyOverride: 'anthropic-key',
-        },
-      );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(expect.stringContaining('Hello world.'), {
+        providerType: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+      });
     });
 
     it('uses the explicit episode model owner and matching provider key', async () => {
@@ -262,16 +281,13 @@ describe('processScriptWriting', () => {
           apiKeyOverride: 'openai-key',
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
-      expect(mockDetectLanguage).toHaveBeenCalledWith(
-        expect.stringContaining('Hello world.'),
-        {
-          providerType: 'openai',
-          model: 'gpt-5-nano',
-          apiKeyOverride: 'openai-key',
-        },
-      );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(expect.stringContaining('Hello world.'), {
+        providerType: 'openai',
+        model: 'gpt-5-nano',
+        apiKeyOverride: 'openai-key',
+      });
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
@@ -280,7 +296,7 @@ describe('processScriptWriting', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processScriptWriting(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI key for provider "openai" is required for script writing.',
+        'AI key for provider "openai" is required for script writing.'
       );
       expect(mockWriteScript).not.toHaveBeenCalled();
     });
@@ -289,7 +305,7 @@ describe('processScriptWriting', () => {
       mockGetAiKey.mockResolvedValue(null);
 
       await expect(processScriptWriting(createMockJob(defaultPayload))).rejects.toThrow(
-        'AI model is required for script writing when no AI key is configured.',
+        'AI model is required for script writing when no AI key is configured.'
       );
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockWriteScript).not.toHaveBeenCalled();
@@ -311,13 +327,13 @@ describe('processScriptWriting', () => {
           apiKeyOverride: undefined,
           model: 'gpt-5-mini',
           provider: 'openai',
-        }),
+        })
       );
     });
 
     it('rejects admin-credit routes without an explicit model', async () => {
       await expect(
-        processScriptWriting(createMockJob({ ...defaultPayload, useAdminCredits: true })),
+        processScriptWriting(createMockJob({ ...defaultPayload, useAdminCredits: true }))
       ).rejects.toThrow('AI model is required for script writing when no AI key is configured.');
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -340,7 +356,7 @@ describe('processScriptWriting', () => {
           apiKeyOverride: undefined,
           model: 'claude-code:sonnet',
           provider: 'claude-code',
-        }),
+        })
       );
     });
 
@@ -356,7 +372,7 @@ describe('processScriptWriting', () => {
         { name: 'compile-script' },
         'compile_script',
         { episodeId: 'episode-001', userId: 'user-001' },
-        { jobId: expect.stringMatching(/^compile-episode-001-/) },
+        { jobId: expect.stringMatching(/^compile-episode-001-/) }
       );
     });
   });

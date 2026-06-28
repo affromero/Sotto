@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   const input = parsed.data;
 
-  if (input.aiModel && !input.aiModel.startsWith('claude-code:')) {
+  if (input.aiModel) {
     if (!isValidModelId(input.aiModel)) {
       return errorResponse(
         `Unknown AI model: "${input.aiModel}". Check /api/ai-models for available models.`,

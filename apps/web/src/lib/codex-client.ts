@@ -5,6 +5,7 @@ import { tmpdir } from 'os';
 import { getCodexSshHost, isCodexAvailable } from './agent-availability';
 import { logger } from './logger';
 import { buildAgentInvocation } from './agent-invocation';
+import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 
 /**
  * Codex CLI provider client — routes AI calls through `codex exec` in a
@@ -32,14 +33,26 @@ interface CodexResponse {
 interface CodexOptions {
   model?: string;
   timeoutMs?: number;
+  effort?: AgentEffortLevel;
 }
 
 /** Resolve the model override, stripping the `codex:` routing prefix. The bare
  * provider id "codex" and an empty value both mean "use Codex's configured default". */
-function resolveModel(model?: string): string {
-  const selected = (model || process.env.CODEX_MODEL || '').trim();
-  if (selected === 'codex') return '';
-  return selected.startsWith('codex:') ? selected.slice('codex:'.length) : selected;
+function resolveSelection(opts?: CodexOptions): { model: string; effort?: AgentEffortLevel } {
+  const selected =
+    (opts?.model && opts.model !== 'codex' ? opts.model : process.env.CODEX_MODEL) ?? '';
+  const parsed = parseAgentModelId(selected, 'codex');
+  const model = parsed?.model ?? '';
+  const effort =
+    opts?.effort ??
+    parsed?.effort ??
+    parseAgentModelId(
+      `codex${model ? `:${model}` : ''}#effort=${
+        process.env.CODEX_MODEL_REASONING_EFFORT ?? process.env.CODEX_EFFORT ?? ''
+      }`
+    )?.effort ??
+    undefined;
+  return effort ? { model, effort } : { model };
 }
 
 /**
@@ -51,20 +64,22 @@ export async function executeCodex(
   prompt: string,
   opts?: CodexOptions
 ): Promise<CodexResponse> {
-  const model = resolveModel(opts?.model);
+  const { model, effort } = resolveSelection(opts);
   const timeoutMs = opts?.timeoutMs || 600_000;
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
   const outFile = join(
     /* turbopackIgnore: true */ tmpdir(),
-    `codex-${process.pid}-${Date.now()}.txt`,
+    `codex-${process.pid}-${Date.now()}.txt`
   );
 
   const args = ['exec', ...SANDBOX, ...NO_MCP, '-o', outFile];
   if (model) args.push('-m', model);
+  if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
   args.push('-'); // read the prompt from stdin
 
   logger.info('codex: executing', {
     model: model || '(configured default)',
+    effort: effort ?? '(configured default)',
     promptLength: String(fullPrompt.length),
   });
 

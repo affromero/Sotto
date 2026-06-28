@@ -8,6 +8,7 @@ import { getAiKey } from './byok';
 import { getAiProviderMeta, getProviderForModel } from './providers/ai-registry';
 import { getAutoModelConfig, resolveDisabledSystemAiProviders } from './auto-model-config';
 import { getServerInfra, infra } from './server-config';
+import { normalizeAgentModelId } from './agent-models/id';
 import { logger } from './logger';
 
 export interface ResolvedLearningAi {
@@ -77,18 +78,24 @@ export async function resolveLearningAi(userId: string): Promise<ResolvedLearnin
     // Honor the owner-configured claude-code model (wizard CLI picker / admin),
     // falling back to the registry default (opus).
     const configured = await configuredModelFor('claude-code');
-    const model = configured ?? getAiProviderMeta('claude-code').defaultModel;
+    const infraModel = infra('aiModel', 'CLAUDE_CODE_MODEL');
+    const model =
+      normalizeAgentModelId('claude-code', configured ?? infraModel) ??
+      getAiProviderMeta('claude-code').defaultModel;
     if (!model) throw new Error('No default model configured for claude-code.');
     return { provider: 'claude-code', model };
   }
 
-  // Codex CLI — keyless; uses the model configured in the user's Codex setup
-  // (the bare "codex" routing sentinel; an explicit model can be set via CODEX_MODEL).
+  // Codex CLI — keyless. Prefer the owner-selected model, then CODEX_MODEL,
+  // then the bare "codex" sentinel for the user's Codex configured default.
   if (envProvider === 'codex') {
     if (await isSystemAiProviderDisabled('codex')) {
       throw new Error('Codex is disabled in admin provider settings.');
     }
-    return { provider: 'codex', model: 'codex' };
+    const configured = await configuredModelFor('codex');
+    const infraModel = infra('aiModel', 'CODEX_MODEL');
+    const model = normalizeAgentModelId('codex', configured ?? infraModel) ?? 'codex';
+    return { provider: 'codex', model };
   }
 
   // Totally-local inference: an OpenAI-compatible server (Ollama / vLLM / LM Studio).

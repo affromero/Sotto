@@ -131,8 +131,8 @@ export async function PATCH(request: NextRequest) {
       ...data
     } = validation.data;
 
-    // Validate preferredAiModel against registry (claude-code:* models are exempt)
-    if (preferredAiModel && !preferredAiModel.startsWith('claude-code:')) {
+    // Validate preferredAiModel against registry or dynamic CLI model id support.
+    if (preferredAiModel) {
       if (!isValidModelId(preferredAiModel)) {
         return errorResponse(
           `Unknown AI model: "${preferredAiModel}". Check /api/ai-models for available models.`,
