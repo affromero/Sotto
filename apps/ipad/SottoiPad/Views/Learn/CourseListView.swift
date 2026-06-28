@@ -11,11 +11,11 @@ struct CourseListView: View {
 
     var body: some View {
         NavigationSplitView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Sotto")
-                            .font(.largeTitle.bold())
+                            .font(.title.bold())
                             .foregroundStyle(SottoTheme.ink)
                         if let activeProfile = model.activeProfile {
                             Text(activeProfile.name)
@@ -45,11 +45,11 @@ struct CourseListView: View {
                     .overlay(Circle().stroke(SottoTheme.line))
                     .accessibilityLabel("Create course")
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
 
                 AgentUsageStatusCard()
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 18)
 
                 List(selection: $selectedCourseId) {
                     ForEach(model.courses) { course in
@@ -74,7 +74,7 @@ struct CourseListView: View {
                 .padding(20)
             }
             .background(SottoTheme.paper)
-            .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 440)
+            .navigationSplitViewColumnWidth(min: 300, ideal: 330, max: 360)
         } detail: {
             if let selectedCourse {
                 CourseDetailPane(course: selectedCourse)
@@ -111,7 +111,7 @@ private struct AgentUsageStatusCard: View {
     var body: some View {
         Group {
             if model.agentUsageFailed || model.isAgentUsageRefreshing || !providers.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Label("Usage", systemImage: "clock")
                             .font(.caption.bold())
@@ -147,17 +147,22 @@ private struct AgentUsageStatusCard: View {
                             .font(.caption)
                             .foregroundStyle(SottoTheme.muted)
                     } else {
-                        ForEach(providers) { provider in
+                        ForEach(providers.prefix(3)) { provider in
                             ProviderUsageRow(provider: provider)
+                        }
+                        if providers.count > 3 {
+                            Text("+\(providers.count - 3) more")
+                                .font(.caption2)
+                                .foregroundStyle(SottoTheme.muted)
                         }
                     }
                 }
-                .padding(14)
-                .background(SottoTheme.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(12)
+                .background(SottoTheme.surface.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(SottoTheme.line)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(SottoTheme.line.opacity(0.65))
                 )
             }
         }
@@ -177,10 +182,10 @@ private struct ProviderUsageRow: View {
     let provider: SottoAgentUsageProvider
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(displayName)
-                    .font(.callout.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(SottoTheme.ink)
                     .lineLimit(1)
 
@@ -190,45 +195,40 @@ private struct ProviderUsageRow: View {
                     Text("Limited")
                         .font(.caption.bold())
                         .foregroundStyle(.red)
+                } else if let primaryWindow {
+                    Text(windowSummary(primaryWindow))
+                        .font(.caption2)
+                        .foregroundStyle(SottoTheme.muted)
+                        .lineLimit(1)
+                        .monospacedDigit()
                 }
             }
 
             if provider.windows.isEmpty {
                 Label(provider.detail, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
-            } else {
-                VStack(spacing: 5) {
-                    ForEach(provider.windows, id: \.label) { window in
-                        HStack(spacing: 6) {
-                            Text(window.label)
-                                .font(.caption.bold())
-                                .foregroundStyle(SottoTheme.ink)
-                                .frame(width: 32, alignment: .leading)
+            } else if let primaryWindow {
+                HStack(spacing: 6) {
+                    Text(primaryWindow.label)
+                        .font(.caption2.bold())
+                        .foregroundStyle(SottoTheme.muted)
+                        .frame(width: 24, alignment: .leading)
 
-                            ProgressView(value: clampedPercent(window.usedPercent), total: 100)
-                                .tint(provider.limitReached ? .red : SottoTheme.success)
-
-                            Text(windowSummary(window))
-                                .font(.caption)
-                                .foregroundStyle(SottoTheme.muted)
-                                .lineLimit(1)
-                                .monospacedDigit()
-                        }
-                    }
+                    ProgressView(value: clampedPercent(primaryWindow.usedPercent), total: 100)
+                        .tint(provider.limitReached ? .red : SottoTheme.primary)
                 }
             }
 
             if let credits = creditsLabel {
                 Text(credits)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(SottoTheme.muted)
                     .lineLimit(1)
             }
         }
-        .padding(.top, 10)
-        .overlay(Rectangle().fill(SottoTheme.line).frame(height: 1), alignment: .top)
+        .padding(.top, 6)
     }
 
     private var displayName: String {
@@ -249,6 +249,12 @@ private struct ProviderUsageRow: View {
             return "Credits $\(balance)"
         }
         return nil
+    }
+
+    private var primaryWindow: SottoAgentUsageWindow? {
+        provider.windows.max { left, right in
+            left.usedPercent < right.usedPercent
+        }
     }
 
     private func windowSummary(_ window: SottoAgentUsageWindow) -> String {
@@ -331,7 +337,7 @@ private struct CourseDetailPane: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 18) {
                 CourseHeroPanel(
                     title: courseTitle,
                     course: course,
@@ -370,27 +376,9 @@ private struct CourseDetailPane: View {
                 CourseNotesEditor(course: course)
 
                 CourseClassHistoryPanel(course: course)
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(statusTitle)
-                        .font(.title2.bold())
-                        .foregroundStyle(SottoTheme.ink)
-                    Text(statusDetail)
-                        .font(.body)
-                        .foregroundStyle(SottoTheme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(22)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(SottoTheme.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(SottoTheme.line)
-                )
             }
-            .padding(44)
-            .frame(maxWidth: 1060, alignment: .leading)
+            .padding(36)
+            .frame(maxWidth: 980, alignment: .leading)
         }
         .background(SottoTheme.paper)
     }
@@ -402,22 +390,6 @@ private struct CourseDetailPane: View {
 
     private var primaryActionIcon: String {
         generation == nil ? "play.fill" : "clock"
-    }
-
-    private var statusTitle: String {
-        if generation != nil { return "Class is being generated" }
-        if generationError != nil { return "Class generation needs attention" }
-        return course.activeClassId == nil ? "Next class is ready" : "Current class is waiting"
-    }
-
-    private var statusDetail: String {
-        if generation != nil {
-            return "You can keep using the iPad while Sotto builds the class. When it is ready, this action changes to Resume class."
-        }
-        if generationError != nil {
-            return "The background class build did not finish cleanly. Retry when the server is reachable."
-        }
-        return course.activeClassId == nil ? "Use Take class to generate the first class. The workbook becomes available as soon as that class exists." : "Resume the active class before Sotto creates another one. The workbook button opens the current worksheet with Apple Pencil notes."
     }
 
     private func startOrResumeClass() {
