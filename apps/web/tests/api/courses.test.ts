@@ -5,6 +5,7 @@ const mockAuthenticateRequest = vi.fn();
 const mockGetOrCreateCurriculum = vi.fn();
 const mockCourseFindMany = vi.fn();
 const mockCourseUpsert = vi.fn();
+const mockCourseClassFindMany = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -19,6 +20,9 @@ vi.mock('@/lib/prisma', () => ({
     course: {
       findMany: (...args: unknown[]) => mockCourseFindMany(...args),
       upsert: (...args: unknown[]) => mockCourseUpsert(...args),
+    },
+    courseClass: {
+      findMany: (...args: unknown[]) => mockCourseClassFindMany(...args),
     },
   },
 }));
@@ -69,6 +73,7 @@ describe('GET /api/v1/courses', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
     mockCourseFindMany.mockResolvedValue(SAMPLE_COURSES);
+    mockCourseClassFindMany.mockResolvedValue([{ id: 'class-7', lesson: { level: 'B1' } }]);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -104,13 +109,43 @@ describe('GET /api/v1/courses', () => {
     expect(body.courses[1].placement).toMatchObject({ level: 'B1' });
   });
 
-  it('queries only the signed-in user\'s courses', async () => {
+  it('keeps an active class when it matches the course level', async () => {
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.courses[1].activeClassId).toBe('class-7');
+  });
+
+  it('hides a stale active class from a lower CEFR level', async () => {
+    mockCourseFindMany.mockResolvedValue([
+      {
+        id: 'course-b1',
+        nativeLang: 'en',
+        targetLang: 'de',
+        currentLevel: 'B1',
+        startLevel: 'B1',
+        activeClassId: 'class-a1',
+        curriculum: { title: 'German from English' },
+        placement: null,
+      },
+    ]);
+    mockCourseClassFindMany.mockResolvedValue([{ id: 'class-a1', lesson: { level: 'A1' } }]);
+
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.courses[0].activeClassId).toBeNull();
+  });
+
+  it("queries only the signed-in user's courses", async () => {
     await GET(makeGetRequest());
 
     expect(mockCourseFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'u1' },
-      }),
+      })
     );
   });
 });
@@ -203,11 +238,19 @@ describe('POST /api/v1/courses', () => {
   });
 
   it('accepts valid two-letter ISO code pairs', async () => {
-    for (const [native, target] of [['en', 'de'], ['en', 'es'], ['es', 'en']]) {
+    for (const [native, target] of [
+      ['en', 'de'],
+      ['en', 'es'],
+      ['es', 'en'],
+    ]) {
       vi.clearAllMocks();
       mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
       mockGetOrCreateCurriculum.mockResolvedValue({ id: 'cur-1' });
-      mockCourseUpsert.mockResolvedValue({ id: 'course-x', nativeLang: native, targetLang: target });
+      mockCourseUpsert.mockResolvedValue({
+        id: 'course-x',
+        nativeLang: native,
+        targetLang: target,
+      });
 
       const response = await POST(makePostRequest({ native, target }));
       expect(response.status).toBe(201);

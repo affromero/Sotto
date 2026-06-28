@@ -59,6 +59,17 @@ function selectNextLesson(
   );
 }
 
+function isBelowCourseLevel(lessonLevel: string, currentLevel: string): boolean {
+  return cefrRank(lessonLevel as CefrLevel) < cefrRank(currentLevel as CefrLevel);
+}
+
+async function clearActiveClassGate(classId: string, courseId: string): Promise<void> {
+  await prisma.$transaction([
+    prisma.courseClass.delete({ where: { id: classId } }),
+    prisma.course.update({ where: { id: courseId }, data: { activeClassId: null } }),
+  ]);
+}
+
 async function assertClassStillGenerating(classId: string) {
   const cls = await prisma.courseClass.findUnique({
     where: { id: classId },
@@ -342,9 +353,16 @@ export async function createNextClass(
   // Gating: only one non-passed class at a time.
   const active = await prisma.courseClass.findFirst({
     where: { courseId, status: { not: 'PASSED' } },
+    include: { lesson: { select: { level: true } } },
     orderBy: { order: 'asc' },
   });
-  if (active) return { kind: 'gated', activeClassId: active.id, status: active.status };
+  if (active) {
+    if (isBelowCourseLevel(active.lesson.level, course.currentLevel)) {
+      await clearActiveClassGate(active.id, courseId);
+    } else {
+      return { kind: 'gated', activeClassId: active.id, status: active.status };
+    }
+  }
 
   const passed = await prisma.courseClass.findMany({
     where: { courseId, status: 'PASSED' },
@@ -544,6 +562,26 @@ export async function regenerateCurrentClass(classId: string, userId: string): P
     });
     throw err;
   }
+}
+
+export async function deleteClassForUser(classId: string, userId: string): Promise<boolean> {
+  const cls = await prisma.courseClass.findFirst({
+    where: { id: classId, course: { userId } },
+    select: {
+      id: true,
+      courseId: true,
+      course: { select: { activeClassId: true } },
+    },
+  });
+  if (!cls) return false;
+
+  await prisma.$transaction([
+    prisma.courseClass.delete({ where: { id: classId } }),
+    ...(cls.course.activeClassId === classId
+      ? [prisma.course.update({ where: { id: cls.courseId }, data: { activeClassId: null } })]
+      : []),
+  ]);
+  return true;
 }
 
 export async function getClassForUser(classId: string, userId: string) {

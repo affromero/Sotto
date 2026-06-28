@@ -48,6 +48,9 @@ struct CourseListView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
 
+                AgentUsageStatusCard()
+                    .padding(.horizontal, 20)
+
                 List(selection: $selectedCourseId) {
                     ForEach(model.courses) { course in
                         CourseRow(course: course)
@@ -81,6 +84,7 @@ struct CourseListView: View {
             if model.courses.isEmpty {
                 await model.loadCourses()
             }
+            await model.loadAgentUsage()
         }
         .onChange(of: model.courses) { _, courses in
             guard selectedCourseId == nil else { return }
@@ -90,6 +94,169 @@ struct CourseListView: View {
             NewCourseView()
                 .environmentObject(model)
         }
+    }
+}
+
+private struct AgentUsageStatusCard: View {
+    @EnvironmentObject private var model: SottoAppModel
+
+    private var providers: [SottoAgentUsageProvider] {
+        model.agentUsage?.providers.filter(shouldShowProvider) ?? []
+    }
+
+    var body: some View {
+        Group {
+            if model.agentUsageFailed || model.isAgentUsageRefreshing || !providers.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Label("Usage", systemImage: "clock")
+                            .font(.caption.bold())
+                            .foregroundStyle(SottoTheme.ink)
+
+                        Spacer()
+
+                        if model.isAgentUsageRefreshing {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+
+                        Button {
+                            Task {
+                                await model.loadAgentUsage()
+                            }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SottoTheme.muted)
+                        .accessibilityLabel("Refresh usage")
+                    }
+
+                    if model.agentUsageFailed {
+                        Label("Usage status is unavailable.", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(SottoTheme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if providers.isEmpty {
+                        Text("Loading usage")
+                            .font(.caption)
+                            .foregroundStyle(SottoTheme.muted)
+                    } else {
+                        ForEach(providers) { provider in
+                            ProviderUsageRow(provider: provider)
+                        }
+                    }
+                }
+                .padding(14)
+                .background(SottoTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(SottoTheme.line)
+                )
+            }
+        }
+    }
+
+    private func shouldShowProvider(_ provider: SottoAgentUsageProvider) -> Bool {
+        provider.limitReached ||
+        provider.status == "ready" ||
+        (provider.status == "action_required" && provider.category == "audio") ||
+        provider.status == "unavailable" ||
+        !provider.windows.isEmpty ||
+        provider.credits != nil
+    }
+}
+
+private struct ProviderUsageRow: View {
+    let provider: SottoAgentUsageProvider
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(displayName)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(SottoTheme.ink)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                if provider.limitReached {
+                    Text("Limited")
+                        .font(.caption.bold())
+                        .foregroundStyle(.red)
+                }
+            }
+
+            if provider.windows.isEmpty {
+                Label(provider.detail, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(SottoTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 5) {
+                    ForEach(provider.windows, id: \.label) { window in
+                        HStack(spacing: 6) {
+                            Text(window.label)
+                                .font(.caption.bold())
+                                .foregroundStyle(SottoTheme.ink)
+                                .frame(width: 32, alignment: .leading)
+
+                            ProgressView(value: clampedPercent(window.usedPercent), total: 100)
+                                .tint(provider.limitReached ? .red : SottoTheme.success)
+
+                            Text(windowSummary(window))
+                                .font(.caption)
+                                .foregroundStyle(SottoTheme.muted)
+                                .lineLimit(1)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+            }
+
+            if let credits = creditsLabel {
+                Text(credits)
+                    .font(.caption)
+                    .foregroundStyle(SottoTheme.muted)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.top, 10)
+        .overlay(Rectangle().fill(SottoTheme.line).frame(height: 1), alignment: .top)
+    }
+
+    private var displayName: String {
+        if let planLabel = provider.planLabel, !planLabel.isEmpty {
+            return "\(planLabel) \(provider.shortLabel)"
+        }
+        return provider.shortLabel
+    }
+
+    private var creditsLabel: String? {
+        if let label = provider.credits?.label, !label.isEmpty {
+            return label
+        }
+        if provider.credits?.unlimited == true {
+            return "Credits unlimited"
+        }
+        if let balance = provider.credits?.balance, !balance.isEmpty {
+            return "Credits $\(balance)"
+        }
+        return nil
+    }
+
+    private func windowSummary(_ window: SottoAgentUsageWindow) -> String {
+        let value = window.valueLabel ?? "\(Int(clampedPercent(window.usedPercent).rounded()))%"
+        if let resetIn = window.resetIn {
+            return "\(value) (\(resetIn))"
+        }
+        return value
+    }
+
+    private func clampedPercent(_ value: Double) -> Double {
+        min(100, max(0, value))
     }
 }
 

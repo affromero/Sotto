@@ -30,6 +30,7 @@ const mockGetClassForUser = vi.fn();
 const mockSubmitClass = vi.fn();
 const mockRegenerateFailedSections = vi.fn();
 const mockRegenerateCurrentClass = vi.fn();
+const mockDeleteClassForUser = vi.fn();
 const mockCreateNextClass = vi.fn();
 
 vi.mock('@/lib/class-service', () => {
@@ -40,6 +41,7 @@ vi.mock('@/lib/class-service', () => {
     submitClass: (...args: unknown[]) => mockSubmitClass(...args),
     regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
     regenerateCurrentClass: (...args: unknown[]) => mockRegenerateCurrentClass(...args),
+    deleteClassForUser: (...args: unknown[]) => mockDeleteClassForUser(...args),
     createNextClass: (...args: unknown[]) => mockCreateNextClass(...args),
     CourseNotFoundError,
     ClassGenerationCancelledError,
@@ -51,7 +53,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---- Imports under test ----
-import { GET, POST } from '@/app/api/v1/classes/[classId]/route';
+import { DELETE as DELETEClass, GET, POST } from '@/app/api/v1/classes/[classId]/route';
 import { POST as POSTSubmit } from '@/app/api/v1/classes/[classId]/submit/route';
 import { POST as POSTNextClass } from '@/app/api/v1/courses/[courseId]/next-class/route';
 import { DELETE as DELETEGeneration } from '@/app/api/v1/courses/[courseId]/generation/route';
@@ -390,6 +392,51 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ---- DELETE /api/v1/classes/[classId] ----
+
+describe('DELETE /api/v1/classes/[classId]', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+
+    const res = await DELETEClass(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'DELETE'),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('deletes an owned class', async () => {
+    mockDeleteClassForUser.mockResolvedValue(true);
+
+    const res = await DELETEClass(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'DELETE'),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteClassForUser).toHaveBeenCalledWith('class-1', 'u1');
+    const body = await res.json();
+    expect(body).toEqual({ deleted: true });
+  });
+
+  it('returns 404 when the class is not owned by the user', async () => {
+    mockDeleteClassForUser.mockResolvedValue(false);
+
+    const res = await DELETEClass(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'DELETE'),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(404);
   });
 });
 

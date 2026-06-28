@@ -7,7 +7,12 @@ struct RootView: View {
         ZStack {
             if model.isPaired {
                 if model.hasSelectedProfile {
-                    CourseListView()
+                    if let selectedClass = model.selectedClass {
+                        ClassSessionView(classDetail: selectedClass)
+                            .environmentObject(model)
+                    } else {
+                        CourseListView()
+                    }
                 } else {
                     ProfileSelectionView()
                 }
@@ -27,10 +32,6 @@ struct RootView: View {
             }
         }
         .background(SottoTheme.paper)
-        .sheet(item: $model.selectedClass) { classDetail in
-            ClassSessionView(classDetail: classDetail)
-                .environmentObject(model)
-        }
         .sheet(isPresented: practiceSheetBinding) {
             if let practiceStart = model.practiceStart {
                 PracticeStartView(start: practiceStart)
