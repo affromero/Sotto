@@ -17,6 +17,7 @@
 		A10000000000000000000007 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* CredentialStore.swift */; };
 		A10000000000000000000008 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PairingView.swift */; };
 		A10000000000000000000009 /* CourseListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* CourseListView.swift */; };
+		A10000000000000000000015 /* CourseWorkspacePanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* CourseWorkspacePanels.swift */; };
 		A1000000000000000000000A /* ClassSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* ClassSessionView.swift */; };
 		A10000000000000000000010 /* ClassSessionIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ClassSessionIntroView.swift */; };
 		A10000000000000000000011 /* ClassSessionSectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* ClassSessionSectionViews.swift */; };
@@ -40,6 +41,7 @@
 		A20000000000000000000007 /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* CourseListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseListView.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* CourseWorkspacePanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseWorkspacePanels.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* ClassSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionView.swift; sourceTree = "<group>"; };
 		A20000000000000000000010 /* ClassSessionIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionIntroView.swift; sourceTree = "<group>"; };
 		A20000000000000000000011 /* ClassSessionSectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionSectionViews.swift; sourceTree = "<group>"; };
@@ -160,6 +162,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000009 /* CourseListView.swift */,
+				A20000000000000000000015 /* CourseWorkspacePanels.swift */,
 				A2000000000000000000000A /* ClassSessionView.swift */,
 				A20000000000000000000010 /* ClassSessionIntroView.swift */,
 				A20000000000000000000011 /* ClassSessionSectionViews.swift */,
@@ -272,6 +275,7 @@
 				A10000000000000000000007 /* CredentialStore.swift in Sources */,
 				A10000000000000000000008 /* PairingView.swift in Sources */,
 				A10000000000000000000009 /* CourseListView.swift in Sources */,
+				A10000000000000000000015 /* CourseWorkspacePanels.swift in Sources */,
 				A1000000000000000000000A /* ClassSessionView.swift in Sources */,
 				A10000000000000000000010 /* ClassSessionIntroView.swift in Sources */,
 				A10000000000000000000011 /* ClassSessionSectionViews.swift in Sources */,

@@ -36,7 +36,7 @@ struct PracticeStartView: View {
                 .frame(maxWidth: 940, alignment: .leading)
             }
             .background(SottoTheme.paper)
-            .navigationTitle("Full catch-up")
+            .navigationTitle(practiceTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -65,13 +65,32 @@ struct PracticeStartView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Full catch-up")
+            Text(practiceTitle)
                 .font(.system(size: 40, weight: .bold, design: .serif))
                 .foregroundStyle(SottoTheme.ink)
             Text(statusCopy)
                 .font(.title3)
                 .foregroundStyle(SottoTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var practiceTitle: String {
+        switch start.kind {
+        case "GRAMMAR":
+            return "Grammar practice"
+        case "READING":
+            return "Reading practice"
+        case "LISTENING":
+            return "Listening practice"
+        case "SPEAKING":
+            return "Speaking practice"
+        case "WRITING":
+            return "Writing practice"
+        case "VOCAB":
+            return "Vocabulary practice"
+        default:
+            return "Full catch-up"
         }
     }
 

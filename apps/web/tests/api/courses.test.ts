@@ -52,9 +52,12 @@ const SAMPLE_COURSES = [
     targetLang: 'de',
     currentLevel: 'A1',
     startLevel: 'A1',
+    placementSource: 'MANUAL',
+    pedagogy: 'BALANCED',
     activeClassId: null,
     curriculum: { title: 'German from English' },
     placement: null,
+    classes: [],
   },
   {
     id: 'course-2',
@@ -62,9 +65,26 @@ const SAMPLE_COURSES = [
     targetLang: 'es',
     currentLevel: 'B1',
     startLevel: 'A2',
+    placementSource: 'PLACEMENT',
+    pedagogy: 'IMMERSION',
     activeClassId: 'class-7',
     curriculum: { title: 'Spanish from English' },
     placement: { level: 'B1', createdAt: new Date('2026-01-01T00:00:00Z') },
+    classes: [
+      {
+        id: 'class-7',
+        order: 4,
+        status: 'AVAILABLE',
+        attempt: 1,
+        sourceTitle: 'A market interview',
+        createdAt: new Date('2026-01-02T00:00:00Z'),
+        submittedAt: null,
+        passedAt: null,
+        failedAt: null,
+        lesson: { title: 'Ordering food', level: 'B1' },
+        submission: null,
+      },
+    ],
   },
 ];
 
@@ -109,6 +129,24 @@ describe('GET /api/v1/courses', () => {
     expect(body.courses[1].placement).toMatchObject({ level: 'B1' });
   });
 
+  it('returns teaching approach and class history for rich clients', async () => {
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.courses[1].pedagogy).toBe('IMMERSION');
+    expect(body.courses[1].classes).toHaveLength(1);
+    expect(body.courses[1].classes[0]).toMatchObject({
+      id: 'class-7',
+      order: 4,
+      status: 'AVAILABLE',
+      attempt: 1,
+      sourceTitle: 'A market interview',
+      lesson: { title: 'Ordering food', level: 'B1' },
+      submission: null,
+    });
+  });
+
   it('keeps an active class when it matches the course level', async () => {
     const response = await GET(makeGetRequest());
     const body = await response.json();
@@ -125,9 +163,12 @@ describe('GET /api/v1/courses', () => {
         targetLang: 'de',
         currentLevel: 'B1',
         startLevel: 'B1',
+        placementSource: 'PLACEMENT',
+        pedagogy: 'BALANCED',
         activeClassId: 'class-a1',
         curriculum: { title: 'German from English' },
         placement: null,
+        classes: [],
       },
     ]);
     mockCourseClassFindMany.mockResolvedValue([{ id: 'class-a1', lesson: { level: 'A1' } }]);

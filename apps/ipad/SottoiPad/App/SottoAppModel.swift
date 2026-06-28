@@ -255,7 +255,10 @@ final class SottoAppModel: ObservableObject {
         startClassGeneration(for: course)
     }
 
-    func startClassGeneration(for course: SottoCourse) {
+    func startClassGeneration(
+        for course: SottoCourse,
+        source: SottoClassGenerationSource = .curriculum
+    ) {
         guard let client = makeClient() else { return }
         guard classGenerationTasks[course.id] == nil else { return }
 
@@ -271,13 +274,19 @@ final class SottoAppModel: ObservableObject {
         errorMessage = nil
 
         classGenerationTasks[course.id] = Task { [weak self] in
-            await self?.runClassGeneration(client: client, course: course, startedAt: startedAt)
+            await self?.runClassGeneration(
+                client: client,
+                course: course,
+                source: source,
+                startedAt: startedAt
+            )
         }
     }
 
     private func runClassGeneration(
         client: SottoAPIClient,
         course: SottoCourse,
+        source: SottoClassGenerationSource,
         startedAt: Date
     ) async {
         let progressTask = startClassGenerationPolling(client: client, course: course, startedAt: startedAt)
@@ -290,7 +299,7 @@ final class SottoAppModel: ObservableObject {
         }
 
         do {
-            try await client.startNextClassGeneration(courseId: course.id)
+            try await client.startNextClassGeneration(courseId: course.id, source: source)
             if let classId = try await waitForGeneratedClassAfterRequestFailure(
                 client: client,
                 course: course,
@@ -567,6 +576,39 @@ final class SottoAppModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    func fetchCourseTopics(courseId: String) async throws -> [SottoTopicSuggestion] {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before loading class topics.")
+        }
+        return try await client.fetchCourseTopics(courseId: courseId)
+    }
+
+    func fetchCourseNotes(courseId: String) async throws -> SottoCourseNotesResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before loading course notes.")
+        }
+        return try await client.fetchCourseNotes(courseId: courseId)
+    }
+
+    func saveCourseNotes(courseId: String, body: String) async throws -> SottoCourseNotesResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before saving course notes.")
+        }
+        return try await client.saveCourseNotes(courseId: courseId, body: body)
+    }
+
+    func updateCoursePedagogy(
+        courseId: String,
+        pedagogy: SottoPedagogyStyle
+    ) async throws -> SottoPedagogyStyle {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this iPad before changing the teaching approach.")
+        }
+        let saved = try await client.updateCoursePedagogy(courseId: courseId, pedagogy: pedagogy)
+        courses = try await client.listCourses()
+        return saved
     }
 
     func submitClassAnswers(_ answers: [SottoSubmitAnswer]) async {
