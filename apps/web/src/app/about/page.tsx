@@ -17,9 +17,9 @@ export default function AboutPage() {
           <header className={styles.hero}>
             <h1 className={styles.heroTitle}>{BRAND.tagline}</h1>
             <p className={styles.heroSubtitle}>
-              Sotto is open source language learning you run yourself. You learn a language in the
-              context of your own work and interests, on a stack you control. It stays private
-              because you own the agent, keys, data, and infrastructure.
+              Sotto is open source language learning you run yourself. It gives learners a private
+              rehearsal space for the language they want to use before class, tutoring, or real
+              conversation, on a stack they control.
             </p>
           </header>
 
@@ -44,7 +44,7 @@ export default function AboutPage() {
               <p className={styles.featureDescription}>
                 Get placed at the right CEFR level, then work through courses across five skills:
                 grammar, reading, listening, speaking, and writing. Each course is gated by mastery
-                and built from the context you choose to share.
+                and built from the context and situations you choose to share.
               </p>
             </div>
 
@@ -68,11 +68,11 @@ export default function AboutPage() {
                   <path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3" />
                 </svg>
               </div>
-              <h2 className={styles.featureTitle}>Remember</h2>
+              <h2 className={styles.featureTitle}>Rehearse</h2>
               <p className={styles.featureDescription}>
-                Every word and grammar point you meet enters a personal vocabulary memory graph that
-                you own. Spaced repetition brings the right review back at the right moment, across
-                all five skills.
+                Repeat speaking, listening, writing, and vocabulary practice privately before a
+                human is waiting on the other side. Mistakes become material for the next attempt,
+                not a performance.
               </p>
             </div>
 
@@ -116,12 +116,37 @@ export default function AboutPage() {
           </section>
 
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Built Around You</h2>
+            <h2 className={styles.sectionTitle}>Built for Low-Pressure Practice</h2>
             <p className={styles.sectionText}>
-              Most language tools teach the same lessons to everyone. Sotto teaches the language
-              through the things you already care about. A paper you are reading, a project you are
-              shipping, a topic you keep coming back to. The course bends toward your context, not
-              the other way around.
+              Most language tools treat conversation as the starting point. Sotto treats it as the
+              thing many learners need to rehearse for. A paper you are reading, a project you are
+              shipping, a classroom topic, a travel scene, or a difficult conversation can become
+              private practice first.
+            </p>
+            <p className={styles.sectionText}>
+              It is also not another AI language chatbot. The useful surface is the learning loop
+              around the model: classes, assigned rehearsal, recordings, rubrics, spaced repetition,
+              and follow-up evidence that can survive beyond a single chat thread.
+            </p>
+            <p className={styles.sectionText}>
+              That does not make Sotto a replacement for teachers, tutors, or classmates. It handles
+              repetition, preparation, and gentle feedback so human learning moments can start from
+              a stronger attempt.
+            </p>
+          </section>
+
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>A Teacher-Run Path</h2>
+            <p className={styles.sectionText}>
+              In a classroom deployment, the self-hosted owner can become the teacher and learner
+              profiles can become student spaces. The useful version of that mode is not an AI
+              teacher; it is homework, class-prep scenarios, private retries, and follow-up notes
+              the teacher can review before the next lesson.
+            </p>
+            <p className={styles.sectionText}>
+              That keeps the product honest: Sotto creates practice evidence and lowers the social
+              load between lessons, while the teacher keeps control over goals, rubrics, feedback,
+              and what happens live.
             </p>
           </section>
 

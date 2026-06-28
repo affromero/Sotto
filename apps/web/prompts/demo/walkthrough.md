@@ -39,8 +39,8 @@ Rules:
 - Use present tense, third person: "The user types a topic. The AI generates a two-voice script."
 - Keep sentences short. One idea per sentence. No conjunctions chaining 3+ clauses.
 
-Good: "A new episode appears in the feed with cover art, title, and duration. Listeners can play it directly or fork it with their own angle."
-Bad: "Welcome — let's see how easy it is to create a episode! I'll walk you through the amazing creation flow."
+Good: "A new class appears with grammar, reading, listening, speaking, and writing sections. This is structured rehearsal, not another AI language chatbot. The learner can practice privately before trying the material live."
+Bad: "Welcome - let's see how easy it is to create a course! I'll walk you through the amazing creation flow."
 
 ## Scene Structure
 

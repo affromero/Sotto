@@ -89,7 +89,8 @@ const MATERIAL_TYPES: Array<{
 const CONTEXT_PROMPTS = [
   'Class notes, a syllabus, or the chapter you are studying now',
   'A paragraph you can partly read, plus words you keep missing',
-  'Work, travel, family, or hobby situations you want to talk about',
+  'Work, travel, family, school, or tutoring situations you want to rehearse',
+  'Homework instructions, teacher feedback, or prompts for the next class',
   'Articles, videos, podcasts, songs, or books you actually want in lessons',
 ];
 
@@ -284,7 +285,8 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
             </div>
             <p className={c.contextDirectCopy}>
               Start with one exact thing: a class note, a syllabus line, an article URL, a book, a
-              song, a paragraph, or a situation you want to handle in the target language.
+              song, a paragraph, homework feedback, or a situation you want to handle in the target
+              language.
             </p>
           </div>
           <span className={c.contextDirectCount}>
@@ -401,7 +403,7 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
 
       <div className={c.ctxTally}>
         {totalContext === 0 ? (
-          'One context item is required. If you are unsure, add the textbook chapter, a URL, or three situations you want to practice.'
+          'One context item is required. If you are unsure, add the textbook chapter, a URL, a homework prompt, or three situations you want to rehearse.'
         ) : (
           <>
             Sotto will weave your course from{' '}
