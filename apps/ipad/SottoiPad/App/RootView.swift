@@ -96,7 +96,8 @@ struct LoadingOverlay: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 18) {
-                SottoProgressMark(progress: operation?.progress)
+                SottoBrandMark(progress: operation?.progress)
+                    .frame(width: 116, height: 116)
 
                 VStack(spacing: 6) {
                     Text(operation?.title ?? "Working with your Sotto server")
@@ -139,96 +140,5 @@ struct LoadingOverlay: View {
             return "Step \(currentStep) of \(totalSteps) / \(percent)"
         }
         return percent
-    }
-}
-
-private struct SottoProgressMark: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isAnimating = false
-
-    let progress: Double?
-
-    private var clampedProgress: Double? {
-        guard let progress else { return nil }
-        return max(0, min(1, progress))
-    }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(SottoTheme.primary.opacity(0.16), lineWidth: 8)
-
-            if let clampedProgress {
-                Circle()
-                    .trim(from: 0, to: clampedProgress)
-                    .stroke(
-                        SottoTheme.primary,
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: clampedProgress)
-            } else {
-                Circle()
-                    .trim(from: 0, to: 0.34)
-                    .stroke(
-                        SottoTheme.primary,
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(isAnimating && !reduceMotion ? 270 : -90))
-                    .animation(
-                        reduceMotion ? nil : .linear(duration: 1.4).repeatForever(autoreverses: false),
-                        value: isAnimating
-                    )
-            }
-
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.416, green: 0.627, blue: 1.0),
-                                Color(red: 0.545, green: 0.482, blue: 1.0),
-                                Color(red: 1.0, green: 0.561, blue: 0.694),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                .white.opacity(0.42),
-                                .white.opacity(0.08),
-                                .clear,
-                            ],
-                            center: .topLeading,
-                            startRadius: 0,
-                            endRadius: 58
-                        )
-                    )
-
-                Text("S")
-                    .font(.system(size: 34, weight: .bold, design: .serif))
-                    .foregroundStyle(.white.opacity(0.9))
-
-                Circle()
-                    .stroke(.white.opacity(0.28), lineWidth: 1)
-            }
-            .frame(width: 76, height: 76)
-            .shadow(color: SottoTheme.primary.opacity(0.24), radius: 16, y: 8)
-            .scaleEffect(reduceMotion ? 1 : (isAnimating ? 1.04 : 0.96))
-            .opacity(reduceMotion ? 1 : (isAnimating ? 1 : 0.82))
-            .animation(
-                reduceMotion ? nil : .easeInOut(duration: 1.8).repeatForever(autoreverses: true),
-                value: isAnimating
-            )
-        }
-        .frame(width: 116, height: 116)
-        .accessibilityHidden(true)
-        .onAppear {
-            isAnimating = true
-        }
     }
 }

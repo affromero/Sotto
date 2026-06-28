@@ -69,6 +69,10 @@ struct NextClassCreatedResponse: Decodable {
     let done: Bool?
 }
 
+struct NextClassBackgroundResponse: Decodable {
+    let started: Bool
+}
+
 struct SottoGenerationProgress: Decodable, Equatable {
     let status: String
     let classId: String?

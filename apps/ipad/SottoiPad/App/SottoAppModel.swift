@@ -16,11 +16,14 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var agentUsage: SottoAgentUsageStatus?
     @Published private(set) var isAgentUsageRefreshing = false
     @Published private(set) var agentUsageFailed = false
+    @Published private(set) var classGenerationOperations: [String: SottoLoadingOperation] = [:]
+    @Published private(set) var classGenerationErrors: [String: String] = [:]
     @Published var errorMessage: String?
 
     private let credentialStore = CredentialStore()
     private var activeClassGenerationCourseId: String?
-    private var cancelledClassGenerationCourseId: String?
+    private var cancelledClassGenerationCourseIds = Set<String>()
+    private var classGenerationTasks: [String: Task<Void, Never>] = [:]
 
     init() {
         credentials = try? credentialStore.load()
@@ -85,7 +88,9 @@ final class SottoAppModel: ObservableObject {
         resetLearnerState()
         canCancelLoading = false
         activeClassGenerationCourseId = nil
-        cancelledClassGenerationCourseId = nil
+        cancelledClassGenerationCourseIds.removeAll()
+        classGenerationTasks.values.forEach { $0.cancel() }
+        classGenerationTasks.removeAll()
         errorMessage = nil
     }
 
@@ -177,6 +182,10 @@ final class SottoAppModel: ObservableObject {
         agentUsage = nil
         isAgentUsageRefreshing = false
         agentUsageFailed = false
+        classGenerationOperations = [:]
+        classGenerationErrors = [:]
+        classGenerationTasks.values.forEach { $0.cancel() }
+        classGenerationTasks.removeAll()
     }
 
     func closeClass() {
@@ -238,35 +247,63 @@ final class SottoAppModel: ObservableObject {
     }
 
     func startOrResumeClass(for course: SottoCourse) async {
+        if let activeClassId = course.activeClassId {
+            await openClass(activeClassId)
+            return
+        }
+
+        startClassGeneration(for: course)
+    }
+
+    func startClassGeneration(for course: SottoCourse) {
         guard let client = makeClient() else { return }
-        isLoading = true
-        canCancelLoading = true
+        guard classGenerationTasks[course.id] == nil else { return }
+
         activeClassGenerationCourseId = course.id
-        cancelledClassGenerationCourseId = nil
+        cancelledClassGenerationCourseIds.remove(course.id)
+        classGenerationErrors[course.id] = nil
         let startedAt = Date()
-        loadingOperation = classGenerationOperation(
+        classGenerationOperations[course.id] = classGenerationOperation(
             progress: nil,
             course: course,
             elapsedSeconds: 0
         )
         errorMessage = nil
+
+        classGenerationTasks[course.id] = Task { [weak self] in
+            await self?.runClassGeneration(client: client, course: course, startedAt: startedAt)
+        }
+    }
+
+    private func runClassGeneration(
+        client: SottoAPIClient,
+        course: SottoCourse,
+        startedAt: Date
+    ) async {
         let progressTask = startClassGenerationPolling(client: client, course: course, startedAt: startedAt)
         defer {
             progressTask.cancel()
+            classGenerationTasks[course.id] = nil
             if activeClassGenerationCourseId == course.id {
                 activeClassGenerationCourseId = nil
             }
-            canCancelLoading = false
-            loadingOperation = nil
-            isLoading = false
         }
 
         do {
-            let classId = try await client.startNextClass(courseId: course.id)
-            guard !isClassGenerationCancelled(course.id) else { return }
-            selectedClass = try await client.fetchClass(classId: classId)
-            classResult = nil
-            refreshAgentUsageInBackground()
+            try await client.startNextClassGeneration(courseId: course.id)
+            if let classId = try await waitForGeneratedClassAfterRequestFailure(
+                client: client,
+                course: course,
+                startedAt: startedAt,
+                originalError: SottoAPIError.message("Class generation did not finish.")
+            ) {
+                guard !isClassGenerationCancelled(course.id) else { return }
+                await finishBackgroundClassGeneration(courseId: course.id, classId: classId, client: client)
+                return
+            }
+
+            classGenerationErrors[course.id] = "Class generation did not finish."
+            classGenerationOperations[course.id] = nil
         } catch {
             if isClassGenerationCancelled(course.id) {
                 return
@@ -280,9 +317,7 @@ final class SottoAppModel: ObservableObject {
                     originalError: error
                 ) {
                     guard !isClassGenerationCancelled(course.id) else { return }
-                    selectedClass = try await client.fetchClass(classId: classId)
-                    classResult = nil
-                    refreshAgentUsageInBackground()
+                    await finishBackgroundClassGeneration(courseId: course.id, classId: classId, client: client)
                     return
                 }
             } catch {
@@ -291,9 +326,25 @@ final class SottoAppModel: ObservableObject {
                 }
             }
 
-            errorMessage = error.localizedDescription
+            classGenerationErrors[course.id] = error.localizedDescription
+            classGenerationOperations[course.id] = nil
         }
+    }
 
+    private func finishBackgroundClassGeneration(
+        courseId: String,
+        classId _: String,
+        client: SottoAPIClient
+    ) async {
+        do {
+            courses = try await client.listCourses()
+            classGenerationErrors[courseId] = nil
+            classGenerationOperations[courseId] = nil
+            refreshAgentUsageInBackground()
+        } catch {
+            classGenerationErrors[courseId] = error.localizedDescription
+            classGenerationOperations[courseId] = nil
+        }
     }
 
     func openClass(_ classId: String) async {
@@ -442,11 +493,17 @@ final class SottoAppModel: ObservableObject {
     }
 
     func cancelCurrentClassGeneration() async {
-        guard let courseId = activeClassGenerationCourseId, let client = makeClient() else { return }
+        guard let courseId = activeClassGenerationCourseId else { return }
+        await cancelClassGeneration(for: courseId)
+    }
 
-        cancelledClassGenerationCourseId = courseId
-        canCancelLoading = false
-        loadingOperation = SottoLoadingOperation(
+    func cancelClassGeneration(for courseId: String) async {
+        guard let client = makeClient() else { return }
+
+        cancelledClassGenerationCourseIds.insert(courseId)
+        classGenerationTasks[courseId]?.cancel()
+        classGenerationTasks[courseId] = nil
+        classGenerationOperations[courseId] = SottoLoadingOperation(
             title: "Cancelling class generation",
             detail: "Stopping the current class build and clearing the retry state.",
             progress: nil,
@@ -459,15 +516,15 @@ final class SottoAppModel: ObservableObject {
         do {
             try await client.cancelClassGeneration(courseId: courseId)
             courses = try await client.listCourses()
+            classGenerationErrors[courseId] = nil
         } catch {
-            errorMessage = error.localizedDescription
+            classGenerationErrors[courseId] = error.localizedDescription
         }
 
         if activeClassGenerationCourseId == courseId {
             activeClassGenerationCourseId = nil
         }
-        loadingOperation = nil
-        isLoading = false
+        classGenerationOperations[courseId] = nil
     }
 
     private func makeClient(usesSelectedProfile: Bool = true) -> SottoAPIClient? {
@@ -486,7 +543,7 @@ final class SottoAppModel: ObservableObject {
     }
 
     private func isClassGenerationCancelled(_ courseId: String) -> Bool {
-        cancelledClassGenerationCourseId == courseId
+        cancelledClassGenerationCourseIds.contains(courseId)
     }
 
     private func waitForGeneratedClassAfterRequestFailure(
@@ -496,12 +553,13 @@ final class SottoAppModel: ObservableObject {
         originalError: Error
     ) async throws -> String? {
         let deadline = Date().addingTimeInterval(900)
+        let idleGraceDeadline = startedAt.addingTimeInterval(30)
 
         while !Task.isCancelled && !isClassGenerationCancelled(course.id) {
             let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
             let progress = try? await client.fetchClassGenerationProgress(courseId: course.id)
 
-            loadingOperation = classGenerationOperation(
+            classGenerationOperations[course.id] = classGenerationOperation(
                 progress: progress,
                 course: course,
                 elapsedSeconds: elapsedSeconds
@@ -513,7 +571,7 @@ final class SottoAppModel: ObservableObject {
                 }
             }
 
-            if progress?.status == "IDLE" || Date() >= deadline {
+            if Date() >= deadline || (progress?.status == "IDLE" && Date() >= idleGraceDeadline) {
                 throw originalError
             }
 
@@ -535,7 +593,7 @@ final class SottoAppModel: ObservableObject {
                     let progress = try await client.fetchClassGenerationProgress(courseId: course.id)
                     await MainActor.run {
                         guard let self else { return }
-                        self.loadingOperation = self.classGenerationOperation(
+                        self.classGenerationOperations[course.id] = self.classGenerationOperation(
                             progress: progress,
                             course: course,
                             elapsedSeconds: elapsedSeconds
@@ -544,7 +602,7 @@ final class SottoAppModel: ObservableObject {
                 } catch {
                     await MainActor.run {
                         guard let self else { return }
-                        self.loadingOperation = self.classGenerationOperation(
+                        self.classGenerationOperations[course.id] = self.classGenerationOperation(
                             progress: nil,
                             course: course,
                             elapsedSeconds: elapsedSeconds

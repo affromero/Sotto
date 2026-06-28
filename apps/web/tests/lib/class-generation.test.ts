@@ -154,4 +154,28 @@ describe('generateSectionQuestions', () => {
     expect(qs).toHaveLength(2);
     expect(qs[1].correctIndex).toBe(1);
   });
+
+  it('retries with stricter JSON instructions when the first response is malformed', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({
+        content: '[{"question":"broken"',
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'm',
+      })
+      .mockResolvedValueOnce({
+        content: SAMPLE,
+        inputTokens: 2,
+        outputTokens: 2,
+        model: 'm',
+      });
+
+    const qs = await generateSectionQuestions(BASE);
+
+    expect(qs).toHaveLength(2);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
+      'Return ONLY a valid JSON array'
+    );
+  });
 });

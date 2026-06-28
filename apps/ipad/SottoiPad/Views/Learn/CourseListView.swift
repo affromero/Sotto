@@ -53,7 +53,11 @@ struct CourseListView: View {
 
                 List(selection: $selectedCourseId) {
                     ForEach(model.courses) { course in
-                        CourseRow(course: course)
+                        CourseRow(
+                            course: course,
+                            generation: model.classGenerationOperations[course.id],
+                            error: model.classGenerationErrors[course.id]
+                        )
                             .tag(course.id)
                     }
                 }
@@ -262,6 +266,8 @@ private struct ProviderUsageRow: View {
 
 private struct CourseRow: View {
     let course: SottoCourse
+    let generation: SottoLoadingOperation?
+    let error: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -281,8 +287,18 @@ private struct CourseRow: View {
             }
 
             HStack(spacing: 8) {
-                Label(course.activeClassId == nil ? "Ready" : "Class open", systemImage: course.activeClassId == nil ? "checkmark.circle" : "bolt.circle")
-                    .foregroundStyle(course.activeClassId == nil ? SottoTheme.success : SottoTheme.primary)
+                if generation != nil {
+                    SottoBrandMark(progress: generation?.progress)
+                        .frame(width: 18, height: 18)
+                    Text("Generating")
+                        .foregroundStyle(SottoTheme.primary)
+                } else if error != nil {
+                    Label("Needs retry", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.red)
+                } else {
+                    Label(course.activeClassId == nil ? "Ready" : "Class open", systemImage: course.activeClassId == nil ? "checkmark.circle" : "bolt.circle")
+                        .foregroundStyle(course.activeClassId == nil ? SottoTheme.success : SottoTheme.primary)
+                }
                 Text("\(course.nativeLang.uppercased()) -> \(course.targetLang.uppercased())")
                     .foregroundStyle(SottoTheme.muted)
             }
@@ -295,6 +311,14 @@ private struct CourseRow: View {
 private struct CourseDetailPane: View {
     @EnvironmentObject private var model: SottoAppModel
     let course: SottoCourse
+
+    private var generation: SottoLoadingOperation? {
+        model.classGenerationOperations[course.id]
+    }
+
+    private var generationError: String? {
+        model.classGenerationErrors[course.id]
+    }
 
     var body: some View {
         ScrollView {
@@ -313,6 +337,18 @@ private struct CourseDetailPane: View {
                     }
                 }
 
+                if let generation {
+                    ClassGenerationStatusPanel(operation: generation) {
+                        Task {
+                            await model.cancelClassGeneration(for: course.id)
+                        }
+                    }
+                } else if let generationError {
+                    ClassGenerationErrorPanel(message: generationError) {
+                        model.startClassGeneration(for: course)
+                    }
+                }
+
                 HStack(spacing: 14) {
                     Button {
                         Task {
@@ -323,10 +359,11 @@ private struct CourseDetailPane: View {
                             }
                         }
                     } label: {
-                        Label(course.activeClassId == nil ? "Take class" : "Resume class", systemImage: "play.fill")
+                        Label(primaryActionTitle, systemImage: primaryActionIcon)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SottoPrimaryButtonStyle())
+                    .disabled(generation != nil)
 
                     Button {
                         Task {
@@ -350,10 +387,10 @@ private struct CourseDetailPane: View {
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
-                    Text(course.activeClassId == nil ? "Next class is ready" : "Current class is waiting")
+                    Text(statusTitle)
                         .font(.title2.bold())
                         .foregroundStyle(SottoTheme.ink)
-                    Text(course.activeClassId == nil ? "Use Take class to generate the first class. The workbook becomes available as soon as that class exists." : "Resume the active class before Sotto creates another one. The workbook button opens the current worksheet with Apple Pencil notes.")
+                    Text(statusDetail)
                         .font(.body)
                         .foregroundStyle(SottoTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -371,6 +408,127 @@ private struct CourseDetailPane: View {
             .frame(maxWidth: 980, alignment: .leading)
         }
         .background(SottoTheme.paper)
+    }
+
+    private var primaryActionTitle: String {
+        if generation != nil { return "Generating class" }
+        return course.activeClassId == nil ? "Take class" : "Resume class"
+    }
+
+    private var primaryActionIcon: String {
+        generation == nil ? "play.fill" : "clock"
+    }
+
+    private var statusTitle: String {
+        if generation != nil { return "Class is being generated" }
+        if generationError != nil { return "Class generation needs attention" }
+        return course.activeClassId == nil ? "Next class is ready" : "Current class is waiting"
+    }
+
+    private var statusDetail: String {
+        if generation != nil {
+            return "You can keep using the iPad while Sotto builds the class. When it is ready, this action changes to Resume class."
+        }
+        if generationError != nil {
+            return "The background class build did not finish cleanly. Retry when the server is reachable."
+        }
+        return course.activeClassId == nil ? "Use Take class to generate the first class. The workbook becomes available as soon as that class exists." : "Resume the active class before Sotto creates another one. The workbook button opens the current worksheet with Apple Pencil notes."
+    }
+}
+
+private struct ClassGenerationStatusPanel: View {
+    let operation: SottoLoadingOperation
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            SottoBrandMark(progress: operation.progress)
+                .frame(width: 58, height: 58)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(operation.title)
+                        .font(.headline)
+                        .foregroundStyle(SottoTheme.ink)
+                    Spacer()
+                    if let progress = operation.progress {
+                        Text("\(Int(max(0, min(1, progress)) * 100))%")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(SottoTheme.muted)
+                    }
+                }
+
+                Text(operation.detail)
+                    .font(.callout)
+                    .foregroundStyle(SottoTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ProgressView(value: operation.progress ?? 0.04)
+                    .tint(SottoTheme.primary)
+
+                HStack {
+                    if let elapsedSeconds = operation.elapsedSeconds {
+                        Text("Elapsed \(formatDuration(elapsedSeconds))")
+                            .font(.caption)
+                            .foregroundStyle(SottoTheme.muted)
+                    }
+                    Spacer()
+                    Button(role: .destructive, action: onCancel) {
+                        Label("Cancel", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SottoTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(SottoTheme.line)
+        )
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        if minutes > 0 {
+            return "\(minutes)m \(remainingSeconds)s"
+        }
+        return "\(remainingSeconds)s"
+    }
+}
+
+private struct ClassGenerationErrorPanel: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Class generation failed")
+                    .font(.headline)
+                    .foregroundStyle(SottoTheme.ink)
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(SottoTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("Retry", action: onRetry)
+                .buttonStyle(.bordered)
+        }
+        .padding(18)
+        .background(SottoTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(SottoTheme.line)
+        )
     }
 }
 

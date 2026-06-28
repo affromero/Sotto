@@ -66,6 +66,14 @@ struct SottoAPIClient {
         throw SottoAPIError.message("Sotto did not return a class to open.")
     }
 
+    func startNextClassGeneration(courseId: String) async throws {
+        let _: NextClassBackgroundResponse = try await post(
+            "/api/v1/courses/\(courseId)/next-class?background=1",
+            body: EmptyBody(),
+            acceptedStatuses: [202]
+        )
+    }
+
     func fetchClassGenerationProgress(courseId: String) async throws -> SottoGenerationProgress {
         try await get("/api/v1/courses/\(courseId)/generation")
     }
