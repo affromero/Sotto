@@ -6,6 +6,7 @@ const mockListByokProviders = vi.fn();
 const mockStoreByokKey = vi.fn();
 const mockRemoveByokKey = vi.fn();
 const mockValidateByokKey = vi.fn();
+const mockUpdateByokExtraData = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -16,6 +17,7 @@ vi.mock('@/lib/byok', () => ({
   storeByokKey: (...args: unknown[]) => mockStoreByokKey(...args),
   removeByokKey: (...args: unknown[]) => mockRemoveByokKey(...args),
   validateByokKey: (...args: unknown[]) => mockValidateByokKey(...args),
+  updateByokExtraData: (...args: unknown[]) => mockUpdateByokExtraData(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -143,6 +145,7 @@ describe('POST /api/v1/settings/byok', () => {
         provider: 'cartesia',
         apiKey: 'sk-car-test-123456',
         adminApiKey: 'sk-car-admin-test-123456',
+        usagePlan: 'pro',
         monthlyCreditLimit: '1000000',
         billingResetDay: '1',
       })
@@ -154,10 +157,70 @@ describe('POST /api/v1/settings/byok', () => {
       userId: undefined,
       extra: {
         adminApiKey: 'sk-car-admin-test-123456',
+        usagePlan: 'pro',
         monthlyCreditLimit: '1000000',
         billingResetDay: '1',
       },
     });
+  });
+
+  it('updates Cartesia usage metadata without replacing an existing provider key', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockUpdateByokExtraData.mockResolvedValue(true);
+
+    const response = await POST(
+      createRequest('POST', {
+        provider: 'cartesia',
+        adminApiKey: 'sk-car-admin-test-123456',
+        usagePlan: 'pro',
+        monthlyCreditLimit: '1000000',
+        billingResetDay: '1',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockValidateByokKey).not.toHaveBeenCalled();
+    expect(mockStoreByokKey).not.toHaveBeenCalled();
+    expect(mockUpdateByokExtraData).toHaveBeenCalledWith('user-1', 'cartesia', {
+      adminApiKey: 'sk-car-admin-test-123456',
+      usagePlan: 'pro',
+      monthlyCreditLimit: '1000000',
+      billingResetDay: '1',
+    });
+  });
+
+  it('clears a stored custom Cartesia limit when switching to a plan preset', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockUpdateByokExtraData.mockResolvedValue(true);
+
+    const response = await POST(
+      createRequest('POST', {
+        provider: 'cartesia',
+        usagePlan: 'free',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateByokExtraData).toHaveBeenCalledWith('user-1', 'cartesia', {
+      usagePlan: 'free',
+      monthlyCreditLimit: null,
+    });
+  });
+
+  it('requires an existing key before saving metadata only', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockUpdateByokExtraData.mockResolvedValue(false);
+
+    const response = await POST(
+      createRequest('POST', {
+        provider: 'cartesia',
+        adminApiKey: 'sk-car-admin-test-123456',
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toContain('Add a cartesia API key');
   });
 });
 

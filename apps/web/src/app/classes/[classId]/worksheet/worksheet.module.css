@@ -81,7 +81,9 @@
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .printButton:hover {
@@ -109,8 +111,7 @@
   padding: var(--spacing-xl) var(--spacing-md);
   background:
     linear-gradient(90deg, rgba(47, 111, 119, 0.06) 0 1px, transparent 1px),
-    linear-gradient(180deg, rgba(47, 111, 119, 0.05) 0 1px, transparent 1px),
-    var(--color-surface);
+    linear-gradient(180deg, rgba(47, 111, 119, 0.05) 0 1px, transparent 1px), var(--color-surface);
   background-size: 30px 30px;
   box-shadow: 0 24px 70px rgba(23, 32, 51, 0.16);
   border: 1px solid rgba(23, 32, 51, 0.08);
@@ -235,6 +236,256 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2xl);
+}
+
+/* ---- Teaching brief ---- */
+
+.introBlock {
+  margin-bottom: var(--spacing-2xl);
+  padding-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.introLead {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.introLead p:first-child {
+  font-family: var(--font-heading);
+  font-size: clamp(1.25rem, 3vw, 1.7rem);
+  line-height: 1.22;
+  font-weight: 650;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.introLead p:last-child {
+  font: var(--text-body-sm);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.introVisuals {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.timelineFigure,
+.contrastFigure {
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  overflow: hidden;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.timelineFigure figcaption,
+.contrastFigure figcaption {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font: var(--text-caption);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.timelineFigure ol {
+  list-style: none;
+  padding: var(--spacing-md);
+  margin: 0;
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.timelineFigure li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.timelineFigure li span {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  background: #2a8c78;
+  color: #fff;
+  font: var(--text-caption);
+  font-weight: 800;
+}
+
+.timelineFigure li p {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+}
+
+.contrastGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.contrastGrid > div {
+  padding: var(--spacing-md);
+}
+
+.contrastGrid > div:first-child {
+  background: rgba(63, 79, 176, 0.08);
+  border-right: 1px solid var(--color-border);
+}
+
+.contrastGrid > div:last-child {
+  background: rgba(185, 128, 36, 0.1);
+}
+
+.contrastGrid b {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+  font-weight: 800;
+}
+
+.contrastGrid ul {
+  margin: 0;
+  padding-left: var(--spacing-md);
+  color: var(--color-text-secondary);
+  font: var(--text-body-sm);
+  line-height: 1.45;
+}
+
+.introColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.introColumns h2 {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text-secondary);
+  font: var(--text-caption);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.introColumns ul {
+  margin: 0;
+  padding-left: var(--spacing-lg);
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+  line-height: 1.52;
+}
+
+.introColumns li + li {
+  margin-top: var(--spacing-xs);
+}
+
+.exampleCard {
+  padding: 0 0 var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.exampleCard + .exampleCard {
+  margin-top: var(--spacing-sm);
+}
+
+.exampleCard h3,
+.exampleCard p,
+.exampleCard small {
+  margin: 0;
+}
+
+.exampleCard h3 {
+  color: var(--color-text-primary);
+  font: var(--text-body);
+  font-weight: 800;
+}
+
+.exampleCard p,
+.exampleCard small {
+  color: var(--color-text-secondary);
+  font: var(--text-body-sm);
+  line-height: 1.45;
+}
+
+.exampleCard small {
+  display: block;
+  margin-top: 3px;
+}
+
+.calloutGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.callout {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid rgba(30, 33, 40, 0.14);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font: var(--text-body-sm);
+  line-height: 1.42;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.callout b {
+  display: block;
+  color: var(--color-text-primary);
+  font: var(--text-caption);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.tone_blue {
+  border-color: rgba(63, 79, 176, 0.3);
+}
+
+.tone_teal {
+  border-color: rgba(42, 140, 120, 0.36);
+  background: rgba(42, 140, 120, 0.08);
+}
+
+.tone_rose {
+  border-color: rgba(198, 79, 112, 0.32);
+  background: rgba(198, 79, 112, 0.07);
+}
+
+.tone_amber {
+  border-color: rgba(185, 128, 36, 0.34);
+  background: rgba(185, 128, 36, 0.09);
+}
+
+@media (max-width: 640px) {
+  .introVisuals,
+  .introColumns,
+  .calloutGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .contrastGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .contrastGrid > div:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
 }
 
 /* ---- Section block ---- */
@@ -619,6 +870,14 @@
 
   /* Force black-on-white for all text */
   .worksheetTitle,
+  .introLead p,
+  .introColumns h2,
+  .exampleCard h3,
+  .callout b,
+  .timelineFigure figcaption,
+  .contrastFigure figcaption,
+  .timelineFigure li p,
+  .contrastGrid b,
   .sectionTitle,
   .questionText,
   .targetPhrase,
@@ -629,6 +888,11 @@
   .translation,
   .writingGuidance,
   .optionText,
+  .introColumns li,
+  .exampleCard p,
+  .exampleCard small,
+  .callout,
+  .contrastGrid li,
   .footerText {
     color: #000 !important;
   }
@@ -662,6 +926,9 @@
   }
 
   .writingItem,
+  .timelineFigure,
+  .contrastFigure,
+  .callout,
   .qrWrapper,
   .passageBlock {
     background: none !important;

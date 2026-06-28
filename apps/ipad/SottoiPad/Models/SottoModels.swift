@@ -149,6 +149,7 @@ struct SottoClassDetail: Decodable, Identifiable, Equatable {
     let sourceTitle: String?
     let lesson: SottoLesson?
     let intro: SottoClassIntro?
+    let vocabulary: [SottoClassVocabularyItem]?
     let submitted: Bool
     let sections: [SottoClassSection]
 }
@@ -165,12 +166,50 @@ struct SottoClassIntro: Decodable, Equatable {
     let focus: [String]
     let examples: [SottoClassIntroExample]
     let tips: [String]
+    let visuals: SottoClassIntroVisuals?
 }
 
 struct SottoClassIntroExample: Decodable, Equatable {
     let target: String
     let meaning: String
     let note: String
+}
+
+struct SottoClassIntroVisuals: Decodable, Equatable {
+    let timeline: SottoClassTimeline?
+    let contrast: SottoClassContrast?
+    let callouts: [SottoClassCallout]
+    let links: [SottoClassLink]
+}
+
+struct SottoClassTimeline: Decodable, Equatable {
+    let title: String
+    let steps: [String]
+}
+
+struct SottoClassContrast: Decodable, Equatable {
+    let title: String
+    let leftLabel: String
+    let leftItems: [String]
+    let rightLabel: String
+    let rightItems: [String]
+}
+
+struct SottoClassCallout: Decodable, Equatable {
+    let label: String
+    let text: String
+    let tone: String
+}
+
+struct SottoClassLink: Decodable, Equatable {
+    let label: String
+    let url: String
+}
+
+struct SottoClassVocabularyItem: Decodable, Equatable {
+    let lemma: String
+    let gloss: String
+    let pos: String?
 }
 
 struct SottoClassSection: Decodable, Identifiable, Equatable {
@@ -210,6 +249,23 @@ struct SottoSpeakingPrompt: Decodable, Identifiable, Equatable {
     let translation: String
     let ipa: String?
     let referenceTtsUrl: String?
+    let latestRecording: SottoSpeakingRecording?
+}
+
+struct SottoSpeakingRecording: Decodable, Equatable {
+    let id: String
+    let status: String
+    let transcript: String?
+    let overallScore: Double?
+    let rubricScores: [String: Double]?
+    let phonemeScores: [SottoSpeakingAlignmentToken]?
+    let feedback: String?
+}
+
+struct SottoSpeakingAlignmentToken: Decodable, Equatable {
+    let op: String
+    let expected: String?
+    let actual: String?
 }
 
 struct SottoWritingPrompt: Decodable, Identifiable, Equatable {
@@ -254,6 +310,16 @@ struct SottoClassSubmitResult: Decodable, Equatable {
     let passedSections: Int
     let totalSections: Int
     let sections: [SottoClassSectionResult]
+}
+
+struct SottoSelectionHelpResponse: Decodable, Equatable {
+    let text: String
+    let examples: [SottoSelectionHelpExample]
+}
+
+struct SottoSelectionHelpExample: Decodable, Equatable {
+    let sentence: String
+    let note: String
 }
 
 struct SottoClassSectionResult: Decodable, Identifiable, Equatable {

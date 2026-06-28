@@ -22,7 +22,9 @@ describe('AI Provider Client DTO', () => {
 
   it('LLM providers have non-empty models, STT-only providers have empty models', () => {
     const llmProviders = meta.filter((m) =>
-      ['anthropic', 'openai', 'google', 'groq', 'xai', 'deepseek', 'mistral', 'nvidia'].includes(m.id)
+      ['anthropic', 'openai', 'google', 'groq', 'xai', 'deepseek', 'mistral', 'nvidia'].includes(
+        m.id
+      )
     );
     const sttOnlyProviders = meta.filter((m) =>
       ['together', 'deepgram', 'assemblyai', 'gladia', 'speechmatics'].includes(m.id)
@@ -86,6 +88,24 @@ describe('TTS Provider Client DTO', () => {
       expect(['auto', 'optional_hint', 'recommended']).toContain(provider.languageDetection);
       expect(typeof provider.voicesAreCrossLingual).toBe('boolean');
     }
+  });
+
+  it('exposes Cartesia usage allowance presets as serializable metadata', () => {
+    const cartesia = meta.find((provider) => provider.id === 'cartesia');
+
+    expect(cartesia?.usageAllowance).toMatchObject({
+      kind: 'monthly_limit',
+      unitLabel: 'credits',
+      planField: 'usagePlan',
+      allowanceField: 'monthlyCreditLimit',
+      resetDayField: 'billingResetDay',
+      presets: [
+        { id: 'free', label: 'Free', monthlyLimit: 20_000 },
+        { id: 'pro', label: 'Pro', monthlyLimit: 100_000 },
+        { id: 'startup', label: 'Startup', monthlyLimit: 1_250_000 },
+        { id: 'scale', label: 'Scale', monthlyLimit: 8_000_000 },
+      ],
+    });
   });
 
   it('DTOs are JSON-serializable', () => {

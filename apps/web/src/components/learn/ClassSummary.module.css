@@ -119,7 +119,7 @@
 
 .wrapScores {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 8px;
   padding: 22px 26px;
 }
@@ -234,6 +234,182 @@
   margin-top: 3px;
 }
 
+/* ---- feedback clinic ---- */
+.clinic {
+  margin-top: 26px;
+  padding: 22px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.clinicHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.clinicTitle {
+  margin: 10px 0 0;
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 480;
+  color: var(--ink);
+}
+
+.clinicActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.clinicGrid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .clinicGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.clinicCard {
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.clinicCard h3 {
+  margin: 0 0 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.clinicText {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.drillList,
+.speechList,
+.writingList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drillRow {
+  min-height: 44px;
+  padding: 12px 13px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.drillRow b,
+.speechLine b {
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.speechItem,
+.writingItem {
+  padding: 12px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.speechLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.transcript {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.axisRow,
+.soundFocus {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.axisRow span,
+.soundFocus span {
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.soundFocus span {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 9%, var(--paper));
+  border-color: color-mix(in srgb, var(--bad) 26%, var(--line));
+}
+
+.referenceAudio {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.vocabChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.vocabChip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 180px;
+  padding: 7px 9px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  border-radius: var(--r);
+}
+
+.vocabChip b {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.vocabChip small {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
 /* ---- actions ---- */
 .cactions {
   margin-top: 34px;
@@ -294,9 +470,23 @@
   color: var(--ink);
 }
 
+.btnGhost {
+  background: var(--paper);
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+  text-decoration: none;
+}
+
+.btnGhost:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn {
-    transition: filter 0.2s, color 0.2s;
+    transition:
+      filter 0.2s,
+      color 0.2s;
   }
   .btn:active {
     transform: none;

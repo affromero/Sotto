@@ -10,24 +10,37 @@
  */
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ClassGlyph } from './ClassGlyph';
 import { CefrDisclaimer } from './CefrDisclaimer';
 import { ScoreDial } from './ClassWidgets';
-import { skillLabel, type ClassSubmitResult } from './classTypes';
+import {
+  skillLabel,
+  type ClassSection,
+  type ClassSpeakingAlignmentToken,
+  type ClassSubmitResult,
+  type ClassVocabularyItem,
+} from './classTypes';
 import styles from './ClassSummary.module.css';
 
 interface ClassSummaryProps {
+  courseId: string;
   lesson: { title: string; level: string; objective: string };
   order: number;
   result: ClassSubmitResult;
+  sections: ClassSection[];
+  vocabulary: ClassVocabularyItem[];
   regenerating: boolean;
   onRetryFailed: () => void;
 }
 
 export function ClassSummary({
+  courseId,
   lesson,
   order,
   result,
+  sections,
+  vocabulary,
   regenerating,
   onRetryFailed,
 }: ClassSummaryProps) {
@@ -53,8 +66,8 @@ export function ClassSummary({
           )}
         </h1>
         <p className={styles.modLede}>
-          You moved through all four skills of &ldquo;{lesson.title}.&rdquo; Here&rsquo;s what held
-          and what unlocked.
+          You moved through the class skills of &ldquo;{lesson.title}.&rdquo; Here&rsquo;s what held
+          and what needs another pass.
         </p>
 
         <div className={styles.wrapHero}>
@@ -113,6 +126,13 @@ export function ClassSummary({
           </div>
         </div>
 
+        <FeedbackClinic
+          courseId={courseId}
+          result={result}
+          sections={sections}
+          vocabulary={vocabulary}
+        />
+
         <CefrDisclaimer variant="compact" />
 
         <div className={styles.cactions}>
@@ -153,4 +173,194 @@ export function ClassSummary({
       </div>
     </div>
   );
+}
+
+function FeedbackClinic({
+  courseId,
+  result,
+  sections,
+  vocabulary,
+}: {
+  courseId: string;
+  result: ClassSubmitResult;
+  sections: ClassSection[];
+  vocabulary: ClassVocabularyItem[];
+}) {
+  const weakSections = result.sections
+    .filter((section) => !section.passed || section.score < 0.82)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3);
+  const speakingFeedback = sections
+    .flatMap((section) => section.prompts)
+    .filter((prompt) => prompt.latestRecording?.status === 'SCORED')
+    .slice(0, 3);
+  const writingFeedback = sections
+    .flatMap((section) => section.writingPrompts)
+    .filter((prompt) => prompt.response)
+    .slice(0, 2);
+  const courseParam = encodeURIComponent(courseId);
+
+  return (
+    <section className={styles.clinic} aria-labelledby="feedback-clinic-title">
+      <div className={styles.clinicHead}>
+        <div>
+          <div className={styles.eyebrow}>
+            <span className={styles.eyebrowIdx}>◎ ·</span> Coach&apos;s review
+          </div>
+          <h2 className={styles.clinicTitle} id="feedback-clinic-title">
+            Feedback Clinic
+          </h2>
+        </div>
+        <div className={styles.clinicActions}>
+          <Link
+            className={`${styles.btn} ${styles.btnGhost}`}
+            href={`/learn/practice?course=${courseParam}&kind=SPEAKING`}
+          >
+            <ClassGlyph name="mic" size={15} /> Speaking
+          </Link>
+          <Link
+            className={`${styles.btn} ${styles.btnGhost}`}
+            href={`/learn/practice?course=${courseParam}&kind=VOCAB`}
+          >
+            <ClassGlyph name="graph" size={15} /> Vocabulary
+          </Link>
+        </div>
+      </div>
+
+      <div className={styles.clinicGrid}>
+        <article className={styles.clinicCard}>
+          <h3>Targeted drills</h3>
+          {weakSections.length > 0 ? (
+            <div className={styles.drillList}>
+              {weakSections.map((section) => (
+                <Link
+                  key={section.id}
+                  className={styles.drillRow}
+                  href={`/learn/practice?course=${courseParam}&kind=${encodeURIComponent(section.skill)}`}
+                >
+                  <span>{skillLabel(section.skill)}</span>
+                  <b>{formatPercent(section.score)}</b>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.clinicText}>No weak skill score stood out in this attempt.</p>
+          )}
+        </article>
+
+        <article className={styles.clinicCard}>
+          <h3>Pronunciation</h3>
+          {speakingFeedback.length > 0 ? (
+            <div className={styles.speechList}>
+              {speakingFeedback.map((prompt) => {
+                const recording = prompt.latestRecording;
+                const focus =
+                  recording?.phonemeScores?.filter((token) => token.op !== 'match').slice(0, 3) ??
+                  [];
+                return (
+                  <div className={styles.speechItem} key={prompt.id}>
+                    <div className={styles.speechLine}>
+                      <span>{prompt.targetPhrase}</span>
+                      <b>{formatPercent(recording?.overallScore ?? 0)}</b>
+                    </div>
+                    {recording?.transcript && (
+                      <p className={styles.transcript}>&ldquo;{recording.transcript}&rdquo;</p>
+                    )}
+                    {recording?.rubricScores && (
+                      <div className={styles.axisRow}>
+                        {(['accuracy', 'fluency', 'completeness'] as const).map((axis) => (
+                          <span key={axis}>
+                            {axis}: {formatPercent(recording.rubricScores?.[axis] ?? 0)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {focus.length > 0 && (
+                      <div className={styles.soundFocus}>
+                        {focus.map((token, index) => (
+                          <span key={`${prompt.id}-${index}`}>{formatFocusToken(token)}</span>
+                        ))}
+                      </div>
+                    )}
+                    {recording?.feedback && (
+                      <p className={styles.clinicText}>{recording.feedback}</p>
+                    )}
+                    {prompt.referenceTtsUrl && (
+                      <audio
+                        className={styles.referenceAudio}
+                        src={prompt.referenceTtsUrl}
+                        controls
+                        preload="none"
+                        aria-label={`Reference pronunciation for ${prompt.targetPhrase}`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className={styles.clinicText}>
+              Record speaking prompts to unlock voice-based feedback.
+            </p>
+          )}
+        </article>
+
+        <article className={styles.clinicCard}>
+          <h3>Vocabulary</h3>
+          {vocabulary.length > 0 ? (
+            <>
+              <div className={styles.vocabChips}>
+                {vocabulary.slice(0, 10).map((item) => (
+                  <span className={styles.vocabChip} key={item.lemma}>
+                    <b>{item.lemma}</b>
+                    <small>{item.gloss}</small>
+                  </span>
+                ))}
+              </div>
+              <Link
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                href={`/learn/practice?course=${courseParam}&kind=VOCAB`}
+              >
+                Practice vocabulary <ClassGlyph name="arrow" size={15} />
+              </Link>
+            </>
+          ) : (
+            <p className={styles.clinicText}>No lesson vocabulary was attached to this class.</p>
+          )}
+        </article>
+
+        <article className={styles.clinicCard}>
+          <h3>Writing</h3>
+          {writingFeedback.length > 0 ? (
+            <div className={styles.writingList}>
+              {writingFeedback.map((prompt) => (
+                <div className={styles.writingItem} key={prompt.id}>
+                  <div className={styles.speechLine}>
+                    <span>{prompt.task}</span>
+                    <b>{formatPercent(prompt.response?.overallScore ?? 0)}</b>
+                  </div>
+                  {prompt.response?.feedback && (
+                    <p className={styles.clinicText}>{prompt.response.feedback}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.clinicText}>
+              Complete writing prompts to receive correction feedback.
+            </p>
+          )}
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatFocusToken(token: ClassSpeakingAlignmentToken): string {
+  if (token.expected && token.actual) return `${token.expected} -> ${token.actual}`;
+  return token.expected ?? token.actual ?? 'sound';
 }

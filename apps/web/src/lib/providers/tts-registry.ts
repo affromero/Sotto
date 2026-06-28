@@ -3,6 +3,11 @@
  * support, and validation functions for every supported BYOK provider.
  */
 import { logger } from '../logger';
+import {
+  CARTESIA_USAGE_ALLOWANCE,
+  type ProviderUsageAllowance,
+  type ProviderUsageAllowancePreset,
+} from '../provider-usage/allowances';
 import { TTS_LANGUAGE_SUPPORT_SETS } from '../speech-language-support';
 
 export type TtsProviderId =
@@ -27,6 +32,9 @@ export interface TtsProviderAuthField {
   type?: 'password' | 'text' | 'number';
   optional?: boolean;
 }
+
+export type TtsProviderUsageAllowancePreset = ProviderUsageAllowancePreset;
+export type TtsProviderUsageAllowance = ProviderUsageAllowance;
 
 export interface TtsModelOption {
   id: string;
@@ -58,6 +66,7 @@ export interface TtsProviderMeta {
   languageParam: string | null;
   /** true = any voice works for any supported language (most providers). false = voice–language affinity matters (e.g. Fal/Qwen3). */
   voicesAreCrossLingual: boolean;
+  usageAllowance?: TtsProviderUsageAllowance;
   auth: {
     fields: TtsProviderAuthField[];
     validate: (credentials: Record<string, string>) => Promise<boolean>;
@@ -219,6 +228,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageDetection: 'optional_hint',
     languageParam: 'language',
     voicesAreCrossLingual: true,
+    usageAllowance: CARTESIA_USAGE_ALLOWANCE,
     auth: {
       fields: [
         { key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' },
@@ -757,6 +767,7 @@ export interface TtsProviderClientMeta {
   supportsStreaming: boolean;
   models: TtsModelClientOption[];
   authFields: TtsProviderAuthField[];
+  usageAllowance?: TtsProviderUsageAllowance;
   recommended: boolean;
   languageDetection: 'auto' | 'optional_hint' | 'recommended';
   voicesAreCrossLingual: boolean;
@@ -787,6 +798,7 @@ export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
           supportedLanguages: [...m.supportedLanguages],
         })),
         authFields: p.auth.fields,
+        usageAllowance: p.usageAllowance,
         recommended: p.id === 'elevenlabs',
         languageDetection: p.languageDetection,
         voicesAreCrossLingual: p.voicesAreCrossLingual,

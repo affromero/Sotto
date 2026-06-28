@@ -254,6 +254,7 @@ describe('GET /api/v1/classes/[classId]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.submitted).toBe(false);
+    expect(body.vocabulary).toEqual([{ lemma: 'hola', gloss: 'hello', pos: null }]);
 
     const questions = body.sections[0].questions;
     expect(questions[0]).not.toHaveProperty('correctIndex');
@@ -281,6 +282,7 @@ describe('GET /api/v1/classes/[classId]', () => {
       targetPhrase: 'Hola',
       translation: 'Hello',
       referenceTtsUrl: 'https://r2/ref.mp3',
+      latestRecording: null,
     });
   });
 

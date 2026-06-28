@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ClassSessionView: View {
     @EnvironmentObject private var model: SottoAppModel
@@ -6,6 +7,13 @@ struct ClassSessionView: View {
 
     @State private var answers: [String: Int] = [:]
     @State private var showingRemoveConfirmation = false
+    @State private var selectionHelpRequest: LearnerSelectionHelpRequest?
+    @State private var selectionHelp: SottoSelectionHelpResponse?
+    @State private var selectionHelpError: String?
+    @State private var isLoadingSelectionHelp = false
+    @State private var isExportingClass = false
+    @State private var classExportError: String?
+    @State private var exportedClass: ClassPDFExport?
 
     private var currentClass: SottoClassDetail {
         model.selectedClass ?? classDetail
@@ -33,10 +41,16 @@ struct ClassSessionView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
-                    header
+                    ClassHeroHeader(
+                        classDetail: currentClass,
+                        answeredCount: answers.count,
+                        questionCount: questions.count,
+                        completionProgress: completionProgress,
+                        completionPercent: completionPercent
+                    )
 
                     if let intro = currentClass.intro {
-                        ClassIntroBlock(intro: intro)
+                        ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
                     }
 
                     if let result = model.classResult {
@@ -44,7 +58,20 @@ struct ClassSessionView: View {
                     }
 
                     ForEach(currentClass.sections) { section in
-                        ClassSectionView(section: section, answers: $answers)
+                        ClassSectionView(
+                            section: section,
+                            answers: $answers,
+                            onSelectionHelp: openSelectionHelp
+                        )
+                    }
+
+                    ClassFeedbackClinicBlock(
+                        classDetail: currentClass,
+                        result: model.classResult
+                    ) { kind in
+                        Task {
+                            await model.startPractice(courseId: currentClass.courseId, kind: kind)
+                        }
                     }
                 }
                 .padding(28)
@@ -63,6 +90,13 @@ struct ClassSessionView: View {
                     ProfileToolbarMenu {
                         model.closeClass()
                     }
+
+                    Button {
+                        exportCurrentClass()
+                    } label: {
+                        Label(isExportingClass ? "Exporting" : "Export", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(isExportingClass)
 
                     Button {
                         let classId = currentClass.id
@@ -110,6 +144,36 @@ struct ClassSessionView: View {
                         .environmentObject(model)
                 }
             }
+            .sheet(item: $exportedClass) { export in
+                ClassShareSheet(activityItems: [export.url])
+            }
+            .alert(
+                "Could not export class",
+                isPresented: Binding(
+                    get: { classExportError != nil },
+                    set: { if !$0 { classExportError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(classExportError ?? "")
+            }
+            .sheet(item: $selectionHelpRequest, onDismiss: resetSelectionHelp) { request in
+                SelectionHelpSheet(
+                    request: request,
+                    help: selectionHelp,
+                    isLoading: isLoadingSelectionHelp,
+                    errorMessage: selectionHelpError
+                ) {
+                    Task {
+                        await loadSelectionHelp(for: request)
+                    }
+                }
+                .presentationDetents([.medium, .large])
+                .task(id: request.id) {
+                    await loadSelectionHelp(for: request)
+                }
+            }
             .confirmationDialog("Remove class?", isPresented: $showingRemoveConfirmation, titleVisibility: .visible) {
                 Button("Remove class", role: .destructive) {
                     Task {
@@ -136,282 +200,57 @@ struct ClassSessionView: View {
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(currentClass.lesson?.title ?? "Sotto class")
-                    .font(.system(size: 40, weight: .bold, design: .serif))
-                    .foregroundStyle(SottoTheme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let objective = currentClass.lesson?.objective, !objective.isEmpty {
-                    Text(objective)
-                        .font(.title3)
-                        .foregroundStyle(SottoTheme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(spacing: 10) {
-                Label(currentClass.status.capitalized, systemImage: "flag.checkered")
-                Text("\(answers.count) of \(questions.count) answered")
-                if let sourceTitle = currentClass.sourceTitle {
-                    Text(sourceTitle)
-                        .lineLimit(1)
-                }
-            }
-            .font(.callout)
-            .foregroundStyle(SottoTheme.muted)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Class completion")
-                    Spacer()
-                    Text("\(completionPercent)%")
-                        .monospacedDigit()
-                }
-                .font(.caption.bold())
-                .foregroundStyle(SottoTheme.muted)
-
-                ProgressView(value: completionProgress)
-                    .tint(SottoTheme.primary)
-            }
-        }
-    }
-}
-
-private struct ClassIntroBlock: View {
-    let intro: SottoClassIntro
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(intro.purpose)
-                    .font(.title2.bold())
-                    .foregroundStyle(SottoTheme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(intro.about)
-                    .font(.body)
-                    .foregroundStyle(SottoTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Focus")
-                        .font(.caption.bold())
-                        .foregroundStyle(SottoTheme.muted)
-                    ForEach(intro.focus, id: \.self) { item in
-                        Label(item, systemImage: "checkmark.circle")
-                            .font(.callout)
-                            .foregroundStyle(SottoTheme.ink)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Examples")
-                        .font(.caption.bold())
-                        .foregroundStyle(SottoTheme.muted)
-                    ForEach(intro.examples, id: \.target) { example in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(example.target)
-                                .font(.headline)
-                                .foregroundStyle(SottoTheme.ink)
-                            Text(example.meaning)
-                                .font(.callout)
-                                .foregroundStyle(SottoTheme.muted)
-                            Text(example.note)
-                                .font(.caption)
-                                .foregroundStyle(SottoTheme.muted)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if !intro.tips.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tips")
-                        .font(.caption.bold())
-                        .foregroundStyle(SottoTheme.muted)
-                    ForEach(intro.tips, id: \.self) { tip in
-                        Text(tip)
-                            .font(.callout)
-                            .foregroundStyle(SottoTheme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-        .padding(22)
-        .background(SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(SottoTheme.line)
+    private func openSelectionHelp(text: String, contextText: String) {
+        let cleaned = cleanLearnerSelection(text)
+        guard !cleaned.isEmpty else { return }
+        selectionHelp = nil
+        selectionHelpError = nil
+        isLoadingSelectionHelp = true
+        selectionHelpRequest = LearnerSelectionHelpRequest(
+            courseId: currentClass.courseId,
+            text: cleaned,
+            contextText: cleanLearnerSelection(contextText)
         )
     }
-}
 
-private struct ClassSectionView: View {
-    let section: SottoClassSection
-    @Binding var answers: [String: Int]
+    private func loadSelectionHelp(for request: LearnerSelectionHelpRequest) async {
+        guard selectionHelpRequest?.id == request.id else { return }
+        isLoadingSelectionHelp = true
+        selectionHelpError = nil
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(section.skill.capitalized)
-                        .font(.title2.bold())
-                        .foregroundStyle(SottoTheme.ink)
-                    Text(section.status.capitalized)
-                        .font(.callout)
-                        .foregroundStyle(SottoTheme.muted)
-                }
-                Spacer()
-                if let score = section.score {
-                    Text("\(Int(score * 100))%")
-                        .font(.headline)
-                        .foregroundStyle(section.passed == true ? SottoTheme.success : SottoTheme.primary)
-                }
-            }
-
-            if let episode = section.episode, let audioUrl = episode.audioUrl, let url = URL(string: audioUrl) {
-                Link(destination: url) {
-                    Label(episode.title, systemImage: "play.circle")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(SottoSecondaryButtonStyle())
-            }
-
-            ForEach(section.questions.sorted { $0.order < $1.order }) { question in
-                QuestionView(question: question, selectedIndex: answers[question.id]) { selected in
-                    answers[question.id] = selected
-                }
-            }
-
-            if !section.prompts.isEmpty {
-                PromptBlock(title: "Speaking", icon: "waveform", prompts: section.prompts.map {
-                    "\($0.targetPhrase) - \($0.translation)"
-                })
-            }
-
-            if !section.writingPrompts.isEmpty {
-                PromptBlock(title: "Writing", icon: "square.and.pencil", prompts: section.writingPrompts.map(\.task))
-            }
+        do {
+            let response = try await model.fetchSelectionHelp(
+                courseId: request.courseId,
+                text: request.text,
+                contextText: request.contextText
+            )
+            guard selectionHelpRequest?.id == request.id else { return }
+            selectionHelp = response
+        } catch {
+            guard selectionHelpRequest?.id == request.id else { return }
+            selectionHelpError = error.localizedDescription
         }
-        .padding(22)
-        .background(SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(SottoTheme.line)
-        )
+
+        isLoadingSelectionHelp = false
     }
-}
 
-private struct QuestionView: View {
-    let question: SottoQuestion
-    let selectedIndex: Int?
-    let onSelect: (Int) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let passage = question.passageText, !passage.isEmpty {
-                Text(passage)
-                    .font(.body)
-                    .foregroundStyle(SottoTheme.muted)
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SottoTheme.paper)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            }
-
-            Text(question.question)
-                .font(.headline)
-                .foregroundStyle(SottoTheme.ink)
-
-            VStack(spacing: 8) {
-                ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
-                    Button {
-                        onSelect(index)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: selectedIndex == index ? "largecircle.fill.circle" : "circle")
-                                .foregroundStyle(selectedIndex == index ? SottoTheme.primary : SottoTheme.muted)
-                            Text(option)
-                                .foregroundStyle(SottoTheme.ink)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(14)
-                        .background(selectedIndex == index ? SottoTheme.primary.opacity(0.08) : SottoTheme.paper)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            if let explanation = question.explanation, !explanation.isEmpty {
-                Text(explanation)
-                    .font(.callout)
-                    .foregroundStyle(SottoTheme.muted)
-            }
-        }
+    private func resetSelectionHelp() {
+        selectionHelp = nil
+        selectionHelpError = nil
+        isLoadingSelectionHelp = false
     }
-}
 
-struct PromptBlock: View {
-    let title: String
-    let icon: String
-    let prompts: [String]
+    private func exportCurrentClass() {
+        isExportingClass = true
+        classExportError = nil
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: icon)
-                .font(.headline)
-                .foregroundStyle(SottoTheme.ink)
-
-            ForEach(prompts, id: \.self) { prompt in
-                Text(prompt)
-                    .font(.body)
-                    .foregroundStyle(SottoTheme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        do {
+            let url = try ClassPDFExporter.export(classDetail: currentClass, answers: answers)
+            exportedClass = ClassPDFExport(url: url)
+        } catch {
+            classExportError = error.localizedDescription
         }
-        .padding(16)
-        .background(SottoTheme.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
 
-private struct ClassResultBanner: View {
-    let result: SottoClassSubmitResult
-
-    var body: some View {
-        HStack(spacing: 18) {
-            Image(systemName: result.passed ? "checkmark.seal.fill" : "exclamationmark.arrow.triangle.2.circlepath")
-                .font(.system(size: 42))
-                .foregroundStyle(result.passed ? SottoTheme.success : SottoTheme.primary)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(result.passed ? "Class passed" : "Review needed")
-                    .font(.title2.bold())
-                    .foregroundStyle(SottoTheme.ink)
-                Text("\(Int(result.overallScore * 100))% overall, \(result.passedSections) of \(result.totalSections) sections passed.")
-                    .font(.body)
-                    .foregroundStyle(SottoTheme.muted)
-            }
-
-            Spacer()
-        }
-        .padding(20)
-        .background(SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(SottoTheme.line)
-        )
+        isExportingClass = false
     }
 }

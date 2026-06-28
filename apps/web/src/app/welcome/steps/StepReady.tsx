@@ -32,6 +32,7 @@ import c from '../components.styles';
 const MAX_ONBOARDING_NOTE_CHARS = 4000;
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
 const CARTESIA_ADMIN_KEY_ID = 'cartesia:adminApiKey';
+const CARTESIA_USAGE_PLAN_ID = 'cartesia:usagePlan';
 const CARTESIA_MONTHLY_LIMIT_ID = 'cartesia:monthlyCreditLimit';
 const CARTESIA_RESET_DAY_ID = 'cartesia:billingResetDay';
 
@@ -156,6 +157,9 @@ export function StepReady({
         ? {
             ...(voice.keys[CARTESIA_ADMIN_KEY_ID]?.trim()
               ? { adminApiKey: voice.keys[CARTESIA_ADMIN_KEY_ID].trim() }
+              : {}),
+            ...(voice.keys[CARTESIA_USAGE_PLAN_ID]?.trim()
+              ? { usagePlan: voice.keys[CARTESIA_USAGE_PLAN_ID].trim() }
               : {}),
             ...(voice.keys[CARTESIA_MONTHLY_LIMIT_ID]?.trim()
               ? { monthlyCreditLimit: voice.keys[CARTESIA_MONTHLY_LIMIT_ID].trim() }

@@ -236,7 +236,7 @@ const optionalBillingResetDayString = z
   .refine((value) => Number(value) >= 1 && Number(value) <= 31)
   .optional();
 
-export const byokSchema = z.object({
+const byokBaseSchema = z.object({
   provider: z.enum([
     'elevenlabs',
     'openai',
@@ -252,14 +252,40 @@ export const byokSchema = z.object({
     'playht',
     'suno',
   ]),
-  apiKey: z.string().min(10).max(500),
   userId: z.string().trim().min(1).max(500).optional(),
   adminApiKey: z.string().trim().min(10).max(500).optional(),
+  usagePlan: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_-]+$/i)
+    .max(80)
+    .optional(),
   monthlyCreditLimit: optionalPositiveIntegerString,
   billingResetDay: optionalBillingResetDayString,
 });
 
-export const byokProviderSchema = byokSchema.pick({ provider: true });
+export const byokSchema = byokBaseSchema.extend({
+  apiKey: z.string().trim().min(10).max(500),
+});
+
+export const byokSaveSchema = byokBaseSchema
+  .extend({
+    apiKey: z.string().trim().min(10).max(500).optional(),
+  })
+  .refine(
+    (value) =>
+      Boolean(
+        value.apiKey ||
+        value.userId ||
+        value.adminApiKey ||
+        value.usagePlan ||
+        value.monthlyCreditLimit ||
+        value.billingResetDay
+      ),
+    { message: 'At least one credential field is required' }
+  );
+
+export const byokProviderSchema = byokBaseSchema.pick({ provider: true });
 
 /**
  * Draft creation validation

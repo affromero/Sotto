@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { Glyph } from '@/components/Glyph';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Glyph, type GlyphName } from '@/components/Glyph';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import shell from '../../adminTheme.styles';
 
@@ -36,6 +36,13 @@ interface ModelConfig {
 interface PlatformConfig {
   aiProvider: string;
   aiModel: string;
+}
+
+interface AutoModelPayload {
+  model: ModelConfig;
+  includedModels: string[] | null;
+  includedTtsModels: string[] | null;
+  includedSttModels: string[] | null;
 }
 
 export interface ProviderModelConfigProps {
@@ -89,6 +96,9 @@ function firstModelKey(providers: ProviderOption[], composite: boolean): string 
 function setToArray(set: Set<string>): string[] | null {
   return set.size > 0 ? [...set] : null;
 }
+
+const AUTOSAVE_DELAY_MS = 650;
+const SAVED_VISIBLE_MS = 3000;
 
 function errorMessageFromResponseBody(body: unknown, fallback: string): string {
   if (!body || typeof body !== 'object') return fallback;
@@ -391,105 +401,6 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Platform operations — compact provider + model dropdowns
-// ---------------------------------------------------------------------------
-
-interface PlatformSectionProps {
-  aiProviders: ProviderOption[];
-  initialPlatformAiProvider: string;
-  initialPlatformAiModel: string;
-  onChange: (provider: string, model: string) => void;
-}
-
-function PlatformSection({
-  aiProviders,
-  initialPlatformAiProvider,
-  initialPlatformAiModel,
-  onChange,
-}: PlatformSectionProps) {
-  const [provider, setProvider] = useState(initialPlatformAiProvider);
-  const [model, setModel] = useState(initialPlatformAiModel);
-
-  const models = useMemo(
-    () => aiProviders.find((p) => p.id === provider)?.models ?? [],
-    [aiProviders, provider]
-  );
-
-  function handleProvider(newProvider: string) {
-    setProvider(newProvider);
-    const pData = aiProviders.find((p) => p.id === newProvider);
-    const firstModel = pData?.models[0]?.id ?? '';
-    setModel(firstModel);
-    onChange(newProvider, firstModel);
-  }
-
-  function handleModel(newModel: string) {
-    setModel(newModel);
-    onChange(provider, newModel);
-  }
-
-  return (
-    <div className={shell.panel}>
-      <div className={shell.panelHead}>
-        <span className={shell.phTitle}>
-          <Glyph name="gear" size={15} />
-          Platform operations AI
-        </span>
-      </div>
-      <div className={shell.panelBody}>
-        <p className={shell.sectionLede}>
-          AI model for internal platform tasks (handle screening, credential lookup, language
-          detection) that run without learner context.
-        </p>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label htmlFor="platform-provider" className={shell.pickLabel} style={{ margin: 0 }}>
-              Provider
-            </label>
-            <select
-              id="platform-provider"
-              className={shell.uselect}
-              value={provider}
-              onChange={(e) => handleProvider(e.target.value)}
-              aria-label="Platform AI provider"
-              style={{ minHeight: '44px' }}
-            >
-              {aiProviders.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.displayName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {models.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label htmlFor="platform-model" className={shell.pickLabel} style={{ margin: 0 }}>
-                Model
-              </label>
-              <select
-                id="platform-model"
-                className={shell.uselect}
-                value={model}
-                onChange={(e) => handleModel(e.target.value)}
-                aria-label="Platform AI model"
-                style={{ minHeight: '44px' }}
-              >
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.displayName} ({m.tier})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Root export
 // ---------------------------------------------------------------------------
 
@@ -506,6 +417,8 @@ export function ProviderModelConfig({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastSavedKeyRef = useRef<string | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const aiState = useUnifiedModelState({
     initialDefault: {
@@ -537,47 +450,103 @@ export function ProviderModelConfig({
     compositeIds: true,
   });
 
-  const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
-  const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
+  const savePayload = useMemo<AutoModelPayload>(
+    () => ({
+      model: {
+        aiProvider: aiState.defaultSelection.provider,
+        aiModel: aiState.defaultSelection.model,
+        ttsProvider: ttsState.defaultSelection.provider,
+        ttsModel: ttsState.defaultSelection.model,
+        sttProvider: sttState.defaultSelection.provider,
+        sttModel: sttState.defaultSelection.model,
+      },
+      includedModels: setToArray(aiState.included),
+      includedTtsModels: setToArray(ttsState.included),
+      includedSttModels: setToArray(sttState.included),
+    }),
+    [
+      aiState.defaultSelection.model,
+      aiState.defaultSelection.provider,
+      aiState.included,
+      sttState.defaultSelection.model,
+      sttState.defaultSelection.provider,
+      sttState.included,
+      ttsState.defaultSelection.model,
+      ttsState.defaultSelection.provider,
+      ttsState.included,
+    ]
+  );
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
+  const saveKey = useMemo(() => JSON.stringify(savePayload), [savePayload]);
 
-    try {
-      const res = await fetch('/api/v1/admin/auto-models', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: {
-            aiProvider: aiState.defaultSelection.provider,
-            aiModel: aiState.defaultSelection.model,
-            ttsProvider: ttsState.defaultSelection.provider,
-            ttsModel: ttsState.defaultSelection.model,
-            sttProvider: sttState.defaultSelection.provider,
-            sttModel: sttState.defaultSelection.model,
-          },
-          platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
-          includedModels: setToArray(aiState.included),
-          includedTtsModels: setToArray(ttsState.included),
-          includedSttModels: setToArray(sttState.included),
-        }),
-      });
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
 
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as unknown;
-        throw new Error(errorMessageFromResponseBody(data, 'Failed to save provider changes.'));
-      }
-
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
-    } finally {
-      setSaving(false);
+  useEffect(() => {
+    if (lastSavedKeyRef.current === saveKey) return;
+    if (lastSavedKeyRef.current === null) {
+      lastSavedKeyRef.current = saveKey;
+      return;
     }
-  }
+
+    let active = true;
+    setSaved(false);
+    setError(null);
+
+    const timeout = setTimeout(async () => {
+      setSaving(true);
+
+      try {
+        const res = await fetch('/api/v1/admin/auto-models', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: saveKey,
+        });
+
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as unknown;
+          throw new Error(errorMessageFromResponseBody(data, 'Failed to save provider changes.'));
+        }
+
+        if (!active) return;
+        lastSavedKeyRef.current = saveKey;
+        setSaved(true);
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setSaved(false), SAVED_VISIBLE_MS);
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : 'Failed to save');
+      } finally {
+        if (active) setSaving(false);
+      }
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [saveKey]);
+
+  const saveStatusClass = [
+    shell.saveStatus,
+    error
+      ? shell.saveStatusError
+      : saving
+        ? shell.saveStatusSaving
+        : saved
+          ? shell.saveStatusSaved
+          : shell.saveStatusIdle,
+  ].join(' ');
+  const saveStatusIcon: GlyphName = error ? 'x' : saving ? 'clock' : saved ? 'check' : 'dot';
+  const saveStatusText = error
+    ? 'Autosave failed'
+    : saving
+      ? 'Saving changes...'
+      : saved
+        ? 'Changes saved'
+        : 'Changes save automatically';
 
   return (
     <div>
@@ -585,58 +554,15 @@ export function ProviderModelConfig({
       <TaskSection title="Text-to-speech" icon="volume" lede={SPEECH_LEDE} state={ttsState} />
       <TaskSection title="Speech-to-text" icon="mic" lede={SPEECH_LEDE} state={sttState} />
 
-      <PlatformSection
-        aiProviders={aiProviders}
-        initialPlatformAiProvider={platformAiProvider}
-        initialPlatformAiModel={platformAiModel}
-        onChange={(p, m) => {
-          setPlatformAiProvider(p);
-          setPlatformAiModel(m);
-        }}
-      />
-
       {error && (
-        <div
-          role="alert"
-          style={{
-            background: 'color-mix(in oklab, var(--danger) 13%, transparent)',
-            border: '1px solid color-mix(in oklab, var(--danger) 40%, transparent)',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            fontSize: '13.5px',
-            color: 'var(--danger)',
-            marginBottom: '14px',
-          }}
-        >
+        <div role="alert" className={shell.saveError}>
           {error}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <button
-          type="button"
-          className={`${shell.btnSm} ${shell.primary}`}
-          onClick={handleSave}
-          disabled={saving}
-          aria-label="Save provider and model changes"
-        >
-          {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
-        </button>
-        {saved && (
-          <span
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: '11px',
-              color: 'var(--ok)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            <Glyph name="check" size={12} />
-            Saved
-          </span>
-        )}
+      <div className={saveStatusClass} role="status" aria-live="polite">
+        <Glyph name={saveStatusIcon} size={12} />
+        {saveStatusText}
       </div>
     </div>
   );

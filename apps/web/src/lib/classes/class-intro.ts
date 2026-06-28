@@ -13,12 +13,36 @@ export interface ClassIntroExample {
   note: string;
 }
 
+export interface ClassIntroVisuals {
+  timeline: {
+    title: string;
+    steps: string[];
+  } | null;
+  contrast: {
+    title: string;
+    leftLabel: string;
+    leftItems: string[];
+    rightLabel: string;
+    rightItems: string[];
+  } | null;
+  callouts: Array<{
+    label: string;
+    text: string;
+    tone: 'blue' | 'teal' | 'rose' | 'amber';
+  }>;
+  links: Array<{
+    label: string;
+    url: string;
+  }>;
+}
+
 export interface ClassIntro {
   purpose: string;
   about: string;
   focus: string[];
   examples: ClassIntroExample[];
   tips: string[];
+  visuals?: ClassIntroVisuals;
 }
 
 export interface ClassIntroParams {
@@ -49,7 +73,50 @@ const introSchema = z.object({
     .min(1)
     .max(5),
   tips: z.array(z.string().min(1)).min(1).max(5),
+  visuals: z
+    .object({
+      timeline: z
+        .object({
+          title: z.string().min(1),
+          steps: z.array(z.string().min(1)).min(2).max(6),
+        })
+        .nullable()
+        .optional(),
+      contrast: z
+        .object({
+          title: z.string().min(1),
+          leftLabel: z.string().min(1),
+          leftItems: z.array(z.string().min(1)).min(1).max(5),
+          rightLabel: z.string().min(1),
+          rightItems: z.array(z.string().min(1)).min(1).max(5),
+        })
+        .nullable()
+        .optional(),
+      callouts: z
+        .array(
+          z.object({
+            label: z.string().min(1),
+            text: z.string().min(1),
+            tone: z.enum(['blue', 'teal', 'rose', 'amber']).optional(),
+          })
+        )
+        .max(4)
+        .optional(),
+      links: z
+        .array(
+          z.object({
+            label: z.string().min(1),
+            url: z.string().url(),
+          })
+        )
+        .max(3)
+        .optional(),
+    })
+    .optional(),
 });
+
+type ParsedIntro = z.infer<typeof introSchema>;
+type ParsedIntroVisuals = ParsedIntro['visuals'];
 
 function cleanJson(text: string): string {
   return text
@@ -70,7 +137,7 @@ function labelFromKey(key: string): string {
 function normalizeIntro(value: unknown): ClassIntro | null {
   const parsed = introSchema.safeParse(value);
   if (!parsed.success) return null;
-  return parsed.data;
+  return completeIntro(parsed.data);
 }
 
 export function classIntroFromSeed(
@@ -113,16 +180,16 @@ export function buildFallbackClassIntro(p: Omit<ClassIntroParams, 'userId'>): Cl
   const sourceLead = p.sourceTitle ? ` using ${p.sourceTitle}` : '';
   if (immersion) {
     const targetItems = vocab.map((item) => item.lemma).join(', ');
-    return {
+    return completeIntro({
       purpose: `${p.level} ${p.targetLang}${sourceLead}: ${targetItems || p.title}.`,
       about: targetItems || p.title,
       focus: focus.length > 0 ? focus : [p.targetLang],
       examples,
       tips: grammar.length > 0 ? grammar : [p.targetLang],
-    };
+    });
   }
 
-  return {
+  return completeIntro({
     purpose: `Build ${p.level} control of ${p.title.toLowerCase()}${sourceLead}.`,
     about: `${p.objective} Start by identifying the message, then check the grammar signal that makes the sentence work.`,
     focus: focus.length > 0 ? focus : ['Understand the main idea before choosing an answer.'],
@@ -132,7 +199,123 @@ export function buildFallbackClassIntro(p: Omit<ClassIntroParams, 'userId'>): Cl
       'Watch endings, word order, and small connector words.',
       'Say each example aloud once before moving to the questions.',
     ],
+  });
+}
+
+function completeIntro(
+  intro: Omit<ClassIntro, 'visuals'> & { visuals?: ParsedIntroVisuals }
+): ClassIntro {
+  const derived = deriveIntroVisuals(intro);
+  const normalized = normalizeVisuals(intro.visuals);
+  return {
+    ...intro,
+    visuals: normalized ? { ...derived, ...normalized } : derived,
   };
+}
+
+function normalizeVisuals(visuals: ParsedIntroVisuals): ClassIntroVisuals | undefined {
+  if (!visuals) return undefined;
+
+  return {
+    timeline: visuals.timeline
+      ? { title: visuals.timeline.title, steps: visuals.timeline.steps.slice(0, 6) }
+      : null,
+    contrast: visuals.contrast
+      ? {
+          title: visuals.contrast.title,
+          leftLabel: visuals.contrast.leftLabel,
+          leftItems: visuals.contrast.leftItems.slice(0, 5),
+          rightLabel: visuals.contrast.rightLabel,
+          rightItems: visuals.contrast.rightItems.slice(0, 5),
+        }
+      : null,
+    callouts: (visuals.callouts ?? []).slice(0, 4).map((callout) => ({
+      label: callout.label,
+      text: callout.text,
+      tone: callout.tone ?? 'blue',
+    })),
+    links: (visuals.links ?? []).slice(0, 3),
+  };
+}
+
+function deriveIntroVisuals(intro: Omit<ClassIntro, 'visuals'>): ClassIntroVisuals {
+  const timelineSteps = deriveTimelineSteps(intro);
+  const contrast = deriveContrast(intro);
+  const tones: Array<'blue' | 'teal' | 'rose' | 'amber'> = ['blue', 'teal', 'rose', 'amber'];
+
+  return {
+    timeline:
+      timelineSteps.length >= 2
+        ? {
+            title: timelineSteps.some((step) => /zuerst|dann|then|first|finally|schlie/i.test(step))
+              ? 'Story order'
+              : 'Learning path',
+            steps: timelineSteps,
+          }
+        : null,
+    contrast,
+    callouts: intro.tips.slice(0, 4).map((tip, index) => ({
+      label: `Tip ${index + 1}`,
+      text: tip,
+      tone: tones[index % tones.length],
+    })),
+    links: [],
+  };
+}
+
+function deriveTimelineSteps(intro: Omit<ClassIntro, 'visuals'>): string[] {
+  const explicitSequence = intro.focus
+    .flatMap((item) => item.split(/→|->|⇒|, then | then |, dann | dann /i))
+    .map((item) => item.trim().replace(/^[.:;\-\s]+|[.:;\-\s]+$/g, ''))
+    .filter((item) => item.length > 1 && item.length <= 48);
+
+  if (explicitSequence.length >= 2) {
+    return explicitSequence.slice(0, 5);
+  }
+
+  return intro.examples
+    .slice(0, 4)
+    .map((example) => example.target.trim())
+    .filter((item) => item.length > 0)
+    .map((item) => (item.length > 64 ? `${item.slice(0, 61).trim()}...` : item));
+}
+
+function deriveContrast(intro: Omit<ClassIntro, 'visuals'>): ClassIntroVisuals['contrast'] {
+  const leftItems: string[] = [];
+  const rightItems: string[] = [];
+
+  for (const item of [...intro.focus, ...intro.tips]) {
+    if (/perfekt/i.test(item)) leftItems.push(item);
+    else if (/präteritum|praeteritum|war|hatte|musste|wollte/i.test(item)) rightItems.push(item);
+    else if (/\bals\b/i.test(item)) leftItems.push(item);
+    else if (/\bwenn\b/i.test(item)) rightItems.push(item);
+  }
+
+  if (leftItems.length > 0 && rightItems.length > 0) {
+    const isPastTense = [...leftItems, ...rightItems].some((item) =>
+      /perfekt|präteritum|praeteritum/i.test(item)
+    );
+    return {
+      title: isPastTense ? 'Tense choice map' : 'Decision map',
+      leftLabel: isPastTense ? 'Perfekt / one-time cue' : 'Use when...',
+      leftItems: leftItems.slice(0, 3),
+      rightLabel: isPastTense ? 'Präteritum / repeated cue' : 'Avoid when...',
+      rightItems: rightItems.slice(0, 3),
+    };
+  }
+
+  const examples = intro.examples.slice(0, 2);
+  if (examples.length >= 2) {
+    return {
+      title: 'Compare the examples',
+      leftLabel: examples[0].target,
+      leftItems: [examples[0].meaning, examples[0].note],
+      rightLabel: examples[1].target,
+      rightItems: [examples[1].meaning, examples[1].note],
+    };
+  }
+
+  return null;
 }
 
 export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntro> {

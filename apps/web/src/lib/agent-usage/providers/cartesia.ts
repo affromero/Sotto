@@ -1,5 +1,6 @@
-import { getByokExtraData, getSharedByokKey } from '../../byok';
+import { getByokExtraData, getSharedAdminByokExtraData, getSharedByokKey } from '../../byok';
 import { logger } from '../../logger';
+import { CARTESIA_USAGE_ALLOWANCE } from '../../provider-usage/allowances';
 import type {
   AgentUsageCacheEntry,
   AgentUsageCredits,
@@ -28,25 +29,80 @@ const CARTESIA_USAGE_API_VERSION = '2026-03-01';
 
 let cartesiaCache: AgentUsageCacheEntry | null = null;
 
+function hasAdminUsageKey(extraData: Record<string, string> | null): boolean {
+  return Boolean(extraData?.adminApiKey?.trim());
+}
+
+function cartesiaEnvExtraData(): Record<string, string> | null {
+  const extra = {
+    ...(process.env.CARTESIA_ADMIN_API_KEY?.trim()
+      ? { adminApiKey: process.env.CARTESIA_ADMIN_API_KEY.trim() }
+      : {}),
+    ...(process.env.CARTESIA_USAGE_PLAN?.trim()
+      ? { usagePlan: process.env.CARTESIA_USAGE_PLAN.trim() }
+      : {}),
+    ...(process.env.CARTESIA_MONTHLY_CREDIT_LIMIT?.trim()
+      ? { monthlyCreditLimit: process.env.CARTESIA_MONTHLY_CREDIT_LIMIT.trim() }
+      : {}),
+    ...(process.env.CARTESIA_BILLING_RESET_DAY?.trim()
+      ? { billingResetDay: process.env.CARTESIA_BILLING_RESET_DAY.trim() }
+      : {}),
+  };
+  return Object.keys(extra).length > 0 ? extra : null;
+}
+
+function mergeExtraData(
+  ...items: Array<Record<string, string> | null>
+): Record<string, string> | null {
+  const merged = Object.assign(
+    {},
+    ...items.filter((item): item is Record<string, string> => Boolean(item))
+  );
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
 async function getCartesiaRuntimeCredentials(
   userId: string
 ): Promise<{ apiKey: string; extraData: Record<string, string> | null } | null> {
   const byokKey = await getSharedByokKey(userId, 'cartesia');
   if (byokKey) {
+    const ownerExtraData = await getByokExtraData(byokKey.ownerUserId, 'cartesia');
+    const sharedAdminExtraData = hasAdminUsageKey(ownerExtraData)
+      ? null
+      : await getSharedAdminByokExtraData(userId, 'cartesia');
+    const extraData = mergeExtraData(cartesiaEnvExtraData(), ownerExtraData, sharedAdminExtraData);
+
     return {
       apiKey: byokKey.apiKey,
-      extraData: await getByokExtraData(byokKey.ownerUserId, 'cartesia'),
+      extraData,
     };
   }
 
   const apiKey = process.env.CARTESIA_API_KEY?.trim();
-  return apiKey ? { apiKey, extraData: null } : null;
+  return apiKey ? { apiKey, extraData: cartesiaEnvExtraData() } : null;
 }
 
 function optionalPositiveInteger(value: string | null | undefined): number | null {
   if (!value?.trim()) return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function resolveCartesiaUsageAllowance(extraData: Record<string, string> | null): {
+  monthlyLimit: number | null;
+  planId: string | null;
+  planLabel: string | null;
+} {
+  const planId = extraData?.usagePlan?.trim().toLowerCase() || null;
+  const preset = CARTESIA_USAGE_ALLOWANCE.presets.find((item) => item.id === planId) ?? null;
+  const explicitLimit = optionalPositiveInteger(extraData?.monthlyCreditLimit);
+  const monthlyLimit = explicitLimit ?? preset?.monthlyLimit ?? null;
+
+  return {
+    monthlyLimit,
+    planId,
+    planLabel: preset?.label ?? (monthlyLimit !== null ? 'Custom' : null),
+  };
 }
 
 function daysInUtcMonth(year: number, monthIndex: number): number {
@@ -173,13 +229,15 @@ export async function getCartesiaUsageProvider(
   if (!credentials) return null;
 
   const adminKey = credentials.extraData?.adminApiKey?.trim() || null;
-  const monthlyLimit = optionalPositiveInteger(credentials.extraData?.monthlyCreditLimit);
+  const allowance = resolveCartesiaUsageAllowance(credentials.extraData);
+  const monthlyLimit = allowance.monthlyLimit;
   const resetDay = optionalPositiveInteger(credentials.extraData?.billingResetDay) ?? 1;
 
   const nowDate = new Date();
   const billingWindow = resolveCartesiaBillingWindow(nowDate, resetDay);
   const cacheKey = providerCacheKey([
     adminKey ? hashToken(adminKey) : 'no-admin',
+    allowance.planId,
     monthlyLimit,
     billingWindow.start.toISOString(),
     billingWindow.end.toISOString(),
@@ -195,7 +253,7 @@ export async function getCartesiaUsageProvider(
       category: 'audio',
       label: 'Cartesia',
       shortLabel: 'Cartesia',
-      planLabel: null,
+      planLabel: allowance.planLabel,
       status: 'action_required',
       detail: 'Add a Cartesia admin API key in provider settings to show credit usage.',
       windows: [],
@@ -230,7 +288,7 @@ export async function getCartesiaUsageProvider(
         category: 'audio',
         label: 'Cartesia',
         shortLabel: 'Cartesia',
-        planLabel: null,
+        planLabel: allowance.planLabel,
         status:
           response.status === 401 || response.status === 403 ? 'action_required' : 'unavailable',
         detail:
@@ -258,7 +316,7 @@ export async function getCartesiaUsageProvider(
         category: 'audio',
         label: 'Cartesia',
         shortLabel: 'Cartesia',
-        planLabel: null,
+        planLabel: allowance.planLabel,
         status: 'unavailable',
         detail: 'Cartesia credit usage is unavailable right now.',
         windows: [],
@@ -274,7 +332,7 @@ export async function getCartesiaUsageProvider(
       category: 'audio',
       label: 'Cartesia',
       shortLabel: 'Cartesia',
-      planLabel: null,
+      planLabel: allowance.planLabel,
       status: 'ready',
       detail: parsed.detail ?? 'Cartesia credit usage is current.',
       windows: parsed.windows,
@@ -296,7 +354,7 @@ export async function getCartesiaUsageProvider(
       category: 'audio',
       label: 'Cartesia',
       shortLabel: 'Cartesia',
-      planLabel: null,
+      planLabel: allowance.planLabel,
       status: 'unavailable',
       detail: 'Cartesia credit usage is unreachable right now.',
       windows: [],

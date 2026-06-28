@@ -255,8 +255,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
   const due = await getDueItems(p.courseId);
   await assertClassStillGenerating(p.classId);
 
-  // Adaptive listening section — non-blocking: a TTS/AI hiccup must not
-  // prevent the learner from accessing their MC sections.
+  // These generated skills are required class surfaces. If one fails, the class
+  // is not published; createNextClass rolls back, regenerateCurrentClass marks
+  // the attempt FAILED, and the learner can regenerate a real class.
   try {
     await assertClassStillGenerating(p.classId);
     await generateClassListening({
@@ -277,13 +278,13 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     await assertClassStillGenerating(p.classId);
   } catch (err) {
     await rethrowIfGenerationWasCancelled(p.classId, err);
-    logger.warn('generateClassListening failed; continuing without listening section', {
+    logger.error('Required listening section generation failed', {
       classId: p.classId,
       error: err instanceof Error ? err.message : String(err),
     });
+    throw err;
   }
 
-  // Speaking section — non-blocking, same rationale as the listening section.
   try {
     await assertClassStillGenerating(p.classId);
     await generateClassSpeaking({
@@ -300,13 +301,13 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     await assertClassStillGenerating(p.classId);
   } catch (err) {
     await rethrowIfGenerationWasCancelled(p.classId, err);
-    logger.warn('generateClassSpeaking failed; continuing without speaking section', {
+    logger.error('Required speaking section generation failed', {
       classId: p.classId,
       error: err instanceof Error ? err.message : String(err),
     });
+    throw err;
   }
 
-  // Writing section — non-blocking, same rationale as listening/speaking.
   try {
     await assertClassStillGenerating(p.classId);
     await generateClassWriting({
@@ -323,10 +324,11 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     await assertClassStillGenerating(p.classId);
   } catch (err) {
     await rethrowIfGenerationWasCancelled(p.classId, err);
-    logger.warn('generateClassWriting failed; continuing without writing section', {
+    logger.error('Required writing section generation failed', {
       classId: p.classId,
       error: err instanceof Error ? err.message : String(err),
     });
+    throw err;
   }
 
   await assertClassStillGenerating(p.classId);
@@ -592,7 +594,26 @@ export async function getClassForUser(classId: string, userId: string) {
         orderBy: { skill: 'asc' },
         include: {
           questions: { orderBy: { order: 'asc' } },
-          prompts: { orderBy: { order: 'asc' } },
+          prompts: {
+            orderBy: { order: 'asc' },
+            include: {
+              recordings: {
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: {
+                  id: true,
+                  status: true,
+                  transcript: true,
+                  overallScore: true,
+                  rubricScores: true,
+                  phonemeScores: true,
+                  feedback: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
           writingPrompts: {
             orderBy: { order: 'asc' },
             include: { responses: { where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 } },

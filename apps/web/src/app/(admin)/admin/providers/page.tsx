@@ -1,12 +1,11 @@
 import { auth } from '@/lib/auth';
-import { getAutoModelConfig } from '@/lib/auto-model-config';
+import { getAutoModelConfig, resolveDisabledSystemAiProviders } from '@/lib/auto-model-config';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
 import { getAllAiProviderClientMeta, getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getTestableProviders } from '@/lib/admin/testable-providers';
-import { Glyph } from '@/components/Glyph';
 import { ProvidersTabs } from './ProvidersTabs';
 import styles from '../../adminTheme.styles';
 
@@ -30,18 +29,21 @@ export default async function AdminProvidersPage() {
     isValid: k.isValid,
   }));
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
+  const disabledSystemAiProviders = resolveDisabledSystemAiProviders(config);
   const aiSystemProviders = [
     {
       id: 'claude-code',
       label: 'Claude Code',
       description: 'Linked via the local Claude Code CLI. No API key needed.',
       available: claudeCodeAvailable,
+      disabled: disabledSystemAiProviders.has('claude-code'),
     },
     {
       id: 'codex',
       label: 'Codex',
       description: 'Linked via the local Codex CLI. No API key needed.',
       available: codexAvailable,
+      disabled: disabledSystemAiProviders.has('codex'),
     },
   ];
 
@@ -50,6 +52,7 @@ export default async function AdminProvidersPage() {
   const STT_ONLY_AI = new Set(['deepgram', 'assemblyai', 'together', 'gladia', 'speechmatics']);
   const aiProviders = getAllAiProviderMeta()
     .filter((p) => !STT_ONLY_AI.has(p.id))
+    .filter((p) => !disabledSystemAiProviders.has(p.id as 'claude-code' | 'codex'))
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
@@ -101,17 +104,6 @@ export default async function AdminProvidersPage() {
           sttProviders: testable.stt,
         }}
       />
-
-      <div className={styles.note}>
-        <div className={styles.noteTitle}>
-          <Glyph name="lock" size={14} /> Platform operations
-        </div>
-        <p>
-          A dedicated AI model runs internal tasks without learner context (handle screening,
-          credential lookup, language detection). Set it in the model defaults above; it can be more
-          capable than the learner-facing default.
-        </p>
-      </div>
     </>
   );
 }

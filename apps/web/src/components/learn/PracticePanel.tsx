@@ -10,6 +10,7 @@ interface PracticePanelProps {
   courseName: string;
   initialFocusTargetId?: string | null;
   initialAutoMode?: string | null;
+  initialKind?: string | null;
 }
 
 interface Overview {
@@ -43,6 +44,7 @@ export function PracticePanel({
   courseName,
   initialFocusTargetId = null,
   initialAutoMode = null,
+  initialKind = null,
 }: PracticePanelProps) {
   const autoStarted = useRef(false);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -111,6 +113,17 @@ export function PracticePanel({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [initialAutoMode, initialFocusTargetId, startKind]);
+
+  useEffect(() => {
+    if (!initialKind || initialFocusTargetId || autoStarted.current) return;
+    const normalizedKind = initialKind.toUpperCase();
+    if (!KINDS.some((item) => item.kind === normalizedKind)) return;
+    autoStarted.current = true;
+    const timer = window.setTimeout(() => {
+      void startKind(normalizedKind);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialFocusTargetId, initialKind, startKind]);
 
   function backToOverview() {
     setStart(null);

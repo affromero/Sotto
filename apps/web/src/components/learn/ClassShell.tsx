@@ -333,9 +333,12 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     stage = (
       <>
         <ClassSummary
+          courseId={cls.courseId}
           lesson={cls.lesson}
           order={cls.order}
           result={result}
+          sections={sections}
+          vocabulary={cls.vocabulary}
           regenerating={regenerating}
           onRetryFailed={() => void handleRetryFailed()}
         />

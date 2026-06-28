@@ -4,6 +4,7 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { buildClassDocument } from '@/lib/class-document';
+import { classIntroFromSeed } from '@/lib/classes/class-intro';
 import { addJob, worksheetPdfQueue, JobType } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ classId: string }> };
@@ -22,7 +23,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { id: classId, course: { userId: authed.userId } },
       include: {
         course: { select: { nativeLang: true, targetLang: true } },
-        lesson: { select: { title: true, level: true, objective: true } },
+        lesson: {
+          select: {
+            title: true,
+            level: true,
+            objective: true,
+            grammarPoints: true,
+            targetVocab: true,
+          },
+        },
         sections: {
           include: {
             questions: { orderBy: { order: 'asc' } },
@@ -36,6 +45,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!cls) return errorResponse('Class not found', 404);
 
     const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const grammarPoints = Array.isArray(cls.lesson.grammarPoints)
+      ? (cls.lesson.grammarPoints as string[])
+      : [];
+    const targetVocab = Array.isArray(cls.lesson.targetVocab)
+      ? (cls.lesson.targetVocab as Array<{ lemma: string; gloss: string; pos?: string }>)
+      : [];
+    const intro = classIntroFromSeed(cls.adaptiveSeed, {
+      level: cls.lesson.level,
+      nativeLang: cls.course.nativeLang,
+      targetLang: cls.course.targetLang,
+      title: cls.lesson.title,
+      objective: cls.lesson.objective,
+      grammarPoints,
+      targetVocab,
+      sourceTitle: cls.sourceTitle,
+    });
 
     const document = await buildClassDocument(
       {
@@ -47,6 +72,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           level: cls.lesson?.level ?? '',
           objective: cls.lesson?.objective ?? '',
         },
+        intro,
         sections: cls.sections.map((s) => ({
           id: s.id,
           skill: s.skill,
@@ -75,7 +101,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           })),
         })),
       },
-      { isAnswerKey: false, appBaseUrl },
+      { isAnswerKey: false, appBaseUrl }
     );
 
     return NextResponse.json({ document, worksheetPdfUrl: cls.worksheetPdfUrl ?? null });

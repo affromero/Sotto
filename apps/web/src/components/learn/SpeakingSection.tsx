@@ -33,11 +33,18 @@ interface RubricScores {
   completeness?: number;
 }
 
+interface AlignmentToken {
+  op: 'match' | 'substitute' | 'delete' | 'insert';
+  expected?: string;
+  actual?: string;
+}
+
 interface ScoringResult {
   recordingId: string;
   transcript?: string | null;
   overallScore?: number | null;
   rubricScores?: RubricScores | null;
+  phonemeScores?: AlignmentToken[] | null;
   feedback?: string | null;
   status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
 }
@@ -189,6 +196,8 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
   const overall = result?.overallScore != null ? Math.round(result.overallScore * 100) : 0;
   const rubric = result?.rubricScores ?? null;
   const isBusy = phase === 'uploading' || phase === 'grading';
+  const focusTokens =
+    result?.phonemeScores?.filter((token) => token.op !== 'match').slice(0, 4) ?? [];
 
   return (
     <article className={styles.speakCard} aria-label={`Speaking prompt ${index + 1} of ${total}`}>
@@ -253,6 +262,25 @@ function PromptCard({ endpointBase, prompt, index, total, onScored }: PromptCard
                 );
               })}
             </div>
+            {result.transcript && (
+              <div className={styles.transcriptBlock}>
+                <span className={styles.transcriptLabel}>You said</span>
+                <p className={styles.transcript}>&ldquo;{result.transcript}&rdquo;</p>
+              </div>
+            )}
+            {focusTokens.length > 0 && (
+              <div className={styles.soundFocus} aria-label="Pronunciation focus">
+                {focusTokens.map((token, tokenIndex) => (
+                  <span className={styles.soundChip} key={`${token.op}-${tokenIndex}`}>
+                    {token.expected && token.actual
+                      ? `${token.expected} -> ${token.actual}`
+                      : token.expected
+                        ? token.expected
+                        : token.actual}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -376,8 +404,8 @@ export function SpeakingSection({
         </div>
         <h1 className={styles.title}>Say it out loud.</h1>
         <p className={styles.modLede}>
-          Speak the line; the recognizer you chose scores accuracy, fluency, and completeness so you
-          know where the sound drifts. Phrase {idx + 1} of {total}.
+          Record each phrase. Pronunciation, rhythm, and completeness are scored from your audio.
+          Phrase {idx + 1} of {total}.
         </p>
 
         {cur && (

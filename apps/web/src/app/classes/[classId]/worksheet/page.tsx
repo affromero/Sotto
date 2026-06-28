@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { buildClassDocument, type BuildClassDocumentInput } from '@/lib/class-document';
+import { classIntroFromSeed } from '@/lib/classes/class-intro';
 import type { ClassDocument, ClassDocumentSection } from '@sotto/shared';
 import { PrintButton } from './PrintButton';
 import styles from './worksheet.module.css';
@@ -152,6 +153,100 @@ function WritingPromptBlock({
   );
 }
 
+function IntroBlock({ intro }: { intro: NonNullable<ClassDocument['intro']> }) {
+  const visuals = intro.visuals;
+
+  return (
+    <section className={styles.introBlock} aria-label="Class brief">
+      <div className={styles.introLead}>
+        <p>{intro.purpose}</p>
+        <p>{intro.about}</p>
+      </div>
+
+      {(visuals?.timeline || visuals?.contrast) && (
+        <div className={styles.introVisuals}>
+          {visuals.timeline && visuals.timeline.steps.length >= 2 && (
+            <figure className={styles.timelineFigure}>
+              <figcaption>{visuals.timeline.title}</figcaption>
+              <ol>
+                {visuals.timeline.steps.map((step, index) => (
+                  <li key={`${step}-${index}`}>
+                    <span>{index + 1}</span>
+                    <p>{step}</p>
+                  </li>
+                ))}
+              </ol>
+            </figure>
+          )}
+          {visuals.contrast && (
+            <figure className={styles.contrastFigure}>
+              <figcaption>{visuals.contrast.title}</figcaption>
+              <div className={styles.contrastGrid}>
+                <div>
+                  <b>{visuals.contrast.leftLabel}</b>
+                  <ul>
+                    {visuals.contrast.leftItems.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <b>{visuals.contrast.rightLabel}</b>
+                  <ul>
+                    {visuals.contrast.rightItems.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </figure>
+          )}
+        </div>
+      )}
+
+      <div className={styles.introColumns}>
+        <div>
+          <h2>Focus</h2>
+          <ul>
+            {intro.focus.map((item, index) => (
+              <li key={`${item}-${index}`}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h2>Examples</h2>
+          {intro.examples.map((example, index) => (
+            <article className={styles.exampleCard} key={`${example.target}-${index}`}>
+              <h3>{example.target}</h3>
+              <p>{example.meaning}</p>
+              <small>{example.note}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.calloutGrid}>
+        {(visuals?.callouts?.length
+          ? visuals.callouts
+          : intro.tips.map((tip, index) => ({
+              label: `Tip ${index + 1}`,
+              text: tip,
+              tone: 'blue' as const,
+            }))
+        ).map((callout, index) => (
+          <p
+            className={`${styles.callout} ${styles[`tone_${callout.tone}`]}`}
+            key={`${callout.label}-${callout.text}-${index}`}
+          >
+            <b>{callout.label}</b>
+            {callout.text}
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SectionBlock({ section }: { section: ClassDocumentSection }) {
   return (
     <section className={styles.sectionBlock} aria-labelledby={`section-title-${section.id}`}>
@@ -215,7 +310,15 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
     where: { id: classId, course: { userId: session.user.id } },
     include: {
       course: { select: { nativeLang: true, targetLang: true } },
-      lesson: { select: { title: true, level: true, objective: true } },
+      lesson: {
+        select: {
+          title: true,
+          level: true,
+          objective: true,
+          grammarPoints: true,
+          targetVocab: true,
+        },
+      },
       sections: {
         include: {
           questions: { orderBy: { order: 'asc' } },
@@ -228,6 +331,23 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
 
   if (!cls) notFound();
 
+  const grammarPoints = Array.isArray(cls.lesson.grammarPoints)
+    ? (cls.lesson.grammarPoints as string[])
+    : [];
+  const targetVocab = Array.isArray(cls.lesson.targetVocab)
+    ? (cls.lesson.targetVocab as Array<{ lemma: string; gloss: string; pos?: string }>)
+    : [];
+  const intro = classIntroFromSeed(cls.adaptiveSeed, {
+    level: cls.lesson.level,
+    nativeLang: cls.course.nativeLang,
+    targetLang: cls.course.targetLang,
+    title: cls.lesson.title,
+    objective: cls.lesson.objective,
+    grammarPoints,
+    targetVocab,
+    sourceTitle: cls.sourceTitle,
+  });
+
   const input: BuildClassDocumentInput = {
     id: cls.id,
     nativeLang: cls.course.nativeLang,
@@ -237,6 +357,7 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
       level: cls.lesson.level,
       objective: cls.lesson.objective,
     },
+    intro,
     sections: cls.sections.map((s) => ({
       id: s.id,
       skill: s.skill,
@@ -323,6 +444,8 @@ export default async function WorksheetPage({ params }: WorksheetPageProps) {
             <span className={styles.worksheetDateUnderline} aria-hidden="true" />
           </div>
         </header>
+
+        {doc.intro && <IntroBlock intro={doc.intro} />}
 
         <div className={styles.sectionsGrid}>
           {doc.sections.map((section) => (
