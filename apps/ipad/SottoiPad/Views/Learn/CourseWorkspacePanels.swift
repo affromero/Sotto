@@ -1,29 +1,5 @@
 import SwiftUI
 
-private struct StatPill: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title.uppercased())
-                .font(.caption2.bold())
-                .foregroundStyle(SottoTheme.muted)
-            Text(value)
-                .font(.headline)
-                .foregroundStyle(SottoTheme.ink)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(SottoTheme.line)
-        )
-    }
-}
-
 struct CourseHeroPanel: View {
     let title: String
     let course: SottoCourse
@@ -31,16 +7,16 @@ struct CourseHeroPanel: View {
     let onPlacement: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     Text(languageName(course.targetLang).uppercased())
                         .font(.caption.bold())
-                        .tracking(2.4)
+                        .tracking(1.8)
                         .foregroundStyle(SottoTheme.muted)
 
                     Text(title)
-                        .font(.system(size: 46, weight: .bold, design: .serif))
+                        .font(.system(size: 38, weight: .semibold, design: .serif))
                         .foregroundStyle(SottoTheme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -49,20 +25,16 @@ struct CourseHeroPanel: View {
 
                 VStack(alignment: .trailing, spacing: 10) {
                     Text(course.pedagogy.label)
-                        .font(.callout.bold())
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(SottoTheme.primary.opacity(0.12))
+                        .font(.caption.bold())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(SottoTheme.primary.opacity(0.09))
                         .foregroundStyle(SottoTheme.primary)
                         .clipShape(Capsule())
-
-                    Text("\(languageName(course.nativeLang)) -> \(languageName(course.targetLang))")
-                        .font(.caption)
-                        .foregroundStyle(SottoTheme.muted)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Level")
                         .font(.caption.bold())
@@ -81,37 +53,39 @@ struct CourseHeroPanel: View {
                             .frame(width: proxy.size.width * levelFraction(course.currentLevel))
                     }
                 }
-                .frame(height: 9)
+                .frame(height: 6)
 
                 if isManualPlacement {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("You set this level yourself. Confirm it with placement when you want Sotto to check the fit.")
-                            .font(.callout)
+                    HStack(alignment: .center, spacing: 10) {
+                        Text("Manual level. Placement can confirm the fit.")
+                            .font(.caption)
                             .foregroundStyle(SottoTheme.muted)
                             .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 12)
+                        Spacer(minLength: 8)
                         Button(action: onPlacement) {
                             Label("Confirm level", systemImage: "checkmark.seal")
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                 }
             }
 
-            HStack(spacing: 12) {
-                StatPill(title: "From", value: course.nativeLang.uppercased())
-                StatPill(title: "To", value: course.targetLang.uppercased())
-                StatPill(title: "Placement", value: placementLabel(course.placementSource))
-                StatPill(title: "Classes", value: "\(course.classes.count)")
+            FlowLayout(spacing: 8) {
+                Text("\(course.nativeLang.uppercased()) -> \(course.targetLang.uppercased())")
+                Text("Placement \(placementLabel(course.placementSource))")
+                Text("\(course.classes.count) \(course.classes.count == 1 ? "class" : "classes")")
             }
+            .font(.caption)
+            .foregroundStyle(SottoTheme.muted)
         }
-        .padding(24)
+        .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(SottoTheme.surface.opacity(0.82))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(SottoTheme.line)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(SottoTheme.line.opacity(0.65))
         )
     }
 }
@@ -127,96 +101,63 @@ struct CourseActionGrid: View {
     let onPlacement: () -> Void
     let onWorkbook: () -> Void
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 155), spacing: 12),
+    private let secondaryColumns = [
+        GridItem(.adaptive(minimum: 116), spacing: 8),
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-            ActionTile(
+        VStack(alignment: .leading, spacing: 10) {
+            ActionButton(
                 title: primaryTitle,
-                subtitle: generating ? "Building" : "Class",
                 icon: primaryIcon,
-                tint: SottoTheme.primary,
-                filled: true,
                 disabled: generating,
                 action: onPrimary
             )
 
-            Menu {
-                ForEach(practiceOptions) { option in
-                    Button(option.label) {
-                        onPractice(option.kind)
+            LazyVGrid(columns: secondaryColumns, alignment: .leading, spacing: 8) {
+                Menu {
+                    ForEach(practiceOptions) { option in
+                        Button(option.label) {
+                            onPractice(option.kind)
+                        }
                     }
+                } label: {
+                    SecondaryActionLabel(title: "Practice", icon: "target")
                 }
-            } label: {
-                ActionTileLabel(
-                    title: "Practice",
-                    subtitle: "Skill drills",
-                    icon: "target",
-                    tint: SottoTheme.success,
-                    filled: false
-                )
+                .buttonStyle(.plain)
+
+                SecondaryAction(title: "Live", icon: "waveform", action: onLive)
+                SecondaryAction(title: "Exam", icon: "checklist", action: onExam)
+                SecondaryAction(title: "Placement", icon: "checkmark.seal", action: onPlacement)
+                SecondaryAction(title: "Workbook", icon: "pencil.and.scribble", action: onWorkbook)
             }
-            .buttonStyle(.plain)
-
-            ActionTile(
-                title: "Live",
-                subtitle: "Conversation",
-                icon: "waveform",
-                tint: Color(red: 0.08, green: 0.42, blue: 0.48),
-                filled: false,
-                action: onLive
-            )
-
-            ActionTile(
-                title: "Exam",
-                subtitle: "Mock test",
-                icon: "checklist",
-                tint: Color(red: 0.60, green: 0.30, blue: 0.10),
-                filled: false,
-                action: onExam
-            )
-
-            ActionTile(
-                title: "Placement",
-                subtitle: "Level fit",
-                icon: "checkmark.seal",
-                tint: Color(red: 0.40, green: 0.28, blue: 0.58),
-                filled: false,
-                action: onPlacement
-            )
-
-            ActionTile(
-                title: "Workbook",
-                subtitle: "Pencil notes",
-                icon: "pencil.and.scribble",
-                tint: SottoTheme.primary,
-                filled: false,
-                action: onWorkbook
-            )
         }
     }
 }
 
-private struct ActionTile: View {
+private struct ActionButton: View {
     let title: String
-    let subtitle: String
     let icon: String
-    let tint: Color
-    let filled: Bool
     var disabled = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            ActionTileLabel(
-                title: title,
-                subtitle: subtitle,
-                icon: icon,
-                tint: tint,
-                filled: filled
-            )
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.headline.weight(.semibold))
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.84)
+                Spacer(minLength: 4)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SottoTheme.primary)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -224,44 +165,42 @@ private struct ActionTile: View {
     }
 }
 
-private struct ActionTileLabel: View {
+private struct SecondaryAction: View {
     let title: String
-    let subtitle: String
     let icon: String
-    let tint: Color
-    let filled: Bool
+    let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3.weight(.semibold))
-                .frame(width: 38, height: 38)
-                .background(filled ? Color.white.opacity(0.18) : tint.opacity(0.12))
-                .foregroundStyle(filled ? .white : tint)
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(filled ? .white : SottoTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(filled ? .white.opacity(0.78) : SottoTheme.muted)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 4)
+        Button(action: action) {
+            SecondaryActionLabel(title: title, icon: icon)
         }
-        .padding(14)
-        .frame(minHeight: 74)
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SecondaryActionLabel: View {
+    let title: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(SottoTheme.primary)
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(SottoTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.88)
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(filled ? tint : SottoTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(SottoTheme.surface.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(filled ? Color.clear : SottoTheme.line)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(SottoTheme.line.opacity(0.65))
         )
     }
 }
@@ -280,7 +219,7 @@ struct SourcedClassPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             PanelHeader(
                 title: "Class about...",
-                subtitle: "Build the next class from an article, paper, video link, or a learner interest.",
+                subtitle: "Use a link or one interest starter.",
                 icon: "link"
             )
 
@@ -307,8 +246,8 @@ struct SourcedClassPanel: View {
             }
 
             if activeClassId != nil {
-                Label("An active class is already waiting. Opening a source now resumes that class first.", systemImage: "bolt.circle")
-                    .font(.callout)
+                Label("Active class waiting. This opens it first.", systemImage: "bolt.circle")
+                    .font(.caption)
                     .foregroundStyle(SottoTheme.muted)
             }
 
@@ -325,7 +264,7 @@ struct SourcedClassPanel: View {
                             Button(topic.label) {
                                 start(source: .topic(topic.query))
                             }
-                            .buttonStyle(ChipButtonStyle(tint: SottoTheme.success))
+                            .buttonStyle(ChipButtonStyle(tint: SottoTheme.primary))
                         }
                     }
                 }
@@ -395,7 +334,7 @@ struct TeachingApproachPanel: View {
         VStack(alignment: .leading, spacing: 14) {
             PanelHeader(
                 title: "Teaching approach",
-                subtitle: "Applies to the next class, practice, listening, speaking, and exam generation.",
+                subtitle: "Used for future generation.",
                 icon: "slider.horizontal.3"
             )
 
@@ -468,7 +407,7 @@ struct CourseNotesEditor: View {
         VStack(alignment: .leading, spacing: 14) {
             PanelHeader(
                 title: "Course notes",
-                subtitle: "Paste official notes, vocab lists, or textbook context. Saved vocabulary is added to the learner memory.",
+                subtitle: "Save official notes, vocab, or textbook context.",
                 icon: "note.text"
             )
 
@@ -576,7 +515,7 @@ struct CourseClassHistoryPanel: View {
             HStack(alignment: .firstTextBaseline) {
                 PanelHeader(
                     title: "Class history",
-                    subtitle: "Reopen a class, review feedback, or open its workbook.",
+                    subtitle: "Reopen classes and workbooks.",
                     icon: "clock.arrow.circlepath"
                 )
                 Spacer()
@@ -682,18 +621,16 @@ private struct PanelHeader: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.headline)
-                .frame(width: 36, height: 36)
-                .background(SottoTheme.primary.opacity(0.1))
+                .font(.callout.weight(.semibold))
+                .frame(width: 28, height: 28)
                 .foregroundStyle(SottoTheme.primary)
-                .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.title3.bold())
+                    .font(.headline)
                     .foregroundStyle(SottoTheme.ink)
                 Text(subtitle)
-                    .font(.callout)
+                    .font(.caption)
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -704,14 +641,9 @@ private struct PanelHeader: View {
 private struct PanelStyleModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding(22)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SottoTheme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(SottoTheme.line)
-            )
+            .overlay(Rectangle().fill(SottoTheme.line.opacity(0.65)).frame(height: 1), alignment: .top)
     }
 }
 
@@ -730,7 +662,7 @@ private struct ChipButtonStyle: ButtonStyle {
             .foregroundStyle(tint)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(tint.opacity(configuration.isPressed ? 0.18 : 0.10))
+            .background(tint.opacity(configuration.isPressed ? 0.14 : 0.07))
             .clipShape(Capsule())
     }
 }
