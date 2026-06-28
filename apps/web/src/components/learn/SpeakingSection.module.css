@@ -382,6 +382,16 @@
   text-wrap: pretty;
 }
 
+.feedbackLink {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  white-space: nowrap;
+}
+
 /* ---- actions / buttons ---- */
 .cactions {
   margin-top: 22px;

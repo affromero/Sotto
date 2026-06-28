@@ -1,10 +1,25 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 
 struct ClassSectionView: View {
+    let classId: String
     let section: SottoClassSection
     @Binding var answers: [String: Int]
     let onSelectionHelp: (String, String) -> Void
+
+    private var skill: String {
+        section.skill.uppercased()
+    }
+
+    private var sortedQuestions: [SottoQuestion] {
+        section.questions.sorted { $0.order < $1.order }
+    }
+
+    private var sharedReadingPassage: String? {
+        guard skill == "READING" else { return nil }
+        return sortedQuestions.first { ($0.passageText ?? "").isEmpty == false }?.passageText
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -34,18 +49,19 @@ struct ClassSectionView: View {
                 }
             }
 
-            if let episode = section.episode, let audioUrl = episode.audioUrl, let url = URL(string: audioUrl) {
-                Link(destination: url) {
-                    Label(episode.title, systemImage: "play.circle")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(SottoSecondaryButtonStyle())
+            if skill == "LISTENING" {
+                ClassListeningAudioBlock(episode: section.episode)
             }
 
-            ForEach(section.questions.sorted { $0.order < $1.order }) { question in
+            if let sharedReadingPassage {
+                ClassReadingPassageBlock(passage: sharedReadingPassage, onSelectionHelp: onSelectionHelp)
+            }
+
+            ForEach(sortedQuestions) { question in
                 QuestionView(
                     question: question,
                     selectedIndex: answers[question.id],
+                    showsPassage: sharedReadingPassage == nil,
                     onSelectionHelp: onSelectionHelp
                 ) { selected in
                     answers[question.id] = selected
@@ -53,9 +69,17 @@ struct ClassSectionView: View {
             }
 
             if !section.prompts.isEmpty {
-                PromptBlock(title: "Speaking", icon: "waveform", prompts: section.prompts.map {
-                    "\($0.targetPhrase) - \($0.translation)"
-                }, onSelectionHelp: onSelectionHelp)
+                if skill == "SPEAKING" {
+                    ClassSpeakingPracticeView(
+                        classId: classId,
+                        prompts: section.prompts,
+                        onSelectionHelp: onSelectionHelp
+                    )
+                } else {
+                    PromptBlock(title: "Speaking", icon: "waveform", prompts: section.prompts.map {
+                        "\($0.targetPhrase) - \($0.translation)"
+                    }, onSelectionHelp: onSelectionHelp)
+                }
             }
 
             if !section.writingPrompts.isEmpty {
@@ -83,10 +107,109 @@ struct ClassSectionView: View {
     }
 }
 
+private struct ClassListeningAudioBlock: View {
+    let episode: SottoClassEpisode?
+
+    @State private var player: AVPlayer?
+    @State private var isPlaying = false
+
+    private var audioURL: URL? {
+        guard let audioUrl = episode?.audioUrl else { return nil }
+        return URL(string: audioUrl)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(SottoTheme.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(episode?.title ?? "Listening audio")
+                        .font(.headline)
+                        .foregroundStyle(SottoTheme.ink)
+                    Text(audioURL == nil ? listeningStatus : "Listen first, then answer below.")
+                        .font(.callout)
+                        .foregroundStyle(SottoTheme.muted)
+                }
+                Spacer()
+            }
+
+            Button {
+                togglePlayback()
+            } label: {
+                Label(isPlaying ? "Pause audio" : "Play audio", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(SottoSecondaryButtonStyle())
+            .disabled(audioURL == nil)
+        }
+        .padding(16)
+        .background(SottoTheme.paper)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onDisappear {
+            player?.pause()
+            isPlaying = false
+        }
+    }
+
+    private var listeningStatus: String {
+        if episode == nil {
+            return "Listening was not attached to this generated class."
+        }
+        return "Audio is still generating. The comprehension questions are available below."
+    }
+
+    private func togglePlayback() {
+        guard let audioURL else { return }
+        if player == nil {
+            player = AVPlayer(url: audioURL)
+        }
+        if isPlaying {
+            player?.pause()
+            isPlaying = false
+        } else {
+            player?.play()
+            isPlaying = true
+        }
+    }
+}
+
+private struct ClassReadingPassageBlock: View {
+    let passage: String
+    let onSelectionHelp: (String, String) -> Void
+
+    var body: some View {
+        SelectableLearnerText(
+            passage,
+            font: LearnerTextFonts.body,
+            color: UIColor(SottoTheme.ink),
+            onExamples: onSelectionHelp
+        )
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [
+                    SottoTheme.paper,
+                    SottoTheme.primary.opacity(0.08),
+                    Color(red: 0.98, green: 0.95, blue: 0.88),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(SottoTheme.primary.opacity(0.18))
+        )
+    }
+}
+
 struct ClassFeedbackClinicBlock: View {
     let classDetail: SottoClassDetail
     let result: SottoClassSubmitResult?
-    let onStartPractice: (String) -> Void
 
     private var weakSections: [SottoClassSectionResult] {
         (result?.sections ?? [])
@@ -124,22 +247,6 @@ struct ClassFeedbackClinicBlock: View {
                 }
 
                 Spacer()
-
-                HStack(spacing: 10) {
-                    Button {
-                        onStartPractice("SPEAKING")
-                    } label: {
-                        Label("Speaking", systemImage: "mic")
-                    }
-                    .buttonStyle(SottoSecondaryButtonStyle())
-
-                    Button {
-                        onStartPractice("VOCAB")
-                    } label: {
-                        Label("Vocabulary", systemImage: "point.3.connected.trianglepath.dotted")
-                    }
-                    .buttonStyle(SottoSecondaryButtonStyle())
-                }
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
@@ -151,21 +258,16 @@ struct ClassFeedbackClinicBlock: View {
                     } else {
                         VStack(spacing: 8) {
                             ForEach(weakSections) { section in
-                                Button {
-                                    onStartPractice(section.skill)
-                                } label: {
-                                    HStack {
-                                        Text(classSkillLabel(section.skill))
-                                        Spacer()
-                                        Text(percent(section.score))
-                                            .font(.callout.monospacedDigit())
-                                            .foregroundStyle(SottoTheme.primary)
-                                    }
-                                    .padding(12)
-                                    .background(SottoTheme.paper)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                HStack {
+                                    Text(classSkillLabel(section.skill))
+                                    Spacer()
+                                    Text(percent(section.score))
+                                        .font(.callout.monospacedDigit())
+                                        .foregroundStyle(SottoTheme.primary)
                                 }
-                                .buttonStyle(.plain)
+                                .padding(12)
+                                .background(SottoTheme.paper)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
                         }
                     }
@@ -208,13 +310,9 @@ struct ClassFeedbackClinicBlock: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 }
                             }
-
-                            Button {
-                                onStartPractice("VOCAB")
-                            } label: {
-                                Label("Practice vocabulary", systemImage: "arrow.right")
-                            }
-                            .buttonStyle(SottoPrimaryButtonStyle())
+                            Text("These words stay with the class and feed the learner vocabulary review after submission.")
+                                .font(.callout)
+                                .foregroundStyle(SottoTheme.muted)
                         }
                     }
                 }
@@ -341,12 +439,27 @@ struct PronunciationFeedbackRow: View {
 struct QuestionView: View {
     let question: SottoQuestion
     let selectedIndex: Int?
+    let showsPassage: Bool
     let onSelectionHelp: (String, String) -> Void
     let onSelect: (Int) -> Void
 
+    init(
+        question: SottoQuestion,
+        selectedIndex: Int?,
+        showsPassage: Bool = true,
+        onSelectionHelp: @escaping (String, String) -> Void,
+        onSelect: @escaping (Int) -> Void
+    ) {
+        self.question = question
+        self.selectedIndex = selectedIndex
+        self.showsPassage = showsPassage
+        self.onSelectionHelp = onSelectionHelp
+        self.onSelect = onSelect
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let passage = question.passageText, !passage.isEmpty {
+            if showsPassage, let passage = question.passageText, !passage.isEmpty {
                 SelectableLearnerText(
                     passage,
                     font: LearnerTextFonts.body,

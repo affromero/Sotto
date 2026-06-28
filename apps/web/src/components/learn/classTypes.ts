@@ -154,6 +154,16 @@ export interface ClassVocabularyItem {
   pos?: string | null;
 }
 
+export interface ClassFeedbackNote {
+  id: string;
+  skill: string;
+  title: string;
+  body: string;
+  score?: number | null;
+  returnHref: string;
+  tone: 'good' | 'review';
+}
+
 export interface ClassData {
   id: string;
   courseId: string;

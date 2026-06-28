@@ -61,14 +61,37 @@ beforeEach(() => {
   mockGetMemoryGraph.mockResolvedValue({ nodes: [], edges: [] });
   // class-A belongs to OWNER only.
   mockGetClassForUser.mockImplementation((_classId: string, userId: string) =>
-    Promise.resolve(userId === OWNER ? { id: 'class-A', sections: [] } : null),
+    Promise.resolve(
+      userId === OWNER
+        ? {
+            id: 'class-A',
+            courseId: 'course-A',
+            status: 'AVAILABLE',
+            order: 1,
+            passThreshold: 0.7,
+            sourceUrl: null,
+            sourceTitle: null,
+            adaptiveSeed: null,
+            submission: null,
+            course: { nativeLang: 'en', targetLang: 'es' },
+            lesson: {
+              title: 'Owner class',
+              level: 'A1',
+              objective: 'Read owner-owned class data.',
+              grammarPoints: [],
+              targetVocab: [],
+            },
+            sections: [],
+          }
+        : null
+    )
   );
 });
 
 afterEach(() => vi.clearAllMocks());
 
 describe('GET /api/v1/courses/[courseId]/graph — memory graph isolation', () => {
-  it("lets the owner read their own course graph", async () => {
+  it('lets the owner read their own course graph', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: OWNER });
     const { GET } = await import('@/app/api/v1/courses/[courseId]/graph/route');
     const res = await GET(req('/api/v1/courses/course-A/graph'), {
@@ -87,7 +110,7 @@ describe('GET /api/v1/courses/[courseId]/graph — memory graph isolation', () =
     expect(res.status).toBe(404);
     // The intruder's userId was used in the lookup, and the graph was never read.
     expect(mockCourseFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'course-A', userId: INTRUDER } }),
+      expect.objectContaining({ where: { id: 'course-A', userId: INTRUDER } })
     );
     expect(mockGetMemoryGraph).not.toHaveBeenCalled();
   });
@@ -114,7 +137,7 @@ describe('GET /api/v1/classes/[classId] — class isolation', () => {
     expect(mockGetClassForUser).toHaveBeenCalledWith('class-A', OWNER);
   });
 
-  it("blocks another learner from reading class-A (404)", async () => {
+  it('blocks another learner from reading class-A (404)', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: INTRUDER });
     const { GET } = await import('@/app/api/v1/classes/[classId]/route');
     const res = await GET(req('/api/v1/classes/class-A'), {

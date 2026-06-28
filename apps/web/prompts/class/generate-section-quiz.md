@@ -15,22 +15,32 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 ## Requirements
 
 - skill = grammar: each question tests one of the listed grammar points in the target language.
-- skill = reading: include a short target-language sentence or mini-passage inside the question and test comprehension; put the passage text in `passageRef`.
+- skill = reading without a source passage: write one interesting target-language passage first, appropriate to {{LEVEL}}, then ask comprehension questions about it.
+- skill = reading with a source passage: use the provided source passage as the reading text and ask comprehension questions about it.
+- Reading passages should be concrete and memorable: a small scene, message, short article, diary entry, notice, or story tied to the objective and vocabulary.
+- Reading questions must test actual comprehension of the passage, not grammar form in disguise.
 - Spread coverage across the listed grammar points and vocabulary.
 - Each question has exactly 4 options and exactly 1 correct answer. Match {{LEVEL}} difficulty.
-- Follow the language policy for all learner-visible fields: question, options, explanation, and passageRef.
+- Follow the language policy for all learner-visible fields: passage, question, options, explanation, and passageRef.
 - One-sentence explanation per question.
+- Put the full generated reading text in the top-level `passage` field. For grammar, set `passage` to an empty string.
+- For reading questions, `passageRef` should be a short locator such as "paragraph 1" or "the notice"; do not duplicate the full passage in each question.
 
 ## Output
 
-Return ONLY valid JSON — no markdown fences, no preamble. Prefer a bare JSON array; schema-constrained providers may return `{ "questions": [...] }`. Each question:
+Return ONLY valid JSON — no markdown fences, no preamble. Use this shape:
 
 ```
 {
-  "question": "…",
-  "options": ["…", "…", "…", "…"],
-  "correctIndex": 0,
-  "explanation": "…",
-  "passageRef": "…(reading passage; empty string for grammar)"
+  "passage": "…(full reading passage; empty string for grammar)",
+  "questions": [
+    {
+      "question": "…",
+      "options": ["…", "…", "…", "…"],
+      "correctIndex": 0,
+      "explanation": "…",
+      "passageRef": "…(short reading locator; empty string for grammar)"
+    }
+  ]
 }
 ```

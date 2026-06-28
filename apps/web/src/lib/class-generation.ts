@@ -18,6 +18,7 @@ const CLASS_SECTION_QUIZ_JSON_SCHEMA = {
   schema: {
     type: 'object',
     properties: {
+      passage: { type: 'string' },
       questions: {
         type: 'array',
         minItems: 1,
@@ -41,7 +42,7 @@ const CLASS_SECTION_QUIZ_JSON_SCHEMA = {
         },
       },
     },
-    required: ['questions'],
+    required: ['passage', 'questions'],
     additionalProperties: false,
   },
 } as const;
@@ -52,7 +53,7 @@ export interface GeneratedQuestion {
   correctIndex: number;
   explanation: string;
   passageRef?: string;
-  /** Full leveled reading passage (sourced classes). Persisted to LessonQuestion.passageText. */
+  /** Full leveled reading passage. Persisted to LessonQuestion.passageText. */
   passageText?: string;
 }
 
@@ -68,9 +69,10 @@ export interface SectionGenParams {
   seed: string;
   note?: string;
   /**
-   * Optional sourced-class reading passage (CEFR-leveled, target language). When
-   * present for a READING section, MCQs are based on it and each returned READING
-   * question carries it as `passageText`. Absent = today's curriculum behavior.
+   * Optional sourced-class reading passage (CEFR-leveled, target language).
+   * When present for a READING section, MCQs are based on it and each returned
+   * READING question carries it as `passageText`. Absent = the generator must
+   * create a fresh leveled passage for curriculum reading sections.
    */
   sourceContent?: string;
 }
@@ -85,6 +87,12 @@ interface RawGeneratedQuestion {
 
 interface WrappedGeneratedQuestions {
   questions?: unknown;
+  passage?: unknown;
+}
+
+interface ParsedGeneratedQuestions {
+  questions: RawGeneratedQuestion[];
+  passage?: string;
 }
 
 function sanitizeLlmJson(text: string): string {
@@ -95,11 +103,14 @@ function sanitizeLlmJson(text: string): string {
     .trim();
 }
 
-function extractFirstJsonArray(text: string): string {
-  const start = text.indexOf('[');
-  if (start === -1) throw new Error('No JSON array found in response');
+function extractFirstJsonValue(text: string): string {
+  const objectStart = text.indexOf('{');
+  const arrayStart = text.indexOf('[');
+  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
+  if (starts.length === 0) throw new Error('No JSON object or array found in response');
 
-  let depth = 0;
+  const start = Math.min(...starts);
+  const stack: string[] = [];
   let inString = false;
   let escape = false;
   for (let i = start; i < text.length; i += 1) {
@@ -117,26 +128,41 @@ function extractFirstJsonArray(text: string): string {
       continue;
     }
     if (inString) continue;
-    if (ch === '[') depth += 1;
-    if (ch === ']' && --depth === 0) return text.slice(start, i + 1);
+    if (ch === '{') {
+      stack.push('}');
+      continue;
+    }
+    if (ch === '[') {
+      stack.push(']');
+      continue;
+    }
+    if (stack.length > 0 && ch === stack[stack.length - 1]) {
+      stack.pop();
+      if (stack.length === 0) return text.slice(start, i + 1);
+    }
   }
 
-  throw new Error('Unbalanced JSON array in response');
+  throw new Error('Unbalanced JSON response');
 }
 
-function parseRawQuestions(content: string): RawGeneratedQuestion[] {
+function parseGeneratedQuestions(content: string): ParsedGeneratedQuestions {
   const cleaned = sanitizeLlmJson(content);
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    parsed = JSON.parse(extractFirstJsonArray(cleaned));
+    parsed = JSON.parse(extractFirstJsonValue(cleaned));
   }
 
-  if (Array.isArray(parsed)) return parsed as RawGeneratedQuestion[];
+  if (Array.isArray(parsed)) return { questions: parsed as RawGeneratedQuestion[] };
   if (parsed && typeof parsed === 'object') {
     const wrapped = parsed as WrappedGeneratedQuestions;
-    if (Array.isArray(wrapped.questions)) return wrapped.questions as RawGeneratedQuestion[];
+    if (Array.isArray(wrapped.questions)) {
+      return {
+        questions: wrapped.questions as RawGeneratedQuestion[],
+        passage: typeof wrapped.passage === 'string' ? wrapped.passage : undefined,
+      };
+    }
   }
 
   throw new Error('Class generation returned no question array.');
@@ -149,7 +175,7 @@ function buildUserPrompt(skill: SkillType, attempt: number, previousError?: stri
     base,
     '',
     `The previous response could not be used: ${previousError ?? 'invalid JSON'}.`,
-    'Return ONLY a valid JSON array. Do not include markdown fences, prose, comments, trailing commas, or unescaped quotation marks inside string values.',
+    'Return ONLY a valid JSON object matching the schema. Do not include markdown fences, prose, comments, trailing commas, or unescaped quotation marks inside string values.',
   ].join('\n');
 }
 
@@ -164,9 +190,10 @@ function buildRepairPrompt(content: string, previousError: string): string {
     '',
     'Rules:',
     '- Preserve the educational meaning where possible.',
+    '- Return one top-level `passage` string. Use an empty string for grammar.',
     `- Return at most ${QUESTIONS_PER_SECTION} questions.`,
     '- Each question must have exactly 4 options and a 0-based correctIndex.',
-    '- Include passageRef as an empty string when there is no passage.',
+    '- Include passageRef as a short anchor to the reading passage, or an empty string for grammar.',
     '- No markdown fences, prose, comments, or trailing commas.',
     '',
     'Malformed response:',
@@ -177,8 +204,14 @@ function buildRepairPrompt(content: string, previousError: string): string {
 function normalizeQuestions(
   raw: RawGeneratedQuestion[],
   useSourcePassage: boolean,
-  sourceContent?: string
+  sourceContent?: string,
+  generatedPassage?: string
 ): GeneratedQuestion[] {
+  const readingPassage = useSourcePassage
+    ? sourceContent
+    : generatedPassage?.trim()
+      ? generatedPassage.trim()
+      : undefined;
   return raw
     .filter(
       (q) =>
@@ -196,9 +229,7 @@ function normalizeQuestions(
       correctIndex: Math.max(0, Math.min(3, Number(q.correctIndex))),
       explanation: typeof q.explanation === 'string' ? q.explanation : '',
       passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
-      // Sourced READING: attach the leveled passage so the learner reads the
-      // real excerpt the questions are about.
-      passageText: useSourcePassage ? sourceContent : undefined,
+      passageText: readingPassage,
     }));
 }
 
@@ -264,11 +295,24 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     });
 
     try {
-      const raw = parseRawQuestions(response.content);
-      const questions = normalizeQuestions(raw, useSourcePassage, p.sourceContent);
-      if (questions.length > 0) return questions;
-      lastError = 'response contained no usable questions';
-      lastMalformedContent = '';
+      const parsed = parseGeneratedQuestions(response.content);
+      const questions = normalizeQuestions(
+        parsed.questions,
+        useSourcePassage,
+        p.sourceContent,
+        p.skill === 'READING' ? parsed.passage : undefined
+      );
+      if (questions.length === 0) {
+        lastError = 'response contained no usable questions';
+        lastMalformedContent = '';
+        continue;
+      }
+      if (p.skill === 'READING' && !useSourcePassage && !questions.some((q) => q.passageText)) {
+        lastError = 'reading response omitted the required passage';
+        lastMalformedContent = response.content;
+        continue;
+      }
+      return questions;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       lastMalformedContent = response.content;
@@ -316,10 +360,22 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         userId: p.userId,
       });
 
-      const raw = parseRawQuestions(repairResponse.content);
-      const questions = normalizeQuestions(raw, useSourcePassage, p.sourceContent);
-      if (questions.length > 0) return questions;
-      lastError = 'repaired response contained no usable questions';
+      const parsed = parseGeneratedQuestions(repairResponse.content);
+      const questions = normalizeQuestions(
+        parsed.questions,
+        useSourcePassage,
+        p.sourceContent,
+        p.skill === 'READING' ? parsed.passage : undefined
+      );
+      if (questions.length === 0) {
+        lastError = 'repaired response contained no usable questions';
+        throw new Error(lastError);
+      }
+      if (p.skill === 'READING' && !useSourcePassage && !questions.some((q) => q.passageText)) {
+        lastError = 'repaired reading response omitted the required passage';
+        throw new Error(lastError);
+      }
+      return questions;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }

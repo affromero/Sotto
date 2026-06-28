@@ -121,6 +121,40 @@ struct SottoAPIClient {
         )
     }
 
+    func uploadClassSpeakingRecording(
+        classId: String,
+        promptId: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        var request = try makeRequest(
+            path: "/api/v1/classes/\(classId)/speaking/\(promptId)",
+            method: "POST",
+            authorized: true
+        )
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try multipartAudioBody(
+            audioURL: audioURL,
+            boundary: boundary,
+            fieldName: "audio",
+            fileName: "speaking.wav",
+            contentType: "audio/wav"
+        )
+        return try await send(request, acceptedStatuses: [201])
+    }
+
+    func pollClassSpeakingRecording(
+        classId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        let encodedRecordingId =
+            recordingId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? recordingId
+        return try await get(
+            "/api/v1/classes/\(classId)/speaking/\(promptId)?recordingId=\(encodedRecordingId)"
+        )
+    }
+
     func submitClass(classId: String, answers: [SottoSubmitAnswer]) async throws -> SottoClassSubmitResult {
         try await post("/api/v1/classes/\(classId)/submit", body: SubmitClassRequest(answers: answers))
     }
@@ -200,6 +234,30 @@ struct SottoAPIClient {
 
         let path = (context.codingPath + [key]).map(\.stringValue).joined(separator: ".")
         return path.isEmpty ? "A required field was missing." : "Missing field: \(path)."
+    }
+
+    private func multipartAudioBody(
+        audioURL: URL,
+        boundary: String,
+        fieldName: String,
+        fileName: String,
+        contentType: String
+    ) throws -> Data {
+        var body = Data()
+        body.appendString("--\(boundary)\r\n")
+        body.appendString(
+            "Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n"
+        )
+        body.appendString("Content-Type: \(contentType)\r\n\r\n")
+        body.append(try Data(contentsOf: audioURL))
+        body.appendString("\r\n--\(boundary)--\r\n")
+        return body
+    }
+}
+
+private extension Data {
+    mutating func appendString(_ value: String) {
+        append(Data(value.utf8))
     }
 }
 

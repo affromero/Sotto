@@ -92,9 +92,11 @@ describe('POST /api/v1/courses/[courseId]/selection-help', () => {
         },
       ],
       expect.objectContaining({
-        jsonSchema: expect.objectContaining({ name: 'selection_help_examples' }),
+        model: 'claude-test',
+        apiKeyOverride: 'key',
       })
     );
+    expect(mockGenerateResponse.mock.calls[0][2]).not.toHaveProperty('jsonSchema');
     expect(mockGenerateResponse.mock.calls[0][0]).toContain('Immediate immersion for A2');
     expect(mockLogUsage).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'selection-help', userId: 'user-1' })
@@ -116,6 +118,36 @@ describe('POST /api/v1/courses/[courseId]/selection-help', () => {
     expect(systemPrompt).toContain('example sentence in the target language (de)');
     expect(systemPrompt).toContain('note in the source/native language (en)');
     expect(systemPrompt).toContain('A1 scaffolding');
+  });
+
+  it('parses valid examples from fenced or prefaced JSON', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: `Here are examples:\n\`\`\`json\n${JSON.stringify(EXAMPLES)}\n\`\`\``,
+      inputTokens: 11,
+      outputTokens: 22,
+      model: 'claude-test',
+    });
+
+    const res = await POST(jsonReq({ text: 'ich heiße' }), COURSE_PARAMS);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ text: 'ich heiße', examples: EXAMPLES.examples });
+  });
+
+  it('returns a specific validation error when model examples are unusable', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({ examples: [{ sentence: 'Ich heiße Ana.', note: 'Kurz.' }] }),
+      inputTokens: 11,
+      outputTokens: 22,
+      model: 'claude-test',
+    });
+
+    const res = await POST(jsonReq({ text: 'ich heiße' }), COURSE_PARAMS);
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({
+      error: 'Could not build examples for that selection. Try a shorter phrase.',
+    });
   });
 
   it('400s on an empty selection', async () => {

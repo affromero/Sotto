@@ -10,12 +10,12 @@
  */
 
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ClassGlyph } from './ClassGlyph';
 import { CefrDisclaimer } from './CefrDisclaimer';
 import { ScoreDial } from './ClassWidgets';
 import {
   skillLabel,
+  type ClassFeedbackNote,
   type ClassSection,
   type ClassSpeakingAlignmentToken,
   type ClassSubmitResult,
@@ -24,23 +24,23 @@ import {
 import styles from './ClassSummary.module.css';
 
 interface ClassSummaryProps {
-  courseId: string;
   lesson: { title: string; level: string; objective: string };
   order: number;
   result: ClassSubmitResult;
   sections: ClassSection[];
   vocabulary: ClassVocabularyItem[];
+  feedbackNotes?: ClassFeedbackNote[];
   regenerating: boolean;
   onRetryFailed: () => void;
 }
 
 export function ClassSummary({
-  courseId,
   lesson,
   order,
   result,
   sections,
   vocabulary,
+  feedbackNotes = [],
   regenerating,
   onRetryFailed,
 }: ClassSummaryProps) {
@@ -127,10 +127,10 @@ export function ClassSummary({
         </div>
 
         <FeedbackClinic
-          courseId={courseId}
           result={result}
           sections={sections}
           vocabulary={vocabulary}
+          feedbackNotes={feedbackNotes}
         />
 
         <CefrDisclaimer variant="compact" />
@@ -175,18 +175,22 @@ export function ClassSummary({
   );
 }
 
-function FeedbackClinic({
-  courseId,
+export function FeedbackClinic({
   result,
   sections,
   vocabulary,
+  feedbackNotes = [],
+  returnHref,
+  returnLabel = 'Back to class',
 }: {
-  courseId: string;
-  result: ClassSubmitResult;
+  result?: ClassSubmitResult | null;
   sections: ClassSection[];
   vocabulary: ClassVocabularyItem[];
+  feedbackNotes?: ClassFeedbackNote[];
+  returnHref?: string;
+  returnLabel?: string;
 }) {
-  const weakSections = result.sections
+  const weakSections = (result?.sections ?? [])
     .filter((section) => !section.passed || section.score < 0.82)
     .sort((a, b) => a.score - b.score)
     .slice(0, 3);
@@ -198,10 +202,9 @@ function FeedbackClinic({
     .flatMap((section) => section.writingPrompts)
     .filter((prompt) => prompt.response)
     .slice(0, 2);
-  const courseParam = encodeURIComponent(courseId);
 
   return (
-    <section className={styles.clinic} aria-labelledby="feedback-clinic-title">
+    <section className={styles.clinic} id="feedback-clinic" aria-labelledby="feedback-clinic-title">
       <div className={styles.clinicHead}>
         <div>
           <div className={styles.eyebrow}>
@@ -211,40 +214,54 @@ function FeedbackClinic({
             Feedback Clinic
           </h2>
         </div>
-        <div className={styles.clinicActions}>
-          <Link
-            className={`${styles.btn} ${styles.btnGhost}`}
-            href={`/learn/practice?course=${courseParam}&kind=SPEAKING`}
-          >
-            <ClassGlyph name="mic" size={15} /> Speaking
-          </Link>
-          <Link
-            className={`${styles.btn} ${styles.btnGhost}`}
-            href={`/learn/practice?course=${courseParam}&kind=VOCAB`}
-          >
-            <ClassGlyph name="graph" size={15} /> Vocabulary
-          </Link>
-        </div>
+        {returnHref && (
+          <a className={styles.clinicReturn} href={returnHref}>
+            <ClassGlyph name="back" size={15} /> {returnLabel}
+          </a>
+        )}
       </div>
 
       <div className={styles.clinicGrid}>
+        {feedbackNotes.length > 0 && (
+          <article className={styles.clinicCard}>
+            <h3>Live notes</h3>
+            <div className={styles.feedbackNoteList}>
+              {feedbackNotes.slice(0, 5).map((note) => (
+                <div
+                  className={`${styles.feedbackNote} ${
+                    note.tone === 'good' ? styles.feedbackNoteGood : styles.feedbackNoteReview
+                  }`}
+                  key={note.id}
+                >
+                  <div className={styles.speechLine}>
+                    <span>{note.title}</span>
+                    {typeof note.score === 'number' && <b>{formatPercent(note.score)}</b>}
+                  </div>
+                  <p className={styles.clinicText}>{note.body}</p>
+                  <a className={styles.returnLink} href={note.returnHref}>
+                    Return to current exercise
+                  </a>
+                </div>
+              ))}
+            </div>
+          </article>
+        )}
+
         <article className={styles.clinicCard}>
           <h3>Targeted drills</h3>
           {weakSections.length > 0 ? (
             <div className={styles.drillList}>
               {weakSections.map((section) => (
-                <Link
-                  key={section.id}
-                  className={styles.drillRow}
-                  href={`/learn/practice?course=${courseParam}&kind=${encodeURIComponent(section.skill)}`}
-                >
+                <div key={section.id} className={styles.drillRow}>
                   <span>{skillLabel(section.skill)}</span>
                   <b>{formatPercent(section.score)}</b>
-                </Link>
+                </div>
               ))}
             </div>
           ) : (
-            <p className={styles.clinicText}>No weak skill score stood out in this attempt.</p>
+            <p className={styles.clinicText}>
+              No weak skill score stood out yet. This updates as the class is graded.
+            </p>
           )}
         </article>
 
@@ -285,6 +302,11 @@ function FeedbackClinic({
                     {recording?.feedback && (
                       <p className={styles.clinicText}>{recording.feedback}</p>
                     )}
+                    {returnHref && (
+                      <a className={styles.returnLink} href={returnHref}>
+                        Return to current exercise
+                      </a>
+                    )}
                     {prompt.referenceTtsUrl && (
                       <audio
                         className={styles.referenceAudio}
@@ -317,12 +339,9 @@ function FeedbackClinic({
                   </span>
                 ))}
               </div>
-              <Link
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                href={`/learn/practice?course=${courseParam}&kind=VOCAB`}
-              >
-                Practice vocabulary <ClassGlyph name="arrow" size={15} />
-              </Link>
+              <p className={styles.clinicText}>
+                These are queued into the learner vocabulary flow after the class.
+              </p>
             </>
           ) : (
             <p className={styles.clinicText}>No lesson vocabulary was attached to this class.</p>
@@ -341,6 +360,11 @@ function FeedbackClinic({
                   </div>
                   {prompt.response?.feedback && (
                     <p className={styles.clinicText}>{prompt.response.feedback}</p>
+                  )}
+                  {returnHref && (
+                    <a className={styles.returnLink} href={returnHref}>
+                      Return to current exercise
+                    </a>
                   )}
                 </div>
               ))}

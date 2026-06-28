@@ -59,6 +59,7 @@ struct ClassSessionView: View {
 
                     ForEach(currentClass.sections) { section in
                         ClassSectionView(
+                            classId: currentClass.id,
                             section: section,
                             answers: $answers,
                             onSelectionHelp: openSelectionHelp
@@ -68,11 +69,7 @@ struct ClassSessionView: View {
                     ClassFeedbackClinicBlock(
                         classDetail: currentClass,
                         result: model.classResult
-                    ) { kind in
-                        Task {
-                            await model.startPractice(courseId: currentClass.courseId, kind: kind)
-                        }
-                    }
+                    )
                 }
                 .padding(28)
                 .frame(maxWidth: 980, alignment: .leading)

@@ -56,18 +56,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         translation: p.translation,
         ipa: p.ipa,
         referenceTtsUrl: p.referenceTtsUrl,
-        latestRecording:
-          p.recordings?.[0] && submitted
-            ? {
-                id: p.recordings[0].id,
-                status: p.recordings[0].status,
-                transcript: p.recordings[0].transcript,
-                overallScore: p.recordings[0].overallScore,
-                rubricScores: p.recordings[0].rubricScores,
-                phonemeScores: p.recordings[0].phonemeScores,
-                feedback: p.recordings[0].feedback,
-              }
-            : null,
+        latestRecording: p.recordings?.[0]
+          ? {
+              id: p.recordings[0].id,
+              status: p.recordings[0].status,
+              transcript: p.recordings[0].transcript,
+              overallScore: p.recordings[0].overallScore,
+              rubricScores: p.recordings[0].rubricScores,
+              phonemeScores: p.recordings[0].phonemeScores,
+              feedback: p.recordings[0].feedback,
+            }
+          : null,
       })),
       writingPrompts: s.writingPrompts.map((p) => {
         const r = p.responses[0];
