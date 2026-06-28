@@ -5,12 +5,16 @@ The lesson objective is: {{OBJECTIVE}}
 The lesson vocabulary the learner has been studying:
 {{VOCAB}}
 {{NOTES}}
+
+Language policy:
+{{LANGUAGE_POLICY}}
+
 Generate exactly {{COUNT}} short writing tasks the learner should respond to in {{TARGET}}. Each task must:
 
 - Be a realistic, communicative prompt (a message to reply to, a short note to write, a situation to describe)
 - Be appropriate for {{LEVEL}} proficiency and draw on the objective and vocabulary above
 - Be answerable in 1–3 sentences at A1/A2, or a short paragraph at B1+
-- Task instructions may be written in the learner's native language ({{NATIVE}}); the learner writes their response in {{TARGET}}
+- Follow the language policy for task instructions and guidance.
 - Vary in type so the learner practices different registers and structures
 
 ## Output

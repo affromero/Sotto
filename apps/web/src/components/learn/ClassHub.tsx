@@ -12,28 +12,37 @@
  */
 
 import { ClassGlyph } from './ClassGlyph';
-import { SKILL_GLYPH, skillLabel, type ClassSection } from './classTypes';
+import { LearningSelectionMenu } from './LearningSelectionMenu';
+import { SKILL_GLYPH, skillLabel, type ClassIntroData, type ClassSection } from './classTypes';
 import styles from './ClassHub.module.css';
 
 interface ClassHubProps {
   classId: string;
+  courseId: string;
   lesson: { title: string; level: string; objective: string };
+  intro: ClassIntroData;
   order: number;
   sections: ClassSection[];
   /** committed 0..100 score per section id */
   scores: Record<string, number>;
   started: boolean;
+  regenerating?: boolean;
   onBegin: () => void;
+  onRegenerate: () => void;
 }
 
 export function ClassHub({
   classId,
+  courseId,
   lesson,
+  intro,
   order,
   sections,
   scores,
   started,
+  regenerating = false,
   onBegin,
+  onRegenerate,
 }: ClassHubProps) {
   const doneCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
   const totalSkills = sections.length;
@@ -45,7 +54,50 @@ export function ClassHub({
           <span className={styles.eyebrowIdx}>Today ·</span> Class {order} · {lesson.level}
         </div>
         <h1 className={styles.title}>{lesson.title}</h1>
-        <p className={styles.modLede}>{lesson.objective}</p>
+        <LearningSelectionMenu
+          courseId={courseId}
+          sourceType="CLASS"
+          sourceId={classId}
+          sourceLabel="Class"
+        >
+          <div className={styles.introBlock}>
+            <div className={styles.introLead}>
+              <span className={styles.introNumber}>01</span>
+              <p>{intro.purpose}</p>
+            </div>
+            <div className={styles.introAbout}>
+              <span className={styles.introNumber}>02</span>
+              <p>{intro.about}</p>
+            </div>
+            <div className={styles.introGrid}>
+              <div className={styles.introPanel}>
+                <span className={styles.introNumber}>03</span>
+                <ul>
+                  {intro.focus.map((item, index) => (
+                    <li key={`${item}-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className={styles.introPanel}>
+                <span className={styles.introNumber}>04</span>
+                <div className={styles.exampleList}>
+                  {intro.examples.map((example, index) => (
+                    <div className={styles.example} key={`${example.target}-${index}`}>
+                      <b>{example.target}</b>
+                      <span>{example.meaning}</span>
+                      <small>{example.note}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className={styles.tipLine}>
+              {intro.tips.map((tip, index) => (
+                <span key={`${tip}-${index}`}>{tip}</span>
+              ))}
+            </div>
+          </div>
+        </LearningSelectionMenu>
 
         <div className={styles.drawn}>
           <ClassGlyph name="spark" size={16} />
@@ -104,6 +156,16 @@ export function ClassHub({
             >
               <ClassGlyph name="pen" size={17} /> iPad workbook
             </a>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnSecondary}`}
+              onClick={onRegenerate}
+              disabled={regenerating}
+              aria-busy={regenerating}
+            >
+              <ClassGlyph name="spark" size={17} />{' '}
+              {regenerating ? 'Regenerating...' : 'Regenerate class'}
+            </button>
           </div>
         </div>
 

@@ -6,9 +6,13 @@ Below is the full transcript of the episode:
 
 Generate {{COUNT}} multiple-choice comprehension questions based solely on the content of the transcript above. Each question must be answerable from the transcript — do not introduce outside knowledge.
 {{NOTES}}
+
+Language policy:
+{{LANGUAGE_POLICY}}
+
 ## Requirements
 
-- Write each question stem in the target language ({{TARGET}}); brief native-language ({{NATIVE}}) hints are allowed at A1/A2 level.
+- Follow the language policy for all learner-visible fields: question, options, and explanation.
 - Test comprehension of meaning, sequence, vocabulary in context, speaker intent, or inference from the transcript.
 - Each question has exactly 4 options and exactly 1 correct answer.
 - Match {{LEVEL}} difficulty: A1/A2 questions test literal recall; B1+ questions include inference and contextual vocabulary.

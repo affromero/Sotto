@@ -15,12 +15,14 @@ import { getAutoModelConfig } from './auto-model-config';
 import { uploadFile } from './r2';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { classLanguagePolicy } from './classes/class-language-policy';
 
 const SPEAKING_PROMPT_COUNT = 4;
 
 export interface ClassSpeakingParams {
   userId: string;
   classId: string;
+  attempt?: number;
   level: string;
   nativeLang: string;
   targetLang: string;
@@ -62,12 +64,16 @@ interface RawSpeakingPrompt {
 function isValidRawPrompt(item: unknown): item is RawSpeakingPrompt {
   if (typeof item !== 'object' || item === null) return false;
   const obj = item as Record<string, unknown>;
-  return typeof obj.targetPhrase === 'string' && obj.targetPhrase.trim() !== '' &&
-    typeof obj.translation === 'string' && obj.translation.trim() !== '';
+  return (
+    typeof obj.targetPhrase === 'string' &&
+    obj.targetPhrase.trim() !== '' &&
+    typeof obj.translation === 'string' &&
+    obj.translation.trim() !== ''
+  );
 }
 
 export async function composeSpeakingPrompts(
-  p: SpeakingPromptsParams,
+  p: SpeakingPromptsParams
 ): Promise<ComposedSpeakingPrompt[]> {
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveLearningAi(p.userId);
@@ -79,6 +85,11 @@ export async function composeSpeakingPrompts(
     LEVEL: p.level,
     NATIVE: p.nativeLang,
     TARGET: p.targetLang,
+    LANGUAGE_POLICY: classLanguagePolicy({
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+    }),
     OBJECTIVE: p.objective,
     VOCAB: vocabList,
     NOTES: formatNotesForPrompt(p.note ?? ''),
@@ -88,7 +99,7 @@ export async function composeSpeakingPrompts(
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${SPEAKING_PROMPT_COUNT} speaking prompts.` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.7 },
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.7 }
   );
 
   logUsage({
@@ -101,7 +112,10 @@ export async function composeSpeakingPrompts(
   });
 
   // Parse JSON defensively (strip fences, filter invalid items)
-  const cleaned = res.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = res.content
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
   let rawPrompts: unknown[];
   try {
     rawPrompts = JSON.parse(cleaned);
@@ -155,7 +169,9 @@ export async function composeSpeakingPrompts(
       const { provider } = await resolveTtsProvider({
         userId: p.userId,
         episodeId: p.refId,
-        requestedProvider: requestedTtsProvider as Parameters<typeof resolveTtsProvider>[0]['requestedProvider'],
+        requestedProvider: requestedTtsProvider as Parameters<
+          typeof resolveTtsProvider
+        >[0]['requestedProvider'],
         requestedModel: userSpeechPrefs?.preferredTtsModel ?? undefined,
         language: p.targetLang,
       });
@@ -189,9 +205,8 @@ export async function composeSpeakingPrompts(
 
 // Generate the SPEAKING section of a class: compose prompts, then persist the
 // gated ClassSection + SpeakingPrompt rows.
-export async function generateClassSpeaking(
-  p: ClassSpeakingParams,
-): Promise<ClassSpeakingResult> {
+export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<ClassSpeakingResult> {
+  const attempt = p.attempt ?? 1;
   const prompts = await composeSpeakingPrompts({
     userId: p.userId,
     level: p.level,
@@ -199,7 +214,7 @@ export async function generateClassSpeaking(
     targetLang: p.targetLang,
     objective: p.objective,
     targetVocab: p.targetVocab,
-    refId: p.classId,
+    refId: `${p.classId}-${attempt}`,
     note: p.note,
   });
 
@@ -207,8 +222,8 @@ export async function generateClassSpeaking(
     data: {
       classId: p.classId,
       skill: 'SPEAKING',
-      attempt: 1,
-      seed: `${p.classId}-SPEAKING-1`,
+      attempt,
+      seed: `${p.classId}-SPEAKING-${attempt}`,
       spec: { objective: p.objective },
       status: 'READY',
       generatedAt: new Date(),

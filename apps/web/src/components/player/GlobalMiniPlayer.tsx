@@ -5,10 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 
-const MiniPlayer = dynamic(
-  () => import('./MiniPlayer').then((m) => ({ default: m.MiniPlayer })),
-  { ssr: false }
-);
+const MiniPlayer = dynamic(() => import('./MiniPlayer').then((m) => ({ default: m.MiniPlayer })), {
+  ssr: false,
+});
 
 export function GlobalMiniPlayer() {
   const pathname = usePathname();
@@ -16,7 +15,8 @@ export function GlobalMiniPlayer() {
   const player = usePlayer();
 
   const isEpisodeRoute = pathname.startsWith('/episode/') || pathname.startsWith('/@');
-  const isVisible = !isEpisodeRoute && !!player.episodeId;
+  const isClassRoute = pathname.startsWith('/learn/class/');
+  const isVisible = !isEpisodeRoute && !isClassRoute && !!player.episodeId;
 
   useEffect(() => {
     if (isVisible) {

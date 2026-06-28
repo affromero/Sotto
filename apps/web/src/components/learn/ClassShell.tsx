@@ -205,7 +205,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     }
   }
 
-  async function handleRegenerate() {
+  async function handleRetryFailed() {
     setRegenerating(true);
     setErrorMessage('');
     try {
@@ -229,9 +229,45 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     }
   }
 
+  async function handleRegenerateClass() {
+    setRegenerating(true);
+    setErrorMessage('');
+    try {
+      const res = await fetch(`/api/v1/classes/${classId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'class' }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(body.error ?? 'Failed to regenerate. Please try again.');
+        return;
+      }
+      setAnswers({});
+      setScores({});
+      setResult(null);
+      setSegIdx(0);
+      setCurScore(0);
+      setView('loading');
+      await loadClass();
+    } catch {
+      setErrorMessage('Network error. Please try again.');
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
   // ---- elapsed progress for the rail (committed sections + live segment) ----
   const committedCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
   const startedHour = committedCount > 0;
+  const activeSectionProgress =
+    view === 'hour' && sections.length > 0 ? Math.min(curScore / Math.max(gate, 1), 1) : 0;
+  const completionPct =
+    view === 'summary'
+      ? 100
+      : sections.length > 0
+        ? Math.round(((committedCount + activeSectionProgress) / sections.length) * 100)
+        : 0;
 
   // ---- loading / error ----
   if (view === 'loading') {
@@ -279,12 +315,16 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       <>
         <ClassHub
           classId={classId}
+          courseId={cls.courseId}
           lesson={cls.lesson}
+          intro={cls.intro}
           order={cls.order}
           sections={sections}
           scores={scores}
           started={startedHour}
+          regenerating={regenerating}
           onBegin={beginHour}
+          onRegenerate={() => void handleRegenerateClass()}
         />
         {sourcesPanel}
       </>
@@ -297,7 +337,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
           order={cls.order}
           result={result}
           regenerating={regenerating}
-          onRetryFailed={() => void handleRegenerate()}
+          onRetryFailed={() => void handleRetryFailed()}
         />
         {sourcesPanel}
       </>
@@ -385,13 +425,19 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         </div>
 
         {onHub ? (
-          <HubRail level={cls.lesson.level} sections={sections} scores={scores} />
+          <HubRail
+            level={cls.lesson.level}
+            sections={sections}
+            scores={scores}
+            completionPct={completionPct}
+          />
         ) : (
           <TimelineRail
             sections={sections}
             segIdx={segIdx}
             scores={scores}
             curScore={curScore}
+            completionPct={completionPct}
             gate={gate}
             isSummary={view === 'summary'}
             onLeave={() => setView('hub')}
@@ -407,7 +453,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
       <main className={styles.cstage}>
         <div className={styles.cstageInner}>
-          {errorMessage && view === 'hour' && (
+          {errorMessage && (view === 'hour' || view === 'hub' || view === 'summary') && (
             <p className={styles.errorBanner} role="alert">
               {errorMessage}
             </p>
@@ -425,12 +471,10 @@ interface HubRailProps {
   level: string;
   sections: ClassSection[];
   scores: Record<string, number>;
+  completionPct: number;
 }
 
-function HubRail({ level, sections, scores }: HubRailProps) {
-  const vals = sections.map((s) => scores[s.id] ?? 0).filter((v) => v > 0);
-  const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
-  const pct = Math.max(8, Math.min(96, avg || 8));
+function HubRail({ level, sections, scores, completionPct }: HubRailProps) {
   return (
     <>
       <nav className={styles.cnav} aria-label="Class sections">
@@ -451,15 +495,22 @@ function HubRail({ level, sections, scores }: HubRailProps) {
         <div className={styles.crailDiv} />
         <div className={styles.lvlStrip}>
           <div className={styles.lvlTop}>
-            <span>Level</span>
+            <span>Class completion</span>
             <span>
-              <b>{level}</b>
+              <b>{completionPct}%</b>
             </span>
           </div>
-          <div className={styles.lvlBar}>
-            <i style={{ width: `${pct}%` }} />
+          <div
+            className={styles.lvlBar}
+            role="progressbar"
+            aria-label="Class completion"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={completionPct}
+          >
+            <i style={{ width: `${completionPct}%` }} />
           </div>
-          <div className={styles.lvlNote}>one rung above your reach</div>
+          <div className={styles.lvlNote}>{level} · one rung above your reach</div>
         </div>
       </div>
     </>
@@ -473,6 +524,7 @@ interface TimelineRailProps {
   segIdx: number;
   scores: Record<string, number>;
   curScore: number;
+  completionPct: number;
   gate: number;
   isSummary: boolean;
   onLeave: () => void;
@@ -484,6 +536,7 @@ function TimelineRail({
   segIdx,
   scores,
   curScore,
+  completionPct,
   gate,
   isSummary,
   onLeave,
@@ -495,6 +548,24 @@ function TimelineRail({
         <button type="button" className={styles.ctlLeave} onClick={onLeave}>
           <ClassGlyph name="back" size={13} /> Leave class
         </button>
+      </div>
+      <div className={styles.classProgress}>
+        <div className={styles.lvlTop}>
+          <span>Class completion</span>
+          <span>
+            <b>{completionPct}%</b>
+          </span>
+        </div>
+        <div
+          className={styles.lvlBar}
+          role="progressbar"
+          aria-label="Class completion"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={completionPct}
+        >
+          <i style={{ width: `${completionPct}%` }} />
+        </div>
       </div>
 
       <div className={styles.ctl}>

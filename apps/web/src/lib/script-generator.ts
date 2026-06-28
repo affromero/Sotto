@@ -9,20 +9,34 @@ import { logger } from './logger';
 import type { BiasAnalysis } from './media-bias';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
 
-
 /** Extract the first complete JSON object or array from a string containing surrounding text. */
 function extractFirstJson(text: string, open: '{' | '['): string {
   const close = open === '{' ? '}' : ']';
   const trimmed = text.trim();
-  try { JSON.parse(trimmed); return trimmed; } catch {}
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {}
   const start = text.indexOf(open);
-  if (start === -1) throw new Error(`No JSON ${open === '{' ? 'object' : 'array'} found in response`);
-  let depth = 0, inString = false, escape = false;
+  if (start === -1)
+    throw new Error(`No JSON ${open === '{' ? 'object' : 'array'} found in response`);
+  let depth = 0,
+    inString = false,
+    escape = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === open) depth++;
     if (ch === close && --depth === 0) return text.slice(start, i + 1);
@@ -72,7 +86,16 @@ export type ScriptTurn = {
 };
 
 export type SoundCue = {
-  type: 'intro' | 'transition' | 'outro' | 'ambient' | 'laugh_track' | 'music_sting' | 'applause' | 'comedic_hit' | 'rim_shot';
+  type:
+    | 'intro'
+    | 'transition'
+    | 'outro'
+    | 'ambient'
+    | 'laugh_track'
+    | 'music_sting'
+    | 'applause'
+    | 'comedic_hit'
+    | 'rim_shot';
   prompt: string; // text prompt for sound effect generation
   durationSeconds: number;
   insertAfterTurn: number; // index of the turn after which to insert this cue
@@ -113,9 +136,7 @@ export type ScriptPlace = {
  * Normalize references from AI output — authors may arrive as a
  * comma-separated string instead of string[].
  */
-function normalizeReferences(
-  refs: Array<Record<string, unknown>>
-): GeneratedReference[] {
+function normalizeReferences(refs: Array<Record<string, unknown>>): GeneratedReference[] {
   return refs.map((ref) => ({
     ...ref,
     authors: Array.isArray(ref.authors)
@@ -174,7 +195,10 @@ function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): Sc
   // Check if any numbers actually changed
   let hasChanges = false;
   for (const [old, nu] of numberMap) {
-    if (old !== nu) { hasChanges = true; break; }
+    if (old !== nu) {
+      hasChanges = true;
+      break;
+    }
   }
   if (!hasChanges) return turns;
 
@@ -220,12 +244,23 @@ function collapseAdjacentCitations(text: string): string {
 
 const VALID_REF_TYPES = new Set(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']);
 const REF_TYPE_ALIASES: Record<string, string> = {
-  JOURNAL: 'PAPER', journal: 'PAPER', paper: 'PAPER',
-  WEBPAGE: 'WEB', webpage: 'WEB', web: 'WEB', website: 'WEB', URL: 'WEB',
-  NEWS: 'ARTICLE', article: 'ARTICLE', news: 'ARTICLE',
-  book: 'BOOK', TEXTBOOK: 'BOOK',
-  video: 'VIDEO', YOUTUBE: 'VIDEO',
-  report: 'REPORT', GOVERNMENT: 'REPORT',
+  JOURNAL: 'PAPER',
+  journal: 'PAPER',
+  paper: 'PAPER',
+  WEBPAGE: 'WEB',
+  webpage: 'WEB',
+  web: 'WEB',
+  website: 'WEB',
+  URL: 'WEB',
+  NEWS: 'ARTICLE',
+  article: 'ARTICLE',
+  news: 'ARTICLE',
+  book: 'BOOK',
+  TEXTBOOK: 'BOOK',
+  video: 'VIDEO',
+  YOUTUBE: 'VIDEO',
+  report: 'REPORT',
+  GOVERNMENT: 'REPORT',
 };
 
 function coerceRefType(raw: unknown): string | null {
@@ -245,7 +280,15 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
 
   // --- turns: map alternate key names the AI might use ---
   if (!Array.isArray(result.turns) || result.turns.length === 0) {
-    const TURN_ALIASES = ['dialogue', 'dialog', 'conversation', 'script', 'lines', 'segments', 'entries'];
+    const TURN_ALIASES = [
+      'dialogue',
+      'dialog',
+      'conversation',
+      'script',
+      'lines',
+      'segments',
+      'entries',
+    ];
     for (const alias of TURN_ALIASES) {
       if (Array.isArray(result[alias]) && (result[alias] as unknown[]).length > 0) {
         result.turns = result[alias];
@@ -280,10 +323,8 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
         return {
           type: item.type ?? item.cueType ?? item.cue_type,
           prompt: item.prompt ?? item.description ?? item.text,
-          durationSeconds:
-            item.durationSeconds ?? item.duration_seconds ?? item.duration,
-          insertAfterTurn:
-            item.insertAfterTurn ?? item.insert_after_turn ?? item.afterTurn,
+          durationSeconds: item.durationSeconds ?? item.duration_seconds ?? item.duration,
+          insertAfterTurn: item.insertAfterTurn ?? item.insert_after_turn ?? item.afterTurn,
           volume: item.volume ?? undefined,
           fadeOutMs: item.fadeOutMs ?? item.fade_out_ms ?? undefined,
         };
@@ -310,14 +351,18 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
         return {
           number: item.number ?? item.num ?? item.ref_number ?? item.id,
           title,
-          authors: authors !== undefined
-            ? (Array.isArray(authors) ? authors : typeof authors === 'string' ? [authors] : [])
-            : [],
+          authors:
+            authors !== undefined
+              ? Array.isArray(authors)
+                ? authors
+                : typeof authors === 'string'
+                  ? [authors]
+                  : []
+              : [],
           year: item.year ?? null,
           url: item.url ?? item.link ?? item.source_url ?? null,
           type: coerceRefType(item.type ?? item.sourceType ?? item.source_type) ?? 'WEB',
-          publisher:
-            item.publisher ?? item.publisher_name ?? item.source ?? null,
+          publisher: item.publisher ?? item.publisher_name ?? item.source ?? null,
           doi: item.doi ?? null,
         };
       })
@@ -326,7 +371,9 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
     // Auto-assign numbers if they're all missing
     const refs = result.references as Record<string, unknown>[];
     if (refs.length > 0 && refs.every((r) => r.number == null)) {
-      refs.forEach((r, i) => { r.number = i + 1; });
+      refs.forEach((r, i) => {
+        r.number = i + 1;
+      });
     }
   }
 
@@ -365,11 +412,16 @@ function getAudienceGuidance(audience: string | undefined): string {
 
 const TONE_GUIDANCE_MAIN: Record<string, string> = {
   casual: '- Keep it light, use humor freely, casual language, pop culture references',
-  professional: '- Maintain a professional but warm tone, with occasional humor to keep it engaging',
-  socratic: '- Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery',
-  storytelling: '- Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.',
-  comedic: '- Write like a John Oliver editorial comedy segment: clear setup/punchline structure, callbacks to earlier jokes, absurdist escalation, and satirical commentary grounded in real facts. Balance humor with substance — jokes should illuminate the topic, not replace it. Include comedic tangents that circle back to the main point. Use [audience laughs] and [applause] tags after punchlines.',
-  satirical: '- Deploy biting wit and irony to expose contradictions. Use the contrast between dry delivery and absurd subject matter. Employ rhetorical questions that answer themselves. Reference real headlines and public figures for satirical effect. Every joke should make a point. Use [audience laughs] sparingly for the sharpest lines.',
+  professional:
+    '- Maintain a professional but warm tone, with occasional humor to keep it engaging',
+  socratic:
+    '- Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery',
+  storytelling:
+    '- Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.',
+  comedic:
+    '- Write like a John Oliver editorial comedy segment: clear setup/punchline structure, callbacks to earlier jokes, absurdist escalation, and satirical commentary grounded in real facts. Balance humor with substance — jokes should illuminate the topic, not replace it. Include comedic tangents that circle back to the main point. Use [audience laughs] and [applause] tags after punchlines.',
+  satirical:
+    '- Deploy biting wit and irony to expose contradictions. Use the contrast between dry delivery and absurd subject matter. Employ rhetorical questions that answer themselves. Reference real headlines and public figures for satirical effect. Every joke should make a point. Use [audience laughs] sparingly for the sharpest lines.',
 };
 
 const TONE_GUIDANCE_REVISION: Record<string, string> = {
@@ -377,8 +429,10 @@ const TONE_GUIDANCE_REVISION: Record<string, string> = {
   professional: '- Maintain a professional but warm tone',
   socratic: '- Use the Socratic method — probing questions building on each other',
   storytelling: '- Frame everything as narrative — characters, conflict, resolution',
-  comedic: '- Maintain John Oliver-style comedy: setup/punchline, callbacks, absurdist escalation. Include [audience laughs] after punchlines.',
-  satirical: '- Deploy biting wit and irony, dry delivery contrasting absurd subject matter. Use [audience laughs] sparingly.',
+  comedic:
+    '- Maintain John Oliver-style comedy: setup/punchline, callbacks, absurdist escalation. Include [audience laughs] after punchlines.',
+  satirical:
+    '- Deploy biting wit and irony, dry delivery contrasting absurd subject matter. Use [audience laughs] sparingly.',
 };
 
 export interface SourceMetadata {
@@ -389,8 +443,19 @@ export interface SourceMetadata {
   wordCount?: number;
   sourceType?: string;
   biasAnalysis?: BiasAnalysis;
-  tables?: { caption: string | null; headers: string[]; rows: string[][]; sourceLabel: string | null }[];
-  figures?: { url: string; caption: string | null; altText: string | null; sourceLabel: string | null; mimeType: string }[];
+  tables?: {
+    caption: string | null;
+    headers: string[];
+    rows: string[][];
+    sourceLabel: string | null;
+  }[];
+  figures?: {
+    url: string;
+    caption: string | null;
+    altText: string | null;
+    sourceLabel: string | null;
+    mimeType: string;
+  }[];
   keyStatistics?: { label: string; value: string; unit: string | null; context: string | null }[];
 }
 
@@ -400,19 +465,30 @@ export interface SourceMetadata {
  */
 function renderBiasGuidance(sourceMetadata?: SourceMetadata): string {
   const bias = sourceMetadata?.biasAnalysis;
-  if (!bias?.isPolitical || !bias.sourceBias || bias.sourceBias === 'center' || bias.sourceBias === 'pro-science') {
+  if (
+    !bias?.isPolitical ||
+    !bias.sourceBias ||
+    bias.sourceBias === 'center' ||
+    bias.sourceBias === 'pro-science'
+  ) {
     return '';
   }
-  return '\n\n' + loadAndRender('shared/bias-guidance.md', {
-    SOURCE_NAME: bias.sourceName ?? 'the source',
-    SOURCE_BIAS: bias.sourceBias,
-  });
+  return (
+    '\n\n' +
+    loadAndRender('shared/bias-guidance.md', {
+      SOURCE_NAME: bias.sourceName ?? 'the source',
+      SOURCE_BIAS: bias.sourceBias,
+    })
+  );
 }
 
 function buildLanguageInstruction(
   lang: string | null | undefined,
   mode: string | null | undefined,
-  opts?: { mustIncludeVocabulary?: Array<{ word: string; translation: string }>; forLearning?: boolean },
+  opts?: {
+    mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
+    forLearning?: boolean;
+  }
 ): { languageInstruction: string; vocabularyInstruction: string } {
   if (!lang || (lang === 'en' && !opts?.forLearning)) {
     return {
@@ -448,15 +524,16 @@ This is a LANGUAGE LEARNING audio lesson. Mix ${langName} and English (~40% Engl
 
     full_immersion: `## Language: ${langName} — Full Immersion Mode
 
-This is a LANGUAGE LEARNING audio lesson. Generate the ENTIRE script in ${langName} (~95%).
+This is a LANGUAGE LEARNING audio lesson. Generate the learner-facing script in ${langName} only.
 - Wrap 5-8 advanced or nuanced vocabulary items with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
-- Speak naturally at near-native pace
-- Only use English for terms with no direct translation
+- Speak naturally at the requested CEFR level
+- Do not use English, source-language explanations, inline translations, or bilingual transitions in the script
 - Assume the listener knows basics from prior episodes
 - Source articles may be in English — translate and adapt ALL content into ${langName}`,
   };
 
-  const instruction = modeInstructions[mode ?? 'conversational_mix'] ?? modeInstructions.conversational_mix;
+  const instruction =
+    modeInstructions[mode ?? 'conversational_mix'] ?? modeInstructions.conversational_mix;
 
   const vocabularyInstruction = `## Vocabulary Output — REQUIRED when language learning mode is active
 
@@ -522,19 +599,26 @@ export async function generateScript(params: {
   model: string;
 }> {
   const speakers = params.speakers ?? [
-    { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects with short reactions.' },
-    { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies, examples, and occasionally humor. Explains complex topics in ways that create "aha" moments.' },
+    {
+      name: 'HOST',
+      description:
+        'Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects with short reactions.',
+    },
+    {
+      name: 'EXPERT',
+      description:
+        'Knowledgeable, vivid storyteller, uses analogies, examples, and occasionally humor. Explains complex topics in ways that create "aha" moments.',
+    },
   ];
   const speakerCount = speakers.length;
   const speakerSection = speakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
 
-  const voiceDeliveryGuidelines = speakerCount === 1
-    ? loadPrompt('generation/monologue-guidelines.md')
-    : loadPrompt('generation/dialogue-guidelines.md');
+  const voiceDeliveryGuidelines =
+    speakerCount === 1
+      ? loadPrompt('generation/monologue-guidelines.md')
+      : loadPrompt('generation/dialogue-guidelines.md');
 
-  const eli5Section = params.depth === 'eli5'
-    ? loadPrompt('generation/eli5-section.md')
-    : '';
+  const eli5Section = params.depth === 'eli5' ? loadPrompt('generation/eli5-section.md') : '';
 
   const langInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode, {
     mustIncludeVocabulary: params.mustIncludeVocabulary,
@@ -574,12 +658,16 @@ export async function generateScript(params: {
     : `Topic: ${params.topic}\nDepth: ${params.depth}`;
 
   const ai = createAIProvider(params.provider);
-  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-    maxTokens: 12288,
-    apiKeyOverride: params.apiKeyOverride,
-    model: params.model,
-    useWebSearch: params.webSearchEnabled !== false,
-  });
+  const response = await ai.generateResponse(
+    systemPrompt,
+    [{ role: 'user', content: userMessage }],
+    {
+      maxTokens: 12288,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+      useWebSearch: params.webSearchEnabled !== false,
+    }
+  );
 
   return parseScriptResponse(response);
 }
@@ -600,7 +688,16 @@ export async function generateScriptWithUserFeedback(params: {
   sourceMetadata?: SourceMetadata;
   speakers?: Array<{ name: string; description: string }>;
   previousScript: Array<{ speaker: string; text: string; direction?: string }>;
-  previousReferences: Array<{ number: number; title: string; authors?: string; year?: number; url?: string; type: string; publisher?: string; doi?: string }>;
+  previousReferences: Array<{
+    number: number;
+    title: string;
+    authors?: string;
+    year?: number;
+    url?: string;
+    type: string;
+    publisher?: string;
+    doi?: string;
+  }>;
   userFeedback: string;
   apiKeyOverride?: string;
   model?: string;
@@ -619,9 +716,14 @@ export async function generateScriptWithUserFeedback(params: {
 }> {
   const feedbackSpeakers = params.speakers ?? [
     { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation' },
-    { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies and examples' },
+    {
+      name: 'EXPERT',
+      description: 'Knowledgeable, vivid storyteller, uses analogies and examples',
+    },
   ];
-  const feedbackSpeakerSection = feedbackSpeakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+  const feedbackSpeakerSection = feedbackSpeakers
+    .map((s) => `- ${s.name}: ${s.description}`)
+    .join('\n');
 
   const systemPrompt = loadAndRender('generation/script-revision-user.md', {
     SPEAKER_SECTION: feedbackSpeakerSection,
@@ -664,12 +766,16 @@ ${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sou
 Revise the script addressing ALL user feedback. Keep what works, change what the user flagged. Return JSON only.`;
 
   const ai = createAIProvider(params.provider);
-  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-    maxTokens: 12288,
-    apiKeyOverride: params.apiKeyOverride,
-    model: params.model,
-    useWebSearch: params.webSearchEnabled !== false,
-  });
+  const response = await ai.generateResponse(
+    systemPrompt,
+    [{ role: 'user', content: userMessage }],
+    {
+      maxTokens: 12288,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+      useWebSearch: params.webSearchEnabled !== false,
+    }
+  );
 
   return parseScriptResponse(response);
 }
@@ -694,15 +800,23 @@ export function parseScriptResponse(response: {
   outputTokens: number;
   model: string;
 } {
-  let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[]; places?: ScriptPlace[] };
+  let parsed: {
+    turns: ScriptTurn[];
+    soundCues: SoundCue[];
+    references: GeneratedReference[];
+    places?: ScriptPlace[];
+  };
 
   // Helper: attempt JSON parse with optional array-wrapping
   function tryParseJson(text: string): typeof parsed | null {
     try {
       const rawParsed = JSON.parse(text);
-      if (Array.isArray(rawParsed)) return { turns: rawParsed, soundCues: [], references: [], places: [] };
+      if (Array.isArray(rawParsed))
+        return { turns: rawParsed, soundCues: [], references: [], places: [] };
       return rawParsed;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   // Helper: extract first JSON object or array from text
@@ -713,7 +827,9 @@ export function parseScriptResponse(response: {
       try {
         const turns = JSON.parse(extractFirstJson(text, '['));
         return { turns, soundCues: [], references: [], places: [] };
-      } catch { return null; }
+      } catch {
+        return null;
+      }
     }
   }
 
@@ -750,7 +866,7 @@ export function parseScriptResponse(response: {
     });
     throw new Error(
       `AI returned unparseable script output (${response.content.length} chars, model: ${response.model}). ` +
-      `Preview: ${response.content.substring(0, 200)}`
+        `Preview: ${response.content.substring(0, 200)}`
     );
   }
 
@@ -816,7 +932,10 @@ function formatSourceBlock(content: string, metadata?: SourceMetadata): string {
   const truncated = content.substring(0, SOURCE_CONTENT_LIMIT);
   const sections: string[] = [];
 
-  if (metadata && (metadata.title || metadata.author || metadata.publishedDate || metadata.siteName)) {
+  if (
+    metadata &&
+    (metadata.title || metadata.author || metadata.publishedDate || metadata.siteName)
+  ) {
     const parts = [
       metadata.title && `Title: ${metadata.title}`,
       metadata.author && `Author: ${metadata.author}`,
@@ -833,7 +952,10 @@ function formatSourceBlock(content: string, metadata?: SourceMetadata): string {
     const tableBlocks = metadata.tables.map((t, i) => {
       const label = t.caption || `Table ${i + 1}`;
       const header = t.headers.join(' | ');
-      const rows = t.rows.slice(0, 20).map((r) => r.join(' | ')).join('\n');
+      const rows = t.rows
+        .slice(0, 20)
+        .map((r) => r.join(' | '))
+        .join('\n');
       return `[${label}]\n${header}\n${rows}`;
     });
     sections.push(`\nSource Tables:\n${tableBlocks.join('\n\n')}`);

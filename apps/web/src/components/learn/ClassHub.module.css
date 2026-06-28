@@ -66,6 +66,124 @@
   text-wrap: pretty;
 }
 
+.introBlock {
+  margin-top: 22px;
+  display: grid;
+  gap: 14px;
+  color: var(--ink);
+}
+
+.introLead,
+.introAbout {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.introLead p,
+.introAbout p {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+.introLead p {
+  font-family: var(--serif);
+  font-size: clamp(20px, 2.4vw, 25px);
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.introNumber {
+  min-width: 28px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  padding-top: 5px;
+}
+
+.introGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 12px;
+}
+
+.introPanel {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+}
+
+.introPanel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  font-size: 14.5px;
+}
+
+.introPanel li + li {
+  margin-top: 7px;
+}
+
+.exampleList {
+  display: grid;
+  gap: 10px;
+}
+
+.example {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.example:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.example b {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.example span,
+.example small {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.tipLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.tipLine span {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 7px 9px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  background: color-mix(in oklab, var(--well) 72%, transparent);
+}
+
+@media (max-width: 760px) {
+  .introGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .drawn {
   display: flex;
   align-items: center;
@@ -323,6 +441,15 @@
 
 .btn:active {
   transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.btn:disabled:active {
+  transform: none;
 }
 
 .btnPrimary {

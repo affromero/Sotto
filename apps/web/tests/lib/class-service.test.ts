@@ -11,10 +11,12 @@ const mockCourseClassUpdate = vi.fn();
 const mockCourseClassDelete = vi.fn();
 const mockClassSectionCreate = vi.fn();
 const mockClassSectionUpdate = vi.fn();
+const mockClassSectionDeleteMany = vi.fn();
 const mockLessonQuestionCreate = vi.fn();
 const mockLessonQuestionDeleteMany = vi.fn();
 const mockSpeakingRecordingDeleteMany = vi.fn();
 const mockClassSubmissionUpsert = vi.fn();
+const mockClassSubmissionDeleteMany = vi.fn();
 const mockCourseUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
@@ -35,6 +37,7 @@ vi.mock('@/lib/prisma', () => ({
     classSection: {
       create: (...args: unknown[]) => mockClassSectionCreate(...args),
       update: (...args: unknown[]) => mockClassSectionUpdate(...args),
+      deleteMany: (...args: unknown[]) => mockClassSectionDeleteMany(...args),
     },
     lessonQuestion: {
       create: (...args: unknown[]) => mockLessonQuestionCreate(...args),
@@ -45,15 +48,27 @@ vi.mock('@/lib/prisma', () => ({
     },
     classSubmission: {
       upsert: (...args: unknown[]) => mockClassSubmissionUpsert(...args),
+      deleteMany: (...args: unknown[]) => mockClassSubmissionDeleteMany(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));
 
 const mockGenerateSectionQuestions = vi.fn();
+const mockGenerateClassIntro = vi.fn();
+const mockEnsureCurriculumHasLevelLessons = vi.fn();
 
 vi.mock('@/lib/class-generation', () => ({
   generateSectionQuestions: (...args: unknown[]) => mockGenerateSectionQuestions(...args),
+}));
+
+vi.mock('@/lib/classes/class-intro', () => ({
+  generateClassIntro: (...args: unknown[]) => mockGenerateClassIntro(...args),
+}));
+
+vi.mock('@/lib/curriculum-generator', () => ({
+  ensureCurriculumHasLevelLessons: (...args: unknown[]) =>
+    mockEnsureCurriculumHasLevelLessons(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -91,6 +106,7 @@ import {
   createNextClass,
   getClassForUser,
   submitClass,
+  regenerateCurrentClass,
   regenerateFailedSections,
   ClassGenerationCancelledError,
   CourseNotFoundError,
@@ -109,11 +125,25 @@ const SAMPLE_LESSON = {
   title: 'Introduction',
 };
 
+const SAMPLE_B1_LESSON = {
+  id: 'lesson-b1',
+  level: 'B1',
+  order: 15,
+  slug: 'opinions',
+  objective: 'Discuss opinions with supporting reasons',
+  grammarPoints: ['subordinate-clauses'],
+  targetVocab: [{ lemma: 'meiner Meinung nach', gloss: 'in my opinion' }],
+  title: 'Opinions',
+};
+
 const SAMPLE_COURSE = {
   id: 'course-1',
   userId: 'u1',
+  curriculumId: 'curriculum-1',
+  currentLevel: 'A1',
   nativeLang: 'en',
   targetLang: 'es',
+  pedagogy: 'BALANCED',
   curriculum: {
     lessons: [SAMPLE_LESSON],
   },
@@ -165,13 +195,26 @@ describe('createNextClass', () => {
     // Default: $transaction runs all ops (each op is already a resolved promise from mocked methods)
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
-    mockClassSectionCreate.mockResolvedValue({
-      id: 'section-x',
-      seed: 'course-1-GRAMMAR-1',
-      skill: 'GRAMMAR',
+    mockGenerateClassIntro.mockResolvedValue({
+      purpose: 'Purpose',
+      about: 'About',
+      focus: ['Focus'],
+      examples: [{ target: 'Hola', meaning: 'Hello', note: 'Greeting' }],
+      tips: ['Tip'],
     });
+    mockEnsureCurriculumHasLevelLessons.mockResolvedValue(undefined);
+    mockClassSectionCreate.mockImplementation(
+      ({ data }: { data: { skill: string; seed: string } }) =>
+        Promise.resolve({
+          id: `section-${data.skill}`,
+          seed: data.seed,
+          skill: data.skill,
+        })
+    );
     mockLessonQuestionCreate.mockResolvedValue({});
     mockClassSectionUpdate.mockResolvedValue({});
+    mockClassSectionDeleteMany.mockResolvedValue({ count: 0 });
+    mockClassSubmissionDeleteMany.mockResolvedValue({ count: 0 });
     mockCourseClassCreate.mockResolvedValue({ id: 'class-new' });
     mockCourseClassFindUnique.mockResolvedValue({ status: 'GENERATING' });
     mockCourseClassUpdate.mockResolvedValue({});
@@ -219,6 +262,9 @@ describe('createNextClass', () => {
     expect(mockCourseClassCreate).toHaveBeenCalled();
     // Should have called generateSectionQuestions for each MC skill (GRAMMAR + READING)
     expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(2);
+    expect(mockGenerateClassIntro).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'A1', title: 'Introduction' })
+    );
     // Should have updated course.activeClassId
     expect(mockCourseUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ activeClassId: 'class-new' }) })
@@ -251,7 +297,11 @@ describe('createNextClass', () => {
   });
 
   describe('sourced mode', () => {
-    const SOURCED_COURSE = { ...SAMPLE_COURSE, currentLevel: 'B1' };
+    const SOURCED_COURSE = {
+      ...SAMPLE_COURSE,
+      currentLevel: 'B1',
+      curriculum: { lessons: [SAMPLE_LESSON, SAMPLE_B1_LESSON] },
+    };
 
     beforeEach(() => {
       mockCourseFindFirst.mockResolvedValue(SOURCED_COURSE);
@@ -289,6 +339,9 @@ describe('createNextClass', () => {
       expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
         expect.objectContaining({ sourceContent: 'Ein angepasster Artikeltext.', level: 'B1' })
       );
+      expect(mockGenerateClassIntro).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'B1', title: 'Opinions' })
+      );
     });
 
     it('topic mode builds about the topic at currentLevel without extracting a URL', async () => {
@@ -304,6 +357,27 @@ describe('createNextClass', () => {
       expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
         expect.objectContaining({ objective: 'Mars rovers', level: 'B1', sourceContent: undefined })
       );
+    });
+
+    it('starts normal classes at the course currentLevel instead of the first unpassed A1 lesson', async () => {
+      const result = await createNextClass('course-1', 'u1');
+
+      expect(result.kind).toBe('created');
+      expect(mockCourseClassCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            lessonId: 'lesson-b1',
+            order: 15,
+          }),
+        })
+      );
+      expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'B1',
+          objective: 'Discuss opinions with supporting reasons',
+        })
+      );
+      expect(mockEnsureCurriculumHasLevelLessons).not.toHaveBeenCalled();
     });
 
     it('fails closed when the source cannot be read — no class is created', async () => {
@@ -550,6 +624,89 @@ describe('submitClass', () => {
     const speaking = result!.sections.find((s) => s.skill === 'SPEAKING')!;
     expect(speaking.score).toBeCloseTo(0.45, 5); // (0.9 + 0) / 2
     expect(speaking.passed).toBe(false);
+  });
+});
+
+// ---- regenerateCurrentClass ----
+
+describe('regenerateCurrentClass', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+    mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
+    mockGenerateClassIntro.mockResolvedValue({
+      purpose: 'Purpose',
+      about: 'About',
+      focus: ['Focus'],
+      examples: [{ target: 'Hola', meaning: 'Hello', note: 'Greeting' }],
+      tips: ['Tip'],
+    });
+    mockClassSectionCreate.mockImplementation(
+      ({ data }: { data: { skill: string; seed: string } }) =>
+        Promise.resolve({
+          id: `section-${data.skill}`,
+          seed: data.seed,
+          skill: data.skill,
+        })
+    );
+    mockClassSectionUpdate.mockResolvedValue({});
+    mockClassSectionDeleteMany.mockResolvedValue({ count: 4 });
+    mockClassSubmissionDeleteMany.mockResolvedValue({ count: 1 });
+    mockLessonQuestionCreate.mockResolvedValue({});
+    mockCourseClassFindUnique.mockResolvedValue({ status: 'GENERATING' });
+    mockCourseClassUpdate.mockResolvedValue({});
+    mockCourseUpdate.mockResolvedValue({});
+  });
+
+  it('clears the current class and rebuilds it with a bumped attempt', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      courseId: 'course-1',
+      status: 'AVAILABLE',
+      attempt: 1,
+      sourceUrl: null,
+      sourceTitle: null,
+      lesson: SAMPLE_LESSON,
+      course: SAMPLE_COURSE,
+    });
+
+    const result = await regenerateCurrentClass('class-1', 'u1');
+
+    expect(result).toBe(true);
+    expect(mockCourseClassUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'class-1' },
+        data: expect.objectContaining({ status: 'GENERATING', attempt: 2 }),
+      })
+    );
+    expect(mockClassSubmissionDeleteMany).toHaveBeenCalledWith({ where: { classId: 'class-1' } });
+    expect(mockClassSectionDeleteMany).toHaveBeenCalledWith({ where: { classId: 'class-1' } });
+    expect(mockClassSectionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ skill: 'GRAMMAR', attempt: 2, seed: 'class-1-GRAMMAR-2' }),
+      })
+    );
+    expect(mockCourseClassUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'class-1' },
+        data: expect.objectContaining({ status: 'AVAILABLE' }),
+      })
+    );
+  });
+
+  it('returns false for a passed class', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      status: 'PASSED',
+      attempt: 1,
+      lesson: SAMPLE_LESSON,
+      course: SAMPLE_COURSE,
+    });
+
+    const result = await regenerateCurrentClass('class-1', 'u1');
+
+    expect(result).toBe(false);
+    expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
   });
 });
 

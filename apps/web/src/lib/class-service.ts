@@ -10,6 +10,10 @@ import { generateClassSpeaking } from './class-speaking-generator';
 import { generateClassWriting } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { buildLearnerContext } from './pedagogy';
+import { Prisma } from '@/generated/prisma/client';
+import { ensureCurriculumHasLevelLessons } from './curriculum-generator';
+import { cefrRank } from './cefr-levels';
+import { generateClassIntro } from './classes/class-intro';
 import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
 
@@ -28,6 +32,7 @@ interface LessonLike {
   level: string;
   order: number;
   slug: string;
+  title: string;
   objective: string;
   grammarPoints: unknown;
   targetVocab: unknown;
@@ -41,6 +46,17 @@ function lessonInputs(lesson: LessonLike) {
       gloss: string;
     }>,
   };
+}
+
+function selectNextLesson(
+  lessons: LessonLike[],
+  currentLevel: CefrLevel,
+  passedSet: Set<string>
+): LessonLike | undefined {
+  const currentRank = cefrRank(currentLevel);
+  return lessons.find(
+    (lesson) => !passedSet.has(lesson.id) && cefrRank(lesson.level as CefrLevel) >= currentRank
+  );
 }
 
 async function assertClassStillGenerating(classId: string) {
@@ -85,6 +101,7 @@ async function buildSection(
   nativeLang: string,
   targetLang: string,
   note: string,
+  attempt = 1,
   over?: SectionOverride
 ): Promise<void> {
   await assertClassStillGenerating(classId);
@@ -93,8 +110,8 @@ async function buildSection(
     data: {
       classId,
       skill,
-      attempt: 1,
-      seed: `${classId}-${skill}-1`,
+      attempt,
+      seed: `${classId}-${skill}-${attempt}`,
       spec: { lessonSlug: lesson.slug },
       status: 'GENERATING',
     },
@@ -138,6 +155,11 @@ async function buildSection(
   await assertClassStillGenerating(classId);
 }
 
+function noteForAttempt(note: string, classId: string, attempt: number): string {
+  const variation = `Class attempt ${attempt} for ${classId}: generate a fresh variation. Do not reuse the same examples, questions, prompts, or distractors from earlier attempts.`;
+  return [note, variation].filter(Boolean).join('\n\n');
+}
+
 export type NextClassResult =
   | { kind: 'gated'; activeClassId: string; status: string }
   | { kind: 'done' }
@@ -151,16 +173,171 @@ export interface SourcedClassOpts {
   topic?: string;
 }
 
+interface ClassBuildCourse {
+  nativeLang: string;
+  targetLang: string;
+  currentLevel: string;
+  pedagogy: string;
+}
+
+interface ClassContentBuildParams {
+  classId: string;
+  courseId: string;
+  userId: string;
+  course: ClassBuildCourse;
+  lesson: LessonLike;
+  attempt: number;
+  sourceTitle: string | null;
+  override?: SectionOverride;
+  listeningSource?: {
+    sourceContent?: string;
+    sourceMetadata?: PreparedClassSource['sourceMetadata'];
+    sourceUrl?: string;
+  };
+}
+
+async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.InputJsonObject> {
+  const note = noteForAttempt(
+    buildLearnerContext(
+      await getCourseNote(p.courseId),
+      p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
+    ),
+    p.classId,
+    p.attempt
+  );
+  await assertClassStillGenerating(p.classId);
+  const { grammarPoints, targetVocab } = lessonInputs(p.lesson);
+  const lessonLevel = (p.override?.level ?? p.lesson.level) as CefrLevel;
+  const lessonObjective = p.override?.objective ?? p.lesson.objective;
+
+  const intro = await generateClassIntro({
+    userId: p.userId,
+    level: lessonLevel,
+    nativeLang: p.course.nativeLang,
+    targetLang: p.course.targetLang,
+    title: p.lesson.title,
+    objective: lessonObjective,
+    grammarPoints,
+    targetVocab,
+    note,
+    sourceTitle: p.sourceTitle,
+  });
+  await assertClassStillGenerating(p.classId);
+
+  for (const skill of MC_SKILLS) {
+    await buildSection(
+      p.classId,
+      p.userId,
+      skill,
+      p.lesson,
+      p.course.nativeLang,
+      p.course.targetLang,
+      note,
+      p.attempt,
+      p.override
+    );
+  }
+  await assertClassStillGenerating(p.classId);
+
+  await seedLessonItems(p.courseId, p.classId, lessonLevel, targetVocab, grammarPoints);
+  await assertClassStillGenerating(p.classId);
+  const due = await getDueItems(p.courseId);
+  await assertClassStillGenerating(p.classId);
+
+  // Adaptive listening section — non-blocking: a TTS/AI hiccup must not
+  // prevent the learner from accessing their MC sections.
+  try {
+    await assertClassStillGenerating(p.classId);
+    await generateClassListening({
+      userId: p.userId,
+      classId: p.classId,
+      courseId: p.courseId,
+      attempt: p.attempt,
+      level: lessonLevel,
+      nativeLang: p.course.nativeLang,
+      targetLang: p.course.targetLang,
+      objective: lessonObjective,
+      mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
+      note,
+      sourceContent: p.listeningSource?.sourceContent,
+      sourceMetadata: p.listeningSource?.sourceMetadata,
+      sourceUrl: p.listeningSource?.sourceUrl,
+    });
+    await assertClassStillGenerating(p.classId);
+  } catch (err) {
+    await rethrowIfGenerationWasCancelled(p.classId, err);
+    logger.warn('generateClassListening failed; continuing without listening section', {
+      classId: p.classId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Speaking section — non-blocking, same rationale as the listening section.
+  try {
+    await assertClassStillGenerating(p.classId);
+    await generateClassSpeaking({
+      userId: p.userId,
+      classId: p.classId,
+      attempt: p.attempt,
+      level: lessonLevel,
+      nativeLang: p.course.nativeLang,
+      targetLang: p.course.targetLang,
+      objective: lessonObjective,
+      targetVocab,
+      note,
+    });
+    await assertClassStillGenerating(p.classId);
+  } catch (err) {
+    await rethrowIfGenerationWasCancelled(p.classId, err);
+    logger.warn('generateClassSpeaking failed; continuing without speaking section', {
+      classId: p.classId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Writing section — non-blocking, same rationale as listening/speaking.
+  try {
+    await assertClassStillGenerating(p.classId);
+    await generateClassWriting({
+      userId: p.userId,
+      classId: p.classId,
+      attempt: p.attempt,
+      level: lessonLevel,
+      nativeLang: p.course.nativeLang,
+      targetLang: p.course.targetLang,
+      objective: lessonObjective,
+      targetVocab,
+      note,
+    });
+    await assertClassStillGenerating(p.classId);
+  } catch (err) {
+    await rethrowIfGenerationWasCancelled(p.classId, err);
+    logger.warn('generateClassWriting failed; continuing without writing section', {
+      classId: p.classId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  await assertClassStillGenerating(p.classId);
+  return {
+    vocabIds: due.vocab.map((v) => v.id),
+    grammarKeys: due.grammar.map((g) => g.topicKey),
+    dueCount: due.vocab.length + due.grammar.length,
+    intro: intro as unknown as Prisma.InputJsonObject,
+  };
+}
+
 export async function createNextClass(
   courseId: string,
   userId: string,
   opts?: SourcedClassOpts
 ): Promise<NextClassResult> {
-  const course = await prisma.course.findFirst({
+  const initialCourse = await prisma.course.findFirst({
     where: { id: courseId, userId },
     include: { curriculum: { include: { lessons: { orderBy: { order: 'asc' } } } } },
   });
-  if (!course) throw new CourseNotFoundError('Course not found');
+  if (!initialCourse) throw new CourseNotFoundError('Course not found');
+  let course = initialCourse;
 
   // Gating: only one non-passed class at a time.
   const active = await prisma.courseClass.findFirst({
@@ -174,7 +351,23 @@ export async function createNextClass(
     select: { lessonId: true },
   });
   const passedSet = new Set(passed.map((p) => p.lessonId));
-  const lesson = course.curriculum.lessons.find((l) => !passedSet.has(l.id));
+  if (!course.curriculum.lessons.some((lesson) => lesson.level === course.currentLevel)) {
+    await ensureCurriculumHasLevelLessons({
+      userId,
+      curriculumId: course.curriculumId,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      level: course.currentLevel,
+    });
+    const refreshedCourse = await prisma.course.findFirst({
+      where: { id: courseId, userId },
+      include: { curriculum: { include: { lessons: { orderBy: { order: 'asc' } } } } },
+    });
+    if (!refreshedCourse) throw new CourseNotFoundError('Course not found');
+    course = refreshedCourse;
+  }
+
+  const lesson = selectNextLesson(course.curriculum.lessons, course.currentLevel, passedSet);
   if (!lesson) return { kind: 'done' };
 
   // Sourced mode: prepare the source BEFORE creating the class so a failed
@@ -229,121 +422,128 @@ export async function createNextClass(
     },
   });
 
-  const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
-  await assertClassStillGenerating(cls.id);
-
+  let adaptiveSeed: Prisma.InputJsonObject;
   try {
-    for (const skill of MC_SKILLS) {
-      await buildSection(
-        cls.id,
-        userId,
-        skill,
-        lesson,
-        course.nativeLang,
-        course.targetLang,
-        note,
-        override
-      );
-    }
+    adaptiveSeed = await buildClassContent({
+      classId: cls.id,
+      courseId,
+      userId,
+      course,
+      lesson,
+      attempt: 1,
+      sourceTitle,
+      override,
+      listeningSource,
+    });
   } catch (err) {
     await rethrowIfGenerationWasCancelled(cls.id, err);
     // Roll back the half-built class so the learner can retry cleanly.
     await prisma.courseClass.delete({ where: { id: cls.id } }).catch(() => {});
     throw err;
   }
-  await assertClassStillGenerating(cls.id);
-
-  const { grammarPoints, targetVocab } = lessonInputs(lesson);
-  await seedLessonItems(courseId, cls.id, lesson.level as CefrLevel, targetVocab, grammarPoints);
-  await assertClassStillGenerating(cls.id);
-  const due = await getDueItems(courseId);
-  await assertClassStillGenerating(cls.id);
-
-  // Adaptive listening section — non-blocking: a TTS/AI hiccup must not
-  // prevent the learner from accessing their MC sections.
-  try {
-    await assertClassStillGenerating(cls.id);
-    await generateClassListening({
-      userId,
-      classId: cls.id,
-      courseId,
-      level: override?.level ?? lesson.level,
-      nativeLang: course.nativeLang,
-      targetLang: course.targetLang,
-      objective: override?.objective ?? lesson.objective,
-      mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
-      note,
-      sourceContent: listeningSource.sourceContent,
-      sourceMetadata: listeningSource.sourceMetadata,
-      sourceUrl: listeningSource.sourceUrl,
-    });
-    await assertClassStillGenerating(cls.id);
-  } catch (err) {
-    await rethrowIfGenerationWasCancelled(cls.id, err);
-    logger.warn('generateClassListening failed; continuing without listening section', {
-      classId: cls.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
-  // Speaking section — non-blocking, same rationale as the listening section.
-  try {
-    await assertClassStillGenerating(cls.id);
-    await generateClassSpeaking({
-      userId,
-      classId: cls.id,
-      level: lesson.level,
-      nativeLang: course.nativeLang,
-      targetLang: course.targetLang,
-      objective: lesson.objective,
-      targetVocab,
-      note,
-    });
-    await assertClassStillGenerating(cls.id);
-  } catch (err) {
-    await rethrowIfGenerationWasCancelled(cls.id, err);
-    logger.warn('generateClassSpeaking failed; continuing without speaking section', {
-      classId: cls.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
-  // Writing section — non-blocking, same rationale as listening/speaking.
-  try {
-    await assertClassStillGenerating(cls.id);
-    await generateClassWriting({
-      userId,
-      classId: cls.id,
-      level: lesson.level,
-      nativeLang: course.nativeLang,
-      targetLang: course.targetLang,
-      objective: lesson.objective,
-      targetVocab,
-      note,
-    });
-    await assertClassStillGenerating(cls.id);
-  } catch (err) {
-    await rethrowIfGenerationWasCancelled(cls.id, err);
-    logger.warn('generateClassWriting failed; continuing without writing section', {
-      classId: cls.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
-  await assertClassStillGenerating(cls.id);
   await prisma.courseClass.update({
     where: { id: cls.id },
     data: {
       status: 'AVAILABLE',
-      adaptiveSeed: {
-        vocabIds: due.vocab.map((v) => v.id),
-        grammarKeys: due.grammar.map((g) => g.topicKey),
-        dueCount: due.vocab.length + due.grammar.length,
-      },
+      adaptiveSeed,
     },
   });
   await prisma.course.update({ where: { id: courseId }, data: { activeClassId: cls.id } });
   return { kind: 'created', classId: cls.id };
+}
+
+export async function regenerateCurrentClass(classId: string, userId: string): Promise<boolean> {
+  const cls = await prisma.courseClass.findFirst({
+    where: { id: classId, course: { userId } },
+    include: { lesson: true, course: true },
+  });
+  if (!cls || cls.status === 'PASSED') return false;
+  if (cls.status === 'GENERATING') throw new Error('Class is already regenerating.');
+
+  let sourceTitle = cls.sourceTitle;
+  let sourceUrl = cls.sourceUrl;
+  let override: SectionOverride | undefined;
+  let listeningSource:
+    | {
+        sourceContent?: string;
+        sourceMetadata?: PreparedClassSource['sourceMetadata'];
+        sourceUrl?: string;
+      }
+    | undefined;
+
+  // Re-prepare sourced material before touching the existing class, so source
+  // extraction failures do not destroy the current attempt.
+  if (cls.sourceUrl) {
+    const prepared = await prepareClassSource({
+      url: cls.sourceUrl,
+      level: cls.course.currentLevel,
+      targetLang: cls.course.targetLang,
+      nativeLang: cls.course.nativeLang,
+      userId,
+    });
+    sourceTitle = prepared.title;
+    sourceUrl = prepared.sourceUrl;
+    override = {
+      level: cls.course.currentLevel,
+      objective: prepared.title ?? cls.lesson.objective,
+      sourceContent: prepared.leveledContent,
+    };
+    listeningSource = {
+      sourceContent: prepared.leveledContent,
+      sourceMetadata: prepared.sourceMetadata,
+      sourceUrl: prepared.sourceUrl,
+    };
+  } else if (cls.sourceTitle) {
+    override = { level: cls.course.currentLevel, objective: cls.sourceTitle };
+  }
+
+  const attempt = cls.attempt + 1;
+  await prisma.courseClass.update({
+    where: { id: classId },
+    data: {
+      status: 'GENERATING',
+      attempt,
+      sourceTitle,
+      sourceUrl,
+      adaptiveSeed: Prisma.JsonNull,
+      worksheetPdfUrl: null,
+      submittedAt: null,
+      passedAt: null,
+      failedAt: null,
+    },
+  });
+  await prisma.classSubmission.deleteMany({ where: { classId } });
+  await prisma.classSection.deleteMany({ where: { classId } });
+
+  try {
+    const adaptiveSeed = await buildClassContent({
+      classId,
+      courseId: cls.courseId,
+      userId,
+      course: cls.course,
+      lesson: cls.lesson,
+      attempt,
+      sourceTitle,
+      override,
+      listeningSource,
+    });
+    await prisma.courseClass.update({
+      where: { id: classId },
+      data: {
+        status: 'AVAILABLE',
+        adaptiveSeed,
+      },
+    });
+    await prisma.course.update({ where: { id: cls.courseId }, data: { activeClassId: classId } });
+    return true;
+  } catch (err) {
+    await rethrowIfGenerationWasCancelled(classId, err);
+    await prisma.courseClass.update({
+      where: { id: classId },
+      data: { status: 'FAILED', failedAt: new Date() },
+    });
+    throw err;
+  }
 }
 
 export async function getClassForUser(classId: string, userId: string) {
@@ -382,7 +582,16 @@ export async function getClassForUser(classId: string, userId: string) {
           },
         },
       },
-      lesson: { select: { title: true, level: true, objective: true } },
+      lesson: {
+        select: {
+          title: true,
+          level: true,
+          objective: true,
+          grammarPoints: true,
+          targetVocab: true,
+        },
+      },
+      course: { select: { nativeLang: true, targetLang: true } },
       submission: { select: { passed: true, overallScore: true, submittedAt: true } },
     },
   });

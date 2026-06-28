@@ -208,6 +208,12 @@
   justify-content: space-between;
 }
 
+.classProgress {
+  display: grid;
+  gap: 8px;
+  padding: 2px 4px 6px;
+}
+
 .ctlLeave {
   display: inline-flex;
   align-items: center;
