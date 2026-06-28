@@ -13,6 +13,9 @@ final class SottoAppModel: ObservableObject {
     @Published var isLoading = false
     @Published var loadingOperation: SottoLoadingOperation?
     @Published private(set) var canCancelLoading = false
+    @Published private(set) var agentUsage: SottoAgentUsageStatus?
+    @Published private(set) var isAgentUsageRefreshing = false
+    @Published private(set) var agentUsageFailed = false
     @Published var errorMessage: String?
 
     private let credentialStore = CredentialStore()
@@ -171,6 +174,15 @@ final class SottoAppModel: ObservableObject {
         classResult = nil
         practiceResult = nil
         workbook = nil
+        agentUsage = nil
+        isAgentUsageRefreshing = false
+        agentUsageFailed = false
+    }
+
+    func closeClass() {
+        selectedClass = nil
+        classResult = nil
+        workbook = nil
     }
 
     func loadCourses() async {
@@ -186,6 +198,20 @@ final class SottoAppModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    func loadAgentUsage() async {
+        guard hasSelectedProfile, let client = makeClient() else { return }
+        isAgentUsageRefreshing = true
+
+        do {
+            agentUsage = try await client.fetchAgentUsage()
+            agentUsageFailed = false
+        } catch {
+            agentUsageFailed = true
+        }
+
+        isAgentUsageRefreshing = false
     }
 
     func createCourse(native: String, target: String) async {
@@ -240,6 +266,7 @@ final class SottoAppModel: ObservableObject {
             guard !isClassGenerationCancelled(course.id) else { return }
             selectedClass = try await client.fetchClass(classId: classId)
             classResult = nil
+            refreshAgentUsageInBackground()
         } catch {
             if isClassGenerationCancelled(course.id) {
                 return
@@ -255,6 +282,7 @@ final class SottoAppModel: ObservableObject {
                     guard !isClassGenerationCancelled(course.id) else { return }
                     selectedClass = try await client.fetchClass(classId: classId)
                     classResult = nil
+                    refreshAgentUsageInBackground()
                     return
                 }
             } catch {
@@ -281,6 +309,64 @@ final class SottoAppModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
 
+        isLoading = false
+    }
+
+    func regenerateSelectedClass() async {
+        guard let client = makeClient(), let selectedClass else { return }
+        isLoading = true
+        canCancelLoading = false
+        loadingOperation = SottoLoadingOperation(
+            title: "Regenerating class",
+            detail: "Building a fresh version of the current class.",
+            progress: nil,
+            currentStep: nil,
+            totalSteps: nil,
+            elapsedSeconds: nil,
+            remainingSeconds: nil
+        )
+        errorMessage = nil
+
+        do {
+            try await client.regenerateClass(classId: selectedClass.id)
+            self.selectedClass = try await client.fetchClass(classId: selectedClass.id)
+            classResult = nil
+            courses = try await client.listCourses()
+            refreshAgentUsageInBackground()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        loadingOperation = nil
+        isLoading = false
+    }
+
+    func deleteSelectedClass() async {
+        guard let client = makeClient(), let selectedClass else { return }
+        isLoading = true
+        canCancelLoading = false
+        loadingOperation = SottoLoadingOperation(
+            title: "Removing class",
+            detail: "Clearing the active class so a new one can be generated.",
+            progress: nil,
+            currentStep: nil,
+            totalSteps: nil,
+            elapsedSeconds: nil,
+            remainingSeconds: nil
+        )
+        errorMessage = nil
+
+        do {
+            try await client.deleteClass(classId: selectedClass.id)
+            self.selectedClass = nil
+            classResult = nil
+            workbook = nil
+            courses = try await client.listCourses()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        loadingOperation = nil
         isLoading = false
     }
 
@@ -391,6 +477,12 @@ final class SottoAppModel: ObservableObject {
             apiKey: credentials.apiKey,
             profileId: usesSelectedProfile ? credentials.selectedProfile?.id : nil
         )
+    }
+
+    private func refreshAgentUsageInBackground() {
+        Task { [weak self] in
+            await self?.loadAgentUsage()
+        }
     }
 
     private func isClassGenerationCancelled(_ courseId: String) -> Bool {

@@ -98,6 +98,43 @@ struct SottoLoadingOperation: Equatable {
     let remainingSeconds: Int?
 }
 
+struct SottoAgentUsageStatus: Decodable, Equatable {
+    let providers: [SottoAgentUsageProvider]
+    let refreshedAt: String
+    let cacheTtlSeconds: Int
+}
+
+struct SottoAgentUsageProvider: Decodable, Identifiable, Equatable {
+    let id: String
+    let category: String
+    let label: String
+    let shortLabel: String
+    let planLabel: String?
+    let status: String
+    let detail: String
+    let windows: [SottoAgentUsageWindow]
+    let credits: SottoAgentUsageCredits?
+    let limitReached: Bool
+    let refreshedAt: String
+}
+
+struct SottoAgentUsageWindow: Decodable, Equatable {
+    let label: String
+    let usedPercent: Double
+    let remainingPercent: Double
+    let resetIn: String?
+    let resetAt: String?
+    let limitWindowSeconds: Int?
+    let valueLabel: String?
+    let unbounded: Bool?
+}
+
+struct SottoAgentUsageCredits: Decodable, Equatable {
+    let balance: String?
+    let unlimited: Bool
+    let label: String?
+}
+
 struct SottoClassDetail: Decodable, Identifiable, Equatable {
     let id: String
     let courseId: String
@@ -107,6 +144,7 @@ struct SottoClassDetail: Decodable, Identifiable, Equatable {
     let sourceUrl: String?
     let sourceTitle: String?
     let lesson: SottoLesson?
+    let intro: SottoClassIntro?
     let submitted: Bool
     let sections: [SottoClassSection]
 }
@@ -115,6 +153,20 @@ struct SottoLesson: Decodable, Equatable {
     let title: String
     let level: String
     let objective: String?
+}
+
+struct SottoClassIntro: Decodable, Equatable {
+    let purpose: String
+    let about: String
+    let focus: [String]
+    let examples: [SottoClassIntroExample]
+    let tips: [String]
+}
+
+struct SottoClassIntroExample: Decodable, Equatable {
+    let target: String
+    let meaning: String
+    let note: String
 }
 
 struct SottoClassSection: Decodable, Identifiable, Equatable {

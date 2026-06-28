@@ -35,6 +35,10 @@ function levelFraction(level: string): number {
   return (i + 1) / CEFR_ORDER.length;
 }
 
+function isAtOrAboveCurrentLevel(classLevel: string, currentLevel: string): boolean {
+  return CEFR_ORDER.indexOf(classLevel) >= CEFR_ORDER.indexOf(currentLevel);
+}
+
 export default async function LearnPage() {
   const session = await auth();
   const userId = session?.user?.id;
@@ -129,6 +133,13 @@ export default async function LearnPage() {
             const isManualPlacement = course.placementSource === 'MANUAL';
             const courseTitle = course.curriculum?.title ?? langLabel(course.targetLang);
             const placementHref = `/learn/placement?native=${course.nativeLang}&target=${course.targetLang}`;
+            const activeClass = course.activeClassId
+              ? course.classes.find((cls) => cls.id === course.activeClassId)
+              : null;
+            const activeClassId =
+              activeClass && isAtOrAboveCurrentLevel(activeClass.lesson.level, course.currentLevel)
+                ? course.activeClassId
+                : null;
             return (
               <li key={course.id} className={styles.courseCard}>
                 <div className={styles.courseInfo}>
@@ -164,10 +175,7 @@ export default async function LearnPage() {
                   </div>
                 </div>
                 <div className={styles.courseActions}>
-                  <StartNextClass
-                    courseId={course.id}
-                    activeClassId={course.activeClassId ?? null}
-                  />
+                  <StartNextClass courseId={course.id} activeClassId={activeClassId} />
                   <Link
                     href="/learn/practice"
                     className={styles.practiceLink}
@@ -198,10 +206,7 @@ export default async function LearnPage() {
                   </Link>
                 </div>
                 <div className={styles.sourcedRow}>
-                  <SourcedClassEntry
-                    courseId={course.id}
-                    activeClassId={course.activeClassId ?? null}
-                  />
+                  <SourcedClassEntry courseId={course.id} activeClassId={activeClassId} />
                 </div>
                 <div className={styles.sourcedRow}>
                   <PedagogySelector courseId={course.id} current={course.pedagogy} />

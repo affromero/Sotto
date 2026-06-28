@@ -36,6 +36,10 @@ struct SottoAPIClient {
         return response.courses
     }
 
+    func fetchAgentUsage() async throws -> SottoAgentUsageStatus {
+        try await get("/api/v1/agent-usage")
+    }
+
     func createCourse(native: String, target: String) async throws -> SottoCourse {
         let response: SottoCourseCreateResponse = try await post(
             "/api/v1/courses",
@@ -72,6 +76,18 @@ struct SottoAPIClient {
 
     func fetchClass(classId: String) async throws -> SottoClassDetail {
         try await get("/api/v1/classes/\(classId)")
+    }
+
+    func regenerateClass(classId: String) async throws {
+        let _: ClassRegenerationResponse = try await post(
+            "/api/v1/classes/\(classId)",
+            body: RegenerateClassRequest(scope: "class"),
+            acceptedStatuses: [200]
+        )
+    }
+
+    func deleteClass(classId: String) async throws {
+        let _: DeleteClassResponse = try await delete("/api/v1/classes/\(classId)")
     }
 
     func startPractice(courseId: String, kind: String) async throws -> SottoPracticeStart {
@@ -118,7 +134,10 @@ struct SottoAPIClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.timeoutInterval = path.contains("/next-class") ? 300 : 60
+        request.timeoutInterval =
+            path.contains("/next-class") || (method == "POST" && path.contains("/api/v1/classes/"))
+            ? 300
+            : 60
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -189,6 +208,18 @@ private struct SubmitPracticeRequest: Encodable {
 
 private struct SubmitClassRequest: Encodable {
     let answers: [SottoSubmitAnswer]
+}
+
+private struct RegenerateClassRequest: Encodable {
+    let scope: String
+}
+
+private struct ClassRegenerationResponse: Decodable {
+    let regenerated: Bool
+}
+
+private struct DeleteClassResponse: Decodable {
+    let deleted: Bool
 }
 
 private struct EmptyBody: Encodable {}

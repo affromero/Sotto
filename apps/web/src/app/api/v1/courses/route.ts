@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { cefrRank } from '@/lib/cefr-levels';
 
 const langCode = z.string().trim().toLowerCase().length(2);
 const createSchema = z.object({ native: langCode, target: langCode });
@@ -31,9 +32,36 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ courses });
+    const activeIds = courses
+      .map((course) => course.activeClassId)
+      .filter((id): id is string => Boolean(id));
+    const activeClasses =
+      activeIds.length > 0
+        ? await prisma.courseClass.findMany({
+            where: { id: { in: activeIds }, course: { userId: authed.userId } },
+            select: {
+              id: true,
+              lesson: { select: { level: true } },
+            },
+          })
+        : [];
+    const activeLevelById = new Map(activeClasses.map((cls) => [cls.id, cls.lesson.level]));
+    const sanitizedCourses = courses.map((course) => {
+      const activeLevel = course.activeClassId
+        ? activeLevelById.get(course.activeClassId)
+        : undefined;
+      const activeClassId =
+        activeLevel && cefrRank(activeLevel) >= cefrRank(course.currentLevel)
+          ? course.activeClassId
+          : null;
+      return { ...course, activeClassId };
+    });
+
+    return NextResponse.json({ courses: sanitizedCourses });
   } catch (error: unknown) {
-    logger.error('Failed to list courses', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to list courses', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to list courses', 500);
   }
 }
@@ -68,7 +96,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ course }, { status: 201 });
   } catch (error: unknown) {
-    logger.error('Failed to create course', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to create course', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to create course', 500);
   }
 }

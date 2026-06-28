@@ -2,10 +2,10 @@ import SwiftUI
 
 struct ClassSessionView: View {
     @EnvironmentObject private var model: SottoAppModel
-    @Environment(\.dismiss) private var dismiss
     let classDetail: SottoClassDetail
 
     @State private var answers: [String: Int] = [:]
+    @State private var showingRemoveConfirmation = false
 
     private var currentClass: SottoClassDetail {
         model.selectedClass ?? classDetail
@@ -19,11 +19,25 @@ struct ClassSessionView: View {
         !questions.isEmpty && questions.allSatisfy { answers[$0.id] != nil }
     }
 
+    private var completionProgress: Double {
+        if currentClass.submitted { return 1 }
+        guard !questions.isEmpty else { return 0 }
+        return min(1, Double(answers.count) / Double(questions.count))
+    }
+
+    private var completionPercent: Int {
+        Int((completionProgress * 100).rounded())
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     header
+
+                    if let intro = currentClass.intro {
+                        ClassIntroBlock(intro: intro)
+                    }
 
                     if let result = model.classResult {
                         ClassResultBanner(result: result)
@@ -42,12 +56,12 @@ struct ClassSessionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        dismiss()
+                        model.closeClass()
                     }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
                     ProfileToolbarMenu {
-                        dismiss()
+                        model.closeClass()
                     }
 
                     Button {
@@ -58,6 +72,26 @@ struct ClassSessionView: View {
                     } label: {
                         Label("Workbook", systemImage: "pencil.and.scribble")
                     }
+
+                    Menu {
+                        Button {
+                            Task {
+                                await model.regenerateSelectedClass()
+                                answers = [:]
+                            }
+                        } label: {
+                            Label("Regenerate class", systemImage: "arrow.triangle.2.circlepath")
+                        }
+
+                        Button(role: .destructive) {
+                            showingRemoveConfirmation = true
+                        } label: {
+                            Label("Remove class", systemImage: "trash")
+                        }
+                    } label: {
+                        Label("Class settings", systemImage: "ellipsis.circle")
+                    }
+                    .disabled(model.isLoading)
 
                     Button {
                         Task {
@@ -70,23 +104,24 @@ struct ClassSessionView: View {
                     .disabled(!allAnswered)
                 }
             }
-            .overlay {
-                if model.isLoading {
-                    LoadingOverlay(
-                        operation: model.loadingOperation,
-                        onCancel: model.canCancelLoading ? {
-                            Task {
-                                await model.cancelCurrentClassGeneration()
-                            }
-                        } : nil
-                    )
-                }
-            }
             .sheet(isPresented: workbookSheetBinding) {
                 if let workbook = model.workbook {
                     WorkbookView(response: workbook)
                         .environmentObject(model)
                 }
+            }
+            .confirmationDialog("Remove class?", isPresented: $showingRemoveConfirmation, titleVisibility: .visible) {
+                Button("Remove class", role: .destructive) {
+                    Task {
+                        await model.deleteSelectedClass()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes the current generated class and clears the active-class gate so you can generate a new one.")
+            }
+            .onChange(of: currentClass.sections.map(\.id)) { _, _ in
+                answers = [:]
             }
         }
     }
@@ -127,7 +162,96 @@ struct ClassSessionView: View {
             }
             .font(.callout)
             .foregroundStyle(SottoTheme.muted)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Class completion")
+                    Spacer()
+                    Text("\(completionPercent)%")
+                        .monospacedDigit()
+                }
+                .font(.caption.bold())
+                .foregroundStyle(SottoTheme.muted)
+
+                ProgressView(value: completionProgress)
+                    .tint(SottoTheme.primary)
+            }
         }
+    }
+}
+
+private struct ClassIntroBlock: View {
+    let intro: SottoClassIntro
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(intro.purpose)
+                    .font(.title2.bold())
+                    .foregroundStyle(SottoTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(intro.about)
+                    .font(.body)
+                    .foregroundStyle(SottoTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Focus")
+                        .font(.caption.bold())
+                        .foregroundStyle(SottoTheme.muted)
+                    ForEach(intro.focus, id: \.self) { item in
+                        Label(item, systemImage: "checkmark.circle")
+                            .font(.callout)
+                            .foregroundStyle(SottoTheme.ink)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Examples")
+                        .font(.caption.bold())
+                        .foregroundStyle(SottoTheme.muted)
+                    ForEach(intro.examples, id: \.target) { example in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(example.target)
+                                .font(.headline)
+                                .foregroundStyle(SottoTheme.ink)
+                            Text(example.meaning)
+                                .font(.callout)
+                                .foregroundStyle(SottoTheme.muted)
+                            Text(example.note)
+                                .font(.caption)
+                                .foregroundStyle(SottoTheme.muted)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !intro.tips.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tips")
+                        .font(.caption.bold())
+                        .foregroundStyle(SottoTheme.muted)
+                    ForEach(intro.tips, id: \.self) { tip in
+                        Text(tip)
+                            .font(.callout)
+                            .foregroundStyle(SottoTheme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(22)
+        .background(SottoTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(SottoTheme.line)
+        )
     }
 }
 

@@ -3,6 +3,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import {
+  deleteClassForUser,
   getClassForUser,
   regenerateCurrentClass,
   regenerateFailedSections,
@@ -139,6 +140,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to regenerate sections';
     logger.error('Failed to regenerate sections', { error: message });
+    return errorResponse(message, 500);
+  }
+}
+
+/** DELETE /api/classes/[classId] — remove an owned class and clear the active-class gate. */
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const authed = await authenticateRequest(request);
+    if (!authed) return errorResponse('Unauthorized', 401);
+    const { classId } = await params;
+
+    const ok = await deleteClassForUser(classId, authed.userId);
+    if (!ok) return errorResponse('Class not found', 404);
+    return NextResponse.json({ deleted: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete class';
+    logger.error('Failed to delete class', { error: message });
     return errorResponse(message, 500);
   }
 }

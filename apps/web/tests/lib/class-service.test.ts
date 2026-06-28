@@ -108,6 +108,7 @@ import {
   submitClass,
   regenerateCurrentClass,
   regenerateFailedSections,
+  deleteClassForUser,
   ClassGenerationCancelledError,
   CourseNotFoundError,
 } from '@/lib/class-service';
@@ -216,6 +217,7 @@ describe('createNextClass', () => {
     mockClassSectionDeleteMany.mockResolvedValue({ count: 0 });
     mockClassSubmissionDeleteMany.mockResolvedValue({ count: 0 });
     mockCourseClassCreate.mockResolvedValue({ id: 'class-new' });
+    mockCourseClassDelete.mockResolvedValue({});
     mockCourseClassFindUnique.mockResolvedValue({ status: 'GENERATING' });
     mockCourseClassUpdate.mockResolvedValue({});
     mockCourseUpdate.mockResolvedValue({});
@@ -229,11 +231,44 @@ describe('createNextClass', () => {
 
   it('returns {kind:"gated"} when a non-PASSED class already exists', async () => {
     mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
-    mockCourseClassFindFirst.mockResolvedValue({ id: 'class-active', status: 'IN_PROGRESS' });
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-active',
+      status: 'IN_PROGRESS',
+      lesson: { level: 'A1' },
+    });
 
     const result = await createNextClass('course-1', 'u1');
 
     expect(result).toEqual({ kind: 'gated', activeClassId: 'class-active', status: 'IN_PROGRESS' });
+  });
+
+  it('clears a stale below-level active class and creates at the course currentLevel', async () => {
+    mockCourseFindFirst.mockResolvedValue({
+      ...SAMPLE_COURSE,
+      currentLevel: 'B1',
+      curriculum: { lessons: [SAMPLE_LESSON, SAMPLE_B1_LESSON] },
+    });
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-stale-a1',
+      status: 'IN_PROGRESS',
+      lesson: { level: 'A1' },
+    });
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockCourseClassDelete.mockResolvedValue({});
+
+    const result = await createNextClass('course-1', 'u1');
+
+    expect(result.kind).toBe('created');
+    expect(mockCourseClassDelete).toHaveBeenCalledWith({ where: { id: 'class-stale-a1' } });
+    expect(mockCourseUpdate).toHaveBeenCalledWith({
+      where: { id: 'course-1' },
+      data: { activeClassId: null },
+    });
+    expect(mockCourseClassCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ lessonId: 'lesson-b1', order: 15 }),
+      })
+    );
   });
 
   it('returns {kind:"done"} when all lessons are passed', async () => {
@@ -707,6 +742,43 @@ describe('regenerateCurrentClass', () => {
 
     expect(result).toBe(false);
     expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
+  });
+});
+
+// ---- deleteClassForUser ----
+
+describe('deleteClassForUser', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+    mockCourseClassDelete.mockResolvedValue({});
+    mockCourseUpdate.mockResolvedValue({});
+  });
+
+  it('returns false when the class is not owned by the user', async () => {
+    mockCourseClassFindFirst.mockResolvedValue(null);
+
+    const result = await deleteClassForUser('class-1', 'u1');
+
+    expect(result).toBe(false);
+    expect(mockCourseClassDelete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the class and clears activeClassId when needed', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      courseId: 'course-1',
+      course: { activeClassId: 'class-1' },
+    });
+
+    const result = await deleteClassForUser('class-1', 'u1');
+
+    expect(result).toBe(true);
+    expect(mockCourseClassDelete).toHaveBeenCalledWith({ where: { id: 'class-1' } });
+    expect(mockCourseUpdate).toHaveBeenCalledWith({
+      where: { id: 'course-1' },
+      data: { activeClassId: null },
+    });
   });
 });
 
