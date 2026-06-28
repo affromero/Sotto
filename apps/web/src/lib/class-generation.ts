@@ -6,6 +6,7 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { classLanguagePolicy } from './classes/class-language-policy';
 import type { SkillType } from '@sotto/shared';
 
 const QUESTIONS_PER_SECTION = 5;
@@ -123,6 +124,11 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     LEVEL: p.level,
     NATIVE: p.nativeLang,
     TARGET: p.targetLang,
+    LANGUAGE_POLICY: classLanguagePolicy({
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+    }),
     OBJECTIVE: p.objective,
     GRAMMAR_POINTS: p.grammarPoints.join(', '),
     VOCAB: p.targetVocab.map((v) => `${v.lemma} (${v.gloss})`).join('; '),

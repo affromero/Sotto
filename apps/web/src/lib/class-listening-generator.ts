@@ -18,6 +18,7 @@ import { addJob, verifyClassReferencesQueue, JobType } from './queue';
 import { getConfiguredTtsProviderId } from './providers/tts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { classLanguagePolicy, isImmersionLevel } from './classes/class-language-policy';
 
 const LISTENING_QUIZ_COUNT = 4;
 
@@ -25,6 +26,7 @@ export interface ClassListeningParams {
   userId: string;
   classId: string;
   courseId: string;
+  attempt?: number;
   level: string;
   nativeLang: string;
   targetLang: string;
@@ -79,7 +81,9 @@ export interface ListeningContent {
   comprehensionQuestions: ListeningComprehensionQuestion[];
 }
 
-export async function composeListeningContent(p: ListeningContentParams): Promise<ListeningContent> {
+export async function composeListeningContent(
+  p: ListeningContentParams
+): Promise<ListeningContent> {
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveLearningAi(p.userId);
   const userSpeechPrefs = await prisma.user.findUnique({
@@ -101,7 +105,9 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       language: p.targetLang,
       status: 'PENDING',
       ttsProvider: configuredTtsProvider ?? undefined,
-      ttsModel: configuredTtsProvider ? (userSpeechPrefs?.preferredTtsModel ?? undefined) : undefined,
+      ttsModel: configuredTtsProvider
+        ? (userSpeechPrefs?.preferredTtsModel ?? undefined)
+        : undefined,
     },
   });
   const episodeId = episode.id;
@@ -119,7 +125,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       model: ai.model,
       apiKeyOverride: ai.apiKey,
       targetLanguage: p.targetLang,
-      languageMode: 'conversational_mix',
+      languageMode: isImmersionLevel(p.level) ? 'full_immersion' : 'conversational_mix',
       forLearning: true,
       mustIncludeVocabulary: p.mustIncludeVocab,
       sourceContent: p.sourceContent,
@@ -205,6 +211,11 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       LEVEL: p.level,
       NATIVE: p.nativeLang,
       TARGET: p.targetLang,
+      LANGUAGE_POLICY: classLanguagePolicy({
+        level: p.level,
+        nativeLang: p.nativeLang,
+        targetLang: p.targetLang,
+      }),
       TRANSCRIPT: transcript,
       NOTES: formatNotesForPrompt(p.note ?? ''),
     });
@@ -212,8 +223,13 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
     const provider = createAIProvider(ai.provider);
     const quizResponse = await provider.generateResponse(
       systemPrompt,
-      [{ role: 'user', content: `Generate ${LISTENING_QUIZ_COUNT} listening comprehension questions.` }],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.7 },
+      [
+        {
+          role: 'user',
+          content: `Generate ${LISTENING_QUIZ_COUNT} listening comprehension questions.`,
+        },
+      ],
+      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.7 }
     );
 
     logUsage({
@@ -227,8 +243,16 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
     });
 
     // Step 10: parse quiz JSON
-    const cleaned = quizResponse.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    let rawQuestions: Array<{ question: string; options: unknown[]; correctIndex: unknown; explanation: string }>;
+    const cleaned = quizResponse.content
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+    let rawQuestions: Array<{
+      question: string;
+      options: unknown[];
+      correctIndex: unknown;
+      explanation: string;
+    }>;
     try {
       rawQuestions = JSON.parse(cleaned);
     } catch (err) {
@@ -244,7 +268,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
           typeof q.question === 'string' &&
           Array.isArray(q.options) &&
           q.options.length === 4 &&
-          typeof q.correctIndex === 'number',
+          typeof q.correctIndex === 'number'
       )
       .slice(0, LISTENING_QUIZ_COUNT)
       .map((q) => ({
@@ -261,14 +285,19 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
     return { episodeId, comprehensionQuestions: questions };
   } catch (err) {
     // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
-    await prisma.episode.update({ where: { id: episodeId }, data: { status: 'FAILED' } }).catch(() => {});
+    await prisma.episode
+      .update({ where: { id: episodeId }, data: { status: 'FAILED' } })
+      .catch(() => {});
     throw err;
   }
 }
 
 // Generate the LISTENING section of a class: compose the content, then persist
 // the gated ClassSection + LessonQuestion rows.
-export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
+export async function generateClassListening(
+  p: ClassListeningParams
+): Promise<ClassListeningResult> {
+  const attempt = p.attempt ?? 1;
   const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: p.userId,
     courseId: p.courseId,
@@ -289,8 +318,8 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       data: {
         classId: p.classId,
         skill: 'LISTENING',
-        attempt: 1,
-        seed: `${p.classId}-LISTENING-1`,
+        attempt,
+        seed: `${p.classId}-LISTENING-${attempt}`,
         spec: { objective: p.objective },
         status: 'READY',
         episodeId,
@@ -320,7 +349,9 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
     return { sectionId: section.id, episodeId };
   } catch (err) {
     // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
-    await prisma.episode.update({ where: { id: episodeId }, data: { status: 'FAILED' } }).catch(() => {});
+    await prisma.episode
+      .update({ where: { id: episodeId }, data: { status: 'FAILED' } })
+      .catch(() => {});
     throw err;
   }
 }

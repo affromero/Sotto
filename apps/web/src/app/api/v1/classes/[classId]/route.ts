@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { getClassForUser, regenerateFailedSections } from '@/lib/class-service';
+import {
+  getClassForUser,
+  regenerateCurrentClass,
+  regenerateFailedSections,
+} from '@/lib/class-service';
+import { classIntroFromSeed } from '@/lib/classes/class-intro';
 
 type RouteParams = { params: Promise<{ classId: string }> };
 
@@ -70,6 +75,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }),
     }));
 
+    const grammarPoints = Array.isArray(cls.lesson.grammarPoints)
+      ? (cls.lesson.grammarPoints as string[])
+      : [];
+    const targetVocab = Array.isArray(cls.lesson.targetVocab)
+      ? (cls.lesson.targetVocab as Array<{ lemma: string; gloss: string; pos?: string }>)
+      : [];
+    const intro = classIntroFromSeed(cls.adaptiveSeed, {
+      level: cls.lesson.level,
+      nativeLang: cls.course.nativeLang,
+      targetLang: cls.course.targetLang,
+      title: cls.lesson.title,
+      objective: cls.lesson.objective,
+      grammarPoints,
+      targetVocab,
+      sourceTitle: cls.sourceTitle,
+    });
+
     return NextResponse.json({
       id: cls.id,
       courseId: cls.courseId,
@@ -79,7 +101,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Sourced-class attribution (null for curriculum classes).
       sourceUrl: cls.sourceUrl,
       sourceTitle: cls.sourceTitle,
-      lesson: cls.lesson,
+      lesson: {
+        title: cls.lesson.title,
+        level: cls.lesson.level,
+        objective: cls.lesson.objective,
+      },
+      intro,
       submission: cls.submission,
       submitted,
       sections,
@@ -92,12 +119,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-/** POST /api/classes/[classId] — regenerate failed sections in a fresh form (retry). */
+/** POST /api/classes/[classId] — regenerate failed sections, or the current class with {scope:"class"}. */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const { classId } = await params;
+    const body = (await request.json().catch(() => ({}))) as { scope?: unknown };
+
+    if (body.scope === 'class') {
+      const ok = await regenerateCurrentClass(classId, authed.userId);
+      if (!ok) return errorResponse('Class not found or already passed.', 400);
+      return NextResponse.json({ regenerated: true, scope: 'class' });
+    }
 
     const ok = await regenerateFailedSections(classId, authed.userId);
     if (!ok) return errorResponse('No failed sections to regenerate (or class not found).', 400);

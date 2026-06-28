@@ -89,6 +89,20 @@ export interface ClassSection {
   writingPrompts: WritingPromptData[];
 }
 
+export interface ClassIntroExample {
+  target: string;
+  meaning: string;
+  note: string;
+}
+
+export interface ClassIntroData {
+  purpose: string;
+  about: string;
+  focus: string[];
+  examples: ClassIntroExample[];
+  tips: string[];
+}
+
 export interface ClassData {
   id: string;
   courseId: string;
@@ -100,6 +114,7 @@ export interface ClassData {
   /** Human-readable source title for the "Built from …" attribution. */
   sourceTitle: string | null;
   lesson: { title: string; level: string; objective: string };
+  intro: ClassIntroData;
   submitted: boolean;
   submission: { passed: boolean; overallScore: number } | null;
   sections: ClassSection[];

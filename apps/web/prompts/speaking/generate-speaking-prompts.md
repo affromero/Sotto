@@ -5,6 +5,10 @@ The lesson objective is: {{OBJECTIVE}}
 The lesson vocabulary the learner has been studying:
 {{VOCAB}}
 {{NOTES}}
+
+Language policy:
+{{LANGUAGE_POLICY}}
+
 Generate exactly {{COUNT}} short target phrases the learner should say aloud. Each phrase must:
 
 - Be written entirely in {{TARGET}}
@@ -20,7 +24,7 @@ Return ONLY a JSON array — no markdown fences, no preamble, no trailing commen
 ```
 {
   "targetPhrase": "phrase in {{TARGET}}",
-  "translation": "meaning in {{NATIVE}}",
+  "translation": "meaning or support note that follows the language policy",
   "ipa": "optional IPA transcription of the phrase"
 }
 ```

@@ -29,6 +29,7 @@ vi.mock('@/lib/prisma', () => ({
 const mockGetClassForUser = vi.fn();
 const mockSubmitClass = vi.fn();
 const mockRegenerateFailedSections = vi.fn();
+const mockRegenerateCurrentClass = vi.fn();
 const mockCreateNextClass = vi.fn();
 
 vi.mock('@/lib/class-service', () => {
@@ -38,6 +39,7 @@ vi.mock('@/lib/class-service', () => {
     getClassForUser: (...args: unknown[]) => mockGetClassForUser(...args),
     submitClass: (...args: unknown[]) => mockSubmitClass(...args),
     regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
+    regenerateCurrentClass: (...args: unknown[]) => mockRegenerateCurrentClass(...args),
     createNextClass: (...args: unknown[]) => mockCreateNextClass(...args),
     CourseNotFoundError,
     ClassGenerationCancelledError,
@@ -76,10 +78,29 @@ function courseParams(courseId: string) {
 // A class with two sections, each with two questions. Submission is null (not yet submitted).
 const SAMPLE_CLASS_UNSUBMITTED = {
   id: 'class-1',
+  courseId: 'course-1',
   status: 'IN_PROGRESS',
   order: 1,
   passThreshold: 0.6,
-  lesson: { title: 'Greetings', level: 'A1', objective: 'Learn greetings' },
+  sourceUrl: null,
+  sourceTitle: null,
+  adaptiveSeed: {
+    intro: {
+      purpose: 'Practice greetings.',
+      about: 'Use greetings before the questions.',
+      focus: ['Greet someone'],
+      examples: [{ target: 'Hola', meaning: 'Hello', note: 'Greeting' }],
+      tips: ['Listen for formal and informal forms.'],
+    },
+  },
+  course: { nativeLang: 'en', targetLang: 'es' },
+  lesson: {
+    title: 'Greetings',
+    level: 'A1',
+    objective: 'Learn greetings',
+    grammarPoints: ['ser-present'],
+    targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+  },
   submission: null,
   sections: [
     {
@@ -89,6 +110,7 @@ const SAMPLE_CLASS_UNSUBMITTED = {
       attempt: 1,
       score: null,
       passed: null,
+      episode: null,
       questions: [
         {
           id: 'q1',
@@ -96,6 +118,7 @@ const SAMPLE_CLASS_UNSUBMITTED = {
           question: 'Q1?',
           options: ['a', 'b', 'c', 'd'],
           passageRef: null,
+          passageText: null,
           correctIndex: 0,
           explanation: 'Exp1',
         },
@@ -105,6 +128,7 @@ const SAMPLE_CLASS_UNSUBMITTED = {
           question: 'Q2?',
           options: ['a', 'b', 'c', 'd'],
           passageRef: null,
+          passageText: null,
           correctIndex: 1,
           explanation: 'Exp2',
         },
@@ -126,6 +150,7 @@ const SAMPLE_CLASS_SPEAKING = {
       attempt: 1,
       score: null,
       passed: null,
+      episode: null,
       questions: [],
       prompts: [
         {
@@ -153,7 +178,12 @@ const SAMPLE_CLASS_LISTENING = {
       attempt: 1,
       score: null,
       passed: null,
-      episode: { id: 'pod-1', audioUrl: 'https://r2/listen.mp3', title: 'Listening' },
+      episode: {
+        id: 'pod-1',
+        audioUrl: 'https://r2/listen.mp3',
+        title: 'Listening',
+        references: [],
+      },
       questions: [
         {
           id: 'l1',
@@ -161,6 +191,7 @@ const SAMPLE_CLASS_LISTENING = {
           question: 'What did they discuss?',
           options: ['a', 'b', 'c', 'd'],
           passageRef: null,
+          passageText: null,
           correctIndex: 0,
           explanation: 'E',
         },
@@ -298,6 +329,7 @@ describe('GET /api/v1/classes/[classId]', () => {
     expect(body.status).toBe('IN_PROGRESS');
     expect(body.passThreshold).toBe(0.6);
     expect(body.lesson).toMatchObject({ title: 'Greetings' });
+    expect(body.intro).toMatchObject({ purpose: 'Practice greetings.' });
     expect(body.sections).toHaveLength(1);
   });
 });
@@ -332,6 +364,21 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ regenerated: true });
+  });
+
+  it('regenerates the current class when scope=class', async () => {
+    mockRegenerateCurrentClass.mockResolvedValue(true);
+
+    const res = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', { scope: 'class' }),
+      classParams('class-1')
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith('class-1', 'u1');
+    expect(mockRegenerateFailedSections).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body).toEqual({ regenerated: true, scope: 'class' });
   });
 
   it('returns 400 when there are no failed sections to regenerate', async () => {

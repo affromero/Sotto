@@ -9,6 +9,7 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { classLanguagePolicy } from './classes/class-language-policy';
 
 const WRITING_PROMPT_COUNT = 3;
 
@@ -38,7 +39,9 @@ function isValidRawPrompt(item: unknown): item is RawWritingPrompt {
   return typeof obj.task === 'string' && obj.task.trim() !== '';
 }
 
-export async function composeWritingPrompts(p: WritingPromptsParams): Promise<ComposedWritingPrompt[]> {
+export async function composeWritingPrompts(
+  p: WritingPromptsParams
+): Promise<ComposedWritingPrompt[]> {
   const ai = await resolveLearningAi(p.userId);
 
   const vocabList = p.targetVocab.map((v) => `${v.lemma} — ${v.gloss}`).join('\n');
@@ -47,6 +50,11 @@ export async function composeWritingPrompts(p: WritingPromptsParams): Promise<Co
     LEVEL: p.level,
     NATIVE: p.nativeLang,
     TARGET: p.targetLang,
+    LANGUAGE_POLICY: classLanguagePolicy({
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+    }),
     OBJECTIVE: p.objective,
     VOCAB: vocabList,
     NOTES: formatNotesForPrompt(p.note ?? ''),
@@ -56,7 +64,7 @@ export async function composeWritingPrompts(p: WritingPromptsParams): Promise<Co
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${WRITING_PROMPT_COUNT} writing tasks.` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.7 },
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.7 }
   );
 
   logUsage({
@@ -68,7 +76,10 @@ export async function composeWritingPrompts(p: WritingPromptsParams): Promise<Co
     userId: p.userId,
   });
 
-  const cleaned = res.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = res.content
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
   let raw: unknown[];
   try {
     const parsed = JSON.parse(cleaned);
@@ -91,6 +102,7 @@ export async function composeWritingPrompts(p: WritingPromptsParams): Promise<Co
 export interface ClassWritingParams {
   userId: string;
   classId: string;
+  attempt?: number;
   level: string;
   nativeLang: string;
   targetLang: string;
@@ -104,6 +116,7 @@ export interface ClassWritingResult {
 }
 
 export async function generateClassWriting(p: ClassWritingParams): Promise<ClassWritingResult> {
+  const attempt = p.attempt ?? 1;
   const prompts = await composeWritingPrompts({
     userId: p.userId,
     level: p.level,
@@ -118,8 +131,8 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
     data: {
       classId: p.classId,
       skill: 'WRITING',
-      attempt: 1,
-      seed: `${p.classId}-WRITING-1`,
+      attempt,
+      seed: `${p.classId}-WRITING-${attempt}`,
       spec: { objective: p.objective },
       status: 'READY',
       generatedAt: new Date(),
