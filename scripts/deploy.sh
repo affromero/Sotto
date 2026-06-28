@@ -262,13 +262,19 @@ COMMIT_SHA=$(git rev-parse --short HEAD)
 export WEB_PORT=$NEW_WEB_PORT
 docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build
 
+# Build the worker image before migrations so the Prisma CLI comes from the
+# pinned workspace install, not an npx network fallback.
+echo ""
+echo "=== Building migration runner ==="
+docker compose -f "$COMPOSE_WORKERS" build workers-heavy
+
 # --- Database migrations ---
 
 echo ""
 echo "=== Running database migrations ==="
-docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" run --rm --no-deps \
+docker compose -f "$COMPOSE_WORKERS" run --rm --no-deps \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
-  web npx prisma@6 db push --skip-generate --schema=prisma/schema.prisma --accept-data-loss
+  workers-heavy npx --no-install prisma db push --skip-generate --schema=prisma/schema.prisma --accept-data-loss
 
 # --- Start new slot ---
 
