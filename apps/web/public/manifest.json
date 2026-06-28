@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Sotto: Learn a language in your context",
+  "name": "Sotto: Private language rehearsal",
   "short_name": "Sotto",
-  "description": "Language learning you run yourself, with courses built from your notes, work, and interests.",
+  "description": "Self-hosted language rehearsal, not another AI language chatbot, before class, tutoring, or real conversation.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -29,7 +29,7 @@
       "name": "Practice",
       "short_name": "Practice",
       "url": "/learn/practice",
-      "description": "Ungated skill practice"
+      "description": "Private skill rehearsal"
     },
     {
       "name": "Connect a device",

@@ -254,7 +254,23 @@ Do not describe meeting recap, news briefing, public feed, or bot workflow surfa
 
 ---
 
-## 9. Learning API Surfaces
+## 9. Classroom and Teacher-Mode Boundary
+
+The shipped data model supports isolated learner profiles on one self-hosted instance. That is enough for household switching and is the base for a future teacher-run mode, but it is not yet a homework or classroom-management system.
+
+Teacher mode should add explicit models and routes for:
+
+- teacher-authored assignments that target one or more learner profiles
+- assigned practice scenarios, source material, writing prompts, and speaking prompts
+- per-student attempt history and retry state
+- follow-up queues for teacher review before class
+- teacher-visible summaries that avoid exposing raw private notes unless the teacher assigned them
+
+The design boundary is important: Sotto may capture practice evidence and suggest follow-ups, but teacher-controlled deployments should keep teachers responsible for goals, rubrics, final judgment, and live instruction.
+
+---
+
+## 10. Learning API Surfaces
 
 The current learning API surface is under `/api/v1`:
 
@@ -287,7 +303,7 @@ Existing `/api/v1/episodes/*` routes may still be used by the reused audio engin
 
 ---
 
-## 10. Storage
+## 11. Storage
 
 Local storage is the default for OSS.
 
@@ -306,7 +322,7 @@ Storage rules:
 
 ---
 
-## 11. Security
+## 12. Security
 
 Security priorities:
 
@@ -322,7 +338,7 @@ Learning data is sensitive. Course notes, vocabulary graphs, speaking recordings
 
 ---
 
-## 12. Managed Hosting
+## 13. Managed Hosting
 
 The active product should not depend on managed hosting or Sotto billing. The free self-hosted build includes the full learning loop.
 

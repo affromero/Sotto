@@ -59,9 +59,12 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    // brand.ts must carry the new language-learning positioning
-    expect(sharedPositioningSource).toContain('Learn a language, taught in your own context.');
-    expect(sharedPositioningSource).toContain('Courses from your notes, work, and interests');
+    // brand.ts and static app metadata must carry the private-rehearsal positioning
+    expect(sharedPositioningSource).toContain(
+      'Practice a language before the pressure of speaking.'
+    );
+    expect(sharedPositioningSource).toContain('low-pressure rehearsal');
+    expect(sharedPositioningSource).toContain('not another AI language chatbot');
 
     // old social-episode and episode-network copy must be gone
     expect(landingSource).not.toContain('social episode network');
@@ -704,7 +707,7 @@ describe('open-source language-learning OSS surfaces', () => {
     for (const claim of staleClaims) {
       expect(releaseDocsSource, claim).not.toContain(claim);
     }
-    expect(releaseDocsSource).toContain('Learn a language, taught in your own context.');
+    expect(releaseDocsSource).toContain('Practice a language before the pressure of speaking.');
     expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
     expect(releaseDocsSource).toContain('keyless local agent');

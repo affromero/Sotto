@@ -18,9 +18,11 @@
 | Build a class from a source    | `/learn` -> `Class about...`                               | Link/topic entry on the course card                           | CEFR-leveled sourced class                                   |
 | Study on iPad                  | Class hub/history -> `iPad workbook`                       | `/classes/[classId]/worksheet`                                | Printable/annotatable workbook with web deep links           |
 | Sharpen one skill              | `/learn/practice`                                          | Practice panel                                                | Ungated practice session and SRS updates                     |
+| Rehearse before live speaking  | `/learn/practice` or `/learn/live`                         | Practice runner or live conversation                          | Private attempts and follow-up vocabulary                    |
 | Review memory                  | `/memory`                                                  | Cytoscape graph                                               | Course-scoped vocab/grammar SRS view                         |
 | Take a mock exam               | `/learn/exams?course=...`                                  | Exam runner                                                   | Self-assessment score and feedback                           |
 | Pair clients and devices       | `/settings/devices`                                        | QR pairing/API keys                                           | `sk_sotto_` key for TUI, agents, scripts, or app clients     |
+| Plan teacher-run practice      | `/profiles`                                                | Student profile picker                                        | Isolated student profiles today; homework mode planned       |
 
 ### End-to-end learner journey
 
@@ -432,7 +434,7 @@ Use `/learn/practice` for ungated sessions.
 3. Complete the session.
 4. Submit.
 
-Practice updates the memory graph and spaced-repetition state. It does not advance the course level or replace the gated class.
+Practice updates the memory graph and spaced-repetition state. It does not advance the course level or replace the gated class. It is also the low-pressure rehearsal surface: learners can retry speaking, writing, listening, and vocabulary privately before they bring a stronger attempt to a teacher, tutor, classmate, or live conversation.
 
 ### Memory graph
 
@@ -499,6 +501,19 @@ Sotto is private-first and self-hosted. A local install can still have multiple 
 5. Return to `/profiles` to switch learners.
 
 Each profile has its own courses, progress, practice history, and memory graph. Owner-only operations such as API key management remain restricted to the owner/admin profile.
+
+### Planned teacher mode
+
+Teacher mode should extend the profile model without turning Sotto into a replacement teacher:
+
+1. The teacher self-hosts or school-hosts the instance.
+2. The teacher creates one profile per student.
+3. The teacher assigns homework as private rehearsal: scenarios, target vocabulary, source material, speaking prompts, writing prompts, or catch-up practice.
+4. Each student completes the assignment in their own profile, with retries allowed.
+5. Sotto captures attempts, scores, difficult words, questions asked, and suggested follow-ups.
+6. The teacher reviews the follow-up queue before class and decides what to reteach, skip, or discuss live.
+
+The boundary is intentional. Sotto should help teachers prepare classes and follow up with each student; it should not claim to certify final ability, replace teacher judgment, or make curriculum decisions without teacher review.
 
 ## 11. Maintenance Flow
 

@@ -110,7 +110,7 @@ export default function OgImage() {
             marginBottom: 24,
           }}
         >
-          Place. Practice.{' '}
+          Practice. Rehearse.{' '}
           <span style={{ color: '#3F4FB0', fontStyle: 'italic' }}>Progress.</span>
         </h1>
         <p
