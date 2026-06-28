@@ -17,6 +17,9 @@ describe('desktop download redirects', () => {
     process.env.R2_PUBLIC_URL = 'https://cdn.sotto.fm';
     delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
     delete process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_BASE_URL;
+    delete process.env.DESKTOP_GITHUB_RELEASE_BASE_URL;
+    delete process.env.DESKTOP_LATEST_VERSION;
+    delete process.env.NEXT_PUBLIC_DESKTOP_LATEST_VERSION;
   });
 
   afterEach(() => {
@@ -24,6 +27,9 @@ describe('desktop download redirects', () => {
     delete process.env.R2_PUBLIC_URL;
     delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
     delete process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_BASE_URL;
+    delete process.env.DESKTOP_GITHUB_RELEASE_BASE_URL;
+    delete process.env.DESKTOP_LATEST_VERSION;
+    delete process.env.NEXT_PUBLIC_DESKTOP_LATEST_VERSION;
   });
 
   it('redirects a platform download to the primary file from the latest manifest', async () => {
@@ -67,17 +73,29 @@ describe('desktop download redirects', () => {
     );
   });
 
-  it('returns a clear 404 before a platform build has been published', async () => {
+  it('falls back to the GitHub release asset when a CDN manifest is missing', async () => {
     global.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
 
     const response = await GET(request('/download/linux'), params('linux'));
 
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'Desktop build has not been published yet.',
-      platform: 'linux',
-      version: 'latest',
-    });
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://github.com/affromero/Sotto/releases/download/v0.1/sotto-host-v0.1-linux.AppImage'
+    );
+  });
+
+  it('falls back to GitHub release downloads when CDN downloads are not configured', async () => {
+    delete process.env.R2_PUBLIC_URL;
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock;
+
+    const response = await GET(request('/download/windows?version=0.1'), params('windows'));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://github.com/affromero/Sotto/releases/download/v0.1/sotto-host-v0.1-windows.msi'
+    );
   });
 
   it('rejects unsupported platforms', async () => {
