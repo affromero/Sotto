@@ -274,7 +274,7 @@ echo ""
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_WORKERS" run --rm --no-deps \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
-  workers-heavy npx --no-install prisma db push --skip-generate --schema=prisma/schema.prisma --accept-data-loss
+  workers-heavy npx --no-install prisma db push --schema=prisma/schema.prisma --accept-data-loss
 
 # --- Start new slot ---
 
