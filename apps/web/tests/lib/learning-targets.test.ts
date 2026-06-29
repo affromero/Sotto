@@ -5,6 +5,7 @@ const mockLearnerVocabUpsert = vi.fn();
 const mockLearnerFocusTargetUpsert = vi.fn();
 const mockLearnerFocusTargetFindFirst = vi.fn();
 const mockLearnerFocusTargetUpdate = vi.fn();
+const mockAssertStorageWritable = vi.fn();
 const mockUploadFile = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
 const mockGetConfiguredTtsProviderId = vi.fn();
@@ -24,7 +25,10 @@ vi.mock('@/lib/prisma', () => ({
     },
   },
 }));
-vi.mock('@/lib/r2', () => ({ uploadFile: (...a: unknown[]) => mockUploadFile(...a) }));
+vi.mock('@/lib/r2', () => ({
+  assertStorageWritable: (...a: unknown[]) => mockAssertStorageWritable(...a),
+  uploadFile: (...a: unknown[]) => mockUploadFile(...a),
+}));
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...a: unknown[]) => mockGetAutoModelConfig(...a),
 }));
@@ -96,6 +100,7 @@ beforeEach(() => {
     },
   });
   mockLearnerFocusTargetUpdate.mockResolvedValue(TARGET_ROW);
+  mockAssertStorageWritable.mockResolvedValue(undefined);
 });
 
 describe('learning target text handling', () => {
@@ -143,7 +148,7 @@ describe('addVisualCue', () => {
       expect.any(URL),
       expect.objectContaining({
         headers: { Authorization: 'user-pexels-key' },
-      }),
+      })
     );
   });
 });
@@ -180,7 +185,7 @@ describe('generateTargetPronunciation', () => {
         requestedProvider: 'cartesia',
         requestedModel: 'sonic-2',
         language: 'es',
-      }),
+      })
     );
     expect(generateSpeech).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -188,7 +193,7 @@ describe('generateTargetPronunciation', () => {
         voiceId: 'cartesia-voice',
         modelId: 'sonic-2',
         language: 'es',
-      }),
+      })
     );
   });
 
@@ -224,7 +229,7 @@ describe('generateTargetPronunciation', () => {
         requestedProvider: 'openai',
         requestedModel: 'tts-1-hd',
         language: 'es',
-      }),
+      })
     );
   });
 });
@@ -246,7 +251,7 @@ describe('addLearningTarget', () => {
           partOfSpeech: 'phrase',
           mastery: 0.05,
         }),
-      }),
+      })
     );
     expect(mockLearnerFocusTargetUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -257,7 +262,7 @@ describe('addLearningTarget', () => {
             normalizedText: 'me cuesta',
           },
         },
-      }),
+      })
     );
   });
 });
