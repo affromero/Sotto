@@ -3,11 +3,17 @@
 #
 # Usage: docker compose -f docker-compose.workers.yml up -d
 
+x-worker-image: &worker-image
+  image: ${SOTTO_WORKERS_IMAGE:-sotto-workers}:${SOTTO_IMAGE_TAG:-local}
+  build:
+    context: .
+    dockerfile: apps/web/Dockerfile.workers
+    args:
+      WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}
+
 services:
   workers-heavy:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile.workers
+    <<: *worker-image
     restart: unless-stopped
     deploy:
       resources:
@@ -33,9 +39,7 @@ services:
         max-file: '5'
 
   workers-pipeline:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile.workers
+    <<: *worker-image
     restart: unless-stopped
     deploy:
       resources:
@@ -61,9 +65,7 @@ services:
         max-file: '5'
 
   workers-light:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile.workers
+    <<: *worker-image
     restart: unless-stopped
     deploy:
       resources:

@@ -101,6 +101,43 @@ render_caddy_config() {
   printf '%s\n' "$rendered" | remove_optional_markers
 }
 
+validate_image_source() {
+  case "$SOTTO_IMAGE_SOURCE" in
+    build|registry) ;;
+    *)
+      echo "ERROR: SOTTO_IMAGE_SOURCE must be 'build' or 'registry', got: $SOTTO_IMAGE_SOURCE"
+      exit 1
+      ;;
+  esac
+}
+
+registry_login_if_configured() {
+  if [ -z "${GHCR_TOKEN:-}" ]; then
+    return
+  fi
+
+  echo "Logging in to ghcr.io with GHCR_TOKEN"
+  printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USERNAME:-$USER}" --password-stdin
+}
+
+pull_with_retry() {
+  local description="$1"
+  shift
+
+  local start=$SECONDS
+  local attempt=1
+  until "$@"; do
+    if [ $((SECONDS - start)) -ge "$IMAGE_PULL_TIMEOUT" ]; then
+      echo "ERROR: failed to pull $description after ${IMAGE_PULL_TIMEOUT}s"
+      return 1
+    fi
+
+    echo "Pull failed for $description (attempt $attempt); retrying in 15s"
+    attempt=$((attempt + 1))
+    sleep 15
+  done
+}
+
 cleanup_stale_caddy_configs() {
   local target_path="$1"
   local target_dir target_base legacy_site_name
@@ -149,9 +186,10 @@ echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT)"
 
 echo ""
 echo "=== Pulling latest code ==="
-PREV_SHA=$(git rev-parse --short HEAD)
+PREV_COMMIT_SHA=$(git rev-parse HEAD)
 git pull origin main
 git submodule update --init --recursive
+GIT_COMMIT_SHA=$(git rev-parse HEAD)
 
 # --- Environment ---
 
@@ -170,6 +208,23 @@ source "$COMPOSE_ENV_FILE"
 set +a
 require_env NEXT_PUBLIC_APP_URL
 
+COMMIT_SHA="$GIT_COMMIT_SHA"
+export COMMIT_SHA
+SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"
+validate_image_source
+SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"
+if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
+  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-ghcr.io/affromero/sotto-web-prod}"
+  SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-ghcr.io/affromero/sotto-workers-prod}"
+  SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}"
+else
+  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-sotto-web}"
+  SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-sotto-workers}"
+  SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-sotto-workers-base:$SOTTO_IMAGE_TAG}"
+fi
+IMAGE_PULL_TIMEOUT="${SOTTO_IMAGE_PULL_TIMEOUT:-600}"
+export SOTTO_IMAGE_TAG SOTTO_WEB_IMAGE SOTTO_WORKERS_IMAGE SOTTO_WORKER_BASE_IMAGE
+
 APP_DOMAIN="$(app_host_from_url "$NEXT_PUBLIC_APP_URL")"
 WWW_DOMAIN="${SOTTO_WWW_DOMAIN:-}"
 CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"
@@ -177,6 +232,10 @@ CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"
 validate_caddy_host SOTTO_WWW_DOMAIN "$WWW_DOMAIN"
 
 echo "Loaded env file: $ENV_FILE"
+echo "Deploy source:   $SOTTO_IMAGE_SOURCE"
+echo "Commit:          $COMMIT_SHA"
+echo "Previous commit: $PREV_COMMIT_SHA"
+echo "Image tag:       $SOTTO_IMAGE_TAG"
 echo "App domain:      $APP_DOMAIN"
 if [ -n "$WWW_DOMAIN" ]; then
   echo "WWW domain:      $WWW_DOMAIN"
@@ -246,27 +305,36 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# --- Pre-build cleanup (prevent disk exhaustion) ---
+# --- Image/cache status ---
 
 echo ""
-echo "=== Pre-build cleanup ==="
-docker image prune -af --filter "until=24h" 2>/dev/null || true
-docker builder prune -af 2>/dev/null || true
+echo "=== Docker disk usage before deploy ==="
+docker system df || true
 
-# --- Build new slot ---
+# --- Prepare new slot image ---
 
 echo ""
-echo "=== Building $NEW_SLOT slot ==="
-export COMMIT_SHA
-COMMIT_SHA=$(git rev-parse --short HEAD)
+echo "=== Preparing $NEW_SLOT slot image ==="
 export WEB_PORT=$NEW_WEB_PORT
-docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build
+if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
+  registry_login_if_configured
+  pull_with_retry "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG" \
+    docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"
+else
+  docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build web
+fi
 
-# Build the worker image before migrations so the Prisma CLI comes from the
+# Prepare the worker image before migrations so the Prisma CLI comes from the
 # pinned workspace install, not an npx network fallback.
 echo ""
-echo "=== Building migration runner ==="
-docker compose -f "$COMPOSE_WORKERS" build workers-heavy
+echo "=== Preparing migration runner ==="
+if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
+  pull_with_retry "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG" \
+    docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"
+else
+  docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .
+  docker compose -f "$COMPOSE_WORKERS" build workers-heavy
+fi
 
 # --- Database migrations ---
 
@@ -280,7 +348,7 @@ docker compose -f "$COMPOSE_WORKERS" run --rm --no-deps \
 
 echo ""
 echo "=== Starting $NEW_SLOT slot ==="
-docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" up -d
+docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" up -d --no-build web
 
 # --- Health check new slot ---
 
@@ -325,15 +393,14 @@ echo ""
 echo "=== Post-deploy smoke check ==="
 BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 
-# --- Build and restart workers ---
+# --- Restart workers ---
 # Workers are stateless BullMQ consumers; jobs are durable in Redis.
 # No drain needed — restart immediately with new code.
 
 echo ""
-echo "=== Building and restarting workers ==="
+echo "=== Restarting workers ==="
 echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESET_PIPELINE:-full} light=${WORKER_PRESET_LIGHT:-full}"
-docker compose -f "$COMPOSE_WORKERS" build
-docker compose -f "$COMPOSE_WORKERS" up -d --force-recreate
+docker compose -f "$COMPOSE_WORKERS" up -d --force-recreate --no-build
 
 # --- Stop old slot ---
 # Workers are already out of app compose — no job drain needed here.
@@ -362,7 +429,12 @@ echo "=== Saved active slot: $NEW_SLOT ==="
 
 echo ""
 echo "=== Cleaning up old images ==="
-docker image prune -f
+docker image prune -af --filter "until=168h" || true
+if [ "${SOTTO_DEPLOY_CLEAN_BUILDER:-0}" = "1" ]; then
+  docker builder prune -af --filter "until=168h" || true
+else
+  echo "Builder cache retained. Set SOTTO_DEPLOY_CLEAN_BUILDER=1 to prune old builder cache."
+fi
 
 echo ""
 echo "=== Deploy complete ==="
