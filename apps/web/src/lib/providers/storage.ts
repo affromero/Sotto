@@ -1,39 +1,106 @@
 import type { Readable } from 'stream';
+import * as path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { infra } from '../server-config';
 
 export interface StorageProvider {
   uploadFile(key: string, data: Buffer, contentType: string): Promise<string>;
   uploadStream(key: string, body: Readable, contentType: string): Promise<string>;
+  downloadFile(key: string): Promise<Buffer>;
   getPresignedUrl(key: string, expiresIn?: number): Promise<string>;
   deleteFile(key: string): Promise<void>;
 }
 
+interface StorageProviderOptions {
+  s3Bucket?: string | null;
+  s3Region?: string | null;
+}
+
 /**
- * Cloudflare R2 provider — wraps existing r2.ts.
+ * Cloudflare R2 provider.
  */
 class R2Provider implements StorageProvider {
-  private async getClient() {
-    return import('../r2');
+  private get bucket() {
+    return process.env.R2_BUCKET_NAME || 'sotto-storage';
+  }
+
+  private get publicUrl() {
+    return process.env.R2_PUBLIC_URL?.trim() || null;
+  }
+
+  private async getR2Client() {
+    const {
+      S3Client: S3,
+      PutObjectCommand,
+      GetObjectCommand,
+      DeleteObjectCommand,
+    } = await import('@aws-sdk/client-s3');
+    const accountId = process.env.R2_ACCOUNT_ID?.trim();
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+    if (!accountId || !accessKeyId || !secretAccessKey) {
+      throw new Error('R2 storage not configured — set R2_* environment variables');
+    }
+    const client = new S3({
+      region: 'auto',
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+    return { client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand };
+  }
+
+  private urlForKey(key: string): string {
+    return this.publicUrl ? `${this.publicUrl}/${key}` : key;
   }
 
   async uploadFile(key: string, data: Buffer, contentType: string): Promise<string> {
-    const r2 = await this.getClient();
-    return r2.uploadFile(key, data, contentType);
+    const { client, PutObjectCommand } = await this.getR2Client();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: data,
+        ContentType: contentType,
+      })
+    );
+    return this.urlForKey(key);
   }
 
   async uploadStream(key: string, body: Readable, contentType: string): Promise<string> {
-    const r2 = await this.getClient();
-    return r2.uploadStream(key, body, contentType);
+    const { client } = await this.getR2Client();
+    const { Upload } = await import('@aws-sdk/lib-storage');
+    const upload = new Upload({
+      client,
+      params: { Bucket: this.bucket, Key: key, Body: body, ContentType: contentType },
+      queueSize: 4,
+      partSize: 5 * 1024 * 1024,
+    });
+    await upload.done();
+    return this.urlForKey(key);
   }
 
-  async getPresignedUrl(key: string, expiresIn?: number): Promise<string> {
-    const r2 = await this.getClient();
-    return r2.getPresignedUrl(key, expiresIn);
+  async downloadFile(key: string): Promise<Buffer> {
+    const { client, GetObjectCommand } = await this.getR2Client();
+    const response = await client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!response.Body) throw new Error(`Empty response downloading ${key} from R2`);
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  }
+
+  async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+    const { client, GetObjectCommand } = await this.getR2Client();
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+    return getSignedUrl(client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn,
+    });
   }
 
   async deleteFile(key: string): Promise<void> {
-    const r2 = await this.getClient();
-    return r2.deleteFile(key);
+    const { client, DeleteObjectCommand } = await this.getR2Client();
+    await client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 }
 
@@ -41,8 +108,15 @@ class R2Provider implements StorageProvider {
  * AWS S3 provider — uses AWS S3 directly.
  */
 class S3Provider implements StorageProvider {
+  constructor(private readonly options: StorageProviderOptions = {}) {}
+
   private async getS3Client() {
-    const { S3Client: S3, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+    const {
+      S3Client: S3,
+      PutObjectCommand,
+      GetObjectCommand,
+      DeleteObjectCommand,
+    } = await import('@aws-sdk/client-s3');
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
 
     // Credentials are secrets — env-only, never sourced from DB config. When s3 is
@@ -52,7 +126,7 @@ class S3Provider implements StorageProvider {
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
     if (!accessKeyId || !secretAccessKey) {
       throw new Error(
-        'STORAGE_PROVIDER=s3 requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Set them in your environment.',
+        'STORAGE_PROVIDER=s3 requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Set them in your environment.'
       );
     }
 
@@ -65,21 +139,23 @@ class S3Provider implements StorageProvider {
   }
 
   private get bucket() {
-    return infra('s3Bucket', 'AWS_S3_BUCKET') || 'sotto-storage';
+    return this.options.s3Bucket?.trim() || infra('s3Bucket', 'AWS_S3_BUCKET') || 'sotto-storage';
   }
 
   private get region() {
-    return infra('s3Region', 'AWS_S3_REGION') || 'us-east-1';
+    return this.options.s3Region?.trim() || infra('s3Region', 'AWS_S3_REGION') || 'us-east-1';
   }
 
   async uploadFile(key: string, data: Buffer, contentType: string): Promise<string> {
     const { client, PutObjectCommand } = await this.getS3Client();
-    await client.send(new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      Body: data,
-      ContentType: contentType,
-    }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: data,
+        ContentType: contentType,
+      })
+    );
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
@@ -87,7 +163,7 @@ class S3Provider implements StorageProvider {
     const { client } = await this.getS3Client();
     const { Upload } = await import('@aws-sdk/lib-storage');
     const upload = new Upload({
-      client: client as any,
+      client,
       params: { Bucket: this.bucket, Key: key, Body: body, ContentType: contentType },
       queueSize: 4,
       partSize: 5 * 1024 * 1024,
@@ -96,13 +172,22 @@ class S3Provider implements StorageProvider {
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
+  async downloadFile(key: string): Promise<Buffer> {
+    const { client, GetObjectCommand } = await this.getS3Client();
+    const response = await client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!response.Body) throw new Error(`Empty response downloading ${key} from S3`);
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  }
+
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const { client, GetObjectCommand, getSignedUrl } = await this.getS3Client();
-    return getSignedUrl(
-      client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-      { expiresIn }
-    );
+    return getSignedUrl(client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn,
+    });
   }
 
   async deleteFile(key: string): Promise<void> {
@@ -116,40 +201,49 @@ class S3Provider implements StorageProvider {
  */
 class LocalProvider implements StorageProvider {
   private get baseDir() {
-    return process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage';
+    return path.resolve(process.cwd(), process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage');
+  }
+
+  private pathForKey(key: string): string {
+    if (key.startsWith('file://')) return fileURLToPath(key);
+    const resolved = path.resolve(this.baseDir, key);
+    if (resolved !== this.baseDir && !resolved.startsWith(`${this.baseDir}${path.sep}`)) {
+      throw new Error(`Refusing to access local storage path outside ${this.baseDir}`);
+    }
+    return resolved;
   }
 
   async uploadFile(key: string, data: Buffer, _contentType: string): Promise<string> {
     const fs = await import('fs/promises');
-    const path = await import('path');
-    const filePath = path.join(this.baseDir, key);
+    const filePath = this.pathForKey(key);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, data);
-    return `file://${filePath}`;
+    return pathToFileURL(filePath).href;
   }
 
   async uploadStream(key: string, body: Readable, _contentType: string): Promise<string> {
     const fs = await import('fs');
     const fsPromises = await import('fs/promises');
-    const path = await import('path');
     const { pipeline } = await import('stream/promises');
-    const filePath = path.join(this.baseDir, key);
+    const filePath = this.pathForKey(key);
     await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
     await pipeline(body, fs.createWriteStream(filePath));
-    return `file://${filePath}`;
+    return pathToFileURL(filePath).href;
+  }
+
+  async downloadFile(key: string): Promise<Buffer> {
+    const fs = await import('fs/promises');
+    return fs.readFile(this.pathForKey(key));
   }
 
   async getPresignedUrl(key: string): Promise<string> {
-    const path = await import('path');
-    return `file://${path.join(this.baseDir, key)}`;
+    return pathToFileURL(this.pathForKey(key)).href;
   }
 
   async deleteFile(key: string): Promise<void> {
     const fs = await import('fs/promises');
-    const path = await import('path');
-    const filePath = path.join(this.baseDir, key);
     try {
-      await fs.unlink(filePath);
+      await fs.unlink(this.pathForKey(key));
     } catch {
       // File may not exist
     }
@@ -166,13 +260,16 @@ function resolveStorageProviderType(type?: string): StorageProviderId {
   return providerType;
 }
 
-export function createStorageProvider(type?: string): StorageProvider {
+export function createStorageProvider(
+  type?: string,
+  options: StorageProviderOptions = {}
+): StorageProvider {
   const providerType = resolveStorageProviderType(type);
   switch (providerType) {
     case 'r2':
       return new R2Provider();
     case 's3':
-      return new S3Provider();
+      return new S3Provider(options);
     case 'local':
       return new LocalProvider();
   }

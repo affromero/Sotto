@@ -160,6 +160,32 @@ vi.mock('@/lib/r2', () => ({
   deleteFile: vi.fn(),
 }));
 
+const { mockStorageSend, MockPutObjectCommand, MockGetObjectCommand, MockDeleteObjectCommand } =
+  vi.hoisted(() => ({
+    mockStorageSend: vi.fn().mockResolvedValue({}),
+    MockPutObjectCommand: vi.fn(function (this: { params?: unknown }, params: unknown) {
+      this.params = params;
+    }),
+    MockGetObjectCommand: vi.fn(function (this: { params?: unknown }, params: unknown) {
+      this.params = params;
+    }),
+    MockDeleteObjectCommand: vi.fn(function (this: { params?: unknown }, params: unknown) {
+      this.params = params;
+    }),
+  }));
+
+vi.mock('@aws-sdk/client-s3', () => {
+  class MockS3Client {
+    send = mockStorageSend;
+  }
+  return {
+    S3Client: MockS3Client,
+    PutObjectCommand: MockPutObjectCommand,
+    GetObjectCommand: MockGetObjectCommand,
+    DeleteObjectCommand: MockDeleteObjectCommand,
+  };
+});
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -307,10 +333,29 @@ describe('Provider Factories', () => {
   });
 
   describe('createStorageProvider', () => {
-    it('r2 provider delegates to r2.ts', async () => {
+    it('r2 provider writes through an S3-compatible client', async () => {
+      process.env.R2_ACCOUNT_ID = 'account';
+      process.env.R2_ACCESS_KEY_ID = 'access';
+      process.env.R2_SECRET_ACCESS_KEY = 'secret';
+      process.env.R2_BUCKET_NAME = 'bucket';
+      process.env.R2_PUBLIC_URL = 'https://r2.example.com';
+      mockStorageSend.mockResolvedValue({});
+
       const provider = createStorageProvider('r2');
       const url = await provider.uploadFile('key', Buffer.from('data'), 'text/plain');
-      expect(url).toBe('https://r2.example.com/file');
+      expect(url).toBe('https://r2.example.com/key');
+      expect(MockPutObjectCommand).toHaveBeenCalledWith({
+        Bucket: 'bucket',
+        Key: 'key',
+        Body: expect.any(Buffer),
+        ContentType: 'text/plain',
+      });
+
+      delete process.env.R2_ACCOUNT_ID;
+      delete process.env.R2_ACCESS_KEY_ID;
+      delete process.env.R2_SECRET_ACCESS_KEY;
+      delete process.env.R2_BUCKET_NAME;
+      delete process.env.R2_PUBLIC_URL;
     });
 
     it('rejects unknown storage providers instead of switching to local storage', () => {

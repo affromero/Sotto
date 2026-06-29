@@ -9,7 +9,12 @@ vi.hoisted(() => {
   process.env.R2_PUBLIC_URL = 'https://cdn.example.com';
 });
 
-import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import {
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   uploadFile,
@@ -17,6 +22,7 @@ import {
   uploadEpisodeAudio,
   uploadSegmentAudio,
   getPresignedUrl,
+  assertStorageWritable,
   downloadFile,
   downloadToFile,
   deleteFile,
@@ -27,22 +33,27 @@ import {
 } from '@/lib/r2';
 
 // Mock AWS SDK and presigner
-const { mockSend, MockPutObjectCommand, MockGetObjectCommand, MockDeleteObjectCommand, MockListObjectsV2Command } =
-  vi.hoisted(() => ({
-    mockSend: vi.fn(),
-    MockPutObjectCommand: vi.fn(function (this: any, params: any) {
-      this.params = params;
-    }),
-    MockGetObjectCommand: vi.fn(function (this: any, params: any) {
-      this.params = params;
-    }),
-    MockDeleteObjectCommand: vi.fn(function (this: any, params: any) {
-      this.params = params;
-    }),
-    MockListObjectsV2Command: vi.fn(function (this: any, params: any) {
-      this.params = params;
-    }),
-  }));
+const {
+  mockSend,
+  MockPutObjectCommand,
+  MockGetObjectCommand,
+  MockDeleteObjectCommand,
+  MockListObjectsV2Command,
+} = vi.hoisted(() => ({
+  mockSend: vi.fn(),
+  MockPutObjectCommand: vi.fn(function (this: any, params: any) {
+    this.params = params;
+  }),
+  MockGetObjectCommand: vi.fn(function (this: any, params: any) {
+    this.params = params;
+  }),
+  MockDeleteObjectCommand: vi.fn(function (this: any, params: any) {
+    this.params = params;
+  }),
+  MockListObjectsV2Command: vi.fn(function (this: any, params: any) {
+    this.params = params;
+  }),
+}));
 
 vi.mock('@aws-sdk/client-s3', () => {
   class MockS3Client {
@@ -71,6 +82,10 @@ vi.mock('@aws-sdk/lib-storage', () => ({
   }),
 }));
 
+vi.mock('@/lib/server-config', () => ({
+  infra: (_key: string, envName: string) => process.env[envName],
+}));
+
 const { mockCreateWriteStream, mockPipeline } = vi.hoisted(() => ({
   mockCreateWriteStream: vi.fn().mockReturnValue({
     on: vi.fn(),
@@ -82,7 +97,11 @@ const { mockCreateWriteStream, mockPipeline } = vi.hoisted(() => ({
 
 vi.mock(import('fs'), async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, default: { ...actual, createWriteStream: mockCreateWriteStream }, createWriteStream: mockCreateWriteStream };
+  return {
+    ...actual,
+    default: { ...actual, createWriteStream: mockCreateWriteStream },
+    createWriteStream: mockCreateWriteStream,
+  };
 });
 
 vi.mock(import('stream/promises'), async (importOriginal) => {
@@ -103,6 +122,12 @@ vi.mock('@/lib/logger', () => ({
 describe('r2.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.R2_ACCOUNT_ID = 'test-account-id';
+    process.env.R2_ACCESS_KEY_ID = 'test-access-key';
+    process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
+    process.env.R2_BUCKET_NAME = 'test-bucket';
+    process.env.R2_PUBLIC_URL = 'https://cdn.example.com';
+    delete process.env.STORAGE_PROVIDER;
   });
 
   describe('uploadFile', () => {
@@ -175,6 +200,26 @@ describe('r2.ts', () => {
     });
   });
 
+  describe('assertStorageWritable', () => {
+    it('checks object storage with a real write before paid audio generation', async () => {
+      mockSend.mockResolvedValue({});
+
+      await assertStorageWritable();
+
+      expect(PutObjectCommand).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Key: expect.stringMatching(/^__sotto-preflight\/.+\.txt$/),
+        Body: expect.any(Buffer),
+        ContentType: 'text/plain',
+      });
+      expect(DeleteObjectCommand).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Key: expect.stringMatching(/^__sotto-preflight\/.+\.txt$/),
+      });
+      expect(mockSend).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('uploadEpisodeAudio', () => {
     it('uploads episode audio with correct key format', async () => {
       mockSend.mockResolvedValue({});
@@ -192,7 +237,6 @@ describe('r2.ts', () => {
         ContentType: 'audio/mpeg',
       });
     });
-
   });
 
   describe('uploadSegmentAudio', () => {
@@ -420,15 +464,15 @@ describe('r2.ts', () => {
     });
 
     it('blocks deletion of segment audio files without force flag', async () => {
-      await expect(
-        deleteFile('episodes/abc123/segments/seg456.mp3')
-      ).rejects.toThrow('Refusing to delete protected file');
+      await expect(deleteFile('episodes/abc123/segments/seg456.mp3')).rejects.toThrow(
+        'Refusing to delete protected file'
+      );
     });
 
     it('blocks deletion of episode audio files without force flag', async () => {
-      await expect(
-        deleteFile('episodes/abc123/audio.mp3')
-      ).rejects.toThrow('Refusing to delete protected file');
+      await expect(deleteFile('episodes/abc123/audio.mp3')).rejects.toThrow(
+        'Refusing to delete protected file'
+      );
     });
 
     it('allows deletion of segment audio with force flag', async () => {
@@ -450,7 +494,6 @@ describe('r2.ts', () => {
 
       expect(mockSend).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe('extractR2Key', () => {
@@ -479,9 +522,7 @@ describe('r2.ts', () => {
     });
 
     it('returns presigned URL for UNLISTED visibility', async () => {
-      (getSignedUrl as Mock).mockResolvedValue(
-        'https://signed.example.com/file.mp3?sig=abc'
-      );
+      (getSignedUrl as Mock).mockResolvedValue('https://signed.example.com/file.mp3?sig=abc');
 
       const url = 'https://cdn.example.com/episodes/abc/audio.mp3';
       const result = await resolveAudioUrl(url);
@@ -528,19 +569,12 @@ describe('r2.ts', () => {
 
     it('filters out entries without Prefix', async () => {
       mockSend.mockResolvedValue({
-        CommonPrefixes: [
-          { Prefix: 'episodes/' },
-          { Prefix: undefined },
-          { Prefix: 'avatars/' },
-        ],
+        CommonPrefixes: [{ Prefix: 'episodes/' }, { Prefix: undefined }, { Prefix: 'avatars/' }],
       });
 
       const result = await listPrefixes();
 
-      expect(result).toEqual([
-        { prefix: 'episodes/' },
-        { prefix: 'avatars/' },
-      ]);
+      expect(result).toEqual([{ prefix: 'episodes/' }, { prefix: 'avatars/' }]);
     });
   });
 

@@ -624,6 +624,8 @@ export async function getClassForUser(classId: string, userId: string) {
               audioUrl: true,
               status: true,
               title: true,
+              failureReason: true,
+              technicalError: true,
               // Sourced-class sources: render via ReferenceList with verification badges.
               references: {
                 orderBy: { number: 'asc' },

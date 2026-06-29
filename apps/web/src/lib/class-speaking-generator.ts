@@ -12,7 +12,7 @@ import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { canResolveTts, resolveTtsProvider, getConfiguredTtsProviderId } from './providers/tts';
 import { getAutoModelConfig } from './auto-model-config';
-import { uploadFile } from './r2';
+import { assertStorageWritable, uploadFile } from './r2';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy } from './classes/class-language-policy';
@@ -158,10 +158,22 @@ export async function composeSpeakingPrompts(
     where: { id: p.userId },
     select: { preferredTtsModel: true },
   });
+  let storageWritable = Boolean(ttsAvailable && requestedTtsProvider);
+  if (storageWritable) {
+    try {
+      await assertStorageWritable();
+    } catch (err) {
+      logger.warn('Reference TTS storage is unavailable for speaking prompts', {
+        refId: p.refId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      storageWritable = false;
+    }
+  }
 
   const referenceTtsUrls: (string | null)[] = [];
   for (let i = 0; i < phrases.length; i++) {
-    if (!ttsAvailable || !requestedTtsProvider) {
+    if (!ttsAvailable || !requestedTtsProvider || !storageWritable) {
       referenceTtsUrls.push(null);
       continue;
     }

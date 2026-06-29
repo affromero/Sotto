@@ -19,6 +19,24 @@ interface Config {
 }
 
 type InfraKey = keyof Config;
+type MigrationStatus = 'idle' | 'running' | 'done' | 'error';
+
+interface MigrationResult {
+  sourceProvider: string;
+  targetProvider: string;
+  scanned: number;
+  migrated: number;
+  skipped: number;
+  failed: number;
+  switched: boolean;
+  errors: Array<{ id: string; field: string; error: string }>;
+}
+
+function isMigrationResult(
+  value: MigrationResult | { error?: string } | null
+): value is MigrationResult {
+  return Boolean(value && 'migrated' in value && 'failed' in value);
+}
 
 const GROUPS: Array<{
   title: string;
@@ -77,6 +95,8 @@ export default function SiteConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [clearStatus, setClearStatus] = useState<'idle' | 'clearing' | 'cleared' | 'error'>('idle');
+  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>('idle');
+  const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
   const [clearBannerOpen, setClearBannerOpen] = useState(false);
 
   useEffect(() => {
@@ -93,6 +113,8 @@ export default function SiteConfigPage() {
     setCfg((c) => (c ? { ...c, [key]: value } : c));
     setSaveStatus('idle');
     setClearStatus('idle');
+    setMigrationStatus('idle');
+    setMigrationResult(null);
     setClearBannerOpen(false);
   }
 
@@ -136,6 +158,37 @@ export default function SiteConfigPage() {
       setClearBannerOpen(false);
     } catch {
       setClearStatus('error');
+    }
+  }
+
+  async function migrateStorage() {
+    if (!cfg) return;
+    setMigrationStatus('running');
+    setMigrationResult(null);
+    setSaveStatus('idle');
+    try {
+      const res = await fetch('/api/v1/admin/storage/migrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetProvider: cfg.storageProvider || 'local',
+          s3Bucket: cfg.s3Bucket,
+          s3Region: cfg.s3Region,
+          switchAfter: true,
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | MigrationResult
+        | { error?: string }
+        | null;
+      if (!res.ok || !isMigrationResult(body)) {
+        throw new Error(body && 'error' in body ? body.error : 'Storage migration failed');
+      }
+      setMigrationResult(body);
+      setMigrationStatus(body.failed > 0 ? 'error' : 'done');
+      setSaveStatus(body.switched ? 'saved' : 'idle');
+    } catch {
+      setMigrationStatus('error');
     }
   }
 
@@ -228,23 +281,93 @@ export default function SiteConfigPage() {
       {GROUPS.map((group) => (
         <section key={group.title} className={styles.group}>
           <h2 className={styles.sectionTitle}>{group.title}</h2>
+          {group.title === 'Storage' && cfg.storageProvider !== 's3' && (
+            <p className={styles.groupHelp}>
+              {cfg.storageProvider === 'r2'
+                ? 'Cloudflare R2 credentials stay in R2_* environment variables. Restart web and workers after changing secrets.'
+                : 'Local storage writes to LOCAL_STORAGE_DIR on this machine. Back up that directory with the database.'}
+            </p>
+          )}
           {group.fields.map((f) => (
             <div key={f.key} className={styles.field}>
               <label className={styles.fieldLabel} htmlFor={f.key}>
                 {f.label}
               </label>
-              <input
-                id={f.key}
-                className={styles.input}
-                type="text"
-                value={cfg[f.key] ?? ''}
-                placeholder={f.placeholder}
-                onChange={(e) => setField(f.key, e.target.value)}
-              />
+              {f.key === 'storageProvider' ? (
+                <select
+                  id={f.key}
+                  className={styles.select}
+                  value={cfg.storageProvider ?? 'local'}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                >
+                  <option value="local">local - local disk</option>
+                  <option value="r2">r2 - Cloudflare R2</option>
+                  <option value="s3">s3 - AWS S3</option>
+                </select>
+              ) : group.title === 'Storage' && cfg.storageProvider !== 's3' ? (
+                <input
+                  id={f.key}
+                  className={styles.input}
+                  type="text"
+                  value={cfg[f.key] ?? ''}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                  disabled
+                />
+              ) : (
+                <input
+                  id={f.key}
+                  className={styles.input}
+                  type="text"
+                  value={cfg[f.key] ?? ''}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                />
+              )}
             </div>
           ))}
+          {group.title === 'Storage' && (
+            <section className={styles.migrationBox} aria-labelledby="storage-migration-title">
+              <div>
+                <h3 id="storage-migration-title" className={styles.migrationTitle}>
+                  Migrate existing media
+                </h3>
+                <p className={styles.migrationText}>
+                  Copies known media references to the selected provider, updates database URLs, and
+                  leaves the old files in place. Use this when switching from local disk to a bucket
+                  or back.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.migrateBtn}
+                onClick={migrateStorage}
+                disabled={migrationStatus === 'running' || saveStatus === 'saving'}
+              >
+                {migrationStatus === 'running' ? 'Migrating...' : 'Migrate media and switch'}
+              </button>
+            </section>
+          )}
         </section>
       ))}
+
+      {migrationResult && (
+        <div
+          className={`${styles.resultBanner} ${
+            migrationStatus === 'done' ? styles.resultSuccess : styles.resultError
+          }`}
+          role="status"
+        >
+          Storage migration {migrationStatus === 'done' ? 'complete' : 'finished with errors'}:{' '}
+          {migrationResult.migrated} migrated, {migrationResult.skipped} skipped,{' '}
+          {migrationResult.failed} failed.
+        </div>
+      )}
+      {migrationStatus === 'error' && !migrationResult && (
+        <div className={`${styles.resultBanner} ${styles.resultError}`} role="status">
+          Storage migration failed.
+        </div>
+      )}
 
       <div className={styles.actions}>
         <button

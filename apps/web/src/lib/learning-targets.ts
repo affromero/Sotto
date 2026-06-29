@@ -1,10 +1,7 @@
 import { prisma } from './prisma';
-import { uploadFile } from './r2';
+import { assertStorageWritable, uploadFile } from './r2';
 import { getAutoModelConfig } from './auto-model-config';
-import {
-  getConfiguredTtsProviderId,
-  resolveTtsProvider,
-} from './providers/tts';
+import { getConfiguredTtsProviderId, resolveTtsProvider } from './providers/tts';
 import { isValidProviderId, type TtsProviderId } from './providers/tts-registry';
 import { getVisualCueKey } from './visual-cue-keys';
 import { logger } from './logger';
@@ -139,7 +136,10 @@ async function loadOwnedCourse(courseId: string, userId: string): Promise<Course
   return course;
 }
 
-async function ensureVocabForTarget(course: CourseContext, target: LearningTargetInput & { kind: FocusTargetKind }) {
+async function ensureVocabForTarget(
+  course: CourseContext,
+  target: LearningTargetInput & { kind: FocusTargetKind }
+) {
   if (target.kind === 'SENTENCE') return;
   const lemma = cleanText(target.text, MAX_TARGET_TEXT);
   if (!lemma) return;
@@ -165,7 +165,7 @@ async function ensureVocabForTarget(course: CourseContext, target: LearningTarge
 export async function addLearningTarget(
   courseId: string,
   userId: string,
-  input: LearningTargetInput,
+  input: LearningTargetInput
 ): Promise<LearningTargetDto> {
   const course = await loadOwnedCourse(courseId, userId);
   const text = cleanText(input.text, MAX_TARGET_TEXT);
@@ -176,7 +176,7 @@ export async function addLearningTarget(
   const contextText = input.contextText ? cleanText(input.contextText, MAX_CONTEXT_TEXT) : null;
   const userMarkedDifficulty = Math.max(
     MIN_DIFFICULTY,
-    Math.min(MAX_DIFFICULTY, Math.round(input.userMarkedDifficulty ?? DEFAULT_DIFFICULTY)),
+    Math.min(MAX_DIFFICULTY, Math.round(input.userMarkedDifficulty ?? DEFAULT_DIFFICULTY))
   );
   const sourceType = input.sourceType ?? 'MANUAL';
   const priorityBoost = difficultyToPriorityBoost(userMarkedDifficulty);
@@ -217,7 +217,7 @@ export async function addLearningTarget(
 export async function listLearningTargets(
   courseId: string,
   userId: string,
-  limit = 30,
+  limit = 30
 ): Promise<LearningTargetDto[]> {
   await loadOwnedCourse(courseId, userId);
   const targets = await prisma.learnerFocusTarget.findMany({
@@ -231,7 +231,7 @@ export async function listLearningTargets(
 export async function getPracticeFocusTargets(
   courseId: string,
   limit = 4,
-  focusTargetId?: string | null,
+  focusTargetId?: string | null
 ): Promise<FocusPracticeTarget[]> {
   const where = focusTargetId ? { courseId, id: focusTargetId } : { courseId };
   const targets = await prisma.learnerFocusTarget.findMany({
@@ -254,7 +254,7 @@ export async function markFocusTargetsPracticed(
   courseId: string,
   focusTargetIds: string[],
   quality: number,
-  now: Date,
+  now: Date
 ): Promise<void> {
   const ids = [...new Set(focusTargetIds.filter(Boolean))];
   if (ids.length === 0) return;
@@ -330,7 +330,7 @@ async function fetchPexelsCue(userId: string, query: string): Promise<VisualCueR
 export async function addVisualCue(
   courseId: string,
   userId: string,
-  targetId: string,
+  targetId: string
 ): Promise<LearningTargetDto> {
   const target = await findTargetForUser(courseId, userId, targetId);
   const cue = await fetchPexelsCue(userId, target.text);
@@ -353,9 +353,9 @@ async function resolvePronunciationRouting(target: Awaited<ReturnType<typeof fin
     const config = await getAutoModelConfig().catch(() => null);
     return {
       providerId: configured,
-      model: target.course.user.preferredTtsModel ?? (
-        config?.model.ttsProvider === configured ? config.model.ttsModel : null
-      ),
+      model:
+        target.course.user.preferredTtsModel ??
+        (config?.model.ttsProvider === configured ? config.model.ttsModel : null),
       source: 'server-configured',
     };
   }
@@ -377,14 +377,16 @@ async function resolvePronunciationRouting(target: Awaited<ReturnType<typeof fin
       source: 'auto-model',
     };
   } catch {
-    throw new LearningTargetUnavailableError(`No TTS provider supports ${target.course.targetLang}`);
+    throw new LearningTargetUnavailableError(
+      `No TTS provider supports ${target.course.targetLang}`
+    );
   }
 }
 
 export async function generateTargetPronunciation(
   courseId: string,
   userId: string,
-  targetId: string,
+  targetId: string
 ): Promise<LearningTargetDto> {
   const target = await findTargetForUser(courseId, userId, targetId);
   const routing = await resolvePronunciationRouting(target);
@@ -407,8 +409,12 @@ export async function generateTargetPronunciation(
       source: routing.source,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw new LearningTargetUnavailableError('Pronunciation is not available for the selected TTS provider');
+    throw new LearningTargetUnavailableError(
+      'Pronunciation is not available for the selected TTS provider'
+    );
   }
+
+  await assertStorageWritable();
 
   const voiceId = provider.getVoiceId('HOST', episodeId, undefined, target.course.targetLang);
   const audioBuffer = await provider.generateSpeech({
@@ -417,7 +423,11 @@ export async function generateTargetPronunciation(
     modelId: provider.getModelId(),
     language: target.course.targetLang,
   });
-  const url = await uploadFile(`learning-targets/${courseId}/${target.id}.mp3`, audioBuffer, 'audio/mpeg');
+  const url = await uploadFile(
+    `learning-targets/${courseId}/${target.id}.mp3`,
+    audioBuffer,
+    'audio/mpeg'
+  );
   const updated = await prisma.learnerFocusTarget.update({
     where: { id: target.id },
     data: { pronunciationAudioUrl: url },

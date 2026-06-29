@@ -309,7 +309,7 @@ describe('welcome hosted-demo mode', () => {
   it('keeps the placement ladder to one selected rung', async () => {
     const user = userEvent.setup();
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=7&lang=de');
+    window.history.pushState({}, '', '/welcome?step=8&lang=de');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -804,7 +804,8 @@ describe('welcome hosted-demo mode', () => {
           ttsModel: {},
           sttModel: {},
         }}
-        config={{ selfHosted: true, isOwner: false }}
+        storage={{ provider: 's3', s3Bucket: 'sotto-media', s3Region: 'us-east-1' }}
+        config={{ selfHosted: true, isOwner: true }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
       />
@@ -824,6 +825,7 @@ describe('welcome hosted-demo mode', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
       course: { native: 'en', target: 'it', level: 'A2' },
       preferred: { language: 'it' },
+      infra: { storageProvider: 's3', s3Bucket: 'sotto-media', s3Region: 'us-east-1' },
     });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('https://example.com/paper');
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('[book] Invisible Cities');
