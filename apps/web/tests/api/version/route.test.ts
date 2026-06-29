@@ -25,8 +25,8 @@ describe('GET /api/version', () => {
     process.env.DESKTOP_LATEST_VERSION = '0.1';
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
-        tag_name: 'v0.1',
-        html_url: 'https://github.com/affromero/Sotto/releases/tag/v0.1',
+        tag_name: 'v0.1.0',
+        html_url: 'https://github.com/affromero/Sotto/releases/tag/v0.1.0',
         published_at: '2026-06-28T12:00:00Z',
       })
     );
@@ -48,13 +48,13 @@ describe('GET /api/version', () => {
       version: packageJson.version,
       commit: '6b2b9122',
       latest: {
-        version: 'v0.1',
-        url: 'https://github.com/affromero/Sotto/releases/tag/v0.1',
+        version: 'v0.1.0',
+        url: 'https://github.com/affromero/Sotto/releases/tag/v0.1.0',
         publishedAt: '2026-06-28T12:00:00Z',
       },
       updateAvailable: false,
       desktop: {
-        latest: 'v0.1',
+        latest: 'v0.1.0',
         downloads: {
           mac: '/download/mac',
           windows: '/download/windows',

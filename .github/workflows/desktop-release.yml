@@ -4,14 +4,14 @@ name: Desktop launcher release
 # installers to R2 — the bucket that sotto.fm uses for /download desktop assets.
 # Each build publishes both a release-version path and a short-commit path, so
 # users can pin a desktop build without requiring a package version bump.
-# Trigger by pushing a tag like `v0.1` or `desktop-v0.1.0`, or run manually.
+# Trigger by pushing a tag like `v0.1.0` or `desktop-v0.1.0`, or run manually.
 on:
   push:
     tags: ['v*', 'desktop-v*']
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Version path to publish, for example v0.1'
+        description: 'Version path to publish, for example v0.1.0'
         required: false
         type: string
 
@@ -65,7 +65,7 @@ jobs:
 
           RAW_VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.release_version || github.ref_name }}"
           if [ -z "$RAW_VERSION" ] || [ "$RAW_VERSION" = "main" ]; then
-            RAW_VERSION="v$(node -p "require('./apps/desktop/package.json').version.replace(/\\.0$/, '')")"
+            RAW_VERSION="v$(node -p "require('./apps/desktop/package.json').version")"
           fi
 
           RELEASE_VERSION="${RAW_VERSION#desktop-}"
@@ -226,6 +226,8 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - uses: actions/checkout@v6
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -234,14 +236,37 @@ jobs:
       - name: List artifacts
         run: ls -lR artifacts
 
+      - name: Extract release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${GITHUB_REF_NAME#desktop-}"
+          VERSION="${VERSION#v}"
+
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { flag=1; print; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > changelog-section.md
+
+          if [ ! -s changelog-section.md ]; then
+            echo "CHANGELOG.md is missing release notes for $VERSION" >&2
+            exit 1
+          fi
+
+          cp changelog-section.md release-notes.md
+          cat >> release-notes.md <<'EOF'
+
+          Desktop installers are attached to this release. The same files are published for website download links under:
+
+          - `/download/desktop/<version>/<platform>/`
+          - `/download/desktop/<short-sha>/<platform>/`
+          - `/download/desktop/latest/<platform>/`
+          EOF
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
-          body: |
-            Sotto Host desktop installers.
-
-            The same files are published for the website download links under
-            `/download/desktop/<version>/<platform>/`,
-            `/download/desktop/<short-sha>/<platform>/`, and
-            `/download/desktop/latest/<platform>/`.
+          body_path: release-notes.md
