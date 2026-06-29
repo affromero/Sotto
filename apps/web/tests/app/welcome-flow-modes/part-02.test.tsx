@@ -214,7 +214,7 @@ describe('welcome hosted-demo mode', () => {
 
   it('supports design step deep-links without persisting hosted-demo state', async () => {
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=7&lang=es');
+    window.history.pushState({}, '', '/welcome?step=8&lang=es');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 
@@ -228,7 +228,7 @@ describe('welcome hosted-demo mode', () => {
 
   it('deep-links to the context brief before compose', async () => {
     mockConfigFetch(false);
-    window.history.pushState({}, '', '/welcome?step=8&lang=es');
+    window.history.pushState({}, '', '/welcome?step=9&lang=es');
 
     render(<WelcomeFlow initialConfig={{ selfHosted: false, isOwner: false }} />);
 

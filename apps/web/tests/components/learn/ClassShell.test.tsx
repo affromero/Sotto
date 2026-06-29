@@ -142,4 +142,22 @@ describe('ClassShell', () => {
     fireEvent.click(screen.getByRole('button', { name: /back to learn/i }));
     expect(mockPush).toHaveBeenCalledWith('/learn');
   });
+
+  it('surfaces failed listening audio details', async () => {
+    const cls = incompleteClass();
+    const listening = cls.sections.find((item) => item.skill === 'LISTENING');
+    if (listening?.episode) {
+      listening.episode.status = 'FAILED';
+      listening.episode.failureReason = 'Audio generation failed. Please try again.';
+      listening.episode.technicalError =
+        'R2 storage not configured - set R2_* environment variables';
+    }
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(cls));
+
+    render(<ClassShell classId="class-15" />);
+
+    expect(await screen.findByText(/Listening section audio failed/i)).toHaveTextContent(
+      /Audio generation failed/i
+    );
+  });
 });

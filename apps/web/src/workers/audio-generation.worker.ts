@@ -4,7 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveTtsProvider, createTtsProviderAsync } from '@/lib/providers';
 import { type TtsProviderId } from '@/lib/providers/tts-registry';
 import type { TtsProvider } from '@/lib/providers/tts';
-import { uploadSegmentAudio } from '@/lib/r2';
+import { assertStorageWritable, uploadSegmentAudio } from '@/lib/r2';
 import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { generateTtsAudio, getPlatformTtsKey } from '@/lib/tts-generation';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
@@ -76,6 +76,8 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     await job.updateProgress(100);
     return;
   }
+
+  await assertStorageWritable();
 
   // Fetch episode to determine voice configuration
   const episode = await prisma.episode.findUniqueOrThrow({

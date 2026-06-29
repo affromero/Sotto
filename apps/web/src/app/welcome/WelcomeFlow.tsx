@@ -13,6 +13,7 @@ import { StepLearnerProfile } from './steps/StepLearnerProfile';
 import { StepWelcome } from './steps/StepWelcome';
 import { StepAgent } from './steps/StepAgent';
 import { StepVoice } from './steps/StepVoice';
+import { StepStorage } from './storage/StepStorage';
 import { StepContext } from './steps/StepContext';
 import { StepPlacement } from './steps/StepPlacement';
 import { StepContextReview } from './steps/StepContextReview';
@@ -43,6 +44,12 @@ export interface VoiceState {
   ttsModel: Record<string, string>;
   /** Selected model per STT registry provider id (cloud/key-based providers only). */
   sttModel: Record<string, string>;
+}
+
+export interface StorageState {
+  provider: 'local' | 'r2' | 's3';
+  s3Bucket: string;
+  s3Region: string;
 }
 
 /** One selectable model option surfaced in the wizard. */
@@ -83,6 +90,11 @@ export interface FlowState {
 export interface OnboardingConfig {
   selfHosted: boolean;
   isOwner: boolean;
+  infra?: {
+    storageProvider: string | null;
+    s3Bucket: string | null;
+    s3Region: string | null;
+  } | null;
 }
 
 interface WelcomeFlowProps {
@@ -111,6 +123,12 @@ const DEFAULT_VOICE: VoiceState = {
   sttModel: {},
 };
 
+const DEFAULT_STORAGE: StorageState = {
+  provider: 'local',
+  s3Bucket: '',
+  s3Region: '',
+};
+
 interface WelcomeSnapshot {
   step: number;
   profileName: string;
@@ -119,6 +137,7 @@ interface WelcomeSnapshot {
   language: string;
   agent: AgentState;
   voice: VoiceState;
+  storage: StorageState;
   sources: Set<string>;
   contextItems: ContextItem[];
   understood: Set<CefrLevel>;
@@ -208,6 +227,28 @@ function parseVoice(value: unknown): VoiceState {
   };
 }
 
+function parseStorage(value: unknown): StorageState {
+  const record = asRecord(value);
+  const provider =
+    record?.provider === 'r2' || record?.provider === 's3' || record?.provider === 'local'
+      ? record.provider
+      : DEFAULT_STORAGE.provider;
+  return {
+    provider,
+    s3Bucket: typeof record?.s3Bucket === 'string' ? record.s3Bucket : '',
+    s3Region: typeof record?.s3Region === 'string' ? record.s3Region : '',
+  };
+}
+
+function storageFromConfig(config: OnboardingConfig): StorageState {
+  const provider = config.infra?.storageProvider;
+  return {
+    provider: provider === 'r2' || provider === 's3' || provider === 'local' ? provider : 'local',
+    s3Bucket: config.infra?.s3Bucket ?? '',
+    s3Region: config.infra?.s3Region ?? '',
+  };
+}
+
 function parseContextItems(value: unknown): ContextItem[] {
   if (!Array.isArray(value)) return [];
 
@@ -256,6 +297,7 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
       language: typeof record.language === 'string' ? record.language : '',
       agent: parseAgent(record.agent),
       voice: parseVoice(record.voice),
+      storage: parseStorage(record.storage),
       sources: new Set(sources),
       contextItems: parseContextItems(record.contextItems),
       understood: toSingleUnderstoodSet(understood),
@@ -286,6 +328,7 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
           }
         : { ...DEFAULT_AGENT },
     voice: { ...DEFAULT_VOICE },
+    storage: { ...DEFAULT_STORAGE },
     sources: new Set(),
     contextItems:
       clamped >= 6
@@ -316,6 +359,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [language, setLanguage] = useState('');
   const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
   const [voice, setVoice] = useState<VoiceState>({ ...DEFAULT_VOICE });
+  const [storage, setStorage] = useState<StorageState>({ ...DEFAULT_STORAGE });
   const [sources, setSources] = useState<Set<string>>(new Set());
   const [contextItems, setContextItems] = useState<ContextItem[]>([]);
   const [understood, setUnderstood] = useState<Set<CefrLevel>>(new Set());
@@ -331,7 +375,15 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     fetch('/api/v1/onboarding/config', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: OnboardingConfig | null) => {
-        if (active && data) setConfig({ selfHosted: !!data.selfHosted, isOwner: !!data.isOwner });
+        if (active && data) {
+          const nextConfig = {
+            selfHosted: !!data.selfHosted,
+            isOwner: !!data.isOwner,
+            infra: data.infra ?? null,
+          };
+          setConfig(nextConfig);
+          if (!hydratedRef.current) setStorage(storageFromConfig(nextConfig));
+        }
       })
       .catch(() => {
         // Leave the safe default (demo) if config can't be read.
@@ -361,6 +413,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setLanguage(snapshot.language);
     setAgent(snapshot.agent);
     setVoice(snapshot.voice);
+    setStorage(snapshot.storage);
     setSources(snapshot.sources);
     setContextItems(snapshot.contextItems);
     setUnderstood(toSingleUnderstoodSet(snapshot.understood));
@@ -426,6 +479,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         language,
         agent,
         voice,
+        storage,
         sources: [...sources],
         contextItems,
         understood: [...understood],
@@ -443,6 +497,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     sources,
     step,
     storageReady,
+    storage,
     understood,
     voice,
   ]);
@@ -467,18 +522,20 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                     : step === 5
                       ? true
                       : step === 6
-                        ? contextItems.length > 0
+                        ? true
                         : step === 7
-                          ? !!level
+                          ? contextItems.length > 0
                           : step === 8
-                            ? contextItems.length > 0 && !!level
-                            : false;
+                            ? !!level
+                            : step === 9
+                              ? contextItems.length > 0 && !!level
+                              : false;
 
-        if (canAdvance && step < 9) {
+        if (canAdvance && step < 11) {
           e.preventDefault();
           go(step + 1);
         }
-      } else if (e.key === 'Escape' && step > 1 && step <= 9) {
+      } else if (e.key === 'Escape' && step > 1 && step <= 11) {
         e.preventDefault();
         go(step - 1);
       }
@@ -501,6 +558,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setBaseLang('en');
     setAgent({ ...DEFAULT_AGENT });
     setVoice({ ...DEFAULT_VOICE });
+    setStorage(storageFromConfig(config));
     setSources(new Set());
     setContextItems([]);
     setUnderstood(new Set());
@@ -596,16 +654,28 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       break;
     case 6:
       stepView = (
-        <StepContext
-          contextItems={contextItems}
-          setContextItems={setContextItems}
+        <StepStorage
+          storage={storage}
+          config={config}
           demoMode={demoMode}
+          setStorage={(updater) => setStorage((prev) => updater(prev))}
           onNext={() => go(7)}
           onBack={() => go(5)}
         />
       );
       break;
     case 7:
+      stepView = (
+        <StepContext
+          contextItems={contextItems}
+          setContextItems={setContextItems}
+          demoMode={demoMode}
+          onNext={() => go(8)}
+          onBack={() => go(6)}
+        />
+      );
+      break;
+    case 8:
       stepView = (
         <StepPlacement
           baseLang={baseLang}
@@ -616,18 +686,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           onAddContextItems={addContextItems}
           level={level}
           demoMode={demoMode}
-          onNext={() => go(8)}
-          onBack={() => go(6)}
-        />
-      );
-      break;
-    case 8:
-      stepView = (
-        <StepContextReview
-          baseLang={baseLang}
-          language={language}
-          level={level}
-          contextItems={contextItems}
           onNext={() => go(9)}
           onBack={() => go(7)}
         />
@@ -635,16 +693,28 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       break;
     case 9:
       stepView = (
-        <StepCompose
+        <StepContextReview
+          baseLang={baseLang}
+          language={language}
           level={level}
-          voice={voice}
-          demoMode={demoMode}
-          onDone={() => go(10)}
+          contextItems={contextItems}
+          onNext={() => go(10)}
           onBack={() => go(8)}
         />
       );
       break;
     case 10:
+      stepView = (
+        <StepCompose
+          level={level}
+          voice={voice}
+          demoMode={demoMode}
+          onDone={() => go(11)}
+          onBack={() => go(9)}
+        />
+      );
+      break;
+    case 11:
       stepView = (
         <StepReady
           baseLang={baseLang}
@@ -654,6 +724,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           contextItems={contextItems}
           agent={agent}
           voice={voice}
+          storage={storage}
           config={config}
           onRestart={reset}
           onJump={go}

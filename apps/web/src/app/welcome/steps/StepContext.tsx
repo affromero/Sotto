@@ -266,7 +266,7 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>05 ·</span> Grant context
+        <span className={t.eyebrowIdx}>06 ·</span> Grant context
       </div>
       <h1 className={t.title}>
         Teach it <em>what you care about</em>.

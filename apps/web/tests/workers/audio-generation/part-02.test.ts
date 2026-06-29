@@ -98,8 +98,10 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 }));
 
 const mockUploadSegmentAudio = vi.fn().mockResolvedValue('https://r2.example.com/audio.mp3');
+const mockAssertStorageWritable = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/r2', () => ({
+  assertStorageWritable: (...args: unknown[]) => mockAssertStorageWritable(...args),
   uploadSegmentAudio: (...args: unknown[]) => mockUploadSegmentAudio(...args),
 }));
 
@@ -306,6 +308,7 @@ describe('processAudioGeneration', () => {
     mockUploadSegmentAudio.mockResolvedValue(
       'https://r2.example.com/episodes/episode-001/segments/segment-001.mp3'
     );
+    mockAssertStorageWritable.mockResolvedValue(undefined);
     mockProviderGetVoiceId.mockReturnValue('voice-abc');
     mockStandardGetVoiceId.mockReturnValue('openai-voice-abc');
     mockGetAudioDuration.mockResolvedValue(5.234);
@@ -666,6 +669,16 @@ describe('processAudioGeneration', () => {
       await expect(processAudioGeneration(job)).rejects.toThrow(
         'ElevenLabs API error (429): rate limited'
       );
+    });
+
+    it('fails storage preflight before calling the TTS provider', async () => {
+      mockAssertStorageWritable.mockRejectedValue(new Error('Storage is not writable'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioGeneration(job)).rejects.toThrow('Storage is not writable');
+      expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+      expect(mockPremiumGenerateSpeech).not.toHaveBeenCalled();
+      expect(mockUploadSegmentAudio).not.toHaveBeenCalled();
     });
 
     it('propagates errors from uploadSegmentAudio', async () => {

@@ -913,8 +913,13 @@ private func classPresentationIssues(_ classDetail: SottoClassDetail) -> [String
 
     if let listening = sectionsBySkill["LISTENING"], listening.episode == nil {
         issues.append("Listening section has no audio episode.")
-    } else if let listening = sectionsBySkill["LISTENING"], listening.episode?.audioUrl == nil {
-        issues.append("Listening section audio is not ready yet.")
+    } else if let listening = sectionsBySkill["LISTENING"], let episode = listening.episode, episode.audioUrl == nil {
+        if episode.status == "FAILED" {
+            let detail = episode.failureReason ?? episode.technicalError
+            issues.append("Listening section audio failed\(detail.map { ": \($0)" } ?? ".")")
+        } else {
+            issues.append("Listening section audio is not ready yet.")
+        }
     }
 
     if let speaking = sectionsBySkill["SPEAKING"], speaking.prompts.isEmpty {

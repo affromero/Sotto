@@ -94,6 +94,8 @@ export interface ClassSectionEpisode {
   audioUrl: string | null;
   status: string;
   title: string;
+  failureReason?: string | null;
+  technicalError?: string | null;
   /** The class's verified sources (sourced classes); empty for curriculum classes. */
   references: ClassReference[];
 }
@@ -245,7 +247,12 @@ export function classPresentationIssues(cls: ClassData): string[] {
   if (listening && !listening.episode) {
     issues.push('Listening section has no audio episode.');
   } else if (listening?.episode && !listening.episode.audioUrl) {
-    issues.push('Listening section audio is not ready yet.');
+    if (listening.episode.status === 'FAILED') {
+      const detail = listening.episode.failureReason ?? listening.episode.technicalError;
+      issues.push(`Listening section audio failed${detail ? `: ${detail}` : '.'}`);
+    } else {
+      issues.push('Listening section audio is not ready yet.');
+    }
   }
 
   const speaking = sectionsBySkill.get('SPEAKING');

@@ -14,7 +14,13 @@ import {
   lessonTitle,
 } from '../data';
 import type { CefrLevel } from '../data';
-import type { AgentState, ContextItem, VoiceState, OnboardingConfig } from '../WelcomeFlow';
+import type {
+  AgentState,
+  ContextItem,
+  StorageState,
+  VoiceState,
+  OnboardingConfig,
+} from '../WelcomeFlow';
 import {
   resolveAi,
   resolveLiveTranslateKey,
@@ -76,6 +82,7 @@ interface Props {
   contextItems: ContextItem[];
   agent: AgentState;
   voice: VoiceState;
+  storage?: StorageState;
   config: OnboardingConfig;
   onRestart: () => void;
   onJump: (step: number) => void;
@@ -89,6 +96,7 @@ export function StepReady({
   contextItems,
   agent,
   voice,
+  storage = { provider: 'local', s3Bucket: '', s3Region: '' },
   config,
   onRestart,
   onJump,
@@ -106,6 +114,12 @@ export function StepReady({
   const agentLabel = agent.method === 'cli' && prov.cli ? prov.cli.label : prov.name;
   const ttsName = (TTS_PROVIDERS.find((p) => p.id === voice.tts) ?? TTS_PROVIDERS[0]).name;
   const sttName = (STT_PROVIDERS.find((p) => p.id === voice.stt) ?? STT_PROVIDERS[0]).name;
+  const storageName =
+    storage.provider === 'r2'
+      ? 'Cloudflare R2'
+      : storage.provider === 's3'
+        ? 'AWS S3'
+        : 'Local disk';
   const visualCueName = voice.visualCueProvider === 'pexels' ? 'Pexels cues' : 'Image cues off';
   const contextSignalCount = sources.size + contextItems.length;
 
@@ -206,7 +220,14 @@ export function StepReady({
     }
 
     // Everything else (course, preferences, owner infra) in one call.
-    const infra = config.isOwner ? { ...ai.infra, ...tts.infra, ...stt.infra } : undefined;
+    const storageInfra = {
+      storageProvider: storage.provider,
+      s3Bucket: storage.provider === 's3' ? storage.s3Bucket : null,
+      s3Region: storage.provider === 's3' ? storage.s3Region : null,
+    };
+    const infra = config.isOwner
+      ? { ...ai.infra, ...tts.infra, ...stt.infra, ...storageInfra }
+      : undefined;
     const note = buildContextNote(sources, contextItems);
 
     try {
@@ -247,7 +268,7 @@ export function StepReady({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>09 ·</span> Ready
+        <span className={t.eyebrowIdx}>10 ·</span> Ready
       </div>
       <h1 className={t.title}>
         Welcome to your <em>{lang.native}</em>.
@@ -272,7 +293,7 @@ export function StepReady({
             </button>
             <button
               className={`${c.courseBadge} ${c.courseJump}`}
-              onClick={() => onJump(7)}
+              onClick={() => onJump(8)}
               title="Retake placement"
               type="button"
             >
@@ -323,6 +344,15 @@ export function StepReady({
             >
               <Glyph name="mic" size={13} />
               {sttName}
+            </button>
+            <button
+              className={`${c.csItem} ${c.csJump}`}
+              onClick={() => onJump(6)}
+              title="Change storage"
+              type="button"
+            >
+              <Glyph name="shield" size={13} />
+              {storageName}
             </button>
             <button
               className={`${c.csItem} ${c.csJump}`}

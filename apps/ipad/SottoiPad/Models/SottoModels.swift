@@ -378,6 +378,8 @@ struct SottoClassEpisode: Decodable, Equatable {
     let audioUrl: String?
     let status: String
     let title: String
+    let failureReason: String?
+    let technicalError: String?
 }
 
 struct SottoQuestion: Decodable, Identifiable, Equatable {

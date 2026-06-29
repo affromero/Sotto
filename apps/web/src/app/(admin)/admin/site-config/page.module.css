@@ -44,6 +44,12 @@
   gap: var(--spacing-sm);
 }
 
+.groupHelp {
+  margin: 0 0 var(--spacing-xs);
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -72,6 +78,54 @@
 .select:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.migrationBox {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.migrationTitle {
+  margin: 0 0 4px;
+  font: var(--text-body-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.migrationText {
+  margin: 0;
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+}
+
+.migrateBtn {
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font: var(--text-body-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.migrateBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .actions {

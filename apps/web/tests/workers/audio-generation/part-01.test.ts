@@ -98,8 +98,10 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 }));
 
 const mockUploadSegmentAudio = vi.fn().mockResolvedValue('https://r2.example.com/audio.mp3');
+const mockAssertStorageWritable = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/r2', () => ({
+  assertStorageWritable: (...args: unknown[]) => mockAssertStorageWritable(...args),
   uploadSegmentAudio: (...args: unknown[]) => mockUploadSegmentAudio(...args),
 }));
 

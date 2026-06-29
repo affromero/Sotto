@@ -202,7 +202,7 @@ export function StepContextReview({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>07 ·</span> Read context
+        <span className={t.eyebrowIdx}>08 ·</span> Read context
       </div>
       <h1 className={t.title}>
         Review the <em>practice brief</em>.

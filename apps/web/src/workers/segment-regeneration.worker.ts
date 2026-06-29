@@ -5,7 +5,7 @@ import { resolveTtsProvider } from '@/lib/providers';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { logUsage } from '@/lib/usage-logger';
-import { uploadSegmentAudio } from '@/lib/r2';
+import { assertStorageWritable, uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
@@ -57,6 +57,8 @@ export async function processSegmentRegeneration(
       `Episode ${episodeId} is missing a TTS provider. Select a provider before regenerating audio.`
     );
   }
+
+  await assertStorageWritable();
 
   const { provider, source, providerId } = await resolveTtsProvider({
     userId: episode.userId,

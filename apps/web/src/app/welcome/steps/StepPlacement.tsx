@@ -228,7 +228,7 @@ export function StepPlacement({
   return (
     <div className={t.stepEnter}>
       <div className={t.eyebrow}>
-        <span className={t.eyebrowIdx}>06 ·</span> Placement
+        <span className={t.eyebrowIdx}>07 ·</span> Placement
       </div>
       <h1 className={t.title}>{title}</h1>
       <p className={t.lede}>{lede}</p>
