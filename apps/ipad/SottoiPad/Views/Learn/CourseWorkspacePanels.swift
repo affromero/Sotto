@@ -622,8 +622,10 @@ private struct PanelHeader: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.callout.weight(.semibold))
-                .frame(width: 28, height: 28)
+                .frame(width: 32, height: 32)
+                .background(SottoTheme.primary.opacity(0.08))
                 .foregroundStyle(SottoTheme.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -641,9 +643,14 @@ private struct PanelHeader: View {
 private struct PanelStyleModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding(.vertical, 18)
+            .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(Rectangle().fill(SottoTheme.line.opacity(0.65)).frame(height: 1), alignment: .top)
+            .background(SottoTheme.surface.opacity(0.76))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(SottoTheme.line.opacity(0.7))
+            )
     }
 }
 
