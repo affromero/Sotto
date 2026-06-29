@@ -175,6 +175,101 @@
   max-width: 58ch;
   text-wrap: pretty;
 }
+.localModePanel {
+  display: grid;
+  gap: 22px;
+  padding: clamp(22px, 4vw, 30px);
+  border: 1px solid rgba(236, 237, 242, 0.16);
+  border-radius: var(--r);
+  background: linear-gradient(135deg, rgba(63, 79, 176, 0.18), transparent 34%), var(--voice-bg);
+  color: var(--voice-fg);
+  box-shadow: 0 18px 44px rgba(30, 33, 40, 0.12);
+}
+.localModeIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.localModeKicker {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #aab7ff;
+  margin: 0;
+}
+.localModeTitle {
+  font-family: var(--serif);
+  font-weight: 440;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: var(--voice-fg);
+  margin: 0;
+  text-wrap: balance;
+}
+.localModeTitle em {
+  color: #aab7ff;
+  font-style: italic;
+}
+.localModeCopy {
+  font-size: 15px;
+  line-height: 1.58;
+  color: color-mix(in oklab, var(--voice-fg) 72%, var(--voice-soft));
+  margin: 0;
+  max-width: 54ch;
+  text-wrap: pretty;
+}
+.localModeGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+  border-top: 1px solid rgba(236, 237, 242, 0.14);
+}
+.localModeItem {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 13px;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(236, 237, 242, 0.14);
+}
+.localModeIcon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(170, 183, 255, 0.38);
+  border-radius: var(--r);
+  color: #aab7ff;
+  background: rgba(255, 255, 255, 0.04);
+}
+.localModeItemCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.localModeLabel {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--voice-soft);
+}
+.localModeItemTitle {
+  font-size: 14.5px;
+  line-height: 1.25;
+  color: var(--voice-fg);
+}
+.localModeItemBody {
+  font-size: 13.5px;
+  line-height: 1.48;
+  color: color-mix(in oklab, var(--voice-fg) 62%, var(--voice-soft));
+  text-wrap: pretty;
+}
 .providerCarousel {
   position: relative;
   overflow: hidden;

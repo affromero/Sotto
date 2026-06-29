@@ -162,6 +162,22 @@
   }
 }
 @media (min-width: 720px) {
+  .localModePanel {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .localModeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 16px;
+    border-top: none;
+  }
+
+  .localModeItem {
+    padding: 0;
+    border-bottom: none;
+  }
+
   .skillGrid {
     grid-template-columns: repeat(2, 1fr);
   }

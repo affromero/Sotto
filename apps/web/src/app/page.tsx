@@ -189,6 +189,8 @@ interface SupportedProvider {
 }
 
 const SUPPORTED_PROVIDERS: SupportedProvider[] = [
+  { key: 'local', name: 'Local models', logo: 'local', capability: 'AI · TTS · STT' },
+  { key: 'kokoro', name: 'Kokoro', logo: 'kokoro', capability: 'Local TTS' },
   { key: 'claude-code', name: 'Claude Code', logo: 'anthropic', capability: 'Agent' },
   { key: 'codex', name: 'Codex', logo: 'openai', capability: 'Agent' },
   { key: 'anthropic', name: 'Anthropic', logo: 'anthropic', capability: 'AI' },
@@ -212,8 +214,40 @@ const SUPPORTED_PROVIDERS: SupportedProvider[] = [
   { key: 'assemblyai', name: 'AssemblyAI', logo: 'assemblyai', capability: 'STT' },
   { key: 'gladia', name: 'Gladia', logo: 'gladia', capability: 'STT' },
   { key: 'speechmatics', name: 'Speechmatics', logo: 'speechmatics', capability: 'STT' },
-  { key: 'kokoro', name: 'Kokoro', logo: 'kokoro', capability: 'Local TTS' },
-  { key: 'local', name: 'Local models', logo: 'local', capability: 'AI · TTS · STT' },
+];
+
+interface LocalModeItem {
+  label: string;
+  title: string;
+  body: string;
+  icon: GlyphName;
+}
+
+const LOCAL_MODE_ITEMS: LocalModeItem[] = [
+  {
+    label: 'AI',
+    title: 'Local LLMs',
+    body: 'Ollama, vLLM, LM Studio, llama.cpp, or any OpenAI-compatible endpoint.',
+    icon: 'spark',
+  },
+  {
+    label: 'TTS',
+    title: 'Local speech out',
+    body: 'Bundled Kokoro or your own sidecar that speaks the Sotto TTS contract.',
+    icon: 'wave',
+  },
+  {
+    label: 'STT',
+    title: 'Local speech in',
+    body: 'Local Whisper-compatible speech recognition for speaking practice and feedback.',
+    icon: 'mic',
+  },
+  {
+    label: 'Storage',
+    title: 'Local disk',
+    body: 'Courses, recordings, audio, progress, and vocabulary memory stay on disk you choose.',
+    icon: 'lock',
+  },
 ];
 
 interface WalkProvider {
@@ -451,12 +485,40 @@ export default async function LandingPage() {
           <div className={styles.providersHead}>
             <p className={styles.sectionLabel}>Provider choice</p>
             <h2 id="providers-title" className={styles.providersTitle}>
-              Connect the companies and models <em>you already trust</em>.
+              Run it <em>100% local</em>, or connect the providers you trust.
             </h2>
             <p className={styles.providersCopy}>
-              LLMs, speech generation, speech recognition, CLI agents, and local models all plug
-              into the same private rehearsal stack you run.
+              Full private mode is first-class: local LLMs, local speech, local storage, and local
+              CLI agents can power the same private rehearsal stack. Cloud providers stay optional.
             </p>
+          </div>
+
+          <div className={styles.localModePanel} aria-label="100% local full private mode">
+            <div className={styles.localModeIntro}>
+              <p className={styles.localModeKicker}>Full private mode</p>
+              <h3 className={styles.localModeTitle}>
+                The whole rehearsal loop can stay <em>on your machine</em>.
+              </h3>
+              <p className={styles.localModeCopy}>
+                Point Sotto at local endpoints for AI, TTS, STT, and storage. Nothing needs a cloud
+                key unless you explicitly choose one.
+              </p>
+            </div>
+
+            <ul className={styles.localModeGrid}>
+              {LOCAL_MODE_ITEMS.map((item) => (
+                <li key={item.label} className={styles.localModeItem}>
+                  <span className={styles.localModeIcon} aria-hidden="true">
+                    <Glyph name={item.icon} size={17} />
+                  </span>
+                  <span className={styles.localModeItemCopy}>
+                    <span className={styles.localModeLabel}>{item.label}</span>
+                    <strong className={styles.localModeItemTitle}>{item.title}</strong>
+                    <span className={styles.localModeItemBody}>{item.body}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className={styles.providerCarousel} aria-label="Supported providers">

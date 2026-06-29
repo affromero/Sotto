@@ -30,7 +30,10 @@ const { mockCanResolveTts, mockResolveTtsProvider } = vi.hoisted(() => ({
   mockResolveTtsProvider: vi.fn(),
 }));
 const { mockGetAutoModelConfig } = vi.hoisted(() => ({ mockGetAutoModelConfig: vi.fn() }));
-const { mockUploadFile } = vi.hoisted(() => ({ mockUploadFile: vi.fn() }));
+const { mockAssertStorageWritable, mockUploadFile } = vi.hoisted(() => ({
+  mockAssertStorageWritable: vi.fn(),
+  mockUploadFile: vi.fn(),
+}));
 const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 // ---- Module mocks ----
@@ -76,6 +79,7 @@ vi.mock('@/lib/auto-model-config', () => ({
 }));
 
 vi.mock('@/lib/r2', () => ({
+  assertStorageWritable: (...args: unknown[]) => mockAssertStorageWritable(...args),
   uploadFile: (...args: unknown[]) => mockUploadFile(...args),
 }));
 
@@ -136,6 +140,7 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
   });
   mockCanResolveTts.mockResolvedValue(withTts);
   if (withTts) {
+    mockAssertStorageWritable.mockResolvedValue(undefined);
     mockGetAutoModelConfig.mockResolvedValue({
       model: {
         aiProvider: 'anthropic',
