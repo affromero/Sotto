@@ -18,11 +18,11 @@ The open source deployment should be boring to operate:
 
 ## Hosting Options
 
-| Option | Best For | Tradeoff |
-| --- | --- | --- |
-| Single VPS | Most self-hosters and small teams | Lowest operational complexity; vertical scaling first |
-| Managed app + managed Postgres/Redis | Teams that want less server maintenance | More vendor-specific setup and higher monthly cost |
-| Multi-node container platform | Larger managed-hosting operators | More moving pieces; useful only after load requires it |
+| Option                               | Best For                                | Tradeoff                                               |
+| ------------------------------------ | --------------------------------------- | ------------------------------------------------------ |
+| Single VPS                           | Most self-hosters and small teams       | Lowest operational complexity; vertical scaling first  |
+| Managed app + managed Postgres/Redis | Teams that want less server maintenance | More vendor-specific setup and higher monthly cost     |
+| Multi-node container platform        | Larger managed-hosting operators        | More moving pieces; useful only after load requires it |
 
 The default documentation assumes a single Ubuntu 24.04 VPS. Hetzner, DigitalOcean, Fly Machines, EC2, or any Docker-capable host can work.
 
@@ -30,13 +30,13 @@ The default documentation assumes a single Ubuntu 24.04 VPS. Hetzner, DigitalOce
 
 The repository ships the production services as three compose files:
 
-| File | Services | Lifecycle |
-| --- | --- | --- |
-| `docker-compose.infra.yml` | Postgres, PgBouncer, Redis, Pinchtab | Long-lived, rarely restarted |
-| `docker-compose.app.yml` | Web app | Blue-green deployment slots |
-| `docker-compose.workers.yml` | BullMQ worker groups | Recreated after the new app slot passes health checks |
+| File                         | Services                             | Lifecycle                                             |
+| ---------------------------- | ------------------------------------ | ----------------------------------------------------- |
+| `docker-compose.infra.yml`   | Postgres, PgBouncer, Redis, Pinchtab | Long-lived, rarely restarted                          |
+| `docker-compose.app.yml`     | Web app                              | Blue-green deployment slots                           |
+| `docker-compose.workers.yml` | BullMQ worker groups                 | Recreated after the new app slot passes health checks |
 
-`scripts/deploy.sh` coordinates those files. It loads `.env.production` by default, copies it to `.env` for Docker Compose, renders `Caddyfile` with the operator's domain, starts infra, builds the next app slot, runs Prisma, smoke-tests the new slot, restarts workers, and stops the old slot.
+`scripts/deploy.sh` coordinates those files. It loads `.env.production` by default, copies it to `.env` for Docker Compose, renders `Caddyfile` with the operator's domain, starts infra, prepares the next app slot, runs Prisma, smoke-tests the new slot, restarts workers, and stops the old slot.
 
 ## Recommended Server Setup
 
@@ -59,10 +59,10 @@ The script installs Docker, Caddy, core utilities, configures a `sotto` user, en
 
 Point your own domain at the VPS:
 
-| Record | Host | Value |
-| --- | --- | --- |
-| `A` | `@` | `YOUR_SERVER_IPV4` |
-| `AAAA` | `@` | `YOUR_SERVER_IPV6` if enabled |
+| Record  | Host  | Value                                        |
+| ------- | ----- | -------------------------------------------- |
+| `A`     | `@`   | `YOUR_SERVER_IPV4`                           |
+| `AAAA`  | `@`   | `YOUR_SERVER_IPV6` if enabled                |
 | `CNAME` | `www` | your apex domain, if you want a www redirect |
 
 Use the exact public URL in `NEXT_PUBLIC_APP_URL`.
@@ -79,15 +79,15 @@ chmod 600 .env.production
 
 Minimum required production categories:
 
-| Category | Variables |
-| --- | --- |
-| Public URL | `NEXT_PUBLIC_APP_URL` |
-| Database | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`, `DIRECT_DATABASE_URL` |
-| Redis | `REDIS_PASSWORD`, `REDIS_URL` |
-| Storage | `STORAGE_PROVIDER` plus the matching local or S3/R2 values |
-| AI | explicit `AI_PROVIDER` and provider credentials |
-| TTS | explicit `TTS_PROVIDER` and provider credentials |
-| BYOK | `BYOK_ENCRYPTION_KEY` |
+| Category   | Variables                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| Public URL | `NEXT_PUBLIC_APP_URL`                                                                      |
+| Database   | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`, `DIRECT_DATABASE_URL` |
+| Redis      | `REDIS_PASSWORD`, `REDIS_URL`                                                              |
+| Storage    | `STORAGE_PROVIDER` plus the matching local or S3/R2 values                                 |
+| AI         | explicit `AI_PROVIDER` and provider credentials                                            |
+| TTS        | explicit `TTS_PROVIDER` and provider credentials                                           |
+| BYOK       | `BYOK_ENCRYPTION_KEY`                                                                      |
 
 Optional Caddy host for www redirect:
 
@@ -118,18 +118,34 @@ cd ~/sotto
 SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
 ```
 
+By default, the script uses `SOTTO_IMAGE_SOURCE=build` and builds images on the server. That keeps the deployment self-host neutral because `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` are baked into the Next.js client bundle at build time from your own `.env.production`. Worker runtime dependencies are isolated in a local `SOTTO_WORKER_BASE_IMAGE`, so later builds can reuse the slow apt, Playwright, yt-dlp, and CLI layers.
+
+Maintainers who publish deployment images from CI can opt into registry mode:
+
+```bash
+SOTTO_IMAGE_SOURCE=registry
+SOTTO_WEB_IMAGE=ghcr.io/affromero/sotto-web-prod
+SOTTO_WORKERS_IMAGE=ghcr.io/affromero/sotto-workers-prod
+SOTTO_IMAGE_TAG=<full git commit sha>
+```
+
+Registry images must be built with the same public URL and VAPID public key used by the target deployment. In the upstream maintainer workflow, `SOTTO_IMAGE_TAG` defaults to the full commit SHA after `git pull`, and the script waits up to `SOTTO_IMAGE_PULL_TIMEOUT` seconds for that immutable tag to become available.
+
+For the upstream maintainer workflow, set repository variables `SOTTO_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` before relying on `SOTTO_IMAGE_SOURCE=registry`. Production image publication fails when `SOTTO_PUBLIC_APP_URL` is missing.
+
 Expected deploy phases:
 
 1. Pull latest code and submodules.
 2. Load `.env.production` into `.env` for Docker Compose.
 3. Render and validate Caddy config.
 4. Start infra services and wait for Postgres, Redis, and PgBouncer.
-5. Build the inactive blue-green app slot.
+5. Build or pull the inactive blue-green app slot image.
 6. Run Prisma schema sync against `DIRECT_DATABASE_URL` when present.
 7. Start and health-check the new slot.
 8. Run production smoke checks.
-9. Build and restart workers.
+9. Restart workers from the prepared worker image.
 10. Stop the previous app slot.
+11. Prune old unused Docker images after the deployment has succeeded.
 
 ## Storage
 
@@ -162,12 +178,12 @@ For single-VPS deployments, also enable provider snapshots or equivalent block-v
 
 ## Scaling Path
 
-| Stage | Move |
-| --- | --- |
-| Initial private install | Single VPS, local or S3-compatible storage |
-| Worker pressure | Increase worker presets or move workers to a separate host |
-| Database pressure | Move Postgres to managed Postgres or a dedicated database host |
-| Media pressure | Use object storage plus CDN in front of generated media |
+| Stage                    | Move                                                                |
+| ------------------------ | ------------------------------------------------------------------- |
+| Initial private install  | Single VPS, local or S3-compatible storage                          |
+| Worker pressure          | Increase worker presets or move workers to a separate host          |
+| Database pressure        | Move Postgres to managed Postgres or a dedicated database host      |
+| Media pressure           | Use object storage plus CDN in front of generated media             |
 | Managed-hosting business | Split customer deployments by environment, not by shared data plane |
 
 ## Release Checklist

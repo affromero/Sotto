@@ -1,9 +1,9 @@
 # Publishes the open-source Sotto images to GHCR.
 #
-# Unlike deploy.yml (which builds on the server), this builds the public
-# self-host images used by curl|bash. It needs the private learning-model
-# submodule during the build, so it uses the same deploy key as CI.
-# The curl|bash installer pulls these images.
+# deploy.yml publishes separate maintainer production images tagged by full SHA.
+# This workflow owns the public self-host image tags used by curl|bash. It needs
+# the private learning-model submodule during the build, so it uses the same
+# deploy key as CI. The curl|bash installer pulls these images.
 name: Publish OSS image
 
 on:
@@ -43,6 +43,17 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
 
+      - name: Build and push worker base
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile.workers-base
+          push: true
+          tags: |
+            ghcr.io/affromero/sotto-workers-base:node22
+          cache-from: type=gha,scope=sotto-workers-base
+          cache-to: type=gha,mode=max,scope=sotto-workers-base
+
       - name: Build and push sotto-web
         uses: docker/build-push-action@v7
         with:
@@ -66,6 +77,8 @@ jobs:
           context: .
           file: apps/web/Dockerfile.workers
           push: true
+          build-args: |
+            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base:node22
           tags: |
             ghcr.io/affromero/sotto-workers:latest
             ghcr.io/affromero/sotto-workers:${{ steps.sha.outputs.short }}

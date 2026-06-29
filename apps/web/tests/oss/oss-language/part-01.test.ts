@@ -466,7 +466,18 @@ describe('open-source language-learning OSS surfaces', () => {
     );
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');
     const caddyTemplate = readFileSync(resolve(repoRoot, 'Caddyfile'), 'utf8');
-    const deploymentSources = [deploySource, setupServerSource, caddyTemplate].join('\n');
+    const appComposeSource = readFileSync(resolve(repoRoot, 'docker-compose.app.yml'), 'utf8');
+    const workersComposeSource = readFileSync(
+      resolve(repoRoot, 'docker-compose.workers.yml'),
+      'utf8'
+    );
+    const deploymentSources = [
+      deploySource,
+      setupServerSource,
+      caddyTemplate,
+      appComposeSource,
+      workersComposeSource,
+    ].join('\n');
 
     expect(publicInstallerSource).toBe(installerSource);
     expect(installerSource).toContain('https://sotto.fm/install.sh');
@@ -475,6 +486,30 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(deploySource).toContain('render_caddy_config');
     expect(deploySource).toContain(
       'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"'
+    );
+    expect(deploySource).toContain('SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"');
+    expect(deploySource).toContain(
+      'docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build web'
+    );
+    expect(deploySource).toContain('docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"');
+    expect(deploySource).toContain('docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"');
+    expect(deploySource).toContain('SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"');
+    expect(deploySource).toContain(
+      'SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-sotto-workers-base:$SOTTO_IMAGE_TAG}"'
+    );
+    expect(deploySource).toContain(
+      'docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .'
+    );
+    expect(deploySource).toContain('SOTTO_DEPLOY_CLEAN_BUILDER');
+    expect(appComposeSource).toContain(
+      'image: ${SOTTO_WEB_IMAGE:-sotto-web}:${SOTTO_IMAGE_TAG:-local}'
+    );
+    expect(appComposeSource).toContain('NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}');
+    expect(workersComposeSource).toContain(
+      'image: ${SOTTO_WORKERS_IMAGE:-sotto-workers}:${SOTTO_IMAGE_TAG:-local}'
+    );
+    expect(workersComposeSource).toContain(
+      'WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}'
     );
     expect(setupServerSource).toContain('cp .env.example .env.production');
     expect(setupServerSource).toContain(
@@ -504,6 +539,9 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocs).toContain('docker-compose.infra.yml');
     expect(releaseDocs).toContain('docker-compose.app.yml');
     expect(releaseDocs).toContain('docker-compose.workers.yml');
+    expect(releaseDocs).toContain('SOTTO_IMAGE_SOURCE=build');
+    expect(releaseDocs).toContain('SOTTO_IMAGE_SOURCE=registry');
+    expect(releaseDocs).toContain('SOTTO_IMAGE_TAG');
     expect(releaseDocs).not.toContain('https://sotto.fm');
     expect(releaseDocs).not.toContain('sotto.fm');
     expect(releaseDocs).not.toContain('dashboard.doppler.com');

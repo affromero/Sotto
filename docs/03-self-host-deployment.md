@@ -147,17 +147,21 @@ cd ~/sotto
 SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
 ```
 
+The default deploy path uses `SOTTO_IMAGE_SOURCE=build`, which builds the web and worker images on your server. Keep that default for self-hosted deployments because `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` are baked into the browser bundle during `next build`. Worker runtime dependencies are built into a local `SOTTO_WORKER_BASE_IMAGE` first so later deploys can reuse the slow apt, Playwright, yt-dlp, and CLI layers.
+
+Operators with their own CI-built images can opt into registry mode by setting `SOTTO_IMAGE_SOURCE=registry`, `SOTTO_WEB_IMAGE`, `SOTTO_WORKERS_IMAGE`, and `SOTTO_IMAGE_TAG`. Registry images must be built for the same public URL and VAPID public key as the target server. The deploy script waits up to `SOTTO_IMAGE_PULL_TIMEOUT` seconds for the selected image tag before failing. In the upstream maintainer workflow, set repository variables `SOTTO_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` before using registry mode; production image publication fails when `SOTTO_PUBLIC_APP_URL` is missing.
+
 The deploy script:
 
 1. pulls the latest `main`;
 2. copies `.env.production` to `.env` for Docker Compose;
 3. renders and validates Caddy;
 4. starts infra services from `docker-compose.infra.yml`;
-5. builds the inactive app slot from `docker-compose.app.yml`;
+5. builds or pulls the inactive app slot from `docker-compose.app.yml`;
 6. runs Prisma schema sync;
 7. health-checks the new web slot;
 8. runs `scripts/smoke-prod.sh`;
-9. rebuilds and restarts workers from `docker-compose.workers.yml`;
+9. restarts workers from the prepared `docker-compose.workers.yml` image;
 10. stops the previous app slot.
 
 ## 7. Verify

@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: ci
   cancel-in-progress: true
@@ -18,6 +22,8 @@ jobs:
       NEXT_PUBLIC_APP_URL: https://selfhost.example.com
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.SUBMODULE_SSH_KEY }}
@@ -32,3 +38,78 @@ jobs:
       - run: npm run type-check
       - run: npm test
       - run: npm run build
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decide whether to rebuild worker base
+        id: worker_base
+        run: |
+          set -euo pipefail
+          before="${{ github.event.before }}"
+          build_base=false
+          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            build_base=true
+          elif ! git diff --quiet "$before" "$GITHUB_SHA" -- apps/web/Dockerfile.workers-base; then
+            build_base=true
+          elif ! docker manifest inspect ghcr.io/affromero/sotto-workers-base:node22 >/dev/null 2>&1; then
+            build_base=true
+          fi
+          echo "build=$build_base" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push worker base
+        if: steps.worker_base.outputs.build == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile.workers-base
+          push: true
+          tags: |
+            ghcr.io/affromero/sotto-workers-base:node22
+            ghcr.io/affromero/sotto-workers-base:${{ github.sha }}
+          cache-from: type=gha,scope=sotto-workers-base
+          cache-to: type=gha,mode=max,scope=sotto-workers-base
+
+      - name: Validate production image env
+        run: |
+          set -euo pipefail
+          if [ -z "$SOTTO_PUBLIC_APP_URL" ]; then
+            echo "SOTTO_PUBLIC_APP_URL repository variable is required for production image builds"
+            exit 1
+          fi
+        env:
+          SOTTO_PUBLIC_APP_URL: ${{ vars.SOTTO_PUBLIC_APP_URL }}
+
+      - name: Build and push production web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+            NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '' }}
+          tags: |
+            ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
+          cache-from: type=gha,scope=sotto-web-prod
+          cache-to: type=gha,mode=max,scope=sotto-web-prod
+
+      - name: Build and push production worker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile.workers
+          push: true
+          build-args: |
+            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base:node22
+          tags: |
+            ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
+          cache-from: type=gha,scope=sotto-workers-prod
+          cache-to: type=gha,mode=max,scope=sotto-workers-prod
