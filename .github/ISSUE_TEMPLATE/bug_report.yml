@@ -33,7 +33,7 @@ body:
     attributes:
       label: Version or commit
       description: 'For web/self-host, run: curl -s http://localhost:3000/api/version. On sotto.fm, use https://sotto.fm/api/version.'
-      placeholder: e.g. v0.1, 6b2b9122
+      placeholder: e.g. v0.1.0, 6b2b9122
     validations:
       required: true
   - type: dropdown
@@ -109,7 +109,7 @@ body:
     id: browser
     attributes:
       label: Browser or desktop version
-      placeholder: e.g. Firefox 128, Chrome 126, Safari 18, Sotto Host v0.1
+      placeholder: e.g. Firefox 128, Chrome 126, Safari 18, Sotto Host v0.1.0
     validations:
       required: false
   - type: textarea

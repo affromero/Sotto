@@ -16,7 +16,7 @@ interface DesktopDownloadManifest {
 }
 
 const PLATFORMS = new Set<DesktopPlatform>(['mac', 'windows', 'linux']);
-const DEFAULT_LATEST_DESKTOP_VERSION = 'v0.1';
+const DEFAULT_LATEST_DESKTOP_VERSION = 'v0.1.0';
 const DEFAULT_GITHUB_RELEASE_BASE_URL = 'https://github.com/affromero/Sotto/releases/download';
 const GITHUB_RELEASE_EXTENSIONS: Record<DesktopPlatform, string> = {
   mac: 'dmg',
@@ -32,6 +32,8 @@ function isDesktopPlatform(value: string): value is DesktopPlatform {
 function normalizeVersion(value: string | null): string {
   const version = value?.trim();
   if (!version || version === 'latest') return 'latest';
+  const shortSemver = version.match(/^v?(\d+)\.(\d+)$/);
+  if (shortSemver) return `v${shortSemver[1]}.${shortSemver[2]}.0`;
   if (version.startsWith('v')) return version;
   if (COMMIT_SHA_PATTERN.test(version)) return version.toLowerCase();
   return `v${version}`;

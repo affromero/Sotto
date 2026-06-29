@@ -35,9 +35,9 @@ describe('desktop download redirects', () => {
   it('redirects a platform download to the primary file from the latest manifest', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
-        version: 'v0.1',
+        version: 'v0.1.0',
         platform: 'mac',
-        primary: { href: 'sotto-host-v0.1-mac.dmg', filename: 'sotto-host-v0.1-mac.dmg' },
+        primary: { href: 'sotto-host-v0.1.0-mac.dmg', filename: 'sotto-host-v0.1.0-mac.dmg' },
       })
     );
     global.fetch = fetchMock;
@@ -50,14 +50,33 @@ describe('desktop download redirects', () => {
     );
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'https://cdn.sotto.fm/download/desktop/latest/mac/sotto-host-v0.1-mac.dmg'
+      'https://cdn.sotto.fm/download/desktop/latest/mac/sotto-host-v0.1.0-mac.dmg'
     );
   });
 
-  it('supports explicit release versions without requiring the v prefix', async () => {
+  it('supports explicit SemVer release versions without requiring the v prefix', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
-        primary: { href: '/download/desktop/v0.1/windows/sotto-host-v0.1-windows.msi' },
+        primary: { href: '/download/desktop/v0.1.0/windows/sotto-host-v0.1.0-windows.msi' },
+      })
+    );
+    global.fetch = fetchMock;
+
+    const response = await GET(request('/download/windows?version=0.1.0'), params('windows'));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://cdn.sotto.fm/download/desktop/v0.1.0/windows/manifest.json',
+      { next: { revalidate: 300 } }
+    );
+    expect(response.headers.get('location')).toBe(
+      'https://cdn.sotto.fm/download/desktop/v0.1.0/windows/sotto-host-v0.1.0-windows.msi'
+    );
+  });
+
+  it('normalizes legacy two-part version input to the canonical patch release', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        primary: { href: '/download/desktop/v0.1.0/windows/sotto-host-v0.1.0-windows.msi' },
       })
     );
     global.fetch = fetchMock;
@@ -65,20 +84,20 @@ describe('desktop download redirects', () => {
     const response = await GET(request('/download/windows?version=0.1'), params('windows'));
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://cdn.sotto.fm/download/desktop/v0.1/windows/manifest.json',
+      'https://cdn.sotto.fm/download/desktop/v0.1.0/windows/manifest.json',
       { next: { revalidate: 300 } }
     );
     expect(response.headers.get('location')).toBe(
-      'https://cdn.sotto.fm/download/desktop/v0.1/windows/sotto-host-v0.1-windows.msi'
+      'https://cdn.sotto.fm/download/desktop/v0.1.0/windows/sotto-host-v0.1.0-windows.msi'
     );
   });
 
   it('supports commit-hash download channels without adding a version prefix', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
-        version: 'v0.1',
+        version: 'v0.1.0',
         commit: { short: '6b2b9122' },
-        primary: { href: 'sotto-host-v0.1-mac.dmg' },
+        primary: { href: 'sotto-host-v0.1.0-mac.dmg' },
       })
     );
     global.fetch = fetchMock;
@@ -91,7 +110,7 @@ describe('desktop download redirects', () => {
     );
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'https://cdn.sotto.fm/download/desktop/6b2b9122/mac/sotto-host-v0.1-mac.dmg'
+      'https://cdn.sotto.fm/download/desktop/6b2b9122/mac/sotto-host-v0.1.0-mac.dmg'
     );
   });
 
@@ -102,7 +121,7 @@ describe('desktop download redirects', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'https://github.com/affromero/Sotto/releases/download/v0.1/sotto-host-v0.1-linux.AppImage'
+      'https://github.com/affromero/Sotto/releases/download/v0.1.0/sotto-host-v0.1.0-linux.AppImage'
     );
   });
 
@@ -111,12 +130,12 @@ describe('desktop download redirects', () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock;
 
-    const response = await GET(request('/download/windows?version=0.1'), params('windows'));
+    const response = await GET(request('/download/windows?version=0.1.0'), params('windows'));
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'https://github.com/affromero/Sotto/releases/download/v0.1/sotto-host-v0.1-windows.msi'
+      'https://github.com/affromero/Sotto/releases/download/v0.1.0/sotto-host-v0.1.0-windows.msi'
     );
   });
 

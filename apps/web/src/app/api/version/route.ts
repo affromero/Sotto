@@ -4,7 +4,7 @@ import packageJson from '../../../../package.json';
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_GITHUB_REPOSITORY = 'affromero/Sotto';
-const DEFAULT_DESKTOP_LATEST_VERSION = 'v0.1';
+const DEFAULT_DESKTOP_LATEST_VERSION = 'v0.1.0';
 
 type GithubLatestRelease = {
   tag_name?: unknown;
@@ -19,7 +19,10 @@ function getCurrentCommit(): string {
 function normalizeDesktopVersion(value: string | undefined): string {
   const version = value?.trim();
   if (!version) return DEFAULT_DESKTOP_LATEST_VERSION;
-  if (version === 'latest' || version.startsWith('v')) return version;
+  if (version === 'latest') return version;
+  const shortSemver = version.match(/^v?(\d+)\.(\d+)$/);
+  if (shortSemver) return `v${shortSemver[1]}.${shortSemver[2]}.0`;
+  if (version.startsWith('v')) return version;
   return `v${version}`;
 }
 
