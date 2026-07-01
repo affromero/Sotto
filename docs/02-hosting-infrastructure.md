@@ -131,7 +131,7 @@ SOTTO_IMAGE_TAG=<full git commit sha>
 
 Registry images must be built with the same public URL and VAPID public key used by the target deployment. In the upstream maintainer workflow, `SOTTO_IMAGE_TAG` defaults to the full commit SHA after `git pull`, and the script waits up to `SOTTO_IMAGE_PULL_TIMEOUT` seconds for that immutable tag to become available.
 
-For the upstream maintainer workflow, set repository variables `SOTTO_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` before relying on `SOTTO_IMAGE_SOURCE=registry`. Production image publication fails when `SOTTO_PUBLIC_APP_URL` is missing.
+For the upstream maintainer workflow, set repository variables `SOTTO_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` before relying on `SOTTO_IMAGE_SOURCE=registry`. Production image publication is skipped when `SOTTO_PUBLIC_APP_URL` is missing.
 
 Expected deploy phases:
 
