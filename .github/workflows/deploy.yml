@@ -77,16 +77,20 @@ jobs:
           cache-to: type=gha,mode=max,scope=sotto-workers-base
 
       - name: Validate production image env
+        id: production_image_env
         run: |
           set -euo pipefail
           if [ -z "$SOTTO_PUBLIC_APP_URL" ]; then
-            echo "SOTTO_PUBLIC_APP_URL repository variable is required for production image builds"
-            exit 1
+            echo "SOTTO_PUBLIC_APP_URL repository variable is not set; skipping production image publication."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
         env:
           SOTTO_PUBLIC_APP_URL: ${{ vars.SOTTO_PUBLIC_APP_URL }}
 
       - name: Build and push production web image
+        if: steps.production_image_env.outputs.publish == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -102,6 +106,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=sotto-web-prod
 
       - name: Build and push production worker image
+        if: steps.production_image_env.outputs.publish == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
