@@ -91,7 +91,7 @@
 
 .windowRow {
   display: grid;
-  grid-template-columns: 32px minmax(56px, 1fr) auto;
+  grid-template-columns: minmax(40px, 64px) minmax(48px, 1fr) auto;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -105,6 +105,10 @@
 }
 
 .windowLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 700;
   color: var(--color-text-primary);
 }
