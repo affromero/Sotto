@@ -196,6 +196,8 @@ function titleAgentModel(raw: string): string {
     )
     .replace(/-/g, ' ')
     .replace(/\s+/g, ' ')
+    .replace(/\bGpt\b/g, 'GPT')
+    .replace(/\bAi\b/g, 'AI')
     .trim();
 }
 

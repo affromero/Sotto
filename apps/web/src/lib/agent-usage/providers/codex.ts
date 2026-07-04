@@ -23,6 +23,7 @@ import {
   hashToken,
   isRecord,
   readJson,
+  resetInFromTimestamp,
   usageWindow,
   windowLabel,
 } from '../utils';
@@ -35,6 +36,119 @@ interface CodexCredentials {
 const CODEX_TIMEOUT_MS = 5_000;
 
 let codexCache: AgentUsageCacheEntry | null = null;
+
+function codexWindowResetIn(
+  window: Record<string, unknown> | null,
+  now: Date,
+  style: 'duration' | 'friendly'
+): string | null {
+  const resetAfter = getNumber(window?.reset_after_seconds);
+  if (resetAfter !== null) return formatUsageDuration(resetAfter);
+  const resetAt = getNumber(window?.reset_at);
+  return style === 'friendly' ? friendlyReset(resetAt, now) : resetInFromTimestamp(resetAt, now);
+}
+
+function firstNonEmptyString(...values: unknown[]): string | null {
+  for (const value of values) {
+    const stringValue = getString(value);
+    if (stringValue) return stringValue;
+  }
+  return null;
+}
+
+function slug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function isSparkLimit(entry: Record<string, unknown>): boolean {
+  return [getString(entry.limit_name), getString(entry.metered_feature)]
+    .filter((value): value is string => !!value)
+    .some((value) => value.toLowerCase().includes('spark'));
+}
+
+function compactLimitName(entry: Record<string, unknown>): string {
+  const source = firstNonEmptyString(entry.limit_name, entry.metered_feature);
+  if (!source) return 'Extra';
+  const normalized = source.replace(/_/g, '-').toLowerCase();
+  if (normalized.includes('spark')) return 'Spark';
+
+  const suffix = normalized.match(/(?:^|[-\s])(mini|nano|pro|max)(?:$|[-\s])/)?.[1];
+  if (suffix) return suffix.charAt(0).toUpperCase() + suffix.slice(1);
+  if (normalized.includes('codex')) return 'Codex';
+  return 'Extra';
+}
+
+function codexAdditionalWindow(
+  label: string,
+  snapshot: Record<string, unknown>,
+  now: Date
+): AgentUsageWindow {
+  const windowSeconds = getNumber(snapshot.limit_window_seconds);
+  return usageWindow({
+    label,
+    usedPercent: getNumber(snapshot.used_percent) ?? 0,
+    resetIn: codexWindowResetIn(snapshot, now, 'duration'),
+    resetAt: formatResetAt(getNumber(snapshot.reset_at)),
+    limitWindowSeconds: windowSeconds,
+  });
+}
+
+function codexAdditionalWindowKey(
+  entry: Record<string, unknown>,
+  snapshot: Record<string, unknown>,
+  fallback: string
+): string | null {
+  if (isSparkLimit(entry)) {
+    const seconds = getNumber(snapshot.limit_window_seconds);
+    return seconds && seconds >= 6 * 24 * 60 * 60 ? 'codex-spark-weekly' : 'codex-spark';
+  }
+  const source = firstNonEmptyString(entry.metered_feature, entry.limit_name);
+  return source ? `codex-${slug(source)}` : fallback;
+}
+
+function codexAdditionalWindowLabel(
+  entry: Record<string, unknown>,
+  snapshot: Record<string, unknown>
+): string {
+  const compact = compactLimitName(entry);
+  return `${compact} ${windowLabel(getNumber(snapshot.limit_window_seconds), 'Limit')}`;
+}
+
+function parseCodexAdditionalWindows(
+  payload: Record<string, unknown>,
+  now: Date
+): AgentUsageWindow[] {
+  const additionalLimits = Array.isArray(payload.additional_rate_limits)
+    ? payload.additional_rate_limits
+    : [];
+  if (additionalLimits.length === 0) return [];
+
+  const windows: AgentUsageWindow[] = [];
+  const seen = new Set<string>();
+  for (const [index, rawEntry] of additionalLimits.entries()) {
+    if (!isRecord(rawEntry)) continue;
+    const rateLimit = getRecord(rawEntry, 'rate_limit');
+    if (!rateLimit) continue;
+
+    const candidates = isSparkLimit(rawEntry)
+      ? [getRecord(rateLimit, 'primary_window'), getRecord(rateLimit, 'secondary_window')]
+      : [getRecord(rateLimit, 'primary_window') ?? getRecord(rateLimit, 'secondary_window')];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const key = codexAdditionalWindowKey(rawEntry, candidate, `codex-extra-${index}`);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      windows.push(
+        codexAdditionalWindow(codexAdditionalWindowLabel(rawEntry, candidate), candidate, now)
+      );
+    }
+  }
+  return windows;
+}
 
 function parseCodexCredentials(value: unknown, authMtimeMs: number): CodexCredentials | null {
   const tokens = getRecord(value, 'tokens');
@@ -113,8 +227,8 @@ export function parseCodexUsagePayload(
       usageWindow({
         label: windowLabel(primaryWindowSeconds, 'Pri'),
         usedPercent: getNumber(primaryWindow?.used_percent) ?? 0,
-        resetIn: formatUsageDuration(getNumber(primaryWindow?.reset_after_seconds) ?? 0),
-        resetAt: null,
+        resetIn: codexWindowResetIn(primaryWindow, now, 'duration'),
+        resetAt: formatResetAt(getNumber(primaryWindow?.reset_at)),
         limitWindowSeconds: primaryWindowSeconds,
       }),
       ...(secondaryWindow
@@ -122,12 +236,13 @@ export function parseCodexUsagePayload(
             usageWindow({
               label: windowLabel(secondaryWindowSeconds, 'Sec'),
               usedPercent: getNumber(secondaryWindow.used_percent) ?? 0,
-              resetIn: friendlyReset(secondaryResetAt, now),
+              resetIn: codexWindowResetIn(secondaryWindow, now, 'friendly'),
               resetAt: formatResetAt(secondaryResetAt),
               limitWindowSeconds: secondaryWindowSeconds,
             }),
           ]
         : []),
+      ...parseCodexAdditionalWindows(payload, now),
     ],
     credits: balance || unlimited ? { balance, unlimited } : null,
     planLabel: capitalizePlan(getString(payload.plan_type)),

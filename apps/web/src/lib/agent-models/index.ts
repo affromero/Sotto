@@ -40,6 +40,86 @@ interface AgentModelDiscoveryOptions {
   autoConfig?: AutoModelConfigData;
 }
 
+const CODEX_DEFAULT_MODELS: AgentModelOptionInput[] = [
+  {
+    provider: 'codex',
+    model: 'gpt-5',
+    displayName: 'GPT-5',
+    shortDisplayName: 'GPT-5',
+    tier: 'balanced',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5-codex',
+    displayName: 'GPT-5 Codex',
+    shortDisplayName: 'GPT-5 Codex',
+    tier: 'best',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.2-codex',
+    displayName: 'GPT-5.2 Codex',
+    shortDisplayName: 'GPT-5.2 Codex',
+    tier: 'best',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.3-codex',
+    displayName: 'GPT-5.3 Codex',
+    shortDisplayName: 'GPT-5.3 Codex',
+    tier: 'best',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.3-codex-spark',
+    displayName: 'GPT-5.3 Codex Spark',
+    shortDisplayName: 'Codex Spark',
+    tier: 'best',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.4',
+    displayName: 'GPT-5.4',
+    shortDisplayName: 'GPT-5.4',
+    tier: 'balanced',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.4-mini',
+    displayName: 'GPT-5.4 Mini',
+    shortDisplayName: 'GPT-5.4 Mini',
+    tier: 'fast',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.4-nano',
+    displayName: 'GPT-5.4 Nano',
+    shortDisplayName: 'GPT-5.4 Nano',
+    tier: 'fast',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.4-pro',
+    displayName: 'GPT-5.4 Pro',
+    shortDisplayName: 'GPT-5.4 Pro',
+    tier: 'max',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.5',
+    displayName: 'GPT-5.5',
+    shortDisplayName: 'GPT-5.5',
+    tier: 'best',
+  },
+  {
+    provider: 'codex',
+    model: 'gpt-5.5-pro',
+    displayName: 'GPT-5.5 Pro',
+    shortDisplayName: 'GPT-5.5 Pro',
+    tier: 'max',
+  },
+];
+
 function clean(value: string | null | undefined): string {
   return (value ?? '').trim();
 }
@@ -231,13 +311,21 @@ function baseModelOptions(
     ...collectCodexConfigModels(env),
     ...configuredAgentModels(provider, opts.autoConfig),
   ]);
-  const modelOptions = codexModels.map((model) => ({
-    provider,
-    model,
-    displayName: titleAgentModel(model),
-    shortDisplayName: titleAgentModel(model),
-    tier: 'balanced' as const,
-  }));
+  const defaultsById = new Map(CODEX_DEFAULT_MODELS.map((model) => [model.model, model] as const));
+  const modelOptions = unique([
+    ...codexModels,
+    ...CODEX_DEFAULT_MODELS.map((model) => model.model),
+  ]).map((model) => {
+    const defaultOption = defaultsById.get(model);
+    if (defaultOption) return defaultOption;
+    return {
+      provider,
+      model,
+      displayName: titleAgentModel(model),
+      shortDisplayName: titleAgentModel(model),
+      tier: 'balanced' as const,
+    };
+  });
   return [
     {
       provider,

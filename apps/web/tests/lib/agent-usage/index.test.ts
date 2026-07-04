@@ -65,6 +65,87 @@ describe('agent-usage helpers', () => {
     ]);
   });
 
+  it('parses Codex model-specific additional rate limits', () => {
+    const now = new Date('2026-06-27T10:00:00.000Z');
+    const parsed = parseCodexUsagePayload(
+      {
+        plan_type: 'pro',
+        rate_limit: {
+          limit_reached: false,
+          primary_window: {
+            used_percent: 22,
+            reset_at: now.getTime() / 1000 + 7200,
+            limit_window_seconds: 18000,
+          },
+          secondary_window: {
+            used_percent: 43,
+            reset_at: now.getTime() / 1000 + 604800,
+            limit_window_seconds: 604800,
+          },
+        },
+        additional_rate_limits: [
+          {
+            limit_name: 'GPT-5.3-Codex-Spark',
+            metered_feature: 'gpt_5_3_codex_spark',
+            rate_limit: {
+              primary_window: {
+                used_percent: 30,
+                reset_at: now.getTime() / 1000 + 3600,
+                limit_window_seconds: 18000,
+              },
+              secondary_window: {
+                used_percent: 100,
+                reset_at: now.getTime() / 1000 + 604800,
+                limit_window_seconds: 604800,
+              },
+            },
+          },
+          {
+            limit_name: 'GPT-5.3-Codex-Mini',
+            metered_feature: 'gpt_5_3_codex_mini',
+            rate_limit: {
+              primary_window: {
+                used_percent: 12,
+                reset_at: now.getTime() / 1000 + 3600,
+                limit_window_seconds: 18000,
+              },
+            },
+          },
+          {
+            limit_name: 'GPT-5.3-Codex-Mini duplicate',
+            metered_feature: 'gpt_5_3_codex_mini',
+            rate_limit: {
+              primary_window: {
+                used_percent: 99,
+                reset_at: now.getTime() / 1000 + 3600,
+                limit_window_seconds: 18000,
+              },
+            },
+          },
+          'malformed',
+        ],
+      },
+      now
+    );
+
+    expect(parsed.errorCode).toBeNull();
+    expect(parsed.planLabel).toBe('Pro');
+    expect(parsed.windows.map((window) => window.label)).toEqual([
+      '5h',
+      'Wk',
+      'Spark 5h',
+      'Spark Wk',
+      'Mini 5h',
+    ]);
+    expect(parsed.windows).toMatchObject([
+      { label: '5h', usedPercent: 22, resetIn: '2h00m' },
+      { label: 'Wk', usedPercent: 43 },
+      { label: 'Spark 5h', usedPercent: 30, resetIn: '1h00m' },
+      { label: 'Spark Wk', usedPercent: 100 },
+      { label: 'Mini 5h', usedPercent: 12 },
+    ]);
+  });
+
   it('reports Codex API errors without throwing', () => {
     const parsed = parseCodexUsagePayload({ error: { code: 'token_invalidated' } });
 
