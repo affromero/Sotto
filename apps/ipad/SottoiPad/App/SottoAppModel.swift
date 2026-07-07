@@ -45,6 +45,8 @@ final class SottoAppModel: ObservableObject {
         switch PairingScan(scannedValue: scannedValue) {
         case let .pairing(pairing):
             await redeemPairingPayload(pairing)
+        case let .unsupportedServerURL(url):
+            errorMessage = SottoServerURLPolicy.unsupportedMessage(for: url)
         case let .serverURL(url):
             errorMessage = "That QR opens \(url.host() ?? "your Sotto server") in a browser. In Settings > Devices, scroll to Step 2: Pair the app, tap Show pairing code, then scan that QR."
         case .invalid:
@@ -584,21 +586,21 @@ final class SottoAppModel: ObservableObject {
 
     func fetchCourseTopics(courseId: String) async throws -> [SottoTopicSuggestion] {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before loading class topics.")
+            throw SottoAPIError.message("Pair this device before loading class topics.")
         }
         return try await client.fetchCourseTopics(courseId: courseId)
     }
 
     func fetchCourseNotes(courseId: String) async throws -> SottoCourseNotesResponse {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before loading course notes.")
+            throw SottoAPIError.message("Pair this device before loading course notes.")
         }
         return try await client.fetchCourseNotes(courseId: courseId)
     }
 
     func saveCourseNotes(courseId: String, body: String) async throws -> SottoCourseNotesResponse {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before saving course notes.")
+            throw SottoAPIError.message("Pair this device before saving course notes.")
         }
         return try await client.saveCourseNotes(courseId: courseId, body: body)
     }
@@ -608,7 +610,7 @@ final class SottoAppModel: ObservableObject {
         pedagogy: SottoPedagogyStyle
     ) async throws -> SottoPedagogyStyle {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before changing the teaching approach.")
+            throw SottoAPIError.message("Pair this device before changing the teaching approach.")
         }
         let saved = try await client.updateCoursePedagogy(courseId: courseId, pedagogy: pedagogy)
         courses = try await client.listCourses()
@@ -676,7 +678,7 @@ final class SottoAppModel: ObservableObject {
         contextText: String?
     ) async throws -> SottoSelectionHelpResponse {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before asking for class help.")
+            throw SottoAPIError.message("Pair this device before asking for class help.")
         }
         return try await client.fetchSelectionHelp(
             courseId: courseId,
@@ -691,7 +693,7 @@ final class SottoAppModel: ObservableObject {
         audioURL: URL
     ) async throws -> SottoSpeakingUploadResponse {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before recording speaking feedback.")
+            throw SottoAPIError.message("Pair this device before recording speaking feedback.")
         }
         return try await client.uploadClassSpeakingRecording(
             classId: classId,
@@ -706,7 +708,7 @@ final class SottoAppModel: ObservableObject {
         recordingId: String
     ) async throws -> SottoSpeakingPollResponse {
         guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this iPad before checking speaking feedback.")
+            throw SottoAPIError.message("Pair this device before checking speaking feedback.")
         }
         return try await client.pollClassSpeakingRecording(
             classId: classId,
@@ -871,12 +873,15 @@ final class SottoAppModel: ObservableObject {
 
 private enum PairingScan {
     case pairing(PairingPayload)
+    case unsupportedServerURL(URL)
     case serverURL(URL)
     case invalid
 
     init(scannedValue: String) {
         if let pairing = PairingPayload(scannedValue: scannedValue) {
-            self = .pairing(pairing)
+            self = SottoServerURLPolicy.isSupported(pairing.serverURL)
+                ? .pairing(pairing)
+                : .unsupportedServerURL(pairing.serverURL)
             return
         }
 
@@ -890,7 +895,9 @@ private enum PairingScan {
             return
         }
 
-        self = .serverURL(url)
+        self = SottoServerURLPolicy.isSupported(url)
+            ? .serverURL(url)
+            : .unsupportedServerURL(url)
     }
 }
 
