@@ -67,7 +67,7 @@ struct CourseListView: View {
                 Button(role: .destructive) {
                     model.signOut()
                 } label: {
-                    Label("Unpair iPad", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("Unpair device", systemImage: "rectangle.portrait.and.arrow.right")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SottoSecondaryButtonStyle())
@@ -412,7 +412,7 @@ private struct CourseDetailPane: View {
 
     private var statusDetail: String {
         if generation != nil {
-            return "You can keep using the iPad while Sotto builds the class. When it is ready, this action changes to Resume class."
+            return "You can keep using this device while Sotto builds the class. When it is ready, this action changes to Resume class."
         }
         if generationError != nil {
             return "The background class build did not finish cleanly. Retry when the server is reachable."

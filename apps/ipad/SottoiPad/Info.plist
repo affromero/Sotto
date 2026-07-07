@@ -24,8 +24,19 @@
 	<string>Sotto uses the camera to scan the pairing QR code from your self-hosted server.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sotto uses the microphone to record class speaking prompts and score pronunciation feedback.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Sotto connects to your self-hosted server on your local network when you pair this device.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

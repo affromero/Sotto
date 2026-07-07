@@ -8,61 +8,90 @@ struct PairingView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("Sotto")
-                        .font(.system(size: 62, weight: .bold, design: .serif))
-                        .foregroundStyle(SottoTheme.ink)
+            if proxy.size.width < 700 {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        pairingHeader(isCompact: true)
+                        manualPairingForm
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Pair this iPad")
-                            .font(.title.bold())
-                            .foregroundStyle(SottoTheme.ink)
-                        Text("Open Settings > Devices on your self-hosted Sotto server, then scan the pairing QR code shown there.")
-                            .font(.title3)
-                            .foregroundStyle(SottoTheme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
+                        scannerPanel
+                            .frame(height: min(max(proxy.size.width * 1.12, 320), 480))
                     }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        TextField("Paste pairing link", text: $manualCode)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                            .font(.body.monospaced())
-                            .padding(14)
-                            .background(SottoTheme.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(SottoTheme.line)
-                            )
-
-                        Button {
-                            Task {
-                                await model.pair(with: manualCode)
-                            }
-                        } label: {
-                            Label("Pair from link", systemImage: "link")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(SottoSecondaryButtonStyle())
-                        .disabled(manualCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-
-                    Spacer()
+                    .padding(.horizontal, 22)
+                    .padding(.top, 42)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(width: max(360, proxy.size.width * 0.36), alignment: .leading)
-                .padding(48)
+            } else {
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        pairingHeader(isCompact: false)
+                        manualPairingForm
 
-                QRScannerPanel { value in
-                    Task {
-                        await model.pair(with: value)
+                        Spacer()
                     }
+                    .frame(width: max(360, proxy.size.width * 0.36), alignment: .leading)
+                    .padding(48)
+
+                    scannerPanel
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.trailing, 42)
+                        .padding(.vertical, 42)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.trailing, 42)
-                .padding(.vertical, 42)
+            }
+        }
+    }
+
+    private func pairingHeader(isCompact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: isCompact ? 18 : 24) {
+            Text("Sotto")
+                .font(.system(size: isCompact ? 52 : 62, weight: .bold, design: .serif))
+                .foregroundStyle(SottoTheme.ink)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Pair this device")
+                    .font(isCompact ? .title2.bold() : .title.bold())
+                    .foregroundStyle(SottoTheme.ink)
+                Text("Open Settings > Devices on your self-hosted Sotto server, then scan the pairing QR code shown there.")
+                    .font(isCompact ? .body : .title3)
+                    .foregroundStyle(SottoTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var manualPairingForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("Paste pairing link", text: $manualCode)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .font(.body.monospaced())
+                .padding(14)
+                .background(SottoTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(SottoTheme.line)
+                )
+
+            Button {
+                Task {
+                    await model.pair(with: manualCode)
+                }
+            } label: {
+                Label("Pair from link", systemImage: "link")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SottoSecondaryButtonStyle())
+            .disabled(manualCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private var scannerPanel: some View {
+        QRScannerPanel { value in
+            Task {
+                await model.pair(with: value)
             }
         }
     }
@@ -81,9 +110,9 @@ private struct QRScannerPanel: View {
                 )
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("Camera ready", systemImage: "qrcode.viewfinder")
+                Label("Scan pairing code", systemImage: "qrcode.viewfinder")
                     .font(.headline)
-                Text("The scan happens locally. Your server URL and access token stay on this iPad.")
+                Text("The scan happens locally. Your server URL and access token stay on this device.")
                     .font(.callout)
                     .foregroundStyle(.white.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
@@ -262,14 +291,14 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     private func updatePreviewOrientation() {
         guard
             let connection = previewLayer?.connection,
-            connection.isVideoOrientationSupported,
             let interfaceOrientation = view.window?.windowScene?.interfaceOrientation,
-            let videoOrientation = AVCaptureVideoOrientation(interfaceOrientation: interfaceOrientation)
+            let videoRotationAngle = interfaceOrientation.videoRotationAngle,
+            connection.isVideoRotationAngleSupported(videoRotationAngle)
         else {
             return
         }
 
-        connection.videoOrientation = videoOrientation
+        connection.videoRotationAngle = videoRotationAngle
     }
 
     func metadataOutput(
@@ -289,21 +318,21 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     }
 }
 
-private extension AVCaptureVideoOrientation {
-    init?(interfaceOrientation: UIInterfaceOrientation) {
-        switch interfaceOrientation {
+private extension UIInterfaceOrientation {
+    var videoRotationAngle: CGFloat? {
+        switch self {
         case .portrait:
-            self = .portrait
+            90
         case .portraitUpsideDown:
-            self = .portraitUpsideDown
+            270
         case .landscapeLeft:
-            self = .landscapeLeft
+            0
         case .landscapeRight:
-            self = .landscapeRight
+            180
         case .unknown:
-            return nil
+            nil
         @unknown default:
-            return nil
+            nil
         }
     }
 }
