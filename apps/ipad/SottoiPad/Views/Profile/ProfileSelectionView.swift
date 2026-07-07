@@ -40,7 +40,7 @@ struct ProfileSelectionView: View {
                 Button(role: .destructive) {
                     model.signOut()
                 } label: {
-                    Label("Unpair iPad", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("Unpair device", systemImage: "rectangle.portrait.and.arrow.right")
                 }
                 .buttonStyle(SottoSecondaryButtonStyle())
             }
@@ -65,7 +65,7 @@ struct ProfileSelectionView: View {
                 .font(.system(size: 54, weight: .bold, design: .serif))
                 .foregroundStyle(SottoTheme.ink)
 
-            Text("Choose a profile for this iPad or create a new learner on \(serverHost).")
+            Text("Choose a profile for this device or create a new learner on \(serverHost).")
                 .font(.title3)
                 .foregroundStyle(SottoTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -363,7 +363,7 @@ struct ProfileToolbarMenu: View {
                 onExitProfile?()
                 model.signOut()
             } label: {
-                Label("Unpair iPad", systemImage: "rectangle.portrait.and.arrow.right")
+                Label("Unpair device", systemImage: "rectangle.portrait.and.arrow.right")
             }
         } label: {
             Label(profileName, systemImage: "person.crop.circle")
