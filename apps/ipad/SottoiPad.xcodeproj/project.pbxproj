@@ -27,7 +27,21 @@
 		A1000000000000000000000B /* PracticeStartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PracticeStartView.swift */; };
 		A1000000000000000000000C /* WorkbookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* WorkbookView.swift */; };
 		A1000000000000000000000D /* ProfileSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* ProfileSelectionView.swift */; };
+		A10000000000000000000016 /* SottoServerURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* SottoServerURLPolicy.swift */; };
+		A10000000000000000000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* Assets.xcassets */; };
+		A10000000000000000000018 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* PrivacyInfo.xcprivacy */; };
+		B10000000000000000000001 /* SottoServerURLPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* SottoServerURLPolicyTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B60000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A60000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = SottoiPad;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000000 /* SottoiPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SottoiPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -52,10 +66,22 @@
 		A2000000000000000000000C /* WorkbookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbookView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000000000000000000000E /* ProfileSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSelectionView.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* SottoServerURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoServerURLPolicy.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000000000018 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B20000000000000000000000 /* SottoiPadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SottoiPadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000001 /* SottoServerURLPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoServerURLPolicyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B30000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -69,6 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000003 /* SottoiPad */,
+				B40000000000000000000001 /* SottoiPadTests */,
 				A40000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -77,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000000 /* SottoiPad.app */,
+				B20000000000000000000000 /* SottoiPadTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -85,6 +113,8 @@
 			isa = PBXGroup;
 			children = (
 				A2000000000000000000000D /* Info.plist */,
+				A20000000000000000000017 /* Assets.xcassets */,
+				A20000000000000000000018 /* PrivacyInfo.xcprivacy */,
 				A40000000000000000000004 /* App */,
 				A40000000000000000000005 /* Design */,
 				A40000000000000000000006 /* Models */,
@@ -126,6 +156,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000006 /* SottoAPIClient.swift */,
+				A20000000000000000000016 /* SottoServerURLPolicy.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -197,6 +228,14 @@
 			path = Workbook;
 			sourceTree = "<group>";
 		};
+		B40000000000000000000001 /* SottoiPadTests */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000001 /* SottoServerURLPolicyTests.swift */,
+			);
+			path = SottoiPadTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -217,6 +256,24 @@
 			productReference = A20000000000000000000000 /* SottoiPad.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B50000000000000000000001 /* SottoiPadTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B90000000000000000000001 /* Build configuration list for PBXNativeTarget "SottoiPadTests" */;
+			buildPhases = (
+				B30000000000000000000003 /* Sources */,
+				B30000000000000000000001 /* Frameworks */,
+				B30000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B70000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = SottoiPadTests;
+			productName = SottoiPadTests;
+			productReference = B20000000000000000000000 /* SottoiPadTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -229,6 +286,10 @@
 				TargetAttributes = {
 					A50000000000000000000001 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					B50000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A50000000000000000000001;
 					};
 				};
 			};
@@ -246,12 +307,22 @@
 			projectRoot = "";
 			targets = (
 				A50000000000000000000001 /* SottoiPad */,
+				B50000000000000000000001 /* SottoiPadTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000017 /* Assets.xcassets in Resources */,
+				A10000000000000000000018 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B30000000000000000000002 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -285,10 +356,27 @@
 				A1000000000000000000000B /* PracticeStartView.swift in Sources */,
 				A1000000000000000000000C /* WorkbookView.swift in Sources */,
 				A1000000000000000000000D /* ProfileSelectionView.swift in Sources */,
+				A10000000000000000000016 /* SottoServerURLPolicy.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B30000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000001 /* SottoServerURLPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B70000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A50000000000000000000001 /* SottoiPad */;
+			targetProxy = B60000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A70000000000000000000001 /* Debug */ = {
@@ -407,9 +495,10 @@
 		A80000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X6V9878QBS;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = 2HVQQ4W769;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SottoiPad/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -417,8 +506,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.andresromero.sotto.ipad;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fm.sotto.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = (
@@ -429,16 +518,17 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 2;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
 		A80000000000000000000002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X6V9878QBS;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = 2HVQQ4W769;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SottoiPad/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -446,8 +536,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.andresromero.sotto.ipad;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fm.sotto.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = (
@@ -458,7 +548,63 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 2;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B80000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = 2HVQQ4W769;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fm.sotto.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = (
+					iphoneos,
+					iphonesimulator,
+				);
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SottoiPad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SottoiPad";
+			};
+			name = Debug;
+		};
+		B80000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = 2HVQQ4W769;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fm.sotto.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = (
+					iphoneos,
+					iphonesimulator,
+				);
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SottoiPad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SottoiPad";
 			};
 			name = Release;
 		};
@@ -479,6 +625,15 @@
 			buildConfigurations = (
 				A80000000000000000000001 /* Debug */,
 				A80000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B90000000000000000000001 /* Build configuration list for PBXNativeTarget "SottoiPadTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B80000000000000000000001 /* Debug */,
+				B80000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

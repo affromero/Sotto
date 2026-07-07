@@ -67,7 +67,7 @@ struct CourseListView: View {
                 Button(role: .destructive) {
                     model.signOut()
                 } label: {
-                    Label("Unpair iPad", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("Unpair device", systemImage: "rectangle.portrait.and.arrow.right")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SottoSecondaryButtonStyle())

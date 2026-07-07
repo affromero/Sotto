@@ -280,7 +280,7 @@ struct SottoAPIClient {
         do {
             return try JSONDecoder().decode(Response.self, from: data)
         } catch {
-            throw SottoAPIError.message("Sotto returned data this iPad app could not read. \(Self.describeDecodingError(error))")
+            throw SottoAPIError.message("Sotto returned data this app could not read. \(Self.describeDecodingError(error))")
         }
     }
 

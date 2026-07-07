@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 struct CredentialStore {
-    private let service = "co.sotto.ipad"
+    private let service = "fm.sotto.app"
     private let account = "default"
 
     func load() throws -> SottoCredentials? {
