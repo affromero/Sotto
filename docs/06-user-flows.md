@@ -492,6 +492,8 @@ curl -H "Authorization: Bearer sk_sotto_..." \
 
 Use this path when a local Claude Code, Codex, OpenClaw, Hermes, or custom workflow should push private learning context into Sotto or automate course/practice calls. API keys should be scoped to the owner who created them and revoked from `/settings/devices` when no longer needed.
 
+MCP-capable agents (Claude Desktop, Claude Code, Codex, OpenClaw, Hermes) can use the `@sotto/mcp` server instead of raw HTTP; per-client setup snippets live in `packages/mcp/README.md`.
+
 ## 10. Household/Profile Flow
 
 Sotto is private-first and self-hosted. A local install can still have multiple learner profiles inside the household.
