@@ -59,11 +59,11 @@
     "@playwright/test": "^1.61.1",
     "@types/geoip-lite": "^1.4.4",
     "lint-staged": "^17.0.8",
-    "prettier": "^3.8.5",
+    "prettier": "^3.9.4",
     "prisma": "7.8.0",
     "sort-package-json": "^4.0.0"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.2.9"
+    "@next/swc-darwin-arm64": "^16.2.10"
   }
 }
