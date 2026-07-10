@@ -1,6 +1,6 @@
 # @sotto/mcp
 
-MCP server for Sotto. Create and manage private AI episodes from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
+MCP server for Sotto. Create and manage private AI episodes from any MCP-compatible client (Claude Desktop, Claude Code, Codex, Cursor, OpenClaw, Hermes).
 
 ## Setup
 
@@ -59,6 +59,52 @@ codex mcp add sotto \
   -- npx -y @sotto/mcp
 ```
 
+#### OpenClaw
+
+Register the Sotto MCP server with OpenClaw:
+
+```bash
+openclaw mcp add sotto \
+  --command npx \
+  --arg -y \
+  --arg @sotto/mcp \
+  --env SOTTO_API_KEY=sk_sotto_your_key_here \
+  --env SOTTO_API_URL=https://your-sotto.example.com
+```
+
+Or add it to `~/.openclaw/openclaw.json` under `mcp.servers`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "sotto": {
+        "command": "npx",
+        "args": ["-y", "@sotto/mcp"],
+        "env": {
+          "SOTTO_API_KEY": "sk_sotto_your_key_here",
+          "SOTTO_API_URL": "https://your-sotto.example.com"
+        }
+      }
+    }
+  }
+}
+```
+
+#### Hermes
+
+Add the server to `~/.hermes/config.yaml` under `mcp_servers`, then run `/reload-mcp` in the agent:
+
+```yaml
+mcp_servers:
+  sotto:
+    command: 'npx'
+    args: ['-y', '@sotto/mcp']
+    env:
+      SOTTO_API_KEY: 'sk_sotto_your_key_here'
+      SOTTO_API_URL: 'https://your-sotto.example.com'
+```
+
 #### Local development
 
 Point at your local dev server:
@@ -87,15 +133,15 @@ Point at your local dev server:
 
 ## Tools
 
-| Tool                        | Description                                             |
-| --------------------------- | ------------------------------------------------------- |
-| `create_episode`            | Create an AI episode from a topic                       |
-| `ingest_agent_output`       | Create a private episode from local agent output        |
-| `get_episode`               | Get episode details + generation status                 |
-| `list_episodes`             | List your episodes                                      |
-| `update_episode`            | Update title, topic, or visibility                      |
-| `delete_episode`            | Delete a episode                                        |
-| `get_me`                    | Get your Sotto profile                                  |
+| Tool                  | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `create_episode`      | Create an AI episode from a topic                |
+| `ingest_agent_output` | Create a private episode from local agent output |
+| `get_episode`         | Get episode details + generation status          |
+| `list_episodes`       | List your episodes                               |
+| `update_episode`      | Update title, topic, or visibility               |
+| `delete_episode`      | Delete a episode                                 |
+| `get_me`              | Get your Sotto profile                           |
 
 ### Local Agent Ingestion
 
