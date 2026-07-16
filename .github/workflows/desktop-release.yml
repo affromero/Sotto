@@ -220,6 +220,8 @@ jobs:
         with:
           name: sotto-host-${{ matrix.slug }}-${{ needs.prepare.outputs.release_version }}
           path: ${{ runner.temp }}/sotto-desktop-downloads/download/desktop/${{ needs.prepare.outputs.release_version }}/${{ matrix.slug }}/*
+          # Handoff to the release job only; binaries live permanently on R2 + the GitHub Release.
+          retention-days: 1
 
       # Publish the produced bundles to R2 so sotto.fm/download can serve them.
       - name: Upload installers to R2

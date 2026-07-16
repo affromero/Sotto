@@ -93,6 +93,8 @@ jobs:
           path: |
             tui/sotto-${{ matrix.target }}.tar.gz
             tui/sotto-${{ matrix.target }}.tar.gz.sha256
+          # Handoff to the release job only; binaries live permanently on the GitHub Release.
+          retention-days: 1
 
   release:
     name: Attach to GitHub Release
