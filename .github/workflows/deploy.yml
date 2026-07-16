@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
 
+env:
+  # Stop docker/build-push-action uploading a *.dockerbuild record as an artifact on every run.
+  DOCKER_BUILD_RECORD_UPLOAD: false
+  DOCKER_BUILD_SUMMARY: false
+
 permissions:
   contents: read
   packages: write
