@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Blue-green deploy script for Sotto.
-# Runs on the server. Alternates between blue (port 3000) and green (port 3010) slots.
+# Runs on the server. Alternates between blue and green slots (ports
+# SOTTO_WEB_PORT_BLUE/SOTTO_WEB_PORT_GREEN, default 3000/3010).
 # Caddy health-checks both and routes to whichever is alive.
+#
+# Multiple stacks can share one server: SOTTO_STACK (default "sotto") names the
+# stack and scopes the slot state file, compose project names, image names,
+# ports, and Caddy site file. Only the primary "sotto" stack manages the shared
+# infrastructure (postgres/redis/pgbouncer); secondary stacks require it to
+# already be running.
 #
 # Usage: bash ~/sotto/scripts/deploy.sh
 
@@ -11,7 +18,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-SLOT_FILE="$HOME/.sotto-deploy-slot"
 COMPOSE_INFRA="docker-compose.infra.yml"
 COMPOSE_APP="docker-compose.app.yml"
 COMPOSE_WORKERS="docker-compose.workers.yml"
@@ -76,8 +82,7 @@ remove_optional_block() {
 
 remove_optional_markers() {
   awk '
-    $0 == "# BEGIN_OPTIONAL_WWW" { next }
-    $0 == "# END_OPTIONAL_WWW" { next }
+    /^# (BEGIN|END)_OPTIONAL_[A-Z]+$/ { next }
     { print }
   '
 }
@@ -89,6 +94,9 @@ render_caddy_config() {
   local rendered
   rendered="$(<"$CADDY_TEMPLATE")"
   rendered="${rendered//__SOTTO_APP_DOMAIN__/$app_host}"
+  rendered="${rendered//__SOTTO_STACK__/$SOTTO_STACK}"
+  rendered="${rendered//__SOTTO_WEB_PORT_BLUE__/$WEB_PORT_BLUE}"
+  rendered="${rendered//__SOTTO_WEB_PORT_GREEN__/$WEB_PORT_GREEN}"
 
   rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_MAPS" "# END_OPTIONAL_MAPS")"
 
@@ -96,6 +104,13 @@ render_caddy_config() {
     rendered="${rendered//__SOTTO_WWW_DOMAIN__/$www_host}"
   else
     rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_WWW" "# END_OPTIONAL_WWW")"
+  fi
+
+  if [ -n "$BASIC_AUTH_USER" ] && [ -n "$BASIC_AUTH_HASH" ]; then
+    rendered="${rendered//__SOTTO_BASIC_AUTH_USER__/$BASIC_AUTH_USER}"
+    rendered="${rendered//__SOTTO_BASIC_AUTH_HASH__/$BASIC_AUTH_HASH}"
+  else
+    rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_BASICAUTH" "# END_OPTIONAL_BASICAUTH")"
   fi
 
   printf '%s\n' "$rendered" | remove_optional_markers
@@ -140,47 +155,31 @@ pull_with_retry() {
 
 cleanup_stale_caddy_configs() {
   local target_path="$1"
-  local target_dir target_base legacy_site_name
+  local target_dir target_base stale_fragment_name
   target_dir="$(dirname "$target_path")"
   target_base="$(basename "$target_path")"
-  legacy_site_name="sotto"".fm"
+  # Earlier deploys wrote the Caddy fragment with the app domain as its
+  # FILENAME; current deploys write <stack>.conf. Delete any abandoned
+  # duplicate files so Caddy never imports the same site twice. This is
+  # about stale files only — the domain itself is the live site.
+  # (Split literal keeps the domain string out of this public script.)
+  stale_fragment_name="sotto"".fm"
+
+  # Legacy site-file cleanup belongs to the primary stack only — from a
+  # secondary stack this would delete the primary's live site file.
+  if [ "$SOTTO_STACK" != "sotto" ]; then
+    return
+  fi
 
   if [ "$target_dir" != "/etc/caddy/conf.d" ]; then
     return
   fi
 
   sudo find "$target_dir" -maxdepth 1 -type f \
-    \( -name "sotto.conf" -o -name "$legacy_site_name" -o -name "sotto.conf.disabled.*" -o -name "$legacy_site_name.disabled.*" \) \
+    \( -name "sotto.conf" -o -name "$stale_fragment_name" -o -name "sotto.conf.disabled.*" -o -name "$stale_fragment_name.disabled.*" \) \
     ! -name "$target_base" \
     -exec rm -f {} +
 }
-
-# --- Slot resolution ---
-
-if [ -f "$SLOT_FILE" ]; then
-  ACTIVE_SLOT=$(cat "$SLOT_FILE")
-else
-  ACTIVE_SLOT="none"
-fi
-
-if [ "$ACTIVE_SLOT" = "blue" ]; then
-  NEW_SLOT="green"
-  NEW_WEB_PORT=3010
-  OLD_SLOT="blue"
-elif [ "$ACTIVE_SLOT" = "green" ]; then
-  NEW_SLOT="blue"
-  NEW_WEB_PORT=3000
-  OLD_SLOT="green"
-else
-  # First deploy — start with blue
-  NEW_SLOT="blue"
-  NEW_WEB_PORT=3000
-  OLD_SLOT="none"
-fi
-
-echo "=== Blue-green deploy ==="
-echo "Active slot: $ACTIVE_SLOT"
-echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT)"
 
 # --- Pull code ---
 
@@ -208,6 +207,50 @@ source "$COMPOSE_ENV_FILE"
 set +a
 require_env NEXT_PUBLIC_APP_URL
 
+# --- Stack identity (may come from the env file or the caller's environment) ---
+
+SOTTO_STACK="${SOTTO_STACK:-sotto}"
+SLOT_FILE="$HOME/.${SOTTO_STACK}-deploy-slot"
+WEB_PORT_BLUE="${SOTTO_WEB_PORT_BLUE:-3000}"
+WEB_PORT_GREEN="${SOTTO_WEB_PORT_GREEN:-3010}"
+
+BASIC_AUTH_USER="${SOTTO_BASIC_AUTH_USER:-}"
+BASIC_AUTH_HASH="${SOTTO_BASIC_AUTH_HASH:-}"
+if [ -z "$BASIC_AUTH_HASH" ] && [ -n "${SOTTO_BASIC_AUTH_HASH_B64:-}" ]; then
+  # bcrypt hashes contain `$`, which `source` mangles when the env file is
+  # rendered from Doppler — store the hash base64-encoded instead.
+  BASIC_AUTH_HASH="$(printf '%s' "$SOTTO_BASIC_AUTH_HASH_B64" | base64 -d)"
+fi
+
+# --- Slot resolution ---
+
+if [ -f "$SLOT_FILE" ]; then
+  ACTIVE_SLOT=$(cat "$SLOT_FILE")
+else
+  ACTIVE_SLOT="none"
+fi
+
+if [ "$ACTIVE_SLOT" = "blue" ]; then
+  NEW_SLOT="green"
+  NEW_WEB_PORT=$WEB_PORT_GREEN
+  OLD_SLOT="blue"
+elif [ "$ACTIVE_SLOT" = "green" ]; then
+  NEW_SLOT="blue"
+  NEW_WEB_PORT=$WEB_PORT_BLUE
+  OLD_SLOT="green"
+else
+  # First deploy — start with blue
+  NEW_SLOT="blue"
+  NEW_WEB_PORT=$WEB_PORT_BLUE
+  OLD_SLOT="none"
+fi
+
+echo ""
+echo "=== Blue-green deploy ==="
+echo "Stack:       $SOTTO_STACK"
+echo "Active slot: $ACTIVE_SLOT"
+echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT)"
+
 COMMIT_SHA="$GIT_COMMIT_SHA"
 export COMMIT_SHA
 SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"
@@ -218,16 +261,18 @@ if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
   SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-ghcr.io/affromero/sotto-workers-prod}"
   SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}"
 else
-  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-sotto-web}"
-  SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-sotto-workers}"
-  SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-sotto-workers-base:$SOTTO_IMAGE_TAG}"
+  # Per-stack image names: the same commit built for two stacks bakes a
+  # different NEXT_PUBLIC_APP_URL, so the images must not share a tag.
+  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-${SOTTO_STACK}-web}"
+  SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-${SOTTO_STACK}-workers}"
+  SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-${SOTTO_STACK}-workers-base:$SOTTO_IMAGE_TAG}"
 fi
 IMAGE_PULL_TIMEOUT="${SOTTO_IMAGE_PULL_TIMEOUT:-600}"
 export SOTTO_IMAGE_TAG SOTTO_WEB_IMAGE SOTTO_WORKERS_IMAGE SOTTO_WORKER_BASE_IMAGE
 
 APP_DOMAIN="$(app_host_from_url "$NEXT_PUBLIC_APP_URL")"
 WWW_DOMAIN="${SOTTO_WWW_DOMAIN:-}"
-CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"
+CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/${SOTTO_STACK}.conf}"
 
 validate_caddy_host SOTTO_WWW_DOMAIN "$WWW_DOMAIN"
 
@@ -261,6 +306,20 @@ sudo caddy validate --config /etc/caddy/Caddyfile
 sudo caddy reload --config /etc/caddy/Caddyfile --force
 
 # --- Infrastructure ---
+# Shared across all stacks; only the primary stack manages it. A secondary
+# stack bringing it up would collide on the fixed sotto-prod-* container names.
+
+if [ "$SOTTO_STACK" != "sotto" ]; then
+  echo ""
+  echo "=== Secondary stack ($SOTTO_STACK): verifying shared infrastructure ==="
+  for c in sotto-prod-postgres sotto-prod-redis; do
+    if [ "$(docker inspect -f '{{.State.Running}}' "$c" 2>/dev/null)" != "true" ]; then
+      echo "ERROR: shared infra container $c is not running. Deploy the primary stack first."
+      exit 1
+    fi
+  done
+  echo "Shared infrastructure is up"
+else
 
 echo ""
 echo "=== Ensuring infrastructure is running ==="
@@ -305,6 +364,8 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+fi
+
 # --- Image/cache status ---
 
 echo ""
@@ -321,7 +382,7 @@ if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
   pull_with_retry "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG" \
     docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"
 else
-  docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build web
+  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" build web
 fi
 
 # Prepare the worker image before migrations so the Prisma CLI comes from the
@@ -333,14 +394,14 @@ if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
     docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"
 else
   docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .
-  docker compose -f "$COMPOSE_WORKERS" build workers-heavy
+  docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" build workers-heavy
 fi
 
 # --- Database migrations ---
 
 echo ""
 echo "=== Running database migrations ==="
-docker compose -f "$COMPOSE_WORKERS" run --rm --no-deps \
+docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" run --rm --no-deps \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   workers-heavy npx --no-install prisma db push --config=/app/prisma.config.ts --accept-data-loss
 
@@ -348,7 +409,7 @@ docker compose -f "$COMPOSE_WORKERS" run --rm --no-deps \
 
 echo ""
 echo "=== Starting $NEW_SLOT slot ==="
-docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" up -d --no-build web
+docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" up -d --no-build web
 
 # --- Health check new slot ---
 
@@ -379,10 +440,10 @@ if [ "$HEALTH_OK" = false ]; then
   echo "Expected version: $COMMIT_SHA"
   echo ""
   echo "=== Web logs ==="
-  docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" logs --tail=50 web
+  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" logs --tail=50 web
   echo ""
   echo "=== Tearing down failed $NEW_SLOT slot ==="
-  docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" down --timeout 10
+  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" down --timeout 10
   echo "Old slot ($OLD_SLOT) still serving traffic"
   exit 1
 fi
@@ -400,7 +461,7 @@ BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 echo ""
 echo "=== Restarting workers ==="
 echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESET_PIPELINE:-full} light=${WORKER_PRESET_LIGHT:-full}"
-docker compose -f "$COMPOSE_WORKERS" up -d --force-recreate --no-build
+docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" up -d --force-recreate --no-build
 
 # --- Stop old slot ---
 # Workers are already out of app compose — no job drain needed here.
@@ -416,7 +477,7 @@ if [ "$OLD_SLOT" != "none" ]; then
     export WEB_PORT=3010
   fi
 
-  docker compose -f "$COMPOSE_APP" -p "sotto-${OLD_SLOT}" down --timeout 10
+  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${OLD_SLOT}" down --timeout 10
 fi
 
 # --- Save state ---
