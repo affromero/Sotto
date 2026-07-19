@@ -9,6 +9,8 @@ import { getServerInfra } from '@/lib/server-config';
 import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
 import { SettingsForm } from './SettingsForm';
 import { CourseManagement } from '@/components/settings/CourseManagement';
+import { HouseholdInvite } from '@/components/settings/HouseholdInvite';
+import { accessPasswordConfigured } from '@/lib/access/gate';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -190,6 +192,8 @@ export default async function SettingsPage() {
       />
 
       <CourseManagement courses={managedCourses} />
+
+      {user.role === 'ADMIN' && accessPasswordConfigured() ? <HouseholdInvite /> : null}
     </main>
   );
 }
