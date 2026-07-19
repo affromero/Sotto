@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { prisma } from './prisma';
 import { auth } from './auth';
 import { logger } from './logger';
+import { accessPasswordConfigured, verifyGateToken, GATE_COOKIE } from './access/gate';
 import type { NextRequest } from 'next/server';
 
 const KEY_PREFIX = 'sk_sotto_';
@@ -71,6 +72,14 @@ export async function authenticateRequest(
 
       return profile ? { userId: profile.id } : null;
     }
+  }
+
+  // On gated public instances the cookie-session fallback is only available to
+  // browsers that opened the access gate; without this, any anonymous request
+  // would resolve to the owner profile. Bearer clients never reach this path.
+  if (accessPasswordConfigured()) {
+    const gateToken = request.cookies.get(GATE_COOKIE)?.value;
+    if (!(await verifyGateToken(gateToken))) return null;
   }
 
   // Fall back to session auth

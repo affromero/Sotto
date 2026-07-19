@@ -9,9 +9,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-function createRequest(path: string): NextRequest {
+function createRequest(path: string, cookie?: string): NextRequest {
   const url = new URL(path, 'http://localhost:3000');
-  return new NextRequest(url);
+  return new NextRequest(url, cookie ? { headers: { cookie } } : undefined);
 }
 
 function getRedirectLocation(response: Response): string | null {
@@ -39,11 +39,13 @@ describe('Proxy', () => {
   beforeEach(async () => {
     vi.resetModules();
     delete process.env.SELF_HOSTED;
+    delete process.env.SOTTO_ACCESS_PASSWORD;
     proxy = await getProxy();
   });
 
   afterEach(() => {
     delete process.env.SELF_HOSTED;
+    delete process.env.SOTTO_ACCESS_PASSWORD;
   });
 
   describe('Static and SEO assets pass through', () => {
@@ -128,6 +130,47 @@ describe('Proxy', () => {
 
     it('does not redirect the public health route', async () => {
       const res = await proxy(createRequest('/api/v1/health'));
+      expect(isPassThrough(res)).toBe(true);
+    });
+  });
+
+  describe('Access gate (SOTTO_ACCESS_PASSWORD set)', () => {
+    beforeEach(() => {
+      process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
+      process.env.BYOK_ENCRYPTION_KEY = 'test-signing-key-material-0123456789abcdef';
+    });
+
+    const gatedPages = ['/', '/dashboard', '/profiles', '/welcome', '/settings'];
+    for (const path of gatedPages) {
+      it(`redirects ${path} to /gate without a gate cookie`, async () => {
+        const res = await proxy(createRequest(path));
+        expect(getRedirectLocation(res)).toBe('/gate');
+      });
+    }
+
+    const exemptPaths = ['/gate', '/invite', '/invite/anything', '/api/v1/health', '/api/v1/gate'];
+    for (const path of exemptPaths) {
+      it(`never gate-redirects ${path}`, async () => {
+        const res = await proxy(createRequest(path));
+        expect(getRedirectLocation(res)).not.toBe('/gate');
+      });
+    }
+
+    it('rejects a forged gate cookie', async () => {
+      const res = await proxy(createRequest('/dashboard', 'sotto_gate=123.deadbeef'));
+      expect(getRedirectLocation(res)).toBe('/gate');
+    });
+
+    it('passes through with a valid gate cookie', async () => {
+      const { createGateToken } = await import('@/lib/access/gate');
+      const token = await createGateToken();
+      const res = await proxy(createRequest('/dashboard', `sotto_gate=${token}`));
+      expect(isPassThrough(res)).toBe(true);
+    });
+
+    it('is inert when no password is configured', async () => {
+      delete process.env.SOTTO_ACCESS_PASSWORD;
+      const res = await proxy(createRequest('/dashboard'));
       expect(isPassThrough(res)).toBe(true);
     });
   });
