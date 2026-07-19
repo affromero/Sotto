@@ -11,6 +11,18 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
+    ignore:
+      # TypeScript majors cannot land while typescript-eslint pins
+      # `typescript >=4.8.4 <6.1.0` as a peer. npm satisfies that peer by
+      # hoisting TS 5.x to the root, so apps/web resolves 5.x while its own
+      # package.json declares the new major — Next then decides TypeScript is
+      # missing and tries to reinstall it via pnpm, which 404s on the
+      # workspace-only @sotto/* packages and kills `next build`. Drop this
+      # entry once typescript-eslint ships TS 7 support; nothing in our own
+      # code blocks the upgrade (lint, type-check, and tests all pass on 7).
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     groups:
       # Minor + patch bumps are batched into one low-risk PR that should stay
       # green and be safe to merge on sight. Major bumps are deliberately left
