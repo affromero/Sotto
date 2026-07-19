@@ -106,13 +106,6 @@ render_caddy_config() {
     rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_WWW" "# END_OPTIONAL_WWW")"
   fi
 
-  if [ -n "$BASIC_AUTH_USER" ] && [ -n "$BASIC_AUTH_HASH" ]; then
-    rendered="${rendered//__SOTTO_BASIC_AUTH_USER__/$BASIC_AUTH_USER}"
-    rendered="${rendered//__SOTTO_BASIC_AUTH_HASH__/$BASIC_AUTH_HASH}"
-  else
-    rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_BASICAUTH" "# END_OPTIONAL_BASICAUTH")"
-  fi
-
   printf '%s\n' "$rendered" | remove_optional_markers
 }
 
@@ -213,14 +206,6 @@ SOTTO_STACK="${SOTTO_STACK:-sotto}"
 SLOT_FILE="$HOME/.${SOTTO_STACK}-deploy-slot"
 WEB_PORT_BLUE="${SOTTO_WEB_PORT_BLUE:-3000}"
 WEB_PORT_GREEN="${SOTTO_WEB_PORT_GREEN:-3010}"
-
-BASIC_AUTH_USER="${SOTTO_BASIC_AUTH_USER:-}"
-BASIC_AUTH_HASH="${SOTTO_BASIC_AUTH_HASH:-}"
-if [ -z "$BASIC_AUTH_HASH" ] && [ -n "${SOTTO_BASIC_AUTH_HASH_B64:-}" ]; then
-  # bcrypt hashes contain `$`, which `source` mangles when the env file is
-  # rendered from Doppler — store the hash base64-encoded instead.
-  BASIC_AUTH_HASH="$(printf '%s' "$SOTTO_BASIC_AUTH_HASH_B64" | base64 -d)"
-fi
 
 # --- Slot resolution ---
 
