@@ -9,15 +9,6 @@
 # Optional-block markers must stay at column 0 — deploy.sh matches them exactly.
 
 __SOTTO_APP_DOMAIN__ {
-# BEGIN_OPTIONAL_BASICAUTH
-	# Password-gate the browser UI. /api/v1 stays open: MCP, the TUI, and
-	# paired devices authenticate with sk_sotto_ Bearer keys and must not
-	# receive basic-auth challenges.
-	@gated not path /api/v1/*
-	basic_auth @gated {
-		__SOTTO_BASIC_AUTH_USER__ __SOTTO_BASIC_AUTH_HASH__
-	}
-# END_OPTIONAL_BASICAUTH
 	reverse_proxy localhost:__SOTTO_WEB_PORT_BLUE__ localhost:__SOTTO_WEB_PORT_GREEN__ {
 		lb_policy first
 		# Keep this on the legacy health alias so blue-green deploys can proxy

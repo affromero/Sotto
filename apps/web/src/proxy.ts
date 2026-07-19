@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSelfHosted } from './lib/self-hosted';
+import { accessPasswordConfigured, verifyGateToken, GATE_COOKIE } from './lib/access/gate';
 
-// Sotto is fully self-hosted for a single learner — there is no login, so the
-// proxy does no auth gating. The only routing left is steering the managed
-// showcase (SELF_HOSTED=false) into its non-persisting /welcome demo. Real
-// self-hosted installs pass every request straight through.
+// Sotto is self-hosted for a household — there is no login. The proxy does two
+// things only:
+//  1. Access gate: when the owner set SOTTO_ACCESS_PASSWORD (public instances),
+//     page requests without a valid gate cookie go to /gate. API routes are
+//     excluded here — authenticateRequest() enforces the gate for cookie-based
+//     API calls while letting sk_sotto_ Bearer clients through.
+//  2. Managed showcase (SELF_HOSTED=false): steer mock-able app surfaces into
+//     the non-persisting /welcome demo.
 const HOSTED_MOCK_ROUTES = [
   '/classes',
   '/create',
@@ -21,13 +26,20 @@ const HOSTED_MOCK_ROUTES = [
   '/voices',
 ];
 
+const GATE_OPEN_ROUTES = ['/gate', '/invite'];
+
 function isHostedMockRoute(pathname: string): boolean {
-  return HOSTED_MOCK_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  return HOSTED_MOCK_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+function isGateExempt(pathname: string): boolean {
+  return (
+    pathname.startsWith('/api/') ||
+    GATE_OPEN_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
   );
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip static files and SEO routes
@@ -39,6 +51,14 @@ export function proxy(request: NextRequest) {
     pathname === '/robots.txt'
   ) {
     return NextResponse.next();
+  }
+
+  // Access gate for publicly exposed instances.
+  if (accessPasswordConfigured() && !isGateExempt(pathname)) {
+    const gateToken = request.cookies.get(GATE_COOKIE)?.value;
+    if (!(await verifyGateToken(gateToken))) {
+      return NextResponse.redirect(new URL('/gate', request.url));
+    }
   }
 
   // Managed showcase only: route the mock-able app surfaces into the /welcome demo.

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
 
 // ---- Mocks ----
@@ -379,6 +379,67 @@ describe('api-keys', () => {
       const result = await authenticateRequest(mockRequest);
 
       expect(result).toEqual({ userId: 'user-malformed' });
+    });
+  });
+
+  describe('authenticateRequest with the access gate configured', () => {
+    beforeEach(() => {
+      process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
+      process.env.BYOK_ENCRYPTION_KEY = 'test-signing-key-material-0123456789abcdef';
+    });
+
+    afterEach(() => {
+      delete process.env.SOTTO_ACCESS_PASSWORD;
+    });
+
+    function requestWith(cookieValue: string | null): NextRequest {
+      return {
+        headers: { get: vi.fn(() => null) },
+        cookies: {
+          get: vi.fn((name: string) =>
+            name === 'sotto_gate' && cookieValue !== null ? { value: cookieValue } : undefined
+          ),
+        },
+      } as unknown as NextRequest;
+    }
+
+    it('denies the session fallback without a gate cookie', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'owner' } });
+
+      expect(await authenticateRequest(requestWith(null))).toBeNull();
+      expect(mockAuth).not.toHaveBeenCalled();
+    });
+
+    it('denies the session fallback with a forged gate cookie', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'owner' } });
+
+      expect(await authenticateRequest(requestWith('123.deadbeef'))).toBeNull();
+    });
+
+    it('allows the session fallback with a valid gate cookie', async () => {
+      const { createGateToken } = await import('@/lib/access/gate');
+      const token = await createGateToken();
+      mockAuth.mockResolvedValue({ user: { id: 'owner' } });
+
+      expect(await authenticateRequest(requestWith(token!))).toEqual({ userId: 'owner' });
+    });
+
+    it('leaves Bearer key auth untouched by the gate', async () => {
+      const mockRequest = {
+        headers: {
+          get: vi.fn((name: string) =>
+            name === 'authorization' ? 'Bearer sk_sotto_gatedbearer' : null
+          ),
+        },
+        cookies: { get: vi.fn(() => undefined) },
+      } as unknown as NextRequest;
+      mockPrismaApiKeyFindUnique.mockResolvedValue({
+        id: 'key-id-gated',
+        userId: 'user-bearer',
+        revokedAt: null,
+      });
+
+      expect(await authenticateRequest(mockRequest)).toEqual({ userId: 'user-bearer' });
     });
   });
 });
