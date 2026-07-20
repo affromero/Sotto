@@ -251,6 +251,10 @@ else
   SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-${SOTTO_STACK}-web}"
   SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-${SOTTO_STACK}-workers}"
   SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-${SOTTO_STACK}-workers-base:$SOTTO_IMAGE_TAG}"
+  # The workers image builds FROM the locally-tagged base image, which only a
+  # docker-driver builder can see — a docker-container buildx builder resolves
+  # FROM against registries and fails. Pin the default builder for build mode.
+  export BUILDX_BUILDER="${BUILDX_BUILDER:-default}"
 fi
 IMAGE_PULL_TIMEOUT="${SOTTO_IMAGE_PULL_TIMEOUT:-600}"
 export SOTTO_IMAGE_TAG SOTTO_WEB_IMAGE SOTTO_WORKERS_IMAGE SOTTO_WORKER_BASE_IMAGE
