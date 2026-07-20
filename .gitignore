@@ -91,4 +91,4 @@ config/admins.json
 .env.mock.local
 # Removed private financial data and tooling must never be reintroduced.
 /accounting/
-/.claude/skills/expense/
+/.claude/skills/
