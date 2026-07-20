@@ -148,7 +148,18 @@ describe('Proxy', () => {
       });
     }
 
-    const exemptPaths = ['/gate', '/invite', '/invite/anything', '/api/v1/health', '/api/v1/gate'];
+    const exemptPaths = [
+      '/gate',
+      '/invite',
+      '/invite/anything',
+      '/api/v1/health',
+      '/api/v1/gate',
+      '/icon.svg',
+      '/icon-192.png',
+      '/apple-icon.png',
+      '/apple-touch-icon.png',
+      '/favicon.ico',
+    ];
     for (const path of exemptPaths) {
       it(`never gate-redirects ${path}`, async () => {
         const res = await proxy(createRequest(path));

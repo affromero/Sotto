@@ -42,10 +42,14 @@ function isGateExempt(pathname: string): boolean {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip static files and SEO routes
+  // Skip static files and SEO routes. Icon assets must stay reachable without
+  // the gate cookie or browsers fall back to another domain's favicon.
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/icon') ||
+    pathname.startsWith('/apple-icon') ||
+    pathname.startsWith('/apple-touch-icon') ||
     pathname.startsWith('/fonts') ||
     pathname === '/sitemap.xml' ||
     pathname === '/robots.txt'
