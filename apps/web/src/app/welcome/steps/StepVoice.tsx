@@ -53,6 +53,8 @@ interface VoicePickerProps {
   onBaseUrl: (id: string, val: string) => void;
   localPlaceholder: string;
   demoMode: boolean;
+  /** Wizard provider ids whose platform key already exists in the server env. */
+  envDetected: string[];
   /** Model options for the currently selected provider (empty for local/none). */
   modelOptions: ModelOption[];
   modelValue: string;
@@ -73,6 +75,7 @@ function VoicePicker({
   onBaseUrl,
   localPlaceholder,
   demoMode,
+  envDetected,
   modelOptions,
   modelValue,
   onModel,
@@ -105,7 +108,8 @@ function VoicePicker({
       </div>
       <div className={c.voicePills}>
         {providers.map((p) => {
-          const set = !p.local && (keys[p.id] ?? '').trim().length > 0;
+          const set =
+            !p.local && ((keys[p.id] ?? '').trim().length > 0 || envDetected.includes(p.id));
           const isSelected = value === p.id;
           const isSupported = supportsWelcomeSpeechProviderLanguage(kind, p.id, languageCode);
           const languageCount = getWelcomeSpeechProviderLanguageCount(kind, p.id);
@@ -216,7 +220,11 @@ function VoicePicker({
             <input
               className={c.vkInput}
               type="password"
-              placeholder={sel.keyHint}
+              placeholder={
+                envDetected.includes(sel.id)
+                  ? 'detected on the server · paste a key only to override'
+                  : sel.keyHint
+              }
               value={k}
               onChange={(e) => onKey(sel.id, e.target.value)}
               aria-label={`${sel.name} API key`}
@@ -329,7 +337,9 @@ function VoicePicker({
           <div className={c.vkNote}>
             {k.trim()
               ? `Saved to your config · ${sel.note} · edit anytime in admin providers`
-              : `${sel.note} · paste now or add it later in admin providers`}
+              : envDetected.includes(sel.id)
+                ? `Already configured on the server (env) · ${sel.note} · nothing to paste`
+                : `${sel.note} · paste now or add it later in admin providers`}
           </div>
         </div>
       )}
@@ -469,6 +479,9 @@ interface Props {
   voice: VoiceState;
   demoMode: boolean;
   language: string;
+  /** Wizard TTS/STT ids whose platform key already exists in the server env (owner only). */
+  envDetectedTts?: string[];
+  envDetectedStt?: string[];
   /** Registry TTS models keyed by provider id (elevenlabs, openai, cartesia, hume). */
   ttsModels?: Record<string, ModelOption[]>;
   /** Registry STT models keyed by registry provider id (openai, deepgram, assemblyai, elevenlabs). */
@@ -501,6 +514,8 @@ export function StepVoice({
   voice,
   demoMode,
   language,
+  envDetectedTts = [],
+  envDetectedStt = [],
   ttsModels = {},
   sttModels = {},
   setVoice,
@@ -663,6 +678,7 @@ export function StepVoice({
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8000"
         demoMode={demoMode}
+        envDetected={envDetectedTts}
         modelOptions={ttsModelOptions}
         modelValue={voice.ttsModel[ttsModelRegId] ?? ''}
         onModel={setTtsModel}
@@ -682,6 +698,7 @@ export function StepVoice({
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8001/v1"
         demoMode={demoMode}
+        envDetected={envDetectedStt}
         modelOptions={sttModelOptions}
         modelValue={voice.sttModel[sttModelRegId] ?? ''}
         onModel={setSttModel}

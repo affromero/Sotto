@@ -51,6 +51,41 @@ interface CheckState {
   message: string;
 }
 
+const R2_ENV_VARS = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME'];
+const S3_ENV_VARS = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
+
+/**
+ * Owner-only: per-var presence of the selected provider's env secrets, from the
+ * server (booleans only). Turns the passive "set these in env" copy into a
+ * live checklist; the write check below stays the active confirmation.
+ */
+function EnvVarChecklist({ vars, env }: { vars: string[]; env: Record<string, boolean> }) {
+  const allSet = vars.every((name) => env[name]);
+  return (
+    <div aria-label="Server env variables">
+      <ul className={c.localCheckList}>
+        {vars.map((name) => (
+          <li
+            key={name}
+            className={`${c.localCheckItem} ${env[name] ? c.localCheckItemOk : c.localCheckItemError}`}
+          >
+            <span className={c.localCheckItemHead}>
+              <Glyph name={env[name] ? 'check' : 'x'} size={13} />
+              <code>{name}</code>
+              <span>{env[name] ? 'set on the server' : 'missing'}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className={c.vkNote}>
+        {allSet
+          ? 'All required env vars detected on the server — run the write check to confirm.'
+          : 'Secrets are not saved in the wizard. Restart web and workers after changing them.'}
+      </div>
+    </div>
+  );
+}
+
 export function StepStorage({ storage, config, demoMode, setStorage, onNext, onBack }: Props) {
   const [check, setCheck] = useState<CheckState>({
     status: 'idle',
@@ -69,6 +104,8 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
   );
   const stale = check.status !== 'idle' && check.signature !== signature;
   const canCheck = config.isOwner && !demoMode;
+  // Present only for the owner on a real install; demo/learners keep today's copy.
+  const envStorage = canCheck ? (config.env?.storage ?? null) : null;
   const canContinue = demoMode || !config.isOwner || (check.status === 'ok' && !stale);
 
   async function runCheck() {
@@ -156,7 +193,14 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
             <>
               <div className={c.voiceNote}>
                 <Glyph name="shield" size={13} />
-                Uses <code>LOCAL_STORAGE_DIR</code>. Current default: <code>./.sotto/storage</code>.
+                Uses <code>LOCAL_STORAGE_DIR</code>
+                {envStorage?.LOCAL_STORAGE_DIR ? (
+                  <> · set on the server.</>
+                ) : (
+                  <>
+                    . Default: <code>/tmp/sotto-storage</code>.
+                  </>
+                )}
               </div>
               <div className={c.vkNote}>
                 Best for a single Mac, laptop, or private server. Back up this directory with the
@@ -170,9 +214,13 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
                 Set <code>R2_ACCOUNT_ID</code>, <code>R2_ACCESS_KEY_ID</code>,{' '}
                 <code>R2_SECRET_ACCESS_KEY</code>, and <code>R2_BUCKET_NAME</code> in env.
               </div>
-              <div className={c.vkNote}>
-                Secrets are not saved in the wizard. Restart web and workers after changing them.
-              </div>
+              {envStorage ? (
+                <EnvVarChecklist vars={R2_ENV_VARS} env={envStorage} />
+              ) : (
+                <div className={c.vkNote}>
+                  Secrets are not saved in the wizard. Restart web and workers after changing them.
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -202,10 +250,14 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
                   }
                 />
               </div>
-              <div className={c.vkNote}>
-                Credentials stay in <code>AWS_ACCESS_KEY_ID</code> and{' '}
-                <code>AWS_SECRET_ACCESS_KEY</code>.
-              </div>
+              {envStorage ? (
+                <EnvVarChecklist vars={S3_ENV_VARS} env={envStorage} />
+              ) : (
+                <div className={c.vkNote}>
+                  Credentials stay in <code>AWS_ACCESS_KEY_ID</code> and{' '}
+                  <code>AWS_SECRET_ACCESS_KEY</code>.
+                </div>
+              )}
             </>
           )}
         </div>

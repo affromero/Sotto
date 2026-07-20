@@ -11,6 +11,8 @@ import c from '../components.styles';
 interface Props {
   agent: AgentState;
   demoMode: boolean;
+  /** Wizard provider ids whose platform key already exists in the server env (owner only). */
+  envDetected?: string[];
   /** Registry AI models keyed by backend provider id (anthropic, openai). */
   aiModels?: Record<string, ModelOption[]>;
   setAgent: (updater: (prev: AgentState) => AgentState) => void;
@@ -23,6 +25,7 @@ const EMPTY_AI_MODELS: Record<string, ModelOption[]> = {};
 export function StepAgent({
   agent,
   demoMode,
+  envDetected = [],
   aiModels = EMPTY_AI_MODELS,
   setAgent,
   onNext,
@@ -30,6 +33,17 @@ export function StepAgent({
 }: Props) {
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
   const liveTranslationKey = agent.liveTranslationKey ?? '';
+
+  // A key-method provider whose platform key already lives in the server env
+  // needs nothing typed: treat it as connected so the owner can continue, and
+  // any pasted key simply overrides the server one.
+  const envReady =
+    !demoMode && agent.method === 'key' && !agent.value && envDetected.includes(agent.provider);
+  useEffect(() => {
+    if (envReady && agent.status === 'idle') {
+      setAgent((a) => ({ ...a, status: 'connected' }));
+    }
+  }, [envReady, agent.status, setAgent]);
 
   // Model options for the current method. key: claude → anthropic, codex → openai.
   // cli: the matching keyless local agent backend (claude-code or codex).
@@ -187,7 +201,13 @@ export function StepAgent({
                 <input
                   className={c.fieldInput}
                   type={agent.method === 'key' ? 'password' : 'text'}
-                  placeholder={agent.method === 'key' ? prov.keyHint : prov.hint}
+                  placeholder={
+                    agent.method === 'key'
+                      ? envDetected.includes(agent.provider)
+                        ? 'detected on the server · paste a key only to override'
+                        : prov.keyHint
+                      : prov.hint
+                  }
                   value={agent.value}
                   onChange={(e) =>
                     setAgent((a) => ({ ...a, value: e.target.value, status: 'idle' }))
@@ -265,7 +285,9 @@ export function StepAgent({
               <Glyph name="check" size={14} />
               {agent.method === 'cli'
                 ? `${prov.cli?.label} linked · session reused`
-                : `${prov.name} connected`}{' '}
+                : envReady
+                  ? `${prov.name} key detected on the server`
+                  : `${prov.name} connected`}{' '}
               · ready to compose
             </div>
           )}

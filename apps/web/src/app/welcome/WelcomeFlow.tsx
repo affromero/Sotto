@@ -95,6 +95,17 @@ export interface OnboardingConfig {
     s3Bucket: string | null;
     s3Region: string | null;
   } | null;
+  /**
+   * Owner-only: provider keys / storage env vars already present in the server
+   * env (presence booleans only, never values). Wizard display ids. Absent for
+   * the demo and non-owner learners, where the wizard behaves as before.
+   */
+  env?: {
+    tts: string[];
+    stt: string[];
+    ai: string[];
+    storage: Record<string, boolean>;
+  } | null;
 }
 
 interface WelcomeFlowProps {
@@ -631,6 +642,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         <StepAgent
           agent={agent}
           demoMode={demoMode}
+          envDetected={config.env?.ai ?? []}
           aiModels={modelMeta.ai}
           setAgent={(updater) => setAgent((prev) => updater(prev))}
           onNext={() => go(5)}
@@ -643,6 +655,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         <StepVoice
           voice={voice}
           demoMode={demoMode}
+          envDetectedTts={config.env?.tts ?? []}
+          envDetectedStt={config.env?.stt ?? []}
           ttsModels={modelMeta.tts}
           sttModels={modelMeta.stt}
           language={language}

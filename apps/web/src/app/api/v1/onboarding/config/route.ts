@@ -5,6 +5,7 @@ import { getSiteConfig } from '@/lib/site-config';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
+import { buildEnvPresence } from './env-presence';
 
 /**
  * GET /api/onboarding/config
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   try {
     const selfHosted = isSelfHosted();
     if (!selfHosted) {
-      return NextResponse.json({ selfHosted: false, isOwner: false, infra: null });
+      return NextResponse.json({ selfHosted: false, isOwner: false, infra: null, env: null });
     }
 
     const authed = await authenticateRequest(request);
@@ -44,7 +45,11 @@ export async function GET(request: NextRequest) {
         }
       : null;
 
-    return NextResponse.json({ selfHosted, isOwner, infra });
+    // Owner-only: which provider keys / storage env vars the server already has
+    // (presence booleans, never values), so the wizard can pre-check them.
+    const env = isOwner ? buildEnvPresence() : null;
+
+    return NextResponse.json({ selfHosted, isOwner, infra, env });
   } catch (error: unknown) {
     logger.error('Failed to load onboarding config', {
       error: error instanceof Error ? error.message : String(error),
