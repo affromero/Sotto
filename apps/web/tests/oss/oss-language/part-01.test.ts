@@ -485,17 +485,17 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
     expect(deploySource).toContain('render_caddy_config');
     expect(deploySource).toContain(
-      'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"'
+      'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/${SOTTO_STACK}.conf}"'
     );
     expect(deploySource).toContain('SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"');
     expect(deploySource).toContain(
-      'docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build web'
+      'docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" build web'
     );
     expect(deploySource).toContain('docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"');
     expect(deploySource).toContain('docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"');
     expect(deploySource).toContain('SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"');
     expect(deploySource).toContain(
-      'SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-sotto-workers-base:$SOTTO_IMAGE_TAG}"'
+      'SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-${SOTTO_STACK}-workers-base:$SOTTO_IMAGE_TAG}"'
     );
     expect(deploySource).toContain(
       'docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .'
