@@ -383,7 +383,12 @@ if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
     docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"
 else
   docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .
-  docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" build workers-heavy
+  # Build directly (not via compose): the workers image FROMs the local base
+  # tag above, and compose's build path does not reliably honor BUILDX_BUILDER,
+  # falling back to a container-driver builder that cannot see local images.
+  docker build -f apps/web/Dockerfile.workers \
+    --build-arg WORKER_BASE_IMAGE="$SOTTO_WORKER_BASE_IMAGE" \
+    -t "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG" .
 fi
 
 # --- Database migrations ---
