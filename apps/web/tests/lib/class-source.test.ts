@@ -49,7 +49,11 @@ function extracted(over: Record<string, unknown> = {}) {
 describe('prepareClassSource', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveLearningAi.mockResolvedValue({ provider: 'local', model: 'local:qwen3', apiKey: undefined });
+    mockResolveLearningAi.mockResolvedValue({
+      provider: 'local',
+      model: 'local:qwen3',
+      apiKey: undefined,
+    });
     mockGenerateResponse.mockResolvedValue({
       content: 'Ein angepasster Text auf Niveau B1. '.repeat(6),
       model: 'qwen3',
@@ -81,14 +85,27 @@ describe('prepareClassSource', () => {
     // url is carried on sourceUrl, NOT in sourceMetadata (SourceMetadata has no url field)
     expect('url' in result.sourceMetadata).toBe(false);
     // the learner's level + target were passed to the leveling prompt
-    const promptVars = JSON.parse((mockGenerateResponse.mock.calls[0][0] as string).replace('PROMPT ', ''));
-    expect(promptVars).toMatchObject({ LEVEL: 'B1', TARGET: 'de', NATIVE: 'en', TITLE: 'A Real Article' });
+    const promptVars = JSON.parse(
+      (mockGenerateResponse.mock.calls[0][0] as string).replace('PROMPT ', '')
+    );
+    expect(promptVars).toMatchObject({
+      LEVEL: 'B1',
+      TARGET: 'de',
+      NATIVE: 'en',
+      TITLE: 'A Real Article',
+    });
   });
 
   it('throws ClassSourceError when extraction fails (never fabricates a source)', async () => {
     mockExtractContent.mockRejectedValue(new Error('403 paywall'));
     await expect(
-      prepareClassSource({ url: 'https://paywalled.com/x', level: 'A2', targetLang: 'de', nativeLang: 'en', userId: 'u1' }),
+      prepareClassSource({
+        url: 'https://paywalled.com/x',
+        level: 'A2',
+        targetLang: 'de',
+        nativeLang: 'en',
+        userId: 'u1',
+      })
     ).rejects.toBeInstanceOf(ClassSourceError);
     expect(mockGenerateResponse).not.toHaveBeenCalled();
   });
@@ -96,16 +113,33 @@ describe('prepareClassSource', () => {
   it('throws ClassSourceError when the source has too little readable text', async () => {
     mockExtractContent.mockResolvedValue(extracted({ text: 'too short' }));
     await expect(
-      prepareClassSource({ url: 'https://thin.com/x', level: 'B1', targetLang: 'de', nativeLang: 'en', userId: 'u1' }),
+      prepareClassSource({
+        url: 'https://thin.com/x',
+        level: 'B1',
+        targetLang: 'de',
+        nativeLang: 'en',
+        userId: 'u1',
+      })
     ).rejects.toBeInstanceOf(ClassSourceError);
     expect(mockGenerateResponse).not.toHaveBeenCalled();
   });
 
   it('throws ClassSourceError when the model returns an empty passage', async () => {
     mockExtractContent.mockResolvedValue(extracted());
-    mockGenerateResponse.mockResolvedValue({ content: '  ', model: 'qwen3', inputTokens: 1, outputTokens: 0 });
+    mockGenerateResponse.mockResolvedValue({
+      content: '  ',
+      model: 'qwen3',
+      inputTokens: 1,
+      outputTokens: 0,
+    });
     await expect(
-      prepareClassSource({ url: 'https://example.com/x', level: 'B1', targetLang: 'de', nativeLang: 'en', userId: 'u1' }),
+      prepareClassSource({
+        url: 'https://example.com/x',
+        level: 'B1',
+        targetLang: 'de',
+        nativeLang: 'en',
+        userId: 'u1',
+      })
     ).rejects.toBeInstanceOf(ClassSourceError);
   });
 });

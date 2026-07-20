@@ -52,7 +52,10 @@ export async function sendPushNotification(params: {
   // Clean up expired subscriptions
   const expiredIds: string[] = [];
   results.forEach((result, index) => {
-    if (result.status === 'rejected' && (result.reason as { statusCode?: number })?.statusCode === 410) {
+    if (
+      result.status === 'rejected' &&
+      (result.reason as { statusCode?: number })?.statusCode === 410
+    ) {
       expiredIds.push(subscriptions[index].id);
     }
   });
@@ -62,5 +65,8 @@ export async function sendPushNotification(params: {
     logger.info('Cleaned up expired push subscriptions', { count: String(expiredIds.length) });
   }
 
-  logger.info('Push notifications sent', { userId: params.userId, sent: String(subscriptions.length - expiredIds.length) });
+  logger.info('Push notifications sent', {
+    userId: params.userId,
+    sent: String(subscriptions.length - expiredIds.length),
+  });
 }

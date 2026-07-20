@@ -48,7 +48,11 @@ describe('assignVoicesForEpisode', () => {
       expect.objectContaining({
         data: expect.arrayContaining([
           expect.objectContaining({ episodeId: 'pod-1', speaker: 'HOST', provider: 'elevenlabs' }),
-          expect.objectContaining({ episodeId: 'pod-1', speaker: 'EXPERT', provider: 'elevenlabs' }),
+          expect.objectContaining({
+            episodeId: 'pod-1',
+            speaker: 'EXPERT',
+            provider: 'elevenlabs',
+          }),
         ]),
       })
     );
@@ -103,7 +107,11 @@ describe('assignVoicesForEpisode', () => {
       expect.objectContaining({
         data: expect.arrayContaining([
           expect.objectContaining({ episodeId: 'pod-1', speaker: 'HOST', provider: 'elevenlabs' }),
-          expect.objectContaining({ episodeId: 'pod-1', speaker: 'EXPERT', provider: 'elevenlabs' }),
+          expect.objectContaining({
+            episodeId: 'pod-1',
+            speaker: 'EXPERT',
+            provider: 'elevenlabs',
+          }),
           expect.objectContaining({ episodeId: 'pod-1', speaker: 'GUEST', provider: 'elevenlabs' }),
         ]),
       })

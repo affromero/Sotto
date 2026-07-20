@@ -36,37 +36,43 @@ describe('detectLanguage', () => {
   });
 
   it('skips short text without selecting a provider', async () => {
-    await expect(detectLanguage('too short', {
-      providerType: 'openai',
-      model: 'gpt-5-nano',
-      apiKeyOverride: 'sk-test',
-    })).resolves.toBeNull();
+    await expect(
+      detectLanguage('too short', {
+        providerType: 'openai',
+        model: 'gpt-5-nano',
+        apiKeyOverride: 'sk-test',
+      })
+    ).resolves.toBeNull();
 
     expect(mockCreateAIProvider).not.toHaveBeenCalled();
   });
 
   it('throws when no explicit AI runtime is provided', async () => {
-    await expect(detectLanguage('Esta es una oracion suficientemente larga para detectar idioma.')).rejects.toThrow(
-      'AI provider and model are required for language detection.'
-    );
+    await expect(
+      detectLanguage('Esta es una oracion suficientemente larga para detectar idioma.')
+    ).rejects.toThrow('AI provider and model are required for language detection.');
 
     expect(mockCreateAIProvider).not.toHaveBeenCalled();
   });
 
   it('uses the provided provider, model, and key for classification', async () => {
-    await expect(detectLanguage(
-      'Esta es una oracion suficientemente larga para detectar idioma.',
-      {
+    await expect(
+      detectLanguage('Esta es una oracion suficientemente larga para detectar idioma.', {
         providerType: 'openai',
         model: 'gpt-5-nano',
         apiKeyOverride: 'sk-test',
-      }
-    )).resolves.toBe('es');
+      })
+    ).resolves.toBe('es');
 
     expect(mockCreateAIProvider).toHaveBeenCalledWith('openai');
     expect(mockGenerateResponse).toHaveBeenCalledWith(
       expect.stringContaining('Return ONLY the ISO 639-1'),
-      [{ role: 'user', content: 'Esta es una oracion suficientemente larga para detectar idioma.' }],
+      [
+        {
+          role: 'user',
+          content: 'Esta es una oracion suficientemente larga para detectar idioma.',
+        },
+      ],
       {
         maxTokens: 3,
         model: 'gpt-5-nano',
@@ -91,20 +97,24 @@ describe('detectLanguage', () => {
       outputTokens: 1,
     });
 
-    await expect(detectLanguage(
-      'This is enough text to make a language classification request.',
-      { providerType: 'openai', model: 'gpt-5-nano' }
-    )).resolves.toBeNull();
+    await expect(
+      detectLanguage('This is enough text to make a language classification request.', {
+        providerType: 'openai',
+        model: 'gpt-5-nano',
+      })
+    ).resolves.toBeNull();
   });
 
   it('logs and skips when the provider fails', async () => {
     const error = new Error('provider down');
     mockGenerateResponse.mockRejectedValue(error);
 
-    await expect(detectLanguage(
-      'This is enough text to make a language classification request.',
-      { providerType: 'openai', model: 'gpt-5-nano' }
-    )).resolves.toBeNull();
+    await expect(
+      detectLanguage('This is enough text to make a language classification request.', {
+        providerType: 'openai',
+        model: 'gpt-5-nano',
+      })
+    ).resolves.toBeNull();
 
     expect(mockLoggerWarn).toHaveBeenCalledWith('Language detection failed, skipping', { error });
   });

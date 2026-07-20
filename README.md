@@ -51,9 +51,9 @@ Just Docker. No clone, no build:
 curl -fsSL https://sotto.fm/install.sh | bash
 ```
 
-The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code / Codex** CLI with no key, or your agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything.
+The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code** CLI with no key, or your Claude agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything.
 
-**Prefer one click?** Download the desktop installer for macOS `.dmg`, Windows `.exe`, or Linux `.AppImage` from **[sotto.fm/download](https://sotto.fm/download)**. _Sotto Host_ runs the whole stack for you, no terminal.
+**Prefer one click?** Unsigned preview desktop installers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Your OS may require an explicit security override. _Sotto Host_ runs the whole stack for you, no terminal.
 
 1. Open **[localhost:3000](http://localhost:3000)**
 2. Take a 2-minute placement test → it puts you at the right CEFR level
@@ -73,7 +73,7 @@ The social side is its own barrier. Private tutoring, classroom speaking, and co
 
 There is also learning-tool fatigue. Sotto should not feel like another AI language chatbot with an empty prompt box. It wraps the models you already run in a structured course, practice, memory, and teacher follow-up loop.
 
-**Sotto inverts that.** You run the whole stack, connect your own Claude or Codex and the context you choose to share, and it builds a course around your work, interests, and practice situations. Your data never leaves infrastructure you control.
+**Sotto inverts that.** You run the application, database, and files, connect your own Claude or Codex, and choose the context it can use. Content sent to configured cloud AI, speech, search, or storage providers is processed under those providers' terms; local providers can keep processing on infrastructure you control.
 
 > **The differentiators**
 >
@@ -189,21 +189,20 @@ tui               sotto: a headless terminal client (Rust): learn from your term
 packages/shared   Shared types, Zod schemas, brand copy
 packages/mcp      MCP server: exposes Sotto tools to Claude Code / Codex locally
 packages/groundcheck       Submodule: domain-aware reference verification
-packages/learning-model    Submodule: Bayesian learner mastery and practice priority
+packages/learning-model    Submodule: Bayesian mastery and practice priority
 ```
 
 > **Prefer the terminal?** `sotto` ([`tui/`](tui/README.md)) is a keyboard driven TUI client for vocab SRS, listening, speaking, classes, exams, and native audio in a single pane. `cargo install sotto-tui` (the installed command is `sotto`), then `sotto login` with a token from the web app's `/settings/devices`.
 
-### Research Submodules
+### Evidence and learning packages
 
-Two small packages are kept as submodules because they encode Sotto's evidence models.
-They are useful outside the web app, and separating them keeps their assumptions
-reviewable instead of burying them in product code.
+Two small public submodules encode Sotto's evidence models. Recursive clones
+and CI checkouts build and test both real implementations.
 
 | Submodule                                                                    | Why it exists                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`affromero/groundcheck`](https://github.com/affromero/groundcheck#readme)   | Domain-aware reference verification. A Nature paper, a Reuters article, and a government report should not be judged by the same citation formula, so `groundcheck` classifies the source domain and combines verification evidence with domain-specific weights/Bayesian scoring. |
-| [`SottoFM/learning-model`](https://github.com/SottoFM/learning-model#readme) | Learner mastery and practice recommendation. It models a learner's mastery from practice evidence and ranks weak, uncertain, due, or repeatedly missed targets so catch-up practice stays focused on learning value rather than easy repetition.                                   |
+| [`SottoFM/learning-model`](https://github.com/SottoFM/learning-model#readme) | Learner mastery and practice recommendation. It models mastery from practice evidence and ranks weak, uncertain, due, or repeatedly missed targets so catch-up practice stays focused on learning value rather than easy repetition.                                               |
 
 The split matters: source verification asks whether a reference is credible; learner
 modeling asks whether a person has mastered a skill. Both are probabilistic, but they
@@ -236,7 +235,7 @@ curl -fsSL https://sotto.fm/install.sh | bash
 During install you choose how Sotto reaches your AI:
 
 - **An API key** (OpenAI or Anthropic): simplest.
-- **Your local Claude Code / Codex CLI:** bring your own agent; it passes your credentials into the container, no API key.
+- **Your local Claude Code CLI:** bring your own agent; it passes your credentials into the container, no API key.
 - **Your agent on a VPS, over SSH:** Sotto runs `ssh you@vps claude ...` for every LLM call (`CLAUDE_CODE_SSH_HOST`), so your data can stay on your machine.
 
 ### From source (contributors)
@@ -276,10 +275,10 @@ Multilingual by design: **Qwen3 / Gemma 3** (100+ languages) for generation, **W
 
 <br>
 
-Route everything through your local Claude, no key:
+Route everything through a local agent when running from source:
 
 ```dotenv
-AI_PROVIDER=claude-code            # or codex
+AI_PROVIDER=claude-code            # Codex is also supported in source installs
 # CLAUDE_CODE_SSH_HOST=you@vps     # ...or your agent on a VPS, over SSH
 ```
 
@@ -350,7 +349,7 @@ The typed client is generated from the same Zod schemas the web app uses (`packa
 
 Sotto is built around BYOK from the start, surfaced three ways:
 
-1. **Keyless local agent:** set `AI_PROVIDER=claude-code` or `codex` and every LLM call runs through your local [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex](https://github.com/openai/codex) CLI, no API key. Source connector readiness is exposed in `apps/web/src/lib/source-connectors.ts`.
+1. **Keyless local agent:** the Docker installer supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code); source installs can set `AI_PROVIDER=claude-code` or `codex` to use Claude Code or [Codex](https://github.com/openai/codex), with no API key. Source connector readiness is exposed in `apps/web/src/lib/source-connectors.ts`.
 2. **[MCP](https://modelcontextprotocol.io/) server:** add `packages/mcp` to your Claude Code or Codex config and call `ingest_agent_output` to push content from any agent workflow straight into Sotto.
 3. **BYOK in Settings:** store encrypted per account API keys (LLM, TTS, STT), encrypted at rest with `BYOK_ENCRYPTION_KEY`. You pay your providers; Sotto is the infrastructure layer.
 
@@ -370,7 +369,7 @@ The full learning loop ships today and runs on your own stack:
 - **Practice exams:** full multi section mock exams modeled on each language's flagship (Goethe / DELE / Cambridge) at your level, with a mock band and feedback by section. Clearly unaffiliated practice, never an official score.
 - **Live conversation:** live spoken translation (Gemini Live) on your own Google key; new vocabulary feeds the memory graph.
 - **Runs 100% offline:** keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
-- **Households + your devices:** first account becomes owner, invite your family, isolated learner accounts; desktop launcher (Sotto Host), installable PWA on any device, one command secure tunnel.
+- **Households + your devices:** first profile becomes owner, add isolated learner profiles and share the deployment password only with your household; desktop launcher (Sotto Host), installable PWA on any device, one command secure tunnel.
 - **Terminal client:** `sotto`, a Rust + ratatui headless client with in terminal audio playback and recording; the full learning loop over `/api/v1`.
 - **iPad workbooks:** PDF workbooks for any class; generated by the web app, ready for GoodNotes style annotation, and linked back into the exact web class sections.
 

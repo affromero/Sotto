@@ -1,7 +1,11 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL }) });
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({
+    connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL,
+  }),
+});
 
 async function main() {
   console.warn('🌱 Seeding database...');
@@ -293,7 +297,9 @@ async function main() {
     }
   }
 
-  console.warn(`✅ Created ${taxonomyCategories.length} taxonomy categories with ${taxonomyTagCount} tags`);
+  console.warn(
+    `✅ Created ${taxonomyCategories.length} taxonomy categories with ${taxonomyTagCount} tags`
+  );
 }
 
 main()

@@ -16,6 +16,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
+import { createStitchJobId } from '@/lib/audio/stitch-identity';
 
 export async function processSegmentRegeneration(
   job: Job<RegenerateSegmentPayload>
@@ -121,7 +122,8 @@ export async function processSegmentRegeneration(
   await job.updateProgress(40);
 
   // Upload to R2
-  const audioUrl = await uploadSegmentAudio(episodeId, `regen-${crypto.randomUUID()}`, audioBuffer);
+  const regeneratedSegmentId = `regen-${interactionId}`;
+  const audioUrl = await uploadSegmentAudio(episodeId, regeneratedSegmentId, audioBuffer);
 
   // Measure actual audio duration via FFprobe
   let segmentDuration: number;
@@ -142,54 +144,62 @@ export async function processSegmentRegeneration(
 
   // Insert segment and reorder in a transaction to prevent race conditions
   const newSegment = await prisma.$transaction(async (tx) => {
-    // Shift all segments with order > insertAfterOrder up by 1
-    // Update in descending order to avoid unique constraint violations
-    const toShift = await tx.segment.findMany({
-      where: { episodeId, order: { gt: insertAfterOrder } },
-      orderBy: { order: 'desc' },
-      select: { id: true, order: true },
-    });
+    let segment = await tx.segment.findUnique({ where: { id: regeneratedSegmentId } });
+    if (!segment) {
+      const toShift = await tx.segment.findMany({
+        where: { episodeId, order: { gt: insertAfterOrder } },
+        orderBy: { order: 'desc' },
+        select: { id: true, order: true },
+      });
 
-    for (const seg of toShift) {
-      await tx.segment.update({
-        where: { id: seg.id },
-        data: { order: seg.order + 1 },
+      for (const seg of toShift) {
+        await tx.segment.update({
+          where: { id: seg.id },
+          data: { order: seg.order + 1 },
+        });
+      }
+
+      segment = await tx.segment.create({
+        data: {
+          id: regeneratedSegmentId,
+          episodeId,
+          speaker,
+          text: newText,
+          audioUrl,
+          duration: segmentDuration,
+          order: insertAfterOrder + 1,
+        },
       });
     }
 
-    // Create the new segment at the correct position
-    return tx.segment.create({
-      data: {
-        episodeId,
-        speaker,
-        text: newText,
-        audioUrl,
-        duration: segmentDuration,
-        order: insertAfterOrder + 1,
-      },
+    await tx.interaction.update({
+      where: { id: interactionId },
+      data: { status: 'INCORPORATED', incorporated: true },
     });
+    return segment;
   });
 
   await job.updateProgress(75);
-
-  // Mark interaction as incorporated
-  await prisma.interaction.update({
-    where: { id: interactionId },
-    data: { status: 'INCORPORATED', incorporated: true },
-  });
 
   // Queue re-stitch with skipSfx (SFX positions are invalid after inserting a segment)
   const allSegments = await prisma.segment.findMany({
     where: { episodeId },
     orderBy: { order: 'asc' },
-    select: { id: true },
+    select: { id: true, version: true, audioUrl: true },
   });
 
-  await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
-    episodeId,
-    segmentIds: allSegments.map((s) => s.id),
-    skipSfx: true,
-  });
+  await addJob(
+    audioStitchingQueue,
+    JobType.STITCH_AUDIO,
+    {
+      episodeId,
+      segmentIds: allSegments.map((s) => s.id),
+      segmentVersions: allSegments.map((s) => s.version ?? 1),
+      segmentAudioUrls: allSegments.map((s) => s.audioUrl!),
+      skipSfx: true,
+    },
+    { jobId: createStitchJobId(episodeId, allSegments, true) }
+  );
 
   // Set status to STITCHING (the stitching worker will set READY when done)
   await prisma.episode.update({

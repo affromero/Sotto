@@ -16,7 +16,16 @@ const INPUT: BuildClassDocumentInput = {
       id: 'sec-grammar',
       skill: 'GRAMMAR',
       questions: [
-        { id: 'q1', order: 1, question: 'Wie ___ du?', options: ['heißt', 'heißen', 'heiße', 'heißis'], passageRef: null, passageText: null, correctIndex: 0, explanation: 'du -> heißt' },
+        {
+          id: 'q1',
+          order: 1,
+          question: 'Wie ___ du?',
+          options: ['heißt', 'heißen', 'heiße', 'heißis'],
+          passageRef: null,
+          passageText: null,
+          correctIndex: 0,
+          explanation: 'du -> heißt',
+        },
       ],
       prompts: [],
       writingPrompts: [],
@@ -25,7 +34,15 @@ const INPUT: BuildClassDocumentInput = {
       id: 'sec-speaking',
       skill: 'SPEAKING',
       questions: [],
-      prompts: [{ id: 'p1', order: 1, targetPhrase: 'Guten Tag', translation: 'Good day', ipa: 'ˈɡuːtn̩ taːk' }],
+      prompts: [
+        {
+          id: 'p1',
+          order: 1,
+          targetPhrase: 'Guten Tag',
+          translation: 'Good day',
+          ipa: 'ˈɡuːtn̩ taːk',
+        },
+      ],
       writingPrompts: [],
     },
     {
@@ -33,7 +50,14 @@ const INPUT: BuildClassDocumentInput = {
       skill: 'WRITING',
       questions: [],
       prompts: [],
-      writingPrompts: [{ id: 'w1', order: 1, task: 'Write a short greeting.', guidance: 'Use two complete sentences.' }],
+      writingPrompts: [
+        {
+          id: 'w1',
+          order: 1,
+          task: 'Write a short greeting.',
+          guidance: 'Use two complete sentences.',
+        },
+      ],
     },
   ],
 };
@@ -64,7 +88,9 @@ describe('buildClassDocument', () => {
 
     const speaking = doc.sections.find((s) => s.skill === 'SPEAKING')!;
     expect(speaking.appLink).toBe('https://app/learn/class/class-1?section=sec-speaking');
-    expect(speaking.qrDataUrl).toContain('QR(https://app/learn/class/class-1?section=sec-speaking)');
+    expect(speaking.qrDataUrl).toContain(
+      'QR(https://app/learn/class/class-1?section=sec-speaking)'
+    );
     expect(speaking.prompts[0].targetPhrase).toBe('Guten Tag');
 
     const writing = doc.sections.find((s) => s.skill === 'WRITING')!;

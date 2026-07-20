@@ -37,7 +37,8 @@ describe('safeFetch', () => {
   });
 
   it('follows safe redirects to valid public URLs', async () => {
-    const mockFetch = vi.fn()
+    const mockFetch = vi
+      .fn()
       .mockResolvedValueOnce({
         status: 302,
         headers: new Headers({ location: 'https://example.com/final' }),
@@ -65,7 +66,8 @@ describe('safeFetch', () => {
   });
 
   it('resolves relative Location headers against current URL', async () => {
-    const mockFetch = vi.fn()
+    const mockFetch = vi
+      .fn()
       .mockResolvedValueOnce({
         status: 301,
         headers: new Headers({ location: '/page2' }),

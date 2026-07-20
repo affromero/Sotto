@@ -44,7 +44,7 @@ export function applyPronunciationAliases(text: string): string {
 export function generatePlsXml(): string {
   const entries = BRAND_PRONUNCIATIONS.map(
     (rule) =>
-      `    <lexeme>\n      <grapheme>${escapeXml(rule.grapheme)}</grapheme>\n      <alias>${escapeXml(rule.alias)}</alias>\n    </lexeme>`,
+      `    <lexeme>\n      <grapheme>${escapeXml(rule.grapheme)}</grapheme>\n      <alias>${escapeXml(rule.alias)}</alias>\n    </lexeme>`
   ).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -58,5 +58,9 @@ function escapeRegExp(s: string): string {
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

@@ -18,10 +18,12 @@ describe('NotesPlacement', () => {
   async function deduce() {
     const onVerify = vi.fn();
     render(<NotesPlacement native="en" target="es" onVerify={onVerify} />);
-    fireEvent.change(screen.getByLabelText(/paste notes/i), { target: { value: 'mi cuaderno de espanol' } });
+    fireEvent.change(screen.getByLabelText(/paste notes/i), {
+      target: { value: 'mi cuaderno de espanol' },
+    });
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      jsonResponse({ deducedLevel: 'B1', rationale: 'Uses past tense.', confidence: 0.8 }),
+      jsonResponse({ deducedLevel: 'B1', rationale: 'Uses past tense.', confidence: 0.8 })
     );
     fireEvent.click(screen.getByRole('button', { name: /find my level/i }));
     await waitFor(() => expect(screen.getByText('B1')).toBeInTheDocument());
@@ -33,13 +35,15 @@ describe('NotesPlacement', () => {
     expect(screen.getByText('Uses past tense.')).toBeInTheDocument();
     expect(screen.getByText('Confidence: 80%')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /start here/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /verify with a few questions/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /verify with a few questions/i })
+    ).toBeInTheDocument();
   });
 
   it('"Start here" confirms and navigates to the learn hub', async () => {
     await deduce();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      jsonResponse({ courseId: 'course-1', level: 'B1', addedVocabulary: 5 }, true),
+      jsonResponse({ courseId: 'course-1', level: 'B1', addedVocabulary: 5 }, true)
     );
     fireEvent.click(screen.getByRole('button', { name: /start here/i }));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/learn'));
@@ -56,7 +60,7 @@ describe('NotesPlacement', () => {
     render(<NotesPlacement native="en" target="es" onVerify={onVerify} />);
     fireEvent.change(screen.getByLabelText(/paste notes/i), { target: { value: 'x' } });
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      jsonResponse({ error: 'No readable materials uploaded' }, false),
+      jsonResponse({ error: 'No readable materials uploaded' }, false)
     );
     fireEvent.click(screen.getByRole('button', { name: /find my level/i }));
     await waitFor(() => expect(screen.getByText(/no readable materials/i)).toBeInTheDocument());

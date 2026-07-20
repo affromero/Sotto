@@ -210,10 +210,10 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
-Exact values are the `EpisodeStatus` enum in `schema.prisma`. Script
-verification and reference validation run within the `SCRIPTING -> COMPILING`
-span (the `script-verification` and `reference-validation` workers), not as
-their own statuses. `IMPORTING` and `TRANSCRIBING` are alternate entry points
+Exact values are the `EpisodeStatus` enum in `schema.prisma`. Research,
+creative planning, evidence-linked writing, deterministic compilation, and
+claim-support verification occupy the `RESEARCHING -> COMPILING` span.
+`IMPORTING` and `TRANSCRIBING` are alternate entry points
 for imported or transcribed source audio; `UPDATING` is regeneration of an
 existing episode.
 

@@ -6,6 +6,7 @@ const mockEpisodeFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockScriptUpdate = vi.fn();
 const mockReferenceFindMany = vi.fn();
+const mockReferenceCount = vi.fn();
 const mockDiscoveryFindUnique = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/lib/prisma', () => {
     },
     reference: {
       findMany: (...args: unknown[]) => mockReferenceFindMany(...args),
+      count: (...args: unknown[]) => mockReferenceCount(...args),
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockDiscoveryFindUnique(...args),
@@ -37,7 +39,12 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/script-verifier', () => ({
   getMinReferenceCount: (depth: string) => {
-    const bases: Record<string, number> = { deep_dive: 10, standard: 5, quick_overview: 3, eli5: 3 };
+    const bases: Record<string, number> = {
+      deep_dive: 10,
+      standard: 5,
+      quick_overview: 3,
+      eli5: 3,
+    };
     return bases[depth] ?? 5;
   },
 }));
@@ -69,6 +76,7 @@ async function createParams(episodeId: string) {
 describe('GET /api/v1/episodes/[episodeId]/script', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReferenceCount.mockResolvedValue(0);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -180,6 +188,7 @@ describe('GET /api/v1/episodes/[episodeId]/script', () => {
 describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReferenceCount.mockResolvedValue(0);
   });
 
   const validTurns = [
@@ -190,7 +199,10 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -201,7 +213,10 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue(null);
 
-    const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(404);
@@ -212,7 +227,10 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'other-user', status: 'SCRIPT_READY' });
 
-    const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(403);
@@ -223,7 +241,10 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'READY' });
 
-    const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(400);
@@ -243,10 +264,7 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
 
-    const response = await PATCH(
-      createPatchRequest({ turns: [] }),
-      await createParams('pod-1'),
-    );
+    const response = await PATCH(createPatchRequest({ turns: [] }), await createParams('pod-1'));
 
     expect(response.status).toBe(400);
   });
@@ -261,7 +279,7 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
 
     const response = await PATCH(
       createPatchRequest({ turns: monologueTurn }),
-      await createParams('pod-1'),
+      await createParams('pod-1')
     );
 
     expect(response.status).toBe(200);
@@ -272,7 +290,10 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockScriptFindUnique.mockResolvedValue(null);
 
-    const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(404);
@@ -292,10 +313,31 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     mockReferenceFindMany.mockResolvedValue([]);
     mockScriptUpdate.mockResolvedValue({ turns: validTurns, version: 2 });
 
-    const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ turns: validTurns, version: 2 });
+  });
+
+  it('rejects edits to a verified cited script', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockScriptFindUnique.mockResolvedValue({
+      turns: [{ speaker: 'HOST', text: 'Verified claim [1].' }],
+      version: 1,
+    });
+    mockReferenceCount.mockResolvedValue(1);
+
+    const response = await PATCH(
+      createPatchRequest({ turns: [{ speaker: 'HOST', text: 'Different claim [1].' }] }),
+      await createParams('pod-1')
+    );
+
+    expect(response.status).toBe(409);
+    expect(mockScriptUpdate).not.toHaveBeenCalled();
   });
 });

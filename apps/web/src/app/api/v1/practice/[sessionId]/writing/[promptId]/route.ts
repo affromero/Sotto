@@ -32,7 +32,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       where: { id: promptId, practiceSessionId: sessionId },
       select: {
         task: true,
-        practiceSession: { select: { course: { select: { nativeLang: true, targetLang: true, currentLevel: true } } } },
+        practiceSession: {
+          select: {
+            course: { select: { nativeLang: true, targetLang: true, currentLevel: true } },
+          },
+        },
       },
     });
     if (!prompt || !prompt.practiceSession) return errorResponse('Prompt not found', 404);
@@ -59,7 +63,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       corrections: grade.corrections as unknown as Prisma.InputJsonValue,
       feedback: grade.feedback,
     };
-    const existing = await prisma.writingResponse.findFirst({ where: { promptId, userId }, select: { id: true } });
+    const existing = await prisma.writingResponse.findFirst({
+      where: { promptId, userId },
+      select: { id: true },
+    });
     if (existing) await prisma.writingResponse.update({ where: { id: existing.id }, data });
     else await prisma.writingResponse.create({ data });
 

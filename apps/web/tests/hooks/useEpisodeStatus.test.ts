@@ -40,7 +40,11 @@ beforeEach(() => {
   MockEventSource.instances = [];
   (globalThis as Record<string, unknown>).EventSource = MockEventSource;
   global.fetch = vi.fn();
-  Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true, configurable: true });
+  Object.defineProperty(document, 'visibilityState', {
+    value: 'visible',
+    writable: true,
+    configurable: true,
+  });
 });
 
 afterEach(() => {
@@ -61,15 +65,13 @@ describe('useEpisodeStatus', () => {
   describe('initial state', () => {
     it('returns initialStatus when provided', () => {
       const { result } = renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
       );
       expect(result.current.status).toBe('SCRIPTING');
     });
 
     it('returns null status when no initialStatus', () => {
-      const { result } = renderHook(() =>
-        useEpisodeStatus({ episodeId: null }),
-      );
+      const { result } = renderHook(() => useEpisodeStatus({ episodeId: null }));
       expect(result.current.status).toBeNull();
     });
 
@@ -79,18 +81,14 @@ describe('useEpisodeStatus', () => {
     });
 
     it('does not connect when initialStatus is terminal', () => {
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'READY' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'READY' }));
       expect(MockEventSource.instances).toHaveLength(0);
     });
   });
 
   describe('SSE connection', () => {
     it('opens EventSource to the correct URL', () => {
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-123', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-123', initialStatus: 'SCRIPTING' }));
       expect(MockEventSource.instances).toHaveLength(1);
       expect(MockEventSource.instances[0].url).toBe('/api/v1/episodes/pod-123/stream');
     });
@@ -98,7 +96,7 @@ describe('useEpisodeStatus', () => {
     it('sets isConnected=true on open', async () => {
       mockFetchStatus('SCRIPTING');
       const { result } = renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
       );
       expect(result.current.isConnected).toBe(false);
 
@@ -111,9 +109,7 @@ describe('useEpisodeStatus', () => {
 
     it('does a reconciliation fetch on open', async () => {
       mockFetchStatus('COMPILING');
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }));
 
       await act(async () => {
         MockEventSource.instances[0].simulateOpen();
@@ -127,7 +123,7 @@ describe('useEpisodeStatus', () => {
     it('closes SSE when reconciliation fetch returns terminal status', async () => {
       mockFetchStatus('READY');
       const { result } = renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
       );
       const es = MockEventSource.instances[0];
 
@@ -151,7 +147,7 @@ describe('useEpisodeStatus', () => {
 
       const onStatusChange = vi.fn();
       renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING', onStatusChange }),
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING', onStatusChange })
       );
 
       await act(async () => {
@@ -169,17 +165,15 @@ describe('useEpisodeStatus', () => {
       // The full GET fetch is called (not just the SSE { status })
       expect(fetch).toHaveBeenCalledTimes(2);
       expect(onStatusChange).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'GENERATING_AUDIO' }),
+        expect.objectContaining({ status: 'GENERATING_AUDIO' })
       );
     });
 
     it('closes SSE on terminal status from message', async () => {
       mockFetchStatus('SCRIPTING'); // reconciliation on open
-      mockFetchStatus('READY');     // reconciliation on message
+      mockFetchStatus('READY'); // reconciliation on message
 
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }));
       const es = MockEventSource.instances[0];
 
       await act(async () => {
@@ -203,9 +197,7 @@ describe('useEpisodeStatus', () => {
       vi.useFakeTimers();
       mockFetchStatus('SCRIPTING');
 
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }));
 
       await act(async () => {
         MockEventSource.instances[0].simulateError();
@@ -227,9 +219,7 @@ describe('useEpisodeStatus', () => {
       vi.useFakeTimers();
       mockFetchStatus('READY');
 
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }));
 
       await act(async () => {
         MockEventSource.instances[0].simulateError();
@@ -256,9 +246,7 @@ describe('useEpisodeStatus', () => {
     it('does not stack pollers on repeated SSE errors', async () => {
       vi.useFakeTimers();
 
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }));
 
       // Simulate two errors in succession
       await act(async () => {
@@ -288,9 +276,9 @@ describe('useEpisodeStatus', () => {
       });
 
       // Each interval tick should produce at most 1 fetch
-      const fetchCalls = vi.mocked(fetch).mock.calls.filter(
-        (c) => c[0] === '/api/v1/episodes/pod-1',
-      );
+      const fetchCalls = vi
+        .mocked(fetch)
+        .mock.calls.filter((c) => c[0] === '/api/v1/episodes/pod-1');
       expect(fetchCalls.length).toBeLessThanOrEqual(2);
     });
   });
@@ -299,9 +287,7 @@ describe('useEpisodeStatus', () => {
     it('skips polling when tab is hidden', async () => {
       vi.useFakeTimers();
 
-      renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
-      );
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }));
 
       await act(async () => {
         MockEventSource.instances[0].simulateError();
@@ -323,7 +309,7 @@ describe('useEpisodeStatus', () => {
   describe('cleanup', () => {
     it('closes EventSource on unmount', () => {
       const { unmount } = renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
       );
       const es = MockEventSource.instances[0];
       expect(es.closed).toBe(false);
@@ -336,7 +322,7 @@ describe('useEpisodeStatus', () => {
       vi.useFakeTimers();
 
       const { unmount } = renderHook(() =>
-        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' }),
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
       );
 
       await act(async () => {

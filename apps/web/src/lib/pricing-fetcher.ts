@@ -77,7 +77,11 @@ export async function getLatestPricingFromDb(): Promise<
 
   const map = new Map<string, { inputPerMTok: number; outputPerMTok: number; source: string }>();
   for (const s of snapshots) {
-    map.set(s.modelId, { inputPerMTok: s.inputPerMTok, outputPerMTok: s.outputPerMTok, source: s.source });
+    map.set(s.modelId, {
+      inputPerMTok: s.inputPerMTok,
+      outputPerMTok: s.outputPerMTok,
+      source: s.source,
+    });
   }
   return map;
 }
@@ -126,8 +130,6 @@ export async function seedPricingFromRegistry(): Promise<void> {
 }
 
 /** Filter pricing to models known by the registry or pricetoken catalog. */
-export function filterToKnownModels(
-  extracted: ExtractedModelPricing[]
-): ExtractedModelPricing[] {
+export function filterToKnownModels(extracted: ExtractedModelPricing[]): ExtractedModelPricing[] {
   return extracted.filter((m) => getPricetokenModelInfo(m.modelId) !== null);
 }

@@ -7,7 +7,12 @@ import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
-import { upsertCourseGrammar, upsertLiveVocab, type GrammarItem, type VocabItem } from './knowledge-graph';
+import {
+  upsertCourseGrammar,
+  upsertLiveVocab,
+  type GrammarItem,
+  type VocabItem,
+} from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
 
 const MAX_ITEMS = 12;
@@ -129,7 +134,7 @@ export interface ExtractNoteVocabParams {
 function fenceUntrustedText(
   label: 'TRANSCRIPT' | 'COURSE_NOTES',
   text: string,
-  extractionInstruction = 'Extract target-language vocabulary only.',
+  extractionInstruction = 'Extract target-language vocabulary only.'
 ): string {
   const marker = `UNTRUSTED_${label}`;
   const sanitized = text
@@ -198,7 +203,7 @@ export interface NoteLearningTargetResult {
 }
 
 export async function extractAndStoreNoteLearningTargets(
-  p: ExtractNoteVocabParams,
+  p: ExtractNoteVocabParams
 ): Promise<NoteLearningTargetResult> {
   const text = p.note.trim();
   if (!text) return { addedVocabulary: 0, addedGrammar: 0 };
@@ -221,11 +226,11 @@ export async function extractAndStoreNoteLearningTargets(
           content: fenceUntrustedText(
             'COURSE_NOTES',
             text,
-            'Extract catch-up vocabulary and grammar learning targets only.',
+            'Extract catch-up vocabulary and grammar learning targets only.'
           ),
         },
       ],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1400, temperature: 0.2 },
+      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1400, temperature: 0.2 }
     );
 
     logUsage({
@@ -239,8 +244,12 @@ export async function extractAndStoreNoteLearningTargets(
 
     const targets = parseNoteLearningTargets(res.content);
     const [addedVocabulary, addedGrammar] = await Promise.all([
-      targets.vocabulary.length > 0 ? upsertLiveVocab(p.courseId, targets.vocabulary, p.level as CefrLevel) : 0,
-      targets.grammar.length > 0 ? upsertCourseGrammar(p.courseId, targets.grammar, p.level as CefrLevel) : 0,
+      targets.vocabulary.length > 0
+        ? upsertLiveVocab(p.courseId, targets.vocabulary, p.level as CefrLevel)
+        : 0,
+      targets.grammar.length > 0
+        ? upsertCourseGrammar(p.courseId, targets.grammar, p.level as CefrLevel)
+        : 0,
     ]);
     return { addedVocabulary, addedGrammar };
   } catch (error: unknown) {

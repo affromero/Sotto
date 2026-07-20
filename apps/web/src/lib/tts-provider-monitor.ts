@@ -115,11 +115,16 @@ async function fetchProviderState(providerId: TtsProviderId): Promise<ProviderSn
 
 function getApiKeyForProvider(providerId: TtsProviderId): string | null {
   switch (providerId) {
-    case 'elevenlabs': return process.env.ELEVENLABS_API_KEY ?? null;
-    case 'cartesia': return process.env.CARTESIA_API_KEY ?? null;
-    case 'hume': return process.env.HUME_API_KEY ?? null;
-    case 'openai': return process.env.OPENAI_API_KEY ?? null;
-    default: return null;
+    case 'elevenlabs':
+      return process.env.ELEVENLABS_API_KEY ?? null;
+    case 'cartesia':
+      return process.env.CARTESIA_API_KEY ?? null;
+    case 'hume':
+      return process.env.HUME_API_KEY ?? null;
+    case 'openai':
+      return process.env.OPENAI_API_KEY ?? null;
+    default:
+      return null;
   }
 }
 
@@ -127,10 +132,7 @@ function getApiKeyForProvider(providerId: TtsProviderId): string | null {
 // Snapshot diffing
 // ---------------------------------------------------------------------------
 
-export function diffSnapshots(
-  previous: MonitorSnapshot,
-  current: MonitorSnapshot,
-): SnapshotDiff[] {
+export function diffSnapshots(previous: MonitorSnapshot, current: MonitorSnapshot): SnapshotDiff[] {
   const diffs: SnapshotDiff[] = [];
 
   for (const providerId of MONITORED_PROVIDERS) {
@@ -160,7 +162,12 @@ export function diffSnapshots(
     const newVoiceIds = curr.voiceIds.filter((id) => !prevVoiceIds.has(id));
     const removedVoiceIds = prev.voiceIds.filter((id) => !currVoiceIds.has(id));
 
-    if (newModels.length > 0 || removedModels.length > 0 || newVoiceIds.length > 0 || removedVoiceIds.length > 0) {
+    if (
+      newModels.length > 0 ||
+      removedModels.length > 0 ||
+      newVoiceIds.length > 0 ||
+      removedVoiceIds.length > 0
+    ) {
       diffs.push({
         provider: providerId,
         newModels,
@@ -184,7 +191,9 @@ function getMonitorAiRuntime(): { provider: AiProviderId; model: string } {
   const model = process.env.TTS_MONITOR_AI_MODEL;
 
   if (!provider || !model) {
-    throw new Error('TTS provider monitor requires TTS_MONITOR_AI_PROVIDER and TTS_MONITOR_AI_MODEL.');
+    throw new Error(
+      'TTS provider monitor requires TTS_MONITOR_AI_PROVIDER and TTS_MONITOR_AI_MODEL.'
+    );
   }
   if (!isValidAiProviderId(provider)) {
     throw new Error(`Unknown TTS monitor AI provider: "${provider}".`);
@@ -194,14 +203,18 @@ function getMonitorAiRuntime(): { provider: AiProviderId; model: string } {
 }
 
 async function analyzeChangesWithLlm(diffs: SnapshotDiff[]): Promise<string> {
-  const diffSummary = diffs.map((d) => {
-    const parts: string[] = [`### ${d.provider}`];
-    if (d.newModels.length > 0) parts.push(`New models: ${d.newModels.map((m) => m.id).join(', ')}`);
-    if (d.removedModels.length > 0) parts.push(`Removed models: ${d.removedModels.map((m) => m.id).join(', ')}`);
-    if (d.newVoiceCount > 0) parts.push(`${d.newVoiceCount} new voices`);
-    if (d.removedVoiceCount > 0) parts.push(`${d.removedVoiceCount} removed voices`);
-    return parts.join('\n');
-  }).join('\n\n');
+  const diffSummary = diffs
+    .map((d) => {
+      const parts: string[] = [`### ${d.provider}`];
+      if (d.newModels.length > 0)
+        parts.push(`New models: ${d.newModels.map((m) => m.id).join(', ')}`);
+      if (d.removedModels.length > 0)
+        parts.push(`Removed models: ${d.removedModels.map((m) => m.id).join(', ')}`);
+      if (d.newVoiceCount > 0) parts.push(`${d.newVoiceCount} new voices`);
+      if (d.removedVoiceCount > 0) parts.push(`${d.removedVoiceCount} removed voices`);
+      return parts.join('\n');
+    })
+    .join('\n\n');
 
   const registryInfo = MONITORED_PROVIDERS.map((id) => {
     const meta = getProviderMeta(id);
@@ -230,9 +243,11 @@ Structure your response as:
 
   const runtime = getMonitorAiRuntime();
   const ai = createAIProvider(runtime.provider);
-  const response = await ai.generateResponse(systemPrompt, [
-    { role: 'user', content: `TTS provider changes detected:\n\n${diffSummary}` },
-  ], { maxTokens: 1500, model: runtime.model, skipModeration: true });
+  const response = await ai.generateResponse(
+    systemPrompt,
+    [{ role: 'user', content: `TTS provider changes detected:\n\n${diffSummary}` }],
+    { maxTokens: 1500, model: runtime.model, skipModeration: true }
+  );
 
   return response.content;
 }
@@ -248,10 +263,10 @@ async function findExistingIssue(title: string): Promise<boolean> {
   try {
     const response = await fetch(
       'https://api.github.com/repos/affromero/Sotto/issues?state=open&labels=tts-monitor&per_page=100',
-      { headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github+json' } },
+      { headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github+json' } }
     );
     if (!response.ok) return false;
-    const issues = await response.json() as Array<{ title: string }>;
+    const issues = (await response.json()) as Array<{ title: string }>;
     return issues.some((issue) => issue.title === title);
   } catch {
     return false;
@@ -282,7 +297,7 @@ async function createGitHubIssue(title: string, body: string): Promise<string | 
       return null;
     }
 
-    const issue = await response.json() as { html_url: string };
+    const issue = (await response.json()) as { html_url: string };
     return issue.html_url;
   } catch (err) {
     logger.error('GitHub issue creation error', {
@@ -318,7 +333,7 @@ export async function runTtsProviderMonitor(): Promise<void> {
     MONITORED_PROVIDERS.map(async (id) => {
       const state = await fetchProviderState(id);
       return { id, state };
-    }),
+    })
   );
 
   const currentProviders: Record<string, ProviderSnapshot> = {};
@@ -326,7 +341,9 @@ export async function runTtsProviderMonitor(): Promise<void> {
     if (result.status === 'fulfilled') {
       currentProviders[result.value.id] = result.value.state;
     } else {
-      logger.warn('Provider fetch failed', { error: result.reason?.message ?? String(result.reason) });
+      logger.warn('Provider fetch failed', {
+        error: result.reason?.message ?? String(result.reason),
+      });
     }
   }
 

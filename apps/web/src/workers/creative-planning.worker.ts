@@ -48,7 +48,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
         outlineId: existingOutline.id,
         useAdminCredits,
       },
-      { jobId: `write-${episodeId}-${Date.now()}` }
+      { jobId: `write-${episodeId}-${String(job.id)}` }
     );
 
     await job.updateProgress(100);
@@ -183,7 +183,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
       outlineId: savedOutline.id,
       useAdminCredits,
     },
-    { jobId: `write-${episodeId}-${Date.now()}` }
+    { jobId: `write-${episodeId}-${String(job.id)}` }
   );
 
   logger.info('Creative planning complete, queued script writing', {

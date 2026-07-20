@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
 import { isUserAdmin } from '@/lib/auth-guards';
-import { getProviderMeta, isValidProviderId, type TtsProviderId } from '@/lib/providers/tts-registry';
+import {
+  getProviderMeta,
+  isValidProviderId,
+  type TtsProviderId,
+} from '@/lib/providers/tts-registry';
 
 import { errorResponse } from '@/lib/api-response';
 // Env var names for each platform-level TTS provider key

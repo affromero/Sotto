@@ -44,7 +44,10 @@ export function VocabularyMarker({ entry, children, onPause, onResume }: Vocabul
     const centerX = rect.left + rect.width / 2;
     const halfW = TOOLTIP_WIDTH / 2;
     const margin = 8;
-    const left = Math.max(margin, Math.min(window.innerWidth - margin - TOOLTIP_WIDTH, centerX - halfW));
+    const left = Math.max(
+      margin,
+      Math.min(window.innerWidth - margin - TOOLTIP_WIDTH, centerX - halfW)
+    );
     const top = above ? rect.top - 8 : rect.bottom + 8;
 
     setCoords({ top, left });
@@ -66,7 +69,12 @@ export function VocabularyMarker({ entry, children, onPause, onResume }: Vocabul
     closeTimeout.current = setTimeout(() => setOpen(false), 150);
   }, []);
 
-  useEffect(() => () => { if (closeTimeout.current != null) clearTimeout(closeTimeout.current); }, []);
+  useEffect(
+    () => () => {
+      if (closeTimeout.current != null) clearTimeout(closeTimeout.current);
+    },
+    []
+  );
 
   // Manage pause/resume coordination across multiple tooltip instances
   useEffect(() => {
@@ -116,7 +124,7 @@ export function VocabularyMarker({ entry, children, onPause, onResume }: Vocabul
   }, [open]);
 
   const posLabel = entry.partOfSpeech
-    ? POS_LABELS[entry.partOfSpeech.toLowerCase()] ?? entry.partOfSpeech
+    ? (POS_LABELS[entry.partOfSpeech.toLowerCase()] ?? entry.partOfSpeech)
     : null;
 
   const tooltip = open ? (
@@ -137,20 +145,20 @@ export function VocabularyMarker({ entry, children, onPause, onResume }: Vocabul
           </span>
         )}
       </div>
-      {entry.pronunciation && (
-        <p className={styles.pronunciation}>{entry.pronunciation}</p>
-      )}
+      {entry.pronunciation && <p className={styles.pronunciation}>{entry.pronunciation}</p>}
       <p className={styles.translation}>{entry.translation}</p>
-      {entry.exampleSentence && (
-        <p className={styles.example}>{entry.exampleSentence}</p>
-      )}
+      {entry.exampleSentence && <p className={styles.example}>{entry.exampleSentence}</p>}
     </div>
   ) : null;
 
   return (
     <span
       className={styles.wrapper}
-      onMouseEnter={() => { cancelClose(); updatePosition(); setOpen(true); }}
+      onMouseEnter={() => {
+        cancelClose();
+        updatePosition();
+        setOpen(true);
+      }}
       onMouseLeave={scheduleClose}
     >
       <button

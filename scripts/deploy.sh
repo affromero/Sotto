@@ -34,6 +34,18 @@ require_env() {
   fi
 }
 
+require_env_min_length() {
+  local name="$1"
+  local minimum="$2"
+  local value
+  require_env "$name"
+  value="${!name}"
+  if [ "${#value}" -lt "$minimum" ]; then
+    echo "ERROR: $name must be at least $minimum characters"
+    exit 1
+  fi
+}
+
 app_host_from_url() {
   local url="$1"
   case "$url" in
@@ -199,6 +211,8 @@ set -a
 source "$COMPOSE_ENV_FILE"
 set +a
 require_env NEXT_PUBLIC_APP_URL
+require_env_min_length SOTTO_ACCESS_PASSWORD 16
+require_env_min_length BYOK_ENCRYPTION_KEY 32
 
 # --- Stack identity (may come from the env file or the caller's environment) ---
 
@@ -397,7 +411,7 @@ echo ""
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" run --rm --no-deps \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
-  workers-heavy npx --no-install prisma db push --config=/app/prisma.config.ts --accept-data-loss
+  workers-heavy npx --no-install prisma migrate deploy --config=/app/prisma.config.ts
 
 # --- Start new slot ---
 

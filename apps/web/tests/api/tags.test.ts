@@ -3,6 +3,11 @@ import { NextRequest } from 'next/server';
 
 // Define mock fn at module scope so it's properly typed as Mock
 const mockTagFindMany = vi.fn();
+const mockAuthenticateRequest = vi.fn();
+
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -28,6 +33,7 @@ function createRequest(): NextRequest {
 describe('GET /api/v1/tags', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
   });
 
   it('returns a list of tags with correct shape', async () => {
@@ -104,5 +110,4 @@ describe('GET /api/v1/tags', () => {
     expect(body[1].episodeCount).toBe(30);
     expect(body[2].episodeCount).toBe(10);
   });
-
 });

@@ -63,9 +63,15 @@ function createMockJob(): Job<ValidateKeysPayload> {
   } as unknown as Job<ValidateKeysPayload>;
 }
 
-function makeTtsKey(overrides: Partial<{
-  id: string; userId: string; provider: string; encryptedKey: string; extraData: string | null;
-}> = {}) {
+function makeTtsKey(
+  overrides: Partial<{
+    id: string;
+    userId: string;
+    provider: string;
+    encryptedKey: string;
+    extraData: string | null;
+  }> = {}
+) {
   return {
     id: overrides.id ?? 'tts-key-1',
     userId: overrides.userId ?? 'user-1',
@@ -75,9 +81,14 @@ function makeTtsKey(overrides: Partial<{
   };
 }
 
-function makeAiKey(overrides: Partial<{
-  id: string; userId: string; provider: string; encryptedKey: string;
-}> = {}) {
+function makeAiKey(
+  overrides: Partial<{
+    id: string;
+    userId: string;
+    provider: string;
+    encryptedKey: string;
+  }> = {}
+) {
   return {
     id: overrides.id ?? 'ai-key-1',
     userId: overrides.userId ?? 'user-1',
@@ -143,9 +154,7 @@ describe('processKeyValidation', () => {
   });
 
   it('sends KEY_INVALID notification when invalidating a TTS key', async () => {
-    mockTtsKeyFindMany.mockResolvedValue([
-      makeTtsKey({ userId: 'user-42', provider: 'cartesia' }),
-    ]);
+    mockTtsKeyFindMany.mockResolvedValue([makeTtsKey({ userId: 'user-42', provider: 'cartesia' })]);
     mockValidateProviderCredentials.mockResolvedValue(false);
 
     const job = createMockJob();
@@ -192,9 +201,7 @@ describe('processKeyValidation', () => {
   });
 
   it('sends KEY_INVALID notification when invalidating an AI key', async () => {
-    mockAiKeyFindMany.mockResolvedValue([
-      makeAiKey({ userId: 'user-99', provider: 'openai' }),
-    ]);
+    mockAiKeyFindMany.mockResolvedValue([makeAiKey({ userId: 'user-99', provider: 'openai' })]);
     mockValidateAiProviderCredentials.mockResolvedValue(false);
 
     const job = createMockJob();
@@ -224,12 +231,8 @@ describe('processKeyValidation', () => {
     ]);
 
     // First TTS valid, second invalid; first AI valid, second invalid
-    mockValidateProviderCredentials
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
-    mockValidateAiProviderCredentials
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    mockValidateProviderCredentials.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mockValidateAiProviderCredentials.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
     const job = createMockJob();
     const promise = processKeyValidation(job);
@@ -251,9 +254,7 @@ describe('processKeyValidation', () => {
   });
 
   it('decrypts key before validating TTS provider', async () => {
-    mockTtsKeyFindMany.mockResolvedValue([
-      makeTtsKey({ encryptedKey: 'sealed-tts-secret' }),
-    ]);
+    mockTtsKeyFindMany.mockResolvedValue([makeTtsKey({ encryptedKey: 'sealed-tts-secret' })]);
 
     const job = createMockJob();
     const promise = processKeyValidation(job);
@@ -290,9 +291,7 @@ describe('processKeyValidation', () => {
       return `decrypted-${input}`;
     });
 
-    mockTtsKeyFindMany.mockResolvedValue([
-      makeTtsKey({ extraData: extraDataEncrypted }),
-    ]);
+    mockTtsKeyFindMany.mockResolvedValue([makeTtsKey({ extraData: extraDataEncrypted })]);
 
     const job = createMockJob();
     const promise = processKeyValidation(job);
@@ -311,7 +310,9 @@ describe('processKeyValidation', () => {
       makeTtsKey({ id: 'tts-good', encryptedKey: 'good-key' }),
     ]);
     mockDecryptApiKey
-      .mockImplementationOnce(() => { throw new Error('Decryption failed'); })
+      .mockImplementationOnce(() => {
+        throw new Error('Decryption failed');
+      })
       .mockImplementation((input: string) => `decrypted-${input}`);
     mockValidateProviderCredentials.mockResolvedValue(true);
 
@@ -361,9 +362,7 @@ describe('processKeyValidation', () => {
       if (input === 'bad-extra') throw new Error('Extra decrypt failed');
       return `decrypted-${input}`;
     });
-    mockTtsKeyFindMany.mockResolvedValue([
-      makeTtsKey({ extraData: 'bad-extra' }),
-    ]);
+    mockTtsKeyFindMany.mockResolvedValue([makeTtsKey({ extraData: 'bad-extra' })]);
 
     const job = createMockJob();
     const promise = processKeyValidation(job);
@@ -371,9 +370,8 @@ describe('processKeyValidation', () => {
     await promise;
 
     // Should still validate, just without userId from extra
-    expect(mockValidateProviderCredentials).toHaveBeenCalledWith(
-      'elevenlabs',
-      { apiKey: 'decrypted-enc-tts-key' }
-    );
+    expect(mockValidateProviderCredentials).toHaveBeenCalledWith('elevenlabs', {
+      apiKey: 'decrypted-enc-tts-key',
+    });
   });
 });

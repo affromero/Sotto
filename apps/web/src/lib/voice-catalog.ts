@@ -7,10 +7,7 @@
  */
 
 import type { TtsProviderId } from './providers/tts-registry';
-import {
-  VOICE_POOL,
-  type VoicePoolEntry,
-} from './voice-pool';
+import { VOICE_POOL, type VoicePoolEntry } from './voice-pool';
 import {
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
@@ -44,7 +41,10 @@ const CATALOG_TTL = 86400; // 24 hours
 // Static catalogs — built from existing voice pools
 // ---------------------------------------------------------------------------
 
-function voicePoolToCatalog(entries: VoicePoolEntry[], provider: 'elevenlabs' | 'openai'): CatalogVoice[] {
+function voicePoolToCatalog(
+  entries: VoicePoolEntry[],
+  provider: 'elevenlabs' | 'openai'
+): CatalogVoice[] {
   return entries.map((e) => ({
     id: e.ids[provider] ?? e.ids.elevenlabs,
     name: e.name,
@@ -129,7 +129,11 @@ async function fetchCartesiaCatalog(apiKey: string): Promise<CatalogVoice[]> {
       throw new Error(`Cartesia voices API error (${response.status})`);
     }
 
-    const page = await response.json() as { data: Record<string, string>[]; next_page?: string; has_more: boolean };
+    const page = (await response.json()) as {
+      data: Record<string, string>[];
+      next_page?: string;
+      has_more: boolean;
+    };
     for (const v of page.data) {
       voices.push({ id: v.id, name: v.name, gender: v.gender, description: v.description });
     }
@@ -140,10 +144,9 @@ async function fetchCartesiaCatalog(apiKey: string): Promise<CatalogVoice[]> {
 }
 
 async function fetchHumeCatalog(apiKey: string): Promise<CatalogVoice[]> {
-  const response = await fetch(
-    'https://api.hume.ai/v0/tts/voices?provider=HUME_AI&page_size=100',
-    { headers: { 'X-Hume-Api-Key': apiKey } },
-  );
+  const response = await fetch('https://api.hume.ai/v0/tts/voices?provider=HUME_AI&page_size=100', {
+    headers: { 'X-Hume-Api-Key': apiKey },
+  });
 
   if (!response.ok) {
     throw new Error(`Hume voices API error (${response.status})`);
@@ -213,7 +216,7 @@ async function fetchLocalCatalog(): Promise<CatalogVoice[]> {
  */
 export async function getVoiceCatalog(
   providerId: TtsProviderId,
-  apiKey?: string,
+  apiKey?: string
 ): Promise<CatalogVoice[]> {
   switch (providerId) {
     case 'elevenlabs': {

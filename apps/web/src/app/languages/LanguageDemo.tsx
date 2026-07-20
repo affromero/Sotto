@@ -38,8 +38,7 @@ const DEMO_VOCABULARY: VocabularyEntryData[] = [
     translation: 'negotiations',
     partOfSpeech: 'noun',
     pronunciation: 'fer-HAHND-loong-en',
-    exampleSentence:
-      'Die Verhandlungen dauern an. (The negotiations continue.)',
+    exampleSentence: 'Die Verhandlungen dauern an. (The negotiations continue.)',
     difficulty: 'advanced',
   },
   {
@@ -49,8 +48,7 @@ const DEMO_VOCABULARY: VocabularyEntryData[] = [
     translation: 'report',
     partOfSpeech: 'noun',
     pronunciation: 'beh-RIKHT',
-    exampleSentence:
-      'Der Bericht zeigt neue Daten. (The report shows new data.)',
+    exampleSentence: 'Der Bericht zeigt neue Daten. (The report shows new data.)',
     difficulty: 'beginner',
   },
   {
@@ -83,17 +81,11 @@ const DEMO_REFERENCES = [
 ] as ReferenceData[];
 
 export function LanguageDemo() {
-  const parsed = parseTextWithCitationsAndVocabulary(
-    DEMO_TEXT,
-    DEMO_REFERENCES,
-    DEMO_VOCABULARY,
-  );
+  const parsed = parseTextWithCitationsAndVocabulary(DEMO_TEXT, DEMO_REFERENCES, DEMO_VOCABULARY);
 
   return (
     <div className={styles.demoCard}>
-      <p className={styles.demoHint}>
-        Hover the underlined words to see translations
-      </p>
+      <p className={styles.demoHint}>Hover the underlined words to see translations</p>
       <div className={styles.demoTranscript}>{parsed}</div>
       <div className={styles.demoPanels}>
         <VocabularyList vocabularyEntries={DEMO_VOCABULARY} />

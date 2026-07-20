@@ -36,7 +36,9 @@ import { GET } from '@/app/api/v1/courses/[courseId]/graph/route';
 // ---- Helpers ----
 
 function makeGetRequest(courseId: string): NextRequest {
-  return new NextRequest(`http://localhost:3000/api/v1/courses/${courseId}/graph`, { method: 'GET' });
+  return new NextRequest(`http://localhost:3000/api/v1/courses/${courseId}/graph`, {
+    method: 'GET',
+  });
 }
 
 function courseParams(courseId: string) {
@@ -45,12 +47,17 @@ function courseParams(courseId: string) {
 
 const SAMPLE_GRAPH = {
   nodes: [
-    { id: 'v1', kind: 'vocab' as const, label: 'hola', translation: 'hello', strength: 0.7, due: true },
+    {
+      id: 'v1',
+      kind: 'vocab' as const,
+      label: 'hola',
+      translation: 'hello',
+      strength: 0.7,
+      due: true,
+    },
     { id: 'g1', kind: 'grammar' as const, label: 'Articles', strength: 0.5, due: false },
   ],
-  edges: [
-    { source: 'v1', target: 'g1', type: 'exemplifies', weight: 1.0 },
-  ],
+  edges: [{ source: 'v1', target: 'g1', type: 'exemplifies', weight: 1.0 }],
 };
 
 // ---- Tests ----
@@ -103,7 +110,7 @@ describe('GET /api/v1/courses/[courseId]/graph', () => {
     expect(mockCourseFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'course-1', userId: 'u1' },
-      }),
+      })
     );
   });
 

@@ -23,11 +23,9 @@ interface VerifiedRef {
  */
 export async function extractDiscoveryFigures(
   episodeId: string,
-  verifiedRefs: VerifiedRef[],
+  verifiedRefs: VerifiedRef[]
 ): Promise<void> {
-  const refsWithUrls = verifiedRefs
-    .filter((r) => r.url)
-    .slice(0, MAX_REFS_TO_EXTRACT);
+  const refsWithUrls = verifiedRefs.filter((r) => r.url).slice(0, MAX_REFS_TO_EXTRACT);
 
   if (refsWithUrls.length === 0) return;
 
@@ -60,7 +58,7 @@ export async function extractDiscoveryFigures(
         });
         return { figures: [], tables: [] };
       }
-    }),
+    })
   );
 
   for (const result of results) {

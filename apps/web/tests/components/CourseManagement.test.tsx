@@ -21,7 +21,13 @@ describe('CourseManagement', () => {
     global.fetch = vi.fn().mockImplementation((_url: string, init?: { method?: string }) => {
       if (init?.method === 'DELETE') {
         return Promise.resolve(
-          jsonResponse({ deleted: true, episodesDeleted: 1, filesAttempted: 2, filesDeleted: 2, filesFailed: 0 }),
+          jsonResponse({
+            deleted: true,
+            episodesDeleted: 1,
+            filesAttempted: 2,
+            filesDeleted: 2,
+            filesFailed: 0,
+          })
         );
       }
       // graph fetch (counts + export)
@@ -33,7 +39,7 @@ describe('CourseManagement', () => {
             { id: 'g1', kind: 'grammar' },
           ],
           edges: [],
-        }),
+        })
       );
     });
     Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:x'), writable: true });
@@ -58,7 +64,9 @@ describe('CourseManagement', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /remove language/i })[0]);
 
     // Loss summary reflects the fetched counts.
-    await waitFor(() => expect(screen.getByText(/2 tracked words and 1 grammar points/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/2 tracked words and 1 grammar points/i)).toBeInTheDocument()
+    );
 
     const deleteBtn = screen.getByRole('button', { name: /delete permanently/i });
     expect(deleteBtn).toBeDisabled();
@@ -79,7 +87,7 @@ describe('CourseManagement', () => {
     await waitFor(() => expect(mockRefresh).toHaveBeenCalled());
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/v1/courses/c1',
-      expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ confirm: 'de' }) }),
+      expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ confirm: 'de' }) })
     );
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -91,7 +99,7 @@ describe('CourseManagement', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete & restart/i }));
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith('/learn/placement?native=en&target=de'),
+      expect(mockPush).toHaveBeenCalledWith('/learn/placement?native=en&target=de')
     );
   });
 });

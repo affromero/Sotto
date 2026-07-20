@@ -47,16 +47,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Only tui/ is read (spec is vendored in-crate); no submodules needed.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: rustfmt, clippy
 
       - name: Install ALSA dev headers (cpal/rodio link to libasound)
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: tui
 
@@ -81,9 +81,9 @@ jobs:
         working-directory: .
     steps:
       # No submodules needed: @sotto/shared has no submodule dependencies.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm

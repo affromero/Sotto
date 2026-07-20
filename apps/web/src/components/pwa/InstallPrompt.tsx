@@ -65,7 +65,9 @@ export function InstallPrompt() {
     <div className={styles.root} role="dialog" aria-label="Install Sotto">
       <div className={styles.body}>
         <span className={styles.title}>Install Sotto</span>
-        <span className={styles.text}>Add it to your home screen for full-screen, offline access.</span>
+        <span className={styles.text}>
+          Add it to your home screen for full-screen, offline access.
+        </span>
       </div>
       <div className={styles.actions}>
         <button type="button" className={styles.dismiss} onClick={dismiss}>

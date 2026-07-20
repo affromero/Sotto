@@ -63,15 +63,16 @@ export async function GET(request: NextRequest) {
     const userId = authed.userId;
 
     // Check all provider keys in parallel
-    const [openAiKey, elevenLabsKey, togetherKey, deepgramKey, assemblyAiKey, autoConfig, infra] = await Promise.all([
-      getAiKey(userId, 'openai'),
-      getByokKey(userId, 'elevenlabs'),
-      getAiKey(userId, 'together'),
-      getAiKey(userId, 'deepgram'),
-      getAiKey(userId, 'assemblyai'),
-      getAutoModelConfig(),
-      getServerInfra(),
-    ]);
+    const [openAiKey, elevenLabsKey, togetherKey, deepgramKey, assemblyAiKey, autoConfig, infra] =
+      await Promise.all([
+        getAiKey(userId, 'openai'),
+        getByokKey(userId, 'elevenlabs'),
+        getAiKey(userId, 'together'),
+        getAiKey(userId, 'deepgram'),
+        getAiKey(userId, 'assemblyai'),
+        getAutoModelConfig(),
+        getServerInfra(),
+      ]);
 
     const byokProviders = new Set<string>();
 
@@ -106,7 +107,12 @@ export async function GET(request: NextRequest) {
       if (!configuredProviders.includes(provider.id)) continue;
       for (const model of provider.models) {
         const compositeId = `${provider.id}:${model.id}`;
-        if (provider.id !== 'local' && !includedSet.has(compositeId) && !byokProviders.has(provider.id)) continue;
+        if (
+          provider.id !== 'local' &&
+          !includedSet.has(compositeId) &&
+          !byokProviders.has(provider.id)
+        )
+          continue;
         includedModels.push({
           id: compositeId,
           displayName: `${provider.displayName} ${model.displayName}`,
@@ -116,13 +122,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      providers: STT_PROVIDERS,
-      configuredProviders,
-      isByok,
-      includedModels,
-    }, { headers: CACHE_HEADERS });
+    return NextResponse.json(
+      {
+        providers: STT_PROVIDERS,
+        configuredProviders,
+        isByok,
+        includedModels,
+      },
+      { headers: CACHE_HEADERS }
+    );
   }
 
-  return NextResponse.json({ providers: STT_PROVIDERS, configuredProviders }, { headers: CACHE_HEADERS });
+  return NextResponse.json(
+    { providers: STT_PROVIDERS, configuredProviders },
+    { headers: CACHE_HEADERS }
+  );
 }

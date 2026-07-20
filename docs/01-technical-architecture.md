@@ -126,8 +126,8 @@ Listening audio reuses the existing audio pipeline:
 lesson spec, source, vocabulary set, CEFR level, or exercise prompt
   -> content extraction / curriculum resolution
   -> script generation
-  -> script verification
-  -> reference validation
+  -> deterministic script compilation
+  -> Groundcheck-backed source and claim verification
   -> audio generation
   -> audio stitching
   -> listening section, practice session, or mock exam

@@ -51,8 +51,10 @@ export function ModelDropdown({
     if (!isOpen) return;
     const handleClick = (e: MouseEvent) => {
       if (
-        containerRef.current && !containerRef.current.contains(e.target as Node) &&
-        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -110,16 +112,16 @@ export function ModelDropdown({
         disabled={disabled}
       >
         <span className={styles.triggerLabel}>{selected?.displayName ?? label}</span>
-        {!disabled && <ChevronUp size={14} className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`} />}
+        {!disabled && (
+          <ChevronUp
+            size={14}
+            className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`}
+          />
+        )}
       </button>
 
       {isOpen && (
-        <div
-          ref={dropdownRef}
-          className={styles.dropdown}
-          role="listbox"
-          aria-label={label}
-        >
+        <div ref={dropdownRef} className={styles.dropdown} role="listbox" aria-label={label}>
           <div className={styles.dropdownHeader}>{label}</div>
           {hasGroups
             ? Array.from(groups.entries()).map(([group, opts]) => (
@@ -139,7 +141,9 @@ export function ModelDropdown({
                         onClick={() => handleSelect(opt)}
                         disabled={opt.unavailable}
                       >
-                        <span className={styles.optionCheck}>{isSelected && <Check size={14} />}</span>
+                        <span className={styles.optionCheck}>
+                          {isSelected && <Check size={14} />}
+                        </span>
                         <div className={styles.optionContent}>
                           <span className={styles.optionName}>{opt.displayName}</span>
                           {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}

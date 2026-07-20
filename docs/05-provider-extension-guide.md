@@ -8,12 +8,12 @@ Date: 2026-06-13
 
 Most local models should need **zero app code**.
 
-| Capability | Best local contract | Sotto config | Code needed |
-|---|---|---|---|
-| LLM | OpenAI-compatible chat completions | `AI_PROVIDER=local`, `AI_BASE_URL`, `AI_MODEL` | No |
-| STT | OpenAI-compatible transcriptions | `STT_PROVIDER=local`, `STT_BASE_URL`, `STT_MODEL` | No |
-| TTS | Sotto local TTS sidecar | `TTS_PROVIDER=local`, `TTS_BASE_URL`, optional `TTS_MODEL`, `TTS_VOICES` | No |
-| Bundled TTS | Kokoro sidecar | `TTS_PROVIDER=kokoro`, `TTS_BASE_URL` | No |
+| Capability  | Best local contract                | Sotto config                                                             | Code needed |
+| ----------- | ---------------------------------- | ------------------------------------------------------------------------ | ----------- |
+| LLM         | OpenAI-compatible chat completions | `AI_PROVIDER=local`, `AI_BASE_URL`, `AI_MODEL`                           | No          |
+| STT         | OpenAI-compatible transcriptions   | `STT_PROVIDER=local`, `STT_BASE_URL`, `STT_MODEL`                        | No          |
+| TTS         | Sotto local TTS sidecar            | `TTS_PROVIDER=local`, `TTS_BASE_URL`, optional `TTS_MODEL`, `TTS_VOICES` | No          |
+| Bundled TTS | Kokoro sidecar                     | `TTS_PROVIDER=kokoro`, `TTS_BASE_URL`                                    | No          |
 
 The rule is: if your local model can sit behind one of these contracts, do that instead of adding a provider.
 

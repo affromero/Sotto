@@ -24,15 +24,17 @@ export function generateTagSlug(name: string): string {
  * Convert a title into a URL-safe slug (max 80 chars).
  */
 export function slugify(title: string): string {
-  return title
-    .trim()
-    .toLowerCase()
-    .replace(/[&/]/g, '-')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-{2,}/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 80) || 'untitled';
+  return (
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[&/]/g, '-')
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80) || 'untitled'
+  );
 }
 
 /**
@@ -42,7 +44,14 @@ export function slugify(title: string): string {
 export async function generateEpisodeSlug(
   title: string,
   userId: string,
-  prisma: { episode: { findUnique: (args: { where: { userId_slug: { userId: string; slug: string } }; select: { id: true } }) => Promise<{ id: string } | null> } }
+  prisma: {
+    episode: {
+      findUnique: (args: {
+        where: { userId_slug: { userId: string; slug: string } };
+        select: { id: true };
+      }) => Promise<{ id: string } | null>;
+    };
+  }
 ): Promise<string> {
   const base = slugify(title);
   // Try the base slug first

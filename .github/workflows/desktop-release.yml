@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   prepare:
+    if: github.repository == 'affromero/Sotto'
     runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.release_version.outputs.version }}
@@ -27,7 +28,7 @@ jobs:
       should_build: ${{ steps.release_version.outputs.should_build }}
       skip_reason: ${{ steps.release_version.outputs.skip_reason }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Resolve release version
         id: release_version
@@ -78,7 +79,7 @@ jobs:
             slug: linux
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Linux build deps
         if: matrix.os == 'ubuntu-latest'
@@ -86,20 +87,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-node@v6
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
 
       - name: Install + generate icons
         working-directory: apps/desktop
         run: |
-          npm install
+          npm ci
           npm run icon
 
       # Builds the installer for the current OS. Add signing secrets here to
       # produce a signed/notarized build (see apps/desktop/README.md).
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         with:
           projectPath: apps/desktop
 
@@ -216,7 +217,7 @@ jobs:
           cp -R "$VERSION_DIR"/. "$LATEST_DIR"/
           cp -R "$VERSION_DIR"/. "$SHA_DIR"/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sotto-host-${{ matrix.slug }}-${{ needs.prepare.outputs.release_version }}
           path: ${{ runner.temp }}/sotto-desktop-downloads/download/desktop/${{ needs.prepare.outputs.release_version }}/${{ matrix.slug }}/*
@@ -254,9 +255,9 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.prepare.outputs.should_build == 'true' && startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
           merge-multiple: true
@@ -294,7 +295,7 @@ jobs:
           EOF
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: artifacts/*
           body_path: release-notes.md

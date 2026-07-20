@@ -10,11 +10,15 @@ const mockAuthenticate = vi.fn();
 const mockCourseFindFirst = vi.fn();
 const mockExtract = vi.fn();
 
-vi.mock('@/lib/api-keys', () => ({ authenticateRequest: (...a: unknown[]) => mockAuthenticate(...a) }));
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...a: unknown[]) => mockAuthenticate(...a),
+}));
 vi.mock('@/lib/prisma', () => ({
   prisma: { course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) } },
 }));
-vi.mock('@/lib/live-vocab', () => ({ extractAndStoreLiveVocab: (...a: unknown[]) => mockExtract(...a) }));
+vi.mock('@/lib/live-vocab', () => ({
+  extractAndStoreLiveVocab: (...a: unknown[]) => mockExtract(...a),
+}));
 
 import { POST } from '@/app/api/v1/live-translate/session/route';
 
@@ -32,7 +36,11 @@ describe('POST /api/v1/live-translate/session', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ userId: 'u1' });
-    mockCourseFindFirst.mockResolvedValue({ nativeLang: 'en', targetLang: 'de', currentLevel: 'A2' });
+    mockCourseFindFirst.mockResolvedValue({
+      nativeLang: 'en',
+      targetLang: 'de',
+      currentLevel: 'A2',
+    });
     mockExtract.mockResolvedValue(3);
   });
 
@@ -60,7 +68,13 @@ describe('POST /api/v1/live-translate/session', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ added: 3 });
     expect(mockExtract).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'u1', courseId: 'c1', targetLang: 'de', nativeLang: 'en', level: 'A2' }),
+      expect.objectContaining({
+        userId: 'u1',
+        courseId: 'c1',
+        targetLang: 'de',
+        nativeLang: 'en',
+        level: 'A2',
+      })
     );
   });
 });

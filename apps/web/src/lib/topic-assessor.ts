@@ -28,18 +28,24 @@ export async function assessTopicFeasibility(params: {
   const userMessage = [
     `Topic: ${topic}`,
     depth ? `Depth: ${depth}` : null,
-    sourceContent ? `Source content available: ${sourceContent.length} characters (user provided a URL or text)` : 'No source content provided — topic only',
+    sourceContent
+      ? `Source content available: ${sourceContent.length} characters (user provided a URL or text)`
+      : 'No source content provided — topic only',
   ]
     .filter(Boolean)
     .join('\n');
 
   const ai = createAIProvider(params.provider);
-  const response = await ai.generateResponse(SYSTEM_PROMPT, [{ role: 'user', content: userMessage }], {
-    maxTokens: 512,
-    apiKeyOverride: params.apiKeyOverride,
-    model: params.model,
-    skipModeration: true,
-  });
+  const response = await ai.generateResponse(
+    SYSTEM_PROMPT,
+    [{ role: 'user', content: userMessage }],
+    {
+      maxTokens: 512,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+      skipModeration: true,
+    }
+  );
 
   try {
     const parsed = JSON.parse(response.content.trim());

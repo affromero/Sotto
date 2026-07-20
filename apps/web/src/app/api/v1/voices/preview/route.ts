@@ -10,14 +10,22 @@ import { errorResponse } from '@/lib/api-response';
 
 function getPlatformPreviewKey(provider: TtsProviderId): string | undefined {
   switch (provider) {
-    case 'elevenlabs': return process.env.ELEVENLABS_API_KEY;
-    case 'openai': return process.env.OPENAI_API_KEY;
-    case 'cartesia': return process.env.CARTESIA_API_KEY;
-    case 'hume': return process.env.HUME_API_KEY;
-    case 'fal': return process.env.FAL_KEY;
-    case 'replicate': return process.env.REPLICATE_API_TOKEN;
-    case 'minimax': return process.env.FAL_KEY;
-    case 'mistral': return process.env.MISTRAL_API_KEY;
+    case 'elevenlabs':
+      return process.env.ELEVENLABS_API_KEY;
+    case 'openai':
+      return process.env.OPENAI_API_KEY;
+    case 'cartesia':
+      return process.env.CARTESIA_API_KEY;
+    case 'hume':
+      return process.env.HUME_API_KEY;
+    case 'fal':
+      return process.env.FAL_KEY;
+    case 'replicate':
+      return process.env.REPLICATE_API_TOKEN;
+    case 'minimax':
+      return process.env.FAL_KEY;
+    case 'mistral':
+      return process.env.MISTRAL_API_KEY;
   }
 }
 
@@ -57,8 +65,14 @@ export async function POST(request: NextRequest) {
     audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
-    const isInvalidId = msg.includes('422') || msg.toLowerCase().includes('pattern') || msg.toLowerCase().includes('invalid_uid');
-    return errorResponse(isInvalidId ? 'Invalid voice ID format.' : 'Failed to generate preview.', 400);
+    const isInvalidId =
+      msg.includes('422') ||
+      msg.toLowerCase().includes('pattern') ||
+      msg.toLowerCase().includes('invalid_uid');
+    return errorResponse(
+      isInvalidId ? 'Invalid voice ID format.' : 'Failed to generate preview.',
+      400
+    );
   }
 
   const meta = getProviderMeta(providerName);

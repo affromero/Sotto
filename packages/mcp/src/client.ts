@@ -44,8 +44,15 @@ export class SottoClient {
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: res.statusText }));
-      throw new ApiError(res.status, body.error || `HTTP ${res.status}`);
+      const body: unknown = await res.json().catch(() => null);
+      const message =
+        typeof body === 'object' &&
+        body !== null &&
+        'error' in body &&
+        typeof body.error === 'string'
+          ? body.error
+          : `HTTP ${res.status}`;
+      throw new ApiError(res.status, message);
     }
 
     if (res.status === 204) return undefined as T;

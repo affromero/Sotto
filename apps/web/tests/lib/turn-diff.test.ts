@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { hashTurn, matchClaimsToTurns } from '@/lib/turn-diff';
 import type { ClaimAnalysis } from '@/lib/script-verifier';
 
-function makeClaim(overrides: Partial<ClaimAnalysis> & Pick<ClaimAnalysis, 'turnIndex' | 'turnHash'>): ClaimAnalysis {
+function makeClaim(
+  overrides: Partial<ClaimAnalysis> & Pick<ClaimAnalysis, 'turnIndex' | 'turnHash'>
+): ClaimAnalysis {
   return {
     claimText: 'some claim',
     speaker: 'HOST',
@@ -69,7 +71,11 @@ describe('matchClaimsToTurns', () => {
     ];
     const prevClaims: ClaimAnalysis[] = [
       makeClaim({ turnIndex: 0, turnHash: hashTurn('HOST', 'Hello world.'), claimText: 'claim A' }),
-      makeClaim({ turnIndex: 1, turnHash: hashTurn('EXPERT', 'Interesting fact [1].'), claimText: 'claim B' }),
+      makeClaim({
+        turnIndex: 1,
+        turnHash: hashTurn('EXPERT', 'Interesting fact [1].'),
+        claimText: 'claim B',
+      }),
     ];
 
     const { carried, changedIndices } = matchClaimsToTurns(prevClaims, turns);

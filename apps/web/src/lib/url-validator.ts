@@ -7,11 +7,7 @@ export class UrlValidationError extends Error {
   }
 }
 
-const BLOCKED_HOSTNAMES = new Set([
-  'localhost',
-  'metadata.google.internal',
-  'metadata.internal',
-]);
+const BLOCKED_HOSTNAMES = new Set(['localhost', 'metadata.google.internal', 'metadata.internal']);
 
 function shouldSkipDnsValidation(): boolean {
   return process.env.NODE_ENV === 'test' || !!process.env.VITEST;

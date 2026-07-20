@@ -36,7 +36,16 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: vi.fn().mockResolvedValue({ model: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' } }),
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    model: {
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
+  }),
 }));
 
 import { FalProvider } from '@/lib/providers/tts/fal.provider';
@@ -94,7 +103,9 @@ describe('FalProvider', () => {
     const provider = new FalProvider('fal_sk_test', 'qwen3-tts-0.6b');
     await provider.generateSpeech({ text: 'Test', voiceId: 'Dylan' });
 
-    expect(fetchMock.mock.calls[0][0]).toBe('https://fal.run/fal-ai/qwen-3-tts/text-to-speech/0.6b');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/0.6b'
+    );
   });
 
   it('throws on API error', async () => {
@@ -127,5 +138,4 @@ describe('FalProvider', () => {
     expect(provider.getVoiceId('HOST', 'pod-1')).toBe('Vivian');
     expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Dylan');
   });
-
 });

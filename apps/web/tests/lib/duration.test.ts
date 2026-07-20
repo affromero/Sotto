@@ -69,11 +69,7 @@ describe('duration helpers', () => {
   });
 
   it('countScriptWords is not inflated by whitespace in turns', () => {
-    const turns = [
-      { text: ' hello world ' },
-      { text: 'foo bar baz ' },
-      { text: ' one ' },
-    ];
+    const turns = [{ text: ' hello world ' }, { text: 'foo bar baz ' }, { text: ' one ' }];
     expect(countScriptWords(turns)).toBe(6);
   });
 });

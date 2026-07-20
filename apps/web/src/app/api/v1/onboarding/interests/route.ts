@@ -40,7 +40,10 @@ export async function POST(request: NextRequest) {
 
       const topLevelTags = existingTags.filter((t) => !t.parentId);
       if (topLevelTags.length > 0) {
-        return errorResponse('Only sub-interest tags can be selected, not top-level categories', 400);
+        return errorResponse(
+          'Only sub-interest tags can be selected, not top-level categories',
+          400
+        );
       }
     }
 
@@ -105,7 +108,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    logger.error('Failed to save interests', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to save interests', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to save interests', 500);
   }
 }

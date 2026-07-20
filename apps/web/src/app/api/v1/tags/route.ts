@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { authenticateRequest } from '@/lib/api-keys';
+import { errorResponse } from '@/lib/api-response';
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) return errorResponse('Unauthorized', 401);
+
   // Return only top-level tags (no parent) for feed filtering
   const tags = await prisma.tag.findMany({
     where: { parentId: null },

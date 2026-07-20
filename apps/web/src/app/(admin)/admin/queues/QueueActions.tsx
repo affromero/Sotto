@@ -96,9 +96,7 @@ export function QueueActions({
                 </button>
               </div>
               <p className={styles.failedReason}>{job.failedReason}</p>
-              <time className={styles.failedTime}>
-                {new Date(job.timestamp).toLocaleString()}
-              </time>
+              <time className={styles.failedTime}>{new Date(job.timestamp).toLocaleString()}</time>
             </div>
           ))}
           {jobs.length === 0 && <p className={styles.emptyMessage}>No failed jobs found</p>}

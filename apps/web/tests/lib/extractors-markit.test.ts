@@ -33,7 +33,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake-pdf');
-    const result = await extractViaMarkit(buffer, { extension: '.pdf', url: 'https://example.com/paper.pdf' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.pdf',
+      url: 'https://example.com/paper.pdf',
+    });
 
     expect(result.sourceType).toBe('pdf');
     expect(result.extractionMethod).toBe('markit');
@@ -50,7 +53,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake-docx');
-    const result = await extractViaMarkit(buffer, { extension: '.docx', url: 'https://example.com/notes.docx' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.docx',
+      url: 'https://example.com/notes.docx',
+    });
 
     expect(result.sourceType).toBe('document');
     expect(result.extractionMethod).toBe('markit');
@@ -64,7 +70,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake-pptx');
-    const result = await extractViaMarkit(buffer, { extension: '.pptx', url: 'https://example.com/deck.pptx' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.pptx',
+      url: 'https://example.com/deck.pptx',
+    });
 
     expect(result.sourceType).toBe('document');
   });
@@ -76,7 +85,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake-xlsx');
-    const result = await extractViaMarkit(buffer, { extension: '.xlsx', url: 'https://example.com/data.xlsx' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.xlsx',
+      url: 'https://example.com/data.xlsx',
+    });
 
     expect(result.sourceType).toBe('document');
   });
@@ -88,7 +100,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake-epub');
-    const result = await extractViaMarkit(buffer, { extension: '.epub', url: 'https://example.com/book.epub' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.epub',
+      url: 'https://example.com/book.epub',
+    });
 
     expect(result.sourceType).toBe('document');
     expect(result.title).toBe('Novel');
@@ -110,7 +125,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake');
-    const result = await extractViaMarkit(buffer, { extension: '.pdf', url: 'https://example.com/long.pdf' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.pdf',
+      url: 'https://example.com/long.pdf',
+    });
 
     expect(result.markdown.length).toBeLessThanOrEqual(50000);
     expect(result.text.length).toBeLessThanOrEqual(50000);
@@ -123,7 +141,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake');
-    const result = await extractViaMarkit(buffer, { extension: '.pdf', url: 'https://example.com/notitle.pdf' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.pdf',
+      url: 'https://example.com/notitle.pdf',
+    });
 
     expect(result.title).toBeNull();
   });
@@ -135,7 +156,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake');
-    const result = await extractViaMarkit(buffer, { extension: '.pdf', url: 'https://example.com/empty.pdf' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.pdf',
+      url: 'https://example.com/empty.pdf',
+    });
 
     expect(result.text).toBe('');
     expect(result.markdown).toBe('');
@@ -158,7 +182,10 @@ describe('markit extractor', () => {
     });
 
     const buffer = Buffer.from('fake');
-    const result = await extractViaMarkit(buffer, { extension: '.docx', url: 'https://example.com/doc.docx' });
+    const result = await extractViaMarkit(buffer, {
+      extension: '.docx',
+      url: 'https://example.com/doc.docx',
+    });
 
     expect(result.text).not.toContain('#');
     expect(result.text).not.toContain('**');

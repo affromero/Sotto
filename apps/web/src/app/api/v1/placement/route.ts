@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
     const focusParse = cefrLevel.safeParse(request.nextUrl.searchParams.get('focusLevel'));
     const focusLevel = focusParse.success ? focusParse.data : undefined;
     const note = focusLevel
-      ? [baseNote, `The learner's own materials suggest about ${focusLevel}; ensure solid coverage around that level.`]
+      ? [
+          baseNote,
+          `The learner's own materials suggest about ${focusLevel}; ensure solid coverage around that level.`,
+        ]
           .filter(Boolean)
           .join('\n\n')
       : baseNote;
@@ -77,7 +80,7 @@ export async function GET(request: NextRequest) {
       native,
       target,
       note,
-      focusLevel ? VERIFY_PER_BAND : undefined,
+      focusLevel ? VERIFY_PER_BAND : undefined
     );
 
     // Cache the full questions (with answers) for grading; return public versions.
@@ -119,7 +122,7 @@ export async function POST(request: NextRequest) {
       native,
       target,
       outcome.level,
-      cachedNotes ? 'NOTES_VERIFIED' : 'TEST',
+      cachedNotes ? 'NOTES_VERIFIED' : 'TEST'
     );
 
     await prisma.placementResult.upsert({
@@ -130,7 +133,11 @@ export async function POST(request: NextRequest) {
         responses: outcome.responses,
         scoreBySkill: outcome.scoreBySkill,
       },
-      update: { level: outcome.level, responses: outcome.responses, scoreBySkill: outcome.scoreBySkill },
+      update: {
+        level: outcome.level,
+        responses: outcome.responses,
+        scoreBySkill: outcome.scoreBySkill,
+      },
     });
 
     // If the learner reached this test via notes-based "verify with a few
@@ -152,7 +159,11 @@ export async function POST(request: NextRequest) {
 
     await cache.delete(cacheKey(userId, native, target)).catch(() => {});
 
-    return NextResponse.json({ courseId: course.id, level: outcome.level, scoreBySkill: outcome.scoreBySkill });
+    return NextResponse.json({
+      courseId: course.id,
+      level: outcome.level,
+      scoreBySkill: outcome.scoreBySkill,
+    });
   } catch (error: unknown) {
     logger.error('Placement submission failed', {
       error: error instanceof Error ? error.message : String(error),

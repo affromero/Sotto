@@ -4,6 +4,7 @@ import { redeemPairingToken } from '@/lib/pairing';
 import { generateApiKey } from '@/lib/api-keys';
 import { redeemPairingSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
+import { checkRateLimit } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,14 @@ export const dynamic = 'force-dynamic';
  * the token is single-use and short-lived. Mirrors /api/auth/mobile's key mint.
  */
 export async function POST(request: NextRequest) {
+  const ip =
+    request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown';
+  const rate = await checkRateLimit(`pair-redeem:${ip}`, 10, 60);
+  if (!rate.allowed) return errorResponse('Too many attempts. Try again later.', 429);
+
   const body = await request.json().catch(() => ({}));
   const parsed = redeemPairingSchema.safeParse(body);
   if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);

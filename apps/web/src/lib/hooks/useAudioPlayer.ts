@@ -35,8 +35,12 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
         }
         rafId = requestAnimationFrame(tick);
       };
-      audio.addEventListener('play', () => { rafId = requestAnimationFrame(tick); });
-      audio.addEventListener('pause', () => { cancelAnimationFrame(rafId); });
+      audio.addEventListener('play', () => {
+        rafId = requestAnimationFrame(tick);
+      });
+      audio.addEventListener('pause', () => {
+        cancelAnimationFrame(rafId);
+      });
       audio.addEventListener('loadedmetadata', () => {
         setState((s) => ({ ...s, duration: audio.duration || 0 }));
       });

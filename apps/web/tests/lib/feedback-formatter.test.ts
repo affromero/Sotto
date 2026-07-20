@@ -27,9 +27,7 @@ describe('formatUserFeedback', () => {
 
   it('formats highlights', () => {
     const result = formatUserFeedback({
-      highlights: [
-        { turnIndex: 1, text: 'Thanks for having me', note: 'Too generic' },
-      ],
+      highlights: [{ turnIndex: 1, text: 'Thanks for having me', note: 'Too generic' }],
       turns,
     });
 
@@ -41,9 +39,7 @@ describe('formatUserFeedback', () => {
     const result = formatUserFeedback({
       feedback: 'Overall too long',
       turnComments: { 1: 'Simplify this' },
-      highlights: [
-        { turnIndex: 0, text: 'Welcome', note: 'More energy' },
-      ],
+      highlights: [{ turnIndex: 0, text: 'Welcome', note: 'More energy' }],
       turns,
     });
 
@@ -122,6 +118,8 @@ describe('formatUserFeedback', () => {
 
     expect(result).toContain('### General Feedback');
     expect(result).toContain('### User-Provided Source URLs');
-    expect(result.indexOf('General Feedback')).toBeLessThan(result.indexOf('User-Provided Source URLs'));
+    expect(result.indexOf('General Feedback')).toBeLessThan(
+      result.indexOf('User-Provided Source URLs')
+    );
   });
 });

@@ -18,16 +18,16 @@ Sotto is fully free and self-hosted: every learner gets full access on infrastru
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 16 App Router, TypeScript, CSS Modules |
-| Database | PostgreSQL 17 + Prisma 7 |
-| Auth | None — single-learner self-hosted instance with no login |
-| Queue | Redis 7 + BullMQ worker pool |
-| AI | Provider-resolved LLM generation through configured model settings |
-| Audio | ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate, and local/provider-specific TTS integrations |
-| Storage | Local file storage by default; S3/R2-compatible storage for hosted deployments |
-| Deployment | Local Docker Compose for OSS; Hetzner/Docker/Caddy for hosted deployments |
+| Layer      | Technology                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| Frontend   | Next.js 16 App Router, TypeScript, CSS Modules                                                   |
+| Database   | PostgreSQL 17 + Prisma 7                                                                         |
+| Auth       | None — single-learner self-hosted instance with no login                                         |
+| Queue      | Redis 7 + BullMQ worker pool                                                                     |
+| AI         | Provider-resolved LLM generation through configured model settings                               |
+| Audio      | ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate, and local/provider-specific TTS integrations |
+| Storage    | Local file storage by default; S3/R2-compatible storage for hosted deployments                   |
+| Deployment | Local Docker Compose for OSS; Hetzner/Docker/Caddy for hosted deployments                        |
 
 ## Monorepo
 
@@ -58,18 +58,18 @@ npm run ci                     # lint + type-check + test + build
 
 ## Subdirectory CLAUDE.md Index
 
-| Directory | What Is Documented |
-|-----------|--------------------|
-| `apps/` | Application workspace differences |
-| `apps/web/src/app/` | Pages and API routes |
-| `apps/web/src/components/` | Component conventions |
-| `apps/web/src/lib/` | Provider clients, auth helpers, pipeline libraries |
-| `apps/web/src/workers/` | Worker responsibilities and pipeline flow |
-| `apps/web/src/types/` | Type re-exports from `@sotto/shared` |
-| `apps/web/src/styles/` | Design system tokens |
-| `apps/web/prisma/` | Prisma schema and database rules |
-| `packages/` | Shared package boundaries |
-| `tui/` | Rust `sotto` terminal client: API/audio/contract-codegen conventions |
+| Directory                  | What Is Documented                                                   |
+| -------------------------- | -------------------------------------------------------------------- |
+| `apps/`                    | Application workspace differences                                    |
+| `apps/web/src/app/`        | Pages and API routes                                                 |
+| `apps/web/src/components/` | Component conventions                                                |
+| `apps/web/src/lib/`        | Provider clients, auth helpers, pipeline libraries                   |
+| `apps/web/src/workers/`    | Worker responsibilities and pipeline flow                            |
+| `apps/web/src/types/`      | Type re-exports from `@sotto/shared`                                 |
+| `apps/web/src/styles/`     | Design system tokens                                                 |
+| `apps/web/prisma/`         | Prisma schema and database rules                                     |
+| `packages/`                | Shared package boundaries                                            |
+| `tui/`                     | Rust `sotto` terminal client: API/audio/contract-codegen conventions |
 
 ## Design System
 
@@ -84,9 +84,10 @@ The audio generation pipeline powers the adaptive listening skill and any spoken
 ```text
 lesson spec, vocabulary set, CEFR level, or exercise prompt
   -> content extraction / curriculum resolution
-  -> script generation
-  -> script verification
-  -> reference validation
+  -> deep research
+  -> creative planning
+  -> evidence-linked script writing
+  -> fail-closed compilation and claim-support verification
   -> audio generation
   -> audio stitching
   -> learner library (private per-user)
@@ -172,7 +173,7 @@ Provider variables are optional until the selected workflow needs them. Common e
 - Alpine + Chromium: pin Alpine version to match the Chromium version available in its repos. Alpine 3.22+ works with Chromium 136+.
 - Docker service names: workers reach sidecars via Docker service names (e.g. `http://local-tts:8000`); use `localhost` only for local dev outside Docker.
 - Prisma in Docker: always run `npx prisma generate` inside the Docker build because the generated client is platform-specific.
-- Compose files stay at the repo root: the `docker-compose*.yml` files resolve `build.context: .`, `env_file: .env`, and `${VAR}` substitution from the project directory (their own location). Moving them to a subfolder breaks every invocation in `scripts/install.sh`, `scripts/deploy.sh`, `.github/workflows/logs.yml`, and the docs unless each adds `--project-directory`/`--env-file`, and `docker-compose.selfhost.yml` is downloaded standalone by the installer and must keep flat paths. None of this is CI-verifiable, so a wrong path silently breaks deploy or self-host install. Keep them at root.
+- Compose files stay at the repo root: the `docker-compose*.yml` files resolve `build.context: .`, `env_file: .env`, and `${VAR}` substitution from the project directory (their own location). Moving them to a subfolder breaks every invocation in `scripts/install.sh`, `scripts/deploy.sh`, and the docs unless each adds `--project-directory`/`--env-file`, and `docker-compose.selfhost.yml` is downloaded standalone by the installer and must keep flat paths. None of this is CI-verifiable, so a wrong path silently breaks deploy or self-host install. Keep them at root.
 - Monorepo paths: avoid `__dirname`-relative paths across package boundaries. Use `process.cwd()` for cross-package references.
 - DB enum values are uppercase, for example `USER`, `ADMIN`, and `SYSTEM`.
 

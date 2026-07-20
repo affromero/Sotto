@@ -21,7 +21,7 @@ export function isValidVisualCueProviderId(provider: string): provider is Visual
 
 export async function validateVisualCueKey(
   provider: VisualCueProviderId,
-  apiKey: string,
+  apiKey: string
 ): Promise<boolean> {
   if (provider !== 'pexels') return false;
   try {
@@ -41,7 +41,7 @@ export async function validateVisualCueKey(
 export async function storeVisualCueKey(
   userId: string,
   provider: VisualCueProviderId,
-  apiKey: string,
+  apiKey: string
 ): Promise<void> {
   const encryptedKey = encryptApiKey(apiKey);
   await prisma.userVisualCueKey.upsert({
@@ -60,7 +60,7 @@ export async function storeVisualCueKey(
 
 export async function getVisualCueKey(
   userId: string,
-  provider: VisualCueProviderId,
+  provider: VisualCueProviderId
 ): Promise<string | null> {
   const record = await prisma.userVisualCueKey.findUnique({
     where: { userId_provider: { userId, provider } },
@@ -96,18 +96,20 @@ export async function listVisualCueKeys(userId: string): Promise<VisualCueKeyInf
 
   return keys.flatMap((key) => {
     if (!isValidVisualCueProviderId(key.provider)) return [];
-    return [{
-      provider: key.provider,
-      isValid: key.isValid,
-      lastUsedAt: key.lastUsedAt,
-      label: key.label,
-    }];
+    return [
+      {
+        provider: key.provider,
+        isValid: key.isValid,
+        lastUsedAt: key.lastUsedAt,
+        label: key.label,
+      },
+    ];
   });
 }
 
 export async function removeVisualCueKey(
   userId: string,
-  provider: VisualCueProviderId,
+  provider: VisualCueProviderId
 ): Promise<void> {
   await prisma.userVisualCueKey
     .delete({

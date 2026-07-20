@@ -10,18 +10,12 @@ import { invalidateServerInfra } from '@/lib/server-config';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import {
-  getAutoModelConfig,
-  setAutoModelConfig,
-  type ModelConfig,
-} from '@/lib/auto-model-config';
+import { getAutoModelConfig, setAutoModelConfig, type ModelConfig } from '@/lib/auto-model-config';
 import { isValidAiProviderId, getProviderForModel } from '@/lib/providers/ai-registry';
 import { isValidProviderId, getProviderMeta } from '@/lib/providers/tts-registry';
 import { isValidSttProviderId, getSttProviderMeta } from '@/lib/providers/stt-registry';
 
-type PreferredInput = NonNullable<
-  ReturnType<typeof onboardingSaveSchema.parse>['preferred']
->;
+type PreferredInput = NonNullable<ReturnType<typeof onboardingSaveSchema.parse>['preferred']>;
 
 /**
  * Build the AutoModelConfig default-model update from the wizard's preferred

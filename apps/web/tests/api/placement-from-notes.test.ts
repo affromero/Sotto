@@ -56,7 +56,11 @@ describe('POST /api/v1/placement/from-notes (deduce)', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, resetAt: Date.now() + 3600000 });
-    mockRunNotesDeduction.mockResolvedValue({ level: 'B1', rationale: 'Subordinate clauses.', confidence: 0.8 });
+    mockRunNotesDeduction.mockResolvedValue({
+      level: 'B1',
+      rationale: 'Subordinate clauses.',
+      confidence: 0.8,
+    });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -142,7 +146,12 @@ describe('POST /api/v1/placement/from-notes/confirm', () => {
     expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith('u1', 'en', 'es', 'B1', 'NOTES');
     expect(mockSetCourseNote).toHaveBeenCalledWith('course-1', 'mis materiales');
     expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
-      expect.objectContaining({ courseId: 'course-1', userId: 'u1', level: 'B1', note: 'mis materiales' }),
+      expect.objectContaining({
+        courseId: 'course-1',
+        userId: 'u1',
+        level: 'B1',
+        note: 'mis materiales',
+      })
     );
     expect(mockClearNotesDeduction).toHaveBeenCalledWith('u1', 'en', 'es');
   });

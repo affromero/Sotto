@@ -15,6 +15,7 @@ const { MockRedis } = vi.hoisted(() => {
       zrange: vi.fn(),
       zadd: vi.fn(),
       expire: vi.fn(),
+      eval: vi.fn(),
       quit: vi.fn(),
       on: vi.fn(),
     };
@@ -55,7 +56,6 @@ describe('redis.ts', () => {
       expect(client1).toBe(client2);
       expect(MockRedis).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe('cache.get', () => {
@@ -168,8 +168,7 @@ describe('redis.ts', () => {
         await import('@/lib/redis');
       const client = getRedisClientReimport();
 
-      (client.scan as Mock)
-        .mockResolvedValueOnce(['0', ['user:1', 'user:2', 'user:3']]);
+      (client.scan as Mock).mockResolvedValueOnce(['0', ['user:1', 'user:2', 'user:3']]);
       (client.del as Mock).mockResolvedValue(3);
 
       await cacheReimport.deletePattern('user:*');
@@ -223,17 +222,23 @@ describe('redis.ts', () => {
         await import('@/lib/redis');
       const client = getRedisClientReimport();
 
-      (client.zremrangebyscore as Mock).mockResolvedValue(0);
-      (client.zcard as Mock).mockResolvedValue(2);
-      (client.zadd as Mock).mockResolvedValue(1);
-      (client.expire as Mock).mockResolvedValue(1);
+      (client.eval as Mock).mockResolvedValue([1, 7, Date.now() + 60_000]);
 
       const result = await checkRateLimitReimport('user:123', 10, 60);
 
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(7);
       expect(result.resetAt).toBeGreaterThan(Date.now());
-      expect(client.zadd).toHaveBeenCalled();
+      expect(client.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
+        'ratelimit:user:123',
+        expect.any(Number),
+        10,
+        Date.now(),
+        60_000,
+        expect.any(String)
+      );
     });
 
     it('blocks request when at limit', async () => {
@@ -241,15 +246,13 @@ describe('redis.ts', () => {
         await import('@/lib/redis');
       const client = getRedisClientReimport();
 
-      (client.zremrangebyscore as Mock).mockResolvedValue(0);
-      (client.zcard as Mock).mockResolvedValue(10);
-      (client.zrange as Mock).mockResolvedValue(['1704067200000', '1704067200000']);
+      (client.eval as Mock).mockResolvedValue([0, 0, Date.now() + 60_000]);
 
       const result = await checkRateLimitReimport('user:123', 10, 60);
 
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
-      expect(client.zadd).not.toHaveBeenCalled();
+      expect(client.eval).toHaveBeenCalledOnce();
     });
 
     it('removes old entries from sliding window', async () => {
@@ -259,17 +262,19 @@ describe('redis.ts', () => {
       const now = Date.now();
       const windowSeconds = 60;
 
-      (client.zremrangebyscore as Mock).mockResolvedValue(3);
-      (client.zcard as Mock).mockResolvedValue(5);
-      (client.zadd as Mock).mockResolvedValue(1);
-      (client.expire as Mock).mockResolvedValue(1);
+      (client.eval as Mock).mockResolvedValue([1, 4, now + windowSeconds * 1000]);
 
       await checkRateLimitReimport('user:123', 10, windowSeconds);
 
-      expect(client.zremrangebyscore).toHaveBeenCalledWith(
+      expect(client.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
         'ratelimit:user:123',
-        0,
-        now - windowSeconds * 1000
+        now - windowSeconds * 1000,
+        10,
+        now,
+        windowSeconds * 1000,
+        expect.any(String)
       );
     });
 
@@ -278,20 +283,21 @@ describe('redis.ts', () => {
         await import('@/lib/redis');
       const client = getRedisClientReimport();
 
-      (client.zremrangebyscore as Mock).mockResolvedValue(0);
-      (client.zcard as Mock).mockResolvedValue(0);
-      (client.zadd as Mock).mockResolvedValue(1);
-      (client.expire as Mock).mockResolvedValue(1);
+      (client.eval as Mock).mockResolvedValue([1, 99, Date.now() + 3_600_000]);
 
       await checkRateLimitReimport('api:user-456', 100, 3600);
 
-      expect(client.zremrangebyscore).toHaveBeenCalledWith(
+      expect(client.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
         'ratelimit:api:user-456',
         expect.any(Number),
-        expect.any(Number)
+        100,
+        expect.any(Number),
+        3_600_000,
+        expect.any(String)
       );
     });
-
   });
 
   describe('closeRedis', () => {

@@ -12,9 +12,10 @@ import { assignVoicesForEpisode } from '@/lib/voice-assigner';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
+import { verifyEpisodeReferences } from '@/lib/reference-verification/verify-episode';
 
 export async function processCompileScript(job: Job<CompileScriptPayload>): Promise<void> {
-  const { episodeId, userId } = job.data;
+  const { episodeId, userId, useAdminCredits } = job.data;
 
   logger.info('Script compilation starting', { episodeId });
   await job.updateProgress(10);
@@ -23,7 +24,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
   const [script, dossier, episode] = await Promise.all([
     prisma.script.findUniqueOrThrow({
       where: { episodeId },
-      select: { turns: true },
+      select: { turns: true, compiledAt: true },
     }),
     prisma.researchDossier.findUnique({
       where: { episodeId },
@@ -31,7 +32,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     }),
     prisma.episode.findUniqueOrThrow({
       where: { id: episodeId },
-      select: { source: true },
+      select: { source: true, topic: true, title: true },
     }),
   ]);
 
@@ -40,64 +41,93 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     select: { depth: true, durationTarget: true },
   });
 
-  const turns = script.turns as unknown as Array<{ speaker: string; text: string; direction?: string }>;
+  const turns = script.turns as unknown as Array<{
+    speaker: string;
+    text: string;
+    direction?: string;
+  }>;
   const sources = (dossier?.sources as unknown as SourceRecord[]) || [];
   const evidence = (dossier?.evidence as unknown as EvidenceCard[]) || [];
 
   await job.updateProgress(30);
 
-  // Run deterministic compilation
-  const result = compileScript({
-    turns,
-    sources,
-    evidence,
-    depth: discovery.depth || 'standard',
-    durationTarget: discovery.durationTarget || 10,
-  });
+  let compiledTurns = turns;
+  let referenceCount: number;
+  let wordCount: number;
 
-  if (!result.success) {
-    logger.error('Script compilation failed', {
-      episodeId,
-      errors: result.errors,
+  if (script.compiledAt) {
+    referenceCount = await prisma.reference.count({ where: { episodeId } });
+    wordCount = turns.reduce(
+      (total, turn) => total + turn.text.split(/\s+/).filter(Boolean).length,
+      0
+    );
+    logger.info('Script already compiled; resuming post-compilation work', { episodeId });
+  } else {
+    const result = compileScript({
+      turns,
+      sources,
+      evidence,
+      depth: discovery.depth || 'standard',
+      durationTarget: discovery.durationTarget || 10,
     });
-    // For now, proceed with warnings — the errors are logged for debugging
-    // A future enhancement could trigger one editorial LLM pass here
-  }
 
-  await job.updateProgress(50);
-
-  // Update script turns with compiled text (resolved [N] citations)
-  await prisma.script.update({
-    where: { episodeId },
-    data: {
-      turns: result.turns as unknown as Prisma.InputJsonValue,
-    },
-  });
-
-  // Upsert compiled references
-  if (result.references.length > 0) {
-    // Delete existing references and recreate with compiled data
-    await prisma.reference.deleteMany({ where: { episodeId } });
-    await prisma.reference.createMany({
-      data: result.references.map(ref => ({
+    if (!result.success) {
+      logger.error('Script compilation failed', {
         episodeId,
-        number: ref.number,
-        title: ref.title,
-        authors: ref.authors.split(', ').filter(Boolean),
-        year: ref.year,
-        url: ref.url,
-        doi: ref.doi,
-        type: (ref.type || 'WEB') as 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT',
-        publisher: ref.publisher,
-        verificationStatus: 'VERIFIED' as const,
-      })),
+        errors: result.errors,
+      });
+      throw new Error(`Script compilation failed: ${result.errors.join('; ')}`);
+    }
+
+    await job.updateProgress(50);
+
+    if (result.references.length > 0) {
+      await prisma.reference.deleteMany({ where: { episodeId } });
+      await prisma.reference.createMany({
+        data: result.references.map((ref) => ({
+          episodeId,
+          number: ref.number,
+          title: ref.title,
+          authors: ref.authors.split(', ').filter(Boolean),
+          year: ref.year,
+          url: ref.url,
+          doi: ref.doi,
+          type: (ref.type || 'WEB') as 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT',
+          publisher: ref.publisher,
+          verificationStatus: 'PENDING' as const,
+        })),
+      });
+    }
+
+    const referencesVerified = await verifyEpisodeReferences(
+      episodeId,
+      userId,
+      episode.topic || episode.title,
+      result.turns,
+      useAdminCredits
+    );
+    if (!referencesVerified) {
+      throw new Error('Reference verification failed: one or more cited claims are unsupported');
+    }
+
+    compiledTurns = result.turns;
+    referenceCount = result.references.length;
+    wordCount = result.stats.wordCount;
+    await prisma.script.update({
+      where: { episodeId },
+      data: {
+        turns: compiledTurns as unknown as Prisma.InputJsonValue,
+        compiledAt: new Date(),
+      },
     });
   }
 
   await job.updateProgress(70);
 
-  await logPipelineStageComplete(episodeId, 'compile-script',
-    `refs=${result.references.length} words=${result.stats.wordCount} errors=${result.errors.length}`,
+  await logPipelineStageComplete(
+    episodeId,
+    'compile-script',
+    `refs=${referenceCount} words=${wordCount} errors=0`
   );
 
   // Determine whether to auto-approve or pause at SCRIPT_READY
@@ -144,7 +174,9 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
       select: { ttsProvider: true },
     });
     const lateProvider = (lateEpisode.ttsProvider ?? 'elevenlabs') as TtsProviderId;
-    const lateSpeakers = [...new Set(result.turns.map(t => t.speaker))].map(name => ({ name }));
+    const lateSpeakers = [...new Set(compiledTurns.map((t) => t.speaker))].map((name) => ({
+      name,
+    }));
     await assignVoicesForEpisode(episodeId, lateSpeakers, lateProvider);
 
     // Set GENERATING_AUDIO before creating segments — audio worker expects this status
@@ -155,7 +187,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });
 
-    await createSegmentsAndQueueAudio(episodeId, result.turns);
+    await createSegmentsAndQueueAudio(episodeId, compiledTurns);
 
     logger.info('Script compiled and auto-approved, audio generation queued', { episodeId });
   }

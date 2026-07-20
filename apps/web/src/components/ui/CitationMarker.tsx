@@ -39,7 +39,10 @@ export function CitationMarker({ references }: CitationMarkerProps) {
     const centerX = rect.left + rect.width / 2;
     const halfW = TOOLTIP_WIDTH / 2;
     const margin = 8;
-    const left = Math.max(margin, Math.min(window.innerWidth - margin - TOOLTIP_WIDTH, centerX - halfW));
+    const left = Math.max(
+      margin,
+      Math.min(window.innerWidth - margin - TOOLTIP_WIDTH, centerX - halfW)
+    );
     const top = above ? rect.top - 8 : rect.bottom + 8;
 
     setCoords({ top, left });
@@ -61,7 +64,12 @@ export function CitationMarker({ references }: CitationMarkerProps) {
     closeTimeout.current = setTimeout(() => setOpen(false), 150);
   }, []);
 
-  useEffect(() => () => { if (closeTimeout.current != null) clearTimeout(closeTimeout.current); }, []);
+  useEffect(
+    () => () => {
+      if (closeTimeout.current != null) clearTimeout(closeTimeout.current);
+    },
+    []
+  );
 
   // Close on outside click
   useEffect(() => {
@@ -106,9 +114,7 @@ export function CitationMarker({ references }: CitationMarkerProps) {
             <span className={styles.refType}>{TYPE_LABELS[ref.type] || ref.type}</span>
           </div>
           <p className={styles.refTitle}>{ref.title}</p>
-          {ref.authors.length > 0 && (
-            <p className={styles.refAuthors}>{ref.authors.join(', ')}</p>
-          )}
+          {ref.authors.length > 0 && <p className={styles.refAuthors}>{ref.authors.join(', ')}</p>}
           <p className={styles.refMeta}>
             {ref.year && <span>{ref.year}</span>}
             {ref.publisher && (
@@ -119,12 +125,7 @@ export function CitationMarker({ references }: CitationMarkerProps) {
             )}
           </p>
           {ref.url && (
-            <a
-              href={ref.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.refLink}
-            >
+            <a href={ref.url} target="_blank" rel="noopener noreferrer" className={styles.refLink}>
               View source &rarr;
             </a>
           )}
@@ -136,7 +137,11 @@ export function CitationMarker({ references }: CitationMarkerProps) {
   return (
     <span
       className={styles.wrapper}
-      onMouseEnter={() => { cancelClose(); updatePosition(); setOpen(true); }}
+      onMouseEnter={() => {
+        cancelClose();
+        updatePosition();
+        setOpen(true);
+      }}
       onMouseLeave={scheduleClose}
     >
       <button

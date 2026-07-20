@@ -27,9 +27,16 @@ const MODEL_ENDPOINTS: Record<string, string> = {
 
 /** ISO 639-1 → Qwen3 language name mapping (Qwen3 expects full language names). */
 const QWEN3_LANGUAGE_MAP: Record<string, string> = {
-  zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
-  fr: 'French', de: 'German', es: 'Spanish', it: 'Italian',
-  pt: 'Portuguese', ru: 'Russian',
+  zh: 'Chinese',
+  en: 'English',
+  ja: 'Japanese',
+  ko: 'Korean',
+  fr: 'French',
+  de: 'German',
+  es: 'Spanish',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ru: 'Russian',
 };
 
 export class FalProvider implements TtsProvider {
@@ -77,12 +84,21 @@ export class FalProvider implements TtsProvider {
       throw new Error(`Failed to download Fal audio: ${audioResponse.status}`);
     }
 
-    logger.info('Fal speech generated', { model: this.model, voiceId: params.voiceId, chars: params.text.length });
+    logger.info('Fal speech generated', {
+      model: this.model,
+      voiceId: params.voiceId,
+      chars: params.text.length,
+    });
     const arrayBuffer = await audioResponse.arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
 
     // When language is set, prefer voices native to that language

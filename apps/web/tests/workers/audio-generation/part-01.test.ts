@@ -9,7 +9,9 @@ const mockPrismaSegmentCount = vi.fn().mockResolvedValue(0);
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaEpisodeUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
-const mockPrismaEpisodeFindUnique = vi.fn().mockResolvedValue({ status: 'GENERATING_AUDIO' });
+const mockPrismaEpisodeFindUnique = vi
+  .fn()
+  .mockResolvedValue({ status: 'GENERATING_AUDIO', audioGenerationKey: 'generation-001' });
 const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
   language: null,
@@ -28,6 +30,7 @@ vi.mock('@/lib/prisma', () => {
     segment: {
       findUnique: (...args: unknown[]) => mockPrismaSegmentFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
       count: (...args: unknown[]) => mockPrismaSegmentCount(...args),
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
     },
@@ -189,7 +192,9 @@ function createMockJob(data: GenerateAudioPayload): Job<GenerateAudioPayload> {
 
 const defaultPayload: GenerateAudioPayload = {
   episodeId: 'episode-001',
+  audioGenerationKey: 'generation-001',
   segmentId: 'segment-001',
+  segmentVersion: 1,
   speaker: 'HOST',
   text: 'Welcome to the show!',
 };
@@ -286,9 +291,20 @@ describe('processAudioGeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: segment has no existing audio
-    mockPrismaSegmentFindUnique.mockResolvedValue(null);
+    mockPrismaSegmentFindUnique.mockResolvedValue({
+      episodeId: defaultPayload.episodeId,
+      text: defaultPayload.text,
+      version: defaultPayload.segmentVersion,
+      audioUrl: null,
+      ttsProvider: null,
+      ttsModel: null,
+      ttsVoiceId: null,
+    });
     // Default: episode not failed (fail-fast check passes)
-    mockPrismaEpisodeFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockPrismaEpisodeFindUnique.mockResolvedValue({
+      status: 'GENERATING_AUDIO',
+      audioGenerationKey: 'generation-001',
+    });
     mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
       language: null,
@@ -300,7 +316,7 @@ describe('processAudioGeneration', () => {
     // Default: no pending segments (all done)
     mockPrismaSegmentCount.mockResolvedValue(0);
     mockPrismaSegmentFindMany.mockResolvedValue([{ id: 'segment-001' }, { id: 'segment-002' }]);
-    mockPrismaSegmentUpdate.mockResolvedValue({});
+    mockPrismaSegmentUpdate.mockResolvedValue({ count: 1 });
     mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockStandardGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockCartesiaGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
@@ -318,6 +334,21 @@ describe('processAudioGeneration', () => {
   });
 
   describe('idempotency', () => {
+    it('discards a job for an older segment version before calling TTS', async () => {
+      mockPrismaSegmentFindUnique.mockResolvedValue({
+        episodeId: 'episode-001',
+        text: defaultPayload.text,
+        version: 2,
+        audioUrl: null,
+      });
+
+      await processAudioGeneration(createMockJob(defaultPayload));
+
+      expect(mockPremiumGenerateSpeech).not.toHaveBeenCalled();
+      expect(mockUploadSegmentAudio).not.toHaveBeenCalled();
+      expect(mockPrismaSegmentUpdate).not.toHaveBeenCalled();
+    });
+
     it('skips TTS when segment already has audio', async () => {
       mockPrismaSegmentFindUnique.mockResolvedValue({
         audioUrl: 'https://cdn.example.com/existing.mp3',
@@ -338,7 +369,10 @@ describe('processAudioGeneration', () => {
         audioUrl: 'https://cdn.example.com/existing.mp3',
       });
       mockPrismaSegmentCount.mockResolvedValue(0); // all done
-      mockPrismaSegmentFindMany.mockResolvedValue([{ id: 'seg-1' }, { id: 'seg-2' }]);
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1', audioUrl: 'audio-1.mp3' },
+        { id: 'seg-2', audioUrl: 'audio-2.mp3' },
+      ]);
 
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
@@ -347,8 +381,13 @@ describe('processAudioGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'audio-stitching' },
         'stitch_audio',
-        { episodeId: 'episode-001', segmentIds: ['seg-1', 'seg-2'] },
-        { jobId: expect.stringMatching(/^stitch-episode-001-\d+$/) }
+        {
+          episodeId: 'episode-001',
+          segmentIds: ['seg-1', 'seg-2'],
+          segmentVersions: [1, 1],
+          segmentAudioUrls: ['audio-1.mp3', 'audio-2.mp3'],
+        },
+        { jobId: expect.stringMatching(/^stitch-episode-001-[a-f0-9]{24}$/) }
       );
       expect(mockPrismaEpisodeUpdateMany).toHaveBeenCalledWith({
         where: { id: 'episode-001', status: 'GENERATING_AUDIO' },
@@ -631,7 +670,7 @@ describe('processAudioGeneration', () => {
 
       expect(mockUploadSegmentAudio).toHaveBeenCalledWith(
         'episode-001',
-        'segment-001',
+        'segment-001-generation-001',
         audioBuffer
       );
     });
@@ -684,13 +723,22 @@ describe('processAudioGeneration', () => {
       await processAudioGeneration(job);
 
       // Should still update segment with estimated duration
-      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
-        where: { id: 'segment-001' },
-        data: {
-          audioUrl: expect.any(String),
-          duration: 10, // 125 / 12.5
-        },
-      });
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'segment-001',
+            version: 1,
+            episode: {
+              status: 'GENERATING_AUDIO',
+              audioGenerationKey: 'generation-001',
+            },
+          }),
+          data: expect.objectContaining({
+            audioUrl: expect.any(String),
+            duration: 10, // 125 / 12.5
+          }),
+        })
+      );
     });
 
     it('cleans up temp file even when FFprobe fails', async () => {
@@ -706,13 +754,24 @@ describe('processAudioGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
-      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
-        where: { id: 'segment-001' },
-        data: {
-          audioUrl: expect.any(String),
-          duration: 12.345,
-        },
-      });
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'segment-001', version: 1 }),
+          data: expect.objectContaining({
+            audioUrl: expect.any(String),
+            duration: 12.345,
+          }),
+        })
+      );
+    });
+
+    it('discards TTS output when the generation attempt was invalidated in flight', async () => {
+      mockPrismaSegmentUpdate.mockResolvedValue({ count: 0 });
+
+      await processAudioGeneration(createMockJob(defaultPayload));
+
+      expect(mockAddJob).not.toHaveBeenCalled();
+      expect(mockPrismaSegmentCount).not.toHaveBeenCalled();
     });
   });
 
@@ -723,10 +782,15 @@ describe('processAudioGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
-      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
-        where: { id: 'segment-001' },
-        data: { audioUrl: 'https://media.example.com/segments/seg-001.mp3', duration: 7.89 },
-      });
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'segment-001', version: 1 }),
+          data: {
+            audioUrl: 'https://media.example.com/segments/seg-001.mp3',
+            duration: 7.89,
+          },
+        })
+      );
     });
 
     it('logs TTS cost to apiUsageLog', async () => {
@@ -804,15 +868,15 @@ describe('processAudioGeneration', () => {
       expect(mockPrismaSegmentFindMany).toHaveBeenCalledWith({
         where: { episodeId: 'episode-001' },
         orderBy: { order: 'asc' },
-        select: { id: true },
+        select: { id: true, version: true, audioUrl: true },
       });
     });
 
     it('queues a stitching job with all segment IDs and stable jobId', async () => {
       mockPrismaSegmentFindMany.mockResolvedValue([
-        { id: 'seg-a' },
-        { id: 'seg-b' },
-        { id: 'seg-c' },
+        { id: 'seg-a', audioUrl: 'audio-a.mp3' },
+        { id: 'seg-b', audioUrl: 'audio-b.mp3' },
+        { id: 'seg-c', audioUrl: 'audio-c.mp3' },
       ]);
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
@@ -823,8 +887,10 @@ describe('processAudioGeneration', () => {
         {
           episodeId: 'episode-001',
           segmentIds: ['seg-a', 'seg-b', 'seg-c'],
+          segmentVersions: [1, 1, 1],
+          segmentAudioUrls: ['audio-a.mp3', 'audio-b.mp3', 'audio-c.mp3'],
         },
-        { jobId: expect.stringMatching(/^stitch-episode-001-\d+$/) }
+        { jobId: expect.stringMatching(/^stitch-episode-001-[a-f0-9]{24}$/) }
       );
     });
 
@@ -847,7 +913,7 @@ describe('processAudioGeneration', () => {
         expect.anything(),
         'stitch_audio',
         expect.objectContaining({ segmentIds: ['only-segment'] }),
-        { jobId: expect.stringMatching(/^stitch-episode-001-\d+$/) }
+        { jobId: expect.stringMatching(/^stitch-episode-001-[a-f0-9]{24}$/) }
       );
     });
   });

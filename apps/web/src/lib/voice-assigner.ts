@@ -3,11 +3,7 @@
  */
 
 import { prisma } from './prisma';
-import {
-  selectVoiceSet,
-  resolveVoiceId,
-  type VoiceMatchMetadata,
-} from './voice-pool';
+import { selectVoiceSet, resolveVoiceId, type VoiceMatchMetadata } from './voice-pool';
 import {
   selectVoiceSetFromPool,
   CARTESIA_VOICE_POOL,
@@ -41,7 +37,7 @@ export async function assignVoicesForEpisode(
   episodeId: string,
   speakers: SpeakerInput[],
   providerId: TtsProviderId,
-  metadata?: VoiceMatchMetadata,
+  metadata?: VoiceMatchMetadata
 ): Promise<void> {
   if (speakers.length <= 1) return;
 
@@ -66,7 +62,7 @@ async function assignDeterministicVoices(
   episodeId: string,
   speakers: SpeakerInput[],
   providerId: TtsProviderId,
-  metadata?: VoiceMatchMetadata,
+  metadata?: VoiceMatchMetadata
 ): Promise<void> {
   const voiceIds = selectDeterministicVoiceIds(episodeId, speakers.length, providerId, metadata);
   if (voiceIds.length < speakers.length) {
@@ -75,7 +71,8 @@ async function assignDeterministicVoices(
     );
   }
 
-  const entries: Array<{ episodeId: string; speaker: string; voiceId: string; provider: string }> = [];
+  const entries: Array<{ episodeId: string; speaker: string; voiceId: string; provider: string }> =
+    [];
   for (let i = 0; i < speakers.length && i < voiceIds.length; i++) {
     entries.push({
       episodeId,
@@ -103,7 +100,7 @@ function selectDeterministicVoiceIds(
   episodeId: string,
   speakerCount: number,
   providerId: TtsProviderId,
-  metadata?: VoiceMatchMetadata,
+  metadata?: VoiceMatchMetadata
 ): string[] {
   switch (providerId) {
     case 'elevenlabs': {
@@ -148,7 +145,12 @@ function selectDeterministicVoiceIds(
     }
 
     case 'deepgram': {
-      const voices = selectVoiceSetFromPool(DEEPGRAM_AURA_VOICE_POOL, episodeId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(
+        DEEPGRAM_AURA_VOICE_POOL,
+        episodeId,
+        speakerCount,
+        metadata
+      );
       return voices.map((v) => v.id);
     }
 
@@ -163,7 +165,12 @@ function selectDeterministicVoiceIds(
     }
 
     case 'local': {
-      const voices = selectVoiceSetFromPool(getLocalTtsVoicePool(), episodeId, speakerCount, metadata);
+      const voices = selectVoiceSetFromPool(
+        getLocalTtsVoicePool(),
+        episodeId,
+        speakerCount,
+        metadata
+      );
       return voices.map((v) => v.id);
     }
 

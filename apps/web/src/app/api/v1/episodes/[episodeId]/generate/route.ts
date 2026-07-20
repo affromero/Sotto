@@ -9,20 +9,46 @@ import {
   creativePlanningQueue,
   scriptWritingQueue,
   compileScriptQueue,
-  audioGenerationQueue,
   audioStitchingQueue,
   addJob,
   JobType,
 } from '@/lib/queue';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
 import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
-import type {
-  ExtractContentPayload,
-  GenerateAudioPayload,
-  StitchAudioPayload,
-} from '@/lib/queue';
+import type { ExtractContentPayload, StitchAudioPayload } from '@/lib/queue';
+import { randomUUID } from 'crypto';
+import { createStitchJobId } from '@/lib/audio/stitch-identity';
+import { restartExistingSegmentAudio } from '@/lib/segment-creator';
 
 type RouteParams = { params: Promise<{ episodeId: string }> };
+
+async function enqueueAfterClaim(
+  episodeId: string,
+  claimedStatus:
+    | 'EXTRACTING'
+    | 'RESEARCHING'
+    | 'PLANNING'
+    | 'SCRIPTING'
+    | 'COMPILING'
+    | 'GENERATING_AUDIO'
+    | 'STITCHING',
+  enqueue: () => Promise<unknown>
+): Promise<void> {
+  try {
+    await enqueue();
+  } catch (error) {
+    await prisma.episode.updateMany({
+      where: { id: episodeId, status: claimedStatus },
+      data: {
+        status: 'FAILED',
+        failedAtStatus: claimedStatus,
+        failureReason: 'The pipeline could not be queued. Retry generation.',
+        technicalError: error instanceof Error ? error.message : String(error),
+      },
+    });
+    throw error;
+  }
+}
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { episodeId } = await params;
@@ -75,7 +101,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (durationTarget && durationTarget > MAX_LESSON_DURATION_MINUTES) {
     return errorResponse(
       `Requested duration of ${durationTarget} minutes exceeds the maximum of ${MAX_LESSON_DURATION_MINUTES} minutes.`,
-      400,
+      400
     );
   }
 
@@ -89,19 +115,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const forceRestart = request.nextUrl.searchParams.get('forceRestart') === 'true';
 
     if (forceRestart) {
-      // Escape hatch: nuke everything, start from scratch
-      await prisma.episodeVersionSegment.deleteMany({
-        where: { version: { episodeId } },
+      const claimed = await prisma.$transaction(async (tx) => {
+        const cas = await tx.episode.updateMany({
+          where: { id: episodeId, status: 'FAILED' },
+          data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
+        });
+        if (cas.count === 0) return false;
+        await tx.episodeVersionSegment.deleteMany({ where: { version: { episodeId } } });
+        await tx.episodeVersion.deleteMany({ where: { episodeId } });
+        await tx.segment.deleteMany({ where: { episodeId } });
+        await tx.reference.deleteMany({ where: { episodeId } });
+        await tx.script.deleteMany({ where: { episodeId } });
+        return true;
       });
-      await prisma.episodeVersion.deleteMany({ where: { episodeId } });
-      await prisma.segment.deleteMany({ where: { episodeId } });
-      await prisma.reference.deleteMany({ where: { episodeId } });
-      await prisma.script.deleteMany({ where: { episodeId } });
-      await prisma.episode.update({
-        where: { id: episodeId },
-        data: { failedAtStatus: null, failureReason: null },
-      });
-      // Fall through to normal routing below
+      if (!claimed) return errorResponse('Episode is no longer in a restartable state', 409);
+
+      const payload: ExtractContentPayload = {
+        episodeId,
+        userId: authResult.userId,
+        sourceUrl: episode.discovery?.sourceUrl ?? undefined,
+        sourceText: episode.discovery?.sourceContent ?? undefined,
+        useAdminCredits: useAdminCredits || undefined,
+      };
+      await enqueueAfterClaim(episodeId, 'EXTRACTING', () =>
+        addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
+          jobId: `extract-${episodeId}-${Date.now()}`,
+        })
+      );
+      return NextResponse.json({ success: true, message: 'Generation started' });
     } else {
       // Smart resume: inspect existing data and pick up where we left off
       const resumePoint = await determineResumePoint(episodeId);
@@ -117,26 +158,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         // No JSON body — bare retry
       }
 
-      if (bodyProvider) {
-        // User picked a different provider — override the dead one
-        await prisma.episode.update({
-          where: { id: episodeId },
-          data: { ttsProvider: bodyProvider, ttsModel: bodyModel ?? null },
-        });
-        // Old voice IDs are provider-specific — clear them
-        await prisma.episodeVoice.deleteMany({ where: { episodeId } });
-      }
-      // Bare retry: keep ttsProvider so the same voices are used on retry.
-      // The queue failure handler (queue.ts) already clears ttsProvider for
-      // key invalidation errors. For transient failures, preserving the
-      // provider ensures voice consistency.
-
       return await routeResume(
         episodeId,
         authResult.userId,
         episode,
         resumePoint,
-        useAdminCredits
+        useAdminCredits,
+        bodyProvider ? { provider: bodyProvider, model: bodyModel } : undefined
       );
     }
   }
@@ -158,9 +186,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     useAdminCredits: useAdminCredits || undefined,
   };
 
-  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
-    jobId: `extract-${episodeId}`,
-  });
+  await enqueueAfterClaim(episodeId, 'EXTRACTING', () =>
+    addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
+      jobId: `extract-${episodeId}`,
+    })
+  );
 
   return NextResponse.json({ success: true, message: 'Generation started' });
 }
@@ -175,7 +205,8 @@ async function routeResume(
     discovery: { id: string; sourceUrl: string | null; sourceContent: string | null } | null;
   },
   resumePoint: ResumePoint,
-  useAdminCredits: boolean
+  useAdminCredits: boolean,
+  ttsOverride?: { provider: string; model?: string }
 ): Promise<NextResponse> {
   switch (resumePoint.step) {
     case 'EXTRACT_CONTENT': {
@@ -195,9 +226,11 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
-        jobId: `extract-${episodeId}-${Date.now()}`,
-      });
+      await enqueueAfterClaim(episodeId, 'EXTRACTING', () =>
+        addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
+          jobId: `extract-${episodeId}-${Date.now()}`,
+        })
+      );
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from content extraction',
@@ -218,16 +251,18 @@ async function routeResume(
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
 
-      await addJob(
-        deepResearchQueue,
-        JobType.DEEP_RESEARCH,
-        {
-          episodeId,
-          userId,
-          discoveryId: discovery.id,
-          useAdminCredits: useAdminCredits || undefined,
-        },
-        { jobId: `research-${episodeId}-${Date.now()}` }
+      await enqueueAfterClaim(episodeId, 'RESEARCHING', () =>
+        addJob(
+          deepResearchQueue,
+          JobType.DEEP_RESEARCH,
+          {
+            episodeId,
+            userId,
+            discoveryId: discovery.id,
+            useAdminCredits: useAdminCredits || undefined,
+          },
+          { jobId: `research-${episodeId}-${Date.now()}` }
+        )
       );
       return NextResponse.json({
         success: true,
@@ -250,17 +285,19 @@ async function routeResume(
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
 
-      await addJob(
-        creativePlanningQueue,
-        JobType.CREATIVE_PLANNING,
-        {
-          episodeId,
-          userId,
-          discoveryId: discovery.id,
-          dossierId: dossier.id,
-          useAdminCredits: useAdminCredits || undefined,
-        },
-        { jobId: `plan-${episodeId}-${Date.now()}` }
+      await enqueueAfterClaim(episodeId, 'PLANNING', () =>
+        addJob(
+          creativePlanningQueue,
+          JobType.CREATIVE_PLANNING,
+          {
+            episodeId,
+            userId,
+            discoveryId: discovery.id,
+            dossierId: dossier.id,
+            useAdminCredits: useAdminCredits || undefined,
+          },
+          { jobId: `plan-${episodeId}-${Date.now()}` }
+        )
       );
       return NextResponse.json({
         success: true,
@@ -270,10 +307,6 @@ async function routeResume(
     }
 
     case 'WRITE_SCRIPT': {
-      // Delete stale script and refs before rewriting
-      await prisma.reference.deleteMany({ where: { episodeId } });
-      await prisma.script.deleteMany({ where: { episodeId } });
-
       const [discovery, dossier, outline] = await Promise.all([
         prisma.discovery.findUniqueOrThrow({ where: { episodeId } }),
         prisma.researchDossier.findUniqueOrThrow({ where: { episodeId } }),
@@ -287,19 +320,25 @@ async function routeResume(
       if (casWrite.count === 0) {
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
+      await prisma.$transaction([
+        prisma.reference.deleteMany({ where: { episodeId } }),
+        prisma.script.deleteMany({ where: { episodeId } }),
+      ]);
 
-      await addJob(
-        scriptWritingQueue,
-        JobType.WRITE_SCRIPT,
-        {
-          episodeId,
-          userId,
-          discoveryId: discovery.id,
-          dossierId: dossier.id,
-          outlineId: outline.id,
-          useAdminCredits: useAdminCredits || undefined,
-        },
-        { jobId: `write-${episodeId}-${Date.now()}` }
+      await enqueueAfterClaim(episodeId, 'SCRIPTING', () =>
+        addJob(
+          scriptWritingQueue,
+          JobType.WRITE_SCRIPT,
+          {
+            episodeId,
+            userId,
+            discoveryId: discovery.id,
+            dossierId: dossier.id,
+            outlineId: outline.id,
+            useAdminCredits: useAdminCredits || undefined,
+          },
+          { jobId: `write-${episodeId}-${Date.now()}` }
+        )
       );
       return NextResponse.json({
         success: true,
@@ -317,14 +356,17 @@ async function routeResume(
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
 
-      await addJob(
-        compileScriptQueue,
-        JobType.COMPILE_SCRIPT,
-        {
-          episodeId,
-          userId,
-        },
-        { jobId: `compile-${episodeId}-${Date.now()}` }
+      await enqueueAfterClaim(episodeId, 'COMPILING', () =>
+        addJob(
+          compileScriptQueue,
+          JobType.COMPILE_SCRIPT,
+          {
+            episodeId,
+            userId,
+            useAdminCredits: useAdminCredits || undefined,
+          },
+          { jobId: `compile-${episodeId}-${Date.now()}` }
+        )
       );
       return NextResponse.json({
         success: true,
@@ -334,16 +376,6 @@ async function routeResume(
     }
 
     case 'SCRIPT_READY': {
-      // Delete stale segments and versions
-      await prisma.episodeVersionSegment.deleteMany({
-        where: { version: { episodeId } },
-      });
-      await prisma.episodeVersion.deleteMany({ where: { episodeId } });
-      await prisma.segment.deleteMany({ where: { episodeId } });
-      // Clear stale voice assignments — re-approval will assign fresh voices
-      // for whatever provider the user picks
-      await prisma.episodeVoice.deleteMany({ where: { episodeId } });
-
       // Clear TTS provider so user re-enters audio config UI (CAS on FAILED)
       const casReady = await prisma.episode.updateMany({
         where: { id: episodeId, status: 'FAILED' },
@@ -358,6 +390,12 @@ async function routeResume(
       if (casReady.count === 0) {
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
+      await prisma.$transaction([
+        prisma.episodeVersionSegment.deleteMany({ where: { version: { episodeId } } }),
+        prisma.episodeVersion.deleteMany({ where: { episodeId } }),
+        prisma.segment.deleteMany({ where: { episodeId } }),
+        prisma.episodeVoice.deleteMany({ where: { episodeId } }),
+      ]);
 
       return NextResponse.json({
         success: true,
@@ -367,63 +405,74 @@ async function routeResume(
     }
 
     case 'GENERATE_AUDIO': {
+      const audioGenerationKey = randomUUID();
       const casAudio = await prisma.episode.updateMany({
         where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'GENERATING_AUDIO', failedAtStatus: null, failureReason: null },
+        data: {
+          status: 'GENERATING_AUDIO',
+          failedAtStatus: null,
+          failureReason: null,
+          audioGenerationKey,
+        },
       });
       if (casAudio.count === 0) {
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
-
-      // Queue audio generation only for pending segments
-      const pendingSegments = await prisma.segment.findMany({
-        where: { id: { in: resumePoint.pendingSegmentIds } },
-        select: { id: true, speaker: true, text: true },
-      });
-
-      for (const seg of pendingSegments) {
-        const payload: GenerateAudioPayload = {
-          episodeId,
-          segmentId: seg.id,
-          speaker: seg.speaker,
-          text: seg.text,
-        };
-        await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, payload, {
-          jobId: `audio-${episodeId}-${seg.id}-${Date.now()}`,
-        });
+      if (ttsOverride) {
+        await prisma.$transaction([
+          prisma.episode.update({
+            where: { id: episodeId },
+            data: { ttsProvider: ttsOverride.provider, ttsModel: ttsOverride.model ?? null },
+          }),
+          prisma.episodeVoice.deleteMany({ where: { episodeId } }),
+        ]);
       }
+
+      let segmentCount = 0;
+      await enqueueAfterClaim(episodeId, 'GENERATING_AUDIO', async () => {
+        segmentCount = await restartExistingSegmentAudio(episodeId, audioGenerationKey);
+      });
 
       return NextResponse.json({
         success: true,
-        message: `Generation resumed from audio generation (${pendingSegments.length} segments remaining)`,
+        message: `Audio generation restarted (${segmentCount} segments)`,
         resumedAt: 'GENERATE_AUDIO',
-        pendingSegments: pendingSegments.length,
+        segments: segmentCount,
       });
     }
 
     case 'STITCH_AUDIO': {
-      // Delete stale episode versions
-      await prisma.episodeVersionSegment.deleteMany({
-        where: { version: { episodeId } },
-      });
-      await prisma.episodeVersion.deleteMany({ where: { episodeId } });
-
       const casStitch = await prisma.episode.updateMany({
         where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'STITCHING', failedAtStatus: null, failureReason: null },
+        data: {
+          status: 'STITCHING',
+          failedAtStatus: null,
+          failureReason: null,
+          activeStitchKey: null,
+          activeStitchOwner: null,
+        },
       });
       if (casStitch.count === 0) {
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
 
+      const stitchSegments = await prisma.segment.findMany({
+        where: { id: { in: resumePoint.segmentIds }, episodeId },
+        orderBy: { order: 'asc' },
+        select: { id: true, version: true, audioUrl: true },
+      });
       const payload: StitchAudioPayload = {
         episodeId,
-        segmentIds: resumePoint.segmentIds,
+        segmentIds: stitchSegments.map((segment) => segment.id),
+        segmentVersions: stitchSegments.map((segment) => segment.version),
+        segmentAudioUrls: stitchSegments.map((segment) => segment.audioUrl!),
       };
 
-      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload, {
-        jobId: `stitch-${episodeId}-${Date.now()}`,
-      });
+      await enqueueAfterClaim(episodeId, 'STITCHING', () =>
+        addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload, {
+          jobId: createStitchJobId(episodeId, stitchSegments),
+        })
+      );
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from audio stitching',

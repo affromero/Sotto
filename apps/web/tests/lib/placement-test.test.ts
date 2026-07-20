@@ -6,7 +6,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockGenerateResponse } = vi.hoisted(() => ({ mockGenerateResponse: vi.fn() }));
 
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: vi.fn().mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
+  resolveLearningAi: vi
+    .fn()
+    .mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: vi.fn(() => ({ generateResponse: mockGenerateResponse })),
@@ -111,10 +113,24 @@ describe('generatePlacement option shaping', () => {
     mockGenerateResponse.mockResolvedValue(
       llmResponse(
         JSON.stringify([
-          { cefr: 'A1', skill: 'grammar', prompt: 'q1', options: ['a', 'b', 'c', 'd'], correctIndex: 0, explanation: '' },
-          { cefr: 'B1', skill: 'reading', prompt: 'q2', options: ['w', 'x', 'y', 'z'], correctIndex: 2, explanation: '' },
-        ]),
-      ),
+          {
+            cefr: 'A1',
+            skill: 'grammar',
+            prompt: 'q1',
+            options: ['a', 'b', 'c', 'd'],
+            correctIndex: 0,
+            explanation: '',
+          },
+          {
+            cefr: 'B1',
+            skill: 'reading',
+            prompt: 'q2',
+            options: ['w', 'x', 'y', 'z'],
+            correctIndex: 2,
+            explanation: '',
+          },
+        ])
+      )
     );
   });
 
@@ -141,7 +157,9 @@ describe('generatePlacement option shaping', () => {
 describe('deduceLevelFromNotes', () => {
   it('parses the deduced level, rationale, and confidence', async () => {
     mockGenerateResponse.mockResolvedValue(
-      llmResponse('{"level":"B1","rationale":"Uses past tense and subordinate clauses.","confidence":0.8}'),
+      llmResponse(
+        '{"level":"B1","rationale":"Uses past tense and subordinate clauses.","confidence":0.8}'
+      )
     );
 
     const { deduction } = await deduceLevelFromNotes('user-1', 'en', 'es', 'mi cuaderno');
@@ -153,7 +171,7 @@ describe('deduceLevelFromNotes', () => {
 
   it('clamps confidence to 0..1 and floors an unknown level to A1', async () => {
     mockGenerateResponse.mockResolvedValue(
-      llmResponse('{"level":"Z9","rationale":"","confidence":4}'),
+      llmResponse('{"level":"Z9","rationale":"","confidence":4}')
     );
 
     const { deduction } = await deduceLevelFromNotes('user-1', 'en', 'es', 'x');

@@ -6,19 +6,56 @@ import type { ContentDomain } from 'groundcheck';
 import { DOMAIN_CONFIGS } from 'groundcheck';
 import type { ReferenceInput, VerificationCheck } from '@/lib/reference-validator';
 import type { ClaimContext } from './claim-extractor';
+import { z } from 'zod';
+
+const aiEvaluationResponseSchema = z.object({
+  evaluations: z.array(
+    z.object({
+      refNumber: z.number().int().positive(),
+      sourceExists: z.boolean(),
+      verdict: z.enum(['SUPPORTED', 'CONTRADICTED', 'NOT_FOUND']),
+      confidence: z.number().min(0).max(1),
+      reasoning: z.string().min(1),
+      suggestedReplacement: z
+        .object({
+          title: z.string().min(1),
+          authors: z.array(z.string()),
+          year: z.number().int().nullable(),
+          url: z.string().nullable(),
+          doi: z.string().nullable(),
+        })
+        .nullable()
+        .optional(),
+    })
+  ),
+});
 
 /** Extract the first complete JSON object from a string that may contain surrounding text. */
 function extractFirstJsonObject(text: string): string {
   const trimmed = text.trim();
-  try { JSON.parse(trimmed); return trimmed; } catch {}
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {}
   const start = text.indexOf('{');
   if (start === -1) throw new Error('No JSON object found in response');
-  let depth = 0, inString = false, escape = false;
+  let depth = 0,
+    inString = false,
+    escape = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === '{') depth++;
     if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
@@ -87,16 +124,12 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
   try {
     const ai = createAIProvider(provider);
     const response = await Promise.race([
-      ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: userMessage }],
-        {
-          maxTokens: 4096,
-          apiKeyOverride,
-          model,
-          useWebSearch: true,
-        }
-      ),
+      ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+        maxTokens: 4096,
+        apiKeyOverride,
+        model,
+        useWebSearch: true,
+      }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('AI evaluation timed out after 60s')), AI_TIMEOUT_MS)
       ),
@@ -111,9 +144,11 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
       metadata: { refCount: refsWithDomain.length },
     });
 
-    let parsed: ReturnType<typeof JSON.parse>;
+    let parsed: z.infer<typeof aiEvaluationResponseSchema>;
     try {
-      parsed = JSON.parse(extractFirstJsonObject(response.content));
+      parsed = aiEvaluationResponseSchema.parse(
+        JSON.parse(extractFirstJsonObject(response.content))
+      );
     } catch {
       logger.warn('AI evaluation returned non-JSON response');
       for (const { ref } of refsWithDomain) {
@@ -127,32 +162,20 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
       return results;
     }
 
-    const evaluations: Array<{
-      refNumber: number;
-      verdict: string;
-      confidence: number;
-      reasoning: string;
-      suggestedReplacement?: {
-        title: string;
-        authors: string[];
-        year: number | null;
-        url: string | null;
-        doi: string | null;
-      } | null;
-    }> = parsed.evaluations || [];
+    const evaluations = parsed.evaluations;
 
     for (const evaluation of evaluations) {
       const entry = refsWithDomain.find((r) => r.ref.number === evaluation.refNumber);
       if (!entry) continue;
 
-      const passed = evaluation.verdict === 'REAL';
+      const passed = evaluation.sourceExists === true && evaluation.verdict === 'SUPPORTED';
       const confidence = passed ? Math.min(evaluation.confidence, 0.85) : 0;
 
       const check: VerificationCheck = {
         layer: 'ai',
         passed,
         confidence,
-        detail: `AI: ${evaluation.verdict} — ${evaluation.reasoning}`,
+        detail: `AI claim support: ${evaluation.verdict}; source exists: ${String(evaluation.sourceExists)} — ${evaluation.reasoning}`,
       };
 
       if (evaluation.suggestedReplacement) {

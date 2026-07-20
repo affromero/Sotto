@@ -78,7 +78,7 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
           setError(
             typeof body.error === 'string'
               ? body.error
-              : 'Could not start a live session. Check your Google key in Settings.',
+              : 'Could not start a live session. Check your Google key in Settings.'
           );
           setPhase('error');
           return;
@@ -102,7 +102,7 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
         setPhase('error');
       }
     },
-    [courseId, audio, appendLine],
+    [courseId, audio, appendLine]
   );
 
   const stop = useCallback(() => {
@@ -126,7 +126,8 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
   }, [teardown, courseId]);
 
   const toggleDirection = useCallback(async () => {
-    const next: Direction = direction === 'native_to_target' ? 'target_to_native' : 'native_to_target';
+    const next: Direction =
+      direction === 'native_to_target' ? 'target_to_native' : 'native_to_target';
     setDirection(next);
     if (phase === 'live' || phase === 'connecting') {
       teardown();
@@ -156,8 +157,8 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
           Speak and hear the <em>live translation</em>.
         </h1>
         <p className={styles.sub}>
-          {targetLabel} · {level}. A translation practice aid: speak naturally and hear it back.
-          It will not chat or interrupt you, and new words you hit go into your review.
+          {targetLabel} · {level}. A translation practice aid: speak naturally and hear it back. It
+          will not chat or interrupt you, and new words you hit go into your review.
         </p>
       </header>
 
@@ -170,7 +171,16 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
       >
         <span className={styles.dirLang}>{speakLabel}</span>
         <span className={styles.dirArrow} aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M7 7h11M14 3l4 4-4 4M17 17H6M10 21l-4-4 4-4" />
           </svg>
         </span>
@@ -179,7 +189,8 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
 
       {unsupported ? (
         <p className={styles.notice} role="alert">
-          This browser does not support the live audio pipeline. Try a recent Chrome, Edge, or Safari.
+          This browser does not support the live audio pipeline. Try a recent Chrome, Edge, or
+          Safari.
         </p>
       ) : denied ? (
         <p className={styles.notice} role="alert">

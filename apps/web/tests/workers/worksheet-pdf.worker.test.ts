@@ -101,7 +101,11 @@ describe('processWorksheetPdf', () => {
     mockCourseClassFindFirst.mockResolvedValue(makeFakeClass());
 
     // Default: document built
-    mockBuildClassDocument.mockResolvedValue({ classId: 'class-1', title: 'Greetings', sections: [] });
+    mockBuildClassDocument.mockResolvedValue({
+      classId: 'class-1',
+      title: 'Greetings',
+      sections: [],
+    });
 
     // Default: HTML rendered
     mockRenderWorksheetHtml.mockReturnValue('<html></html>');
@@ -123,7 +127,9 @@ describe('processWorksheetPdf', () => {
   it('throws when class is not found', async () => {
     mockCourseClassFindFirst.mockResolvedValue(null);
     const { processWorksheetPdf } = await import('@/workers/worksheet-pdf.worker');
-    await expect(processWorksheetPdf(makeFakeJob() as never)).rejects.toThrow('CourseClass not found');
+    await expect(processWorksheetPdf(makeFakeJob() as never)).rejects.toThrow(
+      'CourseClass not found'
+    );
   });
 
   it('uploads PDF and updates worksheetPdfUrl on success', async () => {
@@ -133,7 +139,7 @@ describe('processWorksheetPdf', () => {
     expect(mockUploadFile).toHaveBeenCalledWith(
       'worksheets/class-1.pdf',
       expect.any(Buffer),
-      'application/pdf',
+      'application/pdf'
     );
 
     expect(mockCourseClassUpdate).toHaveBeenCalledWith({
@@ -182,7 +188,7 @@ describe('processWorksheetPdf', () => {
 
     expect(mockBuildClassDocument).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ appBaseUrl: 'https://app.example.com', isAnswerKey: false }),
+      expect.objectContaining({ appBaseUrl: 'https://app.example.com', isAnswerKey: false })
     );
   });
 
@@ -203,7 +209,7 @@ describe('processWorksheetPdf', () => {
           }),
         ],
       }),
-      expect.any(Object),
+      expect.any(Object)
     );
   });
 

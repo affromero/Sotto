@@ -194,7 +194,8 @@ describe('POST /api/v1/episodes/[episodeId]/interact/[interactionId]/incorporate
         insertAfterOrder: 2,
         newText: 'Generated incorporation segment.',
         speaker: 'EXPERT',
-      })
+      }),
+      { jobId: 'segment-regeneration-interaction-001' }
     );
   });
 

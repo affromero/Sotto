@@ -47,7 +47,8 @@ describe('matchTopicTags', () => {
 
   it('respects maxTags limit', () => {
     const result = matchTopicTags({
-      topic: 'A long topic covering quantum computing, blockchain, AI, neuroscience, genetics, climate change, and renewable energy',
+      topic:
+        'A long topic covering quantum computing, blockchain, AI, neuroscience, genetics, climate change, and renewable energy',
       focusAreas: [],
       maxTags: 3,
     });
@@ -112,7 +113,8 @@ describe('matchTopicTags', () => {
 
   it('defaults maxTags to 5', () => {
     const result = matchTopicTags({
-      topic: 'A comprehensive look at technology, science, business, history, philosophy, health, programming, mathematics, psychology, and economics in the modern world',
+      topic:
+        'A comprehensive look at technology, science, business, history, philosophy, health, programming, mathematics, psychology, and economics in the modern world',
       focusAreas: [],
     });
     // Direct matches should be at most 5 (plus parents)
@@ -126,10 +128,24 @@ describe('matchTopicTags', () => {
 describe('TAG_PARENT_MAP', () => {
   it('maps all sub-interests to valid parent categories', () => {
     const validParents = new Set([
-      'technology', 'science', 'business', 'history', 'philosophy', 'health',
-      'ai-ml', 'programming', 'mathematics', 'psychology', 'economics',
-      'art-design', 'music', 'politics-society', 'environment',
-      'language-literature', 'sports-fitness', 'education',
+      'technology',
+      'science',
+      'business',
+      'history',
+      'philosophy',
+      'health',
+      'ai-ml',
+      'programming',
+      'mathematics',
+      'psychology',
+      'economics',
+      'art-design',
+      'music',
+      'politics-society',
+      'environment',
+      'language-literature',
+      'sports-fitness',
+      'education',
     ]);
 
     for (const [child, parent] of Object.entries(TAG_PARENT_MAP)) {

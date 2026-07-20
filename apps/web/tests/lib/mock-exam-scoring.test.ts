@@ -13,7 +13,10 @@ const mockExamSubmissionUpsert = vi.fn();
 const mockMockExamUpdate = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    mockExam: { findFirst: (...a: unknown[]) => mockExamFindFirst(...a), update: (...a: unknown[]) => mockMockExamUpdate(...a) },
+    mockExam: {
+      findFirst: (...a: unknown[]) => mockExamFindFirst(...a),
+      update: (...a: unknown[]) => mockMockExamUpdate(...a),
+    },
     examSection: { update: (...a: unknown[]) => mockExamSectionUpdate(...a) },
     examSubmission: { upsert: (...a: unknown[]) => mockExamSubmissionUpsert(...a) },
     $transaction: (...a: unknown[]) => mockTransaction(...a),
@@ -21,24 +24,43 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 const mockResolveLearningAi = vi.fn();
-vi.mock('@/lib/learning-ai', () => ({ resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a) }));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+}));
 const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/providers/ai', () => ({ createAIProvider: () => ({ generateResponse: mockGenerateResponse }) }));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
+}));
 vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: () => 'system prompt' }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-import { weightedOverall, computeBand, scoreExam, ExamNotFoundError } from '@/lib/mock-exam-scoring';
+import {
+  weightedOverall,
+  computeBand,
+  scoreExam,
+  ExamNotFoundError,
+} from '@/lib/mock-exam-scoring';
 
 describe('weightedOverall', () => {
   it('weights section scores by their weight', () => {
-    expect(weightedOverall([{ score: 0.5, weight: 0.5 }, { score: 0.8, weight: 0.5 }])).toBeCloseTo(0.65, 5);
+    expect(
+      weightedOverall([
+        { score: 0.5, weight: 0.5 },
+        { score: 0.8, weight: 0.5 },
+      ])
+    ).toBeCloseTo(0.65, 5);
   });
   it('is 0 for no sections', () => {
     expect(weightedOverall([])).toBe(0);
   });
   it('falls back to a plain mean when weights are all 0', () => {
-    expect(weightedOverall([{ score: 0.4, weight: 0 }, { score: 0.6, weight: 0 }])).toBeCloseTo(0.5, 5);
+    expect(
+      weightedOverall([
+        { score: 0.4, weight: 0 },
+        { score: 0.6, weight: 0 },
+      ])
+    ).toBeCloseTo(0.5, 5);
   });
 });
 
@@ -62,7 +84,10 @@ describe('scoreExam', () => {
           id: 's1',
           skill: 'READING',
           weight: 0.5,
-          questions: [{ id: 'q1', correctIndex: 0 }, { id: 'q2', correctIndex: 1 }],
+          questions: [
+            { id: 'q1', correctIndex: 0 },
+            { id: 'q2', correctIndex: 1 },
+          ],
           speakingPrompts: [],
           writingPrompts: [],
         },
@@ -82,7 +107,10 @@ describe('scoreExam', () => {
     mockTransaction.mockResolvedValue([]);
     mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
     mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify({ overall: 'Solid work.', sections: [{ skill: 'READING', feedback: 'Good gist.' }] }),
+      content: JSON.stringify({
+        overall: 'Solid work.',
+        sections: [{ skill: 'READING', feedback: 'Good gist.' }],
+      }),
       inputTokens: 1,
       outputTokens: 1,
       model: 'm',

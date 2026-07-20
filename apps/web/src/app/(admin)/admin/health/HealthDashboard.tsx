@@ -6,10 +6,13 @@ import styles from './page.module.css';
 
 function StatusDot({ status }: { status: string }) {
   const cls =
-    status === 'ok' ? styles.statusOk :
-    status === 'error' ? styles.statusError :
-    status === 'degraded' ? styles.statusDegraded :
-    styles.statusNotConfigured;
+    status === 'ok'
+      ? styles.statusOk
+      : status === 'error'
+        ? styles.statusError
+        : status === 'degraded'
+          ? styles.statusDegraded
+          : styles.statusNotConfigured;
   return <span className={`${styles.statusDot} ${cls}`} aria-label={status} />;
 }
 
@@ -47,8 +50,16 @@ export function HealthDashboard({ initialData }: { initialData: HealthData }) {
   }
 
   // Parse queue data from the checks.queues.detail JSON
-  const queueData: Record<string, { waiting: number; active: number; failed: number }> | null =
-    data.checks?.queues?.detail ? (() => { try { return JSON.parse(data.checks.queues.detail); } catch { return null; } })() : null;
+  const queueData: Record<string, { waiting: number; active: number; failed: number }> | null = data
+    .checks?.queues?.detail
+    ? (() => {
+        try {
+          return JSON.parse(data.checks.queues.detail);
+        } catch {
+          return null;
+        }
+      })()
+    : null;
 
   return (
     <div className={styles.root}>
@@ -148,7 +159,9 @@ export function HealthDashboard({ initialData }: { initialData: HealthData }) {
                 {Object.entries(data.env).map(([key, set]) => (
                   <tr key={key}>
                     <td className={styles.mono}>{key}</td>
-                    <td><StatusDot status={set ? 'ok' : 'not_configured'} /></td>
+                    <td>
+                      <StatusDot status={set ? 'ok' : 'not_configured'} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

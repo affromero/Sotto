@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockGet = vi.fn();
 vi.mock('next/headers', () => ({
@@ -23,6 +23,8 @@ vi.mock('@/lib/local-user', async (importOriginal) => {
 
 import { resolveSession } from '@/lib/auth';
 import { LOCAL_USER_ID } from '@/lib/local-user';
+import { ACTIVE_PROFILE_COOKIE } from '@/lib/local-user';
+import { createGateToken, GATE_COOKIE } from '@/lib/access/gate';
 
 const owner = {
   id: LOCAL_USER_ID,
@@ -43,11 +45,17 @@ const member = {
 describe('resolveSession (cookie-driven household identity)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.SOTTO_ACCESS_PASSWORD;
     mockUserFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
       if (where.id === member.id) return member;
       if (where.id === LOCAL_USER_ID) return owner;
       return null;
     });
+  });
+
+  afterEach(() => {
+    delete process.env.SOTTO_ACCESS_PASSWORD;
+    delete process.env.BYOK_ENCRYPTION_KEY;
   });
 
   it('falls back to the owner (ADMIN) when no profile cookie is set', async () => {
@@ -89,5 +97,46 @@ describe('resolveSession (cookie-driven household identity)', () => {
     expect(mockEnsureLocalUser).toHaveBeenCalledOnce();
     expect(session?.user.id).toBe(LOCAL_USER_ID);
     expect(session?.user.role).toBe('ADMIN');
+  });
+
+  it('does not resolve the owner when the configured access gate cookie is missing', async () => {
+    process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
+    mockGet.mockReturnValue(undefined);
+
+    const session = await resolveSession();
+
+    expect(session).toBeNull();
+    expect(mockUserFindUnique).not.toHaveBeenCalled();
+    expect(mockEnsureLocalUser).not.toHaveBeenCalled();
+  });
+
+  it('does not resolve the owner when the access gate cookie is forged', async () => {
+    process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
+    process.env.BYOK_ENCRYPTION_KEY = 'a'.repeat(32);
+    mockGet.mockImplementation((name: string) =>
+      name === GATE_COOKIE ? { value: '123.forged' } : undefined
+    );
+
+    const session = await resolveSession();
+
+    expect(session).toBeNull();
+    expect(mockUserFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('resolves the selected profile after validating the access gate cookie', async () => {
+    process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
+    process.env.BYOK_ENCRYPTION_KEY = 'a'.repeat(32);
+    const gateToken = await createGateToken();
+    expect(gateToken).not.toBeNull();
+    mockGet.mockImplementation((name: string) => {
+      if (name === GATE_COOKIE) return { value: gateToken };
+      if (name === ACTIVE_PROFILE_COOKIE) return { value: member.id };
+      return undefined;
+    });
+
+    const session = await resolveSession();
+
+    expect(session?.user.id).toBe(member.id);
+    expect(session?.user.role).toBe('USER');
   });
 });

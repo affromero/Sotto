@@ -164,7 +164,10 @@ export function InterestGrid({
                   {count}
                 </div>
               )}
-              <div className={`${styles.chevron} ${isExpanded ? styles.chevronUp : ''}`} aria-hidden="true">
+              <div
+                className={`${styles.chevron} ${isExpanded ? styles.chevronUp : ''}`}
+                aria-hidden="true"
+              >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path
                     d="M4 6l4 4 4-4"
@@ -182,10 +185,7 @@ export function InterestGrid({
 
       {/* Expanded panel rendered as an overlay below the grid */}
       {expandedCategory && (
-        <div
-          className={styles.panel}
-          style={{ height: panelHeight || undefined }}
-        >
+        <div className={styles.panel} style={{ height: panelHeight || undefined }}>
           <div ref={panelRef} className={styles.panelInner}>
             <div className={styles.panelHeader}>
               <div className={styles.panelTitle}>
@@ -196,7 +196,8 @@ export function InterestGrid({
                 type="button"
                 className={styles.bulkAction}
                 onClick={() => {
-                  const allSelected = getSelectedCount(expandedCategory.children, expandedCategory.slug) ===
+                  const allSelected =
+                    getSelectedCount(expandedCategory.children, expandedCategory.slug) ===
                     expandedCategory.children.length + categoryCustomTags.length;
                   if (allSelected) {
                     clearCategory(expandedCategory.children, expandedCategory.slug);
@@ -211,7 +212,11 @@ export function InterestGrid({
                   : 'Select All'}
               </button>
             </div>
-            <div className={styles.chips} role="group" aria-label={`${expandedCategory.name} sub-interests`}>
+            <div
+              className={styles.chips}
+              role="group"
+              aria-label={`${expandedCategory.name} sub-interests`}
+            >
               {expandedCategory.children.map((sub, subIndex) => {
                 const isSelected = selected.has(sub.id);
                 return (
@@ -224,7 +229,14 @@ export function InterestGrid({
                     style={{ animationDelay: `${subIndex * 40}ms` }}
                   >
                     {isSelected && (
-                      <svg className={styles.chipCheck} width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <svg
+                        className={styles.chipCheck}
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        aria-hidden="true"
+                      >
                         <path
                           d="M2.5 7l3 3L11.5 4"
                           stroke="currentColor"
@@ -248,7 +260,14 @@ export function InterestGrid({
                   onClick={() => removeCustomTag(ct.index)}
                   aria-label={`Remove ${ct.name}`}
                 >
-                  <svg className={styles.chipCheck} width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <svg
+                    className={styles.chipCheck}
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden="true"
+                  >
                     <path
                       d="M2.5 7l3 3L11.5 4"
                       stroke="currentColor"
@@ -258,8 +277,20 @@ export function InterestGrid({
                     />
                   </svg>
                   <span>{ct.name}</span>
-                  <svg className={styles.chipRemove} width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                    <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <svg
+                    className={styles.chipRemove}
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 3l6 6M9 3l-6 6"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </button>
               ))}
@@ -289,13 +320,17 @@ export function InterestGrid({
                   className={styles.otherAdd}
                   onClick={() => addCustomTag(expandedCategory.slug)}
                   disabled={
-                    totalCount >= 20 ||
-                    (otherInputs[expandedCategory.slug] || '').trim().length < 2
+                    totalCount >= 20 || (otherInputs[expandedCategory.slug] || '').trim().length < 2
                   }
                   aria-label="Add custom interest"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path
+                      d="M8 3v10M3 8h10"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </button>
               </div>

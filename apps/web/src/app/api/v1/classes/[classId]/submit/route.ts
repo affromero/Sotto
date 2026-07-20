@@ -27,7 +27,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!result) return errorResponse('Class not found', 404);
     return NextResponse.json(result);
   } catch (error: unknown) {
-    logger.error('Failed to submit class', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to submit class', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to submit class', 500);
   }
 }

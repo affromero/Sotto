@@ -16,14 +16,22 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 const mockResolveLearningAi = vi.fn();
-vi.mock('@/lib/learning-ai', () => ({ resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a) }));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+}));
 
 const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/providers/ai', () => ({ createAIProvider: () => ({ generateResponse: mockGenerateResponse }) }));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
+}));
 
 const mockLoadAndRender = vi.fn();
-vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a) }));
-vi.mock('@/lib/course-notes', () => ({ formatNotesForPrompt: (n: string) => (n ? `\nNOTE: ${n}\n` : '') }));
+vi.mock('@/lib/prompt-loader', () => ({
+  loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a),
+}));
+vi.mock('@/lib/course-notes', () => ({
+  formatNotesForPrompt: (n: string) => (n ? `\nNOTE: ${n}\n` : ''),
+}));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -47,7 +55,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
   mockLoadAndRender.mockReturnValue('system prompt');
-  mockGenerateResponse.mockResolvedValue({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' });
+  mockGenerateResponse.mockResolvedValue({
+    content: SAMPLE,
+    inputTokens: 10,
+    outputTokens: 20,
+    model: 'm',
+  });
   mockClassSectionCreate.mockResolvedValue({ id: 'section-w' });
   mockWritingPromptCreateMany.mockResolvedValue({ count: 2 });
 });
@@ -64,7 +77,12 @@ describe('composeWritingPrompts', () => {
   });
 
   it('throws when the model returns no usable tasks', async () => {
-    mockGenerateResponse.mockResolvedValue({ content: '[]', inputTokens: 1, outputTokens: 1, model: 'm' });
+    mockGenerateResponse.mockResolvedValue({
+      content: '[]',
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
     await expect(composeWritingPrompts(PARAMS)).rejects.toThrow(/no usable tasks/i);
   });
 });
@@ -74,12 +92,16 @@ describe('generateClassWriting', () => {
     const res = await generateClassWriting({ ...PARAMS, classId: 'class-1' });
     expect(res).toEqual({ sectionId: 'section-w' });
     expect(mockClassSectionCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ classId: 'class-1', skill: 'WRITING', status: 'READY' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ classId: 'class-1', skill: 'WRITING', status: 'READY' }),
+      })
     );
     expect(mockWritingPromptCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.arrayContaining([expect.objectContaining({ sectionId: 'section-w', order: 1 })]),
-      }),
+        data: expect.arrayContaining([
+          expect.objectContaining({ sectionId: 'section-w', order: 1 }),
+        ]),
+      })
     );
   });
 });

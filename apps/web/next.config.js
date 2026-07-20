@@ -59,7 +59,7 @@ const nextConfig = {
     // React/Next dev mode requires eval() (source maps, fast refresh, error
     // overlays). Allow 'unsafe-eval' in development ONLY — production stays strict.
     const isDev = process.env.NODE_ENV !== 'production';
-    const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://js.stripe.com`;
+    const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`;
     const connectSrc = `connect-src 'self' https:${isDev ? ' ws: wss:' : ''}`;
 
     const defaultCsp = [
@@ -70,7 +70,7 @@ const nextConfig = {
       "font-src 'self' data: https://fonts.gstatic.com",
       connectSrc,
       "media-src 'self' data: https: blob:",
-      "frame-src 'self' https://js.stripe.com",
+      "frame-src 'self'",
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -84,7 +84,7 @@ const nextConfig = {
       "font-src 'self' data: https://fonts.gstatic.com",
       connectSrc,
       "media-src 'self' data: https: blob:",
-      "frame-src 'self' https://js.stripe.com",
+      "frame-src 'self'",
       'frame-ancestors *',
       "base-uri 'self'",
       "form-action 'self'",
@@ -122,6 +122,16 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: permissionsPolicy },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+          { key: 'X-DNS-Prefetch-Control', value: 'off' },
+          ...(isDev
+            ? []
+            : [
+                {
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=63072000; includeSubDomains; preload',
+                },
+              ]),
         ],
       },
       {

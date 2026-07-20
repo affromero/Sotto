@@ -5,17 +5,21 @@
 
 FROM node:22-slim
 
+ARG YT_DLP_VERSION=2026.06.09
+ARG YT_DLP_SHA256=e5d57466682cfa9d61e9cf7c8a4f09b00f4a62af37d3bbdc4bcffdf63615feac
 RUN apt-get update && apt-get install -y \
     openssl ffmpeg libchromaprint-tools python3 python3-pip wget \
-    && (wget -qO /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
-        && chmod +x /usr/local/bin/yt-dlp \
-    || pip install --break-system-packages yt-dlp) \
+    && wget -qO /usr/local/bin/yt-dlp \
+        "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" \
+    && echo "${YT_DLP_SHA256}  /usr/local/bin/yt-dlp" | sha256sum -c - \
+    && chmod +x /usr/local/bin/yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx playwright@1.61.0 install --with-deps chromium
 
-# Install Claude Code CLI so claude-code:* models can spawn the claude binary.
-RUN npm install -g @anthropic-ai/claude-code
+# Pin executable tooling so rebuilding a release cannot silently change it.
+ARG CLAUDE_CODE_VERSION=2.1.208
+RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 
 WORKDIR /app

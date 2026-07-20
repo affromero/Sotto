@@ -14,7 +14,7 @@ Sotto is open-source language-learning infrastructure released under the GNU Aff
 ### First-time setup
 
 ```bash
-git clone https://github.com/SottoFM/sotto.git
+git clone --recurse-submodules https://github.com/affromero/Sotto.git
 cd sotto
 npm run setup
 ```

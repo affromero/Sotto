@@ -1,17 +1,22 @@
 /**
  * Proxy tests
  *
- * Sotto is fully self-hosted with no login, so the proxy does no auth
- * gating. It only (a) skips static/SEO assets and (b) steers the managed
- * showcase (SELF_HOSTED=false) into its /welcome demo. Real self-hosted
- * installs pass every request through.
+ * Sotto is self-hosted with an optional hard access gate. The proxy protects
+ * pages and API routes when that gate is configured, skips static/SEO assets,
+ * and steers the managed showcase into its /welcome demo.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-function createRequest(path: string, cookie?: string): NextRequest {
+function createRequest(
+  path: string,
+  cookie?: string,
+  headers?: Record<string, string>
+): NextRequest {
   const url = new URL(path, 'http://localhost:3000');
-  return new NextRequest(url, cookie ? { headers: { cookie } } : undefined);
+  return new NextRequest(url, {
+    headers: { ...(cookie ? { cookie } : {}), ...headers },
+  });
 }
 
 function getRedirectLocation(response: Response): string | null {
@@ -107,7 +112,6 @@ describe('Proxy', () => {
       '/voices',
       '/classes/class_1/worksheet',
       '/episode/ep_1',
-      '/invite/code_123',
       '/ref/alice',
     ];
 
@@ -140,7 +144,7 @@ describe('Proxy', () => {
       process.env.BYOK_ENCRYPTION_KEY = 'test-signing-key-material-0123456789abcdef';
     });
 
-    const gatedPages = ['/', '/dashboard', '/profiles', '/welcome', '/settings'];
+    const gatedPages = ['/', '/dashboard', '/profiles', '/welcome', '/settings', '/invite'];
     for (const path of gatedPages) {
       it(`redirects ${path} to /gate without a gate cookie`, async () => {
         const res = await proxy(createRequest(path));
@@ -150,8 +154,6 @@ describe('Proxy', () => {
 
     const exemptPaths = [
       '/gate',
-      '/invite',
-      '/invite/anything',
       '/api/v1/health',
       '/api/v1/gate',
       '/icon.svg',
@@ -177,6 +179,35 @@ describe('Proxy', () => {
       const token = await createGateToken();
       const res = await proxy(createRequest('/dashboard', `sotto_gate=${token}`));
       expect(isPassThrough(res)).toBe(true);
+    });
+
+    it('returns 401 for a protected API without a gate cookie', async () => {
+      const res = await proxy(createRequest('/api/v1/keys'));
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' });
+    });
+
+    it('returns 401 for a protected API with a forged gate cookie', async () => {
+      const res = await proxy(createRequest('/api/v1/keys', 'sotto_gate=123.deadbeef'));
+      expect(res.status).toBe(401);
+    });
+
+    it('passes a protected API through with a valid gate cookie', async () => {
+      const { createGateToken } = await import('@/lib/access/gate');
+      const token = await createGateToken();
+      const res = await proxy(createRequest('/api/v1/keys', `sotto_gate=${token}`));
+      expect(isPassThrough(res)).toBe(true);
+      expect(res.status).toBe(200);
+    });
+
+    it('passes bearer requests to handlers for full API-key validation', async () => {
+      const res = await proxy(
+        createRequest('/api/v1/episodes', undefined, {
+          authorization: 'Bearer sk_sotto_candidate',
+        })
+      );
+      expect(isPassThrough(res)).toBe(true);
+      expect(res.status).toBe(200);
     });
 
     it('is inert when no password is configured', async () => {

@@ -16,11 +16,7 @@ export function NotificationBell({ unreadCount, onClick }: NotificationBellProps
     <button
       className={`${styles.button} ${hasUnread ? styles.hasUnread : ''}`}
       onClick={onClick}
-      aria-label={
-        hasUnread
-          ? `Notifications - ${unreadCount} unread`
-          : 'Notifications - no unread'
-      }
+      aria-label={hasUnread ? `Notifications - ${unreadCount} unread` : 'Notifications - no unread'}
     >
       <Bell size={22} className={styles.icon} />
       {hasUnread && (

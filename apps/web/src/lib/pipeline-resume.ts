@@ -29,17 +29,22 @@ interface MarkFailedOptions {
  */
 export async function markEpisodeFailed(
   episodeId: string,
-  options?: string | MarkFailedOptions,
+  options?: string | MarkFailedOptions
 ): Promise<boolean> {
   const opts: MarkFailedOptions =
-    typeof options === 'string' ? { failureReason: options } : options ?? {};
+    typeof options === 'string' ? { failureReason: options } : (options ?? {});
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
     select: { status: true },
   });
 
-  if (!episode || episode.status === 'READY' || episode.status === 'FAILED' || episode.status === 'SCRIPT_READY') {
+  if (
+    !episode ||
+    episode.status === 'READY' ||
+    episode.status === 'FAILED' ||
+    episode.status === 'SCRIPT_READY'
+  ) {
     return false;
   }
 
@@ -115,9 +120,7 @@ export async function determineResumePoint(episodeId: string): Promise<ResumePoi
   if (segments.length > 0 && segments.some((s) => s.audioUrl === null)) {
     const scriptTurnCount = script ? (script.turns as unknown[]).length : 0;
     if (script && segments.length === scriptTurnCount) {
-      const pendingSegmentIds = segments
-        .filter((s) => s.audioUrl === null)
-        .map((s) => s.id);
+      const pendingSegmentIds = segments.filter((s) => s.audioUrl === null).map((s) => s.id);
       return { step: 'GENERATE_AUDIO', pendingSegmentIds };
     }
     return { step: 'SCRIPT_READY' };

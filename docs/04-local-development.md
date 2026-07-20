@@ -52,7 +52,7 @@ The quickstart must not require Doppler.
 npm install
 cp .env.oss.example .env.local
 docker compose up -d postgres redis
-npx prisma db push --schema=apps/web/prisma/schema.prisma
+npx prisma migrate deploy --config=prisma.config.ts
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 npm run dev
 ```
@@ -199,27 +199,7 @@ No missing capability should be hidden by an implicit provider fallback.
 
 ---
 
-## 8. Private RSS Smoke Test
-
-With the app running:
-
-```http
-POST /api/v1/rss/private
-GET /api/v1/rss/private
-DELETE /api/v1/rss/private/tokens/:tokenId
-GET /api/v1/rss/private/:token
-```
-
-Expected behavior:
-
-- raw token appears only on creation
-- database stores only the token hash
-- revoked tokens stop working
-- feed contains only the owner's ready, non-deleted private or unlisted episodes
-
----
-
-## 9. Development Commands
+## 8. Development Commands
 
 | Command                         | What it does                                       |
 | ------------------------------- | -------------------------------------------------- |
@@ -250,7 +230,6 @@ Change the Docker Compose port mapping or stop the local service using the port,
 ### Prisma client is stale
 
 ```bash
-npx prisma db push --schema=apps/web/prisma/schema.prisma
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 ```
 

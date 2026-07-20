@@ -70,7 +70,11 @@ describe('redeemPairingToken', () => {
 
   it('returns null for an already-used token', async () => {
     mockFindUnique.mockResolvedValue({
-      id: 'pt-1', userId: 'user-1', name: 'd', usedAt: new Date(), expiresAt: new Date(Date.now() + 60_000),
+      id: 'pt-1',
+      userId: 'user-1',
+      name: 'd',
+      usedAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
     });
     expect(await redeemPairingToken('used')).toBeNull();
     expect(mockUpdateMany).not.toHaveBeenCalled();
@@ -78,7 +82,11 @@ describe('redeemPairingToken', () => {
 
   it('returns null for an expired token', async () => {
     mockFindUnique.mockResolvedValue({
-      id: 'pt-1', userId: 'user-1', name: 'd', usedAt: null, expiresAt: new Date(Date.now() - 1),
+      id: 'pt-1',
+      userId: 'user-1',
+      name: 'd',
+      usedAt: null,
+      expiresAt: new Date(Date.now() - 1),
     });
     expect(await redeemPairingToken('old')).toBeNull();
     expect(mockUpdateMany).not.toHaveBeenCalled();
@@ -86,7 +94,11 @@ describe('redeemPairingToken', () => {
 
   it('returns null when a concurrent redeem already claimed it (count 0)', async () => {
     mockFindUnique.mockResolvedValue({
-      id: 'pt-1', userId: 'user-1', name: 'd', usedAt: null, expiresAt: new Date(Date.now() + 60_000),
+      id: 'pt-1',
+      userId: 'user-1',
+      name: 'd',
+      usedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
     });
     mockUpdateMany.mockResolvedValue({ count: 0 }); // lost the race
     expect(await redeemPairingToken('raced')).toBeNull();

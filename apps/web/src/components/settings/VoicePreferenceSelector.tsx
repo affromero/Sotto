@@ -15,11 +15,7 @@ interface VoicePreferenceSelectorProps {
   onChange: (voiceId: string | null) => void;
 }
 
-export function VoicePreferenceSelector({
-  label,
-  value,
-  onChange,
-}: VoicePreferenceSelectorProps) {
+export function VoicePreferenceSelector({ label, value, onChange }: VoicePreferenceSelectorProps) {
   const [poolVoices, setPoolVoices] = useState<Voice[]>([]);
   const [loading, setLoading] = useState(true);
 

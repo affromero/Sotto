@@ -9,8 +9,16 @@ export const metadata: Metadata = {
 };
 
 const LANG_NAMES: Record<string, string> = {
-  de: 'German', en: 'English', es: 'Spanish', fr: 'French', it: 'Italian',
-  pt: 'Portuguese', ja: 'Japanese', ko: 'Korean', zh: 'Chinese', ar: 'Arabic',
+  de: 'German',
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  zh: 'Chinese',
+  ar: 'Arabic',
 };
 const langName = (code: string): string => LANG_NAMES[code] ?? code.toUpperCase();
 const cleanCode = (value: string | undefined, fallback: string): string => {

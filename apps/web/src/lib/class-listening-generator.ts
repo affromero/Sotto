@@ -14,11 +14,11 @@ import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
 import { persistGeneratedReferences } from './references';
-import { addJob, verifyClassReferencesQueue, JobType } from './queue';
 import { getConfiguredTtsProviderId } from './providers/tts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy, isImmersionLevel } from './classes/class-language-policy';
+import { verifyEpisodeReferences } from './reference-verification/verify-episode';
 
 const LISTENING_QUIZ_COUNT = 4;
 
@@ -162,13 +162,18 @@ export async function composeListeningContent(
       }
     });
 
-    // Step 4b: persist references, then enqueue the verify-only worker
-    // (verify-class-references). It writes reference verdicts but never runs
-    // createSegmentsAndQueueAudio (segment-creator is not idempotent), which
-    // would double-create segments and double-queue audio.
+    // Step 4b: fail closed before spending money on audio.
     await persistGeneratedReferences(episodeId, result.references);
     if (result.references.length > 0) {
-      await addJob(verifyClassReferencesQueue, JobType.VERIFY_CLASS_REFERENCES, { episodeId });
+      const verified = await verifyEpisodeReferences(
+        episodeId,
+        p.userId,
+        p.objective,
+        result.turns
+      );
+      if (!verified) {
+        throw new Error('Class reference verification failed');
+      }
     }
 
     // Step 5: queue audio generation segments. Class listening audio uses the

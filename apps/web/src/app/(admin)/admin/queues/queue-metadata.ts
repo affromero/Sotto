@@ -7,11 +7,7 @@ export interface QueueStats {
   delayed: number;
 }
 
-export type PipelineStage =
-  | 'Content Pipeline'
-  | 'Audio Pipeline'
-  | 'Interactions'
-  | 'Platform Ops';
+export type PipelineStage = 'Content Pipeline' | 'Audio Pipeline' | 'Interactions' | 'Platform Ops';
 
 interface QueueMeta {
   description: string;
@@ -34,10 +30,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates 2-voice conversational episode scripts via LLM',
     stage: 'Content Pipeline',
   },
-  'verify-class-references': {
-    description: 'Verify-only reference check for sourced classes (writes verdicts, never creates segments)',
-    stage: 'Content Pipeline',
-  },
   'audio-generation': {
     description: 'Converts script segments to audio via TTS providers',
     stage: 'Audio Pipeline',
@@ -54,7 +46,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Re-generates individual audio segments after edits',
     stage: 'Audio Pipeline',
   },
-  'interactions': {
+  interactions: {
     description: 'Processes mid-playback Q&A interruptions',
     stage: 'Interactions',
   },
@@ -62,7 +54,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates PDF transcripts with references',
     stage: 'Interactions',
   },
-  'notifications': {
+  notifications: {
     description: 'Sends push notifications to user devices',
     stage: 'Platform Ops',
   },
@@ -79,11 +71,13 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Audio Pipeline',
   },
   'tts-provider-monitor': {
-    description: 'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',
+    description:
+      'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',
     stage: 'Platform Ops',
   },
   'worksheet-pdf': {
-    description: 'Renders class worksheet to a print-optimized PDF via Playwright and uploads to storage',
+    description:
+      'Renders class worksheet to a print-optimized PDF via Playwright and uploads to storage',
     stage: 'Content Pipeline',
   },
 };

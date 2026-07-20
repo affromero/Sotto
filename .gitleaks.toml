@@ -1,9 +1,7 @@
 # gitleaks configuration for Sotto.
-# Extends the built-in ruleset, then allowlists the places where fake keys,
-# example values, and secret references legitimately live: test fixtures, docs,
-# CLAUDE.md guidance, env templates, and CI workflows (which reference secrets
-# through ${{ secrets.* }}, never literals). Real application source under
-# apps/web/src, packages, and scripts is still fully scanned.
+# Extends the built-in ruleset and allowlists only explicit placeholder
+# patterns. Documentation, tests, environment templates, and workflows are
+# scanned like application source because secrets can leak through any file.
 [extend]
 useDefault = true
 
@@ -18,14 +16,4 @@ regexes = [
   '''sk-(xxx|placeholder|example|your)''',
   '''changeme''',
   '''replace[-_]?me''',
-]
-paths = [
-  '''.*\.env\.example$''',
-  '''.*\.env\.oss\.example$''',
-  '''(.*/)?package-lock\.json$''',
-  '''.*\.test\.(ts|tsx|js|jsx)$''',
-  '''.*\.spec\.(ts|tsx|js|jsx)$''',
-  '''(.*/)?CLAUDE\.md$''',
-  '''docs/.*\.md$''',
-  '''\.github/.*\.ya?ml$''',
 ]

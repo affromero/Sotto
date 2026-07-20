@@ -5,6 +5,7 @@ const mockAuthenticateRequest = vi.fn();
 const mockEpisodeFindUnique = vi.fn();
 const mockEpisodeFindUniqueOrThrow = vi.fn();
 const mockEpisodeUpdate = vi.fn();
+const mockEpisodeUpdateMany = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockDiscoveryFindFirst = vi.fn();
 const mockCreateSegmentsAndQueueAudio = vi.fn();
@@ -24,6 +25,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockEpisodeFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockEpisodeFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockEpisodeUpdate(...args),
+      updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args),
     },
     script: {
       findUnique: (...args: unknown[]) => mockScriptFindUnique(...args),
@@ -104,6 +106,7 @@ describe('POST /api/v1/episodes/[episodeId]/script/approve', () => {
       },
     });
     mockEpisodeUpdate.mockResolvedValue({});
+    mockEpisodeUpdateMany.mockResolvedValue({ count: 1 });
     mockEpisodeFindUniqueOrThrow.mockResolvedValue({ ttsProvider: 'elevenlabs' });
     mockDiscoveryFindFirst.mockResolvedValue(null);
     mockConvertTurnsForProvider.mockImplementation((turns: unknown[]) => Promise.resolve(turns));
@@ -188,6 +191,20 @@ describe('POST /api/v1/episodes/[episodeId]/script/approve', () => {
     expect(body).toEqual({ success: true });
   });
 
+  it('does not mutate configuration or queue audio when another approval wins', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
+    mockEpisodeUpdateMany.mockResolvedValue({ count: 0 });
+
+    const response = await POST(createRequest(), await createParams('pod-1'));
+
+    expect(response.status).toBe(409);
+    expect(mockEpisodeUpdate).not.toHaveBeenCalled();
+    expect(mockEpisodeVoiceDeleteMany).not.toHaveBeenCalled();
+    expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+  });
+
   describe('audio config at approve time', () => {
     it('writes ttsProvider from body', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
@@ -223,14 +240,17 @@ describe('POST /api/v1/episodes/[episodeId]/script/approve', () => {
 
       expect(response.status).toBe(200);
       const providerUpdateCalls = mockEpisodeUpdate.mock.calls.filter(
-        (call: unknown[]) => (call[0] as Record<string, unknown>).data &&
-          'ttsProvider' in ((call[0] as Record<string, Record<string, unknown>>).data)
+        (call: unknown[]) =>
+          (call[0] as Record<string, unknown>).data &&
+          'ttsProvider' in (call[0] as Record<string, Record<string, unknown>>).data
       );
       expect(providerUpdateCalls).toHaveLength(1);
-      expect(providerUpdateCalls[0][0]).toEqual(expect.objectContaining({
-        where: { id: 'pod-1' },
-        data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
-      }));
+      expect(providerUpdateCalls[0][0]).toEqual(
+        expect.objectContaining({
+          where: { id: 'pod-1' },
+          data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
+        })
+      );
       expect(mockAssignVoicesForEpisode).toHaveBeenCalledWith(
         'pod-1',
         expect.any(Array),
@@ -353,7 +373,9 @@ describe('POST /api/v1/episodes/[episodeId]/script/approve', () => {
 
       expect(response.status).toBe(200);
       expect(mockEpisodeVoiceCreateMany).toHaveBeenCalledWith({
-        data: [{ episodeId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc', provider: 'elevenlabs' }],
+        data: [
+          { episodeId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc', provider: 'elevenlabs' },
+        ],
       });
       expect(mockAssignVoicesForEpisode).toHaveBeenCalledWith(
         'pod-1',

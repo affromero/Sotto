@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url });
   } catch (error: unknown) {
-    logger.error('Failed to upload avatar', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to upload avatar', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to upload avatar', 500);
   }
 }

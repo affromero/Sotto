@@ -17,7 +17,11 @@ interface AudioPlayerProps {
   episodeTitle?: string;
 }
 
-export function AudioPlayer({ episodeId: initialEpisodeId, audioUrl, episodeTitle }: AudioPlayerProps) {
+export function AudioPlayer({
+  episodeId: initialEpisodeId,
+  audioUrl,
+  episodeTitle,
+}: AudioPlayerProps) {
   const player = usePlayer();
   const progressRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef<string | null>(null);

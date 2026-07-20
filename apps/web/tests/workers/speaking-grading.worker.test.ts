@@ -81,7 +81,7 @@ vi.mock('@/lib/providers/stt', () => ({
 
 const mockScore = vi.fn().mockResolvedValue({
   overallScore: 0.82,
-  rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.90 },
+  rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.9 },
   feedback: 'Good attempt! Focus on the final consonant.',
   phonemeScores: [{ op: 'match', expected: 'guten', actual: 'guten' }],
   transcript: 'Guten Morgen',
@@ -153,7 +153,7 @@ describe('processSpeakingGrading', () => {
     mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key', provider: 'anthropic' });
     mockScore.mockResolvedValue({
       overallScore: 0.82,
-      rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.90 },
+      rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.9 },
       feedback: 'Good attempt!',
       phonemeScores: [{ op: 'match', expected: 'guten', actual: 'guten' }],
       transcript: 'Guten Morgen',
@@ -165,7 +165,10 @@ describe('processSpeakingGrading', () => {
     mockTranscribe.mockResolvedValue({
       text: 'Guten Morgen',
       segments: [],
-      words: [{ word: 'Guten', start: 0.0, end: 0.5 }, { word: 'Morgen', start: 0.6, end: 1.1 }],
+      words: [
+        { word: 'Guten', start: 0.0, end: 0.5 },
+        { word: 'Morgen', start: 0.6, end: 1.1 },
+      ],
     });
   });
 
@@ -197,7 +200,9 @@ describe('processSpeakingGrading', () => {
       const job = makeJob({ recordingId: 'rec-001' });
       await processSpeakingGrading(job);
 
-      type UpdateArg = { data?: { status?: string; rubricScores?: unknown; phonemeScores?: unknown } };
+      type UpdateArg = {
+        data?: { status?: string; rubricScores?: unknown; phonemeScores?: unknown };
+      };
       const scoredCall = (mockSpeakingRecordingUpdate.mock.calls as Array<[UpdateArg]>).find(
         ([arg]) => arg.data?.status === 'SCORED'
       );
@@ -206,7 +211,7 @@ describe('processSpeakingGrading', () => {
       expect(scoredData.rubricScores).toEqual({
         accuracy: 0.85,
         fluency: 0.78,
-        completeness: 0.90,
+        completeness: 0.9,
       });
       expect(scoredData.phonemeScores).toEqual([
         { op: 'match', expected: 'guten', actual: 'guten' },

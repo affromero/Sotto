@@ -28,7 +28,7 @@ interface AudioConfigPanelProps {
 
 interface SpeakerConfig {
   provider: string; // '' = auto
-  voiceId: string;  // '' = auto
+  voiceId: string; // '' = auto
 }
 
 const SPEAKER_COLOR_CLASSES = ['speaker0', 'speaker1', 'speaker2', 'speaker3'] as const;
@@ -39,7 +39,11 @@ function parseProviderFromOption(optionId: string): { provider: string; model: s
   return { provider, model: rest.join(':') };
 }
 
-export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: AudioConfigPanelProps) {
+export function AudioConfigPanel({
+  speakers,
+  onConfigChange,
+  failedProvider,
+}: AudioConfigPanelProps) {
   const [providerOptions, setProviderOptions] = useState<TtsOption[]>([]);
   const [speakerConfigs, setSpeakerConfigs] = useState<Record<string, SpeakerConfig>>(() => {
     const initial: Record<string, SpeakerConfig> = {};
@@ -63,26 +67,31 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
   }, []);
 
   // Fetch voices for a provider (cached in voicesByProvider)
-  const fetchVoicesForProvider = useCallback(async (providerKey: string) => {
-    if (!providerKey || voicesByProvider[providerKey]) return;
+  const fetchVoicesForProvider = useCallback(
+    async (providerKey: string) => {
+      if (!providerKey || voicesByProvider[providerKey]) return;
 
-    setLoadingVoices((prev) => ({ ...prev, [providerKey]: true }));
-    try {
-      const res = await fetch(`/api/v1/voices?provider=${providerKey}`);
-      if (res.ok) {
-        const data = await res.json();
-        const voices: VoiceOption[] = (data.poolVoices || []).map((v: { id: string; name: string }) => ({
-          id: v.id,
-          name: v.name,
-        }));
-        setVoicesByProvider((prev) => ({ ...prev, [providerKey]: voices }));
+      setLoadingVoices((prev) => ({ ...prev, [providerKey]: true }));
+      try {
+        const res = await fetch(`/api/v1/voices?provider=${providerKey}`);
+        if (res.ok) {
+          const data = await res.json();
+          const voices: VoiceOption[] = (data.poolVoices || []).map(
+            (v: { id: string; name: string }) => ({
+              id: v.id,
+              name: v.name,
+            })
+          );
+          setVoicesByProvider((prev) => ({ ...prev, [providerKey]: voices }));
+        }
+      } catch {
+        // Non-critical
+      } finally {
+        setLoadingVoices((prev) => ({ ...prev, [providerKey]: false }));
       }
-    } catch {
-      // Non-critical
-    } finally {
-      setLoadingVoices((prev) => ({ ...prev, [providerKey]: false }));
-    }
-  }, [voicesByProvider]);
+    },
+    [voicesByProvider]
+  );
 
   // Emit config whenever speakerConfigs change
   useEffect(() => {
@@ -97,17 +106,20 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
     onConfigChange({ voices });
   }, [speakerConfigs, speakers, onConfigChange]);
 
-  const handleProviderChange = useCallback((speaker: string, optionId: string) => {
-    const { provider } = parseProviderFromOption(optionId);
-    setSpeakerConfigs((prev) => ({
-      ...prev,
-      [speaker]: { provider: optionId, voiceId: '' }, // Reset voice when provider changes
-    }));
-    // Fetch voices for this provider if not cached
-    if (provider) {
-      fetchVoicesForProvider(provider);
-    }
-  }, [fetchVoicesForProvider]);
+  const handleProviderChange = useCallback(
+    (speaker: string, optionId: string) => {
+      const { provider } = parseProviderFromOption(optionId);
+      setSpeakerConfigs((prev) => ({
+        ...prev,
+        [speaker]: { provider: optionId, voiceId: '' }, // Reset voice when provider changes
+      }));
+      // Fetch voices for this provider if not cached
+      if (provider) {
+        fetchVoicesForProvider(provider);
+      }
+    },
+    [fetchVoicesForProvider]
+  );
 
   const handleVoiceChange = useCallback((speaker: string, voiceId: string) => {
     setSpeakerConfigs((prev) => ({
@@ -134,9 +146,7 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
 
           return (
             <div key={speaker} className={styles.speakerRow}>
-              <span className={`${styles.speakerLabel} ${colorClass}`}>
-                {speaker}
-              </span>
+              <span className={`${styles.speakerLabel} ${colorClass}`}>{speaker}</span>
               <div className={styles.dropdowns}>
                 <select
                   className={styles.providerSelect}

@@ -109,7 +109,10 @@ function extractPdfTables(text: string): ExtractedTable[] {
     if (tables.length >= MAX_TABLES) break;
 
     // Detect tab-separated or multi-space-separated rows (common PDF table output)
-    const cells = line.split(/\t|  {2,}/).map((c) => c.trim()).filter((c) => c.length > 0);
+    const cells = line
+      .split(/\t|  {2,}/)
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
 
     if (cells.length >= 2) {
       if (lastColCount === 0 || cells.length === lastColCount) {

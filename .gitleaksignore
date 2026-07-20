@@ -1,0 +1,29 @@
+# Audited historical false positives: test-only fixtures, example output, and
+# descriptive prose. Keep entries fingerprint-specific so new findings in the
+# same files and commits still fail.
+09e8eb2695cb7bcf52261c8290f39a796e9b4ebe:docs/06-authentication-setup.md:generic-api-key:337
+167c04a9d45263934d8e768781148958047aa308:.github/workflows/e2e-web.yml:generic-api-key:48
+2f9f8d12e95489345224cc1a83331ecf207ac478:apps/web/tests/api/notifications-subscribe.test.ts:generic-api-key:36
+37929a46400128d70d6218e0470fab28febdc8a1:.github/workflows/ios-ci.yml:generic-api-key:30
+461327c9d44ef60b4f7ebd4cd7f752207e6367f5:apps/web/src/lib/CLAUDE.md:generic-api-key:75
+564c0b5f6d7ae56f68cb1a2e5ab3a89819b60b50:apps/web/src/lib/CLAUDE.md:generic-api-key:71
+56dea02468726055d638d14aa4e804e5931cde69:apps/web/src/lib/CLAUDE.md:generic-api-key:58
+8731b8575dd049c257abdeff71bf07b3eccd2ca3:apps/web/tests/lib/cartesia-voice-clone.test.ts:generic-api-key:74
+929bb1f4213a3ad40b34553a60e520bbad7f60c4:docs/deploy-sotto-fm.md:generic-api-key:361
+929bb1f4213a3ad40b34553a60e520bbad7f60c4:docs/deploy-sotto-fm.md:generic-api-key:365
+929bb1f4213a3ad40b34553a60e520bbad7f60c4:tests/api/keys.test.ts:generic-api-key:306
+929bb1f4213a3ad40b34553a60e520bbad7f60c4:tests/api/keys.test.ts:generic-api-key:335
+929bb1f4213a3ad40b34553a60e520bbad7f60c4:tests/lib/api-keys.test.ts:generic-api-key:124
+929bb1f4213a3ad40b34553a60e520bbad7f60c4:tests/lib/api-keys.test.ts:generic-api-key:237
+ba1c24ef5b5125051f81d5e12a2e7cc72bc69d49:apps/web/tests/lib/access/gate.test.ts:generic-api-key:15
+ba1c24ef5b5125051f81d5e12a2e7cc72bc69d49:apps/web/tests/lib/api-keys.test.ts:generic-api-key:388
+ba1c24ef5b5125051f81d5e12a2e7cc72bc69d49:apps/web/tests/middleware.test.ts:generic-api-key:140
+bf5ad67e8bf0eb67fc89a68c87e466bdf4c0e54d:apps/web/tests/api/admin-test-model.test.ts:generic-api-key:312
+c747b6149933d0e03ec5f01d5e0669542cab4c4d:apps/web/src/lib/CLAUDE.md:generic-api-key:61
+cde867f0778681f289201bfb796458e20d5fc76e:apps/web/tests/api/admin-test-model.test.ts:generic-api-key:442
+ce008de85710897b4090faf0efe8937163f02720:apps/web/tests/lib/byok.test.ts:generic-api-key:488
+ce008de85710897b4090faf0efe8937163f02720:apps/web/tests/lib/byok.test.ts:generic-api-key:77
+ce008de85710897b4090faf0efe8937163f02720:apps/web/tests/lib/byok.test.ts:generic-api-key:84
+ce008de85710897b4090faf0efe8937163f02720:apps/web/tests/lib/byok.test.ts:generic-api-key:91
+e68e1241d507d595259b03e4b13d68dee2841190:apps/web/tests/api/access/gate.test.ts:generic-api-key:25
+f2dd27a13ba1243600d8d42b9cc815463b7caf4a:tests/middleware.test.ts:generic-api-key:18

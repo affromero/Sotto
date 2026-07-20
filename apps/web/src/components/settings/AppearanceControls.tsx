@@ -59,9 +59,7 @@ export function AppearanceControls() {
       <div className={styles.group}>
         <span className={styles.groupLabel}>
           Light palette
-          {resolvedTheme === 'dark' && (
-            <span className={styles.dimNote}> (dark mode active)</span>
-          )}
+          {resolvedTheme === 'dark' && <span className={styles.dimNote}> (dark mode active)</span>}
         </span>
         <div className={styles.paletteRow} role="group" aria-label="Light palette">
           <button
@@ -71,7 +69,11 @@ export function AppearanceControls() {
             aria-pressed={palette === 'aula'}
             disabled={resolvedTheme === 'dark'}
           >
-            <span className={styles.paletteSwatch} style={{ background: '#F5F4F0', borderColor: '#DEDDD6' }} aria-hidden="true" />
+            <span
+              className={styles.paletteSwatch}
+              style={{ background: '#F5F4F0', borderColor: '#DEDDD6' }}
+              aria-hidden="true"
+            />
             <span>Aula cool</span>
           </button>
           <button
@@ -81,7 +83,11 @@ export function AppearanceControls() {
             aria-pressed={palette === 'paper'}
             disabled={resolvedTheme === 'dark'}
           >
-            <span className={styles.paletteSwatch} style={{ background: '#F1EADC', borderColor: '#D3C9B6' }} aria-hidden="true" />
+            <span
+              className={styles.paletteSwatch}
+              style={{ background: '#F1EADC', borderColor: '#D3C9B6' }}
+              aria-hidden="true"
+            />
             <span>Paper warm</span>
           </button>
         </div>

@@ -49,7 +49,10 @@ interface RawFeedback {
 }
 
 function parseFeedback(content: string): RawFeedback | null {
-  const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = content
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
   try {
     const parsed = JSON.parse(cleaned);
     return typeof parsed === 'object' && parsed !== null ? (parsed as RawFeedback) : null;
@@ -70,7 +73,7 @@ async function generateFeedback(
   examName: string,
   level: string,
   sections: ExamSectionScore[],
-  overall: number,
+  overall: number
 ): Promise<FeedbackResult> {
   const pct = (n: number) => `${Math.round(n * 100)}%`;
   const fallback: FeedbackResult = {
@@ -90,7 +93,7 @@ async function generateFeedback(
     const res = await client.generateResponse(
       systemPrompt,
       [{ role: 'user', content: 'Give the feedback.' }],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1024, temperature: 0.4 },
+      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1024, temperature: 0.4 }
     );
     logUsage({
       service: ai.provider,
@@ -124,7 +127,7 @@ export class ExamNotFoundError extends Error {}
 export async function scoreExam(
   examId: string,
   userId: string,
-  answers: Array<{ questionId: string; selectedIndex: number }>,
+  answers: Array<{ questionId: string; selectedIndex: number }>
 ): Promise<ExamScoreResult> {
   const exam = await prisma.mockExam.findFirst({
     where: { id: examId, userId },
@@ -149,10 +152,12 @@ export async function scoreExam(
         const scored = p.recordings.find((r) => r.status === 'SCORED' && r.overallScore != null);
         return scored?.overallScore ?? 0;
       });
-      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+      score =
+        promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
     } else if (s.skill === 'WRITING') {
       const promptScores = s.writingPrompts.map((p) => p.responses[0]?.overallScore ?? 0);
-      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+      score =
+        promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
     } else {
       let correct = 0;
       for (const q of s.questions) {
@@ -166,11 +171,17 @@ export async function scoreExam(
   const overall = weightedOverall(sectionScores);
   const band = computeBand(overall, exam.level);
   const blueprint = getBlueprint(exam.institution, exam.level);
-  const feedback = await generateFeedback(userId, blueprint.examName, exam.level, sectionScores, overall);
+  const feedback = await generateFeedback(
+    userId,
+    blueprint.examName,
+    exam.level,
+    sectionScores,
+    overall
+  );
 
   await prisma.$transaction([
     ...sectionScores.map((s) =>
-      prisma.examSection.update({ where: { id: s.sectionId }, data: { score: s.score } }),
+      prisma.examSection.update({ where: { id: s.sectionId }, data: { score: s.score } })
     ),
     prisma.examSubmission.upsert({
       where: { examId },

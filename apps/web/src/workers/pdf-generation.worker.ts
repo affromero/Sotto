@@ -16,7 +16,10 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
     where: { id: episodeId },
     include: {
       user: { select: { name: true } },
-      segments: { orderBy: { order: 'asc' }, select: { speaker: true, text: true, startTime: true } },
+      segments: {
+        orderBy: { order: 'asc' },
+        select: { speaker: true, text: true, startTime: true },
+      },
       references: { orderBy: { number: 'asc' } },
     },
   });

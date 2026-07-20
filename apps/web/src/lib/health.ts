@@ -24,9 +24,17 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     const start = Date.now();
     try {
       await prisma.$queryRaw`SELECT 1`;
-      return { key: 'database', result: { status: 'ok', latencyMs: Date.now() - start } as CheckResult, critical: true };
+      return {
+        key: 'database',
+        result: { status: 'ok', latencyMs: Date.now() - start } as CheckResult,
+        critical: true,
+      };
     } catch {
-      return { key: 'database', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult, critical: true };
+      return {
+        key: 'database',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+        critical: true,
+      };
     }
   };
 
@@ -35,9 +43,17 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     try {
       const client = getRedisClient();
       await client.ping();
-      return { key: 'redis', result: { status: 'ok', latencyMs: Date.now() - start } as CheckResult, critical: true };
+      return {
+        key: 'redis',
+        result: { status: 'ok', latencyMs: Date.now() - start } as CheckResult,
+        critical: true,
+      };
     } catch {
-      return { key: 'redis', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult, critical: true };
+      return {
+        key: 'redis',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+        critical: true,
+      };
     }
   };
 
@@ -56,11 +72,17 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
           credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
         });
         await r2Client.send(new HeadBucketCommand({ Bucket: bucket }));
-        return { key: 'storage', result: { status: 'ok', latencyMs: Date.now() - start } as CheckResult };
+        return {
+          key: 'storage',
+          result: { status: 'ok', latencyMs: Date.now() - start } as CheckResult,
+        };
       }
       return { key: 'storage', result: { status: 'not_configured', latencyMs: 0 } as CheckResult };
     } catch {
-      return { key: 'storage', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
+      return {
+        key: 'storage',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+      };
     }
   };
 
@@ -69,14 +91,30 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     try {
       if (process.env.ANTHROPIC_API_KEY) {
         const res = await fetch('https://api.anthropic.com/v1/models', {
-          headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+          headers: {
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
           signal: AbortSignal.timeout(5000),
         });
-        return { key: 'anthropic', result: { status: res.ok ? 'ok' : 'error', latencyMs: Date.now() - start, ...(!res.ok && { detail: `HTTP ${res.status}` }) } as CheckResult };
+        return {
+          key: 'anthropic',
+          result: {
+            status: res.ok ? 'ok' : 'error',
+            latencyMs: Date.now() - start,
+            ...(!res.ok && { detail: `HTTP ${res.status}` }),
+          } as CheckResult,
+        };
       }
-      return { key: 'anthropic', result: { status: 'not_configured', latencyMs: 0 } as CheckResult };
+      return {
+        key: 'anthropic',
+        result: { status: 'not_configured', latencyMs: 0 } as CheckResult,
+      };
     } catch {
-      return { key: 'anthropic', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
+      return {
+        key: 'anthropic',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+      };
     }
   };
 
@@ -88,11 +126,21 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
           headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
           signal: AbortSignal.timeout(5000),
         });
-        return { key: 'openai', result: { status: res.ok ? 'ok' : 'error', latencyMs: Date.now() - start, ...(!res.ok && { detail: `HTTP ${res.status}` }) } as CheckResult };
+        return {
+          key: 'openai',
+          result: {
+            status: res.ok ? 'ok' : 'error',
+            latencyMs: Date.now() - start,
+            ...(!res.ok && { detail: `HTTP ${res.status}` }),
+          } as CheckResult,
+        };
       }
       return { key: 'openai', result: { status: 'not_configured', latencyMs: 0 } as CheckResult };
     } catch {
-      return { key: 'openai', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
+      return {
+        key: 'openai',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+      };
     }
   };
 
@@ -104,11 +152,24 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
           headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
           signal: AbortSignal.timeout(5000),
         });
-        return { key: 'elevenlabs', result: { status: res.ok ? 'ok' : 'error', latencyMs: Date.now() - start, ...(!res.ok && { detail: `HTTP ${res.status}` }) } as CheckResult };
+        return {
+          key: 'elevenlabs',
+          result: {
+            status: res.ok ? 'ok' : 'error',
+            latencyMs: Date.now() - start,
+            ...(!res.ok && { detail: `HTTP ${res.status}` }),
+          } as CheckResult,
+        };
       }
-      return { key: 'elevenlabs', result: { status: 'not_configured', latencyMs: 0 } as CheckResult };
+      return {
+        key: 'elevenlabs',
+        result: { status: 'not_configured', latencyMs: 0 } as CheckResult,
+      };
     } catch {
-      return { key: 'elevenlabs', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
+      return {
+        key: 'elevenlabs',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+      };
     }
   };
 
@@ -116,9 +177,17 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     const start = Date.now();
     try {
       const available = await isClaudeAvailable();
-      return { key: 'claudeCode', result: available ? { status: 'ok', latencyMs: Date.now() - start } as CheckResult : { status: 'not_installed' } as CheckResult };
+      return {
+        key: 'claudeCode',
+        result: available
+          ? ({ status: 'ok', latencyMs: Date.now() - start } as CheckResult)
+          : ({ status: 'not_installed' } as CheckResult),
+      };
     } catch {
-      return { key: 'claudeCode', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
+      return {
+        key: 'claudeCode',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+      };
     }
   };
 
@@ -133,13 +202,26 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
           {
             headers: { Authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(5000),
-          },
+          }
         );
-        return { key: 'cfR2Monitoring', result: { status: res.ok ? 'ok' : 'error', latencyMs: Date.now() - start, ...(!res.ok && { detail: `HTTP ${res.status}` }) } as CheckResult };
+        return {
+          key: 'cfR2Monitoring',
+          result: {
+            status: res.ok ? 'ok' : 'error',
+            latencyMs: Date.now() - start,
+            ...(!res.ok && { detail: `HTTP ${res.status}` }),
+          } as CheckResult,
+        };
       }
-      return { key: 'cfR2Monitoring', result: { status: 'not_configured', latencyMs: 0 } as CheckResult };
+      return {
+        key: 'cfR2Monitoring',
+        result: { status: 'not_configured', latencyMs: 0 } as CheckResult,
+      };
     } catch {
-      return { key: 'cfR2Monitoring', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
+      return {
+        key: 'cfR2Monitoring',
+        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
+      };
     }
   };
 
@@ -156,7 +238,13 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
         queues[name] = { waiting, active, failed };
       }
       const totalFailed = Object.values(queues).reduce((sum, q) => sum + q.failed, 0);
-      return { key: 'queues', result: { status: totalFailed > 50 ? 'degraded' : 'ok', detail: JSON.stringify(queues) } as CheckResult };
+      return {
+        key: 'queues',
+        result: {
+          status: totalFailed > 50 ? 'degraded' : 'ok',
+          detail: JSON.stringify(queues),
+        } as CheckResult,
+      };
     } catch {
       return { key: 'queues', result: { status: 'error' } as CheckResult };
     }
@@ -166,7 +254,11 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   const coreResults = await Promise.allSettled([dbCheck(), redisCheck()]);
   for (const result of coreResults) {
     if (result.status === 'fulfilled') {
-      const { critical, result: checkResult } = result.value as { key: string; result: CheckResult; critical?: boolean };
+      const { critical, result: checkResult } = result.value as {
+        key: string;
+        result: CheckResult;
+        critical?: boolean;
+      };
       if (critical && checkResult.status === 'error') healthy = false;
     }
   }
@@ -189,8 +281,13 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   }
 
   const adminResults = await Promise.allSettled([
-    r2Check(), anthropicCheck(), openaiCheck(), elevenlabsCheck(),
-    claudeCodeCheck(), cfApiCheck(), queueCheck(),
+    r2Check(),
+    anthropicCheck(),
+    openaiCheck(),
+    elevenlabsCheck(),
+    claudeCodeCheck(),
+    cfApiCheck(),
+    queueCheck(),
   ]);
 
   for (const result of adminResults) {
@@ -203,9 +300,15 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 
   const envKeys = [
-    'DATABASE_URL', 'REDIS_URL',
-    'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY',
-    'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
+    'DATABASE_URL',
+    'REDIS_URL',
+    'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
+    'ELEVENLABS_API_KEY',
+    'R2_ACCOUNT_ID',
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY',
+    'R2_BUCKET_NAME',
     'CF_API_TOKEN',
   ];
   const env: Record<string, boolean> = {};

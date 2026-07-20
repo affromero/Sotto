@@ -34,10 +34,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       for (const notification of newNotifications) {
         if (isPipelineSuccessNotification(notification.type)) {
           const url = getNotificationUrl(notification);
-          showToast(notification.title, 'success', 6000, url ? {
-            label: 'View',
-            onClick: () => router.push(url),
-          } : undefined);
+          showToast(
+            notification.title,
+            'success',
+            6000,
+            url
+              ? {
+                  label: 'View',
+                  onClick: () => router.push(url),
+                }
+              : undefined
+          );
         } else if (isErrorNotification(notification.type)) {
           showToast(notification.title, 'error', 8000, {
             label: 'Report',

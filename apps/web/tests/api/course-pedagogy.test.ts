@@ -58,7 +58,10 @@ describe('course pedagogy route', () => {
     const res = await PATCH(patchReq({ pedagogy: 'IMMERSION' }), PARAMS);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ pedagogy: 'IMMERSION' });
-    expect(mockCourseUpdate).toHaveBeenCalledWith({ where: { id: 'c1' }, data: { pedagogy: 'IMMERSION' } });
+    expect(mockCourseUpdate).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { pedagogy: 'IMMERSION' },
+    });
   });
 
   it('PATCH rejects an invalid pedagogy value', async () => {

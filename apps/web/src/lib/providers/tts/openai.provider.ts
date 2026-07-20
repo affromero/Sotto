@@ -15,17 +15,32 @@
  */
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
-import { selectVoicePair, resolveVoiceId, findByVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
+import {
+  selectVoicePair,
+  resolveVoiceId,
+  findByVoiceId,
+  type VoiceMatchMetadata,
+} from '../../voice-pool';
 import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
 
 /** All voices available across OpenAI TTS models */
 const OPENAI_VOICES = [
   // Available on all models
-  'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer',
+  'alloy',
+  'echo',
+  'fable',
+  'onyx',
+  'nova',
+  'shimmer',
   // Additional voices on gpt-4o-mini-tts
-  'ash', 'ballad', 'coral', 'sage', 'verse',
+  'ash',
+  'ballad',
+  'coral',
+  'sage',
+  'verse',
   // Highest-quality recommended voices (gpt-4o-mini-tts)
-  'marin', 'cedar',
+  'marin',
+  'cedar',
 ] as const;
 
 // Speakers at even indices (HOST, GUEST) → host voice slot; odd (EXPERT, SKEPTIC) → expert slot.
@@ -33,7 +48,11 @@ const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 type OpenAIVoice = (typeof OPENAI_VOICES)[number];
 
 /** Models that support the `instructions` parameter */
-const INSTRUCTION_MODELS = new Set(['gpt-4o-mini-tts', 'gpt-4o-mini-tts-2025-03-20', 'gpt-4o-mini-tts-2025-12-15']);
+const INSTRUCTION_MODELS = new Set([
+  'gpt-4o-mini-tts',
+  'gpt-4o-mini-tts-2025-03-20',
+  'gpt-4o-mini-tts-2025-12-15',
+]);
 
 export class OpenAITtsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'openai';
@@ -89,7 +108,12 @@ export class OpenAITtsProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? 'nova' : 'onyx';

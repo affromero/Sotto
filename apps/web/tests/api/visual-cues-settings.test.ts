@@ -18,11 +18,7 @@ vi.mock('@/lib/visual-cue-keys', () => ({
   validateVisualCueKey: (...a: unknown[]) => mockValidateVisualCueKey(...a),
 }));
 
-import {
-  DELETE,
-  GET,
-  POST,
-} from '@/app/api/v1/settings/visual-cues/route';
+import { DELETE, GET, POST } from '@/app/api/v1/settings/visual-cues/route';
 
 function req(method: string, body?: unknown) {
   return new NextRequest('http://localhost/api/v1/settings/visual-cues', {

@@ -38,7 +38,9 @@ export function AreaChart({
     data.length === 1 ? width / 2 : pad + (i / (data.length - 1)) * (width - pad * 2);
   const y = (v: number) => height - pad - ((v - min) / (max - min)) * (height - pad * 2 - 14);
 
-  const line = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.v).toFixed(1)}`).join(' ');
+  const line = data
+    .map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.v).toFixed(1)}`)
+    .join(' ');
   const area = `${line} L${x(data.length - 1).toFixed(1)},${height - pad} L${x(0).toFixed(1)},${height - pad} Z`;
 
   return (

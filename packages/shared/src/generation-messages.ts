@@ -73,9 +73,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
       { text: 'Connecting citations to verified sources', topicAware: false },
       { text: 'Final quality check on every reference', topicAware: false },
     ],
-    late: [
-      { text: 'Almost there — verifying every citation', topicAware: false },
-    ],
+    late: [{ text: 'Almost there — verifying every citation', topicAware: false }],
   },
   GENERATING_AUDIO: {
     early: [
@@ -98,9 +96,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
       { text: 'Normalizing volume levels', topicAware: false },
       { text: 'Assembling your final audio lesson', topicAware: false },
     ],
-    late: [
-      { text: 'Final mixing is almost done', topicAware: false },
-    ],
+    late: [{ text: 'Final mixing is almost done', topicAware: false }],
   },
 };
 
@@ -112,7 +108,10 @@ export function resolveMessage(message: StageMessage, topic?: string): string {
   if (!message.topicAware) return message.text;
 
   if (!topic) {
-    return message.text.replace(` ${TOPIC_PLACEHOLDER}`, '').replace(`${TOPIC_PLACEHOLDER} `, '').replace(TOPIC_PLACEHOLDER, '');
+    return message.text
+      .replace(` ${TOPIC_PLACEHOLDER}`, '')
+      .replace(`${TOPIC_PLACEHOLDER} `, '')
+      .replace(TOPIC_PLACEHOLDER, '');
   }
 
   const truncated = topic.length > 60 ? `${topic.slice(0, 57)}...` : topic;

@@ -32,9 +32,16 @@ function isInworldModel(model: string): boolean {
 
 /** ISO 639-1 → Qwen3 language name mapping (same as Fal provider). */
 const QWEN3_LANGUAGE_MAP: Record<string, string> = {
-  zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
-  fr: 'French', de: 'German', es: 'Spanish', it: 'Italian',
-  pt: 'Portuguese', ru: 'Russian',
+  zh: 'Chinese',
+  en: 'English',
+  ja: 'Japanese',
+  ko: 'Korean',
+  fr: 'French',
+  de: 'German',
+  es: 'Spanish',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ru: 'Russian',
 };
 
 interface ReplicatePrediction {
@@ -85,15 +92,18 @@ export class ReplicateProvider implements TtsProvider {
 
     let response: Response;
     try {
-      response = await replicateFetch(`https://api.replicate.com/v1/models/${modelPath}/predictions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-          Prefer: 'wait',
-        },
-        body: JSON.stringify({ input }),
-      });
+      response = await replicateFetch(
+        `https://api.replicate.com/v1/models/${modelPath}/predictions`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'wait',
+          },
+          body: JSON.stringify({ input }),
+        }
+      );
     } catch (error) {
       if (
         error instanceof Error &&
@@ -101,9 +111,7 @@ export class ReplicateProvider implements TtsProvider {
         'status' in error &&
         'bodyText' in error
       ) {
-        throw new Error(
-          `Replicate API error (${String(error.status)}): ${String(error.bodyText)}`,
-        );
+        throw new Error(`Replicate API error (${String(error.status)}): ${String(error.bodyText)}`);
       }
       throw error;
     }
@@ -133,7 +141,9 @@ export class ReplicateProvider implements TtsProvider {
     }
 
     logger.info('Replicate speech generated', {
-      model: this.model, voiceId: params.voiceId, chars: params.text.length,
+      model: this.model,
+      voiceId: params.voiceId,
+      chars: params.text.length,
     });
     const arrayBuffer = await audioResponse.arrayBuffer();
     return Buffer.from(arrayBuffer);
@@ -152,14 +162,23 @@ export class ReplicateProvider implements TtsProvider {
       if (!response.ok) continue;
 
       const prediction: ReplicatePrediction = await response.json();
-      if (prediction.status === 'succeeded' || prediction.status === 'failed' || prediction.status === 'canceled') {
+      if (
+        prediction.status === 'succeeded' ||
+        prediction.status === 'failed' ||
+        prediction.status === 'canceled'
+      ) {
         return prediction;
       }
     }
     throw new Error('Replicate prediction timed out after 60 poll attempts');
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    language?: string
+  ): string {
     const pool = isInworldModel(this.model) ? INWORLD_VOICE_POOL : FAL_VOICE_POOL;
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
 

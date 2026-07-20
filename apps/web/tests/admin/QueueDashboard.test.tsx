@@ -14,7 +14,7 @@ const mockQueues = {
   'content-extraction': { waiting: 3, active: 1, completed: 100, failed: 0, delayed: 0 },
   'script-generation': { waiting: 0, active: 0, completed: 50, failed: 2, delayed: 0 },
   'audio-generation': { waiting: 0, active: 2, completed: 200, failed: 0, delayed: 1 },
-  'notifications': { waiting: 0, active: 0, completed: 500, failed: 0, delayed: 0 },
+  notifications: { waiting: 0, active: 0, completed: 500, failed: 0, delayed: 0 },
 };
 
 function mockFetchSuccess(data = mockQueues) {
@@ -68,7 +68,9 @@ describe('QueueDashboard', () => {
     });
 
     // Scope to the summary cards container to avoid collisions with filter chips
-    const summarySection = screen.getByText('Total Queues').closest('div[class*="summary"]') as HTMLElement;
+    const summarySection = screen
+      .getByText('Total Queues')
+      .closest('div[class*="summary"]') as HTMLElement;
     const cards = within(summarySection);
 
     function cardValue(label: string): string {
@@ -78,10 +80,10 @@ describe('QueueDashboard', () => {
     }
 
     expect(cardValue('Total Queues')).toBe('4');
-    expect(cardValue('Active')).toBe('3');    // 1 + 0 + 2 + 0
-    expect(cardValue('Waiting')).toBe('3');   // 3 + 0 + 0 + 0
-    expect(cardValue('Failed')).toBe('2');    // 0 + 2 + 0 + 0
-    expect(cardValue('Delayed')).toBe('1');   // 0 + 0 + 1 + 0
+    expect(cardValue('Active')).toBe('3'); // 1 + 0 + 2 + 0
+    expect(cardValue('Waiting')).toBe('3'); // 3 + 0 + 0 + 0
+    expect(cardValue('Failed')).toBe('2'); // 0 + 2 + 0 + 0
+    expect(cardValue('Delayed')).toBe('1'); // 0 + 0 + 1 + 0
   });
 
   it('shows error banner on fetch failure', async () => {
@@ -217,7 +219,12 @@ describe('QueueDashboard', () => {
     // Click "Failed" column header to sort by failed (desc first)
     const failedHeaders = screen.getAllByRole('button', { name: /Failed/ });
     // Find the sort button (not the filter chip) — sort buttons contain the indicator character
-    const sortButton = failedHeaders.find((btn) => btn.textContent?.includes('\u21C5') || btn.textContent?.includes('\u2193') || btn.textContent?.includes('\u2191'));
+    const sortButton = failedHeaders.find(
+      (btn) =>
+        btn.textContent?.includes('\u21C5') ||
+        btn.textContent?.includes('\u2193') ||
+        btn.textContent?.includes('\u2191')
+    );
     expect(sortButton).toBeDefined();
     await user.click(sortButton!);
 
@@ -248,7 +255,9 @@ describe('QueueDashboard', () => {
       expect(screen.getByText('content-extraction')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Extracts text from URLs, PDFs, and uploaded files')).toBeInTheDocument();
+    expect(
+      screen.getByText('Extracts text from URLs, PDFs, and uploaded files')
+    ).toBeInTheDocument();
     expect(screen.getByText('Sends push notifications to user devices')).toBeInTheDocument();
   });
 

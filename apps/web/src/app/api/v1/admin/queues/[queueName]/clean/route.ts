@@ -19,7 +19,11 @@ export async function POST(
 
   const queue = getAdminQueue(queueName);
   const removed = await queue.clean(0, 100, 'failed');
-  logger.info('Admin cleaned failed jobs', { adminId, queueName, removedCount: String(removed.length) });
+  logger.info('Admin cleaned failed jobs', {
+    adminId,
+    queueName,
+    removedCount: String(removed.length),
+  });
 
   return NextResponse.json({ ok: true, removedCount: removed.length });
 }

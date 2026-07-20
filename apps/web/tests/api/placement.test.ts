@@ -116,10 +116,22 @@ describe('GET /api/v1/placement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
-    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9, resetAt: Date.now() + 3600000 });
-    mockGeneratePlacement.mockResolvedValue({ questions: SAMPLE_QUESTIONS, provider: 'anthropic', model: 'claude-3-haiku' });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: true,
+      remaining: 9,
+      resetAt: Date.now() + 3600000,
+    });
+    mockGeneratePlacement.mockResolvedValue({
+      questions: SAMPLE_QUESTIONS,
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+    });
     mockToPublic.mockImplementation((q: (typeof SAMPLE_QUESTIONS)[0]) => ({
-      id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options,
+      id: q.id,
+      cefr: q.cefr,
+      skill: q.skill,
+      prompt: q.prompt,
+      options: q.options,
     }));
     mockCacheSet.mockResolvedValue(undefined);
   });
@@ -176,7 +188,11 @@ describe('GET /api/v1/placement', () => {
   });
 
   it('returns 429 when rate limit is exceeded', async () => {
-    mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: false,
+      remaining: 0,
+      resetAt: Date.now() + 3600000,
+    });
 
     const response = await GET(makeGetRequest({ native: 'en', target: 'de' }));
 
@@ -202,21 +218,29 @@ describe('GET /api/v1/placement', () => {
     }
 
     // Full questions (with correctIndex) should be cached for grading
-    expect(mockCacheSet).toHaveBeenCalledWith(
-      'placement:u1:en_de',
-      SAMPLE_QUESTIONS,
-      3600,
-    );
+    expect(mockCacheSet).toHaveBeenCalledWith('placement:u1:en_de', SAMPLE_QUESTIONS, 3600);
   });
 
   it('accepts valid two-letter ISO code pairs', async () => {
-    for (const [native, target] of [['en', 'de'], ['en', 'es'], ['es', 'en']]) {
+    for (const [native, target] of [
+      ['en', 'de'],
+      ['en', 'es'],
+      ['es', 'en'],
+    ]) {
       vi.clearAllMocks();
       mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
       mockCheckRateLimit.mockResolvedValue({ allowed: true });
-      mockGeneratePlacement.mockResolvedValue({ questions: SAMPLE_QUESTIONS, provider: 'anthropic', model: 'claude-3-haiku' });
+      mockGeneratePlacement.mockResolvedValue({
+        questions: SAMPLE_QUESTIONS,
+        provider: 'anthropic',
+        model: 'claude-3-haiku',
+      });
       mockToPublic.mockImplementation((q: (typeof SAMPLE_QUESTIONS)[0]) => ({
-        id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options,
+        id: q.id,
+        cefr: q.cefr,
+        skill: q.skill,
+        prompt: q.prompt,
+        options: q.options,
       }));
       mockCacheSet.mockResolvedValue(undefined);
 
@@ -228,7 +252,7 @@ describe('GET /api/v1/placement', () => {
   it('verify mode (focusLevel) runs a shorter test and emphasizes the level', async () => {
     const req = new NextRequest(
       'http://localhost:3000/api/v1/placement?native=en&target=es&focusLevel=B1',
-      { method: 'GET' },
+      { method: 'GET' }
     );
     const res = await GET(req);
     expect(res.status).toBe(200);
@@ -264,7 +288,12 @@ describe('POST /api/v1/placement', () => {
     mockScorePlacement.mockReturnValue(scoreOutcome);
     // Default: no existing course (first placement). Re-take tests override this.
     mockCourseFindUnique.mockResolvedValue(null);
-    mockCourseUpsert.mockResolvedValue({ id: 'course-1', nativeLang: 'en', targetLang: 'de', currentLevel: 'B1' });
+    mockCourseUpsert.mockResolvedValue({
+      id: 'course-1',
+      nativeLang: 'en',
+      targetLang: 'de',
+      currentLevel: 'B1',
+    });
     mockPlacementResultUpsert.mockResolvedValue({ courseId: 'course-1', level: 'B1' });
     mockCacheDelete.mockResolvedValue(undefined);
     // Default: this submission did not come from a notes deduction.
@@ -424,7 +453,12 @@ describe('POST /api/v1/placement', () => {
       scoreByBand: { A1: 0.0 },
       scoreBySkill: { grammar: 0.0 },
     });
-    mockCourseUpsert.mockResolvedValue({ id: 'course-1', nativeLang: 'en', targetLang: 'de', currentLevel: 'A1' });
+    mockCourseUpsert.mockResolvedValue({
+      id: 'course-1',
+      nativeLang: 'en',
+      targetLang: 'de',
+      currentLevel: 'A1',
+    });
 
     const response = await POST(makePostRequest({ native: 'en', target: 'de', answers }));
     const body = await response.json();
@@ -452,12 +486,12 @@ describe('POST /api/v1/placement', () => {
 
     expect(mockSetCourseNote).toHaveBeenCalledWith('course-1', 'mis materiales');
     expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
-      expect.objectContaining({ courseId: 'course-1', userId: 'u1', note: 'mis materiales' }),
+      expect.objectContaining({ courseId: 'course-1', userId: 'u1', note: 'mis materiales' })
     );
     expect(mockClearNotesDeduction).toHaveBeenCalledWith('u1', 'en', 'de');
     // Arriving via the notes "verify" path records NOTES_VERIFIED provenance.
     expect(mockCourseUpsert.mock.calls[0][0].create).toEqual(
-      expect.objectContaining({ placementSource: 'NOTES_VERIFIED' }),
+      expect.objectContaining({ placementSource: 'NOTES_VERIFIED' })
     );
   });
 });

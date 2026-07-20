@@ -45,7 +45,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // Pair-scoped placement caches survive course deletion; clear them so a fresh
     // placement for the same pair does not read a stale question batch / deduction.
     await Promise.all([
-      cache.delete(`placement:${authed.userId}:${course.nativeLang}_${course.targetLang}`).catch(() => {}),
+      cache
+        .delete(`placement:${authed.userId}:${course.nativeLang}_${course.targetLang}`)
+        .catch(() => {}),
       cache
         .delete(`placement-notes:${authed.userId}:${course.nativeLang}_${course.targetLang}`)
         .catch(() => {}),

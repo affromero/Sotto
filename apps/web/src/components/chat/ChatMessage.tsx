@@ -9,25 +9,15 @@ interface ChatMessageProps {
   timestamp?: string;
 }
 
-export function ChatMessage({
-  role,
-  content,
-  chips,
-  onChipSelect,
-  timestamp,
-}: ChatMessageProps) {
+export function ChatMessage({ role, content, chips, onChipSelect, timestamp }: ChatMessageProps) {
   return (
     <div
       className={`${styles.root} ${styles[role]}`}
       role="log"
       aria-label={`${role === 'user' ? 'You' : 'Assistant'} said`}
     >
-      <div className={styles.bubble}>
-        {content}
-      </div>
-      {timestamp && (
-        <time className={styles.timestamp}>{timestamp}</time>
-      )}
+      <div className={styles.bubble}>{content}</div>
+      {timestamp && <time className={styles.timestamp}>{timestamp}</time>}
       {role === 'assistant' && chips && chips.length > 0 && onChipSelect && (
         <div className={styles.chips}>
           <ChatChips chips={chips} onSelect={onChipSelect} />

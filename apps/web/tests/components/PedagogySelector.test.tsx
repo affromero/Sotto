@@ -16,16 +16,22 @@ describe('PedagogySelector', () => {
     render(<PedagogySelector courseId="c1" current="IMMERSION" />);
     const select = screen.getByLabelText('Teaching approach') as HTMLSelectElement;
     expect(select.value).toBe('IMMERSION');
-    for (const label of ['Balanced', 'Immersion', 'Grammar-first', 'Conversation-first', 'Intensive review']) {
+    for (const label of [
+      'Balanced',
+      'Immersion',
+      'Grammar-first',
+      'Conversation-first',
+      'Intensive review',
+    ]) {
       expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
     }
     expect(screen.getByText(/Krashen/)).toBeInTheDocument();
   });
 
   it('PATCHes the new approach on change and confirms it applies to future content', async () => {
-    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ pedagogy: 'GRAMMAR' }), { status: 200 }),
-    );
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ pedagogy: 'GRAMMAR' }), { status: 200 }));
     const user = userEvent.setup();
     render(<PedagogySelector courseId="c1" current="BALANCED" />);
 
@@ -33,7 +39,7 @@ describe('PedagogySelector', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/courses/c1/pedagogy',
-      expect.objectContaining({ method: 'PATCH' }),
+      expect.objectContaining({ method: 'PATCH' })
     );
     expect(await screen.findByText(/Applies to your next class/)).toBeInTheDocument();
   });

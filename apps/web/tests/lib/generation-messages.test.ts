@@ -56,7 +56,10 @@ describe('resolveMessage', () => {
   });
 
   it('strips {topic} placeholder when no topic is provided', () => {
-    const msg: StageMessage = { text: 'Researching the latest findings on {topic}', topicAware: true };
+    const msg: StageMessage = {
+      text: 'Researching the latest findings on {topic}',
+      topicAware: true,
+    };
     const result = resolveMessage(msg);
     expect(result).not.toContain('{topic}');
     expect(result).toBe('Researching the latest findings on');

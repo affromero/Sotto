@@ -46,7 +46,7 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
         dossierId: existingDossier.id,
         useAdminCredits,
       },
-      { jobId: `plan-${episodeId}-${Date.now()}` }
+      { jobId: `plan-${episodeId}-${String(job.id)}` }
     );
 
     await job.updateProgress(100);
@@ -184,7 +184,7 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
       dossierId: savedDossier.id,
       useAdminCredits,
     },
-    { jobId: `plan-${episodeId}-${Date.now()}` }
+    { jobId: `plan-${episodeId}-${String(job.id)}` }
   );
 
   logger.info('Deep research complete, queued creative planning', {

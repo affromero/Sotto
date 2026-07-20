@@ -9,8 +9,12 @@ const mockWritingResponseFindFirst = vi.fn();
 const mockWritingResponseCreate = vi.fn();
 const mockWritingResponseUpdate = vi.fn();
 
-vi.mock('@/lib/api-keys', () => ({ authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a) }));
-vi.mock('@/lib/writing-grader', () => ({ gradeWriting: (...a: unknown[]) => mockGradeWriting(...a) }));
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
+}));
+vi.mock('@/lib/writing-grader', () => ({
+  gradeWriting: (...a: unknown[]) => mockGradeWriting(...a),
+}));
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     courseClass: { findFirst: (...a: unknown[]) => mockCourseClassFindFirst(...a) },
@@ -22,7 +26,9 @@ vi.mock('@/lib/prisma', () => ({
     },
   },
 }));
-vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 
 import { POST } from '@/app/api/v1/classes/[classId]/writing/[promptId]/route';
 
@@ -36,7 +42,11 @@ function req(body: unknown): NextRequest {
   });
 }
 
-const GRADE = { overallScore: 0.7, corrections: [{ old: 'a', new: 'á', why: 'accent' }], feedback: 'Nice.' };
+const GRADE = {
+  overallScore: 0.7,
+  corrections: [{ old: 'a', new: 'á', why: 'accent' }],
+  feedback: 'Nice.',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -57,7 +67,12 @@ describe('POST /api/v1/classes/[classId]/writing/[promptId]', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(GRADE);
     expect(mockGradeWriting).toHaveBeenCalledWith(
-      expect.objectContaining({ task: 'Reply to the invite.', text: 'Sí, quiero ir.', level: 'A2', targetLang: 'es' }),
+      expect.objectContaining({
+        task: 'Reply to the invite.',
+        text: 'Sí, quiero ir.',
+        level: 'A2',
+        targetLang: 'es',
+      })
     );
     expect(mockWritingResponseCreate).toHaveBeenCalled();
   });
@@ -65,7 +80,9 @@ describe('POST /api/v1/classes/[classId]/writing/[promptId]', () => {
   it('updates the existing response on resubmit', async () => {
     mockWritingResponseFindFirst.mockResolvedValue({ id: 'wr-1' });
     await POST(req({ text: 'Otra vez.' }), PARAMS);
-    expect(mockWritingResponseUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'wr-1' } }));
+    expect(mockWritingResponseUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'wr-1' } })
+    );
     expect(mockWritingResponseCreate).not.toHaveBeenCalled();
   });
 
@@ -75,7 +92,7 @@ describe('POST /api/v1/classes/[classId]/writing/[promptId]', () => {
     expect(res.status).toBe(401);
   });
 
-  it('404s when the class is not the user\'s', async () => {
+  it("404s when the class is not the user's", async () => {
     mockCourseClassFindFirst.mockResolvedValue(null);
     const res = await POST(req({ text: 'x' }), PARAMS);
     expect(res.status).toBe(404);

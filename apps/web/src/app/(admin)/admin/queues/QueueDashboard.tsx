@@ -200,7 +200,12 @@ export function QueueDashboard() {
       <thead>
         <tr>
           {COLUMNS.map(({ key, label }) => (
-            <th key={key} aria-sort={sortCol === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+            <th
+              key={key}
+              aria-sort={
+                sortCol === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+              }
+            >
               <button type="button" className={styles.thSortButton} onClick={() => handleSort(key)}>
                 {label} {sortIndicator(key)}
               </button>
@@ -215,7 +220,11 @@ export function QueueDashboard() {
 
   function renderRow(entry: QueueEntry) {
     const rowClass =
-      entry.stats.failed > 0 ? styles.rowFailed : entry.stats.waiting > 0 ? styles.rowWaiting : undefined;
+      entry.stats.failed > 0
+        ? styles.rowFailed
+        : entry.stats.waiting > 0
+          ? styles.rowWaiting
+          : undefined;
     return (
       <tr key={entry.name} className={rowClass}>
         <td className={styles.queueName}>{entry.name}</td>
@@ -227,7 +236,11 @@ export function QueueDashboard() {
         <td className={styles.queueDescription}>{entry.description}</td>
         <td>
           {entry.stats.failed > 0 && (
-            <QueueActions queueName={entry.name} failedCount={entry.stats.failed} onRefresh={fetchQueues} />
+            <QueueActions
+              queueName={entry.name}
+              failedCount={entry.stats.failed}
+              onRefresh={fetchQueues}
+            />
           )}
         </td>
       </tr>
@@ -251,7 +264,9 @@ export function QueueDashboard() {
       <div className={adminStyles.headerRow}>
         <div className={adminStyles.header}>
           <h1 className={adminStyles.title}>Queues</h1>
-          <p className={adminStyles.subtitle}>Monitor and manage all {summary.total} BullMQ queues</p>
+          <p className={adminStyles.subtitle}>
+            Monitor and manage all {summary.total} BullMQ queues
+          </p>
         </div>
         <div className={styles.refreshControls}>
           <label className={styles.autoRefreshToggle}>
@@ -262,9 +277,7 @@ export function QueueDashboard() {
             />
             Auto-refresh
           </label>
-          <span className={styles.lastRefreshed}>
-            Updated {formatTimeAgo(now - lastRefreshed)}
-          </span>
+          <span className={styles.lastRefreshed}>Updated {formatTimeAgo(now - lastRefreshed)}</span>
           <button type="button" className={styles.actionButton} onClick={fetchQueues}>
             Refresh
           </button>
@@ -332,9 +345,7 @@ export function QueueDashboard() {
         </button>
       </div>
 
-      {filtered.length === 0 && (
-        <p className={adminStyles.empty}>No queues match your filters.</p>
-      )}
+      {filtered.length === 0 && <p className={adminStyles.empty}>No queues match your filters.</p>}
 
       {grouped ? (
         Array.from(groupedByStage.entries()).map(([stage, stageEntries]) => (

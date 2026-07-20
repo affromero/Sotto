@@ -82,9 +82,7 @@ export function ExamHub({ courseId, available, history }: Props) {
           {starting ? 'Building your exam…' : 'Start the exam'}
         </button>
         {starting && (
-          <span className={styles.startNote}>
-            Generating all sections. This can take a minute.
-          </span>
+          <span className={styles.startNote}>Generating all sections. This can take a minute.</span>
         )}
       </div>
       {error && (

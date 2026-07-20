@@ -32,7 +32,7 @@ interface UseEpisodeStatusReturn {
 async function fetchCurrentStatus(
   episodeId: string,
   setStatus: (s: string) => void,
-  onStatusChangeRef: React.RefObject<((event: EpisodeStatusEvent) => void) | undefined>,
+  onStatusChangeRef: React.RefObject<((event: EpisodeStatusEvent) => void) | undefined>
 ): Promise<string | null> {
   try {
     const res = await fetch(`/api/v1/episodes/${episodeId}`);
@@ -57,7 +57,9 @@ export function useEpisodeStatus({
   const [status, setStatus] = useState<string | null>(initialStatus ?? null);
   const [isConnected, setIsConnected] = useState(false);
   const onStatusChangeRef = useRef(onStatusChange);
-  useEffect(() => { onStatusChangeRef.current = onStatusChange; });
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+  });
 
   // Ref to track the single fallback interval so reconnects don't stack them
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -69,25 +71,28 @@ export function useEpisodeStatus({
     }
   }, []);
 
-  const startFallbackPolling = useCallback((id: string, signal: AbortSignal) => {
-    // Clear any existing interval first — prevents stacking
-    clearFallbackPolling();
+  const startFallbackPolling = useCallback(
+    (id: string, signal: AbortSignal) => {
+      // Clear any existing interval first — prevents stacking
+      clearFallbackPolling();
 
-    fallbackIntervalRef.current = setInterval(async () => {
-      if (signal.aborted) {
-        clearFallbackPolling();
-        return;
-      }
-      if (document.visibilityState === 'hidden') return;
+      fallbackIntervalRef.current = setInterval(async () => {
+        if (signal.aborted) {
+          clearFallbackPolling();
+          return;
+        }
+        if (document.visibilityState === 'hidden') return;
 
-      const currentStatus = await fetchCurrentStatus(id, setStatus, onStatusChangeRef);
-      if (currentStatus && TERMINAL_STATUSES.has(currentStatus)) {
-        clearFallbackPolling();
-      }
-    }, FALLBACK_POLL_MS);
+        const currentStatus = await fetchCurrentStatus(id, setStatus, onStatusChangeRef);
+        if (currentStatus && TERMINAL_STATUSES.has(currentStatus)) {
+          clearFallbackPolling();
+        }
+      }, FALLBACK_POLL_MS);
 
-    signal.addEventListener('abort', clearFallbackPolling);
-  }, [clearFallbackPolling]);
+      signal.addEventListener('abort', clearFallbackPolling);
+    },
+    [clearFallbackPolling]
+  );
 
   useEffect(() => {
     if (!episodeId) return;

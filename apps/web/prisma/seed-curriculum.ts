@@ -5,7 +5,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
 import { loadAllCurricula } from './curricula/schema';
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL }) });
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({
+    connectionString: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL,
+  }),
+});
 
 async function main(): Promise<void> {
   const curricula = loadAllCurricula();
@@ -16,7 +20,9 @@ async function main(): Promise<void> {
 
   for (const { manifest, lessons } of curricula) {
     const curriculum = await prisma.curriculum.upsert({
-      where: { nativeLang_targetLang: { nativeLang: manifest.nativeLang, targetLang: manifest.targetLang } },
+      where: {
+        nativeLang_targetLang: { nativeLang: manifest.nativeLang, targetLang: manifest.targetLang },
+      },
       create: {
         nativeLang: manifest.nativeLang,
         targetLang: manifest.targetLang,
@@ -50,7 +56,9 @@ async function main(): Promise<void> {
       });
     }
 
-    console.log(`Seeded ${manifest.nativeLang}->${manifest.targetLang}: ${lessons.length} lessons`);
+    process.stdout.write(
+      `Seeded ${manifest.nativeLang}->${manifest.targetLang}: ${lessons.length} lessons\n`
+    );
   }
 }
 

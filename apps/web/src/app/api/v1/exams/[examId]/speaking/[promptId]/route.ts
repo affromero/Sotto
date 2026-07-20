@@ -24,7 +24,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { examId, promptId } = await params;
     const userId = authed.userId;
 
-    const exam = await prisma.mockExam.findFirst({ where: { id: examId, userId }, select: { id: true } });
+    const exam = await prisma.mockExam.findFirst({
+      where: { id: examId, userId },
+      select: { id: true },
+    });
     if (!exam) return errorResponse('Exam not found', 404);
 
     const prompt = await prisma.speakingPrompt.findFirst({
@@ -35,7 +38,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const formData = await request.formData();
     const audioFile = formData.get('audio');
-    if (!audioFile || typeof audioFile === 'string') return errorResponse('Missing audio file', 400);
+    if (!audioFile || typeof audioFile === 'string')
+      return errorResponse('Missing audio file', 400);
 
     const buffer = Buffer.from(await audioFile.arrayBuffer());
     if (buffer.length === 0 || !isRecognizedAudio(buffer)) {
@@ -51,7 +55,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     await addJob(speakingGradingQueue, JobType.SPEAKING_GRADING, { recordingId: recording.id });
-    logger.info('Exam speaking recording uploaded', { recordingId: recording.id, promptId, userId });
+    logger.info('Exam speaking recording uploaded', {
+      recordingId: recording.id,
+      promptId,
+      userId,
+    });
     return NextResponse.json({ recordingId: recording.id, status: 'PENDING' }, { status: 201 });
   } catch (error: unknown) {
     logger.error('Failed to upload exam speaking recording', {
@@ -69,10 +77,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { examId, promptId } = await params;
     const userId = authed.userId;
 
-    const parsed = pollSchema.safeParse({ recordingId: request.nextUrl.searchParams.get('recordingId') });
+    const parsed = pollSchema.safeParse({
+      recordingId: request.nextUrl.searchParams.get('recordingId'),
+    });
     if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
 
-    const exam = await prisma.mockExam.findFirst({ where: { id: examId, userId }, select: { id: true } });
+    const exam = await prisma.mockExam.findFirst({
+      where: { id: examId, userId },
+      select: { id: true },
+    });
     if (!exam) return errorResponse('Exam not found', 404);
 
     const recording = await prisma.speakingRecording.findFirst({

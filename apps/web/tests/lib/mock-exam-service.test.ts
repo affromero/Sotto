@@ -18,8 +18,14 @@ const mockWritingCreateMany = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
-    mockExam: { create: (...a: unknown[]) => mockExamCreate(...a), update: (...a: unknown[]) => mockExamUpdate(...a) },
-    examSection: { create: (...a: unknown[]) => mockSectionCreate(...a), update: (...a: unknown[]) => mockSectionUpdate(...a) },
+    mockExam: {
+      create: (...a: unknown[]) => mockExamCreate(...a),
+      update: (...a: unknown[]) => mockExamUpdate(...a),
+    },
+    examSection: {
+      create: (...a: unknown[]) => mockSectionCreate(...a),
+      update: (...a: unknown[]) => mockSectionUpdate(...a),
+    },
     examQuestion: { createMany: (...a: unknown[]) => mockQuestionCreateMany(...a) },
     speakingPrompt: { createMany: (...a: unknown[]) => mockSpeakingCreateMany(...a) },
     writingPrompt: { createMany: (...a: unknown[]) => mockWritingCreateMany(...a) },
@@ -27,16 +33,26 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 const mockResolveExamSpec = vi.fn();
-vi.mock('@/lib/exam-spec', () => ({ resolveExamSpec: (...a: unknown[]) => mockResolveExamSpec(...a) }));
+vi.mock('@/lib/exam-spec', () => ({
+  resolveExamSpec: (...a: unknown[]) => mockResolveExamSpec(...a),
+}));
 
 const mockGenQuestions = vi.fn();
-vi.mock('@/lib/class-generation', () => ({ generateSectionQuestions: (...a: unknown[]) => mockGenQuestions(...a) }));
+vi.mock('@/lib/class-generation', () => ({
+  generateSectionQuestions: (...a: unknown[]) => mockGenQuestions(...a),
+}));
 const mockListening = vi.fn();
-vi.mock('@/lib/class-listening-generator', () => ({ composeListeningContent: (...a: unknown[]) => mockListening(...a) }));
+vi.mock('@/lib/class-listening-generator', () => ({
+  composeListeningContent: (...a: unknown[]) => mockListening(...a),
+}));
 const mockSpeaking = vi.fn();
-vi.mock('@/lib/class-speaking-generator', () => ({ composeSpeakingPrompts: (...a: unknown[]) => mockSpeaking(...a) }));
+vi.mock('@/lib/class-speaking-generator', () => ({
+  composeSpeakingPrompts: (...a: unknown[]) => mockSpeaking(...a),
+}));
 const mockWriting = vi.fn();
-vi.mock('@/lib/class-writing-generator', () => ({ composeWritingPrompts: (...a: unknown[]) => mockWriting(...a) }));
+vi.mock('@/lib/class-writing-generator', () => ({
+  composeWritingPrompts: (...a: unknown[]) => mockWriting(...a),
+}));
 vi.mock('@/lib/course-notes', () => ({ getCourseNote: vi.fn(async () => '') }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -53,7 +69,9 @@ const GERMAN_COURSE = {
 
 function lastStatus(): string | undefined {
   const calls = mockExamUpdate.mock.calls;
-  return calls.length ? (calls[calls.length - 1][0] as { data: { status: string } }).data.status : undefined;
+  return calls.length
+    ? (calls[calls.length - 1][0] as { data: { status: string } }).data.status
+    : undefined;
 }
 
 describe('createMockExam', () => {
@@ -78,7 +96,9 @@ describe('createMockExam', () => {
     ]);
     mockListening.mockResolvedValue({
       episodeId: 'pod1',
-      comprehensionQuestions: [{ question: 'L', options: ['a', 'b'], correctIndex: 1, explanation: 'why' }],
+      comprehensionQuestions: [
+        { question: 'L', options: ['a', 'b'], correctIndex: 1, explanation: 'why' },
+      ],
     });
     mockSpeaking.mockResolvedValue([
       { targetPhrase: 'Hallo', translation: 'Hello', ipa: null, referenceTtsUrl: null },
@@ -116,7 +136,9 @@ describe('createMockExam', () => {
     mockSpeaking.mockRejectedValue(new Error('no TTS key'));
     const examId = await createMockExam('c1', 'u1');
     expect(examId).toBe('exam1');
-    const sectionStatuses = mockSectionUpdate.mock.calls.map((c) => (c[0] as { data: { status: string } }).data.status);
+    const sectionStatuses = mockSectionUpdate.mock.calls.map(
+      (c) => (c[0] as { data: { status: string } }).data.status
+    );
     expect(sectionStatuses).toContain('FAILED');
     expect(lastStatus()).toBe('READY');
   });

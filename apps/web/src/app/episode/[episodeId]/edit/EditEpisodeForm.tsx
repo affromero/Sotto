@@ -40,9 +40,12 @@ export function EditEpisodeForm({
 
       if (!response.ok) {
         const data = await response.json();
-        const message = typeof data.error === 'string' ? data.error
-          : data.error?.fieldErrors ? 'Please check the form fields.'
-          : 'Failed to save changes.';
+        const message =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error?.fieldErrors
+              ? 'Please check the form fields.'
+              : 'Failed to save changes.';
         setError(message);
         return;
       }
@@ -69,7 +72,9 @@ export function EditEpisodeForm({
       />
 
       <div className={styles.fieldGroup}>
-        <label htmlFor="topic" className={styles.fieldLabel}>Topic</label>
+        <label htmlFor="topic" className={styles.fieldLabel}>
+          Topic
+        </label>
         <textarea
           id="topic"
           className={styles.textarea}
@@ -83,7 +88,9 @@ export function EditEpisodeForm({
       </div>
 
       <div className={styles.fieldGroup}>
-        <label htmlFor="visibility" className={styles.fieldLabel}>Visibility</label>
+        <label htmlFor="visibility" className={styles.fieldLabel}>
+          Visibility
+        </label>
         <select
           id="visibility"
           className={styles.select}
@@ -99,11 +106,7 @@ export function EditEpisodeForm({
         <Button type="submit" loading={saving} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
-        <Button
-          variant="ghost"
-          type="button"
-          onClick={() => router.push(`/episode/${episodeId}`)}
-        >
+        <Button variant="ghost" type="button" onClick={() => router.push(`/episode/${episodeId}`)}>
           Cancel
         </Button>
       </div>

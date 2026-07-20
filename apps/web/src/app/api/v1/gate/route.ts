@@ -4,6 +4,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import {
   accessPasswordConfigured,
+  accessPasswordMeetsSecurityPolicy,
   verifyAccessPassword,
   createGateToken,
   gateCookieOptions,
@@ -16,16 +17,28 @@ export async function POST(request: NextRequest) {
   if (!accessPasswordConfigured()) {
     return errorResponse('No access password is configured on this instance', 404);
   }
+  if (!accessPasswordMeetsSecurityPolicy()) {
+    return errorResponse('The instance access password does not meet security policy', 503);
+  }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const { allowed, resetAt } = await checkRateLimit(`gate:${ip}`, 5, 60);
-  if (!allowed) {
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (fetchSite === 'cross-site') {
+    return errorResponse('Request rejected', 403);
+  }
+
+  const ip =
+    request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown';
+  const [clientLimit, sustainedLimit] = await Promise.all([
+    checkRateLimit(`gate:client:${ip}`, 5, 60),
+    checkRateLimit(`gate:sustained:${ip}`, 20, 15 * 60),
+  ]);
+  if (!clientLimit.allowed || !sustainedLimit.allowed) {
     return NextResponse.json(
-      { error: 'Too many attempts. Try again shortly.' },
-      {
-        status: 429,
-        headers: { 'Retry-After': String(Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))) },
-      }
+      { error: 'Too many attempts. Try again later.' },
+      { status: 429, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 

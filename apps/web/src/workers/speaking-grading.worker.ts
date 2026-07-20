@@ -3,7 +3,11 @@ import { Prisma } from '@/generated/prisma/client';
 import { SpeakingGradingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveLearningAi } from '@/lib/learning-ai';
-import { resolveSttProvider, createSttProvider, getConfiguredSttProviderId } from '@/lib/providers/stt';
+import {
+  resolveSttProvider,
+  createSttProvider,
+  getConfiguredSttProviderId,
+} from '@/lib/providers/stt';
 import { resolvePronunciationScorer } from '@/lib/pronunciation/scorer';
 import { logger } from '@/lib/logger';
 
@@ -48,7 +52,9 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
       select: { course: { select: { targetLang: true } } },
     });
     if (!ps) {
-      throw new Error(`PracticeSession not found for practiceSessionId: ${recording.practiceSessionId}`);
+      throw new Error(
+        `PracticeSession not found for practiceSessionId: ${recording.practiceSessionId}`
+      );
     }
     targetLang = ps.course.targetLang;
   } else if (recording.examSectionId) {
@@ -61,7 +67,9 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
     }
     targetLang = es.exam.course.targetLang;
   } else {
-    throw new Error(`SpeakingRecording ${recordingId} has no parent section, practice session, or exam section`);
+    throw new Error(
+      `SpeakingRecording ${recordingId} has no parent section, practice session, or exam section`
+    );
   }
   const userId = recording.userId;
 
@@ -97,7 +105,11 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
       language: targetLang,
     });
 
-    const sttProvider = createSttProvider(resolvedStt.providerId, resolvedStt.apiKey, resolvedStt.model);
+    const sttProvider = createSttProvider(
+      resolvedStt.providerId,
+      resolvedStt.apiKey,
+      resolvedStt.model
+    );
     const sttResult = await sttProvider.transcribe(audioBuffer, { language: targetLang });
 
     transcript = sttResult.text;

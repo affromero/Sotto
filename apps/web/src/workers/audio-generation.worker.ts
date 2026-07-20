@@ -9,9 +9,20 @@ import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { generateTtsAudio, getPlatformTtsKey } from '@/lib/tts-generation';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { createStitchJobId } from '@/lib/audio/stitch-identity';
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
-  const { episodeId, segmentId, speaker, text, previousText, nextText, direction } = job.data;
+  const {
+    episodeId,
+    audioGenerationKey,
+    segmentId,
+    segmentVersion,
+    speaker,
+    text,
+    previousText,
+    nextText,
+    direction,
+  } = job.data;
 
   logger.info('Generating audio for segment', { episodeId, segmentId, speaker });
   await job.updateProgress(10);
@@ -19,11 +30,14 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   // Fail-fast: skip if episode already failed (another segment errored first)
   const episodeStatus = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { status: true },
+    select: { status: true, audioGenerationKey: true },
   });
 
-  if (episodeStatus?.status === 'FAILED') {
-    logger.info('Episode already failed, skipping segment', { episodeId, segmentId });
+  if (
+    episodeStatus?.status !== 'GENERATING_AUDIO' ||
+    episodeStatus.audioGenerationKey !== audioGenerationKey
+  ) {
+    logger.info('Skipping invalidated audio generation job', { episodeId, segmentId });
     await job.updateProgress(100);
     return;
   }
@@ -31,8 +45,25 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   // Idempotency: skip if segment already has audio; also fetch per-segment TTS overrides
   const existingSegment = await prisma.segment.findUnique({
     where: { id: segmentId },
-    select: { audioUrl: true, ttsProvider: true, ttsModel: true, ttsVoiceId: true },
+    select: {
+      episodeId: true,
+      text: true,
+      version: true,
+      audioUrl: true,
+      ttsProvider: true,
+      ttsModel: true,
+      ttsVoiceId: true,
+    },
   });
+  if (
+    !existingSegment ||
+    (existingSegment.episodeId ?? episodeId) !== episodeId ||
+    (existingSegment.version ?? segmentVersion) !== segmentVersion
+  ) {
+    logger.info('Skipping stale audio generation job', { episodeId, segmentId, segmentVersion });
+    await job.updateProgress(100);
+    return;
+  }
 
   if (existingSegment?.audioUrl) {
     logger.info('Segment already has audio, skipping TTS', { episodeId, segmentId });
@@ -46,7 +77,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       const segments = await prisma.segment.findMany({
         where: { episodeId },
         orderBy: { order: 'asc' },
-        select: { id: true },
+        select: { id: true, version: true, audioUrl: true },
       });
 
       // Queue stitch with stable jobId (idempotent — BullMQ deduplicates)
@@ -56,8 +87,12 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         {
           episodeId,
           segmentIds: segments.map((s) => s.id),
+          segmentVersions: segments.map((s) => s.version ?? 1),
+          segmentAudioUrls: segments.map((s) => s.audioUrl!),
         },
-        { jobId: `stitch-${episodeId}-${Date.now()}` }
+        {
+          jobId: createStitchJobId(episodeId, segments),
+        }
       );
 
       // CAS status transition — only one worker wins
@@ -262,17 +297,41 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   await job.updateProgress(60);
 
   // Upload to R2
-  const audioUrl = await uploadSegmentAudio(episodeId, segmentId, result.audioBuffer);
+  const audioUrl = await uploadSegmentAudio(
+    episodeId,
+    `${segmentId}-${audioGenerationKey}`,
+    result.audioBuffer
+  );
 
   // Update segment with audio URL, duration, and word timings
-  await prisma.segment.update({
-    where: { id: segmentId },
+  const persisted = await prisma.segment.updateMany({
+    where: {
+      id: segmentId,
+      episodeId,
+      version: segmentVersion,
+      text,
+      episode: {
+        status: 'GENERATING_AUDIO',
+        audioGenerationKey,
+      },
+    },
     data: {
       audioUrl,
       duration: result.segmentDuration,
-      wordTimings: result.wordTimings ? JSON.parse(JSON.stringify(result.wordTimings)) : undefined,
+      ...(result.wordTimings
+        ? { wordTimings: JSON.parse(JSON.stringify(result.wordTimings)) }
+        : {}),
     },
   });
+  if (persisted.count === 0) {
+    logger.info('Discarding audio generated for stale segment content', {
+      episodeId,
+      segmentId,
+      segmentVersion,
+    });
+    await job.updateProgress(100);
+    return;
+  }
 
   await job.updateProgress(90);
 
@@ -286,7 +345,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     const segments = await prisma.segment.findMany({
       where: { episodeId },
       orderBy: { order: 'asc' },
-      select: { id: true },
+      select: { id: true, version: true, audioUrl: true },
     });
 
     // Queue stitch with stable jobId (idempotent — BullMQ deduplicates)
@@ -296,8 +355,12 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       {
         episodeId,
         segmentIds: segments.map((s) => s.id),
+        segmentVersions: segments.map((s) => s.version ?? 1),
+        segmentAudioUrls: segments.map((s) => s.audioUrl!),
       },
-      { jobId: `stitch-${episodeId}-${Date.now()}` }
+      {
+        jobId: createStitchJobId(episodeId, segments),
+      }
     );
 
     // CAS status transition — only one worker wins

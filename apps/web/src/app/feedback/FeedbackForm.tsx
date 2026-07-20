@@ -31,7 +31,14 @@ export function FeedbackForm() {
       const response = await fetch('/api/v1/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, rating: rating || undefined, subject, message, email: email || undefined, name: name || undefined }),
+        body: JSON.stringify({
+          type,
+          rating: rating || undefined,
+          subject,
+          message,
+          email: email || undefined,
+          name: name || undefined,
+        }),
       });
 
       if (response.ok) {
@@ -48,8 +55,20 @@ export function FeedbackForm() {
         <span className={styles.successIcon}>🙏</span>
         <h2>Thank you</h2>
         <p>Your feedback means the world to us. We&apos;ll review it carefully and take action.</p>
-        {email && <p className={styles.successNote}>We&apos;ll follow up at <strong>{email}</strong></p>}
-        <button className={styles.resetBtn} onClick={() => { setSubmitted(false); setSubject(''); setMessage(''); setRating(0); }}>
+        {email && (
+          <p className={styles.successNote}>
+            We&apos;ll follow up at <strong>{email}</strong>
+          </p>
+        )}
+        <button
+          className={styles.resetBtn}
+          onClick={() => {
+            setSubmitted(false);
+            setSubject('');
+            setMessage('');
+            setRating(0);
+          }}
+        >
           Share more feedback
         </button>
       </div>

@@ -58,7 +58,12 @@ export interface ExamData {
     overallScore: number | null;
     band: string | null;
     feedback: string | null;
-    sectionResults: Array<{ sectionId: string; skill: string; score: number; feedback: string | null }>;
+    sectionResults: Array<{
+      sectionId: string;
+      skill: string;
+      score: number;
+      feedback: string | null;
+    }>;
   } | null;
 }
 
@@ -67,7 +72,13 @@ function pct(n: number | null | undefined): string {
 }
 
 // Listening audio: the episode finishes generating asynchronously, so poll for it.
-function ListeningAudio({ episodeId, initialUrl }: { episodeId: string; initialUrl: string | null }) {
+function ListeningAudio({
+  episodeId,
+  initialUrl,
+}: {
+  episodeId: string;
+  initialUrl: string | null;
+}) {
   const [audioUrl, setAudioUrl] = useState<string | null>(initialUrl);
   useEffect(() => {
     if (audioUrl) return;
@@ -102,7 +113,15 @@ function ListeningAudio({ episodeId, initialUrl }: { episodeId: string; initialU
       </p>
     );
   }
-  return <audio className={styles.audio} controls preload="metadata" src={audioUrl} aria-label="Listening audio" />;
+  return (
+    <audio
+      className={styles.audio}
+      controls
+      preload="metadata"
+      src={audioUrl}
+      aria-label="Listening audio"
+    />
+  );
 }
 
 interface Props {
@@ -128,7 +147,10 @@ export function ExamRunner({ exam: initialExam }: Props) {
     setError(null);
     try {
       const payload = {
-        answers: Object.entries(answers).map(([questionId, selectedIndex]) => ({ questionId, selectedIndex })),
+        answers: Object.entries(answers).map(([questionId, selectedIndex]) => ({
+          questionId,
+          selectedIndex,
+        })),
       };
       const res = await fetch(`/api/v1/exams/${exam.id}/submit`, {
         method: 'POST',
@@ -178,7 +200,9 @@ export function ExamRunner({ exam: initialExam }: Props) {
               <h2 className={styles.part}>{section.part}</h2>
               {scored && result && <span className={styles.sectionScore}>{pct(result.score)}</span>}
             </div>
-            {scored && result?.feedback && <p className={styles.sectionFeedback}>{result.feedback}</p>}
+            {scored && result?.feedback && (
+              <p className={styles.sectionFeedback}>{result.feedback}</p>
+            )}
 
             {section.status === 'FAILED' && (
               <p className={styles.failed} role="status">
@@ -187,7 +211,10 @@ export function ExamRunner({ exam: initialExam }: Props) {
             )}
 
             {section.format === 'listening' && section.episode && (
-              <ListeningAudio episodeId={section.episode.id} initialUrl={section.episode.audioUrl} />
+              <ListeningAudio
+                episodeId={section.episode.id}
+                initialUrl={section.episode.audioUrl}
+              />
             )}
 
             {section.format === 'speaking' ? (
@@ -239,7 +266,9 @@ export function ExamRunner({ exam: initialExam }: Props) {
                           </label>
                         );
                       })}
-                      {scored && q.explanation && <p className={styles.explanation}>{q.explanation}</p>}
+                      {scored && q.explanation && (
+                        <p className={styles.explanation}>{q.explanation}</p>
+                      )}
                     </fieldset>
                   </li>
                 ))}
@@ -264,7 +293,11 @@ export function ExamRunner({ exam: initialExam }: Props) {
 
       {scored && (
         <div className={styles.submitRow}>
-          <button type="button" className={styles.againBtn} onClick={() => router.push('/learn/exams')}>
+          <button
+            type="button"
+            className={styles.againBtn}
+            onClick={() => router.push('/learn/exams')}
+          >
             Back to exams
           </button>
         </div>
@@ -276,7 +309,15 @@ export function ExamRunner({ exam: initialExam }: Props) {
 }
 
 // Inline writing: each prompt is graded synchronously on submit.
-function ExamWriting({ examId, prompts, disabled }: { examId: string; prompts: WritingPrompt[]; disabled: boolean }) {
+function ExamWriting({
+  examId,
+  prompts,
+  disabled,
+}: {
+  examId: string;
+  prompts: WritingPrompt[];
+  disabled: boolean;
+}) {
   return (
     <div className={styles.writing}>
       {prompts.map((p) => (
@@ -286,7 +327,15 @@ function ExamWriting({ examId, prompts, disabled }: { examId: string; prompts: W
   );
 }
 
-function ExamWritingPrompt({ examId, prompt, disabled }: { examId: string; prompt: WritingPrompt; disabled: boolean }) {
+function ExamWritingPrompt({
+  examId,
+  prompt,
+  disabled,
+}: {
+  examId: string;
+  prompt: WritingPrompt;
+  disabled: boolean;
+}) {
   const [text, setText] = useState('');
   const [phase, setPhase] = useState<'idle' | 'grading' | 'done' | 'error'>('idle');
   const [score, setScore] = useState<number | null>(null);

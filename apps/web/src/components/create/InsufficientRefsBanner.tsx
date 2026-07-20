@@ -94,18 +94,25 @@ export function InsufficientRefsBanner({
           </p>
           <ul className={styles.failureList}>
             {verificationProgress.failureDetails.hallucinated > 0 && (
-              <li>{verificationProgress.failureDetails.hallucinated} references had URLs that don&apos;t exist (AI-generated)</li>
+              <li>
+                {verificationProgress.failureDetails.hallucinated} references had URLs that
+                don&apos;t exist (AI-generated)
+              </li>
             )}
             {verificationProgress.failureDetails.urlNotFound > 0 && (
               <li>{verificationProgress.failureDetails.urlNotFound} references had broken links</li>
             )}
             {verificationProgress.failureDetails.blockedDomain > 0 && (
-              <li>{verificationProgress.failureDetails.blockedDomain} references were from blocked domains</li>
+              <li>
+                {verificationProgress.failureDetails.blockedDomain} references were from blocked
+                domains
+              </li>
             )}
             {verificationProgress.failureDetails.replacementFound > 0 && (
               <li className={styles.successItem}>
                 <CheckCircle size={14} aria-hidden="true" />
-                {verificationProgress.failureDetails.replacementFound} were replaced with verified alternatives
+                {verificationProgress.failureDetails.replacementFound} were replaced with verified
+                alternatives
               </li>
             )}
           </ul>
@@ -113,8 +120,8 @@ export function InsufficientRefsBanner({
         </div>
       ) : (
         <p className={styles.body}>
-          We found {refCount} of {requiredCount} required sources. You can help by
-          providing links to relevant articles, news reports, or papers.
+          We found {refCount} of {requiredCount} required sources. You can help by providing links
+          to relevant articles, news reports, or papers.
         </p>
       )}
 

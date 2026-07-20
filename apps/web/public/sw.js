@@ -2,17 +2,13 @@
 // Handles offline caching, push notifications, and background sync
 // for the Sotto interactive episode platform.
 
-const CACHE_VERSION = 'sotto-v1';
-const RUNTIME_CACHE = 'sotto-runtime-v1';
+const CACHE_VERSION = 'sotto-v2';
+const RUNTIME_CACHE = 'sotto-runtime-v2';
 const MAX_RUNTIME_CACHE_ITEMS = 100;
 
 // Core app shell files to cache on install.
 // These are the minimum resources needed to render the app offline.
-const APP_SHELL = [
-  '/',
-  '/manifest.json',
-  '/favicon.ico',
-];
+const APP_SHELL = ['/manifest.json', '/favicon.ico'];
 
 // ============================================
 // INSTALL — Cache the app shell
@@ -86,9 +82,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls: network-first with cache fallback
+  // Authenticated API responses must never outlive the gate cookie or active
+  // profile in a shared service-worker cache.
   if (url.pathname.startsWith('/api/v1/')) {
-    event.respondWith(networkFirst(request));
     return;
   }
 
@@ -98,14 +94,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests (HTML pages): network-first with offline fallback
+  // Pages contain household/profile data and must never be available after the
+  // access gate expires.
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstNavigation(request));
     return;
   }
 
-  // Everything else: network-first
-  event.respondWith(networkFirst(request));
+  // Do not cache any other dynamic same-origin response.
 });
 
 // ============================================
@@ -140,54 +135,6 @@ function cacheFirst(request) {
   });
 }
 
-/**
- * Network-first strategy: try the network, fall back to cache.
- * Best for API calls and dynamic content that should be fresh
- * when possible but available offline when not.
- */
-function networkFirst(request) {
-  return fetch(request)
-    .then((response) => {
-      // Only cache successful GET responses
-      if (response && response.status === 200 && response.type === 'basic') {
-        addToRuntimeCache(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => {
-      return caches.match(request);
-    });
-}
-
-/**
- * Network-first strategy for navigation requests (HTML pages).
- * If the network is unavailable, serve the cached app shell so
- * the user sees something rather than the browser's offline page.
- */
-function networkFirstNavigation(request) {
-  return fetch(request)
-    .then((response) => {
-      // Cache the page for offline use
-      if (response && response.status === 200) {
-        const responseClone = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => {
-          cache.put(request, responseClone);
-        });
-      }
-      return response;
-    })
-    .catch(() => {
-      // Try the specific page first, then fall back to the cached app shell
-      return caches.match(request).then((cached) => {
-        if (cached) {
-          return cached;
-        }
-        // Return the cached root page as a fallback app shell
-        return caches.match('/');
-      });
-    });
-}
-
 // ============================================
 // CACHE HELPERS
 // ============================================
@@ -197,45 +144,12 @@ function networkFirstNavigation(request) {
  * from cache-first loading.
  */
 function isStaticAsset(pathname) {
-  // Next.js static assets
-  if (pathname.startsWith('/_next/static/')) {
-    return true;
-  }
-
-  // Next.js image optimization
-  if (pathname.startsWith('/_next/image')) {
-    return true;
-  }
-
-  // Font files
-  if (pathname.startsWith('/fonts/')) {
-    return true;
-  }
-
-  // Static file extensions
-  const staticExtensions = [
-    '.js',
-    '.css',
-    '.woff',
-    '.woff2',
-    '.ttf',
-    '.otf',
-    '.eot',
-    '.png',
-    '.jpg',
-    '.jpeg',
-    '.gif',
-    '.svg',
-    '.ico',
-    '.webp',
-    '.avif',
-    '.mp3',
-    '.wav',
-    '.ogg',
-    '.webm',
-  ];
-
-  return staticExtensions.some((ext) => pathname.endsWith(ext));
+  return (
+    pathname.startsWith('/_next/static/') ||
+    pathname.startsWith('/fonts/') ||
+    pathname === '/manifest.json' ||
+    pathname === '/favicon.ico'
+  );
 }
 
 /**

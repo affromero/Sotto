@@ -42,7 +42,16 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: vi.fn().mockResolvedValue({ model: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' } }),
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    model: {
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
+  }),
 }));
 
 vi.mock('@/lib/tts-expression-mapper', () => ({
@@ -149,7 +158,12 @@ describe('ReplicateProvider', () => {
       global.fetch = fetchMock;
 
       const provider = new ReplicateProvider('r8_testtoken');
-      await provider.generateSpeech({ text: 'Great news!', voiceId: 'Ashley', direction: 'energetic', speaker: 'HOST' });
+      await provider.generateSpeech({
+        text: 'Great news!',
+        voiceId: 'Ashley',
+        direction: 'energetic',
+        speaker: 'HOST',
+      });
 
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
       expect(body.input.text).toBe('[happy]Great news!');

@@ -11,11 +11,7 @@ export const AudioPlayerContext = createContext<AudioPlayerContextType | null>(n
 export function AudioPlayerProvider({ children }: { children: React.ReactNode }) {
   const player = useAudioPlayer();
 
-  return (
-    <AudioPlayerContext.Provider value={player}>
-      {children}
-    </AudioPlayerContext.Provider>
-  );
+  return <AudioPlayerContext.Provider value={player}>{children}</AudioPlayerContext.Provider>;
 }
 
 export function usePlayer(): AudioPlayerContextType {

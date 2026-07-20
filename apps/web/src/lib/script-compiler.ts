@@ -77,10 +77,10 @@ export function compileScript(input: CompileInput): CompileResult {
   const warnings: string[] = [];
 
   // Build evidence lookup
-  const evidenceById = new Map(input.evidence.map(e => [e.evidenceId, e]));
+  const evidenceById = new Map(input.evidence.map((e) => [e.evidenceId, e]));
 
   // Build source lookup
-  const sourceById = new Map(input.sources.map(s => [s.sourceId, s]));
+  const sourceById = new Map(input.sources.map((s) => [s.sourceId, s]));
 
   // Step 1: Collect all evidence IDs cited in the script
   const citedEvidenceIds = new Set<string>();
@@ -105,6 +105,31 @@ export function compileScript(input: CompileInput): CompileResult {
   for (const evId of citedEvidenceIds) {
     const ev = evidenceById.get(evId);
     if (ev) {
+      if (ev.sourceIds.length === 0) {
+        errors.push(`Evidence ${evId} does not identify a source`);
+      }
+      for (const sid of ev.sourceIds) {
+        const source = sourceById.get(sid);
+        if (!source) {
+          errors.push(`Evidence ${evId} references missing source ${sid}`);
+          continue;
+        }
+        if (source.verification.status !== 'verified') {
+          errors.push(
+            `Evidence ${evId} references source ${sid} with ${source.verification.status} verification`
+          );
+        }
+      }
+      const availableExcerptIds = new Set(
+        ev.sourceIds.flatMap((sid) =>
+          (sourceById.get(sid)?.excerpts ?? []).map((excerpt) => excerpt.excerptId)
+        )
+      );
+      for (const excerptId of ev.excerptIds) {
+        if (!availableExcerptIds.has(excerptId)) {
+          errors.push(`Evidence ${evId} references missing excerpt ${excerptId}`);
+        }
+      }
       evidenceToSourceMap[evId] = ev.sourceIds;
       for (const sid of ev.sourceIds) {
         usedSourceIds.add(sid);
@@ -132,7 +157,7 @@ export function compileScript(input: CompileInput): CompileResult {
   }
 
   // Step 4: Replace [[ev_*]] with [N] in turn text
-  const compiledTurns = input.turns.map(turn => {
+  const compiledTurns = input.turns.map((turn) => {
     let text = turn.text;
 
     text = text.replace(EVIDENCE_PLACEHOLDER_RE, (_match, id) => {
@@ -140,10 +165,11 @@ export function compileScript(input: CompileInput): CompileResult {
       const ev = evidenceById.get(evId);
       if (!ev) return ''; // already flagged as error
 
-      // Pick the primary source (first one) for the footnote number
-      const primarySourceId = ev.sourceIds[0];
-      const num = primarySourceId ? sourceToRefNumber.get(primarySourceId) : undefined;
-      return num ? `[${num}]` : '';
+      return ev.sourceIds
+        .map((sourceId) => sourceToRefNumber.get(sourceId))
+        .filter((number): number is number => number !== undefined)
+        .map((number) => `[${number}]`)
+        .join('');
     });
 
     return { speaker: turn.speaker, text, direction: turn.direction };
@@ -153,7 +179,7 @@ export function compileScript(input: CompileInput): CompileResult {
   for (let i = 0; i < compiledTurns.length; i++) {
     const urls = compiledTurns[i].text.match(RAW_URL_RE);
     if (urls) {
-      warnings.push(`Turn ${i} contains raw URL(s): ${urls.join(', ')}. These should be citations.`);
+      errors.push(`Turn ${i} contains raw URL(s): ${urls.join(', ')}. These must be citations.`);
     }
   }
 
@@ -170,7 +196,9 @@ export function compileScript(input: CompileInput): CompileResult {
   // Step 7: Validate reference count
   const minRefs = getMinReferenceCount(input.depth, input.durationTarget);
   if (sourceToRefNumber.size < minRefs) {
-    warnings.push(`Only ${sourceToRefNumber.size} sources cited, minimum is ${minRefs} for ${input.depth} depth`);
+    errors.push(
+      `Only ${sourceToRefNumber.size} sources cited, minimum is ${minRefs} for ${input.depth} depth`
+    );
   }
 
   // Step 8: Build final Reference[] array
@@ -185,7 +213,10 @@ export function compileScript(input: CompileInput): CompileResult {
         authors: source.authors.join(', '),
         year: source.year,
         url: source.canonicalUrl,
-        doi: null,
+        doi:
+          source.canonicalUrl?.match(
+            /(?:doi\.org\/|doi:\s*)(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i
+          )?.[1] ?? null,
         type: source.type,
         publisher: source.publisher,
       });

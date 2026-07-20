@@ -90,18 +90,39 @@ async function collectStorageTargets(courseId: string, episodeIds: string[]) {
       episodeIds.length
         ? prismaUnfiltered.episode.findMany({
             where: { id: { in: episodeIds } },
-            select: { id: true, audioUrl: true, pdfUrl: true, waveformUrl: true, spectrogramUrl: true },
+            select: {
+              id: true,
+              audioUrl: true,
+              pdfUrl: true,
+              waveformUrl: true,
+              spectrogramUrl: true,
+            },
           })
         : [],
       episodeIds.length
-        ? prismaUnfiltered.segment.findMany({ where: { episodeId: { in: episodeIds } }, select: { audioUrl: true } })
+        ? prismaUnfiltered.segment.findMany({
+            where: { episodeId: { in: episodeIds } },
+            select: { audioUrl: true },
+          })
         : [],
       episodeIds.length
-        ? prismaUnfiltered.episodeVersion.findMany({ where: { episodeId: { in: episodeIds } }, select: { audioUrl: true } })
+        ? prismaUnfiltered.episodeVersion.findMany({
+            where: { episodeId: { in: episodeIds } },
+            select: { audioUrl: true },
+          })
         : [],
-      prismaUnfiltered.courseClass.findMany({ where: { courseId }, select: { worksheetPdfUrl: true } }),
-      prismaUnfiltered.speakingPrompt.findMany({ where: speakingUnderCourse(courseId), select: { referenceTtsUrl: true } }),
-      prismaUnfiltered.speakingRecording.findMany({ where: { prompt: speakingUnderCourse(courseId) }, select: { audioUrl: true } }),
+      prismaUnfiltered.courseClass.findMany({
+        where: { courseId },
+        select: { worksheetPdfUrl: true },
+      }),
+      prismaUnfiltered.speakingPrompt.findMany({
+        where: speakingUnderCourse(courseId),
+        select: { referenceTtsUrl: true },
+      }),
+      prismaUnfiltered.speakingRecording.findMany({
+        where: { prompt: speakingUnderCourse(courseId) },
+        select: { audioUrl: true },
+      }),
       prismaUnfiltered.learnerFocusTarget.findMany({
         where: { courseId },
         select: { visualCueUrl: true, pronunciationAudioUrl: true },
@@ -111,7 +132,12 @@ async function collectStorageTargets(courseId: string, episodeIds: string[]) {
   return {
     episodePrefixes: episodes.map((episode) => `episodes/${episode.id}/`),
     episodeRefs: uniqueDefined([
-      ...episodes.flatMap((episode) => [episode.audioUrl, episode.pdfUrl, episode.waveformUrl, episode.spectrogramUrl]),
+      ...episodes.flatMap((episode) => [
+        episode.audioUrl,
+        episode.pdfUrl,
+        episode.waveformUrl,
+        episode.spectrogramUrl,
+      ]),
       ...segments.map((segment) => segment.audioUrl),
       ...versions.map((version) => version.audioUrl),
     ]).filter(isAppStorageRef),
@@ -126,9 +152,12 @@ async function collectStorageTargets(courseId: string, episodeIds: string[]) {
 
 async function deleteStorageTargets(
   courseId: string,
-  episodeIds: string[],
+  episodeIds: string[]
 ): Promise<Pick<CourseDeletionResult, 'filesAttempted' | 'filesDeleted' | 'filesFailed'>> {
-  const { episodePrefixes, episodeRefs, explicitRefs } = await collectStorageTargets(courseId, episodeIds);
+  const { episodePrefixes, episodeRefs, explicitRefs } = await collectStorageTargets(
+    courseId,
+    episodeIds
+  );
   const forcedKeys = new Set<string>(episodeRefs.map((ref) => extractR2Key(ref)));
   const normalKeys = new Set<string>(explicitRefs.map((ref) => extractR2Key(ref)));
   let filesAttempted = 0;
@@ -140,7 +169,10 @@ async function deleteStorageTargets(
       const prefixKeys = await listFiles(prefix);
       prefixKeys.forEach((key) => forcedKeys.add(key));
     } catch (error) {
-      logger.warn('Course delete could not list episode storage prefix', { prefix, error: errorMessage(error) });
+      logger.warn('Course delete could not list episode storage prefix', {
+        prefix,
+        error: errorMessage(error),
+      });
     }
   }
 
@@ -152,7 +184,10 @@ async function deleteStorageTargets(
       filesDeleted += 1;
     } catch (error) {
       filesFailed += 1;
-      logger.warn('Course delete could not delete episode storage file', { key, error: errorMessage(error) });
+      logger.warn('Course delete could not delete episode storage file', {
+        key,
+        error: errorMessage(error),
+      });
     }
   }
 
@@ -164,7 +199,10 @@ async function deleteStorageTargets(
       filesDeleted += 1;
     } catch (error) {
       filesFailed += 1;
-      logger.warn('Course delete could not delete storage file', { key, error: errorMessage(error) });
+      logger.warn('Course delete could not delete storage file', {
+        key,
+        error: errorMessage(error),
+      });
     }
   }
 

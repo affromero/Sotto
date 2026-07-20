@@ -318,18 +318,11 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/public/manifest.json',
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
-      'accounting/TODO.md',
-      'accounting/docs/manual-setup.md',
-      'accounting/docs/monthly-close-procedure.md',
-      'accounting/ledger/main.beancount',
-      'accounting/ledger/opening.beancount',
-      'accounting/ledger/2026/02-february.beancount',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
     expect(publicContactSources).toContain('support@example.com');
-    expect(publicContactSources).toContain('https://your-domain.example');
     expect(publicContactSources).not.toContain('sotto.fm');
     expect(publicContactSources).not.toContain('@sottofm');
     expect(publicContactSources).not.toContain('r2.sotto.fm');

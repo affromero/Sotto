@@ -1,13 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import {
-  Headphones,
-  Bell,
-  AlertTriangle,
-  FileText,
-  Megaphone,
-} from 'lucide-react';
+import { Headphones, Bell, AlertTriangle, FileText, Megaphone } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
 import { getNotificationUrl } from '@/lib/notification-utils';
 import styles from './NotificationList.module.css';

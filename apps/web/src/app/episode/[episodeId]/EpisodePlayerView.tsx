@@ -472,8 +472,7 @@ export function EpisodePlayerView({
               topic={episode.topic}
               verificationProgress={
                 verificationProgress as
-                  | import('@/types/episode').VerificationProgressSnapshot
-                  | null
+                  import('@/types/episode').VerificationProgressSnapshot | null
               }
             />
           </div>
@@ -487,8 +486,7 @@ export function EpisodePlayerView({
               topic={episode.topic}
               verificationProgress={
                 verificationProgress as
-                  | import('@/types/episode').VerificationProgressSnapshot
-                  | null
+                  import('@/types/episode').VerificationProgressSnapshot | null
               }
             />
             {scriptTurns && scriptTurns.length > 0 && (
@@ -508,8 +506,7 @@ export function EpisodePlayerView({
                 }}
                 verificationProgress={
                   verificationProgress as
-                    | import('@/types/episode').VerificationProgressSnapshot
-                    | null
+                    import('@/types/episode').VerificationProgressSnapshot | null
                 }
               />
             )}
@@ -777,7 +774,6 @@ export function EpisodePlayerView({
             <SottoBadge />
           </div>
         )}
-
       </div>
 
       {/* Persistent footer mini-player */}

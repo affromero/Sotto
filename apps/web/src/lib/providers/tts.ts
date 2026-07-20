@@ -45,9 +45,16 @@ export interface SfxParams {
 
 export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
-  generateSpeechWithTimestamps?(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }>;
+  generateSpeechWithTimestamps?(
+    params: SpeechParams
+  ): Promise<{ audio: Buffer; wordTimings: WordTiming[] }>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, language?: string): string;
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    language?: string
+  ): string;
   getModelId(): string;
   /** Return the continuity ID from the last generateSpeech() call, if the provider supports it. */
   getLastContinuityId?(): string | null;
@@ -132,7 +139,9 @@ async function importPlayHt() {
  */
 export function createTtsProvider(type: string, byokApiKey?: string, model?: string): TtsProvider {
   if (!type) {
-    throw new Error('TTS provider type is required. Pass an explicit provider from the TTS registry.');
+    throw new Error(
+      'TTS provider type is required. Pass an explicit provider from the TTS registry.'
+    );
   }
 
   // Use lazy-loaded classes synchronously via pre-instantiated inline classes.
@@ -278,7 +287,9 @@ export async function resolveTtsProvider(context: {
   }
 
   if (!language) {
-    logger.debug('No language provided, skipping language-aware provider selection', { episodeId: context.episodeId });
+    logger.debug('No language provided, skipping language-aware provider selection', {
+      episodeId: context.episodeId,
+    });
   }
 
   // Helper: resolve a language-compatible model for a specific provider.
@@ -317,7 +328,9 @@ export async function resolveTtsProvider(context: {
   // Prefer the requested model, then the admin-configured model for the same provider.
   if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
     const config = await getAutoModelConfig();
-    const configModel = requestedModel ?? (config.model.ttsProvider === 'elevenlabs' ? config.model.ttsModel : undefined);
+    const configModel =
+      requestedModel ??
+      (config.model.ttsProvider === 'elevenlabs' ? config.model.ttsModel : undefined);
     const model = resolveModelForLanguage('elevenlabs', configModel);
     return {
       provider: createPremiumTtsProvider(undefined, model),
@@ -327,7 +340,8 @@ export async function resolveTtsProvider(context: {
   }
   if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
     const config = await getAutoModelConfig();
-    const configModel = requestedModel ?? (config.model.ttsProvider === 'openai' ? config.model.ttsModel : undefined);
+    const configModel =
+      requestedModel ?? (config.model.ttsProvider === 'openai' ? config.model.ttsModel : undefined);
     const model = resolveModelForLanguage('openai', configModel);
     return {
       provider: createTtsProvider('openai', undefined, model),
@@ -337,41 +351,83 @@ export async function resolveTtsProvider(context: {
   }
   if (requestedProvider === 'cartesia' && process.env.CARTESIA_API_KEY) {
     const config = await getAutoModelConfig();
-    const configModel = requestedModel ?? (config.model.ttsProvider === 'cartesia' ? config.model.ttsModel : undefined);
+    const configModel =
+      requestedModel ??
+      (config.model.ttsProvider === 'cartesia' ? config.model.ttsModel : undefined);
     const model = resolveModelForLanguage('cartesia', configModel);
     const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
     return { provider, source: 'platform', providerId: 'cartesia' };
   }
   if (requestedProvider === 'hume' && process.env.HUME_API_KEY) {
-    const provider = await createTtsProviderAsync('hume', process.env.HUME_API_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'hume',
+      process.env.HUME_API_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'hume' };
   }
   if (requestedProvider === 'fal' && process.env.FAL_KEY) {
-    const provider = await createTtsProviderAsync('fal', process.env.FAL_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'fal',
+      process.env.FAL_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'fal' };
   }
   if (requestedProvider === 'replicate' && process.env.REPLICATE_API_TOKEN) {
-    const provider = await createTtsProviderAsync('replicate', process.env.REPLICATE_API_TOKEN, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'replicate',
+      process.env.REPLICATE_API_TOKEN,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'replicate' };
   }
   if (requestedProvider === 'minimax' && process.env.FAL_KEY) {
-    const provider = await createTtsProviderAsync('minimax', process.env.FAL_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'minimax',
+      process.env.FAL_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'minimax' };
   }
   if (requestedProvider === 'mistral' && process.env.MISTRAL_API_KEY) {
-    const provider = await createTtsProviderAsync('mistral', process.env.MISTRAL_API_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'mistral',
+      process.env.MISTRAL_API_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'mistral' };
   }
   if (requestedProvider === 'deepgram' && process.env.DEEPGRAM_API_KEY) {
-    const provider = await createTtsProviderAsync('deepgram', process.env.DEEPGRAM_API_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'deepgram',
+      process.env.DEEPGRAM_API_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'deepgram' };
   }
   if (requestedProvider === 'rime' && process.env.RIME_API_KEY) {
-    const provider = await createTtsProviderAsync('rime', process.env.RIME_API_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'rime',
+      process.env.RIME_API_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'rime' };
   }
   if (requestedProvider === 'playht' && process.env.PLAYHT_API_KEY) {
-    const provider = await createTtsProviderAsync('playht', process.env.PLAYHT_API_KEY, undefined, resolvedModel);
+    const provider = await createTtsProviderAsync(
+      'playht',
+      process.env.PLAYHT_API_KEY,
+      undefined,
+      resolvedModel
+    );
     return { provider, source: 'platform', providerId: 'playht' };
   }
   // Kokoro is keyless and local — it is gated by TTS_BASE_URL, not an API key.
@@ -416,7 +472,8 @@ export async function canResolveTts(userId: string): Promise<boolean> {
   if (
     (configuredTtsProvider === 'kokoro' || configuredTtsProvider === 'local') &&
     infra('ttsBaseUrl', 'TTS_BASE_URL')
-  ) return true;
+  )
+    return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.CARTESIA_API_KEY) return true;

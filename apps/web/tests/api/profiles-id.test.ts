@@ -59,19 +59,32 @@ describe('PATCH /api/v1/profiles/[id]', () => {
 
   it('renames a profile', async () => {
     mockUserFindUnique.mockResolvedValue({ id: 'member-1' });
-    mockUserUpdate.mockResolvedValue({ id: 'member-1', name: 'Renamed', image: null, role: 'USER' });
+    mockUserUpdate.mockResolvedValue({
+      id: 'member-1',
+      name: 'Renamed',
+      image: null,
+      role: 'USER',
+    });
 
     const res = await PATCH(req('PATCH', { name: 'Renamed' }), ctx('member-1'));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.name).toBe('Renamed');
-    expect(mockUserUpdate).toHaveBeenCalledWith({ where: { id: 'member-1' }, data: { name: 'Renamed' } });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: 'member-1' },
+      data: { name: 'Renamed' },
+    });
   });
 
   it('sets a preset avatar from a slug', async () => {
     mockUserFindUnique.mockResolvedValue({ id: 'member-1' });
-    mockUserUpdate.mockResolvedValue({ id: 'member-1', name: 'Lena', image: '/avatars/jaguar.png', role: 'USER' });
+    mockUserUpdate.mockResolvedValue({
+      id: 'member-1',
+      name: 'Lena',
+      image: '/avatars/jaguar.png',
+      role: 'USER',
+    });
 
     const res = await PATCH(req('PATCH', { avatarSlug: 'jaguar' }), ctx('member-1'));
     const body = await res.json();

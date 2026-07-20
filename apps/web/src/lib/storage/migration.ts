@@ -56,7 +56,10 @@ function effectiveStorageProvider(configProvider: string | null): StorageProvide
 }
 
 function localBaseDir(): string {
-  return path.resolve(process.cwd(), process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage');
+  return path.resolve(
+    /* turbopackIgnore: true */ process.cwd(),
+    process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage'
+  );
 }
 
 function keyFromLocalUrl(value: string): string | null {

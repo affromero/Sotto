@@ -32,7 +32,14 @@ function baseExam(overrides: Partial<ExamData> = {}): ExamData {
         score: null,
         episode: null,
         questions: [
-          { id: 'q1', order: 1, question: 'Was bedeutet Haus?', options: ['house', 'tree'], passageRef: null, passageText: null },
+          {
+            id: 'q1',
+            order: 1,
+            question: 'Was bedeutet Haus?',
+            options: ['house', 'tree'],
+            passageRef: null,
+            passageText: null,
+          },
         ],
         speakingPrompts: [],
         writingPrompts: [],
@@ -72,7 +79,16 @@ describe('ExamRunner', () => {
           ...baseExam().sections[0],
           score: 1,
           questions: [
-            { id: 'q1', order: 1, question: 'Was bedeutet Haus?', options: ['house', 'tree'], passageRef: null, passageText: null, correctIndex: 0, explanation: 'Haus = house.' },
+            {
+              id: 'q1',
+              order: 1,
+              question: 'Was bedeutet Haus?',
+              options: ['house', 'tree'],
+              passageRef: null,
+              passageText: null,
+              correctIndex: 0,
+              explanation: 'Haus = house.',
+            },
           ],
         },
       ],

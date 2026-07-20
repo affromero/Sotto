@@ -34,7 +34,9 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- R2 mock ----
 
-const mockUploadFile = vi.fn().mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
+const mockUploadFile = vi
+  .fn()
+  .mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
 
 vi.mock('@/lib/r2', () => ({
   uploadFile: (...args: unknown[]) => mockUploadFile(...args),
@@ -71,7 +73,7 @@ function routeParams(sessionId: string, promptId: string) {
  * issues in the test environment (same pattern used by classes-speaking.test.ts).
  */
 function makePostRequest(
-  audioFile?: { arrayBuffer: () => Promise<ArrayBuffer>; type: string } | null,
+  audioFile?: { arrayBuffer: () => Promise<ArrayBuffer>; type: string } | null
 ): NextRequest {
   const fileEntry = audioFile ?? null;
   return {
@@ -105,7 +107,9 @@ describe('POST /api/v1/practice/[sessionId]/speaking/[promptId]', () => {
     mockPracticeSessionFindFirst.mockResolvedValue({ id: 'session-001' });
     mockSpeakingPromptFindFirst.mockResolvedValue({ id: 'prompt-001' });
     mockSpeakingRecordingCreate.mockResolvedValue({ id: 'rec-001', status: 'PENDING' });
-    mockUploadFile.mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
+    mockUploadFile.mockResolvedValue(
+      'https://r2.example.com/speaking/user-001/prompt-001/uuid.webm'
+    );
     mockAddJob.mockResolvedValue({ id: 'job-001' });
   });
 

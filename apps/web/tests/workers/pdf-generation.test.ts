@@ -10,7 +10,11 @@ const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   user: { name: 'Alice Researcher' },
   segments: [
     { speaker: 'HOST', text: 'Welcome to our episode on quantum computing [1].', startTime: 0 },
-    { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
+    {
+      speaker: 'EXPERT',
+      text: 'Thanks for having me. Quantum bits are fascinating [2, 3].',
+      startTime: 45,
+    },
   ],
   references: [
     {
@@ -124,7 +128,11 @@ describe('processPdfGeneration', () => {
       user: { name: 'Alice Researcher' },
       segments: [
         { speaker: 'HOST', text: 'Welcome to our episode on quantum computing [1].', startTime: 0 },
-        { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
+        {
+          speaker: 'EXPERT',
+          text: 'Thanks for having me. Quantum bits are fascinating [2, 3].',
+          startTime: 45,
+        },
       ],
       references: [
         {
@@ -180,8 +188,16 @@ describe('processPdfGeneration', () => {
         creatorName: 'Alice Researcher',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         segments: [
-          { speaker: 'HOST', text: 'Welcome to our episode on quantum computing [1].', startTime: 0 },
-          { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
+          {
+            speaker: 'HOST',
+            text: 'Welcome to our episode on quantum computing [1].',
+            startTime: 0,
+          },
+          {
+            speaker: 'EXPERT',
+            text: 'Thanks for having me. Quantum bits are fascinating [2, 3].',
+            startTime: 45,
+          },
         ],
         references: expect.arrayContaining([
           expect.objectContaining({
@@ -380,7 +396,9 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: any[]) => c[0]
+      );
       for (let i = 1; i < calls.length; i++) {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }
@@ -432,9 +450,7 @@ describe('processPdfGeneration', () => {
 
       const markdown = '# End to End Test\n\nTranscript content.';
       mockGenerateEpisodeTranscript.mockReturnValue(markdown);
-      mockUploadFile.mockResolvedValue(
-        'https://r2.example.com/episodes/episode-e2e/transcript.md'
-      );
+      mockUploadFile.mockResolvedValue('https://r2.example.com/episodes/episode-e2e/transcript.md');
 
       const job = createMockJob({ episodeId: 'episode-e2e', userId: 'user-123' });
       await processPdfGeneration(job);

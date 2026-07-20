@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import type { UserRole } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { LOCAL_USER_ID, ACTIVE_PROFILE_COOKIE, ensureLocalUser } from './local-user';
+import { accessPasswordConfigured, GATE_COOKIE, verifyGateToken } from './access/gate';
 
 export interface AuthUser {
   id: string;
@@ -34,11 +35,19 @@ export interface AuthSession {
  */
 export async function resolveSession(): Promise<AuthSession | null> {
   const cookieStore = await cookies();
+
+  // A household profile is not an authentication boundary. When the instance
+  // access gate is enabled, never resolve the ambient owner/profile until the
+  // shared gate cookie has been verified. This keeps route handlers that use
+  // auth() directly from bypassing SOTTO_ACCESS_PASSWORD.
+  if (accessPasswordConfigured()) {
+    const gateToken = cookieStore.get(GATE_COOKIE)?.value;
+    if (!(await verifyGateToken(gateToken))) return null;
+  }
+
   const activeId = cookieStore.get(ACTIVE_PROFILE_COOKIE)?.value;
 
-  let user = activeId
-    ? await prisma.user.findUnique({ where: { id: activeId } })
-    : null;
+  let user = activeId ? await prisma.user.findUnique({ where: { id: activeId } }) : null;
   if (!user) user = await prisma.user.findUnique({ where: { id: LOCAL_USER_ID } });
   if (!user) user = await ensureLocalUser();
 

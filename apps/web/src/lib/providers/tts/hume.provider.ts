@@ -113,7 +113,9 @@ export class HumeProvider implements TtsProvider {
     return Buffer.from(data.generations[0].audio, 'base64');
   }
 
-  async generateSpeechWithTimestamps(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
+  async generateSpeechWithTimestamps(
+    params: SpeechParams
+  ): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
     const isV1 = this.octaveVersion === '1';
 
     const expression = isV1
@@ -185,7 +187,12 @@ export class HumeProvider implements TtsProvider {
     return this.lastGenerationId;
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? HUME_VOICE_POOL[0].id : HUME_VOICE_POOL[1].id;
@@ -227,7 +234,10 @@ export async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
  * Uses a generic regex to match any limit/concurrency number in the error.
  * If no number is found, caches (default - 1) with a short TTL to re-probe quickly.
  */
-export async function updateHumeConcurrencyFromError(apiKey: string, errorMessage: string): Promise<void> {
+export async function updateHumeConcurrencyFromError(
+  apiKey: string,
+  errorMessage: string
+): Promise<void> {
   try {
     const { cache } = await import('../../redis');
     const crypto = await import('crypto');
@@ -246,7 +256,9 @@ export async function updateHumeConcurrencyFromError(apiKey: string, errorMessag
 
     // No parseable limit — cache a reduced default with short TTL to re-probe quickly
     await cache.set(cacheKey, DEFAULT_HUME_CONCURRENCY - 1, 60);
-    logger.info('Hume 429 without parseable limit, reducing default', { newLimit: DEFAULT_HUME_CONCURRENCY - 1 });
+    logger.info('Hume 429 without parseable limit, reducing default', {
+      newLimit: DEFAULT_HUME_CONCURRENCY - 1,
+    });
   } catch {
     // Swallow Redis errors — original 429 still propagates via BullMQ retry
   }

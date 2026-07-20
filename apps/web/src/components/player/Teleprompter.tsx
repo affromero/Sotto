@@ -4,7 +4,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import type { WordTiming } from '@sotto/shared';
 import { parseTextWithCitations } from '@/lib/citation-parser';
-import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
+import {
+  parseTextWithVocabulary,
+  parseTextWithCitationsAndVocabulary,
+} from '@/lib/vocabulary-parser';
 import { findActiveIndex, findActiveWordIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
@@ -24,10 +27,7 @@ interface TeleprompterProps {
 }
 
 /** Render words with karaoke-style highlighting based on word timings */
-function renderWordTimings(
-  wordTimings: WordTiming[],
-  timeInSegment: number,
-): React.ReactNode {
+function renderWordTimings(wordTimings: WordTiming[], timeInSegment: number): React.ReactNode {
   const activeIdx = findActiveWordIndex(wordTimings, timeInSegment);
   return wordTimings.map((wt, i) => {
     let cls = styles.word;
@@ -68,11 +68,12 @@ function SegmentBlock({
   innerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const idx = getSpeakerIndex(segment.speaker, speakers);
-  const cleanedText = segment.text.replace(STAGE_DIRECTION_PATTERN, '').replace(/\s{2,}/g, ' ').trim();
+  const cleanedText = segment.text
+    .replace(STAGE_DIRECTION_PATTERN, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 
-  const useWordLevel = isActive
-    && segment.wordTimings
-    && segment.wordTimings.length > 0;
+  const useWordLevel = isActive && segment.wordTimings && segment.wordTimings.length > 0;
 
   let content: React.ReactNode;
   if (useWordLevel) {
@@ -81,13 +82,14 @@ function SegmentBlock({
   } else {
     const hasRefs = references.length > 0;
     const hasVocab = vocabularyEntries.length > 0;
-    content = hasRefs && hasVocab
-      ? parseTextWithCitationsAndVocabulary(cleanedText, references, vocabularyEntries)
-      : hasRefs
-        ? parseTextWithCitations(cleanedText, references)
-        : hasVocab
-          ? parseTextWithVocabulary(cleanedText, vocabularyEntries)
-          : cleanedText;
+    content =
+      hasRefs && hasVocab
+        ? parseTextWithCitationsAndVocabulary(cleanedText, references, vocabularyEntries)
+        : hasRefs
+          ? parseTextWithCitations(cleanedText, references)
+          : hasVocab
+            ? parseTextWithVocabulary(cleanedText, vocabularyEntries)
+            : cleanedText;
   }
 
   return (
@@ -144,7 +146,11 @@ export function Teleprompter({
   const nextSegment = activeIndex < segments.length - 1 ? segments[activeIndex + 1] : null;
 
   return (
-    <div className={styles.root} aria-label="Teleprompter view" style={{ '--font-scale': fontScale } as React.CSSProperties}>
+    <div
+      className={styles.root}
+      aria-label="Teleprompter view"
+      style={{ '--font-scale': fontScale } as React.CSSProperties}
+    >
       <div className={styles.sizeControls}>
         <button
           className={styles.sizeBtn}

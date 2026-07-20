@@ -160,7 +160,7 @@ describe('getOrCreateCurriculum', () => {
     expect(mockCurriculumCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ source: 'generated', nativeLang: 'en', targetLang: 'de' }),
-      }),
+      })
     );
     expect(mockLessonCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -168,7 +168,7 @@ describe('getOrCreateCurriculum', () => {
           expect.objectContaining({ slug: 'a1-greetings', level: 'A1', order: 1 }),
           expect.objectContaining({ slug: 'a1-numbers', level: 'A1', order: 2 }),
         ]),
-      }),
+      })
     );
   });
 
@@ -195,7 +195,7 @@ describe('getOrCreateCurriculum', () => {
         service: 'anthropic',
         category: 'curriculum-generation',
         userId: 'user-1',
-      }),
+      })
     );
   });
 
@@ -278,7 +278,11 @@ describe('getOrCreateCurriculum', () => {
     // Make the thrown error behave like a PrismaClientKnownRequestError for the instanceof check
     const { Prisma } = await import('@/generated/prisma/client');
     const prismaError = Object.create(Prisma.PrismaClientKnownRequestError.prototype);
-    Object.assign(prismaError, { message: 'Unique constraint failed', code: 'P2002', clientVersion: '5.0.0' });
+    Object.assign(prismaError, {
+      message: 'Unique constraint failed',
+      code: 'P2002',
+      clientVersion: '5.0.0',
+    });
     mockTransaction.mockRejectedValue(prismaError);
 
     const result = await getOrCreateCurriculum('user-1', 'en', 'de');
@@ -294,9 +298,7 @@ describe('getOrCreateCurriculum', () => {
     mockGetAiKey.mockResolvedValue(null);
     vi.stubEnv('AI_PROVIDER', '');
 
-    await expect(getOrCreateCurriculum('user-no-key', 'en', 'de')).rejects.toThrow(
-      /AI provider/i,
-    );
+    await expect(getOrCreateCurriculum('user-no-key', 'en', 'de')).rejects.toThrow(/AI provider/i);
     expect(mockGenerateResponse).not.toHaveBeenCalled();
   });
 

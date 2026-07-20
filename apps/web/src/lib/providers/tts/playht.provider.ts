@@ -22,11 +22,31 @@ const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 // PlayHT expects full language names. Map the Sotto ISO 639-1 codes it supports;
 // unmapped codes omit the field (PlayHT defaults to the voice's native language).
 const PLAYHT_LANGUAGE_NAMES: Record<string, string> = {
-  en: 'english', es: 'spanish', fr: 'french', de: 'german', pt: 'portuguese',
-  it: 'italian', ja: 'japanese', ko: 'korean', zh: 'mandarin', ar: 'arabic',
-  hi: 'hindi', ru: 'russian', nl: 'dutch', sv: 'swedish', pl: 'polish',
-  tr: 'turkish', da: 'danish', cs: 'czech', hu: 'hungarian', el: 'greek',
-  he: 'hebrew', th: 'thai', id: 'indonesian', ms: 'malay', uk: 'ukrainian',
+  en: 'english',
+  es: 'spanish',
+  fr: 'french',
+  de: 'german',
+  pt: 'portuguese',
+  it: 'italian',
+  ja: 'japanese',
+  ko: 'korean',
+  zh: 'mandarin',
+  ar: 'arabic',
+  hi: 'hindi',
+  ru: 'russian',
+  nl: 'dutch',
+  sv: 'swedish',
+  pl: 'polish',
+  tr: 'turkish',
+  da: 'danish',
+  cs: 'czech',
+  hu: 'hungarian',
+  el: 'greek',
+  he: 'hebrew',
+  th: 'thai',
+  id: 'indonesian',
+  ms: 'malay',
+  uk: 'ukrainian',
   ca: 'catalan',
 };
 
@@ -80,7 +100,12 @@ export class PlayHtProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? PLAYHT_VOICE_POOL[0].id : PLAYHT_VOICE_POOL[1].id;

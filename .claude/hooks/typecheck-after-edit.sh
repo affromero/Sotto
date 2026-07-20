@@ -18,8 +18,9 @@ case "$FILE_PATH" in
   *) exit 0 ;;
 esac
 
-# Run tsc from project root
-TSC_OUTPUT=$(cd /home/ubuntu/Code/Sotto && npx tsc --noEmit --pretty 2>&1 | head -20) || true
+# Run tsc from the repository containing this hook.
+REPO_ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null) || exit 0
+TSC_OUTPUT=$(cd "$REPO_ROOT" && npm run type-check --silent 2>&1 | head -20) || true
 
 if echo "$TSC_OUTPUT" | grep -q "error TS"; then
   echo "TypeScript errors detected after editing $FILE_PATH:"

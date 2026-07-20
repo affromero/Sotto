@@ -25,10 +25,29 @@ export function PlaybackControls() {
         aria-label="Skip back 15 seconds"
         title="Back 15s"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M1 4v6h6" />
           <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          <text x="12" y="16" textAnchor="middle" fill="currentColor" stroke="none" fontSize="8" fontWeight="bold">15</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="currentColor"
+            stroke="none"
+            fontSize="8"
+            fontWeight="bold"
+          >
+            15
+          </text>
         </svg>
       </button>
 
@@ -55,10 +74,29 @@ export function PlaybackControls() {
         aria-label="Skip forward 15 seconds"
         title="Forward 15s"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M23 4v6h-6" />
           <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-          <text x="12" y="16" textAnchor="middle" fill="currentColor" stroke="none" fontSize="8" fontWeight="bold">15</text>
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="currentColor"
+            stroke="none"
+            fontSize="8"
+            fontWeight="bold"
+          >
+            15
+          </text>
         </svg>
       </button>
 
@@ -77,13 +115,31 @@ export function PlaybackControls() {
           aria-label={player.isMuted ? 'Unmute' : 'Mute'}
         >
           {player.isMuted || player.volume === 0 ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" />
               <line x1="23" y1="9" x2="17" y2="15" />
               <line x1="17" y1="9" x2="23" y2="15" />
             </svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" />
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
               <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />

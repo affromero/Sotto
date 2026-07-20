@@ -49,9 +49,7 @@ describe('pdf-generator', () => {
         topic: 'Topic',
         creatorName: 'Creator',
         createdAt: new Date('2026-02-09T10:00:00Z'),
-        segments: [
-          { speaker: 'HOST' as const, text: 'Hello.', startTime: null },
-        ],
+        segments: [{ speaker: 'HOST' as const, text: 'Hello.', startTime: null }],
         references: [],
       };
 
@@ -206,9 +204,7 @@ describe('pdf-generator', () => {
         topic: 'Topic',
         creatorName: 'Creator',
         createdAt: new Date('2026-02-09T10:00:00Z'),
-        segments: [
-          { speaker: 'HOST' as const, text: 'No citations here.', startTime: 0 },
-        ],
+        segments: [{ speaker: 'HOST' as const, text: 'No citations here.', startTime: 0 }],
         references: [],
       };
 
@@ -226,7 +222,11 @@ describe('pdf-generator', () => {
         creatorName: 'Creator',
         createdAt: new Date('2026-02-09T10:00:00Z'),
         segments: [
-          { speaker: 'HOST' as const, text: 'This is cited [1] and this too [2, 3].', startTime: 0 },
+          {
+            speaker: 'HOST' as const,
+            text: 'This is cited [1] and this too [2, 3].',
+            startTime: 0,
+          },
         ],
         references: [],
       };

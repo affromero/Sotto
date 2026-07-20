@@ -73,13 +73,13 @@ export const prisma = basePrisma.$extends({
           // Temporarily inject deletedAt into select so we can check it.
           const originalSelect = args.select;
           args.select = { ...originalSelect, deletedAt: true };
-          const result = await query(args) as Record<string, unknown> | null;
+          const result = (await query(args)) as Record<string, unknown> | null;
           if (!result || result.deletedAt != null) return null;
           // Strip the injected field from the result.
           delete result.deletedAt;
           return result;
         }
-        const result = await query(args) as Record<string, unknown> | null;
+        const result = (await query(args)) as Record<string, unknown> | null;
         if (!result || result.deletedAt != null) return null;
         return result;
       },
@@ -87,7 +87,7 @@ export const prisma = basePrisma.$extends({
         if (args.select) {
           const originalSelect = args.select;
           args.select = { ...originalSelect, deletedAt: true };
-          const result = await query(args) as Record<string, unknown>;
+          const result = (await query(args)) as Record<string, unknown>;
           if (result.deletedAt != null) {
             throw new Prisma.PrismaClientKnownRequestError('No Episode found', {
               code: 'P2025',
@@ -97,7 +97,7 @@ export const prisma = basePrisma.$extends({
           delete result.deletedAt;
           return result;
         }
-        const result = await query(args) as Record<string, unknown>;
+        const result = (await query(args)) as Record<string, unknown>;
         if (result.deletedAt != null) {
           throw new Prisma.PrismaClientKnownRequestError('No Episode found', {
             code: 'P2025',

@@ -163,7 +163,7 @@ describe('elevenlabs', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => mockAudioBuffer.buffer,
-        headers: { get: (name: string) => name === 'request-id' ? 'req-abc123' : null },
+        headers: { get: (name: string) => (name === 'request-id' ? 'req-abc123' : null) },
       });
 
       const result = await generateSpeech({
@@ -273,7 +273,7 @@ describe('elevenlabs', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
-        headers: { get: (name: string) => name === 'request-id' ? 'req-1' : null },
+        headers: { get: (name: string) => (name === 'request-id' ? 'req-1' : null) },
       });
 
       await generateSpeech({
@@ -399,9 +399,7 @@ describe('elevenlabs', () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
-      expect(body).toMatchObject(
-        expect.objectContaining({ duration_seconds: 15 })
-      );
+      expect(body).toMatchObject(expect.objectContaining({ duration_seconds: 15 }));
     });
 
     it('caps duration at 30 seconds', async () => {
@@ -419,9 +417,7 @@ describe('elevenlabs', () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
-      expect(body).toMatchObject(
-        expect.objectContaining({ duration_seconds: 30 })
-      );
+      expect(body).toMatchObject(expect.objectContaining({ duration_seconds: 30 }));
     });
 
     it('throws error when API returns error status', async () => {

@@ -6,8 +6,9 @@ import { accessPasswordConfigured, verifyGateToken, GATE_COOKIE } from './lib/ac
 // things only:
 //  1. Access gate: when the owner set SOTTO_ACCESS_PASSWORD (public instances),
 //     page requests without a valid gate cookie go to /gate. API routes are
-//     excluded here — authenticateRequest() enforces the gate for cookie-based
-//     API calls while letting sk_sotto_ Bearer clients through.
+//     excluded here — auth()/requireAdmin() and authenticateRequest() enforce
+//     the gate inside handlers, while authenticateRequest() also lets valid
+//     sk_sotto_ Bearer clients through.
 //  2. Managed showcase (SELF_HOSTED=false): steer mock-able app surfaces into
 //     the non-persisting /welcome demo.
 const HOSTED_MOCK_ROUTES = [
@@ -16,7 +17,6 @@ const HOSTED_MOCK_ROUTES = [
   '/dashboard',
   '/admin',
   '/episode',
-  '/invite',
   '/learn',
   '/memory',
   '/profile',
@@ -26,17 +26,25 @@ const HOSTED_MOCK_ROUTES = [
   '/voices',
 ];
 
-const GATE_OPEN_ROUTES = ['/gate', '/invite'];
+const GATE_OPEN_ROUTES = ['/gate'];
+const GATE_OPEN_API_ROUTES = new Set([
+  '/api/health',
+  '/api/version',
+  '/api/v1/health',
+  '/api/v1/gate',
+  '/api/v1/auth/pair/redeem',
+]);
 
 function isHostedMockRoute(pathname: string): boolean {
   return HOSTED_MOCK_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
 function isGateExempt(pathname: string): boolean {
-  return (
-    pathname.startsWith('/api/') ||
-    GATE_OPEN_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
-  );
+  return GATE_OPEN_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+function hasApiBearerCredential(request: NextRequest): boolean {
+  return request.headers.get('authorization')?.startsWith('Bearer sk_sotto_') === true;
 }
 
 export async function proxy(request: NextRequest) {
@@ -50,10 +58,31 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/icon') ||
     pathname.startsWith('/apple-icon') ||
     pathname.startsWith('/apple-touch-icon') ||
-    pathname.startsWith('/fonts') ||
-    pathname === '/sitemap.xml' ||
-    pathname === '/robots.txt'
+    pathname.startsWith('/fonts')
   ) {
+    return NextResponse.next();
+  }
+
+  // Hard API perimeter for password-protected deployments. Only the gate
+  // exchange, minimal health/version probes, and one-time pairing redemption
+  // are reachable without a gate cookie. Bearer requests continue to their
+  // handlers, which validate the full API key before returning any data.
+  if (accessPasswordConfigured() && pathname.startsWith('/api/')) {
+    if (!GATE_OPEN_API_ROUTES.has(pathname) && !hasApiBearerCredential(request)) {
+      const gateToken = request.cookies.get(GATE_COOKIE)?.value;
+      if (!(await verifyGateToken(gateToken))) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          {
+            status: 401,
+            headers: {
+              'Cache-Control': 'no-store',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          }
+        );
+      }
+    }
     return NextResponse.next();
   }
 

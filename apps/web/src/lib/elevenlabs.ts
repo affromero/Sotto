@@ -148,7 +148,7 @@ export async function generateSpeech(params: {
         Accept: 'audio/mpeg',
       },
       body: JSON.stringify(body),
-    },
+    }
   );
 
   if (!response.ok) {
@@ -284,7 +284,7 @@ export async function generateSpeechWithTimestamps(params: {
         Accept: 'application/json',
       },
       body: JSON.stringify(body),
-    },
+    }
   );
 
   if (!response.ok) {
@@ -292,7 +292,7 @@ export async function generateSpeechWithTimestamps(params: {
     throw new Error(`ElevenLabs API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     audio_base64: string;
     alignment: ElevenLabsAlignment;
   };

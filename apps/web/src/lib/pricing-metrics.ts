@@ -3,7 +3,13 @@
  * price history over time, and last fetch timestamp.
  */
 import { prisma } from './prisma';
-import { getAiModelDisplayName, getProviderForModel, getModelContextWindow, getModelMaxOutputTokens, getPricetokenModelInfo } from './providers/ai-registry';
+import {
+  getAiModelDisplayName,
+  getProviderForModel,
+  getModelContextWindow,
+  getModelMaxOutputTokens,
+  getPricetokenModelInfo,
+} from './providers/ai-registry';
 import { getAllCurrentPricing } from './pricing';
 
 export interface ModelPricingRow {
@@ -23,9 +29,7 @@ export async function getCurrentModelPricing(): Promise<ModelPricingRow[]> {
   const current = await getAllCurrentPricing();
 
   // Get last update times from DB
-  const latestSnapshots = await prisma.$queryRaw<
-    Array<{ modelId: string; lastUpdated: Date }>
-  >`
+  const latestSnapshots = await prisma.$queryRaw<Array<{ modelId: string; lastUpdated: Date }>>`
     SELECT DISTINCT ON ("modelId") "modelId", "createdAt" AS "lastUpdated"
     FROM "ModelPricingSnapshot"
     ORDER BY "modelId", "createdAt" DESC
@@ -36,9 +40,10 @@ export async function getCurrentModelPricing(): Promise<ModelPricingRow[]> {
     const ptInfo = getPricetokenModelInfo(m.modelId);
     return {
       modelId: m.modelId,
-      displayName: getAiModelDisplayName(m.modelId) !== m.modelId
-        ? getAiModelDisplayName(m.modelId)
-        : ptInfo?.displayName ?? m.modelId,
+      displayName:
+        getAiModelDisplayName(m.modelId) !== m.modelId
+          ? getAiModelDisplayName(m.modelId)
+          : (ptInfo?.displayName ?? m.modelId),
       provider: getProviderForModel(m.modelId) ?? ptInfo?.provider ?? 'unknown',
       inputPerMTok: m.inputPerMTok,
       outputPerMTok: m.outputPerMTok,
@@ -50,7 +55,9 @@ export async function getCurrentModelPricing(): Promise<ModelPricingRow[]> {
   });
 
   // Sort by provider, then model name
-  rows.sort((a, b) => a.provider.localeCompare(b.provider) || a.displayName.localeCompare(b.displayName));
+  rows.sort(
+    (a, b) => a.provider.localeCompare(b.provider) || a.displayName.localeCompare(b.displayName)
+  );
   return rows;
 }
 

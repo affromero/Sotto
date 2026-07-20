@@ -9,14 +9,21 @@ interface SparklineProps {
 }
 
 /** Axis-less mini trend line. Pure SVG, no deps. */
-export function Sparkline({ data, width = 120, height = 32, accent = 'var(--accent)' }: SparklineProps) {
+export function Sparkline({
+  data,
+  width = 120,
+  height = 32,
+  accent = 'var(--accent)',
+}: SparklineProps) {
   if (data.length === 0) return null;
 
   const max = Math.max(...data);
   const min = Math.min(...data);
   const x = (i: number) => (data.length === 1 ? width / 2 : (i / (data.length - 1)) * width);
   const y = (v: number) => height - 2 - ((v - min) / (max - min || 1)) * (height - 4);
-  const line = data.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const line = data
+    .map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+    .join(' ');
 
   return (
     <svg

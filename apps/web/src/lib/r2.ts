@@ -93,7 +93,9 @@ function getObjectStorageConfig(): ObjectStorageConfig {
 }
 
 function localBaseDir(): string {
-  return path.resolve(process.cwd(), process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage');
+  const configured = process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage';
+  if (path.isAbsolute(configured)) return configured;
+  return path.join(/* turbopackIgnore: true */ process.cwd(), configured);
 }
 
 function localPathForKey(keyOrUrl: string): string {
@@ -122,7 +124,7 @@ async function listLocalFiles(prefix: string): Promise<string[]> {
   async function walk(dir: string): Promise<void> {
     let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      entries = await readdir(/* turbopackIgnore: true */ dir, { withFileTypes: true });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
       throw error;
@@ -138,10 +140,12 @@ async function listLocalFiles(prefix: string): Promise<string[]> {
     }
   }
 
-  const rootStat = await stat(root).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === 'ENOENT') return null;
-    throw error;
-  });
+  const rootStat = await stat(/* turbopackIgnore: true */ root).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+  );
   if (!rootStat) return [];
   if (rootStat.isFile()) return [localKeyForPath(root)];
   await walk(root);
@@ -161,10 +165,10 @@ export async function assertStorageWritable(): Promise<void> {
   const key = `__sotto-preflight/${randomUUID()}.txt`;
   if (provider === 'local') {
     const filePath = localPathForKey(key);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await access(path.dirname(filePath), constants.W_OK);
-    await writeFile(filePath, 'ok');
-    await unlink(filePath).catch((error: NodeJS.ErrnoException) => {
+    await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
+    await access(/* turbopackIgnore: true */ path.dirname(filePath), constants.W_OK);
+    await writeFile(/* turbopackIgnore: true */ filePath, 'ok');
+    await unlink(/* turbopackIgnore: true */ filePath).catch((error: NodeJS.ErrnoException) => {
       logger.warn('Storage preflight cleanup failed', { key, error: error.message });
     });
     return;
@@ -200,8 +204,8 @@ export async function uploadFile(
 ): Promise<string> {
   if (configuredStorageProvider() === 'local') {
     const filePath = localPathForKey(key);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, body);
+    await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
+    await writeFile(/* turbopackIgnore: true */ filePath, body);
     logger.info('File uploaded to local storage', { key });
     return pathToFileURL(filePath).href;
   }
@@ -232,7 +236,7 @@ export async function uploadStream(
 ): Promise<string> {
   if (configuredStorageProvider() === 'local') {
     const filePath = localPathForKey(key);
-    await mkdir(path.dirname(filePath), { recursive: true });
+    await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
     await pipeline(body, createWriteStream(filePath));
     logger.info('Stream uploaded to local storage', { key });
     return pathToFileURL(filePath).href;
@@ -323,7 +327,7 @@ export async function resolveAudioUrl(audioUrl: string | null): Promise<string |
  */
 export async function downloadFile(urlOrKey: string): Promise<Buffer> {
   if (configuredStorageProvider() === 'local') {
-    return readFile(localPathForKey(extractR2Key(urlOrKey)));
+    return readFile(/* turbopackIgnore: true */ localPathForKey(extractR2Key(urlOrKey)));
   }
 
   const config = getObjectStorageConfig();
@@ -352,7 +356,7 @@ export async function downloadFile(urlOrKey: string): Promise<Buffer> {
  */
 export async function downloadToFile(urlOrKey: string, destPath: string): Promise<void> {
   if (configuredStorageProvider() === 'local') {
-    await copyFile(localPathForKey(extractR2Key(urlOrKey)), destPath);
+    await copyFile(/* turbopackIgnore: true */ localPathForKey(extractR2Key(urlOrKey)), destPath);
     logger.info('File copied from local storage', { destPath });
     return;
   }
@@ -408,9 +412,11 @@ export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): 
   }
 
   if (configuredStorageProvider() === 'local') {
-    await unlink(localPathForKey(key)).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== 'ENOENT') throw error;
-    });
+    await unlink(/* turbopackIgnore: true */ localPathForKey(key)).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      }
+    );
     logger.info('File deleted from local storage', { key });
     return;
   }
@@ -427,12 +433,12 @@ export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): 
  */
 export async function listPrefixes(): Promise<{ prefix: string }[]> {
   if (configuredStorageProvider() === 'local') {
-    const entries = await readdir(localBaseDir(), { withFileTypes: true }).catch(
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return [];
-        throw error;
-      }
-    );
+    const entries = await readdir(/* turbopackIgnore: true */ localBaseDir(), {
+      withFileTypes: true,
+    }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
     return entries
       .filter((entry) => entry.isDirectory())
       .map((entry) => ({ prefix: `${entry.name}/` }));
@@ -472,7 +478,7 @@ export async function listObjectsDetailed(prefix: string): Promise<
     const keys = await listLocalFiles(prefix);
     return Promise.all(
       keys.map(async (key) => {
-        const info = await stat(localPathForKey(key));
+        const info = await stat(/* turbopackIgnore: true */ localPathForKey(key));
         return {
           key,
           sizeBytes: info.size,

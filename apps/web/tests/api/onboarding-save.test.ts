@@ -142,7 +142,7 @@ describe('POST /api/v1/onboarding/save', () => {
     expect(mockInvalidate).toHaveBeenCalled();
   });
 
-  it('mirrors the owner\'s registry-valid model picks into AutoModelConfig', async () => {
+  it("mirrors the owner's registry-valid model picks into AutoModelConfig", async () => {
     mockIsUserAdmin.mockResolvedValue(true);
     const res = await POST(
       req({

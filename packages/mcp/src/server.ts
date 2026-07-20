@@ -68,9 +68,20 @@ export function createServer(client: SottoClient): McpServer {
     'Create a private Sotto episode from output produced by a local agent run.',
     {
       title: z.string().describe('Episode title'),
-      content: z.string().describe('Raw agent output, transcript, notes, or report to turn into audio'),
+      content: z
+        .string()
+        .describe('Raw agent output, transcript, notes, or report to turn into audio'),
       tts_provider: z
-        .enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral'])
+        .enum([
+          'elevenlabs',
+          'openai',
+          'cartesia',
+          'hume',
+          'fal',
+          'replicate',
+          'minimax',
+          'mistral',
+        ])
         .describe('Explicit TTS provider configured in Sotto'),
       topic: z.string().optional().describe('Optional topic override; defaults to title'),
       idempotency_key: z

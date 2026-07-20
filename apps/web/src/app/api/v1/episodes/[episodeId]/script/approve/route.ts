@@ -54,37 +54,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const nextTtsModel = bodyTtsProvider
     ? (bodyTtsModel ?? null)
     : (episode.ttsModel ?? autoConfig.model.ttsModel);
-
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: { ttsProvider: nextTtsProvider, ttsModel: nextTtsModel },
-  });
-
-  // Fetch resolved ttsProvider for voice assignment and tag conversion
-  // (must happen after TTS provider is written to DB above)
-  const resolvedEpisode = await prisma.episode.findUniqueOrThrow({
-    where: { id: episodeId },
-    select: { ttsProvider: true },
-  });
-  if (!resolvedEpisode.ttsProvider) {
+  if (!nextTtsProvider) {
     return errorResponse('Choose a TTS provider before approving the script.', 400, {
       code: 'tts_provider_required',
     });
-  }
-  const resolvedProvider = resolvedEpisode.ttsProvider as TtsProviderId;
-
-  // Write explicit custom voice selections if provided; auto-assigned speakers are filled below.
-  if (bodyVoices && bodyVoices.length > 0) {
-    await prisma.episodeVoice.deleteMany({ where: { episodeId } });
-    const explicitVoices = bodyVoices
-      .filter((v) => typeof v.voiceId === 'string' && v.voiceId.trim().length > 0)
-      .map((v) => ({ episodeId, speaker: v.speaker, voiceId: v.voiceId!.trim(), provider: resolvedProvider }));
-
-    if (explicitVoices.length > 0) {
-      await prisma.episodeVoice.createMany({
-        data: explicitVoices,
-      });
-    }
   }
 
   const [script, discovery] = await Promise.all([
@@ -95,28 +68,98 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Script not found', 404);
   }
 
-  const turns = script.turns as ScriptTurn[];
-
-  // Derive speakers from discovery or script turns
-  const discoverySpeakers = discovery?.speakers as Array<{ name: string; description?: string }> | null;
-  const speakers = discoverySpeakers && discoverySpeakers.length > 0
-    ? discoverySpeakers
-    : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-
-  await assignVoicesForEpisode(episodeId, speakers, resolvedProvider);
-
-  // Convert TTS tags before creating segments
-  const turnData = turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }));
-  const convertedTurns = await convertTurnsForProvider(turnData, resolvedProvider, { mode: 'disabled' });
-
-  await createSegmentsAndQueueAudio(episodeId, convertedTurns);
-
-  await prisma.episode.update({
-    where: { id: episodeId },
+  // Claim the episode before making any configuration, voice, segment, or
+  // queue mutations. Concurrent approvals therefore have one clear winner.
+  const claimed = await prisma.episode.updateMany({
+    where: { id: episodeId, status: 'SCRIPT_READY' },
     data: { status: 'GENERATING_AUDIO' },
   });
-  await invalidateEpisodeCache(episodeId);
-  await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });
+  if (claimed.count === 0) {
+    return errorResponse('Script approval is already in progress', 409);
+  }
 
-  return NextResponse.json({ success: true });
+  try {
+    await prisma.episode.update({
+      where: { id: episodeId },
+      data: { ttsProvider: nextTtsProvider, ttsModel: nextTtsModel },
+    });
+
+    // Fetch resolved ttsProvider for voice assignment and tag conversion
+    // (must happen after TTS provider is written to DB above)
+    const resolvedEpisode = await prisma.episode.findUniqueOrThrow({
+      where: { id: episodeId },
+      select: { ttsProvider: true },
+    });
+    if (!resolvedEpisode.ttsProvider) {
+      return errorResponse('Choose a TTS provider before approving the script.', 400, {
+        code: 'tts_provider_required',
+      });
+    }
+    const resolvedProvider = resolvedEpisode.ttsProvider as TtsProviderId;
+
+    // Write explicit custom voice selections if provided; auto-assigned speakers are filled below.
+    if (bodyVoices && bodyVoices.length > 0) {
+      await prisma.episodeVoice.deleteMany({ where: { episodeId } });
+      const explicitVoices = bodyVoices
+        .filter((v) => typeof v.voiceId === 'string' && v.voiceId.trim().length > 0)
+        .map((v) => ({
+          episodeId,
+          speaker: v.speaker,
+          voiceId: v.voiceId!.trim(),
+          provider: resolvedProvider,
+        }));
+
+      if (explicitVoices.length > 0) {
+        await prisma.episodeVoice.createMany({
+          data: explicitVoices,
+        });
+      }
+    }
+
+    const turns = script.turns as ScriptTurn[];
+
+    // Derive speakers from discovery or script turns
+    const discoverySpeakers = discovery?.speakers as Array<{
+      name: string;
+      description?: string;
+    }> | null;
+    const speakers =
+      discoverySpeakers && discoverySpeakers.length > 0
+        ? discoverySpeakers
+        : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
+
+    await assignVoicesForEpisode(episodeId, speakers, resolvedProvider);
+
+    // Convert TTS tags before creating segments
+    const turnData = turns.map((t) => ({
+      speaker: t.speaker,
+      text: t.text,
+      direction: t.direction,
+    }));
+    const convertedTurns = await convertTurnsForProvider(turnData, resolvedProvider, {
+      mode: 'disabled',
+    });
+
+    await createSegmentsAndQueueAudio(episodeId, convertedTurns);
+
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    await prisma.episode.updateMany({
+      where: { id: episodeId, status: 'GENERATING_AUDIO' },
+      data: {
+        status: 'SCRIPT_READY',
+        audioGenerationKey: null,
+        failureReason: error instanceof Error ? error.message : 'Audio setup failed',
+      },
+    });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
+    return errorResponse(
+      'Could not start audio generation. The script remains ready to retry.',
+      500
+    );
+  }
 }

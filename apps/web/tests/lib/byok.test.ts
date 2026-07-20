@@ -73,7 +73,8 @@ describe('byok encryption/decryption', () => {
     });
 
     it('preserves Anthropic key format (sk-ant-...)', () => {
-      const key = 'sk-ant-api03-xYz789AbCdEf0123456789-abcdef0123456789ABCDEF0123456789abcdef0123456789ABCDEF01234-AbCdEfGhIjKlMnOpQrStUvWxYz';
+      const key =
+        'sk-ant-api03-xYz789AbCdEf0123456789-abcdef0123456789ABCDEF0123456789abcdef0123456789ABCDEF01234-AbCdEfGhIjKlMnOpQrStUvWxYz';
       const decrypted = decryptApiKey(encryptApiKey(key));
 
       expect(decrypted).toBe(key);
@@ -378,10 +379,7 @@ describe('byok encryption/decryption', () => {
       const buf2 = Buffer.from(encrypted2, 'base64');
 
       // Take header from encryption1, ciphertext from encryption2
-      const frankenstein = Buffer.concat([
-        buf1.subarray(0, 48),
-        buf2.subarray(48),
-      ]);
+      const frankenstein = Buffer.concat([buf1.subarray(0, 48), buf2.subarray(48)]);
       const tampered = frankenstein.toString('base64');
 
       expect(() => decryptApiKey(tampered)).toThrow();
@@ -483,8 +481,14 @@ describe('byok encryption/decryption', () => {
 
   describe('byte-level fidelity for real API keys', () => {
     const realWorldKeys = [
-      { name: 'Anthropic production key', key: 'sk-ant-api03-RealKeyWithMixedCase123-aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' },
-      { name: 'OpenAI project key', key: 'sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567' },
+      {
+        name: 'Anthropic production key',
+        key: `sk-ant-test-${'a'.repeat(64)}`,
+      },
+      {
+        name: 'OpenAI project key',
+        key: `sk-test-${'b'.repeat(64)}`,
+      },
       { name: 'key with trailing newline from clipboard', key: 'sk-ant-api03-abc123\n' },
       { name: 'key with trailing space from clipboard', key: 'sk-ant-api03-abc123 ' },
       { name: 'key pasted with CRLF', key: 'sk-ant-api03-abc123\r\n' },

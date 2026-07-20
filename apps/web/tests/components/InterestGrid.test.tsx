@@ -42,9 +42,7 @@ describe('InterestGrid', () => {
       id: 'cat-3',
       name: 'Business',
       slug: 'business',
-      children: [
-        { id: 'sub-6', name: 'Startups', slug: 'startups' },
-      ],
+      children: [{ id: 'sub-6', name: 'Startups', slug: 'startups' }],
     },
   ];
 
@@ -126,7 +124,13 @@ describe('InterestGrid', () => {
   it('deselecting a chip removes it from onChange', async () => {
     const handleChange = vi.fn();
     const user = userEvent.setup();
-    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-1']} onChange={handleChange} />);
+    render(
+      <InterestGrid
+        categories={mockCategories}
+        selectedTagIds={['sub-1']}
+        onChange={handleChange}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: /Technology/i }));
 
@@ -157,7 +161,13 @@ describe('InterestGrid', () => {
   it('Clear button deselects all children in the expanded category', async () => {
     const handleChange = vi.fn();
     const user = userEvent.setup();
-    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-1', 'sub-2', 'sub-3']} onChange={handleChange} />);
+    render(
+      <InterestGrid
+        categories={mockCategories}
+        selectedTagIds={['sub-1', 'sub-2', 'sub-3']}
+        onChange={handleChange}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: /Technology/i }));
     await user.click(screen.getByText('Clear'));
@@ -225,7 +235,10 @@ describe('InterestGrid', () => {
     // Custom chip should appear
     expect(screen.getByText('Quantum Biology')).toBeInTheDocument();
     // onChange should include custom tag
-    expect(handleChange).toHaveBeenLastCalledWith([], [{ name: 'Quantum Biology', parentSlug: 'technology' }]);
+    expect(handleChange).toHaveBeenLastCalledWith(
+      [],
+      [{ name: 'Quantum Biology', parentSlug: 'technology' }]
+    );
   });
 
   it('pressing Enter in the input adds a custom tag', async () => {
@@ -239,7 +252,10 @@ describe('InterestGrid', () => {
     await user.type(input, 'Indie Hacking{Enter}');
 
     expect(screen.getByText('Indie Hacking')).toBeInTheDocument();
-    expect(handleChange).toHaveBeenLastCalledWith([], [{ name: 'Indie Hacking', parentSlug: 'technology' }]);
+    expect(handleChange).toHaveBeenLastCalledWith(
+      [],
+      [{ name: 'Indie Hacking', parentSlug: 'technology' }]
+    );
   });
 
   it('clears the input field after adding a custom tag', async () => {

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Mocks (must be declared before any import that touches the modules) ----
 
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-new-001' });
+const mockPrismaSegmentFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
@@ -21,9 +22,13 @@ const mockPrismaEpisodeVoiceUpsert = vi.fn().mockResolvedValue({});
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
   const tx = {
     segment: {
+      findUnique: mockPrismaSegmentFindUnique,
       findMany: mockPrismaSegmentFindMany,
       update: mockPrismaSegmentUpdate,
       create: mockPrismaSegmentCreate,
+    },
+    interaction: {
+      update: mockPrismaInteractionUpdate,
     },
   };
   return callback(tx);
@@ -538,15 +543,26 @@ describe('processSegmentRegeneration', () => {
           { id: 'segment-005', order: 5 },
           { id: 'segment-006', order: 6 },
         ])
-        .mockResolvedValueOnce([{ id: 'segment-a' }, { id: 'segment-b' }, { id: 'segment-c' }]);
+        .mockResolvedValueOnce([
+          { id: 'segment-a', audioUrl: 'audio-a.mp3' },
+          { id: 'segment-b', audioUrl: 'audio-b.mp3' },
+          { id: 'segment-c', audioUrl: 'audio-c.mp3' },
+        ]);
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-stitching' }, 'stitch_audio', {
-        episodeId: 'episode-001',
-        segmentIds: ['segment-a', 'segment-b', 'segment-c'],
-        skipSfx: true,
-      });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'audio-stitching' },
+        'stitch_audio',
+        {
+          episodeId: 'episode-001',
+          segmentIds: ['segment-a', 'segment-b', 'segment-c'],
+          segmentVersions: [1, 1, 1],
+          segmentAudioUrls: ['audio-a.mp3', 'audio-b.mp3', 'audio-c.mp3'],
+          skipSfx: true,
+        },
+        { jobId: expect.stringMatching(/^stitch-episode-001-[a-f0-9]{24}$/) }
+      );
     });
 
     it('includes all segment IDs in the re-stitch job', async () => {
@@ -564,7 +580,8 @@ describe('processSegmentRegeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         expect.anything(),
         'stitch_audio',
-        expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3', 'seg-4'] })
+        expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3', 'seg-4'] }),
+        expect.anything()
       );
     });
   });
@@ -640,6 +657,7 @@ describe('processSegmentRegeneration', () => {
       // Segments shifted and new segment created
       expect(mockPrismaSegmentCreate).toHaveBeenCalledWith({
         data: {
+          id: 'regen-interaction-001',
           episodeId: 'episode-001',
           speaker: 'HOST',
           text: 'Let me explain that further.',
@@ -659,7 +677,8 @@ describe('processSegmentRegeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'audio-stitching' },
         'stitch_audio',
-        expect.objectContaining({ skipSfx: true })
+        expect.objectContaining({ skipSfx: true }),
+        expect.anything()
       );
 
       // Episode status updated to STITCHING

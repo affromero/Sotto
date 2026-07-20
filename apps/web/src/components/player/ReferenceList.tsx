@@ -29,7 +29,9 @@ const DOMAIN_LABELS: Record<string, string> = {
 function DomainBadge({ domain }: { domain: string | null }) {
   if (!domain || !DOMAIN_LABELS[domain]) return null;
   return (
-    <span className={`${styles.domainBadge} ${styles[`domain${domain.charAt(0) + domain.slice(1).toLowerCase()}`]}`}>
+    <span
+      className={`${styles.domainBadge} ${styles[`domain${domain.charAt(0) + domain.slice(1).toLowerCase()}`]}`}
+    >
       {DOMAIN_LABELS[domain]}
     </span>
   );
@@ -46,7 +48,17 @@ function VerificationBadge({ status }: { status: string }) {
   if (status === 'VERIFIED') {
     return (
       <span className={styles.verifiedBadge} title="Verified" aria-label="Verified">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </span>
@@ -54,8 +66,22 @@ function VerificationBadge({ status }: { status: string }) {
   }
   if (status === 'FAILED') {
     return (
-      <span className={styles.failedBadge} title="Verification failed" aria-label="Verification failed">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <span
+        className={styles.failedBadge}
+        title="Verification failed"
+        aria-label="Verification failed"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
@@ -63,7 +89,11 @@ function VerificationBadge({ status }: { status: string }) {
     );
   }
   return (
-    <span className={styles.pendingBadge} title="Pending verification" aria-label="Pending verification">
+    <span
+      className={styles.pendingBadge}
+      title="Pending verification"
+      aria-label="Pending verification"
+    >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <circle cx="12" cy="12" r="5" />
       </svg>
@@ -90,20 +120,38 @@ function VerificationDetails({ details }: { details: Record<string, unknown> | n
         <div key={`${check.layer}-${i}`} className={styles.layerRow}>
           <span className={check.passed ? styles.layerPassed : styles.layerFailed}>
             {check.passed ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             ) : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             )}
           </span>
           <span className={styles.layerName}>{LAYER_LABELS[check.layer] || check.layer}</span>
-          {check.detail && (
-            <span className={styles.layerDetail}>{check.detail}</span>
-          )}
+          {check.detail && <span className={styles.layerDetail}>{check.detail}</span>}
         </div>
       ))}
     </div>
@@ -165,7 +213,9 @@ export function ReferenceList({ references }: ReferenceListProps) {
                           className={styles.detailsToggle}
                           onClick={() => setExpandedRef(isExpanded ? null : ref.id)}
                           aria-expanded={isExpanded}
-                          aria-label={isExpanded ? 'Hide verification details' : 'Show verification details'}
+                          aria-label={
+                            isExpanded ? 'Hide verification details' : 'Show verification details'
+                          }
                           type="button"
                         >
                           {isExpanded ? 'Hide details' : 'Details'}
@@ -173,9 +223,7 @@ export function ReferenceList({ references }: ReferenceListProps) {
                       )}
                     </span>
                     {ref.authors.length > 0 && (
-                      <span className={styles.authors}>
-                        {ref.authors.join(', ')}
-                      </span>
+                      <span className={styles.authors}>{ref.authors.join(', ')}</span>
                     )}
                     <span className={styles.meta}>
                       {ref.year && <span>{ref.year}</span>}
@@ -186,9 +234,7 @@ export function ReferenceList({ references }: ReferenceListProps) {
                         </>
                       )}
                       {' \u00B7 '}
-                      <span className={styles.typeBadge}>
-                        {TYPE_LABELS[ref.type] || ref.type}
-                      </span>
+                      <span className={styles.typeBadge}>{TYPE_LABELS[ref.type] || ref.type}</span>
                     </span>
                     {ref.url && (
                       <a
@@ -200,12 +246,8 @@ export function ReferenceList({ references }: ReferenceListProps) {
                         {ref.url}
                       </a>
                     )}
-                    {ref.doi && (
-                      <span className={styles.doi}>DOI: {ref.doi}</span>
-                    )}
-                    {isExpanded && (
-                      <VerificationDetails details={ref.verificationDetails} />
-                    )}
+                    {ref.doi && <span className={styles.doi}>DOI: {ref.doi}</span>}
+                    {isExpanded && <VerificationDetails details={ref.verificationDetails} />}
                   </div>
                 </li>
               );

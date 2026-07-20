@@ -22,7 +22,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { userId: true, lowReferences: true, verificationProgress: true, verificationMode: true },
+    select: {
+      userId: true,
+      lowReferences: true,
+      verificationProgress: true,
+      verificationMode: true,
+    },
   });
 
   if (!episode) {
@@ -59,7 +64,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const depth = discovery?.depth ?? 'standard';
     const effectiveDepth = episode.verificationMode === 'relaxed' ? 'eli5' : depth;
     response.lowReferences = true;
-    response.requiredRefCount = getMinReferenceCount(effectiveDepth, discovery?.durationTarget ?? 10);
+    response.requiredRefCount = getMinReferenceCount(
+      effectiveDepth,
+      discovery?.durationTarget ?? 10
+    );
     if (episode.verificationProgress) {
       response.verificationProgress = episode.verificationProgress;
     }
@@ -105,6 +113,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const oldTurns = script.turns as ScriptTurn[];
   const newTurns = parsed.data.turns;
+  const activeReferenceCount = await prisma.reference.count({
+    where: { episodeId, verificationStatus: { not: 'REMOVED' } },
+  });
+  if (activeReferenceCount > 0 && JSON.stringify(oldTurns) !== JSON.stringify(newTurns)) {
+    return errorResponse(
+      'Verified cited scripts cannot be edited. Regenerate the script to change cited claims.',
+      409
+    );
+  }
 
   // If turns were removed, clean up citation references
   let finalTurns: ScriptTurn[] = newTurns;

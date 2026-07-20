@@ -4,14 +4,8 @@
  * Single source of truth: language sets live in tts-registry.ts on each TtsModelOption.
  * This module provides query functions so callers never inspect raw sets directly.
  */
-import {
-  getProviderMeta,
-  getProviderIds,
-  type TtsProviderId,
-} from './providers/tts-registry';
-import {
-  normalizeSottoLanguageCode,
-} from './speech-language-support';
+import { getProviderMeta, getProviderIds, type TtsProviderId } from './providers/tts-registry';
+import { normalizeSottoLanguageCode } from './speech-language-support';
 
 export { SOTTO_LANGUAGE_CODES } from './speech-language-support';
 
@@ -31,7 +25,7 @@ export { SOTTO_LANGUAGE_CODES } from './speech-language-support';
 export function supportsLanguage(
   providerId: TtsProviderId,
   modelId: string,
-  lang: string | null | undefined,
+  lang: string | null | undefined
 ): boolean {
   const normalized = normalizeSottoLanguageCode(lang);
   if (!normalized) return true;
@@ -51,7 +45,7 @@ export function supportsLanguage(
  * Useful for auto-selection when a specific language is required.
  */
 export function getProvidersForLanguage(
-  lang: string,
+  lang: string
 ): Array<{ providerId: TtsProviderId; modelId: string; tier: string }> {
   const normalized = normalizeSottoLanguageCode(lang);
   if (!normalized) return [];
@@ -78,7 +72,7 @@ export function getProvidersForLanguage(
 export function getDefaultModelForLanguage(
   providerId: TtsProviderId,
   lang: string,
-  preferred?: string | null,
+  preferred?: string | null
 ): string | null {
   const normalized = normalizeSottoLanguageCode(lang);
   if (!normalized) return null;
@@ -117,13 +111,13 @@ export interface VoiceLanguageAffinity {
  * voices when a episode language is known.
  */
 export const VOICE_LANGUAGE_AFFINITIES: Readonly<Record<string, VoiceLanguageAffinity>> = {
-  Vivian:   { nativeLanguages: ['zh'] },
-  Serena:   { nativeLanguages: ['zh'] },
+  Vivian: { nativeLanguages: ['zh'] },
+  Serena: { nativeLanguages: ['zh'] },
   Uncle_Fu: { nativeLanguages: ['zh'] },
-  Dylan:    { nativeLanguages: ['zh'] },
-  Eric:     { nativeLanguages: ['zh'] },
-  Ryan:     { nativeLanguages: ['en'] },
-  Aiden:    { nativeLanguages: ['en'] },
+  Dylan: { nativeLanguages: ['zh'] },
+  Eric: { nativeLanguages: ['zh'] },
+  Ryan: { nativeLanguages: ['en'] },
+  Aiden: { nativeLanguages: ['en'] },
   Ono_Anna: { nativeLanguages: ['ja'] },
-  Sohee:    { nativeLanguages: ['ko'] },
+  Sohee: { nativeLanguages: ['ko'] },
 };

@@ -12,8 +12,14 @@ vi.mock('@/lib/redis', () => ({
   },
   getEpisodeCacheTtl: vi.fn((status: string) => {
     const active = new Set([
-      'EXTRACTING', 'DISCOVERING', 'SCRIPTING', 'RESEARCHING',
-      'PLANNING', 'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
+      'EXTRACTING',
+      'DISCOVERING',
+      'SCRIPTING',
+      'RESEARCHING',
+      'PLANNING',
+      'COMPILING',
+      'GENERATING_AUDIO',
+      'STITCHING',
     ]);
     return active.has(status) ? 2 : 30;
   }),
@@ -52,7 +58,9 @@ vi.mock('@/lib/r2', () => ({
 }));
 
 vi.mock('@/lib/validations', () => ({
-  updateEpisodeSchema: { safeParse: vi.fn().mockReturnValue({ success: true, data: { title: 'New Title' } }) },
+  updateEpisodeSchema: {
+    safeParse: vi.fn().mockReturnValue({ success: true, data: { title: 'New Title' } }),
+  },
 }));
 
 vi.mock('@/lib/slugify', () => ({
@@ -68,11 +76,19 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/episode-select', () => ({
-  EPISODE_PUBLIC_SELECT: { id: true, title: true, status: true, audioUrl: true, visibility: true, userId: true },
+  EPISODE_PUBLIC_SELECT: {
+    id: true,
+    title: true,
+    status: true,
+    audioUrl: true,
+    visibility: true,
+    userId: true,
+  },
 }));
 
 vi.mock('@/lib/api-response', () => ({
-  errorResponse: (msg: string, status: number) => new Response(JSON.stringify({ error: msg }), { status }),
+  errorResponse: (msg: string, status: number) =>
+    new Response(JSON.stringify({ error: msg }), { status }),
 }));
 
 import { NextRequest } from 'next/server';

@@ -99,19 +99,39 @@ describe('shouldRun — preset=full includes everything', () => {
 describe('shouldRun — filters', () => {
   it('exclude filter overrides preset', () => {
     const exclude = new Set(['audio-generation']);
-    expect(shouldRun('audio-generation', opts({ profile: 'heavy', preset: 'core', excludeFilter: exclude }))).toBe(false);
+    expect(
+      shouldRun(
+        'audio-generation',
+        opts({ profile: 'heavy', preset: 'core', excludeFilter: exclude })
+      )
+    ).toBe(false);
   });
 
   it('include filter restricts to specified workers only', () => {
     const include = new Set(['audio-generation']);
-    expect(shouldRun('audio-generation', opts({ profile: 'heavy', preset: 'core', includeFilter: include }))).toBe(true);
-    expect(shouldRun('audio-stitching', opts({ profile: 'heavy', preset: 'core', includeFilter: include }))).toBe(false);
+    expect(
+      shouldRun(
+        'audio-generation',
+        opts({ profile: 'heavy', preset: 'core', includeFilter: include })
+      )
+    ).toBe(true);
+    expect(
+      shouldRun(
+        'audio-stitching',
+        opts({ profile: 'heavy', preset: 'core', includeFilter: include })
+      )
+    ).toBe(false);
   });
 
   it('exclude filter takes priority over include filter', () => {
     const include = new Set(['audio-generation']);
     const exclude = new Set(['audio-generation']);
-    expect(shouldRun('audio-generation', opts({ profile: 'heavy', preset: 'core', includeFilter: include, excludeFilter: exclude }))).toBe(false);
+    expect(
+      shouldRun(
+        'audio-generation',
+        opts({ profile: 'heavy', preset: 'core', includeFilter: include, excludeFilter: exclude })
+      )
+    ).toBe(false);
   });
 });
 
@@ -126,10 +146,13 @@ describe('shouldRun — profile filtering with preset=core', () => {
   });
 
   it('pipeline workers run with pipeline+core (non-experimental)', () => {
-    expect(shouldRun('content-extraction', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
-    expect(shouldRun('script-generation', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
+    expect(shouldRun('content-extraction', opts({ profile: 'pipeline', preset: 'core' }))).toBe(
+      true
+    );
+    expect(shouldRun('script-generation', opts({ profile: 'pipeline', preset: 'core' }))).toBe(
+      true
+    );
     expect(shouldRun('speaking-grading', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
-    expect(shouldRun('verify-class-references', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
   });
 });
 
@@ -140,7 +163,7 @@ describe('set integrity', () => {
       const inPipeline = PIPELINE_WORKERS.has(worker);
       expect(
         inHeavy || inPipeline,
-        `${worker} is in EXPERIMENTAL but not in HEAVY or PIPELINE`,
+        `${worker} is in EXPERIMENTAL but not in HEAVY or PIPELINE`
       ).toBe(true);
     }
   });

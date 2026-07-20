@@ -9,7 +9,9 @@ const mockPrismaSegmentCount = vi.fn().mockResolvedValue(0);
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaEpisodeUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
-const mockPrismaEpisodeFindUnique = vi.fn().mockResolvedValue({ status: 'GENERATING_AUDIO' });
+const mockPrismaEpisodeFindUnique = vi
+  .fn()
+  .mockResolvedValue({ status: 'GENERATING_AUDIO', audioGenerationKey: 'generation-001' });
 const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
   language: null,
@@ -28,6 +30,7 @@ vi.mock('@/lib/prisma', () => {
     segment: {
       findUnique: (...args: unknown[]) => mockPrismaSegmentFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
       count: (...args: unknown[]) => mockPrismaSegmentCount(...args),
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
     },
@@ -189,7 +192,9 @@ function createMockJob(data: GenerateAudioPayload): Job<GenerateAudioPayload> {
 
 const defaultPayload: GenerateAudioPayload = {
   episodeId: 'episode-001',
+  audioGenerationKey: 'generation-001',
   segmentId: 'segment-001',
+  segmentVersion: 1,
   speaker: 'HOST',
   text: 'Welcome to the show!',
 };
@@ -286,9 +291,20 @@ describe('processAudioGeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: segment has no existing audio
-    mockPrismaSegmentFindUnique.mockResolvedValue(null);
+    mockPrismaSegmentFindUnique.mockResolvedValue({
+      episodeId: defaultPayload.episodeId,
+      text: defaultPayload.text,
+      version: defaultPayload.segmentVersion,
+      audioUrl: null,
+      ttsProvider: null,
+      ttsModel: null,
+      ttsVoiceId: null,
+    });
     // Default: episode not failed (fail-fast check passes)
-    mockPrismaEpisodeFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockPrismaEpisodeFindUnique.mockResolvedValue({
+      status: 'GENERATING_AUDIO',
+      audioGenerationKey: 'generation-001',
+    });
     mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
       language: null,
@@ -300,7 +316,7 @@ describe('processAudioGeneration', () => {
     // Default: no pending segments (all done)
     mockPrismaSegmentCount.mockResolvedValue(0);
     mockPrismaSegmentFindMany.mockResolvedValue([{ id: 'segment-001' }, { id: 'segment-002' }]);
-    mockPrismaSegmentUpdate.mockResolvedValue({});
+    mockPrismaSegmentUpdate.mockResolvedValue({ count: 1 });
     mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockStandardGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockCartesiaGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));

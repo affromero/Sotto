@@ -7,8 +7,10 @@ vi.mock('@/lib/redis', () => ({
 }));
 
 import { POST } from '@/app/api/v1/gate/route';
-import { GET as redeemInvite } from '@/app/invite/route';
-import { createInviteToken, verifyGateToken } from '@/lib/access/gate';
+import { verifyGateToken } from '@/lib/access/gate';
+
+const TEST_ACCESS_PASSWORD = 'test-access-password'; // gitleaks:allow
+const TEST_SIGNING_KEY = 'test-signing-key-material-0123456789abcdef'; // gitleaks:allow
 
 function gateRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/v1/gate', {
@@ -21,8 +23,8 @@ function gateRequest(body: unknown): NextRequest {
 describe('access gate routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
-    process.env.BYOK_ENCRYPTION_KEY = 'test-signing-key-material-0123456789abcdef';
+    process.env.SOTTO_ACCESS_PASSWORD = TEST_ACCESS_PASSWORD;
+    process.env.BYOK_ENCRYPTION_KEY = TEST_SIGNING_KEY;
     mockCheckRateLimit.mockResolvedValue({
       allowed: true,
       remaining: 4,
@@ -36,7 +38,7 @@ describe('access gate routes', () => {
 
   describe('POST /api/v1/gate', () => {
     it('opens the gate with the right password and sets a valid cookie', async () => {
-      const res = await POST(gateRequest({ password: 'family-secret' }));
+      const res = await POST(gateRequest({ password: TEST_ACCESS_PASSWORD }));
 
       expect(res.status).toBe(200);
       const cookie = res.cookies.get('sotto_gate');
@@ -56,44 +58,42 @@ describe('access gate routes', () => {
       expect(res.status).toBe(400);
     });
 
-    it('returns 429 with Retry-After when rate limited', async () => {
+    it('returns a generic 429 when any anti-automation bucket is exhausted', async () => {
       mockCheckRateLimit.mockResolvedValue({
         allowed: false,
         remaining: 0,
         resetAt: Date.now() + 30_000,
       });
 
-      const res = await POST(gateRequest({ password: 'family-secret' }));
+      const res = await POST(gateRequest({ password: TEST_ACCESS_PASSWORD }));
 
       expect(res.status).toBe(429);
-      expect(Number(res.headers.get('Retry-After'))).toBeGreaterThan(0);
+      await expect(res.json()).resolves.toEqual({
+        error: 'Too many attempts. Try again later.',
+      });
+      expect(res.headers.get('Retry-After')).toBeNull();
+    });
+
+    it('rejects cross-site browser attempts before checking the password', async () => {
+      const request = new NextRequest('http://localhost:3000/api/v1/gate', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'sec-fetch-site': 'cross-site',
+        },
+        body: JSON.stringify({ password: TEST_ACCESS_PASSWORD }),
+      });
+
+      const res = await POST(request);
+
+      expect(res.status).toBe(403);
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
     });
 
     it('is 404 when no password is configured', async () => {
       delete process.env.SOTTO_ACCESS_PASSWORD;
       const res = await POST(gateRequest({ password: 'anything' }));
       expect(res.status).toBe(404);
-    });
-  });
-
-  describe('GET /invite', () => {
-    it('opens the gate for a valid invite token and lands on the picker', async () => {
-      const token = await createInviteToken();
-      const res = await redeemInvite(new NextRequest(`http://localhost:3000/invite?t=${token}`));
-
-      expect(new URL(res.headers.get('location')!).pathname).toBe('/profiles');
-      expect(await verifyGateToken(res.cookies.get('sotto_gate')?.value)).toBe(true);
-    });
-
-    it('sends invalid or missing tokens to /gate without a cookie', async () => {
-      for (const url of [
-        'http://localhost:3000/invite',
-        'http://localhost:3000/invite?t=123.deadbeef',
-      ]) {
-        const res = await redeemInvite(new NextRequest(url));
-        expect(new URL(res.headers.get('location')!).pathname).toBe('/gate');
-        expect(res.cookies.get('sotto_gate')).toBeUndefined();
-      }
     });
   });
 });

@@ -11,7 +11,12 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 
 vi.mock('@/lib/providers/tts-voices', () => ({
   MINIMAX_VOICE_POOL: [
-    { id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' },
+    {
+      id: 'Deep_Voice_Man',
+      name: 'Deep Voice Man',
+      gender: 'male',
+      character: 'authoritative expert',
+    },
     { id: 'Wise_Woman', name: 'Wise Woman', gender: 'female', character: 'warm narrator' },
   ],
   selectVoicePairFromPool: vi.fn().mockReturnValue({
@@ -36,7 +41,16 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: vi.fn().mockResolvedValue({ model: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' } }),
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    model: {
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
+  }),
 }));
 
 vi.mock('@/lib/tts-expression-mapper', () => ({
@@ -74,11 +88,19 @@ describe('MinimaxProvider', () => {
 
   it('generates speech successfully', async () => {
     const fetchMock = mockFetchResponses({
-      audio: { url: 'https://fal.run/output/audio.mp3', content_type: 'audio/mpeg', file_name: 'audio.mp3', file_size: 1024 },
+      audio: {
+        url: 'https://fal.run/output/audio.mp3',
+        content_type: 'audio/mpeg',
+        file_name: 'audio.mp3',
+        file_size: 1024,
+      },
     });
 
     const provider = new MinimaxProvider('fal_sk_test');
-    const result = await provider.generateSpeech({ text: 'Hello world', voiceId: 'Deep_Voice_Man' });
+    const result = await provider.generateSpeech({
+      text: 'Hello world',
+      voiceId: 'Deep_Voice_Man',
+    });
 
     expect(result).toBeInstanceOf(Buffer);
 
@@ -101,9 +123,9 @@ describe('MinimaxProvider', () => {
     });
 
     const provider = new MinimaxProvider('bad_key');
-    await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' })).rejects.toThrow(
-      'MiniMax API error (401): Unauthorized'
-    );
+    await expect(
+      provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' })
+    ).rejects.toThrow('MiniMax API error (401): Unauthorized');
   });
 
   it('throws when no audio URL in response', async () => {
@@ -113,9 +135,9 @@ describe('MinimaxProvider', () => {
     });
 
     const provider = new MinimaxProvider('fal_sk_test');
-    await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' })).rejects.toThrow(
-      'MiniMax returned no audio URL'
-    );
+    await expect(
+      provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' })
+    ).rejects.toThrow('MiniMax returned no audio URL');
   });
 
   it('returns correct voice IDs for HOST/EXPERT speakers', () => {
@@ -126,7 +148,12 @@ describe('MinimaxProvider', () => {
 
   it('uses correct FAL endpoint URL for speech-02-hd model', async () => {
     const fetchMock = mockFetchResponses({
-      audio: { url: 'https://fal.run/output/audio.mp3', content_type: 'audio/mpeg', file_name: 'audio.mp3', file_size: 1024 },
+      audio: {
+        url: 'https://fal.run/output/audio.mp3',
+        content_type: 'audio/mpeg',
+        file_name: 'audio.mp3',
+        file_size: 1024,
+      },
     });
 
     const provider = new MinimaxProvider('fal_sk_test', 'speech-02-hd');
@@ -137,7 +164,12 @@ describe('MinimaxProvider', () => {
 
   it('uses correct FAL endpoint URL for speech-02-turbo model', async () => {
     const fetchMock = mockFetchResponses({
-      audio: { url: 'https://fal.run/output/audio.mp3', content_type: 'audio/mpeg', file_name: 'audio.mp3', file_size: 1024 },
+      audio: {
+        url: 'https://fal.run/output/audio.mp3',
+        content_type: 'audio/mpeg',
+        file_name: 'audio.mp3',
+        file_size: 1024,
+      },
     });
 
     const provider = new MinimaxProvider('fal_sk_test', 'speech-02-turbo');

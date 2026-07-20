@@ -1,6 +1,13 @@
 const KEYBOARD_PATTERNS = [
-  'qwerty', 'asdf', 'zxcv', 'qwertz', 'azerty',
-  'hjkl', 'uiop', 'bnm', 'wasd',
+  'qwerty',
+  'asdf',
+  'zxcv',
+  'qwertz',
+  'azerty',
+  'hjkl',
+  'uiop',
+  'bnm',
+  'wasd',
 ];
 
 /**

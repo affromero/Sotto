@@ -5,12 +5,7 @@
 // (16 kHz Int16 base64) go in via sendAudio; incoming translated audio (24 kHz) and
 // the input/output transcriptions surface through callbacks. The caller wires these
 // to useLiveAudio (frames out, audio enqueue) and the UI captions.
-import {
-  GoogleGenAI,
-  Modality,
-  type LiveServerMessage,
-  type Session,
-} from '@google/genai';
+import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from '@google/genai';
 
 export interface LiveTokenPayload {
   token: string;
@@ -43,7 +38,7 @@ export interface LiveSessionHandle {
 
 export async function openLiveSession(
   payload: LiveTokenPayload,
-  callbacks: LiveSessionCallbacks,
+  callbacks: LiveSessionCallbacks
 ): Promise<LiveSessionHandle> {
   const ai = new GoogleGenAI({
     apiKey: payload.token,

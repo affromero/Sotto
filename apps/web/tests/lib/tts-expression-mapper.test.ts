@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { mapDirectionToExpression, getSupportedDirections, convertInlineAudioTags } from '@/lib/tts-expression-mapper';
+import {
+  mapDirectionToExpression,
+  getSupportedDirections,
+  convertInlineAudioTags,
+} from '@/lib/tts-expression-mapper';
 
 describe('tts-expression-mapper', () => {
   describe('ElevenLabs', () => {
@@ -256,43 +260,47 @@ describe('tts-expression-mapper', () => {
 
   describe('convertInlineAudioTags', () => {
     it('passes all tags through for ElevenLabs', () => {
-      expect(convertInlineAudioTags('[laughs] Hello [pause] world', 'elevenlabs'))
-        .toBe('[laughs] Hello [pause] world');
+      expect(convertInlineAudioTags('[laughs] Hello [pause] world', 'elevenlabs')).toBe(
+        '[laughs] Hello [pause] world'
+      );
     });
 
     it('keeps [pause] and [long pause] for Hume, strips rest', () => {
-      expect(convertInlineAudioTags('[laughs] Hello [pause] world [long pause] end', 'hume'))
-        .toBe(' Hello [pause] world [long pause] end');
+      expect(convertInlineAudioTags('[laughs] Hello [pause] world [long pause] end', 'hume')).toBe(
+        ' Hello [pause] world [long pause] end'
+      );
     });
 
     it('converts laugh variants to [laughter] for Cartesia', () => {
-      expect(convertInlineAudioTags('[laughs] Hello', 'cartesia'))
-        .toBe('[laughter] Hello');
+      expect(convertInlineAudioTags('[laughs] Hello', 'cartesia')).toBe('[laughter] Hello');
     });
 
     it('converts pauses to SSML breaks for Cartesia', () => {
-      expect(convertInlineAudioTags('[pause] Hello [long pause] end', 'cartesia'))
-        .toBe('<break time="0.5s"/> Hello <break time="1.5s"/> end');
+      expect(convertInlineAudioTags('[pause] Hello [long pause] end', 'cartesia')).toBe(
+        '<break time="0.5s"/> Hello <break time="1.5s"/> end'
+      );
     });
 
     it('converts inline emotion tags to SSML for Cartesia', () => {
-      expect(convertInlineAudioTags('[emotion:excited]Hello[/emotion]', 'cartesia'))
-        .toBe('<emotion value="excited">Hello</emotion>');
+      expect(convertInlineAudioTags('[emotion:excited]Hello[/emotion]', 'cartesia')).toBe(
+        '<emotion value="excited">Hello</emotion>'
+      );
     });
 
     it('converts inline speed tags to SSML for Cartesia', () => {
-      expect(convertInlineAudioTags('[speed:1.3]Fast talk[/speed]', 'cartesia'))
-        .toBe('<speed ratio="1.3">Fast talk</speed>');
+      expect(convertInlineAudioTags('[speed:1.3]Fast talk[/speed]', 'cartesia')).toBe(
+        '<speed ratio="1.3">Fast talk</speed>'
+      );
     });
 
     it('strips emotion/speed tags for OpenAI', () => {
-      expect(convertInlineAudioTags('[emotion:excited]Hello[/emotion]', 'openai'))
-        .toBe('Hello');
+      expect(convertInlineAudioTags('[emotion:excited]Hello[/emotion]', 'openai')).toBe('Hello');
     });
 
     it('converts pauses to punctuation for OpenAI', () => {
-      expect(convertInlineAudioTags('[long pause] Hello [pause] world', 'openai'))
-        .toBe('...  Hello ,  world');
+      expect(convertInlineAudioTags('[long pause] Hello [pause] world', 'openai')).toBe(
+        '...  Hello ,  world'
+      );
     });
   });
 });

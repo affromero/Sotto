@@ -3,7 +3,10 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
-import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
+import {
+  parseTextWithVocabulary,
+  parseTextWithCitationsAndVocabulary,
+} from '@/lib/vocabulary-parser';
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { AudioPlayerContext } from '@/components/providers/AudioPlayerProvider';
@@ -103,7 +106,9 @@ export function TranscriptPanel({
               ref={active ? activeRef : undefined}
               className={`${styles.segment} ${active ? styles.active : ''}`}
               data-speaker-index={idx}
-              data-timestamp={segment.startTime !== null ? formatTimestamp(segment.startTime) : undefined}
+              data-timestamp={
+                segment.startTime !== null ? formatTimestamp(segment.startTime) : undefined
+              }
               onClick={() => {
                 if (segment.startTime !== null) {
                   reengage();
@@ -121,11 +126,22 @@ export function TranscriptPanel({
                 {...learningTextGuardProps<HTMLDivElement>()}
               >
                 {hasRefs && hasVocab
-                  ? parseTextWithCitationsAndVocabulary(segment.text, references, vocabularyEntries, onVocabPause, onVocabResume)
+                  ? parseTextWithCitationsAndVocabulary(
+                      segment.text,
+                      references,
+                      vocabularyEntries,
+                      onVocabPause,
+                      onVocabResume
+                    )
                   : hasRefs
                     ? parseTextWithCitations(segment.text, references)
                     : hasVocab
-                      ? parseTextWithVocabulary(segment.text, vocabularyEntries, onVocabPause, onVocabResume)
+                      ? parseTextWithVocabulary(
+                          segment.text,
+                          vocabularyEntries,
+                          onVocabPause,
+                          onVocabResume
+                        )
                       : segment.text}
               </div>
             </div>

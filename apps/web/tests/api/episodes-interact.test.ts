@@ -188,7 +188,11 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
 
   it('returns 429 when rate limited', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
-    mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: false,
+      remaining: 0,
+      resetAt: Date.now() + 3600000,
+    });
 
     const { request, params } = createRequest('episode-123', {
       question: 'Valid question',

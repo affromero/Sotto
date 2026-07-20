@@ -1,13 +1,4 @@
-const BLOCKED_COMPACT_FRAGMENTS = [
-  'fuck',
-  'shit',
-  'cunt',
-  'pussy',
-  'porn',
-  'xxx',
-  'nazi',
-  'kkk',
-];
+const BLOCKED_COMPACT_FRAGMENTS = ['fuck', 'shit', 'cunt', 'pussy', 'porn', 'xxx', 'nazi', 'kkk'];
 
 const BLOCKED_TOKEN_TERMS = new Set(['bitch', 'dick']);
 

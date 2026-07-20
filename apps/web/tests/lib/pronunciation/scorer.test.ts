@@ -56,7 +56,7 @@ function rubricResponse(
   accuracy: number,
   fluency: number,
   completeness: number,
-  feedback = 'Well done!',
+  feedback = 'Well done!'
 ): { content: string; model: string; inputTokens: number; outputTokens: number } {
   return {
     content: JSON.stringify({ accuracy, fluency, completeness, feedback }),
@@ -111,14 +111,14 @@ describe('SelfContainedScorer', () => {
   describe('wrong transcript', () => {
     it('scores below 0.5 overall when most words are wrong', async () => {
       mockGenerateResponse.mockResolvedValue(
-        rubricResponse(0.1, 0.5, 0.3, 'Focus on the missing words.'),
+        rubricResponse(0.1, 0.5, 0.3, 'Focus on the missing words.')
       );
 
       const result = await scorer.score(
         makeInput({
           targetPhrase: 'Ich heiße Anna gut Morgen',
           transcript: 'hello world',
-        }),
+        })
       );
 
       expect(result.overallScore).toBeLessThan(0.5);
@@ -131,7 +131,7 @@ describe('SelfContainedScorer', () => {
         makeInput({
           targetPhrase: 'Ich heiße Anna',
           transcript: 'I am Bob',
-        }),
+        })
       );
 
       const nonMatches = result.phonemeScores.filter((t) => t.op !== 'match');
@@ -151,7 +151,7 @@ describe('SelfContainedScorer', () => {
             { word: 'heiße', start: 0.35, end: 0.8 },
             { word: 'Anna', start: 0.85, end: 1.2 },
           ],
-        }),
+        })
       );
 
       expect(result.rubricScores.fluency).toBeGreaterThan(0.7);
@@ -168,7 +168,7 @@ describe('SelfContainedScorer', () => {
             { word: 'heiße', start: 2.5, end: 3.0 }, // 2.2 s gap
             { word: 'Anna', start: 5.5, end: 6.0 }, // 2.5 s gap
           ],
-        }),
+        })
       );
 
       // Both LLM and deterministic signals are low → blend should be below 0.7
@@ -227,7 +227,12 @@ describe('SelfContainedScorer', () => {
     it('clamps out-of-range LLM scores', async () => {
       // LLM returns values outside 0..1
       mockGenerateResponse.mockResolvedValue({
-        content: JSON.stringify({ accuracy: 1.5, fluency: -0.2, completeness: 2.0, feedback: 'ok' }),
+        content: JSON.stringify({
+          accuracy: 1.5,
+          fluency: -0.2,
+          completeness: 2.0,
+          feedback: 'ok',
+        }),
         model: 'claude-3-5-haiku-20241022',
         inputTokens: 80,
         outputTokens: 30,
@@ -246,7 +251,8 @@ describe('SelfContainedScorer', () => {
   describe('code-fenced JSON response', () => {
     it('parses JSON wrapped in markdown code fences', async () => {
       mockGenerateResponse.mockResolvedValue({
-        content: '```json\n{"accuracy":0.9,"fluency":0.8,"completeness":1.0,"feedback":"Nice!"}\n```',
+        content:
+          '```json\n{"accuracy":0.9,"fluency":0.8,"completeness":1.0,"feedback":"Nice!"}\n```',
         model: 'claude-3-5-haiku-20241022',
         inputTokens: 80,
         outputTokens: 30,
@@ -277,13 +283,13 @@ describe('resolvePronunciationScorer', () => {
 
   it('throws for an unknown provider', () => {
     expect(() => resolvePronunciationScorer({ provider: 'azure' })).toThrow(
-      /unknown pronunciation scorer provider.*azure/i,
+      /unknown pronunciation scorer provider.*azure/i
     );
   });
 
   it('throws for another unknown provider value', () => {
     expect(() => resolvePronunciationScorer({ provider: 'speechace' })).toThrow(
-      /unknown pronunciation scorer provider.*speechace/i,
+      /unknown pronunciation scorer provider.*speechace/i
     );
   });
 });

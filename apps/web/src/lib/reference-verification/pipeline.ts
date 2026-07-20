@@ -12,7 +12,6 @@ import {
   type ReferenceInput,
   type VerificationCheck,
   type VerificationVerdict,
-  type ReplacementData,
 } from '@/lib/reference-validator';
 import { logger } from '@/lib/logger';
 import { extractClaimContexts, type ClaimContext } from './claim-extractor';
@@ -40,15 +39,6 @@ async function runWithConcurrencyLimit<T>(
   return results;
 }
 
-function findBestReplacement(checks: VerificationCheck[]): ReplacementData | undefined {
-  const priority: Array<'doi' | 'title_search' | 'grounding' | 'ai'> = ['doi', 'title_search', 'grounding', 'ai'];
-  for (const layer of priority) {
-    const check = checks.find((c) => c.layer === layer && c.replacement);
-    if (check?.replacement) return check.replacement;
-  }
-  return undefined;
-}
-
 export interface VerificationResult {
   domain: ContentDomain;
   verdict: VerificationVerdict;
@@ -65,7 +55,11 @@ export async function runReferenceVerification(
   model?: string,
   provider?: string,
   requiredRefCount = Infinity
-): Promise<{ results: Map<string, VerificationResult>; rejectedRefIds: Set<string>; claimContexts: Map<number, ClaimContext> }> {
+): Promise<{
+  results: Map<string, VerificationResult>;
+  rejectedRefIds: Set<string>;
+  claimContexts: Map<number, ClaimContext>;
+}> {
   const results = new Map<string, VerificationResult>();
   const rejectedRefIds = new Set<string>();
 
@@ -121,7 +115,7 @@ export async function runReferenceVerification(
   try {
     externalCheckResults = await runWithConcurrencyLimit(layerTasks, MAX_CONCURRENT);
   } catch (error) {
-    logger.warn('External verification APIs failed, proceeding with AI-only', {
+    logger.warn('External verification APIs failed; affected references will fail closed', {
       error: error instanceof Error ? error.message : 'Unknown',
     });
     externalCheckResults = acceptedRefs.map((ref) => ({ id: ref.id, checks: [] }));
@@ -148,9 +142,15 @@ export async function runReferenceVerification(
   // AI layer: single batch call with per-ref domain instructions
   let aiResults: Map<string, VerificationCheck>;
   try {
-    aiResults = await aiEvaluateWithDomainContext(refsWithDomain, topic, apiKeyOverride, model, provider);
+    aiResults = await aiEvaluateWithDomainContext(
+      refsWithDomain,
+      topic,
+      apiKeyOverride,
+      model,
+      provider
+    );
   } catch (error) {
-    logger.warn('AI evaluation failed, using external checks only', {
+    logger.warn('AI claim-support evaluation failed; affected references will fail closed', {
       error: error instanceof Error ? error.message : 'Unknown',
     });
     aiResults = new Map();
@@ -198,7 +198,11 @@ export async function runReferenceVerification(
       allChecks: allChecks.get(ref.id) ?? [],
     }));
     const groundingResults = await groundFailedReferences(
-      groundingInputs, topic, apiKeyOverride, model, provider
+      groundingInputs,
+      topic,
+      apiKeyOverride,
+      model,
+      provider
     );
     for (const [refId, check] of groundingResults) {
       const existing = allChecks.get(refId) ?? [];
@@ -222,20 +226,26 @@ export async function runReferenceVerification(
         confidence: c.confidence,
       }));
 
-    const { posterior, verdict: rawVerdict, logOddsContributions } = computeBayesianScore(domain, layerResults);
+    const {
+      posterior,
+      verdict: rawVerdict,
+      logOddsContributions,
+    } = computeBayesianScore(domain, layerResults);
 
     let verdict: VerificationVerdict;
 
-    if (rawVerdict === 'VERIFIED') {
+    const claimContext = claimContexts.get(ref.number);
+    const aiClaimCheck = checks.find((check) => check.layer === 'ai');
+    const claimsSupported =
+      (claimContext?.sentences.length ?? 0) > 0 && aiClaimCheck?.passed === true;
+
+    if (rawVerdict === 'VERIFIED' && claimsSupported) {
       verdict = { status: 'VERIFIED', confidence: posterior };
     } else {
-      // Check for a replacement suggestion from any layer
-      const replacement = findBestReplacement(checks);
-      if (replacement) {
-        verdict = { status: 'REPLACED', confidence: posterior, replacement };
-      } else {
-        verdict = { status: 'REMOVED', confidence: posterior };
-      }
+      // Replacement suggestions are evidence for an editorial retry, not proof
+      // that the current numbered citation supports its claims. Fail closed and
+      // require the script/references to be regenerated and re-verified.
+      verdict = { status: 'REMOVED', confidence: posterior };
     }
 
     results.set(ref.id, { domain, verdict, score: posterior, checks, logOddsContributions });

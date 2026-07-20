@@ -100,7 +100,9 @@ export function CourseManagement({ courses }: { courses: ManagedCourse[] }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setDialog((d) => (d ? { ...d, busy: false, error: body.error ?? 'Could not delete the course.' } : d));
+        setDialog((d) =>
+          d ? { ...d, busy: false, error: body.error ?? 'Could not delete the course.' } : d
+        );
         return;
       }
       setList((cur) => cur.filter((c) => c.id !== course.id));
@@ -111,7 +113,9 @@ export function CourseManagement({ courses }: { courses: ManagedCourse[] }) {
         router.refresh();
       }
     } catch {
-      setDialog((d) => (d ? { ...d, busy: false, error: 'A network error occurred. Please try again.' } : d));
+      setDialog((d) =>
+        d ? { ...d, busy: false, error: 'A network error occurred. Please try again.' } : d
+      );
     }
   }
 
@@ -144,7 +148,9 @@ export function CourseManagement({ courses }: { courses: ManagedCourse[] }) {
         {list.map((course) => (
           <li key={course.id} className={styles.row}>
             <div className={styles.rowInfo}>
-              <span className={styles.rowTitle}>{course.title || langLabel(course.targetLang)}</span>
+              <span className={styles.rowTitle}>
+                {course.title || langLabel(course.targetLang)}
+              </span>
               <span className={styles.rowMeta}>
                 {langLabel(course.targetLang)} · {course.currentLevel}
               </span>
@@ -178,7 +184,11 @@ export function CourseManagement({ courses }: { courses: ManagedCourse[] }) {
       </ul>
 
       {dialog && (
-        <div className={styles.overlay} role="presentation" onClick={() => !dialog.busy && setDialog(null)}>
+        <div
+          className={styles.overlay}
+          role="presentation"
+          onClick={() => !dialog.busy && setDialog(null)}
+        >
           <div
             className={styles.dialog}
             role="dialog"

@@ -10,7 +10,8 @@ const mockScoreExam = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({ authenticateRequest: (...a: unknown[]) => mockAuth(...a) }));
 vi.mock('@/lib/mock-exam-scoring', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/mock-exam-scoring')>('@/lib/mock-exam-scoring');
+  const actual =
+    await vi.importActual<typeof import('@/lib/mock-exam-scoring')>('@/lib/mock-exam-scoring');
   return { ...actual, scoreExam: (...a: unknown[]) => mockScoreExam(...a) };
 });
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
@@ -32,7 +33,12 @@ describe('POST /api/v1/exams/[examId]/submit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: 'u1' });
-    mockScoreExam.mockResolvedValue({ overallScore: 0.65, band: 'B1 pass (mock)', sections: [], feedback: 'ok' });
+    mockScoreExam.mockResolvedValue({
+      overallScore: 0.65,
+      band: 'B1 pass (mock)',
+      sections: [],
+      feedback: 'ok',
+    });
   });
 
   it('rejects unauthenticated requests', async () => {

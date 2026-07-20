@@ -8,7 +8,12 @@ vi.mock('@/lib/logger', () => ({
 describe('filterToKnownModels', () => {
   it('keeps models that exist in the AI registry', () => {
     const extracted: ExtractedModelPricing[] = [
-      { modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet', inputPerMTok: 3.0, outputPerMTok: 15.0 },
+      {
+        modelId: 'claude-sonnet-4-6',
+        displayName: 'Claude Sonnet',
+        inputPerMTok: 3.0,
+        outputPerMTok: 15.0,
+      },
       { modelId: 'gpt-5-mini', displayName: 'GPT-5 Mini', inputPerMTok: 0.25, outputPerMTok: 2.0 },
     ];
     const result = filterToKnownModels(extracted);
@@ -19,7 +24,12 @@ describe('filterToKnownModels', () => {
 
   it('keeps models that exist in pricetoken catalog but not AI registry', () => {
     const extracted: ExtractedModelPricing[] = [
-      { modelId: 'deepseek-chat', displayName: 'DeepSeek Chat', inputPerMTok: 0.27, outputPerMTok: 1.10 },
+      {
+        modelId: 'deepseek-chat',
+        displayName: 'DeepSeek Chat',
+        inputPerMTok: 0.27,
+        outputPerMTok: 1.1,
+      },
       { modelId: 'grok-3', displayName: 'Grok 3', inputPerMTok: 3.0, outputPerMTok: 15.0 },
     ];
     const result = filterToKnownModels(extracted);
@@ -28,9 +38,19 @@ describe('filterToKnownModels', () => {
 
   it('filters out completely unknown models', () => {
     const extracted: ExtractedModelPricing[] = [
-      { modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet', inputPerMTok: 3.0, outputPerMTok: 15.0 },
+      {
+        modelId: 'claude-sonnet-4-6',
+        displayName: 'Claude Sonnet',
+        inputPerMTok: 3.0,
+        outputPerMTok: 15.0,
+      },
       { modelId: 'totally-fake-model', displayName: 'Fake', inputPerMTok: 1.0, outputPerMTok: 1.0 },
-      { modelId: 'gpt-99-turbo', displayName: 'GPT-99 Turbo', inputPerMTok: 0.5, outputPerMTok: 5.0 },
+      {
+        modelId: 'gpt-99-turbo',
+        displayName: 'GPT-99 Turbo',
+        inputPerMTok: 0.5,
+        outputPerMTok: 5.0,
+      },
     ];
     const result = filterToKnownModels(extracted);
     expect(result).toHaveLength(1);

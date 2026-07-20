@@ -2,7 +2,8 @@
  * Media bias detection using MBFC (Media Bias/Fact Check) dataset.
  * Lazy-loads the static dataset on first call (server-side only).
  *
- * Data source: drmikecrowe/mbfcext (MIT license, 9,773 sources, daily-updated upstream)
+ * Data source: bundled drmikecrowe/mbfcext snapshot (MIT license; see
+ * THIRD_PARTY_NOTICES.md)
  */
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -85,7 +86,10 @@ function ensureLoaded(): void {
 // ── Public API ──────────────────────────────────────────────────
 
 export function normalizeDomain(domain: string): string {
-  return domain.toLowerCase().replace(/^www\./, '').replace(/\/+$/, '');
+  return domain
+    .toLowerCase()
+    .replace(/^www\./, '')
+    .replace(/\/+$/, '');
 }
 
 export function extractDomain(url: string): string {

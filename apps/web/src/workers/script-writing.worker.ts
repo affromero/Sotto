@@ -48,8 +48,9 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
       {
         episodeId,
         userId,
+        useAdminCredits,
       },
-      { jobId: `compile-${episodeId}-${Date.now()}` }
+      { jobId: `compile-${episodeId}-${String(job.id)}` }
     );
 
     await job.updateProgress(100);
@@ -252,8 +253,9 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     {
       episodeId,
       userId,
+      useAdminCredits,
     },
-    { jobId: `compile-${episodeId}-${Date.now()}` }
+    { jobId: `compile-${episodeId}-${String(job.id)}` }
   );
 
   logger.info('Script writing complete, queued compilation', {

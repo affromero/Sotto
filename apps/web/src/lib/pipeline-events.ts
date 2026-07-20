@@ -8,15 +8,19 @@ import { logger } from './logger';
 export async function logPipelineStageComplete(
   episodeId: string,
   stage: string,
-  message?: string,
+  message?: string
 ): Promise<void> {
-  await prisma.pipelineEvent.create({
-    data: { episodeId, stage, type: 'complete', message: message ?? `${stage} completed` },
-  }).catch((err) => {
-    logger.warn('Failed to log pipeline stage completion', {
-      episodeId, stage, error: err instanceof Error ? err.message : String(err),
+  await prisma.pipelineEvent
+    .create({
+      data: { episodeId, stage, type: 'complete', message: message ?? `${stage} completed` },
+    })
+    .catch((err) => {
+      logger.warn('Failed to log pipeline stage completion', {
+        episodeId,
+        stage,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
-  });
 }
 
 export interface RecentPipelineError {
@@ -37,7 +41,7 @@ export async function getRecentPipelineErrors(
   since?: Date,
   until?: Date,
   sortCol: PipelineErrorSortCol = 'createdAt',
-  sortDir: 'asc' | 'desc' = 'desc',
+  sortDir: 'asc' | 'desc' = 'desc'
 ): Promise<RecentPipelineError[]> {
   const events = await prisma.pipelineEvent.findMany({
     where: {
@@ -99,7 +103,7 @@ export interface DiscoveryChatErrorStats {
 
 export async function getDiscoveryChatErrorStats(
   since: Date,
-  until?: Date,
+  until?: Date
 ): Promise<DiscoveryChatErrorStats> {
   const where = {
     createdAt: {
@@ -160,7 +164,7 @@ export async function getRecentDiscoveryChatErrors(
   sort: 'asc' | 'desc' = 'desc',
   since?: Date,
   until?: Date,
-  sortCol: DiscoveryChatErrorSortCol = 'createdAt',
+  sortCol: DiscoveryChatErrorSortCol = 'createdAt'
 ): Promise<RecentDiscoveryChatError[]> {
   const errors = await prisma.discoveryChatError.findMany({
     where: {

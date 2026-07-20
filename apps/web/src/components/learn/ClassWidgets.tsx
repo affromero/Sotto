@@ -162,8 +162,7 @@ export function ContinueBar({
           </span>
         ) : (
           <span className={styles.lockedNote}>
-            <ClassGlyph name="lock" size={14} /> reach {gate}% to unlock{' '}
-            {nextName ?? 'the wrap-up'}
+            <ClassGlyph name="lock" size={14} /> reach {gate}% to unlock {nextName ?? 'the wrap-up'}
           </span>
         ))}
       <button

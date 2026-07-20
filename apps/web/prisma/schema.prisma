@@ -23,13 +23,13 @@ enum UserRole {
 // ============ USERS & AUTH ============
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  image         String?
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   preferredLanguage    String?
   preferredTtsProvider String?
@@ -47,7 +47,7 @@ model User {
 
   // Per-profile appearance — applied when this profile is active (re-themes on switch)
   themeMode     String  @default("system") // system | light | dark
-  themePalette  String  @default("aula")   // aula | paper
+  themePalette  String  @default("aula") // aula | paper
   themeAccent   String? // hex; null = brand default
   reducedMotion Boolean @default(false)
 
@@ -133,14 +133,18 @@ model Episode {
   language         String? // ISO 639-1, e.g. 'en', 'es', 'ja'
 
   // Source tracking
-  source        EpisodeSource @default(WEB)
+  source EpisodeSource @default(WEB)
 
   // Visibility
   visibility EpisodeVisibility @default(PRIVATE)
   isDelisted Boolean           @default(false)
 
   // Versioning
-  currentVersion Int @default(1)
+  currentVersion         Int     @default(1)
+  lastCompletedStitchKey String?
+  activeStitchKey        String?
+  activeStitchOwner      String?
+  audioGenerationKey     String?
 
   // PDF export
   pdfUrl String?
@@ -155,26 +159,26 @@ model Episode {
   sourcePlatform       String? // e.g. "notebooklm", "spotify", "apple_episodes", "youtube"
 
   // Relations
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  discovery           Discovery?
-  script              Script?
-  segments            Segment[]
-  interactions        Interaction[]
-  saves               Save[]
-  tags                EpisodeTag[]
-  jobs                Job[]
-  pipelineEvents      PipelineEvent[]
-  references          Reference[]
-  versions            EpisodeVersion[]
-  voices              EpisodeVoice[]
-  audioFingerprint    AudioFingerprint?
-  agentIngestion      AgentIngestion?
-  researchDossier     ResearchDossier?
-  creativeOutline     CreativeOutline?
-  vocabularyEntries   VocabularyEntry[]
-  classSection        ClassSection?
-  examSection         ExamSection?
-  practiceSession     PracticeSession?
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discovery         Discovery?
+  script            Script?
+  segments          Segment[]
+  interactions      Interaction[]
+  saves             Save[]
+  tags              EpisodeTag[]
+  jobs              Job[]
+  pipelineEvents    PipelineEvent[]
+  references        Reference[]
+  versions          EpisodeVersion[]
+  voices            EpisodeVoice[]
+  audioFingerprint  AudioFingerprint?
+  agentIngestion    AgentIngestion?
+  researchDossier   ResearchDossier?
+  creativeOutline   CreativeOutline?
+  vocabularyEntries VocabularyEntry[]
+  classSection      ClassSection?
+  examSection       ExamSection?
+  practiceSession   PracticeSession?
 
   @@unique([userId, slug])
   @@index([userId])
@@ -349,18 +353,19 @@ model DiscoveryChatError {
 // ============ SCRIPTS ============
 
 model Script {
-  id                   String   @id @default(cuid())
-  episodeId            String   @unique
+  id                   String    @id @default(cuid())
+  episodeId            String    @unique
   turns                Json // [{speaker: "HOST"|"EXPERT", text: "..."}]
   soundCues            Json? // [{type, prompt, durationSeconds, insertAfterTurn}]
-  markdown             String   @db.Text
-  context              String?  @db.Text // source context used for generation
-  version              Int      @default(1)
-  verificationAttempts Int      @default(0)
-  verificationFeedback String?  @db.Text
+  markdown             String    @db.Text
+  context              String?   @db.Text // source context used for generation
+  version              Int       @default(1)
+  verificationAttempts Int       @default(0)
+  verificationFeedback String?   @db.Text
   verificationClaims   Json? // ClaimAnalysis[] with turnHash — persisted for incremental re-use
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  compiledAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 }
@@ -386,10 +391,10 @@ model Segment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  episode            Episode             @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
+  @@unique([episodeId, order])
   @@index([episodeId])
-  @@index([order])
 }
 
 // ============ EPISODE VOICE ASSIGNMENTS ============
@@ -631,13 +636,14 @@ model Job {
 // ============ PIPELINE EVENTS ============
 
 model PipelineEvent {
-  id        String   @id @default(cuid())
-  episodeId String
-  createdAt DateTime @default(now())
-  stage     String // queue name: 'audio-generation', 'script-verification', etc.
-  type      String // 'error' | 'warning' | 'retry' | 'complete'
-  message   String   @db.Text
-  metadata  Json? // { segmentId?, jobId?, attemptNumber?, errorKind? }
+  id             String   @id @default(cuid())
+  episodeId      String
+  createdAt      DateTime @default(now())
+  stage          String // queue name: 'audio-generation', 'script-verification', etc.
+  type           String // 'error' | 'warning' | 'retry' | 'complete'
+  message        String   @db.Text
+  metadata       Json? // { segmentId?, jobId?, attemptNumber?, errorKind? }
+  idempotencyKey String?  @unique
 
   episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
@@ -875,26 +881,26 @@ model UserVisualCueKey {
 // ============ AUTO MODEL CONFIG ============
 
 model AutoModelConfig {
-  id                  String   @id @default("singleton")
-  aiProvider          String   @default("anthropic")
-  aiModel             String   @default("claude-haiku-4-5-20251001")
-  ttsProvider         String   @default("openai")
-  ttsModel            String   @default("tts-1-hd")
-  sttProvider         String   @default("openai")
-  sttModel            String   @default("whisper-large-v3-turbo")
-  platformAiProvider  String   @default("anthropic")
-  platformAiModel     String   @default("claude-haiku-4-5-20251001")
-  includedModels      Json?
-  includedTtsModels   Json?
-  includedSttModels   Json?
-  updatedAt           DateTime @updatedAt
-  updatedBy           String?
+  id                 String   @id @default("singleton")
+  aiProvider         String   @default("anthropic")
+  aiModel            String   @default("claude-haiku-4-5-20251001")
+  ttsProvider        String   @default("openai")
+  ttsModel           String   @default("tts-1-hd")
+  sttProvider        String   @default("openai")
+  sttModel           String   @default("whisper-large-v3-turbo")
+  platformAiProvider String   @default("anthropic")
+  platformAiModel    String   @default("claude-haiku-4-5-20251001")
+  includedModels     Json?
+  includedTtsModels  Json?
+  includedSttModels  Json?
+  updatedAt          DateTime @updatedAt
+  updatedBy          String?
 }
 
 // ============ SITE CONFIG ============
 
 model SiteConfig {
-  id         String   @id @default("singleton")
+  id String @id @default("singleton")
 
   // Owner-set server infrastructure (non-secret selection only; null = fall back to env).
   // Secrets (provider keys, R2/S3 credentials) never live here — they stay in env or the
@@ -1015,8 +1021,8 @@ model Lesson {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  curriculum Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
-  parent     Lesson?    @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
+  curriculum Curriculum    @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  parent     Lesson?       @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Lesson[]      @relation("LessonTree")
   classes    CourseClass[]
 
@@ -1029,21 +1035,21 @@ model Lesson {
 // A learner's enrollment in one language pair. CEFR level lives here (a user
 // can hold several courses at several levels).
 model Course {
-  id            String    @id @default(cuid())
-  userId        String
-  nativeLang    String
-  targetLang    String
-  curriculumId  String
-  currentLevel  CefrLevel @default(A1) // "you are here"; assigned by placement, advances with mastery
-  startLevel    CefrLevel @default(A1) // immutable placement result
+  id              String           @id @default(cuid())
+  userId          String
+  nativeLang      String
+  targetLang      String
+  curriculumId    String
+  currentLevel    CefrLevel        @default(A1) // "you are here"; assigned by placement, advances with mastery
+  startLevel      CefrLevel        @default(A1) // immutable placement result
   placementSource PlacementSource? // how the level was set (null = unknown/legacy)
-  pedagogy      PedagogyStyle @default(BALANCED) // teaching approach; shapes generation
-  activeClassId String? // current in-flight class (gating convenience cache)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  pedagogy        PedagogyStyle    @default(BALANCED) // teaching approach; shapes generation
+  activeClassId   String? // current in-flight class (gating convenience cache)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  curriculum       Curriculum        @relation(fields: [curriculumId], references: [id])
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum       Curriculum           @relation(fields: [curriculumId], references: [id])
   placement        PlacementResult?
   classes          CourseClass[]
   vocab            LearnerVocab[]
@@ -1183,10 +1189,10 @@ model ClassSection {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  class         CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
-  episode       Episode?         @relation(fields: [episodeId], references: [id], onDelete: SetNull)
-  questions     LessonQuestion[]
-  prompts       SpeakingPrompt[]
+  class          CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  episode        Episode?         @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  questions      LessonQuestion[]
+  prompts        SpeakingPrompt[]
   writingPrompts WritingPrompt[]
 
   @@index([classId, skill, attempt])
@@ -1195,19 +1201,19 @@ model ClassSection {
 // MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
 // post-listen quiz question shape, but supports retries and has no episode.
 model LessonQuestion {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   sectionId    String
   order        Int
   skill        SkillType
-  question     String   @db.Text
+  question     String    @db.Text
   options      Json // ["A","B","C","D"]
   correctIndex Int
-  explanation  String   @db.Text
-  vocabIds     String[] @default([]) // memory-graph linkage (later phases)
-  grammarKeys  String[] @default([])
-  passageRef   String?  @db.Text // short label/anchor for the passage or listening turn
-  passageText  String?  @db.Text // the actual reading passage (sourced classes: a CEFR-leveled excerpt with [N] citations)
-  createdAt    DateTime @default(now())
+  explanation  String    @db.Text
+  vocabIds     String[]  @default([]) // memory-graph linkage (later phases)
+  grammarKeys  String[]  @default([])
+  passageRef   String?   @db.Text // short label/anchor for the passage or listening turn
+  passageText  String?   @db.Text // the actual reading passage (sourced classes: a CEFR-leveled excerpt with [N] citations)
+  createdAt    DateTime  @default(now())
 
   section ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
@@ -1270,9 +1276,9 @@ model SpeakingPrompt {
   referenceTtsUrl   String? // pre-rendered model pronunciation (resolveTtsProvider at build)
   createdAt         DateTime @default(now())
 
-  section         ClassSection?    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
-  examSection     ExamSection?     @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
+  section         ClassSection?       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession?    @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  examSection     ExamSection?        @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
   recordings      SpeakingRecording[]
 
   @@unique([sectionId, order])
@@ -1434,17 +1440,17 @@ model ExamSection {
 // MC question for an exam section. Mirrors LessonQuestion; MC has no async grading
 // so a separate model keeps exams decoupled from ClassSection.
 model ExamQuestion {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   sectionId    String
   order        Int
   skill        SkillType
-  question     String   @db.Text
+  question     String    @db.Text
   options      Json // ["A","B","C","D"]
   correctIndex Int
-  explanation  String   @db.Text
-  passageRef   String?  @db.Text
-  passageText  String?  @db.Text
-  createdAt    DateTime @default(now())
+  explanation  String    @db.Text
+  passageRef   String?   @db.Text
+  passageText  String?   @db.Text
+  createdAt    DateTime  @default(now())
 
   section ExamSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
@@ -1466,12 +1472,12 @@ model ExamSubmission {
 }
 
 model ExamSectionResult {
-  id           String  @id @default(cuid())
+  id           String    @id @default(cuid())
   submissionId String
   sectionId    String
   skill        SkillType
   score        Float // 0..1
-  feedback     String? @db.Text
+  feedback     String?   @db.Text
 
   submission ExamSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
@@ -1491,20 +1497,20 @@ enum EdgeType {
 
 // Per-course vocabulary node with SM-2 spaced-repetition state.
 model LearnerVocab {
-  id            String  @id @default(cuid())
-  courseId      String
-  lemma         String // canonical target-language form
-  translation   String
-  partOfSpeech  String?
-  pronunciation String?
+  id               String     @id @default(cuid())
+  courseId         String
+  lemma            String // canonical target-language form
+  translation      String
+  partOfSpeech     String?
+  pronunciation    String?
   // SRS state (SM-2)
-  ease         Float     @default(2.5)
-  intervalDays Float     @default(0)
-  dueAt        DateTime  @default(now())
-  reps         Int       @default(0)
-  lapses       Int       @default(0)
-  mastery      Float     @default(0) // 0..1 rolled-up strength
-  lastReviewed DateTime?
+  ease             Float      @default(2.5)
+  intervalDays     Float      @default(0)
+  dueAt            DateTime   @default(now())
+  reps             Int        @default(0)
+  lapses           Int        @default(0)
+  mastery          Float      @default(0) // 0..1 rolled-up strength
+  lastReviewed     DateTime?
   // provenance
   firstSeenClassId String?
   cefrLevel        CefrLevel?

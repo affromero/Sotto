@@ -2,13 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { ToastProvider, useToast } from '@/components/providers/ToastProvider';
 
-function TestConsumer({ message = 'Test toast', type = 'success' as const, duration }: { message?: string; type?: 'success' | 'error' | 'info' | 'warning'; duration?: number }) {
+function TestConsumer({
+  message = 'Test toast',
+  type = 'success' as const,
+  duration,
+}: {
+  message?: string;
+  type?: 'success' | 'error' | 'info' | 'warning';
+  duration?: number;
+}) {
   const { showToast } = useToast();
-  return (
-    <button onClick={() => showToast(message, type, duration)}>
-      Trigger
-    </button>
-  );
+  return <button onClick={() => showToast(message, type, duration)}>Trigger</button>;
 }
 
 describe('ToastProvider', () => {
@@ -74,7 +78,9 @@ describe('ToastProvider', () => {
     function ActionConsumer() {
       const { showToast } = useToast();
       return (
-        <button onClick={() => showToast('Ready!', 'success', 4000, { label: 'View', onClick: vi.fn() })}>
+        <button
+          onClick={() => showToast('Ready!', 'success', 4000, { label: 'View', onClick: vi.fn() })}
+        >
           Trigger
         </button>
       );

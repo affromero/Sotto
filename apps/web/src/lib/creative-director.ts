@@ -83,27 +83,48 @@ const FRAMEWORKS: Record<string, { name: string; instructions: string }> = {
 
 function selectFramework(tone: string): string {
   switch (tone) {
-    case 'socratic': return 'question_cascade';
-    case 'professional': return 'problem_solution';
+    case 'socratic':
+      return 'question_cascade';
+    case 'professional':
+      return 'problem_solution';
     case 'comedic':
-    case 'satirical': return 'editorial_comedy';
-    case 'storytelling': return 'storytelling';
+    case 'satirical':
+      return 'editorial_comedy';
+    case 'storytelling':
+      return 'storytelling';
     case 'casual':
-    default: return 'anecdote_reflection';
+    default:
+      return 'anecdote_reflection';
   }
 }
 
 function extractFirstJson(text: string): string {
   const trimmed = text.trim();
-  try { JSON.parse(trimmed); return trimmed; } catch { /* continue */ }
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    /* continue */
+  }
   const start = text.indexOf('{');
   if (start === -1) throw new Error('No JSON object found in response');
-  let depth = 0, inString = false, escape = false;
+  let depth = 0,
+    inString = false,
+    escape = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === '{') depth++;
     if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
@@ -133,27 +154,39 @@ export async function createCreativeOutline(params: CreateOutlineParams): Promis
     AUDIENCE_LEVEL: params.audienceLevel,
     SOURCE_COUNT: String(params.sources.length),
     EVIDENCE_COUNT: String(params.evidence.length),
-    RECOMMENDED_ANGLE: params.recommendedAngle || 'No specific angle recommended — choose the most compelling one',
-    EVIDENCE_JSON: JSON.stringify(params.evidence.map(e => ({
-      evidenceId: e.evidenceId,
-      claim: e.claim,
-      claimType: e.claimType,
-      sourceIds: e.sourceIds,
-      confidence: e.confidence,
-      freshness: e.freshness,
-    })), null, 2),
+    RECOMMENDED_ANGLE:
+      params.recommendedAngle || 'No specific angle recommended — choose the most compelling one',
+    EVIDENCE_JSON: JSON.stringify(
+      params.evidence.map((e) => ({
+        evidenceId: e.evidenceId,
+        claim: e.claim,
+        claimType: e.claimType,
+        sourceIds: e.sourceIds,
+        confidence: e.confidence,
+        freshness: e.freshness,
+      })),
+      null,
+      2
+    ),
     FRAMEWORK: framework.name,
     FRAMEWORK_INSTRUCTIONS: framework.instructions,
   });
 
   const ai = createAIProvider(params.provider);
-  const response = await ai.generateResponse(systemPrompt, [
-    { role: 'user', content: `Design the episode structure for a ${params.durationTarget}-minute ${params.tone} lesson about: ${params.topic}` },
-  ], {
-    maxTokens: 6144,
-    apiKeyOverride: params.apiKeyOverride,
-    model: params.model,
-  });
+  const response = await ai.generateResponse(
+    systemPrompt,
+    [
+      {
+        role: 'user',
+        content: `Design the episode structure for a ${params.durationTarget}-minute ${params.tone} lesson about: ${params.topic}`,
+      },
+    ],
+    {
+      maxTokens: 6144,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+    }
+  );
 
   const data = JSON.parse(extractFirstJson(response.content));
 
@@ -174,7 +207,8 @@ export async function createCreativeOutline(params: CreateOutlineParams): Promis
     listenerPromise: data.listenerPromise || '',
     thesis: data.thesis || '',
     narrativeFramework: frameworkKey,
-    speakerRoles: data.speakerRoles || params.speakers.map(s => ({ speaker: s.name, role: s.description })),
+    speakerRoles:
+      data.speakerRoles || params.speakers.map((s) => ({ speaker: s.name, role: s.description })),
     beats,
     tensionCurve: data.tensionCurve || [],
     bannedAngles: data.bannedAngles || [],

@@ -135,11 +135,7 @@ export const cache = {
  * releasing decrements it. TTL acts as a safety net for leaked slots.
  */
 export const semaphore = {
-  async acquire(
-    key: string,
-    maxSlots: number,
-    ttlSeconds: number = 120
-  ): Promise<boolean> {
+  async acquire(key: string, maxSlots: number, ttlSeconds: number = 120): Promise<boolean> {
     const client = getRedisClient();
     const count = await client.incr(key);
     if (count === 1) {
@@ -190,23 +186,36 @@ export async function checkRateLimit(
   const key = `ratelimit:${identifier}`;
   const now = Date.now();
   const windowStart = now - windowSeconds * 1000;
+  const member = `${now}:${crypto.randomUUID()}`;
+  const script = `
+    redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[1])
+    local current = redis.call('ZCARD', KEYS[1])
+    if current >= tonumber(ARGV[2]) then
+      local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+      local resetAt = tonumber(ARGV[3]) + tonumber(ARGV[4])
+      if #oldest > 0 then resetAt = tonumber(oldest[2]) + tonumber(ARGV[4]) end
+      return {0, 0, resetAt}
+    end
+    redis.call('ZADD', KEYS[1], ARGV[3], ARGV[5])
+    redis.call('PEXPIRE', KEYS[1], ARGV[4])
+    return {1, tonumber(ARGV[2]) - current - 1, tonumber(ARGV[3]) + tonumber(ARGV[4])}
+  `;
+  const result = (await client.eval(
+    script,
+    1,
+    key,
+    windowStart,
+    limit,
+    now,
+    windowSeconds * 1000,
+    member
+  )) as [number, number, number];
 
-  await client.zremrangebyscore(key, 0, windowStart);
-  const current = await client.zcard(key);
-
-  if (current >= limit) {
-    const oldestEntry = await client.zrange(key, 0, 0, 'WITHSCORES');
-    const resetAt =
-      oldestEntry.length > 0
-        ? parseInt(oldestEntry[1]) + windowSeconds * 1000
-        : now + windowSeconds * 1000;
-    return { allowed: false, remaining: 0, resetAt };
-  }
-
-  await client.zadd(key, now, `${now}`);
-  await client.expire(key, windowSeconds);
-
-  return { allowed: true, remaining: limit - current - 1, resetAt: now + windowSeconds * 1000 };
+  return {
+    allowed: result[0] === 1,
+    remaining: result[1],
+    resetAt: result[2],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -217,8 +226,14 @@ const EPISODE_CACHE_PREFIX = 'episode:public:';
 const EPISODE_CHANNEL_PREFIX = 'episode:status:';
 
 const ACTIVE_STATUSES = new Set([
-  'EXTRACTING', 'DISCOVERING', 'RESEARCHING', 'PLANNING',
-  'SCRIPTING', 'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
+  'EXTRACTING',
+  'DISCOVERING',
+  'RESEARCHING',
+  'PLANNING',
+  'SCRIPTING',
+  'COMPILING',
+  'GENERATING_AUDIO',
+  'STITCHING',
 ]);
 
 export function getEpisodeCacheTtl(status: string): number {
@@ -231,7 +246,7 @@ export async function invalidateEpisodeCache(episodeId: string): Promise<void> {
 
 export async function publishEpisodeStatus(
   episodeId: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown>
 ): Promise<void> {
   const client = getRedisClient();
   await client.publish(`${EPISODE_CHANNEL_PREFIX}${episodeId}`, JSON.stringify(payload));
@@ -281,10 +296,7 @@ export async function publishNotification(
   payload: Record<string, unknown>
 ): Promise<void> {
   const client = getRedisClient();
-  await client.publish(
-    `${NOTIF_CHANNEL_PREFIX}${userId}`,
-    JSON.stringify(payload)
-  );
+  await client.publish(`${NOTIF_CHANNEL_PREFIX}${userId}`, JSON.stringify(payload));
 }
 
 /**

@@ -2,14 +2,16 @@ import { createAIProvider } from '@/lib/providers/ai';
 import { loadPrompt } from '@/lib/prompt-loader';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
-import { searchTitle, type ReferenceInput, type VerificationCheck, type ReplacementData } from '@/lib/reference-validator';
+import {
+  searchTitle,
+  type ReferenceInput,
+  type VerificationCheck,
+  type ReplacementData,
+} from '@/lib/reference-validator';
 import type { ContentDomain } from 'groundcheck';
 import type { ClaimContext } from './claim-extractor';
 
-export type GroundingReason =
-  | 'all_checks_failed'
-  | 'unreliable_source'
-  | 'low_quality_source';
+export type GroundingReason = 'all_checks_failed' | 'unreliable_source' | 'low_quality_source';
 
 export interface GroundingInput {
   ref: ReferenceInput;
@@ -21,7 +23,7 @@ export interface GroundingInput {
 
 function requireReferenceGroundingRouting(
   model?: string,
-  provider?: string,
+  provider?: string
 ): { model: string; provider: string } {
   if (!provider || !model) {
     throw new Error('AI provider and model are required for reference grounding.');
@@ -43,7 +45,11 @@ export function needsGrounding(checks: VerificationCheck[]): boolean {
  * Returns 1-3 queries: claim sentence, original title, and topic+keywords.
  * Each query is truncated to ~120 chars for API limits.
  */
-function buildGroundingQueries(claimContext: ClaimContext, refTitle: string, topic?: string): string[] {
+function buildGroundingQueries(
+  claimContext: ClaimContext,
+  refTitle: string,
+  topic?: string
+): string[] {
   const truncate = (s: string): string => {
     if (s.length <= 120) return s;
     const t = s.slice(0, 120);
@@ -62,7 +68,11 @@ function buildGroundingQueries(claimContext: ClaimContext, refTitle: string, top
 
   // Query 3: topic + claim keywords (broadens the search)
   if (topic && claimText.length >= 10) {
-    const keywords = claimText.split(/\s+/).filter(w => w.length > 4).slice(0, 5).join(' ');
+    const keywords = claimText
+      .split(/\s+/)
+      .filter((w) => w.length > 4)
+      .slice(0, 5)
+      .join(' ');
     if (keywords.length >= 10) queries.push(truncate(`${topic} ${keywords}`));
   }
 
@@ -78,12 +88,12 @@ function buildGroundingQueries(claimContext: ClaimContext, refTitle: string, top
  */
 async function openAlexGrounding(
   candidates: Array<{ ref: ReferenceInput; claimContext: ClaimContext; domain: ContentDomain }>,
-  topic?: string,
+  topic?: string
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
 
   const eligible = candidates.filter(
-    ({ domain }) => domain === 'ACADEMIC' || domain === 'EDUCATIONAL' || domain === 'GENERAL',
+    ({ domain }) => domain === 'ACADEMIC' || domain === 'EDUCATIONAL' || domain === 'GENERAL'
   );
 
   const tasks = eligible.map(async ({ ref, claimContext }) => {
@@ -134,15 +144,31 @@ async function openAlexGrounding(
 /** Extract first JSON object from text that may contain surrounding content. */
 function extractFirstJsonObject(text: string): string {
   const trimmed = text.trim();
-  try { JSON.parse(trimmed); return trimmed; } catch { /* not pure JSON */ }
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    /* not pure JSON */
+  }
   const start = text.indexOf('{');
   if (start === -1) throw new Error('No JSON object found in response');
-  let depth = 0, inString = false, escape = false;
+  let depth = 0,
+    inString = false,
+    escape = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === '{') depth++;
     if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
@@ -160,23 +186,28 @@ async function aiGroundBatch(
   systemPrompt: string,
   apiKeyOverride?: string,
   model?: string,
-  provider?: string,
+  provider?: string
 ): Promise<Map<string, VerificationCheck>> {
   const routing = requireReferenceGroundingRouting(model, provider);
 
   const results = new Map<string, VerificationCheck>();
   const BATCH_TIMEOUT_MS = 20_000;
 
-  const refsContext = batch.map(({ ref, claimContext }) => {
-    const claimText = claimContext.sentences.length > 0
-      ? claimContext.sentences.map((s, i) => `  [${claimContext.speakerTurns[i]}] "${s}"`).join('\n')
-      : '  No specific claim extracted.';
+  const refsContext = batch
+    .map(({ ref, claimContext }) => {
+      const claimText =
+        claimContext.sentences.length > 0
+          ? claimContext.sentences
+              .map((s, i) => `  [${claimContext.speakerTurns[i]}] "${s}"`)
+              .join('\n')
+          : '  No specific claim extracted.';
 
-    return `[${ref.number}] Original title: "${ref.title}"
+      return `[${ref.number}] Original title: "${ref.title}"
   Original URL: ${ref.url || 'none'}
   Claims:
 ${claimText}`;
-  }).join('\n\n');
+    })
+    .join('\n\n');
 
   const userMessage = `Topic: ${topic}
 
@@ -189,13 +220,17 @@ Find one real, verifiable source per reference. Return JSON only.`;
   try {
     const ai = createAIProvider(routing.provider);
     const response = await Promise.race([
-      ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: userMessage }],
-        { maxTokens: 4096, apiKeyOverride, model: routing.model, useWebSearch: true },
-      ),
+      ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+        maxTokens: 4096,
+        apiKeyOverride,
+        model: routing.model,
+        useWebSearch: true,
+      }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Grounding AI batch timed out after ${BATCH_TIMEOUT_MS / 1000}s`)), BATCH_TIMEOUT_MS),
+        setTimeout(
+          () => reject(new Error(`Grounding AI batch timed out after ${BATCH_TIMEOUT_MS / 1000}s`)),
+          BATCH_TIMEOUT_MS
+        )
       ),
     ]);
 
@@ -270,7 +305,7 @@ async function aiGroundingSearch(
   topic: string,
   apiKeyOverride?: string,
   model?: string,
-  provider?: string,
+  provider?: string
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
   if (candidates.length === 0) return results;
@@ -281,7 +316,14 @@ async function aiGroundingSearch(
   // Split into batches and process sequentially to respect rate limits
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
     const batch = candidates.slice(i, i + BATCH_SIZE);
-    const batchResults = await aiGroundBatch(batch, topic, systemPrompt, apiKeyOverride, model, provider);
+    const batchResults = await aiGroundBatch(
+      batch,
+      topic,
+      systemPrompt,
+      apiKeyOverride,
+      model,
+      provider
+    );
 
     for (const [id, check] of batchResults) {
       results.set(id, check);
@@ -315,7 +357,7 @@ async function groundReferenceCandidates(
   topic: string,
   apiKeyOverride?: string,
   model?: string,
-  provider?: string,
+  provider?: string
 ): Promise<Map<string, VerificationCheck>> {
   const candidates = inputs;
 
@@ -333,7 +375,7 @@ async function groundReferenceCandidates(
   // Phase 1: OpenAlex (multi-query, claim-based)
   const openAlexResults = await openAlexGrounding(
     candidates.map((c) => ({ ref: c.ref, claimContext: c.claimContext, domain: c.domain })),
-    topic,
+    topic
   );
 
   // Phase 2: AI search for refs not grounded by OpenAlex
@@ -343,7 +385,7 @@ async function groundReferenceCandidates(
     topic,
     apiKeyOverride,
     model,
-    provider,
+    provider
   );
 
   // Merge results (OpenAlex takes priority)
@@ -371,7 +413,7 @@ export async function groundFailedReferences(
   topic: string,
   apiKeyOverride?: string,
   model?: string,
-  provider?: string,
+  provider?: string
 ): Promise<Map<string, VerificationCheck>> {
   const needsWork = inputs.filter((i) => needsGrounding(i.allChecks));
   if (needsWork.length === 0) {
@@ -383,6 +425,6 @@ export async function groundFailedReferences(
     topic,
     apiKeyOverride,
     model,
-    provider,
+    provider
   );
 }

@@ -89,9 +89,9 @@ else
 fi
 mkdir -p .sotto/storage
 
-# Push database schema
-echo "Pushing database schema..."
-npx prisma db push --schema=apps/web/prisma/schema.prisma
+# Apply the clean-slate migration history.
+echo "Applying database migrations..."
+npx prisma migrate deploy --config=prisma.config.ts
 
 # Generate Prisma client
 npx prisma generate --schema=apps/web/prisma/schema.prisma

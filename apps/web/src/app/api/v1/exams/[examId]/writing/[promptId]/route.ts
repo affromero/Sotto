@@ -22,7 +22,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { examId, promptId } = await params;
     const userId = authed.userId;
 
-    const exam = await prisma.mockExam.findFirst({ where: { id: examId, userId }, select: { id: true } });
+    const exam = await prisma.mockExam.findFirst({
+      where: { id: examId, userId },
+      select: { id: true },
+    });
     if (!exam) return errorResponse('Exam not found', 404);
 
     const prompt = await prisma.writingPrompt.findFirst({
@@ -32,7 +35,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         examSectionId: true,
         examSection: {
           select: {
-            exam: { select: { level: true, course: { select: { nativeLang: true, targetLang: true } } } },
+            exam: {
+              select: { level: true, course: { select: { nativeLang: true, targetLang: true } } },
+            },
           },
         },
       },
@@ -61,7 +66,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       corrections: grade.corrections as unknown as Prisma.InputJsonValue,
       feedback: grade.feedback,
     };
-    const existing = await prisma.writingResponse.findFirst({ where: { promptId, userId }, select: { id: true } });
+    const existing = await prisma.writingResponse.findFirst({
+      where: { promptId, userId },
+      select: { id: true },
+    });
     if (existing) await prisma.writingResponse.update({ where: { id: existing.id }, data });
     else await prisma.writingResponse.create({ data });
 

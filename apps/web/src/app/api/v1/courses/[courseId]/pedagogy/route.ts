@@ -8,7 +8,10 @@ import { coursePedagogySchema } from '@/lib/validations';
 type RouteParams = { params: Promise<{ courseId: string }> };
 
 async function ownsCourse(courseId: string, userId: string): Promise<boolean> {
-  const course = await prisma.course.findFirst({ where: { id: courseId, userId }, select: { id: true } });
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, userId },
+    select: { id: true },
+  });
   return Boolean(course);
 }
 
@@ -42,7 +45,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!(await ownsCourse(courseId, authed.userId))) return errorResponse('Course not found', 404);
 
   try {
-    await prisma.course.update({ where: { id: courseId }, data: { pedagogy: parsed.data.pedagogy } });
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { pedagogy: parsed.data.pedagogy },
+    });
     return NextResponse.json({ pedagogy: parsed.data.pedagogy });
   } catch (error: unknown) {
     logger.error('Failed to update course pedagogy', {

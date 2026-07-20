@@ -3,33 +3,35 @@ import { cleanTextForTts, splitTextForTts, STAGE_DIRECTION_PATTERN } from '@/lib
 
 describe('tts-text-cleaner', () => {
   it('strips SFX markers', () => {
-    expect(cleanTextForTts('[SFX: upbeat music, 3s] Hello there'))
-      .toBe('Hello there');
+    expect(cleanTextForTts('[SFX: upbeat music, 3s] Hello there')).toBe('Hello there');
   });
 
   it('strips citation markers', () => {
-    expect(cleanTextForTts('According to a study [1], this works [2, 3].'))
-      .toBe('According to a study, this works.');
+    expect(cleanTextForTts('According to a study [1], this works [2, 3].')).toBe(
+      'According to a study, this works.'
+    );
   });
 
   it('collapses multiple spaces', () => {
-    expect(cleanTextForTts('Hello   there   friend'))
-      .toBe('Hello there friend');
+    expect(cleanTextForTts('Hello   there   friend')).toBe('Hello there friend');
   });
 
   it('preserves clean text', () => {
-    expect(cleanTextForTts('This is perfectly normal text.'))
-      .toBe('This is perfectly normal text.');
+    expect(cleanTextForTts('This is perfectly normal text.')).toBe(
+      'This is perfectly normal text.'
+    );
   });
 
   it('handles combined SFX + citation markers', () => {
-    expect(cleanTextForTts('[SFX: whoosh] A study [1] found [SFX: ding] results [2, 3].'))
-      .toBe('A study found results.');
+    expect(cleanTextForTts('[SFX: whoosh] A study [1] found [SFX: ding] results [2, 3].')).toBe(
+      'A study found results.'
+    );
   });
 
   it('strips vocabulary markers', () => {
-    expect(cleanTextForTts('Das ist [V1:sprechen] und [V2:lesen] auf Deutsch.'))
-      .toBe('Das ist sprechen und lesen auf Deutsch.');
+    expect(cleanTextForTts('Das ist [V1:sprechen] und [V2:lesen] auf Deutsch.')).toBe(
+      'Das ist sprechen und lesen auf Deutsch.'
+    );
   });
 
   it('strips parenthetical stage directions', () => {
@@ -42,8 +44,12 @@ describe('tts-text-cleaner', () => {
   });
 
   it('preserves parentheses that are not stage directions', () => {
-    expect(cleanTextForTts('The GDP (gross domestic product) grew.')).toBe('The GDP (gross domestic product) grew.');
-    expect(cleanTextForTts('He said (and I quote) it was fine.')).toBe('He said (and I quote) it was fine.');
+    expect(cleanTextForTts('The GDP (gross domestic product) grew.')).toBe(
+      'The GDP (gross domestic product) grew.'
+    );
+    expect(cleanTextForTts('He said (and I quote) it was fine.')).toBe(
+      'He said (and I quote) it was fine.'
+    );
   });
 });
 

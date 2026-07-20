@@ -17,18 +17,18 @@ const MAX_INPUT_LENGTH = 32000; // API limit ~32K chars
  */
 const CATEGORY_THRESHOLDS: Record<string, number> = {
   'sexual/minors': 0.1,
-  'sexual': 0.5,
+  sexual: 0.5,
   'harassment/threatening': 0.5,
-  'harassment': 0.6,
+  harassment: 0.6,
   'hate/threatening': 0.5,
-  'hate': 0.6,
+  hate: 0.6,
   'self-harm/intent': 0.4,
   'self-harm/instructions': 0.3,
   'self-harm': 0.5,
   'violence/graphic': 0.6,
-  'violence': 0.7,
+  violence: 0.7,
   'illicit/violent': 0.4,
-  'illicit': 0.5,
+  illicit: 0.5,
 };
 
 export interface ModerationResult {

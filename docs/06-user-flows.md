@@ -101,7 +101,7 @@ npm run dev
 
 Then open `http://localhost:3000`.
 
-`npm run setup` installs dependencies, starts Postgres and Redis, creates `.env.local` from `.env.oss.example`, generates local secrets, pushes the Prisma schema, generates the Prisma client, and keeps storage local by default.
+`npm run setup` installs dependencies, starts Postgres and Redis, creates `.env.local` from `.env.oss.example`, generates local secrets, applies the Prisma migrations, generates the Prisma client, and keeps storage local by default.
 
 ### VPS production
 

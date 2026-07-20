@@ -23,7 +23,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const graph = await getMemoryGraph(courseId);
     return NextResponse.json(graph);
   } catch (error: unknown) {
-    logger.error('Failed to load memory graph', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to load memory graph', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to load memory graph', 500);
   }
 }

@@ -4,16 +4,16 @@ import {
   verifyAccessPassword,
   createGateToken,
   verifyGateToken,
-  createInviteToken,
-  verifyInviteToken,
 } from '@/lib/access/gate';
 
 const ORIGINAL_ENV = { ...process.env };
+const TEST_ACCESS_PASSWORD = 'test-access-password'; // gitleaks:allow
+const TEST_SIGNING_KEY = 'test-signing-key-material-0123456789abcdef'; // gitleaks:allow
 
 describe('access-gate', () => {
   beforeEach(() => {
-    process.env.BYOK_ENCRYPTION_KEY = 'test-signing-key-material-0123456789abcdef';
-    process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
+    process.env.BYOK_ENCRYPTION_KEY = TEST_SIGNING_KEY;
+    process.env.SOTTO_ACCESS_PASSWORD = TEST_ACCESS_PASSWORD;
   });
 
   afterEach(() => {
@@ -30,14 +30,14 @@ describe('access-gate', () => {
     });
 
     it('accepts the configured password and rejects others', async () => {
-      expect(await verifyAccessPassword('family-secret')).toBe(true);
+      expect(await verifyAccessPassword(TEST_ACCESS_PASSWORD)).toBe(true);
       expect(await verifyAccessPassword('wrong')).toBe(false);
       expect(await verifyAccessPassword('')).toBe(false);
     });
 
     it('rejects every password when none is configured', async () => {
       delete process.env.SOTTO_ACCESS_PASSWORD;
-      expect(await verifyAccessPassword('family-secret')).toBe(false);
+      expect(await verifyAccessPassword(TEST_ACCESS_PASSWORD)).toBe(false);
     });
   });
 
@@ -70,17 +70,6 @@ describe('access-gate', () => {
       delete process.env.BYOK_ENCRYPTION_KEY;
       expect(await createGateToken()).toBeNull();
       expect(await verifyGateToken('123.abc')).toBe(false);
-    });
-  });
-
-  describe('invite tokens', () => {
-    it('round-trips and is scope-bound (an invite is not a gate cookie)', async () => {
-      const invite = (await createInviteToken())!;
-      expect(await verifyInviteToken(invite)).toBe(true);
-      expect(await verifyGateToken(invite)).toBe(false);
-
-      const gate = (await createGateToken())!;
-      expect(await verifyInviteToken(gate)).toBe(false);
     });
   });
 });

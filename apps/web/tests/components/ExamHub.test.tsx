@@ -21,7 +21,9 @@ describe('ExamHub', () => {
   it('shows the flagship exam, the not-affiliated disclaimer, and a start button', () => {
     render(<ExamHub courseId="c1" available={AVAILABLE} history={[]} />);
     expect(screen.getAllByText(/Goethe-Zertifikat B1/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/not affiliated with or endorsed by Goethe-Institut/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/not affiliated with or endorsed by Goethe-Institut/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/not an official CEFR certificate/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /start the exam/i })).toBeInTheDocument();
   });
@@ -32,9 +34,17 @@ describe('ExamHub', () => {
         courseId="c1"
         available={AVAILABLE}
         history={[
-          { id: 'e1', examName: 'Goethe-Zertifikat B1', level: 'B1', status: 'SCORED', band: 'B1 pass (mock)', overallScore: 0.72, createdAt: '2026-06-09T00:00:00.000Z' },
+          {
+            id: 'e1',
+            examName: 'Goethe-Zertifikat B1',
+            level: 'B1',
+            status: 'SCORED',
+            band: 'B1 pass (mock)',
+            overallScore: 0.72,
+            createdAt: '2026-06-09T00:00:00.000Z',
+          },
         ]}
-      />,
+      />
     );
     expect(screen.getByText(/B1 pass \(mock\)/)).toBeInTheDocument();
     expect(screen.getByText(/72%/)).toBeInTheDocument();

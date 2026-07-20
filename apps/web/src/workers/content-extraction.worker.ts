@@ -48,7 +48,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
         discoveryId: existingDiscovery.id,
         useAdminCredits,
       },
-      { jobId: `research-${episodeId}-${Date.now()}` }
+      { jobId: `research-${episodeId}-${String(job.id)}` }
     );
 
     await job.updateProgress(100);

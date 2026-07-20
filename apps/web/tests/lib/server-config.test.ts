@@ -12,11 +12,7 @@ vi.mock('@/lib/site-config', () => ({
   getSiteConfig: (...a: unknown[]) => mockGetSiteConfig(...a),
 }));
 
-import {
-  getServerInfra,
-  infra,
-  invalidateServerInfra,
-} from '@/lib/server-config';
+import { getServerInfra, infra, invalidateServerInfra } from '@/lib/server-config';
 
 const EMPTY: SiteConfigData = {
   aiProvider: null,
@@ -94,7 +90,7 @@ describe('server-config infra accessor', () => {
 
   it('getServerInfra returns the full DB snapshot', async () => {
     mockGetSiteConfig.mockResolvedValue(
-      config({ aiProvider: 'local', aiBaseUrl: 'http://localhost:11434/v1' }),
+      config({ aiProvider: 'local', aiBaseUrl: 'http://localhost:11434/v1' })
     );
 
     const snap = await getServerInfra();

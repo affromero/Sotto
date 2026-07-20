@@ -14,7 +14,12 @@
 import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
-import { VOICE_POOL, selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
+import {
+  VOICE_POOL,
+  selectVoicePair,
+  resolveVoiceId,
+  type VoiceMatchMetadata,
+} from '../../voice-pool';
 import { mapDirectionToExpression } from '../../tts-expression-mapper';
 import { applyPronunciationAliases } from '../../pronunciation-dictionary';
 
@@ -95,7 +100,9 @@ export class ElevenLabsProvider implements TtsProvider {
     return audio;
   }
 
-  async generateSpeechWithTimestamps(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
+  async generateSpeechWithTimestamps(
+    params: SpeechParams
+  ): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
     const el = await this.getClient();
     const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
     const modelId = params.modelId ?? this.model;
@@ -146,7 +153,12 @@ export class ElevenLabsProvider implements TtsProvider {
     return el.generateSoundEffect(params);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;

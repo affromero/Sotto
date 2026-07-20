@@ -1,10 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import {
-  themePrefsFromUser,
-  serializeThemePrefs,
-  DEFAULT_THEME_PREFS,
-} from '@/lib/theme-prefs';
+import { themePrefsFromUser, serializeThemePrefs, DEFAULT_THEME_PREFS } from '@/lib/theme-prefs';
 
 describe('themePrefsFromUser', () => {
   it('maps stored columns onto runtime prefs', () => {
@@ -36,7 +32,12 @@ describe('themePrefsFromUser', () => {
 
 describe('serializeThemePrefs', () => {
   it('round-trips through JSON', () => {
-    const prefs = { mode: 'light' as const, palette: 'aula' as const, accent: '#3F4FB0', reducedMotion: false };
+    const prefs = {
+      mode: 'light' as const,
+      palette: 'aula' as const,
+      accent: '#3F4FB0',
+      reducedMotion: false,
+    };
     expect(JSON.parse(serializeThemePrefs(prefs))).toEqual(prefs);
   });
 });

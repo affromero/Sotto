@@ -58,7 +58,12 @@ vi.mock('@/lib/prisma', () => {
     episodeVoice: {
       deleteMany: (...args: unknown[]) => mockPrismaEpisodeVoiceDeleteMany(...args),
     },
+    $transaction: vi.fn(),
   };
+  _mockPrisma.$transaction.mockImplementation(
+    async (operations: Array<Promise<unknown>> | ((tx: typeof _mockPrisma) => Promise<unknown>)) =>
+      typeof operations === 'function' ? operations(_mockPrisma) : Promise.all(operations)
+  );
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
@@ -82,6 +87,12 @@ const mockDetermineResumePoint = vi.fn();
 
 vi.mock('@/lib/pipeline-resume', () => ({
   determineResumePoint: (...args: unknown[]) => mockDetermineResumePoint(...args),
+}));
+
+const mockRestartExistingSegmentAudio = vi.fn().mockResolvedValue(2);
+
+vi.mock('@/lib/segment-creator', () => ({
+  restartExistingSegmentAudio: (...args: unknown[]) => mockRestartExistingSegmentAudio(...args),
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -289,7 +300,7 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       expect(data.resumedAt).toBe('EXTRACT_CONTENT');
     });
 
-    it('uses determineResumePoint to resume from GENERATE_AUDIO with pending segments', async () => {
+    it('restarts every segment as one coherent GENERATE_AUDIO attempt', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
       mockPrismaEpisodeFindUnique.mockResolvedValue({
         id: 'episode-f2',
@@ -302,11 +313,6 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
         step: 'GENERATE_AUDIO',
         pendingSegmentIds: ['seg-3', 'seg-5'],
       });
-      mockPrismaSegmentFindMany.mockResolvedValue([
-        { id: 'seg-3', speaker: 'HOST', text: 'Hello' },
-        { id: 'seg-5', speaker: 'EXPERT', text: 'Hi' },
-      ]);
-
       const request = createMockRequest();
       const params = await createMockParams('episode-f2');
       const response = await POST(request, params);
@@ -314,7 +320,11 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
 
       expect(response.status).toBe(200);
       expect(data.resumedAt).toBe('GENERATE_AUDIO');
-      expect(data.pendingSegments).toBe(2);
+      expect(data.segments).toBe(2);
+      expect(mockRestartExistingSegmentAudio).toHaveBeenCalledWith(
+        'episode-f2',
+        expect.stringMatching(/^[a-f0-9-]{36}$/)
+      );
     });
 
     it('uses determineResumePoint to resume from STITCH_AUDIO', async () => {
@@ -330,6 +340,11 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
         step: 'STITCH_AUDIO',
         segmentIds: ['seg-1', 'seg-2', 'seg-3'],
       });
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1', version: 1, audioUrl: 'audio-1.mp3' },
+        { id: 'seg-2', version: 1, audioUrl: 'audio-2.mp3' },
+        { id: 'seg-3', version: 1, audioUrl: 'audio-3.mp3' },
+      ]);
 
       const request = createMockRequest();
       const params = await createMockParams('episode-f3');
@@ -342,7 +357,7 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
         expect.objectContaining({ name: 'audio-stitching' }),
         'stitch_audio',
         expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3'] }),
-        { jobId: expect.stringMatching(/^stitch-episode-f3-\d+$/) }
+        { jobId: expect.stringMatching(/^stitch-episode-f3-[a-f0-9]{24}$/) }
       );
     });
 
@@ -494,6 +509,5 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       expect(response.status).toBe(200);
       expect(data).toEqual({ success: true, message: 'Generation started' });
     });
-
   });
 });

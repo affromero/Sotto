@@ -10,10 +10,42 @@ beforeAll(() => {
 });
 
 const mockSegments: SegmentData[] = [
-  { id: 'seg-1', speaker: 'HOST', text: 'Welcome to the show!', audioUrl: null, order: 0, startTime: 0, duration: 5 },
-  { id: 'seg-2', speaker: 'EXPERT', text: 'Thanks for having me. According to a study [1], AI is growing rapidly.', audioUrl: null, order: 1, startTime: 5, duration: 8 },
-  { id: 'seg-3', speaker: 'HOST', text: 'That is fascinating!', audioUrl: null, order: 2, startTime: 13, duration: 3 },
-  { id: 'seg-4', speaker: 'EXPERT', text: 'Let me tell you more about it.', audioUrl: null, order: 3, startTime: 16, duration: 5 },
+  {
+    id: 'seg-1',
+    speaker: 'HOST',
+    text: 'Welcome to the show!',
+    audioUrl: null,
+    order: 0,
+    startTime: 0,
+    duration: 5,
+  },
+  {
+    id: 'seg-2',
+    speaker: 'EXPERT',
+    text: 'Thanks for having me. According to a study [1], AI is growing rapidly.',
+    audioUrl: null,
+    order: 1,
+    startTime: 5,
+    duration: 8,
+  },
+  {
+    id: 'seg-3',
+    speaker: 'HOST',
+    text: 'That is fascinating!',
+    audioUrl: null,
+    order: 2,
+    startTime: 13,
+    duration: 3,
+  },
+  {
+    id: 'seg-4',
+    speaker: 'EXPERT',
+    text: 'Let me tell you more about it.',
+    audioUrl: null,
+    order: 3,
+    startTime: 16,
+    duration: 5,
+  },
 ];
 
 const mockReferences: ReferenceData[] = [
@@ -35,24 +67,12 @@ const mockReferences: ReferenceData[] = [
 
 describe('Teleprompter', () => {
   it('renders the teleprompter view', () => {
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={mockReferences}
-        currentTime={0}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={mockReferences} currentTime={0} />);
     expect(screen.getByLabelText('Teleprompter view')).toBeInTheDocument();
   });
 
   it('highlights the active segment based on currentTime', () => {
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={[]}
-        currentTime={6}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
     // At time=6, segment 2 (EXPERT) should be active
     const expertLabels = screen.getAllByText('EXPERT');
     // The active segment should be present
@@ -60,39 +80,21 @@ describe('Teleprompter', () => {
   });
 
   it('shows speaker labels with correct names', () => {
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={[]}
-        currentTime={0}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={[]} currentTime={0} />);
     expect(screen.getAllByText('HOST').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('EXPERT').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows previous, current, and next segments', () => {
     // At time=6, index 1 is active; 0 is prev, 2 is next
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={[]}
-        currentTime={6}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
     expect(screen.getByText('Welcome to the show!')).toBeInTheDocument();
     expect(screen.getByText(/Thanks for having me/)).toBeInTheDocument();
     expect(screen.getByText('That is fascinating!')).toBeInTheDocument();
   });
 
   it('prevents clipboard copy from rendered teleprompter text', () => {
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={[]}
-        currentTime={0}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={[]} currentTime={0} />);
     const text = screen.getByText('Welcome to the show!');
     const guarded = text.closest('[data-learning-text-guard="true"]');
     expect(guarded).toBeInTheDocument();
@@ -103,13 +105,7 @@ describe('Teleprompter', () => {
   });
 
   it('handles first segment (no previous)', () => {
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={[]}
-        currentTime={0}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={[]} currentTime={0} />);
     expect(screen.getByText('Welcome to the show!')).toBeInTheDocument();
   });
 
@@ -130,38 +126,40 @@ describe('Teleprompter', () => {
   });
 
   it('renders citations in segment text', () => {
-    render(
-      <Teleprompter
-        segments={mockSegments}
-        references={mockReferences}
-        currentTime={6}
-      />
-    );
+    render(<Teleprompter segments={mockSegments} references={mockReferences} currentTime={6} />);
     // The [1] citation marker should be rendered as a button
     const citationButton = screen.getByLabelText('Citation 1');
     expect(citationButton).toBeInTheDocument();
   });
 
   it('handles empty segments array', () => {
-    render(
-      <Teleprompter
-        segments={[]}
-        references={[]}
-        currentTime={0}
-      />
-    );
+    render(<Teleprompter segments={[]} references={[]} currentTime={0} />);
     expect(screen.getByLabelText('Teleprompter view')).toBeInTheDocument();
   });
 
   it('strips parenthetical stage directions from display text', () => {
     const segmentsWithDirections: SegmentData[] = [
-      { id: 'seg-a', speaker: 'HOST', text: 'Hello (pause) world!', audioUrl: null, order: 0, startTime: 0, duration: 5 },
-      { id: 'seg-b', speaker: 'EXPERT', text: '(laughs) That is great.', audioUrl: null, order: 1, startTime: 5, duration: 5 },
+      {
+        id: 'seg-a',
+        speaker: 'HOST',
+        text: 'Hello (pause) world!',
+        audioUrl: null,
+        order: 0,
+        startTime: 0,
+        duration: 5,
+      },
+      {
+        id: 'seg-b',
+        speaker: 'EXPERT',
+        text: '(laughs) That is great.',
+        audioUrl: null,
+        order: 1,
+        startTime: 5,
+        duration: 5,
+      },
     ];
 
-    render(
-      <Teleprompter segments={segmentsWithDirections} references={[]} currentTime={0} />
-    );
+    render(<Teleprompter segments={segmentsWithDirections} references={[]} currentTime={0} />);
 
     expect(screen.getByText('Hello world!')).toBeInTheDocument();
     expect(screen.queryByText(/\(pause\)/)).not.toBeInTheDocument();
@@ -174,9 +172,7 @@ describe('Teleprompter', () => {
       <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
     );
 
-    rerender(
-      <Teleprompter segments={mockSegments} references={[]} currentTime={6} />
-    );
+    rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
 
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });

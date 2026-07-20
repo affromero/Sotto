@@ -59,7 +59,7 @@ export function VocabularyList({ vocabularyEntries }: VocabularyListProps) {
             {sorted.map((entry) => {
               const isExpanded = expandedEntry === entry.id;
               const posLabel = entry.partOfSpeech
-                ? POS_LABELS[entry.partOfSpeech.toLowerCase()] ?? entry.partOfSpeech
+                ? (POS_LABELS[entry.partOfSpeech.toLowerCase()] ?? entry.partOfSpeech)
                 : null;
 
               return (

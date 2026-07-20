@@ -158,12 +158,9 @@ LOCAL_STORAGE_DIR=./.sotto/storage
 
 For internet-facing deployments, prefer an S3-compatible bucket such as Cloudflare R2, MinIO, AWS S3, or another provider. Configure CORS for your exact `NEXT_PUBLIC_APP_URL`; do not use wildcard origins for private episode audio.
 
-Private playback paths go through authenticated app routes or private RSS tokens:
-
-```text
-/api/v1/episodes/{episodeId}/stream
-/api/v1/rss/private/{token}
-```
+Episode metadata and storage URLs are returned only through authenticated app
+routes. Keep the storage bucket private and use the configured S3-compatible
+provider's signed access rather than exposing a public bucket.
 
 ## Backups
 

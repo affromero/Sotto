@@ -5,7 +5,7 @@ laptop or desktop with no terminal: open it, click **Start**, and it brings up
 the Docker Compose stack (the same one `scripts/install.sh` installs in
 `~/.sotto`), waits for health, and opens the app in your browser.
 
-The product is **self-hosted only** — Sotto Host launches *your* instance; it is
+The product is **self-hosted only** — Sotto Host launches _your_ instance; it is
 not a hosted account. Builds are distributed from **sotto.fm** (see below).
 
 ## What it does
@@ -13,13 +13,13 @@ not a hosted account. Builds are distributed from **sotto.fm** (see below).
 The Rust side (`src-tauri/src/lib.rs`) is intentionally minimal and shells out to
 Docker Compose:
 
-| Command | Action |
-|---|---|
-| `docker_available` | Is Docker installed/running? |
-| `installed` | Is there a stack in `~/.sotto`? |
-| `start_stack` / `stop_stack` | `docker compose up -d` / `down` in `~/.sotto` |
-| `is_healthy` | TCP probe of the web port (3000) |
-| `open_app` | Open `http://localhost:3000` in the default browser |
+| Command                      | Action                                              |
+| ---------------------------- | --------------------------------------------------- |
+| `docker_available`           | Is Docker installed/running?                        |
+| `installed`                  | Is there a stack in `~/.sotto`?                     |
+| `start_stack` / `stop_stack` | `docker compose up -d` / `down` in `~/.sotto`       |
+| `is_healthy`                 | TCP probe of the web port (3000)                    |
+| `open_app`                   | Open `http://localhost:3000` in the default browser |
 
 The UI is plain HTML/JS in `src/` (no bundler) talking to those commands via the
 global Tauri bridge.
@@ -36,7 +36,7 @@ cd apps/desktop
 npm install
 npm run icon        # generate src-tauri/icons/* from the orb SVG (one-time)
 npm run dev         # run the launcher in dev
-npm run build       # produce a signed installer for the current OS
+npm run build       # produce an unsigned installer for the current OS
 ```
 
 ## Distribution
@@ -46,8 +46,9 @@ npm run build       # produce a signed installer for the current OS
   on tag push and uploads them to R2 (the bucket sotto.fm serves) — credentials
   come from repo secrets (mirrored from Doppler):
   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`.
-- **Code signing / notarization** (Apple Developer ID, Windows Authenticode) is
-  required for a smooth install and needs your certificates — add them as the
+- Release artifacts are currently unsigned. **Code signing / notarization**
+  (Apple Developer ID, Windows Authenticode) is required for a smooth install
+  and needs your certificates — add them as the
   Tauri signing secrets documented at
   https://tauri.app/distribute/ before enabling signed release builds.
 

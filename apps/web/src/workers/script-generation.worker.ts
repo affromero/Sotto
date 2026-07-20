@@ -51,8 +51,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       {
         episodeId,
         userId,
+        useAdminCredits,
       },
-      { jobId: `compile-${episodeId}-${Date.now()}` }
+      { jobId: `compile-${episodeId}-${String(job.id)}` }
     );
 
     await job.updateProgress(100);
@@ -364,8 +365,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     {
       episodeId,
       userId,
+      useAdminCredits,
     },
-    { jobId: `compile-${episodeId}-${Date.now()}` }
+    { jobId: `compile-${episodeId}-${String(job.id)}` }
   );
 
   logger.info('Script queued for compilation', {

@@ -11,9 +11,12 @@ const execFileAsync = promisify(execFile);
 export async function extractWaveformPeaks(audioPath: string, barCount = 200): Promise<number[]> {
   // Get audio duration first
   const { stdout: probeOut } = await execFileAsync('ffprobe', [
-    '-v', 'error',
-    '-show_entries', 'format=duration',
-    '-of', 'csv=p=0',
+    '-v',
+    'error',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'csv=p=0',
     audioPath,
   ]);
   const totalDuration = parseFloat(probeOut.trim());
@@ -24,12 +27,19 @@ export async function extractWaveformPeaks(audioPath: string, barCount = 200): P
   const windowDuration = totalDuration / barCount;
 
   // Use FFmpeg volumedetect-style approach: segment audio into windows and measure RMS
-  const { stderr } = await execFileAsync('ffmpeg', [
-    '-i', audioPath,
-    '-af', `asegment=timestamps=${Array.from({ length: barCount - 1 }, (_, i) => ((i + 1) * windowDuration).toFixed(4)).join('|')},astats=metadata=1:reset=1`,
-    '-f', 'null',
-    '-',
-  ], { maxBuffer: 10 * 1024 * 1024 });
+  const { stderr } = await execFileAsync(
+    'ffmpeg',
+    [
+      '-i',
+      audioPath,
+      '-af',
+      `asegment=timestamps=${Array.from({ length: barCount - 1 }, (_, i) => ((i + 1) * windowDuration).toFixed(4)).join('|')},astats=metadata=1:reset=1`,
+      '-f',
+      'null',
+      '-',
+    ],
+    { maxBuffer: 10 * 1024 * 1024 }
+  );
 
   // Parse RMS_level values from stderr
   const rmsValues: number[] = [];
@@ -90,16 +100,28 @@ function consolidateRmsValues(rmsValues: number[], targetCount: number): number[
  * Fallback: extract peaks using showwavespic filter and parsing pixel values.
  * Simpler but less accurate than astats.
  */
-async function extractWaveformPeaksFallback(audioPath: string, barCount: number): Promise<number[]> {
+async function extractWaveformPeaksFallback(
+  audioPath: string,
+  barCount: number
+): Promise<number[]> {
   // Use showwavespic to generate a 1-pixel-high waveform image, then read pixel values
-  const { stdout } = await execFileAsync('ffmpeg', [
-    '-i', audioPath,
-    '-filter_complex', `showwavespic=s=${barCount}x1:colors=white`,
-    '-frames:v', '1',
-    '-f', 'rawvideo',
-    '-pix_fmt', 'gray',
-    'pipe:1',
-  ], { encoding: 'buffer' as unknown as string, maxBuffer: 10 * 1024 * 1024 });
+  const { stdout } = await execFileAsync(
+    'ffmpeg',
+    [
+      '-i',
+      audioPath,
+      '-filter_complex',
+      `showwavespic=s=${barCount}x1:colors=white`,
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'gray',
+      'pipe:1',
+    ],
+    { encoding: 'buffer' as unknown as string, maxBuffer: 10 * 1024 * 1024 }
+  );
 
   const buffer = Buffer.from(stdout);
   if (buffer.length === 0) {
@@ -108,7 +130,9 @@ async function extractWaveformPeaksFallback(audioPath: string, barCount: number)
   }
 
   const maxVal = Math.max(...buffer, 1);
-  return Array.from(buffer).slice(0, barCount).map((v) => v / maxVal);
+  return Array.from(buffer)
+    .slice(0, barCount)
+    .map((v) => v / maxVal);
 }
 
 /**
@@ -118,12 +142,15 @@ export async function generateSpectrogram(
   audioPath: string,
   outputPath: string,
   width = 1920,
-  height = 400,
+  height = 400
 ): Promise<void> {
   await execFileAsync('ffmpeg', [
-    '-i', audioPath,
-    '-lavfi', `showspectrumpic=s=${width}x${height}:mode=combined:color=intensity:scale=log`,
-    '-frames:v', '1',
+    '-i',
+    audioPath,
+    '-lavfi',
+    `showspectrumpic=s=${width}x${height}:mode=combined:color=intensity:scale=log`,
+    '-frames:v',
+    '1',
     '-y',
     outputPath,
   ]);

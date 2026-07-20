@@ -26,9 +26,18 @@ function extractFirstJsonObject(text: string): string {
 
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === '{') depth++;
     if (ch === '}') {
@@ -43,7 +52,8 @@ function extractFirstJsonObject(text: string): string {
 /** Token budget for verification output. Typical output is ~3-5K tokens (30 claims × ~100 tokens each + feedback). */
 const VERIFICATION_MAX_TOKENS = 8192;
 
-const PARSE_FAILURE_FEEDBACK = 'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
+const PARSE_FAILURE_FEEDBACK =
+  'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
 
 export const VERIFICATION_JSON_SCHEMA = {
   name: 'verification_result',
@@ -67,9 +77,16 @@ export const VERIFICATION_JSON_SCHEMA = {
             verificationNote: { type: 'string' },
           },
           required: [
-            'claimText', 'turnIndex', 'speaker', 'isCommonKnowledge',
-            'existingCitations', 'needsMoreCitations', 'hasUnreliableSource',
-            'unreliableCitations', 'hasMisattribution', 'verificationNote',
+            'claimText',
+            'turnIndex',
+            'speaker',
+            'isCommonKnowledge',
+            'existingCitations',
+            'needsMoreCitations',
+            'hasUnreliableSource',
+            'unreliableCitations',
+            'hasMisattribution',
+            'verificationNote',
           ],
           additionalProperties: false,
         },
@@ -85,17 +102,33 @@ export const VERIFICATION_JSON_SCHEMA = {
 async function retryParseWithStricterPrompt(
   systemPrompt: string,
   userMessage: string,
-  opts: { maxTokens: number; apiKeyOverride?: string; model?: string; provider: string },
-): Promise<{ parsed: Record<string, unknown>; inputTokens: number; outputTokens: number; model: string } | null> {
+  opts: { maxTokens: number; apiKeyOverride?: string; model?: string; provider: string }
+): Promise<{
+  parsed: Record<string, unknown>;
+  inputTokens: number;
+  outputTokens: number;
+  model: string;
+} | null> {
   try {
     const ai = createAIProvider(opts.provider);
     const response = await ai.generateResponse(
-      systemPrompt + '\n\nCRITICAL: You MUST respond with ONLY a valid JSON object. No prose, no markdown fences, no explanation. Start with { and end with }.',
+      systemPrompt +
+        '\n\nCRITICAL: You MUST respond with ONLY a valid JSON object. No prose, no markdown fences, no explanation. Start with { and end with }.',
       [{ role: 'user', content: userMessage + '\n\nRespond with ONLY valid JSON.' }],
-      { maxTokens: opts.maxTokens, apiKeyOverride: opts.apiKeyOverride, model: opts.model, skipModeration: true },
+      {
+        maxTokens: opts.maxTokens,
+        apiKeyOverride: opts.apiKeyOverride,
+        model: opts.model,
+        skipModeration: true,
+      }
     );
     const parsed = JSON.parse(extractFirstJsonObject(response.content));
-    return { parsed, inputTokens: response.inputTokens, outputTokens: response.outputTokens, model: response.model };
+    return {
+      parsed,
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+      model: response.model,
+    };
   } catch {
     return null;
   }
@@ -193,7 +226,7 @@ export function assessReferenceQuality(
   references: GeneratedReference[],
   depth: string,
   durationMinutes?: number,
-  tone?: string,
+  tone?: string
 ): ReferenceQualityAssessment {
   const totalCount = references.length;
   const requiredCount = getMinReferenceCount(depth, durationMinutes);
@@ -248,7 +281,7 @@ function buildVerdict(
   tokenUsage: { inputTokens: number; outputTokens: number; model: string },
   verificationMode?: string,
   tone?: string,
-  durationTarget?: number,
+  durationTarget?: number
 ): VerificationVerdict {
   const commonKnowledgeClaims = claims.filter((c) => c.isCommonKnowledge);
   const sourcingRequired = claims.filter((c) => !c.isCommonKnowledge);
@@ -259,7 +292,11 @@ function buildVerdict(
   const unreliableSourceClaims = sourcingRequired.filter((c) => c.hasUnreliableSource);
   const misattributedClaims = sourcingRequired.filter((c) => c.hasMisattribution);
   const adequatelySourcedClaims = sourcingRequired.filter(
-    (c) => c.existingCitations.length > 0 && !c.needsMoreCitations && !c.hasUnreliableSource && !c.hasMisattribution
+    (c) =>
+      c.existingCitations.length > 0 &&
+      !c.needsMoreCitations &&
+      !c.hasUnreliableSource &&
+      !c.hasMisattribution
   );
 
   const totalWords = turns.reduce((sum, t) => sum + countWords(t.text), 0);
@@ -284,7 +321,10 @@ function buildVerdict(
   const score =
     sourcingRequired.length === 0
       ? 1
-      : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length - misattributedClaims.length) /
+      : (sourcingRequired.length -
+          unsupportedClaims.length -
+          unreliableSourceClaims.length -
+          misattributedClaims.length) /
         sourcingRequired.length;
 
   const isRelaxed = verificationMode === 'relaxed';
@@ -292,7 +332,12 @@ function buildVerdict(
   const effectiveDepth = isRelaxed ? 'eli5' : depth;
   const threshold = DEPTH_THRESHOLDS[effectiveDepth] || 0.8;
 
-  const refQuality = assessReferenceQuality(references, isRelaxed ? 'eli5' : depth, durationTarget, tone);
+  const refQuality = assessReferenceQuality(
+    references,
+    isRelaxed ? 'eli5' : depth,
+    durationTarget,
+    tone
+  );
 
   // Misattribution tolerance: allow up to 2 for standard/quick/eli5, strict zero for deep_dive
   const misattributionLimit = depth === 'deep_dive' ? 0 : 2;
@@ -310,24 +355,32 @@ function buildVerdict(
   const cleanAiFeedback = aiFeedback.replace(/^(PASS|FAIL):\s*/i, '');
   let feedback = cleanAiFeedback;
   if (unsupportedClaims.length > 0) {
-    const uncitedFeedback = `UNCITED CLAIMS: ${unsupportedClaims.length} factual claim(s) have ZERO citations. Every factual claim must be cited. ` +
+    const uncitedFeedback =
+      `UNCITED CLAIMS: ${unsupportedClaims.length} factual claim(s) have ZERO citations. Every factual claim must be cited. ` +
       unsupportedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}"`).join('; ') +
       '. Either add citations from verifiable sources or remove these claims.';
     feedback = feedback ? `${feedback}\n\n${uncitedFeedback}` : uncitedFeedback;
   }
   if (misattributedClaims.length > 0) {
-    const misattrFeedback = `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
-      misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
+    const misattrFeedback =
+      `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
+      misattributedClaims
+        .map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`)
+        .join('; ');
     feedback = feedback ? `${feedback}\n\n${misattrFeedback}` : misattrFeedback;
   }
   if (refQuality.feedback) {
-    feedback = feedback ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}` : `REFERENCES: ${refQuality.feedback}`;
+    feedback = feedback
+      ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}`
+      : `REFERENCES: ${refQuality.feedback}`;
   }
 
   // Programmatically signal failure so the revision loop always knows to act,
   // even when the AI judged the score passing but a reference quality gate failed.
   if (!passed) {
-    feedback = feedback ? `FAIL: ${feedback}` : 'FAIL: Script did not meet verification requirements.';
+    feedback = feedback
+      ? `FAIL: ${feedback}`
+      : 'FAIL: Script did not meet verification requirements.';
   }
 
   return {
@@ -364,7 +417,11 @@ function buildSystemPrompt(
   audienceLevel: string,
   attemptNumber: number,
   previousFeedback: string | undefined,
-  incrementalContext?: { carriedClaims: ClaimAnalysis[]; changedIndices: Set<number>; turnsLength: number }
+  incrementalContext?: {
+    carriedClaims: ClaimAnalysis[];
+    changedIndices: Set<number>;
+    turnsLength: number;
+  }
 ): string {
   let prompt = loadAndRender('verification/script-verifier-base.md', {
     AUDIENCE_LEVEL: audienceLevel,
@@ -378,13 +435,18 @@ function buildSystemPrompt(
   }
 
   if (incrementalContext) {
-    const unchangedIndices = [...Array(incrementalContext.turnsLength).keys()]
-      .filter((i) => !incrementalContext.changedIndices.has(i));
+    const unchangedIndices = [...Array(incrementalContext.turnsLength).keys()].filter(
+      (i) => !incrementalContext.changedIndices.has(i)
+    );
     const changedList = [...incrementalContext.changedIndices].sort((a, b) => a - b);
 
     prompt += loadAndRender('verification/script-verifier-incremental.md', {
       UNCHANGED_INDICES: unchangedIndices.length > 0 ? unchangedIndices.join(', ') : 'none',
-      CARRIED_CLAIMS: incrementalContext.carriedClaims.map((c) => `- Turn ${c.turnIndex} (${c.speaker}): "${c.claimText}" — ${c.verificationNote}`).join('\n'),
+      CARRIED_CLAIMS: incrementalContext.carriedClaims
+        .map(
+          (c) => `- Turn ${c.turnIndex} (${c.speaker}): "${c.claimText}" — ${c.verificationNote}`
+        )
+        .join('\n'),
       CHANGED_LIST: changedList.join(', '),
     });
   }
@@ -409,9 +471,10 @@ function parseClaims(
     unreliableCitations: (c.unreliableCitations as number[]) || [],
     hasMisattribution: (c.hasMisattribution as boolean) ?? false,
     verificationNote: c.verificationNote as string,
-    turnHash: c.turnIndex != null && (c.turnIndex as number) < turns.length
-      ? hashTurn(turns[c.turnIndex as number].speaker, turns[c.turnIndex as number].text)
-      : undefined,
+    turnHash:
+      c.turnIndex != null && (c.turnIndex as number) < turns.length
+        ? hashTurn(turns[c.turnIndex as number].speaker, turns[c.turnIndex as number].text)
+        : undefined,
   }));
   return { claims, aiFeedback: parsed.feedback || '' };
 }
@@ -461,7 +524,13 @@ export async function verifyScript(params: {
     // the hash matches but the verdict could now differ with the replaced source.
     const problemTurnIndices = new Set(
       rawCarried
-        .filter((c) => c.hasUnreliableSource || c.hasMisattribution || (!c.isCommonKnowledge && c.existingCitations.length === 0) || c.needsMoreCitations)
+        .filter(
+          (c) =>
+            c.hasUnreliableSource ||
+            c.hasMisattribution ||
+            (!c.isCommonKnowledge && c.existingCitations.length === 0) ||
+            c.needsMoreCitations
+        )
         .map((c) => c.turnIndex)
     );
     for (const idx of problemTurnIndices) {
@@ -471,11 +540,22 @@ export async function verifyScript(params: {
 
     // All turns unchanged → skip AI call entirely
     if (changedIndices.size === 0) {
-      return buildVerdict(carried, references, depth, maxDurationMinutes, turns, '', {
-        inputTokens: 0,
-        outputTokens: 0,
-        model: params.model || 'skipped',
-      }, params.verificationMode, params.tone, params.durationTarget);
+      return buildVerdict(
+        carried,
+        references,
+        depth,
+        maxDurationMinutes,
+        turns,
+        '',
+        {
+          inputTokens: 0,
+          outputTokens: 0,
+          model: params.model || 'skipped',
+        },
+        params.verificationMode,
+        params.tone,
+        params.durationTarget
+      );
     }
 
     const turnsText = turns.map((t, i) => `[Turn ${i}] ${t.speaker}: ${t.text}`).join('\n\n');
@@ -500,14 +580,18 @@ ${referencesText}
 Analyze ONLY the changed turns listed in the system instructions. Return JSON only.`;
 
     const ai = createAIProvider(params.provider);
-    const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-      maxTokens: VERIFICATION_MAX_TOKENS,
-      apiKeyOverride: params.apiKeyOverride,
-      model: params.model,
-      useWebSearch: false,
-      skipModeration: true,
-      jsonSchema: VERIFICATION_JSON_SCHEMA,
-    });
+    const response = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: userMessage }],
+      {
+        maxTokens: VERIFICATION_MAX_TOKENS,
+        apiKeyOverride: params.apiKeyOverride,
+        model: params.model,
+        useWebSearch: false,
+        skipModeration: true,
+        jsonSchema: VERIFICATION_JSON_SCHEMA,
+      }
+    );
 
     let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
     let extraInputTokens = 0;
@@ -517,7 +601,10 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       parsed = JSON.parse(extractFirstJsonObject(response.content));
     } catch {
       const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
-        maxTokens: VERIFICATION_MAX_TOKENS, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
+        maxTokens: VERIFICATION_MAX_TOKENS,
+        apiKeyOverride: params.apiKeyOverride,
+        model: params.model,
+        provider: params.provider,
       });
       if (retry) {
         parsed = retry.parsed as typeof parsed;
@@ -545,11 +632,17 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
           misattributedClaims: [],
           referenceQuality: {
             totalCount: 0,
-            requiredCount: getMinReferenceCount(params.verificationMode === 'relaxed' ? 'eli5' : depth, params.durationTarget),
+            requiredCount: getMinReferenceCount(
+              params.verificationMode === 'relaxed' ? 'eli5' : depth,
+              params.durationTarget
+            ),
             countPassed: false,
             seriousCount: 0,
             seriousRatio: 0,
-            requiredSeriousRatio: getMinSeriousRatio(params.verificationMode === 'relaxed' ? 'eli5' : depth, params.tone),
+            requiredSeriousRatio: getMinSeriousRatio(
+              params.verificationMode === 'relaxed' ? 'eli5' : depth,
+              params.tone
+            ),
             ratioPassed: false,
             qualityScore: 0,
             feedback: null,
@@ -572,11 +665,22 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
     const dedupedCarried = carried.filter((c) => !newClaimTurnIndices.has(c.turnIndex));
     const allClaims = [...dedupedCarried, ...newClaims];
 
-    return buildVerdict(allClaims, references, depth, maxDurationMinutes, turns, aiFeedback, {
-      inputTokens: response.inputTokens + extraInputTokens,
-      outputTokens: response.outputTokens + extraOutputTokens,
-      model: response.model,
-    }, params.verificationMode, params.tone, params.durationTarget);
+    return buildVerdict(
+      allClaims,
+      references,
+      depth,
+      maxDurationMinutes,
+      turns,
+      aiFeedback,
+      {
+        inputTokens: response.inputTokens + extraInputTokens,
+        outputTokens: response.outputTokens + extraOutputTokens,
+        model: response.model,
+      },
+      params.verificationMode,
+      params.tone,
+      params.durationTarget
+    );
   }
 
   // Full verification path (attempt 1 or no previous claims)
@@ -597,14 +701,18 @@ ${referencesText}
 Analyze every factual claim. Return JSON only.`;
 
   const ai = createAIProvider(params.provider);
-  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-    maxTokens: VERIFICATION_MAX_TOKENS,
-    apiKeyOverride: params.apiKeyOverride,
-    model: params.model,
-    useWebSearch: false,
-    skipModeration: true,
-    jsonSchema: VERIFICATION_JSON_SCHEMA,
-  });
+  const response = await ai.generateResponse(
+    systemPrompt,
+    [{ role: 'user', content: userMessage }],
+    {
+      maxTokens: VERIFICATION_MAX_TOKENS,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+      useWebSearch: false,
+      skipModeration: true,
+      jsonSchema: VERIFICATION_JSON_SCHEMA,
+    }
+  );
 
   let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
   let extraInputTokens = 0;
@@ -614,7 +722,10 @@ Analyze every factual claim. Return JSON only.`;
     parsed = JSON.parse(extractFirstJsonObject(response.content));
   } catch {
     const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
-      maxTokens: VERIFICATION_MAX_TOKENS, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
+      maxTokens: VERIFICATION_MAX_TOKENS,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+      provider: params.provider,
     });
     if (retry) {
       parsed = retry.parsed as typeof parsed;
@@ -664,11 +775,22 @@ Analyze every factual claim. Return JSON only.`;
 
   const { claims, aiFeedback } = parseClaims(parsed, turns);
 
-  return buildVerdict(claims, references, depth, maxDurationMinutes, turns, aiFeedback, {
-    inputTokens: response.inputTokens + extraInputTokens,
-    outputTokens: response.outputTokens + extraOutputTokens,
-    model: response.model,
-  }, params.verificationMode, params.tone, params.durationTarget);
+  return buildVerdict(
+    claims,
+    references,
+    depth,
+    maxDurationMinutes,
+    turns,
+    aiFeedback,
+    {
+      inputTokens: response.inputTokens + extraInputTokens,
+      outputTokens: response.outputTokens + extraOutputTokens,
+      model: response.model,
+    },
+    params.verificationMode,
+    params.tone,
+    params.durationTarget
+  );
 }
 
 function extractDomain(url: string): string {

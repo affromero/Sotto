@@ -17,6 +17,7 @@ import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
+import { createStitchKey } from '@/lib/audio/stitch-identity';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -27,6 +28,53 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
+async function enqueueCompletionSideEffects(input: {
+  episodeId: string;
+  userId: string;
+  title: string;
+  stitchKey: string;
+  duration: number;
+}): Promise<void> {
+  const { episodeId, userId, title, stitchKey, duration } = input;
+  const eventKey = `audio-stitching-complete:${stitchKey}`;
+  await prisma.pipelineEvent.upsert({
+    where: { idempotencyKey: eventKey },
+    create: {
+      episodeId,
+      stage: 'audio-stitching',
+      type: 'complete',
+      message: `Pipeline completed — ${Math.round(duration)}s of audio`,
+      idempotencyKey: eventKey,
+    },
+    update: {},
+  });
+
+  await addJob(
+    notificationQueue,
+    JobType.SEND_NOTIFICATION,
+    {
+      userId,
+      type: 'EPISODE_READY',
+      title: 'Your lesson is ready!',
+      message: `"${title}" is ready to play.`,
+      data: { episodeId },
+    },
+    { jobId: `episode-ready-${stitchKey}` }
+  );
+  await addJob(
+    pdfGenerationQueue,
+    JobType.GENERATE_PDF,
+    { episodeId, userId },
+    { jobId: `episode-pdf-${stitchKey}` }
+  );
+  await addJob(
+    waveformGenerationQueue,
+    JobType.GENERATE_WAVEFORM,
+    { episodeId, userId },
+    { jobId: `episode-waveform-${stitchKey}` }
+  );
+}
+
 /**
  * Find where each segment's raw audio actually starts in the stitched output
  * by cross-correlating a short voiced snippet from each segment file against
@@ -34,102 +82,125 @@ const execFileAsync = promisify(execFile);
  */
 async function detectSegmentBoundaries(
   stitchedPath: string,
-  segmentPaths: string[],
+  segmentPaths: string[]
 ): Promise<number[]> {
   if (segmentPaths.length === 0) return [];
   if (segmentPaths.length === 1) return [0];
 
   try {
-  const { readFile } = await import('fs/promises');
-  const SR = 16000;
+    const { readFile } = await import('fs/promises');
+    const SR = 16000;
 
-  // Convert stitched audio to raw PCM for fast processing
-  const stitchedPcmPath = stitchedPath + '.raw.wav';
-  await execFileAsync('ffmpeg', ['-y', '-i', stitchedPath, '-ar', String(SR), '-ac', '1', stitchedPcmPath]);
-  const stitchedBuf = await readFile(stitchedPcmPath);
-  // Skip WAV header (44 bytes)
-  const stitched = new Float32Array(stitchedBuf.length > 44 ? (stitchedBuf.length - 44) / 2 : 0);
-  for (let i = 0; i < stitched.length; i++) {
-    stitched[i] = stitchedBuf.readInt16LE(44 + i * 2);
-  }
-
-  const starts: number[] = [0]; // first segment always at 0
-  let searchFrom = 0; // only search forward from last found position
-
-  for (let seg = 1; seg < segmentPaths.length; seg++) {
-    try {
-      // Convert segment to same format
-      const segPcmPath = segmentPaths[seg] + '.raw.wav';
-      await execFileAsync('ffmpeg', ['-y', '-i', segmentPaths[seg], '-ar', String(SR), '-ac', '1', segPcmPath]);
-      const segBuf = await readFile(segPcmPath);
-      const segData = new Float32Array(segBuf.length > 44 ? (segBuf.length - 44) / 2 : 0);
-      for (let i = 0; i < segData.length; i++) {
-        segData[i] = segBuf.readInt16LE(44 + i * 2);
-      }
-
-      // Find voice onset in segment (first 320-sample window with RMS > 500)
-      let onset = 0;
-      for (let i = 0; i < segData.length - 320; i += 320) {
-        let sum = 0;
-        for (let j = i; j < i + 320; j++) sum += segData[j] * segData[j];
-        if (Math.sqrt(sum / 320) > 500) { onset = i; break; }
-      }
-
-      // Take 1s of voiced content as search snippet
-      const snippetLen = Math.min(SR, segData.length - onset);
-      const snippet = segData.slice(onset, onset + snippetLen);
-
-      // Normalize snippet
-      let maxSnip = 0;
-      for (let i = 0; i < snippet.length; i++) if (Math.abs(snippet[i]) > maxSnip) maxSnip = Math.abs(snippet[i]);
-      if (maxSnip > 0) for (let i = 0; i < snippet.length; i++) snippet[i] /= maxSnip;
-
-      // Search in stitched audio from last position ± 5s margin
-      const windowStart = Math.max(0, searchFrom - 5 * SR);
-      const windowEnd = Math.min(stitched.length, searchFrom + segData.length + 30 * SR);
-
-      let bestCorr = -Infinity;
-      let bestIdx = searchFrom;
-
-      // Normalize search region
-      let maxSearch = 0;
-      for (let i = windowStart; i < windowEnd; i++) if (Math.abs(stitched[i]) > maxSearch) maxSearch = Math.abs(stitched[i]);
-
-      // Slide snippet over search window (step by 160 samples = 10ms for speed)
-      for (let pos = windowStart; pos < windowEnd - snippetLen; pos += 160) {
-        let corr = 0;
-        for (let j = 0; j < snippetLen; j++) {
-          corr += (stitched[pos + j] / (maxSearch || 1)) * snippet[j];
-        }
-        if (corr > bestCorr) {
-          bestCorr = corr;
-          bestIdx = pos;
-        }
-      }
-
-      // Actual start = match position minus onset offset
-      const actualStart = (bestIdx - onset) / SR;
-      starts.push(Math.max(0, actualStart));
-      searchFrom = bestIdx + segData.length / 2; // advance search position
-
-      // Cleanup temp file
-      await rm(segPcmPath).catch(() => {});
-    } catch {
-      // Fallback: use previous start + previous segment duration estimate
-      const prevStart = starts[starts.length - 1];
-      starts.push(prevStart + 10); // rough fallback
+    // Convert stitched audio to raw PCM for fast processing
+    const stitchedPcmPath = stitchedPath + '.raw.wav';
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-i',
+      stitchedPath,
+      '-ar',
+      String(SR),
+      '-ac',
+      '1',
+      stitchedPcmPath,
+    ]);
+    const stitchedBuf = await readFile(stitchedPcmPath);
+    // Skip WAV header (44 bytes)
+    const stitched = new Float32Array(stitchedBuf.length > 44 ? (stitchedBuf.length - 44) / 2 : 0);
+    for (let i = 0; i < stitched.length; i++) {
+      stitched[i] = stitchedBuf.readInt16LE(44 + i * 2);
     }
-  }
 
-  // Cleanup
-  await rm(stitchedPcmPath).catch(() => {});
+    const starts: number[] = [0]; // first segment always at 0
+    let searchFrom = 0; // only search forward from last found position
 
-  logger.info('Segment boundaries detected via cross-correlation', {
-    segmentCount: String(segmentPaths.length),
-    starts: starts.map((s) => s.toFixed(3)).join(', '),
-  });
+    for (let seg = 1; seg < segmentPaths.length; seg++) {
+      try {
+        // Convert segment to same format
+        const segPcmPath = segmentPaths[seg] + '.raw.wav';
+        await execFileAsync('ffmpeg', [
+          '-y',
+          '-i',
+          segmentPaths[seg],
+          '-ar',
+          String(SR),
+          '-ac',
+          '1',
+          segPcmPath,
+        ]);
+        const segBuf = await readFile(segPcmPath);
+        const segData = new Float32Array(segBuf.length > 44 ? (segBuf.length - 44) / 2 : 0);
+        for (let i = 0; i < segData.length; i++) {
+          segData[i] = segBuf.readInt16LE(44 + i * 2);
+        }
 
-  return starts;
+        // Find voice onset in segment (first 320-sample window with RMS > 500)
+        let onset = 0;
+        for (let i = 0; i < segData.length - 320; i += 320) {
+          let sum = 0;
+          for (let j = i; j < i + 320; j++) sum += segData[j] * segData[j];
+          if (Math.sqrt(sum / 320) > 500) {
+            onset = i;
+            break;
+          }
+        }
+
+        // Take 1s of voiced content as search snippet
+        const snippetLen = Math.min(SR, segData.length - onset);
+        const snippet = segData.slice(onset, onset + snippetLen);
+
+        // Normalize snippet
+        let maxSnip = 0;
+        for (let i = 0; i < snippet.length; i++)
+          if (Math.abs(snippet[i]) > maxSnip) maxSnip = Math.abs(snippet[i]);
+        if (maxSnip > 0) for (let i = 0; i < snippet.length; i++) snippet[i] /= maxSnip;
+
+        // Search in stitched audio from last position ± 5s margin
+        const windowStart = Math.max(0, searchFrom - 5 * SR);
+        const windowEnd = Math.min(stitched.length, searchFrom + segData.length + 30 * SR);
+
+        let bestCorr = -Infinity;
+        let bestIdx = searchFrom;
+
+        // Normalize search region
+        let maxSearch = 0;
+        for (let i = windowStart; i < windowEnd; i++)
+          if (Math.abs(stitched[i]) > maxSearch) maxSearch = Math.abs(stitched[i]);
+
+        // Slide snippet over search window (step by 160 samples = 10ms for speed)
+        for (let pos = windowStart; pos < windowEnd - snippetLen; pos += 160) {
+          let corr = 0;
+          for (let j = 0; j < snippetLen; j++) {
+            corr += (stitched[pos + j] / (maxSearch || 1)) * snippet[j];
+          }
+          if (corr > bestCorr) {
+            bestCorr = corr;
+            bestIdx = pos;
+          }
+        }
+
+        // Actual start = match position minus onset offset
+        const actualStart = (bestIdx - onset) / SR;
+        starts.push(Math.max(0, actualStart));
+        searchFrom = bestIdx + segData.length / 2; // advance search position
+
+        // Cleanup temp file
+        await rm(segPcmPath).catch(() => {});
+      } catch {
+        // Fallback: use previous start + previous segment duration estimate
+        const prevStart = starts[starts.length - 1];
+        starts.push(prevStart + 10); // rough fallback
+      }
+    }
+
+    // Cleanup
+    await rm(stitchedPcmPath).catch(() => {});
+
+    logger.info('Segment boundaries detected via cross-correlation', {
+      segmentCount: String(segmentPaths.length),
+      starts: starts.map((s) => s.toFixed(3)).join(', '),
+    });
+
+    return starts;
   } catch (err) {
     logger.warn('Cross-correlation boundary detection failed, returning empty', {
       error: err instanceof Error ? err.message : String(err),
@@ -152,7 +223,22 @@ const STOCK_SFX: Record<SoundCue['type'], string> = {
 };
 
 export async function processAudioStitching(job: Job<StitchAudioPayload>): Promise<void> {
-  const { episodeId, segmentIds, skipSfx } = job.data;
+  const { episodeId, segmentIds, segmentVersions, segmentAudioUrls, skipSfx } = job.data;
+  if (
+    segmentIds.length !== segmentVersions.length ||
+    segmentIds.length !== segmentAudioUrls.length
+  ) {
+    throw new Error('Stitch payload has inconsistent segment identity');
+  }
+  const stitchKey = createStitchKey(
+    episodeId,
+    segmentIds.map((id, index) => ({
+      id,
+      version: segmentVersions[index],
+      audioUrl: segmentAudioUrls[index],
+    })),
+    Boolean(skipSfx)
+  );
   const tmpDir = path.join(os.tmpdir(), `sotto-stitch-${crypto.randomUUID()}`);
 
   logger.info('Stitching audio', { episodeId, segmentCount: String(segmentIds.length) });
@@ -163,12 +249,24 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     // 1. Fetch ordered segments from database
     const segments = await prisma.segment.findMany({
-      where: { id: { in: segmentIds } },
+      where: { episodeId, id: { in: segmentIds } },
       orderBy: { order: 'asc' },
     });
 
     if (segments.length === 0) {
       throw new Error(`No segments found for episode ${episodeId}`);
+    }
+    if (segments.length !== segmentIds.length) {
+      throw new Error(`Stitch payload contains segments outside episode ${episodeId}`);
+    }
+    if (
+      segments.some(
+        (segment, index) =>
+          (segment.version ?? segmentVersions[index]) !== segmentVersions[index] ||
+          segment.audioUrl !== segmentAudioUrls[index]
+      )
+    ) {
+      throw new Error(`Stitch payload is stale for episode ${episodeId}`);
     }
 
     // 2. Fetch the script for sound cues and turn text (for audience reactions)
@@ -182,8 +280,51 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 3. Load episode metadata
     const episode = await prisma.episode.findUniqueOrThrow({
       where: { id: episodeId },
-      select: { userId: true, title: true, source: true },
+      select: {
+        userId: true,
+        title: true,
+        source: true,
+        status: true,
+        duration: true,
+        lastCompletedStitchKey: true,
+        activeStitchKey: true,
+        activeStitchOwner: true,
+      },
     });
+    if (episode.lastCompletedStitchKey === stitchKey && episode.status === 'READY') {
+      let cumulativeStart = 0;
+      for (const segment of segments) {
+        await prisma.segment.updateMany({
+          where: { id: segment.id, startTime: null },
+          data: { startTime: cumulativeStart },
+        });
+        cumulativeStart += Math.max(0, (segment.duration ?? 0) - 0.3);
+      }
+      await enqueueCompletionSideEffects({
+        episodeId,
+        userId: episode.userId,
+        title: episode.title,
+        stitchKey,
+        duration: episode.duration ?? 0,
+      });
+      await job.updateProgress(100);
+      return;
+    }
+
+    const stitchOwner = String(job.id);
+    const stitchClaim = await prisma.episode.updateMany({
+      where: {
+        id: episodeId,
+        OR: [
+          { activeStitchKey: null, activeStitchOwner: null },
+          { activeStitchKey: stitchKey, activeStitchOwner: stitchOwner },
+        ],
+      },
+      data: { activeStitchKey: stitchKey, activeStitchOwner: stitchOwner },
+    });
+    if (stitchClaim.count === 0) {
+      throw new Error(`Another audio stitch generation is active for episode ${episodeId}`);
+    }
     const usePremiumSfx = true;
 
     await job.updateProgress(10);
@@ -362,25 +503,18 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 9. Create version snapshot before updating episode record
     const currentEpisode = await prisma.episode.findUniqueOrThrow({
       where: { id: episodeId },
-      select: { currentVersion: true, audioUrl: true },
+      select: { currentVersion: true, audioUrl: true, lastCompletedStitchKey: true },
     });
 
-    const newVersion = currentEpisode.currentVersion + (currentEpisode.audioUrl ? 1 : 0);
+    const newVersion =
+      currentEpisode.lastCompletedStitchKey === stitchKey
+        ? currentEpisode.currentVersion
+        : currentEpisode.currentVersion + (currentEpisode.audioUrl ? 1 : 0);
     const changeType = currentEpisode.audioUrl
       ? skipSfx
         ? 'incorporation'
         : 'regeneration'
       : 'initial';
-
-    await prisma.episodeVersion.create({
-      data: {
-        episodeId,
-        version: newVersion,
-        audioUrl,
-        duration: Math.round(duration),
-        changeType,
-      },
-    });
 
     // Compute duration deviation from target
     const discovery = await prisma.discovery.findUnique({
@@ -400,31 +534,41 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       });
     }
 
-    // Update episode record
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: {
-        status: 'READY',
-        audioUrl,
-        duration: Math.round(duration),
-        durationDeviation,
-        fileSize: finalAudio.length,
-        currentVersion: newVersion,
-      },
-    });
+    // Commit the version and episode state atomically. Upsert makes a retry
+    // after upload safe if the first attempt committed before losing its worker.
+    await prisma.$transaction([
+      prisma.episodeVersion.upsert({
+        where: { episodeId_version: { episodeId, version: newVersion } },
+        create: {
+          episodeId,
+          version: newVersion,
+          audioUrl,
+          duration: Math.round(duration),
+          changeType,
+        },
+        update: {
+          audioUrl,
+          duration: Math.round(duration),
+          changeType,
+        },
+      }),
+      prisma.episode.update({
+        where: { id: episodeId },
+        data: {
+          status: 'READY',
+          audioUrl,
+          duration: Math.round(duration),
+          durationDeviation,
+          fileSize: finalAudio.length,
+          currentVersion: newVersion,
+          lastCompletedStitchKey: stitchKey,
+          activeStitchKey: null,
+          activeStitchOwner: null,
+        },
+      }),
+    ]);
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'READY' });
-
-    // Record pipeline completion event for accurate timing metrics
-    await prisma.pipelineEvent.create({
-      data: {
-        episodeId,
-        stage: 'audio-stitching',
-        type: 'complete',
-        message: `Pipeline completed — ${Math.round(duration)}s of audio`,
-      },
-    });
-
 
     // 9. Update segment start times by detecting silence boundaries in the stitched audio
     // This gives exact positions regardless of crossfade/SFX/normalization
@@ -447,7 +591,10 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         return start >= detectedStarts[i - 1] + minGap;
       });
       if (!isMonotonic) {
-        logger.warn('Cross-correlation starts failed monotonicity check, using cumulative fallback', { episodeId });
+        logger.warn(
+          'Cross-correlation starts failed monotonicity check, using cumulative fallback',
+          { episodeId }
+        );
         detectedStarts = [];
       }
     }
@@ -476,41 +623,12 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(95);
 
-    // 10. Send notification
-    const notificationType = 'EPISODE_READY';
-
-    // Idempotency: skip if a notification for this episode+type already exists (stalled job retry)
-    const existingNotif = await prisma.notification.findFirst({
-      where: {
-        userId: episode.userId,
-        type: notificationType as never,
-        data: { path: ['episodeId'], equals: episodeId },
-      },
-      select: { id: true },
-    });
-
-    if (!existingNotif) {
-      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-        userId: episode.userId,
-        type: notificationType,
-        title: 'Your lesson is ready!',
-        message: `"${episode.title}" is ready to play.`,
-        data: { episodeId },
-      });
-    } else {
-      logger.info('Skipping duplicate notification (already exists)', { episodeId, notificationType });
-    }
-
-    // 10c. Auto-generate transcript
-    await addJob(pdfGenerationQueue, JobType.GENERATE_PDF, {
+    await enqueueCompletionSideEffects({
       episodeId,
       userId: episode.userId,
-    });
-
-    // 10c2. Generate waveform visualization data
-    await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
-      episodeId,
-      userId: episode.userId,
+      title: episode.title,
+      stitchKey,
+      duration,
     });
 
     await job.updateProgress(100);

@@ -30,7 +30,6 @@ export enum JobType {
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
   SPEAKING_GRADING = 'speaking_grading',
   WORKSHEET_PDF = 'worksheet_pdf',
-  VERIFY_CLASS_REFERENCES = 'verify_class_references',
 }
 
 /**
@@ -67,7 +66,9 @@ export interface GenerateScriptPayload {
 
 export interface GenerateAudioPayload {
   episodeId: string;
+  audioGenerationKey: string;
   segmentId: string;
+  segmentVersion: number;
   speaker: string;
   text: string;
   previousText?: string;
@@ -78,6 +79,8 @@ export interface GenerateAudioPayload {
 export interface StitchAudioPayload {
   episodeId: string;
   segmentIds: string[];
+  segmentVersions: number[];
+  segmentAudioUrls: string[];
   skipSfx?: boolean;
 }
 
@@ -142,6 +145,7 @@ export interface WriteScriptPayload {
 export interface CompileScriptPayload {
   episodeId: string;
   userId: string;
+  useAdminCredits?: boolean;
 }
 
 export interface GeneratePdfPayload {
@@ -198,7 +202,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
-  'verify-class-references': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -265,8 +268,7 @@ async function handleWorkerFailure(
 
   try {
     const episodeId = (job?.data as Record<string, unknown> | undefined)?.episodeId as
-      | string
-      | undefined;
+      string | undefined;
     if (!episodeId) {
       return;
     }
@@ -286,8 +288,7 @@ async function handleWorkerFailure(
             attemptNumber: job?.attemptsMade,
             maxAttempts: job?.opts?.attempts,
             segmentId: (job?.data as Record<string, unknown> | undefined)?.segmentId as
-              | string
-              | undefined,
+              string | undefined,
             errorKind: classifyError(failedReason || ''),
           },
         },
@@ -506,6 +507,28 @@ export async function addJob<T>(
   payload: T,
   options?: { priority?: number; delay?: number; attempts?: number; jobId?: string }
 ): Promise<Job<T>> {
+  if (options?.jobId != null) {
+    const existing = (await queue.getJob(options.jobId)) as Job<T> | undefined;
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'failed') {
+        await existing.updateData(payload);
+        await existing.retry();
+        logger.info(`Failed job retried on queue: ${queue.name}`, {
+          jobId: existing.id,
+          jobType,
+        });
+      } else {
+        logger.info(`Existing job reused on queue: ${queue.name}`, {
+          jobId: existing.id,
+          jobType,
+          state,
+        });
+      }
+      return existing;
+    }
+  }
+
   // Only pass defined values — undefined overrides BullMQ's defaultJobOptions via Object.assign
   const opts: Record<string, unknown> = {};
   if (options?.priority != null) opts.priority = options.priority;
@@ -580,14 +603,10 @@ export interface WorksheetPdfPayload {
   appBaseUrl?: string;
 }
 
-export interface VerifyClassReferencesPayload {
-  episodeId: string;
-}
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
-export const verifyClassReferencesQueue = createQueueReference('verify-class-references');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

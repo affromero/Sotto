@@ -52,7 +52,7 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: 'Grade the response.' }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.3 },
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.3 }
   );
 
   logUsage({
@@ -64,7 +64,10 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
     userId: p.userId,
   });
 
-  const cleaned = res.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = res.content
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
   let parsed: { overallScore?: unknown; corrections?: unknown; feedback?: unknown };
   try {
     parsed = JSON.parse(cleaned);
@@ -73,7 +76,9 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
   }
 
   const overallScore = clamp01(typeof parsed.overallScore === 'number' ? parsed.overallScore : 0);
-  const corrections = Array.isArray(parsed.corrections) ? parsed.corrections.filter(isCorrection) : [];
+  const corrections = Array.isArray(parsed.corrections)
+    ? parsed.corrections.filter(isCorrection)
+    : [];
   const feedback = typeof parsed.feedback === 'string' ? parsed.feedback : '';
 
   return { overallScore, corrections, feedback };

@@ -182,7 +182,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     speaker: activeSpeaker,
   };
 
-  await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload);
+  await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload, {
+    jobId: `segment-regeneration-${interactionId}`,
+  });
 
   return NextResponse.json(
     {

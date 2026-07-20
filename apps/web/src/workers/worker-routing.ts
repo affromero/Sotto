@@ -9,10 +9,7 @@
  */
 
 /** GPU/API-heavy workers that need beefy containers */
-export const HEAVY_WORKERS = new Set([
-  'audio-generation',
-  'audio-stitching',
-]);
+export const HEAVY_WORKERS = new Set(['audio-generation', 'audio-stitching']);
 
 /** Pipeline orchestration workers */
 export const PIPELINE_WORKERS = new Set([
@@ -26,7 +23,6 @@ export const PIPELINE_WORKERS = new Set([
   'segment-regeneration',
   'speaking-grading',
   'worksheet-pdf',
-  'verify-class-references',
 ]);
 
 /**

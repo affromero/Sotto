@@ -6,13 +6,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveLearningAi = vi.fn();
-vi.mock('@/lib/learning-ai', () => ({ resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a) }));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+}));
 
 const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/providers/ai', () => ({ createAIProvider: () => ({ generateResponse: mockGenerateResponse }) }));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
+}));
 
 const mockLoadAndRender = vi.fn();
-vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a) }));
+vi.mock('@/lib/prompt-loader', () => ({
+  loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a),
+}));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
 import { gradeWriting } from '@/lib/writing-grader';
@@ -70,7 +76,12 @@ describe('gradeWriting', () => {
   });
 
   it('throws on malformed (non-JSON) output', async () => {
-    mockGenerateResponse.mockResolvedValue({ content: 'not json', inputTokens: 1, outputTokens: 1, model: 'm' });
+    mockGenerateResponse.mockResolvedValue({
+      content: 'not json',
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
     await expect(gradeWriting(PARAMS)).rejects.toThrow(/malformed/i);
   });
 });

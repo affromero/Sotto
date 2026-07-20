@@ -69,12 +69,14 @@ export interface PlacementQuestion {
   explanation: string; // server-only
 }
 
-export type PlacementQuestionPublic = Pick<PlacementQuestion, 'id' | 'cefr' | 'skill' | 'prompt' | 'options'>;
+export type PlacementQuestionPublic = Pick<
+  PlacementQuestion,
+  'id' | 'cefr' | 'skill' | 'prompt' | 'options'
+>;
 
 export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
   return { id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options };
 }
-
 
 export async function generatePlacement(
   userId: string,
@@ -83,7 +85,7 @@ export async function generatePlacement(
   note = '',
   // Questions per CEFR band. Defaults to the full test; the "verify with a few
   // questions" path passes a smaller value for a shorter run. Clamped 1..PER_BAND.
-  perBand: number = PER_BAND,
+  perBand: number = PER_BAND
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
   const ai = await resolveLearningAi(userId);
   const bandCount = Math.max(1, Math.min(PER_BAND, Math.round(perBand)));
@@ -102,8 +104,13 @@ export async function generatePlacement(
   const provider = createAIProvider(ai.provider);
   const response = await provider.generateResponse(
     systemPrompt,
-    [{ role: 'user', content: `Generate exactly ${count} placement questions (${bandCount} per CEFR level).` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 6000, temperature: 0.7 },
+    [
+      {
+        role: 'user',
+        content: `Generate exactly ${count} placement questions (${bandCount} per CEFR level).`,
+      },
+    ],
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 6000, temperature: 0.7 }
   );
 
   logUsage({
@@ -115,12 +122,24 @@ export async function generatePlacement(
     userId,
   });
 
-  const cleaned = response.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  let raw: Array<{ cefr?: string; skill?: string; prompt?: string; options?: string[]; correctIndex?: number; explanation?: string }>;
+  const cleaned = response.content
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
+  let raw: Array<{
+    cefr?: string;
+    skill?: string;
+    prompt?: string;
+    options?: string[];
+    correctIndex?: number;
+    explanation?: string;
+  }>;
   try {
     raw = JSON.parse(cleaned);
   } catch (err) {
-    logger.error('Failed to parse placement LLM response', { error: err instanceof Error ? err.message : String(err) });
+    logger.error('Failed to parse placement LLM response', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     throw new Error('Placement generation returned malformed output.');
   }
 
@@ -131,12 +150,14 @@ export async function generatePlacement(
         PLACEMENT_LEVELS.includes(q.cefr as CefrLevel) &&
         Array.isArray(q.options) &&
         q.options.length === 4 &&
-        typeof q.correctIndex === 'number',
+        typeof q.correctIndex === 'number'
     )
     .map((q, i): PlacementQuestion => ({
       id: `pq_${i}`,
       cefr: q.cefr as CefrLevel,
-      skill: (PLACEMENT_SKILLS.includes(q.skill as PlacementSkill) ? q.skill : 'grammar') as PlacementSkill,
+      skill: (PLACEMENT_SKILLS.includes(q.skill as PlacementSkill)
+        ? q.skill
+        : 'grammar') as PlacementSkill,
       prompt: q.prompt as string,
       // The LLM returns 4 content options; append a native-language "I don't
       // know" as the 5th (index 4). correctIndex stays 0..3, so picking it is
@@ -157,12 +178,18 @@ export interface PlacementOutcome {
   level: CefrLevel;
   scoreByBand: Record<string, number>;
   scoreBySkill: Record<string, number>;
-  responses: Array<{ id: string; cefr: CefrLevel; skill: PlacementSkill; selectedIndex: number; correct: boolean }>;
+  responses: Array<{
+    id: string;
+    cefr: CefrLevel;
+    skill: PlacementSkill;
+    selectedIndex: number;
+    correct: boolean;
+  }>;
 }
 
 export function scorePlacement(
   questions: PlacementQuestion[],
-  answers: Array<{ id: string; selectedIndex: number }>,
+  answers: Array<{ id: string; selectedIndex: number }>
 ): PlacementOutcome {
   const selected = new Map(answers.map((a) => [a.id, a.selectedIndex]));
   const band: Record<string, { correct: number; total: number }> = {};
@@ -213,7 +240,7 @@ export async function deduceLevelFromNotes(
   userId: string,
   nativeLang: string,
   targetLang: string,
-  content: string,
+  content: string
 ): Promise<{ deduction: NotesDeduction; provider: string; model: string }> {
   const ai = await resolveLearningAi(userId);
 
@@ -227,7 +254,7 @@ export async function deduceLevelFromNotes(
   const response = await provider.generateResponse(
     systemPrompt,
     [{ role: 'user', content: 'Assess the CEFR level shown by these materials.' }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 800, temperature: 0.2 },
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 800, temperature: 0.2 }
   );
 
   logUsage({
@@ -239,7 +266,10 @@ export async function deduceLevelFromNotes(
     userId,
   });
 
-  const cleaned = response.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = response.content
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
   let raw: { level?: string; rationale?: string; confidence?: number };
   try {
     raw = JSON.parse(cleaned);
@@ -253,8 +283,13 @@ export async function deduceLevelFromNotes(
   const level = (CEFR_ORDER as readonly string[]).includes(raw.level ?? '')
     ? (raw.level as CefrLevel)
     : 'A1';
-  const confidence = typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : 0;
+  const confidence =
+    typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : 0;
   const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : '';
 
-  return { deduction: { level, rationale, confidence }, provider: ai.provider, model: response.model };
+  return {
+    deduction: { level, rationale, confidence },
+    provider: ai.provider,
+    model: response.model,
+  };
 }

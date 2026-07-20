@@ -89,7 +89,7 @@ function clamp01(v: number): number {
  * Returns 0.7 when no timings are available (neutral default).
  */
 function computeFluency(
-  timings: Array<{ word: string; start: number; end: number }> | undefined,
+  timings: Array<{ word: string; start: number; end: number }> | undefined
 ): number {
   if (!timings || timings.length === 0) return 0.7;
   if (timings.length === 1) return 0.85; // single-word: can't measure internal gaps
@@ -121,13 +121,11 @@ function buildAlignmentSummary(
   matched: number,
   expectedCount: number,
   substitutions: Array<{ expected?: string; actual?: string }>,
-  deletions: string[],
+  deletions: string[]
 ): string {
   const parts: string[] = [`Matched ${matched}/${expectedCount} words.`];
   if (substitutions.length > 0) {
-    const subs = substitutions
-      .map((s) => `'${s.expected ?? '?'}'→'${s.actual ?? '?'}'`)
-      .join(', ');
+    const subs = substitutions.map((s) => `'${s.expected ?? '?'}'→'${s.actual ?? '?'}'`).join(', ');
     parts.push(`Substituted: ${subs}.`);
   }
   if (deletions.length > 0) {
@@ -150,7 +148,10 @@ interface LlmRubric {
 function parseLlmRubric(raw: string): LlmRubric | null {
   try {
     // Strip ```json ... ``` or ``` ... ``` wrappers
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const cleaned = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim();
     const parsed: unknown = JSON.parse(cleaned);
     if (typeof parsed !== 'object' || parsed === null) return null;
 
@@ -209,7 +210,7 @@ export class SelfContainedScorer implements PronunciationScorer {
       alignment.matched,
       alignment.expectedCount,
       substitutionTokens,
-      deletionWords,
+      deletionWords
     );
 
     let llmRubric: LlmRubric | null = null;
@@ -231,7 +232,7 @@ export class SelfContainedScorer implements PronunciationScorer {
           maxTokens: 256,
           temperature: 0.2,
           skipModeration: true,
-        },
+        }
       );
 
       await logUsage({
@@ -278,7 +279,7 @@ export class SelfContainedScorer implements PronunciationScorer {
 
     // Step 5 — weighted overall score
     const overallScore = clamp01(
-      finalAccuracy * 0.5 + finalFluency * 0.25 + finalCompleteness * 0.25,
+      finalAccuracy * 0.5 + finalFluency * 0.25 + finalCompleteness * 0.25
     );
 
     return {
@@ -320,6 +321,6 @@ export function resolvePronunciationScorer(context: { provider?: string }): Pron
 
   throw new Error(
     `Unknown pronunciation scorer provider: "${provider}". ` +
-      `Supported: self-contained. Future drop-ins: azure, speechace.`,
+      `Supported: self-contained. Future drop-ins: azure, speechace.`
   );
 }

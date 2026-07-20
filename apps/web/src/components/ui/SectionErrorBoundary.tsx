@@ -14,7 +14,10 @@ interface SectionErrorBoundaryState {
   hasError: boolean;
 }
 
-export class SectionErrorBoundary extends Component<SectionErrorBoundaryProps, SectionErrorBoundaryState> {
+export class SectionErrorBoundary extends Component<
+  SectionErrorBoundaryProps,
+  SectionErrorBoundaryState
+> {
   constructor(props: SectionErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -38,9 +41,7 @@ export class SectionErrorBoundary extends Component<SectionErrorBoundaryProps, S
 
       return (
         <div className={styles.fallback}>
-          <p className={styles.message}>
-            Couldn&apos;t load {this.props.sectionName}.
-          </p>
+          <p className={styles.message}>Couldn&apos;t load {this.props.sectionName}.</p>
           <button
             className={styles.retryBtn}
             onClick={() => this.setState({ hasError: false })}

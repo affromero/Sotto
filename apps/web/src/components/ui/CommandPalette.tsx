@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Command } from 'cmdk';
-import {
-  GraduationCap,
-  Brain,
-  Settings,
-  Sun,
-  Moon,
-} from 'lucide-react';
+import { GraduationCap, Brain, Settings, Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import styles from './CommandPalette.module.css';
 

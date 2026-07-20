@@ -24,109 +24,13 @@ jobs:
       NEXT_PUBLIC_APP_URL: https://selfhost.example.com
 
     steps:
-      - name: Checkout code with submodules
-        if: github.actor != 'dependabot[bot]'
-        uses: actions/checkout@v6
+      - name: Checkout code with public submodules
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           submodules: recursive
-          ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
-
-      - name: Checkout code for Dependabot
-        if: github.actor == 'dependabot[bot]'
-        uses: actions/checkout@v6
-        with:
-          submodules: false
-
-      - name: Checkout public submodules for Dependabot
-        if: github.actor == 'dependabot[bot]'
-        run: git submodule update --init --depth=1 packages/groundcheck
-
-      - name: Add private learning model CI fallback for Dependabot
-        if: github.actor == 'dependabot[bot]'
-        run: |
-          mkdir -p packages/learning-model/src
-          cat > packages/learning-model/package.json <<'JSON'
-          {
-            "name": "@sotto/learning-model",
-            "version": "0.1.0",
-            "description": "CI fallback for the private Sotto learning model submodule",
-            "license": "MIT",
-            "type": "module",
-            "main": "./src/index.ts",
-            "types": "./src/index.ts",
-            "scripts": {
-              "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-              "test": "vitest run",
-              "test:watch": "vitest",
-              "typecheck": "tsc --noEmit"
-            },
-            "devDependencies": {
-              "@vitest/coverage-v8": "^4.0.18",
-              "tsup": "^8.5.1",
-              "typescript": "^5.9.3",
-              "vitest": "^4.0.18"
-            }
-          }
-          JSON
-          cat > packages/learning-model/src/index.ts <<'TS'
-          export interface BayesianEvidence {
-            quality: number;
-            sensitivity?: number;
-            specificity?: number;
-            weight?: number;
-          }
-
-          export interface LearningTargetState {
-            mastery: number;
-            reps: number;
-            lapses: number;
-            dueAt?: Date | null;
-            lastReviewed?: Date | null;
-          }
-
-          export interface LearningPriority {
-            score: number;
-            weakness: number;
-            uncertainty: number;
-            duePressure: number;
-            lapsePressure: number;
-          }
-
-          const clamp01 = (value: number): number =>
-            Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
-
-          export function updateMasteryPosterior(
-            priorMastery: number,
-            evidence: BayesianEvidence | BayesianEvidence[],
-          ): number {
-            const signals = Array.isArray(evidence) ? evidence : [evidence];
-            const weighted = signals.reduce(
-              (sum, signal) => sum + (clamp01(signal.quality) - 0.5) * (signal.weight ?? 1),
-              0,
-            );
-            return clamp01(priorMastery + weighted * 0.2);
-          }
-
-          export function learningPriority(target: LearningTargetState, now: Date): LearningPriority {
-            const mastery = clamp01(target.mastery);
-            const weakness = 1 - mastery;
-            const attempts = Math.max(0, target.reps + target.lapses);
-            const uncertainty = clamp01(1 / Math.sqrt(attempts + 1));
-            const duePressure = target.dueAt != null && target.dueAt.getTime() <= now.getTime() ? 1 : 0;
-            const lapsePressure = clamp01(target.lapses / Math.max(1, attempts));
-            const score = clamp01(
-              weakness * 0.45 + uncertainty * 0.25 + duePressure * 0.2 + lapsePressure * 0.1,
-            );
-            return { score, weakness, uncertainty, duePressure, lapsePressure };
-          }
-
-          export function rankLearningTargets<T extends LearningTargetState>(targets: T[], now: Date): T[] {
-            return [...targets].sort((a, b) => learningPriority(b, now).score - learningPriority(a, now).score);
-          }
-          TS
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
@@ -137,14 +41,5 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate --schema=apps/web/prisma/schema.prisma
 
-      - name: Run linting
-        run: npm run lint
-
-      - name: Run type checking
-        run: npm run type-check
-
-      - name: Run tests
-        run: npm test
-
-      - name: Build the project
-        run: npm run build
+      - name: Run repository CI
+        run: npm run ci

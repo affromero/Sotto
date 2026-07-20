@@ -1,9 +1,4 @@
-import type {
-  AgentIngestResult,
-  Episode,
-  EpisodeDetail,
-  UserProfile,
-} from './types.js';
+import type { AgentIngestResult, Episode, EpisodeDetail, UserProfile } from './types.js';
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return 'N/A';

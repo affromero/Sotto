@@ -43,7 +43,9 @@ const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({
 const { mockPersistGeneratedReferences } = vi.hoisted(() => ({
   mockPersistGeneratedReferences: vi.fn(),
 }));
-const { mockAddJob } = vi.hoisted(() => ({ mockAddJob: vi.fn() }));
+const { mockVerifyEpisodeReferences } = vi.hoisted(() => ({
+  mockVerifyEpisodeReferences: vi.fn(),
+}));
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
 const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
@@ -98,10 +100,8 @@ vi.mock('@/lib/references', () => ({
   persistGeneratedReferences: (...args: unknown[]) => mockPersistGeneratedReferences(...args),
 }));
 
-vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
-  verifyClassReferencesQueue: { name: 'verify-class-references' },
-  JobType: { VERIFY_CLASS_REFERENCES: 'verify_class_references' },
+vi.mock('@/lib/reference-verification/verify-episode', () => ({
+  verifyEpisodeReferences: (...args: unknown[]) => mockVerifyEpisodeReferences(...args),
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -242,7 +242,7 @@ function setupHappyPath() {
   mockVocabEntryCreateMany.mockResolvedValue({ count: SAMPLE_VOCABULARY.length });
   mockCreateSegmentsAndQueueAudio.mockResolvedValue(undefined);
   mockPersistGeneratedReferences.mockResolvedValue(undefined);
-  mockAddJob.mockResolvedValue({ id: 'job-1' });
+  mockVerifyEpisodeReferences.mockResolvedValue(true);
   mockLearnerVocabUpsert.mockResolvedValue({});
   mockLoadAndRender.mockReturnValue('You are a quiz generator.');
   mockGenerateResponse.mockResolvedValue({
@@ -601,10 +601,8 @@ describe('composeListeningContent', () => {
       expect(mockGenerateScript).toHaveBeenCalledWith(
         expect.objectContaining({ sourceContent: undefined, webSearchEnabled: true })
       );
-      // Empty references → persistGeneratedReferences is a no-op caller-side and
-      // the verify-class-references job is never enqueued.
       expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('episode-1', []);
-      expect(mockAddJob).not.toHaveBeenCalled();
+      expect(mockVerifyEpisodeReferences).not.toHaveBeenCalled();
     });
   });
 
@@ -647,7 +645,7 @@ describe('composeListeningContent', () => {
       );
     });
 
-    it('persists the generated references and enqueues the verify-class-references job', async () => {
+    it('verifies generated references before creating audio segments', async () => {
       setupHappyPath();
       mockGenerateScript.mockResolvedValue({
         ...SAMPLE_SCRIPT_RESULT,
@@ -657,11 +655,29 @@ describe('composeListeningContent', () => {
       await composeListeningContent(SOURCED_PARAMS);
 
       expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('episode-1', SOURCED_REFERENCES);
-      expect(mockAddJob).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'verify-class-references' }),
-        'verify_class_references',
-        { episodeId: 'episode-1' }
+      expect(mockVerifyEpisodeReferences).toHaveBeenCalledWith(
+        'episode-1',
+        CONTENT_PARAMS.userId,
+        CONTENT_PARAMS.objective,
+        SAMPLE_SCRIPT_RESULT.turns
       );
+      expect(mockVerifyEpisodeReferences.mock.invocationCallOrder[0]).toBeLessThan(
+        mockCreateSegmentsAndQueueAudio.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('does not create audio when a cited claim cannot be verified', async () => {
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({
+        ...SAMPLE_SCRIPT_RESULT,
+        references: SOURCED_REFERENCES,
+      });
+      mockVerifyEpisodeReferences.mockResolvedValue(false);
+
+      await expect(composeListeningContent(SOURCED_PARAMS)).rejects.toThrow(
+        'Class reference verification failed'
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('still creates segments exactly once (no double-queue)', async () => {

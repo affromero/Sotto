@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_QUEUE_NAMES } from '@/lib/queue';
-import {
-  QUEUE_METADATA,
-  PIPELINE_STAGE_ORDER,
-} from '@/app/(admin)/admin/queues/queue-metadata';
+import { QUEUE_METADATA, PIPELINE_STAGE_ORDER } from '@/app/(admin)/admin/queues/queue-metadata';
 
 describe('queue-metadata', () => {
   it('has metadata for every queue in ALL_QUEUE_NAMES', () => {
@@ -34,7 +31,10 @@ describe('queue-metadata', () => {
   it('every queue stage appears in PIPELINE_STAGE_ORDER', () => {
     const stageSet = new Set(PIPELINE_STAGE_ORDER);
     for (const [name, meta] of Object.entries(QUEUE_METADATA)) {
-      expect(stageSet.has(meta.stage), `${name} stage "${meta.stage}" not in PIPELINE_STAGE_ORDER`).toBe(true);
+      expect(
+        stageSet.has(meta.stage),
+        `${name} stage "${meta.stage}" not in PIPELINE_STAGE_ORDER`
+      ).toBe(true);
     }
   });
 

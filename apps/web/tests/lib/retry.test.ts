@@ -12,7 +12,7 @@ describe('retry', () => {
 
   beforeEach(() => {
     origSetTimeout = globalThis.setTimeout;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
   });
 
@@ -58,9 +58,7 @@ describe('retry', () => {
 
     it('retries on 429 rate limit and succeeds', async () => {
       const err429 = Object.assign(new Error('Rate limited'), { status: 429 });
-      const fn = vi.fn()
-        .mockRejectedValueOnce(err429)
-        .mockResolvedValueOnce('recovered');
+      const fn = vi.fn().mockRejectedValueOnce(err429).mockResolvedValueOnce('recovered');
 
       const result = await withRetry('test', fn);
       expect(result).toBe('recovered');
@@ -69,9 +67,7 @@ describe('retry', () => {
 
     it('retries on 500 server error and succeeds', async () => {
       const err500 = Object.assign(new Error('Server error'), { status: 500 });
-      const fn = vi.fn()
-        .mockRejectedValueOnce(err500)
-        .mockResolvedValueOnce('recovered');
+      const fn = vi.fn().mockRejectedValueOnce(err500).mockResolvedValueOnce('recovered');
 
       const result = await withRetry('test', fn);
       expect(result).toBe('recovered');

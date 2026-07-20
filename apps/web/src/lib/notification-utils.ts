@@ -1,15 +1,8 @@
 import type { NotificationData } from '@/types/notification';
 
-const PIPELINE_SUCCESS_TYPES = new Set([
-  'EPISODE_READY',
-  'SCRIPT_READY',
-]);
+const PIPELINE_SUCCESS_TYPES = new Set(['EPISODE_READY', 'SCRIPT_READY']);
 
-const PIPELINE_ERROR_TYPES = new Set([
-  'EPISODE_FAILED',
-  'KEY_INVALID',
-  'PIPELINE_FAILURE',
-]);
+const PIPELINE_ERROR_TYPES = new Set(['EPISODE_FAILED', 'KEY_INVALID', 'PIPELINE_FAILURE']);
 
 export function isPipelineSuccessNotification(type: string): boolean {
   return PIPELINE_SUCCESS_TYPES.has(type);

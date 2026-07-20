@@ -81,9 +81,11 @@ describe('claude', () => {
 
       mockMessagesCreate.mockResolvedValue(mockResponse);
 
-      const result = await generateResponse('You are a helpful assistant.', [
-        { role: 'user', content: 'Hello, Claude!' },
-      ], { model: DEFAULT_MODEL });
+      const result = await generateResponse(
+        'You are a helpful assistant.',
+        [{ role: 'user', content: 'Hello, Claude!' }],
+        { model: DEFAULT_MODEL }
+      );
 
       expect(result).toEqual({
         content: 'This is a test response from Claude.',
@@ -121,9 +123,11 @@ describe('claude', () => {
 
       mockMessagesCreate.mockResolvedValue(mockResponse);
 
-      const result = await generateResponse('You are a helpful assistant.', [
-        { role: 'user', content: 'Check weather' },
-      ], { model: DEFAULT_MODEL });
+      const result = await generateResponse(
+        'You are a helpful assistant.',
+        [{ role: 'user', content: 'Check weather' }],
+        { model: DEFAULT_MODEL }
+      );
 
       expect(result.content).toBe('');
       expect(result.inputTokens).toBe(50);
@@ -152,9 +156,11 @@ describe('claude', () => {
 
       mockMessagesCreate.mockResolvedValue(mockResponse);
 
-      const result = await generateResponse('You are a helpful assistant.', [
-        { role: 'user', content: 'Test' },
-      ], { model: DEFAULT_MODEL });
+      const result = await generateResponse(
+        'You are a helpful assistant.',
+        [{ role: 'user', content: 'Test' }],
+        { model: DEFAULT_MODEL }
+      );
 
       expect(result.content).toBe('First text block\n\nSecond text block');
     });
@@ -166,7 +172,9 @@ describe('claude', () => {
       const { generateResponse } = await import('@/lib/llm');
 
       await expect(
-        generateResponse('System prompt', [{ role: 'user', content: 'Test' }], { model: DEFAULT_MODEL })
+        generateResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+          model: DEFAULT_MODEL,
+        })
       ).rejects.toThrow('LLM client not initialized — set ANTHROPIC_API_KEY');
     });
 
@@ -177,7 +185,9 @@ describe('claude', () => {
       mockMessagesCreate.mockRejectedValue(apiError);
 
       await expect(
-        generateResponse('System prompt', [{ role: 'user', content: 'Test' }], { model: DEFAULT_MODEL })
+        generateResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+          model: DEFAULT_MODEL,
+        })
       ).rejects.toThrow('Rate limit exceeded');
     });
 
@@ -245,9 +255,11 @@ describe('claude', () => {
       mockMessagesStream.mockReturnValue(mockGenerator());
 
       const chunks: string[] = [];
-      for await (const chunk of streamResponse('System prompt', [
-        { role: 'user', content: 'Stream test' },
-      ], { model: DEFAULT_MODEL })) {
+      for await (const chunk of streamResponse(
+        'System prompt',
+        [{ role: 'user', content: 'Stream test' }],
+        { model: DEFAULT_MODEL }
+      )) {
         chunks.push(chunk);
       }
 
@@ -295,9 +307,11 @@ describe('claude', () => {
       mockMessagesStream.mockReturnValue(mockGenerator());
 
       const chunks: string[] = [];
-      for await (const chunk of streamResponse('System prompt', [
-        { role: 'user', content: 'Test' },
-      ], { model: DEFAULT_MODEL })) {
+      for await (const chunk of streamResponse(
+        'System prompt',
+        [{ role: 'user', content: 'Test' }],
+        { model: DEFAULT_MODEL }
+      )) {
         chunks.push(chunk);
       }
 
@@ -314,9 +328,11 @@ describe('claude', () => {
       mockMessagesStream.mockReturnValue(mockGenerator());
 
       const chunks: string[] = [];
-      for await (const chunk of streamResponse('System prompt', [
-        { role: 'user', content: 'Empty test' },
-      ], { model: DEFAULT_MODEL })) {
+      for await (const chunk of streamResponse(
+        'System prompt',
+        [{ role: 'user', content: 'Empty test' }],
+        { model: DEFAULT_MODEL }
+      )) {
         chunks.push(chunk);
       }
 
@@ -329,7 +345,9 @@ describe('claude', () => {
 
       const { streamResponse } = await import('@/lib/llm');
 
-      const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }], { model: DEFAULT_MODEL });
+      const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+        model: DEFAULT_MODEL,
+      });
 
       await expect(generator.next()).rejects.toThrow(
         'LLM client not initialized — set ANTHROPIC_API_KEY'
@@ -345,7 +363,9 @@ describe('claude', () => {
 
       mockMessagesStream.mockReturnValue(errorGenerator());
 
-      const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }], { model: DEFAULT_MODEL });
+      const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+        model: DEFAULT_MODEL,
+      });
 
       await expect(generator.next()).rejects.toThrow('Stream interrupted');
     });
@@ -357,7 +377,9 @@ describe('claude', () => {
         model: 'nonexistent-model-xyz',
       });
 
-      await expect(generator.next()).rejects.toThrow('Unknown AI model ID: "nonexistent-model-xyz"');
+      await expect(generator.next()).rejects.toThrow(
+        'Unknown AI model ID: "nonexistent-model-xyz"'
+      );
     });
 
     it('streams text when tools option is provided', async () => {

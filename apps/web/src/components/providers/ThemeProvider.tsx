@@ -195,10 +195,22 @@ function setStoredMotion(reduced: boolean) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const theme = useSyncExternalStore(subscribeTheme, getThemeSnapshot, getThemeServerSnapshot);
-  const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemThemeSnapshot, getSystemThemeServerSnapshot);
+  const systemTheme = useSyncExternalStore(
+    subscribeSystemTheme,
+    getSystemThemeSnapshot,
+    getSystemThemeServerSnapshot
+  );
   const accent = useSyncExternalStore(subscribeAccent, getAccentSnapshot, getAccentServerSnapshot);
-  const palette = useSyncExternalStore(subscribePalette, getPaletteSnapshot, getPaletteServerSnapshot);
-  const reducedMotion = useSyncExternalStore(subscribeMotion, getMotionSnapshot, getMotionServerSnapshot);
+  const palette = useSyncExternalStore(
+    subscribePalette,
+    getPaletteSnapshot,
+    getPaletteServerSnapshot
+  );
+  const reducedMotion = useSyncExternalStore(
+    subscribeMotion,
+    getMotionSnapshot,
+    getMotionServerSnapshot
+  );
 
   const resolvedTheme = useMemo<ResolvedTheme>(() => {
     if (isLightOnlyRoute(pathname)) return 'light';
@@ -247,7 +259,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider
-      value={{ theme, resolvedTheme, setTheme, accent, setAccent, palette, setPalette, reducedMotion, setReducedMotion }}
+      value={{
+        theme,
+        resolvedTheme,
+        setTheme,
+        accent,
+        setAccent,
+        palette,
+        setPalette,
+        reducedMotion,
+        setReducedMotion,
+      }}
     >
       {children}
     </ThemeContext.Provider>

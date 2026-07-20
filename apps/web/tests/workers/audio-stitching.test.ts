@@ -14,7 +14,8 @@ const mockPrismaEpisodeFindUniqueOrThrow = vi.fn().mockResolvedValue({
 });
 const mockPrismaEpisodeFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaEpisodeUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaEpisodeVersionCreate = vi.fn().mockResolvedValue({});
+const mockPrismaEpisodeUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+const mockPrismaEpisodeVersionUpsert = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
@@ -33,9 +34,10 @@ vi.mock('@/lib/prisma', () => {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaEpisodeFindUniqueOrThrow(...args),
       findUnique: (...args: unknown[]) => mockPrismaEpisodeFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPrismaEpisodeUpdateMany(...args),
     },
     episodeVersion: {
-      create: (...args: unknown[]) => mockPrismaEpisodeVersionCreate(...args),
+      upsert: (...args: unknown[]) => mockPrismaEpisodeVersionUpsert(...args),
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
@@ -45,6 +47,7 @@ vi.mock('@/lib/prisma', () => {
     },
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
+      upsert: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
     },
     audioFingerprint: {
       upsert: vi.fn().mockResolvedValue({}),
@@ -52,6 +55,7 @@ vi.mock('@/lib/prisma', () => {
     notification: {
       findFirst: (...args: unknown[]) => mockPrismaNotificationFindFirst(...args),
     },
+    $transaction: vi.fn().mockResolvedValue([]),
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -168,6 +172,12 @@ function createMockJob(data: StitchAudioPayload): Job<StitchAudioPayload> {
 const defaultPayload: StitchAudioPayload = {
   episodeId: 'episode-001',
   segmentIds: ['seg-1', 'seg-2', 'seg-3'],
+  segmentVersions: [1, 1, 1],
+  segmentAudioUrls: [
+    'https://r2.example.com/seg-1.mp3',
+    'https://r2.example.com/seg-2.mp3',
+    'https://r2.example.com/seg-3.mp3',
+  ],
 };
 
 // ---- Tests ----
@@ -182,9 +192,27 @@ describe('processAudioStitching', () => {
 
     // Default segment data - first call (initial fetch with audioUrl)
     mockPrismaSegmentFindMany.mockResolvedValueOnce([
-      { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
-      { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
-      { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      {
+        id: 'seg-1',
+        episodeId: 'episode-001',
+        audioUrl: 'https://r2.example.com/seg-1.mp3',
+        order: 0,
+        duration: 100,
+      },
+      {
+        id: 'seg-2',
+        episodeId: 'episode-001',
+        audioUrl: 'https://r2.example.com/seg-2.mp3',
+        order: 1,
+        duration: 100,
+      },
+      {
+        id: 'seg-3',
+        episodeId: 'episode-001',
+        audioUrl: 'https://r2.example.com/seg-3.mp3',
+        order: 2,
+        duration: 100,
+      },
     ]);
     // Default segment data - second call (fresh duration data for startTime)
     mockPrismaSegmentFindMany.mockResolvedValueOnce([
@@ -198,6 +226,8 @@ describe('processAudioStitching', () => {
       userId: 'user-1',
       title: 'Test Episode',
       source: 'WEB',
+      status: 'STITCHING',
+      lastCompletedStitchKey: null,
       currentVersion: 0,
       audioUrl: null,
     });
@@ -228,11 +258,12 @@ describe('processAudioStitching', () => {
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: null, order: 1, duration: 100 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
       ]);
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow(
-        'Segment seg-2 (order 1) has no audioUrl'
+        'Stitch payload is stale for episode episode-001'
       );
     });
   });
@@ -571,13 +602,18 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'notifications' }, 'send_notification', {
-        userId: 'user-1',
-        type: 'EPISODE_READY',
-        title: 'Your lesson is ready!',
-        message: '"Test Episode" is ready to play.',
-        data: { episodeId: 'episode-001' },
-      });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'notifications' },
+        'send_notification',
+        {
+          userId: 'user-1',
+          type: 'EPISODE_READY',
+          title: 'Your lesson is ready!',
+          message: '"Test Episode" is ready to play.',
+          data: { episodeId: 'episode-001' },
+        },
+        { jobId: expect.stringMatching(/^episode-ready-[a-f0-9]{64}$/) }
+      );
     });
 
     it('includes episode title in notification message', async () => {
@@ -596,7 +632,8 @@ describe('processAudioStitching', () => {
         'send_notification',
         expect.objectContaining({
           message: '"Quantum Computing Explained" is ready to play.',
-        })
+        }),
+        { jobId: expect.stringMatching(/^episode-ready-[a-f0-9]{64}$/) }
       );
     });
   });
@@ -609,7 +646,8 @@ describe('processAudioStitching', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'waveform-generation' },
         'generate_waveform',
-        { episodeId: 'episode-001', userId: 'user-1' }
+        { episodeId: 'episode-001', userId: 'user-1' },
+        { jobId: expect.stringMatching(/^episode-waveform-[a-f0-9]{64}$/) }
       );
     });
   });
@@ -619,7 +657,9 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: any[]) => c[0]
+      );
       for (let i = 1; i < calls.length; i++) {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }
@@ -657,9 +697,12 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockMarkEpisodeFailed).toHaveBeenCalledWith('episode-001', expect.objectContaining({
-        technicalError: expect.stringContaining('exceeded max'),
-      }));
+      expect(mockMarkEpisodeFailed).toHaveBeenCalledWith(
+        'episode-001',
+        expect.objectContaining({
+          technicalError: expect.stringContaining('exceeded max'),
+        })
+      );
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
@@ -702,7 +745,6 @@ describe('processAudioStitching', () => {
 
       await expect(processAudioStitching(job)).rejects.toThrow('R2 upload failed');
     });
-
   });
 
   describe('end-to-end flow', () => {
@@ -748,14 +790,15 @@ describe('processAudioStitching', () => {
       // Episode updated to READY
       expect(mockPrismaEpisodeUpdate).toHaveBeenCalledWith({
         where: { id: 'episode-001' },
-        data: {
+        data: expect.objectContaining({
           status: 'READY',
           audioUrl: 'https://media.example.com/final.mp3',
           duration: 306, // rounded
           durationDeviation: 6, // 306 - 5*60 = 6
           fileSize: 1024 * 256,
           currentVersion: 0,
-        },
+          lastCompletedStitchKey: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
       });
 
       // Segment start times updated
@@ -765,6 +808,7 @@ describe('processAudioStitching', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         expect.anything(),
         'send_notification',
+        expect.anything(),
         expect.anything()
       );
 
@@ -806,6 +850,5 @@ describe('processAudioStitching', () => {
         data: expect.objectContaining({ status: 'READY' }),
       });
     });
-
   });
 });

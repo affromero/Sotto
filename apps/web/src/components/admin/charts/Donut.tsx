@@ -16,7 +16,13 @@ interface DonutProps {
 }
 
 /** Ring chart for distributions (e.g. queue jobs by state). Pure SVG, no deps. */
-export function Donut({ segments, size = 140, thickness = 18, centerLabel, centerSub }: DonutProps) {
+export function Donut({
+  segments,
+  size = 140,
+  thickness = 18,
+  centerLabel,
+  centerSub,
+}: DonutProps) {
   const total = segments.reduce((a, s) => a + s.gb, 0) || 1;
   const r = (size - thickness) / 2;
   const circumference = 2 * Math.PI * r;

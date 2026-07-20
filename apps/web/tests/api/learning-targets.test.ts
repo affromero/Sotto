@@ -88,7 +88,7 @@ describe('GET /api/v1/courses/[courseId]/learning-targets', () => {
 
     const res = await listGet(
       new NextRequest('http://localhost/api/v1/courses/c1/learning-targets?limit=10'),
-      COURSE_PARAMS,
+      COURSE_PARAMS
     );
 
     expect(res.status).toBe(200);
@@ -107,7 +107,7 @@ describe('POST /api/v1/courses/[courseId]/learning-targets', () => {
         sourceType: 'CLASS',
         userMarkedDifficulty: 4,
       }),
-      COURSE_PARAMS,
+      COURSE_PARAMS
     );
 
     expect(res.status).toBe(201);
@@ -115,14 +115,14 @@ describe('POST /api/v1/courses/[courseId]/learning-targets', () => {
     expect(mockAddLearningTarget).toHaveBeenCalledWith(
       'c1',
       'u1',
-      expect.objectContaining({ text: 'Me cuesta entenderlo.', sourceType: 'CLASS' }),
+      expect.objectContaining({ text: 'Me cuesta entenderlo.', sourceType: 'CLASS' })
     );
   });
 
   it('400s on malformed target data', async () => {
     const res = await addPost(
       jsonReq('http://localhost/api/v1/courses/c1/learning-targets', { text: '' }),
-      COURSE_PARAMS,
+      COURSE_PARAMS
     );
 
     expect(res.status).toBe(400);
@@ -132,13 +132,16 @@ describe('POST /api/v1/courses/[courseId]/learning-targets', () => {
 
 describe('learning-target enhancement routes', () => {
   it('adds a visual cue when the provider is configured', async () => {
-    mockAddVisualCue.mockResolvedValue({ ...TARGET, visualCueUrl: 'https://images.pexels.com/a.jpg' });
+    mockAddVisualCue.mockResolvedValue({
+      ...TARGET,
+      visualCueUrl: 'https://images.pexels.com/a.jpg',
+    });
 
     const res = await visualPost(
       new NextRequest('http://localhost/api/v1/courses/c1/learning-targets/ft1/visual-cue', {
         method: 'POST',
       }),
-      TARGET_PARAMS,
+      TARGET_PARAMS
     );
 
     expect(res.status).toBe(200);
@@ -147,14 +150,14 @@ describe('learning-target enhancement routes', () => {
 
   it('returns 422 when pronunciation cannot be generated', async () => {
     mockGenerateTargetPronunciation.mockRejectedValue(
-      new LearningTargetUnavailableError('No TTS provider is configured'),
+      new LearningTargetUnavailableError('No TTS provider is configured')
     );
 
     const res = await pronunciationPost(
       new NextRequest('http://localhost/api/v1/courses/c1/learning-targets/ft1/pronunciation', {
         method: 'POST',
       }),
-      TARGET_PARAMS,
+      TARGET_PARAMS
     );
 
     expect(res.status).toBe(422);

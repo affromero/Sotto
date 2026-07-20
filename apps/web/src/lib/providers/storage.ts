@@ -201,7 +201,10 @@ class S3Provider implements StorageProvider {
  */
 class LocalProvider implements StorageProvider {
   private get baseDir() {
-    return path.resolve(process.cwd(), process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage');
+    return path.resolve(
+      /* turbopackIgnore: true */ process.cwd(),
+      process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage'
+    );
   }
 
   private pathForKey(key: string): string {
@@ -216,8 +219,8 @@ class LocalProvider implements StorageProvider {
   async uploadFile(key: string, data: Buffer, _contentType: string): Promise<string> {
     const fs = await import('fs/promises');
     const filePath = this.pathForKey(key);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, data);
+    await fs.mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
+    await fs.writeFile(/* turbopackIgnore: true */ filePath, data);
     return pathToFileURL(filePath).href;
   }
 
@@ -226,14 +229,14 @@ class LocalProvider implements StorageProvider {
     const fsPromises = await import('fs/promises');
     const { pipeline } = await import('stream/promises');
     const filePath = this.pathForKey(key);
-    await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
-    await pipeline(body, fs.createWriteStream(filePath));
+    await fsPromises.mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
+    await pipeline(body, fs.createWriteStream(/* turbopackIgnore: true */ filePath));
     return pathToFileURL(filePath).href;
   }
 
   async downloadFile(key: string): Promise<Buffer> {
     const fs = await import('fs/promises');
-    return fs.readFile(this.pathForKey(key));
+    return fs.readFile(/* turbopackIgnore: true */ this.pathForKey(key));
   }
 
   async getPresignedUrl(key: string): Promise<string> {
@@ -243,7 +246,7 @@ class LocalProvider implements StorageProvider {
   async deleteFile(key: string): Promise<void> {
     const fs = await import('fs/promises');
     try {
-      await fs.unlink(this.pathForKey(key));
+      await fs.unlink(/* turbopackIgnore: true */ this.pathForKey(key));
     } catch {
       // File may not exist
     }

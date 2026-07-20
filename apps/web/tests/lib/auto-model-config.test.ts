@@ -48,7 +48,8 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/providers/tts-registry', () => ({
   getProviderMeta: (id: string) => {
-    if (id === 'openai') return { defaultModel: 'tts-1-hd', models: [{ id: 'tts-1-hd' }, { id: 'tts-1' }] };
+    if (id === 'openai')
+      return { defaultModel: 'tts-1-hd', models: [{ id: 'tts-1-hd' }, { id: 'tts-1' }] };
     if (id === 'elevenlabs') return { defaultModel: 'eleven_v3', models: [{ id: 'eleven_v3' }] };
     return { defaultModel: '', models: [] };
   },
@@ -56,7 +57,11 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 
 vi.mock('@/lib/providers/stt-registry', () => ({
   getSttProviderMeta: (id: string) => {
-    if (id === 'openai') return { defaultModel: 'whisper-1', models: [{ id: 'whisper-1' }, { id: 'gpt-4o-transcribe' }] };
+    if (id === 'openai')
+      return {
+        defaultModel: 'whisper-1',
+        models: [{ id: 'whisper-1' }, { id: 'gpt-4o-transcribe' }],
+      };
     return { defaultModel: '', models: [] };
   },
 }));
@@ -165,7 +170,7 @@ describe('setAutoModelConfig', () => {
         model: { aiProvider: 'openai', aiModel: 'gpt-5', ttsProvider: 'elevenlabs' },
         includedModels: ['gpt-5'],
       },
-      'admin-1',
+      'admin-1'
     );
 
     const call = mockAutoModelConfigUpsert.mock.calls[0][0];
@@ -180,7 +185,7 @@ describe('setAutoModelConfig', () => {
 
   it('rejects an AI model that does not belong to its paired provider', async () => {
     await expect(
-      setAutoModelConfig({ model: { aiProvider: 'anthropic', aiModel: 'gpt-5' } }, 'admin-1'),
+      setAutoModelConfig({ model: { aiProvider: 'anthropic', aiModel: 'gpt-5' } }, 'admin-1')
     ).rejects.toThrow(/does not belong to provider "anthropic"/);
     expect(mockAutoModelConfigUpsert).not.toHaveBeenCalled();
   });
@@ -189,8 +194,8 @@ describe('setAutoModelConfig', () => {
     await expect(
       setAutoModelConfig(
         { model: { sttProvider: 'openai', sttModel: 'not-a-real-model' } },
-        'admin-1',
-      ),
+        'admin-1'
+      )
     ).rejects.toThrow(/is not a model of provider "openai"/);
     expect(mockAutoModelConfigUpsert).not.toHaveBeenCalled();
   });
@@ -202,7 +207,7 @@ describe('setAutoModelConfig', () => {
         includedTtsModels: ['openai:tts-1-hd'],
         includedSttModels: ['openai:whisper-1'],
       },
-      'admin-2',
+      'admin-2'
     );
 
     const call = mockAutoModelConfigUpsert.mock.calls[0][0];
@@ -223,11 +228,11 @@ describe('included model resolvers', () => {
 
   it('return explicit unified lists when configured', () => {
     expect(resolveIncludedModels({ ...config, includedModels: ['gpt-5'] })).toEqual(['gpt-5']);
-    expect(resolveTtsIncludedModels({ ...config, includedTtsModels: ['elevenlabs:eleven_v3'] })).toEqual([
-      'elevenlabs:eleven_v3',
-    ]);
-    expect(resolveSttIncludedModels({ ...config, includedSttModels: ['openai:gpt-4o-transcribe'] })).toEqual([
-      'openai:gpt-4o-transcribe',
-    ]);
+    expect(
+      resolveTtsIncludedModels({ ...config, includedTtsModels: ['elevenlabs:eleven_v3'] })
+    ).toEqual(['elevenlabs:eleven_v3']);
+    expect(
+      resolveSttIncludedModels({ ...config, includedSttModels: ['openai:gpt-4o-transcribe'] })
+    ).toEqual(['openai:gpt-4o-transcribe']);
   });
 });

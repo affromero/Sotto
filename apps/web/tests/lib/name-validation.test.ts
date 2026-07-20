@@ -3,38 +3,68 @@ import { validateDisplayName } from '@/lib/name-validation';
 
 describe('validateDisplayName', () => {
   it('rejects empty string', () => {
-    expect(validateDisplayName('')).toEqual({ valid: false, reason: 'Name must be at least 2 characters' });
+    expect(validateDisplayName('')).toEqual({
+      valid: false,
+      reason: 'Name must be at least 2 characters',
+    });
   });
 
   it('rejects single character', () => {
-    expect(validateDisplayName('A')).toEqual({ valid: false, reason: 'Name must be at least 2 characters' });
+    expect(validateDisplayName('A')).toEqual({
+      valid: false,
+      reason: 'Name must be at least 2 characters',
+    });
   });
 
   it('rejects whitespace-only input', () => {
-    expect(validateDisplayName('   ')).toEqual({ valid: false, reason: 'Name must be at least 2 characters' });
+    expect(validateDisplayName('   ')).toEqual({
+      valid: false,
+      reason: 'Name must be at least 2 characters',
+    });
   });
 
   it('rejects name over 100 characters', () => {
     const long = 'A'.repeat(101);
-    expect(validateDisplayName(long)).toEqual({ valid: false, reason: 'Name must be 100 characters or fewer' });
+    expect(validateDisplayName(long)).toEqual({
+      valid: false,
+      reason: 'Name must be 100 characters or fewer',
+    });
   });
 
   it('rejects all same character repeated', () => {
-    expect(validateDisplayName('aaaa')).toEqual({ valid: false, reason: 'Please enter a real name' });
-    expect(validateDisplayName('ZZZZ')).toEqual({ valid: false, reason: 'Please enter a real name' });
+    expect(validateDisplayName('aaaa')).toEqual({
+      valid: false,
+      reason: 'Please enter a real name',
+    });
+    expect(validateDisplayName('ZZZZ')).toEqual({
+      valid: false,
+      reason: 'Please enter a real name',
+    });
   });
 
   it('rejects numbers only', () => {
-    expect(validateDisplayName('12345')).toEqual({ valid: false, reason: 'Name must contain at least one letter' });
+    expect(validateDisplayName('12345')).toEqual({
+      valid: false,
+      reason: 'Name must contain at least one letter',
+    });
   });
 
   it('rejects symbols only', () => {
-    expect(validateDisplayName('!@#$%')).toEqual({ valid: false, reason: 'Name must contain at least one letter' });
+    expect(validateDisplayName('!@#$%')).toEqual({
+      valid: false,
+      reason: 'Name must contain at least one letter',
+    });
   });
 
   it('rejects keyboard smash patterns', () => {
-    expect(validateDisplayName('qwerty')).toEqual({ valid: false, reason: 'Please enter a real name' });
-    expect(validateDisplayName('Asdf Jones')).toEqual({ valid: false, reason: 'Please enter a real name' });
+    expect(validateDisplayName('qwerty')).toEqual({
+      valid: false,
+      reason: 'Please enter a real name',
+    });
+    expect(validateDisplayName('Asdf Jones')).toEqual({
+      valid: false,
+      reason: 'Please enter a real name',
+    });
   });
 
   it('accepts valid simple names', () => {
