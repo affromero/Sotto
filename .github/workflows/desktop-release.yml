@@ -28,7 +28,7 @@ jobs:
       should_build: ${{ steps.release_version.outputs.should_build }}
       skip_reason: ${{ steps.release_version.outputs.skip_reason }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Resolve release version
         id: release_version
@@ -79,7 +79,7 @@ jobs:
             slug: linux
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Linux build deps
         if: matrix.os == 'ubuntu-latest'
@@ -88,7 +88,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
@@ -100,7 +100,7 @@ jobs:
 
       # Builds the installer for the current OS. Add signing secrets here to
       # produce a signed/notarized build (see apps/desktop/README.md).
-      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         with:
           projectPath: apps/desktop
 
@@ -217,7 +217,7 @@ jobs:
           cp -R "$VERSION_DIR"/. "$LATEST_DIR"/
           cp -R "$VERSION_DIR"/. "$SHA_DIR"/
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sotto-host-${{ matrix.slug }}-${{ needs.prepare.outputs.release_version }}
           path: ${{ runner.temp }}/sotto-desktop-downloads/download/desktop/${{ needs.prepare.outputs.release_version }}/${{ matrix.slug }}/*
@@ -255,9 +255,9 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.prepare.outputs.should_build == 'true' && startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: artifacts
           merge-multiple: true
@@ -295,7 +295,7 @@ jobs:
           EOF
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: artifacts/*
           body_path: release-notes.md
