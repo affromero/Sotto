@@ -35,9 +35,6 @@ yarn-debug.log*
 # Documentation
 docs
 
-# Prisma migrations (schema is needed, migrations are not)
-apps/web/prisma/migrations
-
 # Vercel
 .vercel
 
