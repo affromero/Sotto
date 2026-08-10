@@ -191,40 +191,6 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     }
   };
 
-  const cfApiCheck = async () => {
-    const start = Date.now();
-    try {
-      const accountId = process.env.R2_ACCOUNT_ID;
-      const token = process.env.CF_API_TOKEN;
-      if (accountId && token) {
-        const res = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(5000),
-          }
-        );
-        return {
-          key: 'cfR2Monitoring',
-          result: {
-            status: res.ok ? 'ok' : 'error',
-            latencyMs: Date.now() - start,
-            ...(!res.ok && { detail: `HTTP ${res.status}` }),
-          } as CheckResult,
-        };
-      }
-      return {
-        key: 'cfR2Monitoring',
-        result: { status: 'not_configured', latencyMs: 0 } as CheckResult,
-      };
-    } catch {
-      return {
-        key: 'cfR2Monitoring',
-        result: { status: 'error', latencyMs: Date.now() - start } as CheckResult,
-      };
-    }
-  };
-
   const queueCheck = async () => {
     try {
       const redis = getRedisClient();
@@ -286,7 +252,6 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     openaiCheck(),
     elevenlabsCheck(),
     claudeCodeCheck(),
-    cfApiCheck(),
     queueCheck(),
   ]);
 
@@ -309,7 +274,6 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     'R2_ACCESS_KEY_ID',
     'R2_SECRET_ACCESS_KEY',
     'R2_BUCKET_NAME',
-    'CF_API_TOKEN',
   ];
   const env: Record<string, boolean> = {};
   for (const key of envKeys) {
