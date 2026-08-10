@@ -211,7 +211,12 @@ set -a
 source "$COMPOSE_ENV_FILE"
 set +a
 require_env NEXT_PUBLIC_APP_URL
-require_env_min_length SOTTO_ACCESS_PASSWORD 16
+# The managed showcase (SELF_HOSTED=false) runs ungated on purpose; the access
+# gate activates whenever SOTTO_ACCESS_PASSWORD is set, so requiring it there
+# would password-wall the public demo.
+if [ "${SELF_HOSTED:-true}" != "false" ]; then
+  require_env_min_length SOTTO_ACCESS_PASSWORD 16
+fi
 require_env_min_length BYOK_ENCRYPTION_KEY 32
 
 # --- Stack identity (may come from the env file or the caller's environment) ---
