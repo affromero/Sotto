@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Glyph, type GlyphName } from '@/components/Glyph';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import shell from '../../adminTheme.styles';
+import {
+  formatAgentModelId,
+  parseAgentModelId,
+  type AgentEffortLevel,
+  type AgentProviderId,
+} from '@/lib/agent-models/id';
 
 type LogoProvider = Parameters<typeof TtsProviderLogo>[0]['provider'];
 
@@ -22,6 +28,8 @@ interface ProviderOption {
   id: string;
   displayName: string;
   models: ModelOption[];
+  discoverySource?: 'live' | 'configured' | 'curated';
+  discoveryError?: string | null;
 }
 
 interface ModelConfig {
@@ -223,7 +231,13 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
     [providers, selectedProvider]
   );
 
-  // Cards for the selected provider — a "use configured" card when it has no models.
+  const agentProvider =
+    selectedProvider === 'claude-code' || selectedProvider === 'codex'
+      ? (selectedProvider as AgentProviderId)
+      : null;
+
+  // Agent offerings encode effort in the persisted id. Group their default
+  // picker by base model and expose effort separately below.
   const cards = useMemo(() => {
     if (!providerData) return [];
     if (providerData.models.length === 0) {
@@ -236,8 +250,38 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
         },
       ];
     }
-    return providerData.models;
-  }, [providerData]);
+    if (!agentProvider) return providerData.models;
+    return providerData.models.filter((model) => {
+      const parsed = parseAgentModelId(model.id, agentProvider);
+      return parsed && !parsed.effort;
+    });
+  }, [agentProvider, providerData]);
+
+  const agentSelection = agentProvider
+    ? parseAgentModelId(state.defaultSelection.model, agentProvider)
+    : null;
+  const agentEfforts = useMemo(() => {
+    if (!agentProvider || !providerData || !agentSelection) return [];
+    const efforts = providerData.models.flatMap((model) => {
+      const parsed = parseAgentModelId(model.id, agentProvider);
+      return parsed?.model === agentSelection.model && parsed.effort ? [parsed.effort] : [];
+    });
+    return [...new Set(efforts)];
+  }, [agentProvider, agentSelection, providerData]);
+
+  function selectAgentModel(modelId: string) {
+    if (!agentProvider) return;
+    const parsed = parseAgentModelId(modelId, agentProvider);
+    if (!parsed) return;
+    const preferred = formatAgentModelId(agentProvider, parsed.model, agentSelection?.effort);
+    const available = providerData?.models.some((model) => model.id === preferred);
+    state.setDefault(available ? preferred : formatAgentModelId(agentProvider, parsed.model));
+  }
+
+  function selectAgentEffort(effort: AgentEffortLevel | null) {
+    if (!agentProvider || !agentSelection) return;
+    state.setDefault(formatAgentModelId(agentProvider, agentSelection.model, effort));
+  }
 
   function handleProviderChange(newProvider: string) {
     setSelectedProvider(newProvider);
@@ -312,12 +356,22 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
           })}
         </div>
 
+        {providerData?.discoveryError && (
+          <p className={shell.sectionLede} role="status">
+            Live model discovery failed: {providerData.discoveryError} Showing the curated and
+            configured choices instead.
+          </p>
+        )}
+
         {/* Model grid for the selected provider */}
         <div className={shell.pickLabel}>Default model</div>
         <div className={shell.modelGrid} role="radiogroup" aria-label={`${title} model`}>
           {cards.map((model) => {
             const cardKey = toKey(selectedProvider, model.id, compositeIds);
-            const isSelected = state.defaultKey === cardKey;
+            const parsedCard = agentProvider ? parseAgentModelId(model.id, agentProvider) : null;
+            const isSelected = agentProvider
+              ? parsedCard?.model === agentSelection?.model
+              : state.defaultKey === cardKey;
             return (
               <button
                 key={cardKey}
@@ -326,7 +380,9 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
                 aria-checked={isSelected}
                 aria-label={`Select ${model.displayName}`}
                 className={`${shell.modelCard}${isSelected ? ` ${shell.on}` : ''}`}
-                onClick={() => state.setDefault(cardKey)}
+                onClick={() =>
+                  agentProvider ? selectAgentModel(model.id) : state.setDefault(cardKey)
+                }
                 style={{ minHeight: '44px' }}
               >
                 <div className={shell.mcName}>
@@ -341,6 +397,29 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
             );
           })}
         </div>
+
+        {agentProvider && agentEfforts.length > 0 && (
+          <div>
+            <label className={shell.pickLabel} htmlFor={`${title}-effort`}>
+              Reasoning effort
+            </label>
+            <select
+              id={`${title}-effort`}
+              className={shell.uselect}
+              value={agentSelection?.effort ?? ''}
+              onChange={(event) =>
+                selectAgentEffort((event.target.value || null) as AgentEffortLevel | null)
+              }
+            >
+              <option value="">CLI default</option>
+              {agentEfforts.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effort}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Advanced: learner-available models */}
         <div className={shell.advWrap}>

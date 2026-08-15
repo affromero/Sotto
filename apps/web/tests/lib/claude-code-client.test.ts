@@ -166,6 +166,52 @@ describe('claude-code-client', () => {
       );
     });
 
+    it('sends image data through stream-json stdin without filesystem tools', async () => {
+      const { executeClaudeCode } = await import('@/lib/claude-code-client');
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+
+      const promise = executeClaudeCode('System', 'Describe this image', {
+        images: [{ type: 'image_url', url: 'data:image/png;base64,aGVsbG8=' }],
+      });
+      setTimeout(() => {
+        proc._stdout.write(`${JSON.stringify({ type: 'result', result: 'A test image' })}\n`);
+        proc._stdout.end();
+      }, 0);
+
+      await expect(promise).resolves.toMatchObject({ content: 'A test image' });
+      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(args).toEqual(
+        expect.arrayContaining(['--input-format', 'stream-json', '--tools', ''])
+      );
+      const stdin = proc._stdin.write.mock.calls[0]?.[0] as string;
+      expect(JSON.parse(stdin)).toMatchObject({
+        type: 'user',
+        message: {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
+            },
+            { type: 'text', text: 'Describe this image' },
+          ],
+        },
+      });
+    });
+
+    it('rejects remote image URLs instead of silently dropping them', async () => {
+      const { executeClaudeCode } = await import('@/lib/claude-code-client');
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+
+      const promise = executeClaudeCode('', 'Prompt', {
+        images: [{ type: 'image_url', url: 'https://example.com/image.png' }],
+      });
+      await expect(promise).rejects.toThrow('must be base64 data URLs');
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
     it('trims whitespace from stdout', async () => {
       const { executeClaudeCode } = await import('@/lib/claude-code-client');
 

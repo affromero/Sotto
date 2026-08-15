@@ -7,6 +7,7 @@ import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
 import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
+import type { ImageContentPart } from './providers/ai';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
@@ -74,6 +75,7 @@ interface ClaudeCodeOptions {
   timeoutMs?: number;
   useWebSearch?: boolean;
   effort?: AgentEffortLevel;
+  images?: ImageContentPart[];
 }
 
 const CLAUDE_ENV_KEYS = [
@@ -127,7 +129,27 @@ function buildArgs(
   if (outputFormat === 'stream-json') {
     args.push('--verbose', '--include-partial-messages');
   }
+  if (opts?.images?.length) args.push('--input-format', 'stream-json');
   return args;
+}
+
+function claudeStdin(prompt: string, images: ImageContentPart[] = []): string {
+  if (images.length === 0) return prompt;
+  const content = images.map((image) => {
+    const match = image.url.match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) {
+      throw new Error('Claude Code images must be base64 data URLs (PNG, JPEG, GIF, or WebP).');
+    }
+    return {
+      type: 'image',
+      source: { type: 'base64', media_type: match[1], data: match[2] },
+    };
+  });
+  const message = {
+    type: 'user',
+    message: { role: 'user', content: [...content, { type: 'text', text: prompt }] },
+  };
+  return `${JSON.stringify(message)}\n`;
 }
 
 function resolveSelection(opts?: ClaudeCodeOptions): { model: string; effort?: AgentEffortLevel } {
@@ -152,6 +174,12 @@ export async function executeClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): Promise<ClaudeCodeResponse> {
+  if (opts?.images?.length) {
+    let content = '';
+    for await (const chunk of streamClaudeCode(systemPrompt, prompt, opts)) content += chunk;
+    if (!content) throw new Error('claude-code: no output produced (empty response).');
+    return { content, inputTokens: 0, outputTokens: 0 };
+  }
   const selection = resolveSelection(opts);
   const model = selection.model;
   const timeoutMs = opts?.timeoutMs || 600_000;
@@ -219,7 +247,7 @@ export async function executeClaudeCode(
       );
     });
 
-    child.stdin.write(prompt);
+    child.stdin.write(claudeStdin(prompt, opts?.images));
     child.stdin.end();
   });
 }
@@ -236,6 +264,7 @@ export async function* streamClaudeCode(
   const selection = resolveSelection(opts);
   const model = selection.model;
   const timeoutMs = opts?.timeoutMs || 600_000;
+  const stdin = claudeStdin(prompt, opts?.images);
 
   const args = buildArgs(model, systemPrompt, 'stream-json', {
     ...opts,
@@ -273,7 +302,7 @@ export async function* streamClaudeCode(
     exitCode = code;
   });
 
-  child.stdin.write(prompt);
+  child.stdin.write(stdin);
   child.stdin.end();
 
   let buffer = '';

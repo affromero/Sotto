@@ -1,4 +1,11 @@
-import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
+import type {
+  AIProvider,
+  AIOptions,
+  AIResponse,
+  ChatMessage,
+  ImageContentPart,
+  TextContentPart,
+} from './ai';
 import { serializeMessages } from '../agent-messages';
 import { formatAgentModelId, parseAgentModelId } from '../agent-models/id';
 import { getAiProviderMeta } from './ai-registry';
@@ -10,6 +17,14 @@ function textOf(content: ChatMessage['content']): string {
     .filter((p) => p.type === 'text')
     .map((p) => (p as TextContentPart).text)
     .join('\n');
+}
+
+function imagesOf(messages: ChatMessage[]): ImageContentPart[] {
+  return messages.flatMap((message) =>
+    typeof message.content === 'string'
+      ? []
+      : message.content.filter((part): part is ImageContentPart => part.type === 'image_url')
+  );
 }
 
 function resolveClaudeCodeModel(model?: string): {
@@ -39,10 +54,12 @@ export class ClaudeCodeProvider implements AIProvider {
   ): Promise<AIResponse> {
     const { invocationModel, reportedModel } = resolveClaudeCodeModel(opts?.model);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const images = imagesOf(messages);
     const { executeClaudeCode } = await import('../claude-code-client');
     const result = await executeClaudeCode(system, serializeMessages(textMessages), {
       model: invocationModel,
       useWebSearch: opts?.useWebSearch,
+      ...(images.length ? { images } : {}),
     });
     return { ...result, model: reportedModel };
   }
@@ -54,10 +71,12 @@ export class ClaudeCodeProvider implements AIProvider {
   ): AsyncGenerator<string> {
     const { invocationModel } = resolveClaudeCodeModel(opts?.model);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const images = imagesOf(messages);
     const { streamClaudeCode } = await import('../claude-code-client');
     yield* streamClaudeCode(system, serializeMessages(textMessages), {
       model: invocationModel,
       useWebSearch: opts?.useWebSearch,
+      ...(images.length ? { images } : {}),
     });
   }
 }

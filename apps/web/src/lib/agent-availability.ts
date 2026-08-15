@@ -23,6 +23,7 @@ const CLAUDE_ENV_KEYS = [
 ];
 const CODEX_ENV_KEYS = ['CODEX_HOME', 'CODEX_API_KEY'];
 let statusCache = new Map<AgentProvider, { at: number; status: AgentStatus }>();
+let statusInFlight = new Map<AgentProvider, Promise<AgentStatus>>();
 
 /** Trimmed CLAUDE_CODE_SSH_HOST, or undefined when the CLI runs locally. */
 export function getClaudeSshHost(): string | undefined {
@@ -97,35 +98,42 @@ function probe(
   });
 }
 
-export async function getAgentStatus(provider: AgentProvider): Promise<AgentStatus> {
+export function getAgentStatus(provider: AgentProvider): Promise<AgentStatus> {
   const cached = statusCache.get(provider);
-  if (cached && Date.now() - cached.at < CACHE_MS) return cached.status;
-  installCurrentProviderCredentialSnapshot(provider);
-  const config = providerConfig(provider);
-  const version = await probe(provider, ['--version']);
-  let status: AgentStatus;
-  if (!version.ok) {
-    status = {
-      readiness: config.sshHost ? 'unreachable' : 'not_installed',
-      version: null,
-      detail: version.error || 'CLI version probe failed.',
-    };
-  } else {
-    const auth = await probe(provider, config.authArgs);
-    status = auth.ok
-      ? { readiness: 'ready', version: version.output || null, detail: null }
-      : {
-          readiness: 'not_authenticated',
-          version: version.output || null,
-          detail: auth.error || auth.output || 'CLI authentication probe failed.',
-        };
-  }
-  statusCache.set(provider, { at: Date.now(), status });
-  return status;
+  if (cached && Date.now() - cached.at < CACHE_MS) return Promise.resolve(cached.status);
+  const existing = statusInFlight.get(provider);
+  if (existing) return existing;
+  const promise = (async () => {
+    installCurrentProviderCredentialSnapshot(provider);
+    const config = providerConfig(provider);
+    const version = await probe(provider, ['--version']);
+    let status: AgentStatus;
+    if (!version.ok) {
+      status = {
+        readiness: config.sshHost ? 'unreachable' : 'not_installed',
+        version: null,
+        detail: version.error || 'CLI version probe failed.',
+      };
+    } else {
+      const auth = await probe(provider, config.authArgs);
+      status = auth.ok
+        ? { readiness: 'ready', version: version.output || null, detail: null }
+        : {
+            readiness: 'not_authenticated',
+            version: version.output || null,
+            detail: auth.error || auth.output || 'CLI authentication probe failed.',
+          };
+    }
+    statusCache.set(provider, { at: Date.now(), status });
+    return status;
+  })().finally(() => statusInFlight.delete(provider));
+  statusInFlight.set(provider, promise);
+  return promise;
 }
 
 export function resetAgentStatusCache(): void {
   statusCache = new Map();
+  statusInFlight = new Map();
 }
 
 export async function isClaudeAvailable(): Promise<boolean> {

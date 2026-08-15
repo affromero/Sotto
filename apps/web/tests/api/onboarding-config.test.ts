@@ -9,6 +9,7 @@ const mockAuth = vi.fn();
 const mockIsUserAdmin = vi.fn();
 const mockGetSiteConfig = vi.fn();
 const mockIsSelfHosted = vi.fn();
+const mockGetAgentStatus = vi.fn();
 
 vi.mock('@/lib/auth', () => ({ auth: (...a: unknown[]) => mockAuth(...a) }));
 vi.mock('@/lib/auth-guards', () => ({
@@ -22,6 +23,9 @@ vi.mock('@/lib/self-hosted', () => ({
 }));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('@/lib/agent-availability', () => ({
+  getAgentStatus: (...args: unknown[]) => mockGetAgentStatus(...args),
 }));
 
 import { GET } from '@/app/api/v1/onboarding/config/route';
@@ -51,6 +55,11 @@ describe('GET /api/v1/onboarding/config', () => {
     mockAuth.mockResolvedValue({ user: { id: 'u1' } });
     mockIsUserAdmin.mockResolvedValue(false);
     mockGetSiteConfig.mockResolvedValue(SITE_CONFIG);
+    mockGetAgentStatus.mockImplementation(async (provider: string) => ({
+      readiness: 'ready',
+      version: `${provider} 1.0`,
+      detail: null,
+    }));
   });
 
   it('returns the public demo config without auth on the managed showcase', async () => {
@@ -96,6 +105,7 @@ describe('GET /api/v1/onboarding/config', () => {
     expect(Array.isArray(body.env.stt)).toBe(true);
     expect(Array.isArray(body.env.ai)).toBe(true);
     expect(typeof body.env.storage.R2_ACCOUNT_ID).toBe('boolean');
+    expect(body.agentStatuses.codex.readiness).toBe('ready');
     expect(JSON.stringify(body.env)).not.toContain('sk_');
   });
 

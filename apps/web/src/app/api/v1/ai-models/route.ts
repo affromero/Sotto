@@ -130,9 +130,19 @@ export async function GET(request: NextRequest) {
       models: sortModels([...modelsById.values(), ...claudeCodeModels, ...codexModels]),
       agentModelDiscovery: {
         'claude-code': claudeOffering
-          ? { source: claudeOffering.source, error: claudeOffering.error }
+          ? {
+              source: claudeOffering.source,
+              error: claudeOffering.error,
+              capabilities: getAiProviderMeta('claude-code').capabilities,
+            }
           : null,
-        codex: codexOffering ? { source: codexOffering.source, error: codexOffering.error } : null,
+        codex: codexOffering
+          ? {
+              source: codexOffering.source,
+              error: codexOffering.error,
+              capabilities: getAiProviderMeta('codex').capabilities,
+            }
+          : null,
       },
     },
     { headers: CACHE_HEADERS }

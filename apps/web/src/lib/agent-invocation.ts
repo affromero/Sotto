@@ -69,6 +69,9 @@ export function buildAgentInvocation(
       throw new Error(`Invalid remote environment key: ${key}`);
     }
   }
+  // The remote login shell expands these references before `env -i` starts,
+  // preserving only allowlisted values from the remote agent host. Local app
+  // credentials are intentionally never copied across SSH.
   const assignments = remoteKeys.map((key) => `${key}="\${${key}-}"`).join(' ');
   const command = [cli, ...args].map(shellQuote).join(' ');
   const remote = `env -i ${assignments} ${command}`;

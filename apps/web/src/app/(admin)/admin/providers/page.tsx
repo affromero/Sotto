@@ -69,6 +69,11 @@ export default async function AdminProvidersPage() {
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
+      ...(p.id === 'claude-code'
+        ? { discoverySource: claudeOffering.source, discoveryError: claudeOffering.error }
+        : p.id === 'codex'
+          ? { discoverySource: codexOffering.source, discoveryError: codexOffering.error }
+          : {}),
       models: (p.id === 'claude-code' || p.id === 'codex' ? agentModels[p.id] : p.models).map(
         (m) => ({
           id: m.id,

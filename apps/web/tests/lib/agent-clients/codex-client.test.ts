@@ -115,4 +115,35 @@ describe('codex-client', () => {
       expect.arrayContaining(['-m', 'gpt-5.6', '-c', 'model_reasoning_effort="high"'])
     );
   });
+
+  it('enables native web search only for opted-in turns', async () => {
+    const { executeCodex } = await import('@/lib/codex-client');
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+    const promise = executeCodex('', 'Research', { useWebSearch: true });
+    proc.emit('close', 0);
+    await promise;
+
+    const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    expect(args).toContain('web_search="live"');
+  });
+
+  it('forwards progressive codex stdout chunks', async () => {
+    const { streamCodex } = await import('@/lib/codex-client');
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+    const chunksPromise = (async () => {
+      const chunks: string[] = [];
+      for await (const chunk of streamCodex('', 'Prompt')) chunks.push(chunk);
+      return chunks;
+    })();
+    await Promise.resolve();
+    proc._stdout.emit('data', Buffer.from('First '));
+    proc._stdout.emit('data', Buffer.from('second'));
+    proc.emit('close', 0);
+
+    await expect(chunksPromise).resolves.toEqual(['First ', 'second']);
+    const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    expect(args).not.toContain('-o');
+  });
 });

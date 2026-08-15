@@ -364,6 +364,42 @@ describe('welcome hosted-demo mode', () => {
     ).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   });
 
+  it('picks CLI model and reasoning effort separately while preserving the encoded id', async () => {
+    const user = userEvent.setup();
+    let agent: AgentState = {
+      provider: 'codex',
+      method: 'cli',
+      value: '',
+      model: 'codex:gpt-5.6-sol#effort=high',
+      status: 'connected',
+    };
+    const setAgent = vi.fn((updater: (prev: AgentState) => AgentState) => {
+      agent = updater(agent);
+    });
+    render(
+      <StepAgent
+        agent={agent}
+        demoMode={false}
+        aiModels={{
+          codex: [
+            { id: 'codex:gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+            { id: 'codex:gpt-5.6-sol#effort=high', label: 'GPT-5.6 Sol (high effort)' },
+            { id: 'codex:gpt-5.6-sol#effort=ultra', label: 'GPT-5.6 Sol (ultra effort)' },
+          ],
+        }}
+        setAgent={setAgent}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText(/Codex model/i)).toHaveValue('codex:gpt-5.6-sol');
+    const effort = screen.getByLabelText(/Codex reasoning effort/i);
+    expect(effort).toHaveValue('high');
+    await user.selectOptions(effort, 'ultra');
+    expect(agent.model).toBe('codex:gpt-5.6-sol#effort=ultra');
+  });
+
   it('keeps welcome course copy away from podcast and video framing', () => {
     const copy = [
       ...COMPOSE_LOG.map((line) => line.text),

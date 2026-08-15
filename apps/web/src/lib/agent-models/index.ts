@@ -15,6 +15,7 @@ import {
 } from './id';
 import { getAiProviderMeta, type AiModelOption } from '../providers/ai-registry';
 import { discoverCodexModels, type CodexModelOffering } from './codex-app-server';
+import { getAgentStatus } from '../agent-availability';
 
 type AgentModelEnv = Record<string, string | undefined>;
 
@@ -367,6 +368,17 @@ export async function getAgentModelOffering(
       source: 'configured',
       error: null,
       defaultModel: getAiProviderMeta('claude-code').defaultModel,
+      defaultEffort: null,
+    };
+  }
+  const status = await getAgentStatus('codex');
+  if (status.readiness !== 'ready') {
+    const label = status.readiness.replaceAll('_', ' ');
+    return {
+      models: getAgentModelOptions(provider, opts),
+      source: 'curated',
+      error: `Codex is ${label}.`,
+      defaultModel: null,
       defaultEffort: null,
     };
   }

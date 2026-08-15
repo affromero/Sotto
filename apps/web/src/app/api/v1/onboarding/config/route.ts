@@ -6,6 +6,7 @@ import { isSelfHosted } from '@/lib/self-hosted';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { buildEnvPresence } from './env-presence';
+import { getAgentStatus } from '@/lib/agent-availability';
 
 /**
  * GET /api/onboarding/config
@@ -48,8 +49,19 @@ export async function GET(request: NextRequest) {
     // Owner-only: which provider keys / storage env vars the server already has
     // (presence booleans, never values), so the wizard can pre-check them.
     const env = isOwner ? buildEnvPresence() : null;
+    const agentStatuses = isOwner
+      ? await Promise.all([getAgentStatus('claude-code'), getAgentStatus('codex')]).then(
+          ([claude, codex]) => ({ 'claude-code': claude, codex })
+        )
+      : null;
 
-    return NextResponse.json({ selfHosted, isOwner, infra, env });
+    return NextResponse.json({
+      selfHosted,
+      isOwner,
+      infra,
+      env,
+      ...(agentStatuses ? { agentStatuses } : {}),
+    });
   } catch (error: unknown) {
     logger.error('Failed to load onboarding config', {
       error: error instanceof Error ? error.message : String(error),

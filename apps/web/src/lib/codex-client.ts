@@ -63,23 +63,15 @@ function resolveSelection(opts?: CodexOptions): { model: string; effort?: AgentE
   return effort ? { model, effort } : { model };
 }
 
-/**
- * Spawn `codex exec` and return the full response. Codex has no system-prompt
- * flag, so the system prompt is prepended to the user prompt.
- */
-export async function executeCodex(
-  systemPrompt: string,
-  prompt: string,
-  opts?: CodexOptions
-): Promise<CodexResponse> {
+function codexArgs(
+  opts?: CodexOptions,
+  outFile?: string
+): {
+  args: string[];
+  model: string;
+  effort?: AgentEffortLevel;
+} {
   const { model, effort } = resolveSelection(opts);
-  const timeoutMs = opts?.timeoutMs || 600_000;
-  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const outFile = join(
-    /* turbopackIgnore: true */ tmpdir(),
-    `codex-${process.pid}-${Date.now()}.txt`
-  );
-
   const args = [
     'exec',
     '--ephemeral',
@@ -90,12 +82,31 @@ export async function executeCodex(
     `web_search=${JSON.stringify(opts?.useWebSearch ? 'live' : 'disabled')}`,
     ...SANDBOX,
     '--skip-git-repo-check',
-    '-o',
-    outFile,
   ];
+  if (outFile) args.push('-o', outFile);
   if (model) args.push('-m', model);
   if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
-  args.push('-'); // read the prompt from stdin
+  args.push('-');
+  return effort ? { args, model, effort } : { args, model };
+}
+
+/**
+ * Spawn `codex exec` and return the full response. Codex has no system-prompt
+ * flag, so the system prompt is prepended to the user prompt.
+ */
+export async function executeCodex(
+  systemPrompt: string,
+  prompt: string,
+  opts?: CodexOptions
+): Promise<CodexResponse> {
+  const timeoutMs = opts?.timeoutMs || 600_000;
+  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+  const outFile = join(
+    /* turbopackIgnore: true */ tmpdir(),
+    `codex-${process.pid}-${Date.now()}.txt`
+  );
+
+  const { args, model, effort } = codexArgs(opts, outFile);
 
   logger.info('codex: executing', {
     model: model || '(configured default)',
@@ -165,15 +176,67 @@ export async function executeCodex(
   });
 }
 
-/**
- * Codex exec does not expose a simple token stream, so streaming yields the full
- * result once (the generation still runs to completion in the sandbox first).
- */
+/** Forward the progressive stdout emitted by current `codex exec` releases. */
 export async function* streamCodex(
   systemPrompt: string,
   prompt: string,
   opts?: CodexOptions
 ): AsyncGenerator<string> {
-  const result = await executeCodex(systemPrompt, prompt, opts);
-  yield result.content;
+  const timeoutMs = opts?.timeoutMs || 600_000;
+  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+  const { args } = codexArgs(opts);
+  const { command, args: spawnArgs } = buildAgentInvocation('codex', args, getCodexSshHost(), {
+    remoteEnvKeys: CODEX_ENV_KEYS,
+  });
+  const child = spawn(command, spawnArgs, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: codexEnvironment(),
+  });
+  const chunks: string[] = [];
+  let notify: (() => void) | null = null;
+  let done = false;
+  let failure: Error | null = null;
+  let stderr = '';
+  let produced = false;
+  const timer = setTimeout(() => {
+    child.kill('SIGTERM');
+    failure = new Error(`codex: timed out after ${timeoutMs}ms`);
+  }, timeoutMs);
+  child.stdout.on('data', (chunk: Buffer) => {
+    produced = true;
+    chunks.push(chunk.toString());
+    notify?.();
+  });
+  child.stderr.on('data', (chunk: Buffer) => {
+    stderr += chunk.toString();
+  });
+  child.on('error', (error) => {
+    failure = new Error(`codex: failed to spawn — ${error.message}. Is the 'codex' CLI installed?`);
+  });
+  child.on('close', (code) => {
+    clearTimeout(timer);
+    if (code !== 0 && !failure) {
+      failure = new Error(`codex: exited with code ${code} — ${stderr.slice(0, 500)}`);
+    } else if (!produced && !failure) {
+      failure = new Error(
+        `codex: no output produced (empty response). Buffer: ${stderr.trim().slice(0, 300) || '(empty)'}`
+      );
+    }
+    done = true;
+    notify?.();
+  });
+  child.stdin.write(fullPrompt);
+  child.stdin.end();
+
+  while (!done || chunks.length > 0) {
+    if (chunks.length === 0) {
+      await new Promise<void>((resolve) => {
+        notify = resolve;
+      });
+      notify = null;
+      continue;
+    }
+    yield chunks.shift() as string;
+  }
+  if (failure) throw failure;
 }
