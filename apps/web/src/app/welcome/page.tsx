@@ -5,11 +5,16 @@ import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getAgentModelOffering } from '@/lib/agent-models';
+import { ensureLocalUser } from '@/lib/local-user';
 
 export const metadata = {
   title: 'Welcome to Sotto',
   robots: { index: false, follow: false },
 };
+
+// The self-hosted installation key comes from the live database and must not be
+// resolved while the production image is being built.
+export const dynamic = 'force-dynamic';
 
 /**
  * Registry-sourced model lists for the wizard's model pickers. Keyed by the
@@ -61,9 +66,17 @@ async function buildModelMeta(): Promise<ModelMeta> {
 }
 
 export default async function WelcomePage() {
+  const selfHosted = isSelfHosted();
+  // Browser wizard progress is scoped to the owner row that created it. A
+  // factory reset recreates that row, so stale progress from the previous
+  // installation cannot skip the fresh welcome flow.
+  const onboardingResumeKey = selfHosted
+    ? (await ensureLocalUser()).createdAt.toISOString()
+    : undefined;
+
   return (
     <WelcomeFlow
-      initialConfig={{ selfHosted: isSelfHosted(), isOwner: false }}
+      initialConfig={{ selfHosted, isOwner: false, onboardingResumeKey }}
       modelMeta={await buildModelMeta()}
     />
   );

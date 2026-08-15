@@ -91,6 +91,8 @@ export interface FlowState {
 export interface OnboardingConfig {
   selfHosted: boolean;
   isOwner: boolean;
+  /** Changes when the self-hosted owner is recreated by a factory reset. */
+  onboardingResumeKey?: string;
   infra?: {
     storageProvider: string | null;
     s3Bucket: string | null;
@@ -143,6 +145,7 @@ const DEFAULT_STORAGE: StorageState = {
 };
 
 interface WelcomeSnapshot {
+  onboardingResumeKey?: string;
   step: number;
   profileName: string;
   avatarSlug: string;
@@ -300,6 +303,8 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
       : [];
 
     return {
+      onboardingResumeKey:
+        typeof record.onboardingResumeKey === 'string' ? record.onboardingResumeKey : undefined,
       step: clampStep(storedStep),
       profileName:
         typeof record.profileName === 'string' && record.profileName.trim()
@@ -324,6 +329,7 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
   const clamped = clampStep(step);
   const language = languageParam || (clamped >= 3 ? 'it' : '');
   return {
+    onboardingResumeKey: undefined,
     step: clamped,
     profileName: 'Learner',
     avatarSlug: ANIMAL_AVATARS[0].slug,
@@ -392,6 +398,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           const nextConfig = {
             selfHosted: !!data.selfHosted,
             isOwner: !!data.isOwner,
+            onboardingResumeKey: data.onboardingResumeKey ?? initialConfig?.onboardingResumeKey,
             infra: data.infra ?? null,
             env: data.env ?? null,
             agentStatuses: data.agentStatuses ?? null,
@@ -406,7 +413,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialConfig?.onboardingResumeKey]);
 
   const level = useMemo<CefrLevel | null>(() => {
     let best: CefrLevel | null = null;
@@ -467,7 +474,14 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       if (config.selfHosted) {
         const raw = window.localStorage.getItem(SAVE_KEY);
         const stored = raw ? parseStoredSnapshot(raw) : null;
-        if (stored) applySnapshot(stored);
+        const belongsToCurrentInstall =
+          typeof config.onboardingResumeKey === 'string' &&
+          stored?.onboardingResumeKey === config.onboardingResumeKey;
+        if (stored && belongsToCurrentInstall) {
+          applySnapshot(stored);
+        } else if (raw) {
+          window.localStorage.removeItem(SAVE_KEY);
+        }
       }
 
       setStorageReady(true);
@@ -477,7 +491,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     return () => {
       cancelled = true;
     };
-  }, [config.selfHosted]);
+  }, [config.selfHosted, config.onboardingResumeKey]);
 
   useEffect(() => {
     if (!storageReady || !config.selfHosted || deepLinkMode || typeof window === 'undefined') {
@@ -487,6 +501,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     window.localStorage.setItem(
       SAVE_KEY,
       JSON.stringify({
+        onboardingResumeKey: config.onboardingResumeKey,
         step,
         profileName,
         avatarSlug,
@@ -505,6 +520,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     avatarSlug,
     baseLang,
     config.selfHosted,
+    config.onboardingResumeKey,
     contextItems,
     deepLinkMode,
     language,
