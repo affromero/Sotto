@@ -486,6 +486,7 @@ describe('open-source language-learning OSS surfaces', () => {
     );
     expect(deploySource).toContain('docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"');
     expect(deploySource).toContain('docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"');
+    expect(deploySource).toContain('DEFAULT_WEB_IMAGE="ghcr.io/affromero/sotto-web-personal-prod"');
     expect(deploySource).toContain('SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"');
     expect(deploySource).toContain(
       'SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-${SOTTO_STACK}-workers-base:$SOTTO_IMAGE_TAG}"'
