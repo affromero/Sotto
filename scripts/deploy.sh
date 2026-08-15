@@ -222,6 +222,7 @@ require_env_min_length BYOK_ENCRYPTION_KEY 32
 # --- Stack identity (may come from the env file or the caller's environment) ---
 
 SOTTO_STACK="${SOTTO_STACK:-sotto}"
+export SOTTO_STACK
 SLOT_FILE="$HOME/.${SOTTO_STACK}-deploy-slot"
 WEB_PORT_BLUE="${SOTTO_WEB_PORT_BLUE:-3000}"
 WEB_PORT_GREEN="${SOTTO_WEB_PORT_GREEN:-3010}"
@@ -378,6 +379,25 @@ for i in $(seq 1 30); do
 done
 
 fi
+
+# Refresh host CLI authentication before any migration, web, or worker process
+# starts. The networkless sidecar copies only the two supported auth JSON files
+# into the stack-scoped volume shared by those containers.
+echo ""
+echo "=== Syncing host CLI credentials ==="
+docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" up -d --no-build credential-sync
+for i in $(seq 1 15); do
+  if docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" exec -T credential-sync \
+    test -f /credential-sync/ready >/dev/null 2>&1; then
+    echo "CLI credential sync ready"
+    break
+  fi
+  if [ "$i" -eq 15 ]; then
+    echo "ERROR: CLI credential sync did not become ready"
+    exit 1
+  fi
+  sleep 1
+done
 
 # --- Image/cache status ---
 

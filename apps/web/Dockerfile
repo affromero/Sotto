@@ -52,10 +52,13 @@ RUN npm run build
 
 # ---- Stage 3: Production runner ----
 FROM node:22-alpine AS runner
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl openssh-client
 # Pin executable tooling so rebuilding a release cannot silently change it.
-ARG CLAUDE_CODE_VERSION=2.1.208
-RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+ARG CLAUDE_CODE_VERSION=2.1.225
+ARG CODEX_VERSION=0.144.6
+RUN npm install -g \
+    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    "@openai/codex@${CODEX_VERSION}"
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -65,6 +68,10 @@ ENV HOSTNAME="0.0.0.0"
 # Create non-root user
 RUN addgroup --system --gid 1001 sotto
 RUN adduser --system --uid 1001 sotto
+RUN mkdir -p /home/sotto/.codex /home/sotto/.claude /home/sotto/.ssh \
+    && chown -R sotto:sotto /home/sotto
+
+ENV HOME=/home/sotto
 
 ARG COMMIT_SHA=dev
 ENV COMMIT_SHA=${COMMIT_SHA}

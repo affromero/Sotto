@@ -6,8 +6,7 @@ name: Publish OSS image
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -35,7 +34,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Verify release source
+      - name: Verify source
         run: |
           npm ci
           npm run ci
@@ -76,7 +75,6 @@ jobs:
           tags: |
             ghcr.io/affromero/sotto-web:latest
             ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
-            ${{ github.ref_type == 'tag' && format('ghcr.io/affromero/sotto-web:{0}', github.ref_name) || '' }}
           cache-from: type=gha,scope=sotto-web
           cache-to: type=gha,mode=max,scope=sotto-web
 
@@ -91,6 +89,5 @@ jobs:
           tags: |
             ghcr.io/affromero/sotto-workers:latest
             ghcr.io/affromero/sotto-workers:${{ steps.sha.outputs.short }}
-            ${{ github.ref_type == 'tag' && format('ghcr.io/affromero/sotto-workers:{0}', github.ref_name) || '' }}
           cache-from: type=gha,scope=sotto-workers
           cache-to: type=gha,mode=max,scope=sotto-workers

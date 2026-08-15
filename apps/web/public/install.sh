@@ -17,16 +17,8 @@ fail() { printf "${RED}${BOLD}✗${RESET} %b\n" "$1"; exit 1; }
 
 SOTTO_DIR="${SOTTO_DIR:-$HOME/.sotto}"
 SOTTO_REPOSITORY="${SOTTO_REPOSITORY:-affromero/Sotto}"
-if [ -z "${SOTTO_REF:-}" ]; then
-  info "Resolving the latest published Sotto release..."
-  SOTTO_REF=$(curl -fsSL "https://api.github.com/repos/$SOTTO_REPOSITORY/releases?per_page=100" \
-    | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
-    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' \
-    | head -n 1) \
-    || fail "Could not query the latest release. Set SOTTO_REF to a release tag and retry."
-  [ -n "$SOTTO_REF" ] || fail "Could not resolve the latest release. Set SOTTO_REF to a release tag and retry."
-fi
-SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$SOTTO_REF}"
+SOTTO_REF="${SOTTO_REF:-main}"
+SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-latest}"
 RAW_BASE="${SOTTO_RAW_BASE:-https://raw.githubusercontent.com/${SOTTO_REPOSITORY}/${SOTTO_REF}}"
 WEB_PORT="${WEB_PORT:-3000}"
 
@@ -93,8 +85,9 @@ fi
 printf "\n${BOLD}How should Sotto reach your AI agent?${RESET}\n"
 printf "  ${DIM}1)${RESET} An API key (OpenAI or Anthropic) — simplest\n"
 printf "  ${DIM}2)${RESET} Your local Claude Code CLI (bring your own agent)\n"
-printf "  ${DIM}3)${RESET} Your agent on a VPS, over SSH\n"
-ask AGENT_CHOICE "  Choose [1/2/3, default 1]: " "1"
+printf "  ${DIM}3)${RESET} Your local Codex CLI (bring your own agent)\n"
+printf "  ${DIM}4)${RESET} Your Claude agent on a VPS, over SSH\n"
+ask AGENT_CHOICE "  Choose [1/2/3/4, default 1]: " "1"
 
 AI_BLOCK=""
 TUNNEL_NOTE=""
@@ -103,12 +96,19 @@ case "$AGENT_CHOICE" in
     AGENT_CLI="claude-code"
     AI_BLOCK="AI_PROVIDER=\"$AGENT_CLI\""
     CREDS="$HOME/.claude/.credentials.json"
-    [ -f "$CREDS" ] || fail "No ~/.claude/.credentials.json found. Sign in with Claude Code, then re-run, or use option 1/3."
+    [ -f "$CREDS" ] || fail "No ~/.claude/.credentials.json found. Sign in with Claude Code, then re-run, or use option 1/3/4."
     ok "Sotto will read refreshed Claude credentials through its networkless sync service."
     ;;
   3)
+    AGENT_CLI="codex"
+    AI_BLOCK="AI_PROVIDER=\"$AGENT_CLI\""
+    CREDS="$HOME/.codex/auth.json"
+    [ -f "$CREDS" ] || fail "No ~/.codex/auth.json found. Sign in with Codex, then re-run, or use option 1/2/4."
+    ok "Sotto will read refreshed Codex credentials through its networkless sync service."
+    ;;
+  4)
     ask SSH_HOST "  SSH host for your agent (e.g. you@your-vps): " ""
-    [ -n "$SSH_HOST" ] || fail "An SSH host is required for option 3."
+    [ -n "$SSH_HOST" ] || fail "An SSH host is required for option 4."
     ask SSH_KEY_PATH "  Dedicated private key path [default: ~/.ssh/sotto_agent]: " "$HOME/.ssh/sotto_agent"
     ask SSH_KNOWN_HOSTS "  Pinned known_hosts path [default: ~/.ssh/known_hosts]: " "$HOME/.ssh/known_hosts"
     [ -f "$SSH_KEY_PATH" ] || fail "Dedicated SSH key not found: $SSH_KEY_PATH"

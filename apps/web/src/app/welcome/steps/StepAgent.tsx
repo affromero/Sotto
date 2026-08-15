@@ -72,6 +72,15 @@ export function StepAgent({
     agent.method === 'cli' ? (agent.provider === 'codex' ? 'codex' : 'claude-code') : null;
   const agentSelection = agentProvider ? parseAgentModelId(agent.model, agentProvider) : null;
   const cliStatus = agentProvider ? agentStatuses?.[agentProvider] : undefined;
+  const cliStatusDetail = cliStatus?.version
+    ? cliStatus.version
+    : cliStatus?.readiness === 'not_authenticated'
+      ? `${prov?.cli?.bin ?? 'CLI'} is installed; sign in on the Sotto host`
+      : cliStatus?.readiness === 'unreachable'
+        ? 'The configured SSH agent did not answer'
+        : cliStatus?.readiness === 'not_installed'
+          ? `${prov?.cli?.bin ?? 'CLI'} is not installed in the Sotto runtime`
+          : `Checking ${prov?.cli?.bin ?? 'CLI'} in the Sotto runtime…`;
   const pickerBaseModels = useMemo(
     () =>
       agentProvider
@@ -233,9 +242,7 @@ export function StepAgent({
                         ? `${prov.cli.label} is unreachable`
                         : `${prov.cli.label} not found`}
                 </div>
-                <div className={c.cliPath}>
-                  {cliStatus?.version ?? `${prov.cli.bin} · ${prov.cli.path}`}
-                </div>
+                <div className={c.cliPath}>{cliStatusDetail}</div>
               </div>
               <button
                 className={`${t.btn} ${t.btnGhost}`}
