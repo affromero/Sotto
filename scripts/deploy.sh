@@ -261,7 +261,12 @@ SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"
 validate_image_source
 SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"
 if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
-  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-ghcr.io/affromero/sotto-web-prod}"
+  if [ "$SOTTO_STACK" = "sotto-personal" ]; then
+    DEFAULT_WEB_IMAGE="ghcr.io/affromero/sotto-web-personal-prod"
+  else
+    DEFAULT_WEB_IMAGE="ghcr.io/affromero/sotto-web-prod"
+  fi
+  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-$DEFAULT_WEB_IMAGE}"
   SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-ghcr.io/affromero/sotto-workers-prod}"
   SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}"
 else
