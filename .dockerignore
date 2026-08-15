@@ -1,8 +1,8 @@
 # Dependencies (installed inside container)
 node_modules
 
-# Next.js build output
-.next
+# Next.js build output (workspace app output is nested under apps/web)
+**/.next
 out
 build
 
