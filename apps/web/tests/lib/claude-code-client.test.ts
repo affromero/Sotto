@@ -103,6 +103,8 @@ describe('claude-code-client', () => {
 
   describe('executeClaudeCode', () => {
     it('spawns claude CLI with correct arguments', async () => {
+      process.env.DATABASE_URL = 'must-not-reach-claude';
+      process.env.ANTHROPIC_API_KEY = 'claude-provider-key';
       const { executeClaudeCode } = await import('@/lib/claude-code-client');
 
       const proc = createMockProcess();
@@ -122,8 +124,26 @@ describe('claude-code-client', () => {
         outputTokens: 0,
       });
 
-      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      const [, args, options] = mockSpawn.mock.calls[0] as [
+        string,
+        string[],
+        { env: NodeJS.ProcessEnv },
+      ];
       expect(args).toEqual(expect.arrayContaining(['--model', 'opus']));
+      expect(args).toEqual(
+        expect.arrayContaining([
+          '--safe-mode',
+          '--disable-slash-commands',
+          '--no-session-persistence',
+          '--strict-mcp-config',
+          '--tools',
+          '',
+          '--permission-mode',
+          'dontAsk',
+        ])
+      );
+      expect(options.env.ANTHROPIC_API_KEY).toBe('claude-provider-key');
+      expect(options.env.DATABASE_URL).toBeUndefined();
     });
 
     it('passes encoded effort through to the claude CLI', async () => {
@@ -244,6 +264,8 @@ describe('claude-code-client', () => {
       }
 
       expect(chunks).toContain('Hello');
+      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(args).toEqual(expect.arrayContaining(['--include-partial-messages']));
     });
 
     it('yields text from content_block_delta events', async () => {
@@ -395,7 +417,8 @@ describe('claude-code-client', () => {
       expect(inv.command).toBe('ssh');
       expect(inv.args).toContain('BatchMode=yes');
       expect(inv.args[inv.args.length - 2]).toBe('me@vps');
-      expect(inv.args[inv.args.length - 1]).toBe("'claude' '-p' '--system-prompt' 'be nice'");
+      expect(inv.args[inv.args.length - 1]).toContain('env -i');
+      expect(inv.args[inv.args.length - 1]).toContain("'claude' '-p' '--system-prompt' 'be nice'");
     });
 
     it('executeClaudeCode spawns ssh (not claude) with the prompt still on stdin', async () => {

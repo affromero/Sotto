@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getClaudeSshHost, isClaudeAvailable } from './agent-availability';
-import { buildAgentInvocation } from './agent-invocation';
+import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
 import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
@@ -75,11 +75,56 @@ interface ClaudeCodeOptions {
   effort?: AgentEffortLevel;
 }
 
-function buildArgs(model: string, systemPrompt: string, opts?: ClaudeCodeOptions): string[] {
-  const args = ['-p', '--model', model, '--output-format', 'text'];
+const CLAUDE_ENV_KEYS = [
+  'CLAUDE_HOME',
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'ANTHROPIC_API_KEY',
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_AUTH_TOKEN',
+];
+
+export function claudeCodeEnvironment(): NodeJS.ProcessEnv {
+  const claudeHome = ensureClaudeHome();
+  const env = minimalAgentEnvironment(
+    CLAUDE_ENV_KEYS,
+    claudeHome ? { HOME: claudeHome } : undefined
+  );
+  delete env.CLAUDECODE;
+  return env;
+}
+
+function buildArgs(
+  model: string,
+  systemPrompt: string,
+  outputFormat: 'text' | 'stream-json',
+  opts?: ClaudeCodeOptions
+): string[] {
+  const tools = opts?.useWebSearch ? 'WebSearch,WebFetch' : '';
+  const args = [
+    '-p',
+    '--safe-mode',
+    '--disable-slash-commands',
+    '--no-session-persistence',
+    '--strict-mcp-config',
+    '--mcp-config',
+    '{"mcpServers":{}}',
+    '--tools',
+    tools,
+    '--permission-mode',
+    'dontAsk',
+    '--model',
+    model,
+    '--output-format',
+    outputFormat,
+  ];
   if (opts?.effort) args.push('--effort', opts.effort);
   if (systemPrompt) args.push('--system-prompt', systemPrompt);
-  if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
+  if (opts?.useWebSearch) {
+    args.push('--allowedTools', 'WebSearch,WebFetch');
+  }
+  if (outputFormat === 'stream-json') {
+    args.push('--verbose', '--include-partial-messages');
+  }
   return args;
 }
 
@@ -109,7 +154,7 @@ export async function executeClaudeCode(
   const model = selection.model;
   const timeoutMs = opts?.timeoutMs || 600_000;
 
-  const args = buildArgs(model, systemPrompt, { ...opts, effort: selection.effort });
+  const args = buildArgs(model, systemPrompt, 'text', { ...opts, effort: selection.effort });
 
   logger.info('claude-code: executing', {
     model,
@@ -118,18 +163,13 @@ export async function executeClaudeCode(
     webSearch: String(!!opts?.useWebSearch),
   });
 
-  // Strip CLAUDECODE to prevent "cannot launch inside another session".
-  // Set HOME to the writable claude runtime dir (created from CLAUDE_CODE_CREDENTIALS_JSON
-  // or falling back to CLAUDE_HOME) so the CLI can read credentials and write session data.
-  const { CLAUDECODE: _, ...baseEnv } = process.env;
-  const claudeHome = ensureClaudeHome();
-  const cleanEnv = claudeHome ? { ...baseEnv, HOME: claudeHome } : baseEnv;
-
   return new Promise((resolve, reject) => {
-    const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost());
+    const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost(), {
+      remoteEnvKeys: CLAUDE_ENV_KEYS,
+    });
     const child = spawn(command, spawnArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: cleanEnv,
+      env: claudeCodeEnvironment(),
     });
 
     const timer = setTimeout(() => {
@@ -195,10 +235,10 @@ export async function* streamClaudeCode(
   const model = selection.model;
   const timeoutMs = opts?.timeoutMs || 600_000;
 
-  const args = ['-p', '--model', model, '--output-format', 'stream-json', '--verbose'];
-  if (selection.effort) args.push('--effort', selection.effort);
-  if (systemPrompt) args.push('--system-prompt', systemPrompt);
-  if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
+  const args = buildArgs(model, systemPrompt, 'stream-json', {
+    ...opts,
+    effort: selection.effort,
+  });
 
   logger.info('claude-code: streaming', {
     model,
@@ -207,17 +247,12 @@ export async function* streamClaudeCode(
     webSearch: String(!!opts?.useWebSearch),
   });
 
-  // Strip CLAUDECODE to prevent "cannot launch inside another session".
-  // Set HOME to the writable claude runtime dir so the CLI can read credentials
-  // and write session data without hitting read-only or permission errors.
-  const { CLAUDECODE: _, ...baseEnv } = process.env;
-  const claudeHome = ensureClaudeHome();
-  const cleanEnv = claudeHome ? { ...baseEnv, HOME: claudeHome } : baseEnv;
-
-  const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost());
+  const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost(), {
+    remoteEnvKeys: CLAUDE_ENV_KEYS,
+  });
   const child = spawn(command, spawnArgs, {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: cleanEnv,
+    env: claudeCodeEnvironment(),
   });
 
   const timer = setTimeout(() => {
@@ -240,8 +275,54 @@ export async function* streamClaudeCode(
   child.stdin.end();
 
   let buffer = '';
-  let hasDeltas = false;
+  let produced = false;
+  const streamState = { sawDelta: false, sawAssistant: false };
   let consecutiveParseFailures = 0;
+
+  function textFromEvent(raw: unknown): string[] {
+    if (!raw || typeof raw !== 'object') return [];
+    const outer = raw as {
+      type?: string;
+      event?: unknown;
+      delta?: { text?: unknown };
+      result?: unknown;
+      message?: { content?: unknown };
+      content?: unknown;
+    };
+    const event =
+      outer.type === 'stream_event' && outer.event && typeof outer.event === 'object'
+        ? (outer.event as typeof outer)
+        : outer;
+    if (event.type === 'content_block_delta' && typeof event.delta?.text === 'string') {
+      streamState.sawDelta = true;
+      return [event.delta.text];
+    }
+    if (event.type === 'assistant' && !streamState.sawDelta) {
+      const blocks = event.message?.content ?? event.content;
+      if (!Array.isArray(blocks)) return [];
+      const texts = blocks.flatMap((block) => {
+        if (!block || typeof block !== 'object') return [];
+        const typed = block as { type?: unknown; text?: unknown };
+        return typed.type === 'text' && typeof typed.text === 'string' ? [typed.text] : [];
+      });
+      if (texts.length > 0) streamState.sawAssistant = true;
+      return texts;
+    }
+    if (
+      event.type === 'result' &&
+      !streamState.sawDelta &&
+      !streamState.sawAssistant &&
+      typeof event.result === 'string'
+    ) {
+      return [event.result];
+    }
+    return [];
+  }
+
+  function parseLine(line: string): string[] {
+    const raw = JSON.parse(line) as unknown;
+    return textFromEvent(raw);
+  }
 
   try {
     for await (const chunk of child.stdout) {
@@ -253,31 +334,9 @@ export async function* streamClaudeCode(
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
-          const raw = JSON.parse(line);
-          // Unwrap stream_event envelope if present
-          const event = raw.type === 'stream_event' && raw.event ? raw.event : raw;
-
-          if (event.type === 'content_block_delta' && event.delta?.text) {
-            hasDeltas = true;
-            yield event.delta.text;
-          } else if (event.type === 'result' && !hasDeltas) {
-            // Fallback: yield complete result only if no deltas were received
-            const text = typeof event.result === 'string' ? event.result : '';
-            if (text) {
-              hasDeltas = true;
-              yield text;
-            }
-          } else if (event.type === 'assistant' && !hasDeltas) {
-            // Fallback: extract text from assistant message content blocks
-            const blocks = event.message?.content ?? event.content;
-            if (Array.isArray(blocks)) {
-              for (const block of blocks) {
-                if (block.type === 'text' && block.text) {
-                  hasDeltas = true;
-                  yield block.text;
-                }
-              }
-            }
+          for (const text of parseLine(line)) {
+            produced = true;
+            yield text;
           }
         } catch {
           // Not valid JSON — skip partial lines
@@ -297,38 +356,17 @@ export async function* streamClaudeCode(
     // Process remaining buffer
     if (buffer.trim()) {
       try {
-        const raw = JSON.parse(buffer);
-        const event = raw.type === 'stream_event' && raw.event ? raw.event : raw;
-        if (event.type === 'content_block_delta' && event.delta?.text) {
-          hasDeltas = true;
-          yield event.delta.text;
-        } else if (event.type === 'result' && !hasDeltas) {
-          const text = typeof event.result === 'string' ? event.result : '';
-          if (text) {
-            hasDeltas = true;
-            yield text;
-          }
-        } else if (event.type === 'assistant' && !hasDeltas) {
-          const blocks = event.message?.content ?? event.content;
-          if (Array.isArray(blocks)) {
-            for (const block of blocks) {
-              if (block.type === 'text' && block.text) {
-                hasDeltas = true;
-                yield block.text;
-              }
-            }
-          }
+        for (const text of parseLine(buffer)) {
+          produced = true;
+          yield text;
         }
       } catch {
-        // Final chunk wasn't JSON — yield raw if non-empty
-        if (buffer.trim()) {
-          yield buffer.trim();
-        }
+        consecutiveParseFailures += 1;
       }
     }
 
     // Surface errors when no text was produced
-    if (!hasDeltas) {
+    if (!produced) {
       if (exitCode !== null && exitCode !== 0) {
         const errorMsg = stderr.trim() || `claude-code exited with code ${exitCode}`;
         logger.error('claude-code: stream failed', {

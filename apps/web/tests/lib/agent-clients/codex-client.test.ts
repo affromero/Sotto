@@ -62,6 +62,8 @@ describe('codex-client', () => {
   });
 
   it('passes dynamic model and effort selectors to codex exec', async () => {
+    process.env.DATABASE_URL = 'must-not-reach-codex';
+    process.env.CODEX_API_KEY = 'codex-provider-key';
     const { executeCodex } = await import('@/lib/codex-client');
     const proc = createMockProcess();
     mockSpawn.mockReturnValue(proc);
@@ -72,11 +74,18 @@ describe('codex-client', () => {
     proc.emit('close', 0);
     await expect(promise).resolves.toMatchObject({ content: 'Codex says hi' });
 
-    const [command, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    const [command, args, options] = mockSpawn.mock.calls[0] as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
     expect(command).toBe('codex');
     expect(args).toEqual(
       expect.arrayContaining([
         'exec',
+        '--ephemeral',
+        '--ignore-user-config',
+        '--ignore-rules',
         '-s',
         'read-only',
         '-m',
@@ -85,6 +94,8 @@ describe('codex-client', () => {
         'model_reasoning_effort="xhigh"',
       ])
     );
+    expect(options.env.CODEX_API_KEY).toBe('codex-provider-key');
+    expect(options.env.DATABASE_URL).toBeUndefined();
     expect(proc._stdin.write).toHaveBeenCalledWith('System\n\nPrompt');
   });
 

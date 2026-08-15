@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { getCodexSshHost, isCodexAvailable } from './agent-availability';
 import { logger } from './logger';
-import { buildAgentInvocation } from './agent-invocation';
+import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
 import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 
 /**
@@ -21,6 +21,7 @@ import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 
 const SANDBOX = ['-s', 'read-only'];
 const NO_MCP = ['-c', 'mcp_servers={}'];
+const CODEX_ENV_KEYS = ['CODEX_HOME', 'CODEX_API_KEY'];
 
 export { getCodexSshHost, isCodexAvailable };
 
@@ -34,6 +35,11 @@ interface CodexOptions {
   model?: string;
   timeoutMs?: number;
   effort?: AgentEffortLevel;
+  useWebSearch?: boolean;
+}
+
+export function codexEnvironment(): NodeJS.ProcessEnv {
+  return minimalAgentEnvironment(CODEX_ENV_KEYS);
 }
 
 /** Resolve the model override, stripping the `codex:` routing prefix. The bare
@@ -72,7 +78,19 @@ export async function executeCodex(
     `codex-${process.pid}-${Date.now()}.txt`
   );
 
-  const args = ['exec', ...SANDBOX, ...NO_MCP, '-o', outFile];
+  const args = [
+    'exec',
+    '--ephemeral',
+    '--ignore-user-config',
+    '--ignore-rules',
+    ...NO_MCP,
+    '-c',
+    `web_search=${JSON.stringify(opts?.useWebSearch ? 'live' : 'disabled')}`,
+    ...SANDBOX,
+    '--skip-git-repo-check',
+    '-o',
+    outFile,
+  ];
   if (model) args.push('-m', model);
   if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
   args.push('-'); // read the prompt from stdin
@@ -84,8 +102,13 @@ export async function executeCodex(
   });
 
   return new Promise((resolve, reject) => {
-    const { command, args: spawnArgs } = buildAgentInvocation('codex', args, getCodexSshHost());
-    const child = spawn(command, spawnArgs, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
+    const { command, args: spawnArgs } = buildAgentInvocation('codex', args, getCodexSshHost(), {
+      remoteEnvKeys: CODEX_ENV_KEYS,
+    });
+    const child = spawn(command, spawnArgs, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: codexEnvironment(),
+    });
 
     const timer = setTimeout(() => {
       child.kill('SIGTERM');

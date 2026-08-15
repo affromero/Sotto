@@ -280,6 +280,9 @@ Route everything through a local agent when running from source:
 ```dotenv
 AI_PROVIDER=claude-code            # Codex is also supported in source installs
 # CLAUDE_CODE_SSH_HOST=you@vps     # ...or your agent on a VPS, over SSH
+# CODEX_SSH_HOST=you@vps
+# SOTTO_AGENT_SSH_KEY_PATH=/home/sotto/.ssh/id_ed25519
+# SOTTO_AGENT_SSH_KNOWN_HOSTS_PATH=/home/sotto/.ssh/known_hosts
 ```
 
 Or one OpenAI key for everything:
