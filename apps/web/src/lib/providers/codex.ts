@@ -11,6 +11,17 @@ function textOf(content: ChatMessage['content']): string {
     .join('\n');
 }
 
+function rejectImages(messages: ChatMessage[]): void {
+  if (
+    messages.some(
+      (message) =>
+        Array.isArray(message.content) && message.content.some((part) => part.type !== 'text')
+    )
+  ) {
+    throw new Error("Codex CLI image input is not supported by Sotto's current transport.");
+  }
+}
+
 function reportedModelFor(model?: string): string {
   const selected = model && model !== 'codex' ? model : process.env.CODEX_MODEL;
   const parsed = parseAgentModelId(selected, 'codex');
@@ -28,10 +39,12 @@ export class CodexProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
+    rejectImages(messages);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     const { executeCodex } = await import('../codex-client');
     const result = await executeCodex(system, serializeMessages(textMessages), {
       model: opts?.model,
+      useWebSearch: opts?.useWebSearch,
     });
     return { ...result, model: reportedModelFor(opts?.model) };
   }
@@ -41,8 +54,12 @@ export class CodexProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
+    rejectImages(messages);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     const { streamCodex } = await import('../codex-client');
-    yield* streamCodex(system, serializeMessages(textMessages), { model: opts?.model });
+    yield* streamCodex(system, serializeMessages(textMessages), {
+      model: opts?.model,
+      useWebSearch: opts?.useWebSearch,
+    });
   }
 }

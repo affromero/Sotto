@@ -3,13 +3,13 @@
  * Model Tester can smoke-test. Only rows with a platform key or the signed-in
  * admin's BYOK key are returned. Shared by /admin/providers and /admin/models.
  */
-import { execSync } from 'child_process';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getPlatformTtsKey } from '@/lib/tts-generation';
-import { getAgentModelOptions } from '@/lib/agent-models';
+import { getAgentModelOffering } from '@/lib/agent-models';
+import { getAgentStatus, type AgentReadiness } from '@/lib/agent-availability';
 
 export type TestableProvider = {
   category: 'ai' | 'tts' | 'stt';
@@ -30,16 +30,11 @@ export interface TestableProviders {
   stt: TestableProvider[];
 }
 
-function isCliAvailable(command: string): boolean {
-  try {
-    execSync(`${command} --version`, { stdio: 'ignore', timeout: 3000 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function hasPlatformKey(category: TestableProvider['category'], providerId: string): boolean {
+function hasPlatformKey(
+  category: TestableProvider['category'],
+  providerId: string,
+  agentReadiness: Record<'claude-code' | 'codex', AgentReadiness>
+): boolean {
   if (category === 'ai') {
     switch (providerId) {
       case 'anthropic':
@@ -49,9 +44,9 @@ function hasPlatformKey(category: TestableProvider['category'], providerId: stri
       case 'google':
         return !!process.env.GOOGLE_AI_API_KEY;
       case 'claude-code':
-        return isCliAvailable('claude');
+        return agentReadiness['claude-code'] === 'ready';
       case 'codex':
-        return isCliAvailable('codex');
+        return agentReadiness.codex === 'ready';
       default:
         return false;
     }
@@ -102,7 +97,19 @@ function hasByokKey(
 
 /** Resolve every testable provider/model for the given admin, key-filtered. */
 export async function getTestableProviders(userId: string): Promise<TestableProviders> {
-  const [aiKeys, ttsKeys] = await Promise.all([listAiProviders(userId), listByokProviders(userId)]);
+  const [aiKeys, ttsKeys, claudeOffering, codexOffering, claudeStatus, codexStatus] =
+    await Promise.all([
+      listAiProviders(userId),
+      listByokProviders(userId),
+      getAgentModelOffering('claude-code'),
+      getAgentModelOffering('codex'),
+      getAgentStatus('claude-code'),
+      getAgentStatus('codex'),
+    ]);
+  const agentReadiness = {
+    'claude-code': claudeStatus.readiness,
+    codex: codexStatus.readiness,
+  };
   const aiByokSet = new Set(aiKeys.map((k) => k.provider as string));
   const ttsByokSet = new Set(ttsKeys.map((k) => k.provider as string));
 
@@ -112,7 +119,7 @@ export async function getTestableProviders(userId: string): Promise<TestableProv
     raw
       .map((p) => ({
         ...p,
-        hasPlatformKey: hasPlatformKey(p.category, p.providerId),
+        hasPlatformKey: hasPlatformKey(p.category, p.providerId, agentReadiness),
         hasByokKey: hasByokKey(p.category, p.providerId, aiByokSet, ttsByokSet),
       }))
       .filter((p) => p.hasPlatformKey || p.hasByokKey);
@@ -120,7 +127,11 @@ export async function getTestableProviders(userId: string): Promise<TestableProv
   const ai = withKeyFlags(
     getAllAiProviderMeta().flatMap((p) => {
       const models =
-        p.id === 'claude-code' || p.id === 'codex' ? getAgentModelOptions(p.id) : p.models;
+        p.id === 'claude-code'
+          ? claudeOffering.models
+          : p.id === 'codex'
+            ? codexOffering.models
+            : p.models;
       return models.map((m) => ({
         category: 'ai' as const,
         providerId: p.id,

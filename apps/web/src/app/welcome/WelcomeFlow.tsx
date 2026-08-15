@@ -21,6 +21,7 @@ import { StepCompose } from './steps/StepCompose';
 import { StepReady } from './steps/StepReady';
 import { OnboardingThemeSwitch } from './OnboardingThemeSwitch';
 import t from './theme.module.css';
+import type { AgentStatus } from '@/lib/agent-availability';
 
 export interface AgentState {
   provider: string;
@@ -106,6 +107,7 @@ export interface OnboardingConfig {
     ai: string[];
     storage: Record<string, boolean>;
   } | null;
+  agentStatuses?: Record<'claude-code' | 'codex', AgentStatus> | null;
 }
 
 interface WelcomeFlowProps {
@@ -391,6 +393,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
             selfHosted: !!data.selfHosted,
             isOwner: !!data.isOwner,
             infra: data.infra ?? null,
+            env: data.env ?? null,
+            agentStatuses: data.agentStatuses ?? null,
           };
           setConfig(nextConfig);
           if (!hydratedRef.current) setStorage(storageFromConfig(nextConfig));
@@ -643,6 +647,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           agent={agent}
           demoMode={demoMode}
           envDetected={config.env?.ai ?? []}
+          agentStatuses={config.agentStatuses ?? undefined}
           aiModels={modelMeta.ai}
           setAgent={(updater) => setAgent((prev) => updater(prev))}
           onNext={() => go(5)}

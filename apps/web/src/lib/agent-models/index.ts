@@ -4,6 +4,7 @@ import { join } from 'path';
 import type { AutoModelConfigData } from '../auto-model-config';
 import {
   AGENT_EFFORT_LEVELS,
+  CLAUDE_EFFORT_LEVELS,
   formatAgentModelId,
   isAgentEffort,
   parseAgentModelId,
@@ -13,11 +14,14 @@ import {
   type AgentProviderId,
 } from './id';
 import { getAiProviderMeta, type AiModelOption } from '../providers/ai-registry';
+import { discoverCodexModels, type CodexModelOffering } from './codex-app-server';
+import { getAgentStatus } from '../agent-availability';
 
 type AgentModelEnv = Record<string, string | undefined>;
 
 export {
   AGENT_EFFORT_LEVELS,
+  CLAUDE_EFFORT_LEVELS,
   formatAgentModelId,
   normalizeAgentModelId,
   parseAgentModelId,
@@ -40,85 +44,27 @@ interface AgentModelDiscoveryOptions {
   autoConfig?: AutoModelConfigData;
 }
 
+// Used only when live App Server discovery fails. Exact current offerings come
+// from `model/list`; keeping this list deliberately small limits stale data.
 const CODEX_DEFAULT_MODELS: AgentModelOptionInput[] = [
-  {
-    provider: 'codex',
-    model: 'gpt-5',
-    displayName: 'GPT-5',
-    shortDisplayName: 'GPT-5',
-    tier: 'balanced',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5-codex',
-    displayName: 'GPT-5 Codex',
-    shortDisplayName: 'GPT-5 Codex',
-    tier: 'best',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.2-codex',
-    displayName: 'GPT-5.2 Codex',
-    shortDisplayName: 'GPT-5.2 Codex',
-    tier: 'best',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.3-codex',
-    displayName: 'GPT-5.3 Codex',
-    shortDisplayName: 'GPT-5.3 Codex',
-    tier: 'best',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.3-codex-spark',
-    displayName: 'GPT-5.3 Codex Spark',
-    shortDisplayName: 'Codex Spark',
-    tier: 'best',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.4',
-    displayName: 'GPT-5.4',
-    shortDisplayName: 'GPT-5.4',
-    tier: 'balanced',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.4-mini',
-    displayName: 'GPT-5.4 Mini',
-    shortDisplayName: 'GPT-5.4 Mini',
-    tier: 'fast',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.4-nano',
-    displayName: 'GPT-5.4 Nano',
-    shortDisplayName: 'GPT-5.4 Nano',
-    tier: 'fast',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.4-pro',
-    displayName: 'GPT-5.4 Pro',
-    shortDisplayName: 'GPT-5.4 Pro',
-    tier: 'max',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.5',
-    displayName: 'GPT-5.5',
-    shortDisplayName: 'GPT-5.5',
-    tier: 'best',
-  },
-  {
-    provider: 'codex',
-    model: 'gpt-5.5-pro',
-    displayName: 'GPT-5.5 Pro',
-    shortDisplayName: 'GPT-5.5 Pro',
-    tier: 'max',
-  },
-];
+  ['gpt-5.6-sol', 'GPT-5.6 Sol', 'best'],
+  ['gpt-5.6-terra', 'GPT-5.6 Terra', 'balanced'],
+  ['gpt-5.6-luna', 'GPT-5.6 Luna', 'fast'],
+].map(([model, displayName, tier]) => ({
+  provider: 'codex',
+  model,
+  displayName,
+  shortDisplayName: displayName,
+  tier: tier as AiModelOption['tier'],
+}));
+
+export interface AgentModelOffering {
+  models: AiModelOption[];
+  source: 'live' | 'configured' | 'curated';
+  error: string | null;
+  defaultModel: string | null;
+  defaultEffort: AgentEffortLevel | null;
+}
 
 function clean(value: string | null | undefined): string {
   return (value ?? '').trim();
@@ -274,7 +220,7 @@ function effortOptions(
     ...fromEnv.filter(isAgentEffort),
     ...fromConfig,
     ...configuredAgentEfforts(provider, opts.autoConfig),
-    ...AGENT_EFFORT_LEVELS,
+    ...(provider === 'claude-code' ? CLAUDE_EFFORT_LEVELS : AGENT_EFFORT_LEVELS),
   ]).filter(isAgentEffort);
 }
 
@@ -372,4 +318,87 @@ export function getAgentModelOptions(
     seen.add(option.id);
     return true;
   });
+}
+
+function liveCodexOptions(
+  offerings: CodexModelOffering[],
+  opts: AgentModelDiscoveryOptions
+): AiModelOption[] {
+  const options: AiModelOption[] = [
+    toAiModelOption({
+      provider: 'codex',
+      model: null,
+      displayName: 'Configured Codex default',
+      shortDisplayName: 'Configured default',
+      tier: 'balanced',
+    }),
+  ];
+  const liveModels = new Set(offerings.map((offering) => offering.model));
+  for (const offering of offerings) {
+    const base: AgentModelOptionInput = {
+      provider: 'codex',
+      model: offering.model,
+      displayName: titleAgentModel(offering.model),
+      shortDisplayName: titleAgentModel(offering.model),
+      tier: offering.isDefault ? 'best' : 'balanced',
+    };
+    options.push(toAiModelOption(base));
+    for (const effort of offering.effortOptions) {
+      options.push(toAiModelOption({ ...base, effort }));
+    }
+  }
+
+  // Keep explicitly configured selections visible even if the current CLI no
+  // longer advertises them, so an admin can inspect and replace stale state.
+  for (const option of getAgentModelOptions('codex', opts)) {
+    const parsed = parseAgentModelId(option.id, 'codex');
+    if (parsed?.model && !liveModels.has(parsed.model)) options.push(option);
+  }
+  const seen = new Set<string>();
+  return options.filter((option) => !seen.has(option.id) && Boolean(seen.add(option.id)));
+}
+
+export async function getAgentModelOffering(
+  provider: AgentProviderId,
+  opts: AgentModelDiscoveryOptions = {}
+): Promise<AgentModelOffering> {
+  if (provider === 'claude-code') {
+    return {
+      models: getAgentModelOptions(provider, opts),
+      source: 'configured',
+      error: null,
+      defaultModel: getAiProviderMeta('claude-code').defaultModel,
+      defaultEffort: null,
+    };
+  }
+  const status = await getAgentStatus('codex');
+  if (status.readiness !== 'ready') {
+    const label = status.readiness.replaceAll('_', ' ');
+    return {
+      models: getAgentModelOptions(provider, opts),
+      source: 'curated',
+      error: `Codex is ${label}.`,
+      defaultModel: null,
+      defaultEffort: null,
+    };
+  }
+  try {
+    const offerings = await discoverCodexModels();
+    const selected = offerings.find((offering) => offering.isDefault) ?? offerings[0];
+    return {
+      models: liveCodexOptions(offerings, opts),
+      source: 'live',
+      error: null,
+      defaultModel: selected?.model ?? null,
+      defaultEffort: selected?.defaultEffort ?? null,
+    };
+  } catch (error) {
+    return {
+      models: getAgentModelOptions(provider, opts),
+      source: 'curated',
+      error: error instanceof Error ? error.message : 'Codex model discovery failed.',
+      defaultModel: null,
+      defaultEffort: null,
+    };
+  }
 }

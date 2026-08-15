@@ -45,13 +45,16 @@ services:
       HOSTNAME: '0.0.0.0'
       SOTTO_ACCESS_PASSWORD: ${SOTTO_ACCESS_PASSWORD:?Set SOTTO_ACCESS_PASSWORD in .env}
       BYOK_ENCRYPTION_KEY: ${BYOK_ENCRYPTION_KEY:?Set BYOK_ENCRYPTION_KEY in .env}
+      SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
     ports:
       - '127.0.0.1:${WEB_PORT:-3000}:3000'
     volumes:
       - storage:/app/apps/web/.sotto/storage
+      - cli-credentials:/run/cli-credentials
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      credential-sync: { condition: service_healthy }
     healthcheck:
       test:
         [
@@ -74,18 +77,40 @@ services:
     env_file: [.env]
     environment:
       NODE_ENV: production
+      SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
     volumes:
       - storage:/app/apps/web/.sotto/storage
+      - cli-credentials:/run/cli-credentials
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      credential-sync: { condition: service_healthy }
     networks: [sotto-network]
+    restart: unless-stopped
+
+  credential-sync:
+    image: alpine:3.22
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    volumes:
+      - cli-credentials:/credential-sync
+      - ${HOME}/.claude:/host-claude:ro
+      - ${HOME}/.codex:/host-codex:ro
+      - ./sync-cli-credentials.sh:/usr/local/bin/sync-cli-credentials:ro
+    command: ['/bin/sh', '/usr/local/bin/sync-cli-credentials']
+    healthcheck:
+      test: ['CMD', 'test', '-f', '/credential-sync/ready']
+      interval: 2s
+      timeout: 1s
+      retries: 15
     restart: unless-stopped
 
 volumes:
   pgdata:
   redisdata:
   storage:
+  cli-credentials:
 
 networks:
   sotto-network:

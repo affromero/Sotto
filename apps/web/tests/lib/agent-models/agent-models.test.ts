@@ -42,12 +42,12 @@ describe('agent model selectors', () => {
         'codex:gpt-5.5',
         'codex:gpt-5.5#effort=high',
         'codex:gpt-5.6#effort=xhigh',
-        'codex:gpt-5.3-codex-spark',
-        'codex:gpt-5.5-pro#effort=max',
+        'codex:gpt-5.6-sol',
+        'codex:gpt-5.6-sol#effort=ultra',
       ])
     );
-    expect(models.find((model) => model.id === 'codex:gpt-5.5-pro')?.displayName).toBe(
-      'GPT-5.5 Pro'
+    expect(models.find((model) => model.id === 'codex:gpt-5.6-sol')?.displayName).toBe(
+      'GPT-5.6 Sol'
     );
   });
 

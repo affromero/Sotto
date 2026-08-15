@@ -9,6 +9,7 @@ import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { ProviderModelConfig, type ProviderModelConfigProps } from './ProviderModelConfig';
 import { ModelTestPanel } from '../models/ModelTestPanel';
 import shell from '../../adminTheme.styles';
+import type { AgentReadiness } from '@/lib/agent-availability';
 
 type Tab = 'models' | 'keys' | 'test';
 
@@ -22,6 +23,8 @@ interface ProviderKeyConfigProps {
     label: string;
     description: string;
     available: boolean;
+    readiness: AgentReadiness;
+    credentialReloadAvailable: boolean;
     disabled: boolean;
   }>;
 }

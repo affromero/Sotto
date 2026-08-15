@@ -75,6 +75,10 @@ chmod 700 "$SOTTO_DIR"
 info "Downloading the self-host compose file..."
 curl -fsSL "$RAW_BASE/docker-compose.selfhost.yml" -o "$SOTTO_DIR/docker-compose.yml" \
   || fail "Could not download docker-compose.selfhost.yml from $RAW_BASE"
+curl -fsSL "$RAW_BASE/scripts/agent/sync-cli-credentials.sh" \
+  -o "$SOTTO_DIR/sync-cli-credentials.sh" \
+  || fail "Could not download the CLI credential sync service from $RAW_BASE"
+chmod 700 "$SOTTO_DIR/sync-cli-credentials.sh"
 rm -f "$SOTTO_DIR/docker-compose.override.yml"
 
 # Port (offer a different one if 3000 is taken)
@@ -100,8 +104,7 @@ case "$AGENT_CHOICE" in
     AI_BLOCK="AI_PROVIDER=\"$AGENT_CLI\""
     CREDS="$HOME/.claude/.credentials.json"
     [ -f "$CREDS" ] || fail "No ~/.claude/.credentials.json found. Sign in with Claude Code, then re-run, or use option 1/3."
-    AI_BLOCK="$AI_BLOCK"$'\n'"CLAUDE_CODE_CREDENTIALS_JSON='$(tr -d '\n' < "$CREDS")'"
-    ok "Passed your local Claude credentials to the container."
+    ok "Sotto will read refreshed Claude credentials through its networkless sync service."
     ;;
   3)
     ask SSH_HOST "  SSH host for your agent (e.g. you@your-vps): " ""

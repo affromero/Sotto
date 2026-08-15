@@ -62,6 +62,8 @@ describe('codex-client', () => {
   });
 
   it('passes dynamic model and effort selectors to codex exec', async () => {
+    process.env.DATABASE_URL = 'must-not-reach-codex';
+    process.env.CODEX_API_KEY = 'codex-provider-key';
     const { executeCodex } = await import('@/lib/codex-client');
     const proc = createMockProcess();
     mockSpawn.mockReturnValue(proc);
@@ -72,11 +74,18 @@ describe('codex-client', () => {
     proc.emit('close', 0);
     await expect(promise).resolves.toMatchObject({ content: 'Codex says hi' });
 
-    const [command, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    const [command, args, options] = mockSpawn.mock.calls[0] as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
     expect(command).toBe('codex');
     expect(args).toEqual(
       expect.arrayContaining([
         'exec',
+        '--ephemeral',
+        '--ignore-user-config',
+        '--ignore-rules',
         '-s',
         'read-only',
         '-m',
@@ -85,6 +94,8 @@ describe('codex-client', () => {
         'model_reasoning_effort="xhigh"',
       ])
     );
+    expect(options.env.CODEX_API_KEY).toBe('codex-provider-key');
+    expect(options.env.DATABASE_URL).toBeUndefined();
     expect(proc._stdin.write).toHaveBeenCalledWith('System\n\nPrompt');
   });
 
@@ -103,5 +114,36 @@ describe('codex-client', () => {
     expect(args).toEqual(
       expect.arrayContaining(['-m', 'gpt-5.6', '-c', 'model_reasoning_effort="high"'])
     );
+  });
+
+  it('enables native web search only for opted-in turns', async () => {
+    const { executeCodex } = await import('@/lib/codex-client');
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+    const promise = executeCodex('', 'Research', { useWebSearch: true });
+    proc.emit('close', 0);
+    await promise;
+
+    const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    expect(args).toContain('web_search="live"');
+  });
+
+  it('forwards progressive codex stdout chunks', async () => {
+    const { streamCodex } = await import('@/lib/codex-client');
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+    const chunksPromise = (async () => {
+      const chunks: string[] = [];
+      for await (const chunk of streamCodex('', 'Prompt')) chunks.push(chunk);
+      return chunks;
+    })();
+    await Promise.resolve();
+    proc._stdout.emit('data', Buffer.from('First '));
+    proc._stdout.emit('data', Buffer.from('second'));
+    proc.emit('close', 0);
+
+    await expect(chunksPromise).resolves.toEqual(['First ', 'second']);
+    const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    expect(args).not.toContain('-o');
   });
 });

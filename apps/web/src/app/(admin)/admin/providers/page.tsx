@@ -1,8 +1,9 @@
 import { auth } from '@/lib/auth';
 import { getAutoModelConfig, resolveDisabledSystemAiProviders } from '@/lib/auto-model-config';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
-import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
-import { getAgentModelOptions } from '@/lib/agent-models';
+import { getAgentStatus } from '@/lib/agent-availability';
+import { credentialReloadAvailable } from '@/lib/agent-credentials';
+import { getAgentModelOffering } from '@/lib/agent-models';
 import { getAllAiProviderClientMeta, getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
@@ -16,38 +17,45 @@ export default async function AdminProvidersPage() {
   const session = await auth();
   const userId = session!.user!.id!;
 
-  const [config, testable, byokKeys, aiKeys, claudeCodeAvailable, codexAvailable] =
-    await Promise.all([
-      getAutoModelConfig(),
-      getTestableProviders(userId),
-      listByokProviders(userId),
-      listAiProviders(userId),
-      isClaudeAvailable(),
-      isCodexAvailable(),
-    ]);
+  const [config, testable, byokKeys, aiKeys, claudeStatus, codexStatus] = await Promise.all([
+    getAutoModelConfig(),
+    getTestableProviders(userId),
+    listByokProviders(userId),
+    listAiProviders(userId),
+    getAgentStatus('claude-code'),
+    getAgentStatus('codex'),
+  ]);
   const configuredTtsProviders = byokKeys.map((k) => ({
     provider: k.provider,
     isValid: k.isValid,
   }));
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const disabledSystemAiProviders = resolveDisabledSystemAiProviders(config);
+  const [claudeOffering, codexOffering] = await Promise.all([
+    getAgentModelOffering('claude-code', { autoConfig: config }),
+    getAgentModelOffering('codex', { autoConfig: config }),
+  ]);
   const agentModels = {
-    'claude-code': getAgentModelOptions('claude-code', { autoConfig: config }),
-    codex: getAgentModelOptions('codex', { autoConfig: config }),
+    'claude-code': claudeOffering.models,
+    codex: codexOffering.models,
   };
   const aiSystemProviders = [
     {
       id: 'claude-code',
       label: 'Claude Code',
       description: 'Linked via the local Claude Code CLI. No API key needed.',
-      available: claudeCodeAvailable,
+      available: claudeStatus.readiness === 'ready',
+      readiness: claudeStatus.readiness,
+      credentialReloadAvailable: credentialReloadAvailable('claude-code'),
       disabled: disabledSystemAiProviders.has('claude-code'),
     },
     {
       id: 'codex',
       label: 'Codex',
       description: 'Linked via the local Codex CLI. No API key needed.',
-      available: codexAvailable,
+      available: codexStatus.readiness === 'ready',
+      readiness: codexStatus.readiness,
+      credentialReloadAvailable: credentialReloadAvailable('codex'),
       disabled: disabledSystemAiProviders.has('codex'),
     },
   ];
@@ -61,6 +69,11 @@ export default async function AdminProvidersPage() {
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
+      ...(p.id === 'claude-code'
+        ? { discoverySource: claudeOffering.source, discoveryError: claudeOffering.error }
+        : p.id === 'codex'
+          ? { discoverySource: codexOffering.source, discoveryError: codexOffering.error }
+          : {}),
       models: (p.id === 'claude-code' || p.id === 'codex' ? agentModels[p.id] : p.models).map(
         (m) => ({
           id: m.id,

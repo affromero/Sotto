@@ -1,4 +1,5 @@
-export const AGENT_EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export const AGENT_EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;
+export const CLAUDE_EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type AgentEffortLevel = (typeof AGENT_EFFORT_LEVELS)[number];
 export type AgentProviderId = 'claude-code' | 'codex';
 

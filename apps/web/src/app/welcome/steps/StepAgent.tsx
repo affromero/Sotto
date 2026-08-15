@@ -7,6 +7,13 @@ import { aiModelProviderId } from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '../components.styles';
+import {
+  formatAgentModelId,
+  parseAgentModelId,
+  type AgentEffortLevel,
+  type AgentProviderId,
+} from '@/lib/agent-models/id';
+import type { AgentStatus } from '@/lib/agent-availability';
 
 interface Props {
   agent: AgentState;
@@ -15,6 +22,7 @@ interface Props {
   envDetected?: string[];
   /** Registry AI models keyed by backend provider id (anthropic, openai). */
   aiModels?: Record<string, ModelOption[]>;
+  agentStatuses?: Partial<Record<'claude-code' | 'codex', AgentStatus>>;
   setAgent: (updater: (prev: AgentState) => AgentState) => void;
   onNext: () => void;
   onBack: () => void;
@@ -27,6 +35,7 @@ export function StepAgent({
   demoMode,
   envDetected = [],
   aiModels = EMPTY_AI_MODELS,
+  agentStatuses,
   setAgent,
   onNext,
   onBack,
@@ -59,6 +68,44 @@ export function StepAgent({
     () => (aiRegistryId ? (aiModels[aiRegistryId] ?? []) : []),
     [aiModels, aiRegistryId]
   );
+  const agentProvider: AgentProviderId | null =
+    agent.method === 'cli' ? (agent.provider === 'codex' ? 'codex' : 'claude-code') : null;
+  const agentSelection = agentProvider ? parseAgentModelId(agent.model, agentProvider) : null;
+  const cliStatus = agentProvider ? agentStatuses?.[agentProvider] : undefined;
+  const pickerBaseModels = useMemo(
+    () =>
+      agentProvider
+        ? pickerModels.filter((model) => !parseAgentModelId(model.id, agentProvider)?.effort)
+        : pickerModels,
+    [agentProvider, pickerModels]
+  );
+  const pickerEfforts = useMemo(() => {
+    if (!agentProvider || !agentSelection) return [];
+    return [
+      ...new Set(
+        pickerModels.flatMap((model) => {
+          const parsed = parseAgentModelId(model.id, agentProvider);
+          return parsed?.model === agentSelection.model && parsed.effort ? [parsed.effort] : [];
+        })
+      ),
+    ];
+  }, [agentProvider, agentSelection, pickerModels]);
+
+  function setAgentBaseModel(modelId: string) {
+    if (!agentProvider) {
+      setAgent((current) => ({ ...current, model: modelId }));
+      return;
+    }
+    const base = parseAgentModelId(modelId, agentProvider);
+    if (!base) return;
+    const preferred = formatAgentModelId(agentProvider, base.model, agentSelection?.effort);
+    setAgent((current) => ({
+      ...current,
+      model: pickerModels.some((model) => model.id === preferred)
+        ? preferred
+        : formatAgentModelId(agentProvider, base.model),
+    }));
+  }
 
   // Always keep a concrete model selected once a provider+method is chosen, so
   // configuring an agent always implies a model. Defaults to the first (cheapest).
@@ -174,20 +221,28 @@ export function StepAgent({
           {!demoMode && agent.method === 'cli' && prov.cli && (
             <div className={c.cliDetect}>
               <span className={c.cliIco}>
-                <Glyph name="check" size={18} />
+                <Glyph name={cliStatus?.readiness === 'ready' ? 'check' : 'retry'} size={18} />
               </span>
               <div>
-                <div className={c.cliName}>{prov.cli.label} detected</div>
+                <div className={c.cliName}>
+                  {cliStatus?.readiness === 'ready'
+                    ? `${prov.cli.label} ready`
+                    : cliStatus?.readiness === 'not_authenticated'
+                      ? `${prov.cli.label} needs a login`
+                      : cliStatus?.readiness === 'unreachable'
+                        ? `${prov.cli.label} is unreachable`
+                        : `${prov.cli.label} not found`}
+                </div>
                 <div className={c.cliPath}>
-                  {prov.cli.bin} v{prov.cli.ver} · {prov.cli.path}
+                  {cliStatus?.version ?? `${prov.cli.bin} · ${prov.cli.path}`}
                 </div>
               </div>
               <button
                 className={`${t.btn} ${t.btnGhost}`}
-                disabled={agent.status === 'connected'}
-                onClick={verify}
+                disabled={cliStatus?.readiness === 'ready'}
+                onClick={() => window.location.reload()}
               >
-                {agent.status === 'connected' ? 'Linked' : 'Link'}
+                {cliStatus?.readiness === 'ready' ? 'Linked' : 'Recheck'}
               </button>
             </div>
           )}
@@ -233,17 +288,50 @@ export function StepAgent({
                 <div className={c.field}>
                   <select
                     className={c.fieldInput}
-                    value={agent.model}
-                    onChange={(e) => setAgent((a) => ({ ...a, model: e.target.value }))}
+                    value={
+                      agentProvider && agentSelection
+                        ? formatAgentModelId(agentProvider, agentSelection.model)
+                        : agent.model
+                    }
+                    onChange={(e) => setAgentBaseModel(e.target.value)}
                     aria-label={`${prov.name} model`}
                   >
-                    {pickerModels.map((m) => (
+                    {pickerBaseModels.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.label}
                       </option>
                     ))}
                   </select>
                 </div>
+                {agentProvider && pickerEfforts.length > 0 && (
+                  <>
+                    <div className={c.fieldLabel}>Reasoning effort</div>
+                    <div className={c.field}>
+                      <select
+                        className={c.fieldInput}
+                        value={agentSelection?.effort ?? ''}
+                        onChange={(event) =>
+                          setAgent((current) => ({
+                            ...current,
+                            model: formatAgentModelId(
+                              agentProvider,
+                              agentSelection?.model,
+                              (event.target.value || null) as AgentEffortLevel | null
+                            ),
+                          }))
+                        }
+                        aria-label={`${prov.name} reasoning effort`}
+                      >
+                        <option value="">CLI default</option>
+                        {pickerEfforts.map((effort) => (
+                          <option key={effort} value={effort}>
+                            {effort}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div className={c.locknote}>
                   <Glyph name="spark" size={15} />
                   The model that generates your lessons. Change it anytime in admin settings.

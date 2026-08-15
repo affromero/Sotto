@@ -99,6 +99,8 @@ export interface AiProviderMeta {
   defaultModel: string;
   getApiKeyUrl: string;
   models: AiModelOption[];
+  /** Provider features that Sotto's current transport can actually deliver. */
+  capabilities?: { web: boolean; vision: boolean };
   auth: {
     fields: AiProviderAuthField[];
     validate: (credentials: Record<string, string>) => Promise<boolean>;
@@ -292,6 +294,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
         maxOutputTokens: 128_000,
       },
     ],
+    capabilities: { web: true, vision: true },
     auth: {
       fields: [],
       validate: async () => true,
@@ -308,6 +311,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'codex',
     getApiKeyUrl: '',
     models: [],
+    capabilities: { web: true, vision: false },
     auth: {
       fields: [],
       validate: async () => true,
