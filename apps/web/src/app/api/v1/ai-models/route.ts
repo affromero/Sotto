@@ -12,7 +12,7 @@ import {
   resolveIncludedModels,
 } from '@/lib/auto-model-config';
 import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
-import { getAgentModelOptions } from '@/lib/agent-models';
+import { getAgentModelOffering, type AgentModelOffering } from '@/lib/agent-models';
 
 import { errorResponse } from '@/lib/api-response';
 
@@ -32,11 +32,12 @@ for (const p of getAllAiProviderMeta()) {
 }
 
 function agentModelRows(
+  offering: AgentModelOffering,
   provider: 'claude-code' | 'codex',
   group: string,
   autoConfig: Awaited<ReturnType<typeof getAutoModelConfig>>
 ) {
-  return getAgentModelOptions(provider, { autoConfig }).map((m) => ({
+  return offering.models.map((m) => ({
     id: m.id,
     displayName: m.displayName,
     tier: m.tier,
@@ -60,14 +61,20 @@ export async function GET(request: NextRequest) {
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const disabledSystemProviders = resolveDisabledSystemAiProviders(autoConfig);
-  const claudeCodeModels =
+  const [claudeOffering, codexOffering] = await Promise.all([
     claudeAvailable && !disabledSystemProviders.has('claude-code')
-      ? agentModelRows('claude-code', 'Claude Code (Local)', autoConfig)
-      : [];
-  const codexModels =
+      ? getAgentModelOffering('claude-code', { autoConfig })
+      : null,
     codexAvailable && !disabledSystemProviders.has('codex')
-      ? agentModelRows('codex', 'Codex (Local)', autoConfig)
-      : [];
+      ? getAgentModelOffering('codex', { autoConfig })
+      : null,
+  ]);
+  const claudeCodeModels = claudeOffering
+    ? agentModelRows(claudeOffering, 'claude-code', 'Claude Code (Local)', autoConfig)
+    : [];
+  const codexModels = codexOffering
+    ? agentModelRows(codexOffering, 'codex', 'Codex (Local)', autoConfig)
+    : [];
   const isByok = validKeys.length > 0;
   const includedModelIds = new Set(resolveIncludedModels(autoConfig));
   const modelsById = new Map<
@@ -121,6 +128,12 @@ export async function GET(request: NextRequest) {
       readOnly: false,
       isByok,
       models: sortModels([...modelsById.values(), ...claudeCodeModels, ...codexModels]),
+      agentModelDiscovery: {
+        'claude-code': claudeOffering
+          ? { source: claudeOffering.source, error: claudeOffering.error }
+          : null,
+        codex: codexOffering ? { source: codexOffering.source, error: codexOffering.error } : null,
+      },
     },
     { headers: CACHE_HEADERS }
   );

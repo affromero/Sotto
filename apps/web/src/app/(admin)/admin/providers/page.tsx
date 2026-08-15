@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { getAutoModelConfig, resolveDisabledSystemAiProviders } from '@/lib/auto-model-config';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
-import { getAgentModelOptions } from '@/lib/agent-models';
+import { getAgentModelOffering } from '@/lib/agent-models';
 import { getAllAiProviderClientMeta, getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
@@ -31,9 +31,13 @@ export default async function AdminProvidersPage() {
   }));
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const disabledSystemAiProviders = resolveDisabledSystemAiProviders(config);
+  const [claudeOffering, codexOffering] = await Promise.all([
+    getAgentModelOffering('claude-code', { autoConfig: config }),
+    getAgentModelOffering('codex', { autoConfig: config }),
+  ]);
   const agentModels = {
-    'claude-code': getAgentModelOptions('claude-code', { autoConfig: config }),
-    codex: getAgentModelOptions('codex', { autoConfig: config }),
+    'claude-code': claudeOffering.models,
+    codex: codexOffering.models,
   };
   const aiSystemProviders = [
     {

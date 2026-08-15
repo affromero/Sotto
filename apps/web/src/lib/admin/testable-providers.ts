@@ -9,7 +9,7 @@ import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getPlatformTtsKey } from '@/lib/tts-generation';
-import { getAgentModelOptions } from '@/lib/agent-models';
+import { getAgentModelOffering } from '@/lib/agent-models';
 
 export type TestableProvider = {
   category: 'ai' | 'tts' | 'stt';
@@ -102,7 +102,12 @@ function hasByokKey(
 
 /** Resolve every testable provider/model for the given admin, key-filtered. */
 export async function getTestableProviders(userId: string): Promise<TestableProviders> {
-  const [aiKeys, ttsKeys] = await Promise.all([listAiProviders(userId), listByokProviders(userId)]);
+  const [aiKeys, ttsKeys, claudeOffering, codexOffering] = await Promise.all([
+    listAiProviders(userId),
+    listByokProviders(userId),
+    getAgentModelOffering('claude-code'),
+    getAgentModelOffering('codex'),
+  ]);
   const aiByokSet = new Set(aiKeys.map((k) => k.provider as string));
   const ttsByokSet = new Set(ttsKeys.map((k) => k.provider as string));
 
@@ -120,7 +125,11 @@ export async function getTestableProviders(userId: string): Promise<TestableProv
   const ai = withKeyFlags(
     getAllAiProviderMeta().flatMap((p) => {
       const models =
-        p.id === 'claude-code' || p.id === 'codex' ? getAgentModelOptions(p.id) : p.models;
+        p.id === 'claude-code'
+          ? claudeOffering.models
+          : p.id === 'codex'
+            ? codexOffering.models
+            : p.models;
       return models.map((m) => ({
         category: 'ai' as const,
         providerId: p.id,

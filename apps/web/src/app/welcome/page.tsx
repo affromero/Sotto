@@ -4,7 +4,7 @@ import { getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { getAgentModelOptions } from '@/lib/agent-models';
+import { getAgentModelOffering } from '@/lib/agent-models';
 
 export const metadata = {
   title: 'Welcome to Sotto',
@@ -18,6 +18,10 @@ export const metadata = {
  */
 async function buildModelMeta(): Promise<ModelMeta> {
   const autoConfig = await getAutoModelConfig().catch(() => undefined);
+  const [claudeOffering, codexOffering] = await Promise.all([
+    getAgentModelOffering('claude-code', { autoConfig }),
+    getAgentModelOffering('codex', { autoConfig }),
+  ]);
   const opt = <T extends { id: string; displayName: string }>(models: T[]) =>
     models.map((m) => ({ id: m.id, label: m.displayName }));
   return {
@@ -25,8 +29,8 @@ async function buildModelMeta(): Promise<ModelMeta> {
       anthropic: opt(getAiProviderMeta('anthropic').models),
       openai: opt(getAiProviderMeta('openai').models),
       // Backs the CLI (claude-code) model picker: haiku/sonnet/opus.
-      'claude-code': opt(getAgentModelOptions('claude-code', { autoConfig })),
-      codex: opt(getAgentModelOptions('codex', { autoConfig })),
+      'claude-code': opt(claudeOffering.models),
+      codex: opt(codexOffering.models),
       // Cloud LLM cards.
       xai: opt(getAiProviderMeta('xai').models),
       deepseek: opt(getAiProviderMeta('deepseek').models),
