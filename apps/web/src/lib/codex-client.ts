@@ -6,6 +6,7 @@ import { getCodexSshHost, isCodexAvailable } from './agent-availability';
 import { logger } from './logger';
 import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
 import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
+import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
 
 /**
  * Codex CLI provider client — routes AI calls through `codex exec` in a
@@ -39,6 +40,7 @@ interface CodexOptions {
 }
 
 export function codexEnvironment(): NodeJS.ProcessEnv {
+  installCurrentProviderCredentialSnapshot('codex');
   return minimalAgentEnvironment(CODEX_ENV_KEYS);
 }
 

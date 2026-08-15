@@ -6,6 +6,7 @@ import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocatio
 import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
+import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
@@ -84,6 +85,7 @@ const CLAUDE_ENV_KEYS = [
 ];
 
 export function claudeCodeEnvironment(): NodeJS.ProcessEnv {
+  installCurrentProviderCredentialSnapshot('claude-code');
   const claudeHome = ensureClaudeHome();
   const env = minimalAgentEnvironment(
     CLAUDE_ENV_KEYS,

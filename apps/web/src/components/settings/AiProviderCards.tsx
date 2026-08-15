@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import { Glyph } from '@/components/Glyph';
 import styles from './ProviderCards.module.css';
+import type { AgentReadiness } from '@/lib/agent-availability';
 
 interface ProviderStatus {
   provider: string;
@@ -19,6 +20,8 @@ interface SystemProvider {
   label: string;
   description: string;
   available: boolean;
+  readiness?: AgentReadiness;
+  credentialReloadAvailable?: boolean;
   disabled?: boolean;
 }
 
@@ -171,6 +174,31 @@ export function AiProviderCards({
     } catch {
       setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
       setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleReloadCredentials = async (providerId: string) => {
+    setSavingId(providerId);
+    setErrors((prev) => ({ ...prev, [providerId]: '' }));
+    try {
+      const res = await fetch('/api/v1/admin/agent-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: providerId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setErrors((prev) => ({
+          ...prev,
+          [providerId]: data?.error || 'Could not reload CLI credentials.',
+        }));
+        return;
+      }
+      window.location.reload();
+    } catch {
+      setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
     } finally {
       setSavingId(null);
     }
@@ -385,9 +413,28 @@ export function AiProviderCards({
             {sp.available ? (
               <span className={styles.statusConnected}>Connected</span>
             ) : (
-              <span className={styles.statusNone}>CLI not found</span>
+              <span className={styles.statusNone}>
+                {sp.readiness === 'not_authenticated'
+                  ? 'Sign-in required'
+                  : sp.readiness === 'unreachable'
+                    ? 'Remote CLI unreachable'
+                    : 'CLI not found'}
+              </span>
             )}
           </div>
+          {sp.credentialReloadAvailable && (
+            <div className={styles.cardActions}>
+              <Button
+                variant="ghost"
+                onClick={() => handleReloadCredentials(sp.id)}
+                loading={savingId === sp.id}
+                disabled={savingId !== null}
+              >
+                Reload host login
+              </Button>
+              {errors[sp.id] && <span className={styles.feedbackError}>{errors[sp.id]}</span>}
+            </div>
+          )}
         </div>
       ))}
     </div>

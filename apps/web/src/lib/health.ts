@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { isClaudeAvailable } from '@/lib/agent-availability';
+import { getAgentStatus } from '@/lib/agent-availability';
 import { ALL_QUEUE_NAMES } from '@/lib/queue';
 
 export type CheckResult = { status: string; latencyMs?: number; detail?: string };
@@ -176,12 +176,14 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   const claudeCodeCheck = async () => {
     const start = Date.now();
     try {
-      const available = await isClaudeAvailable();
+      const agentStatus = await getAgentStatus('claude-code');
       return {
         key: 'claudeCode',
-        result: available
-          ? ({ status: 'ok', latencyMs: Date.now() - start } as CheckResult)
-          : ({ status: 'not_installed' } as CheckResult),
+        result: {
+          status: agentStatus.readiness === 'ready' ? 'ok' : agentStatus.readiness,
+          latencyMs: Date.now() - start,
+          ...(agentStatus.detail ? { detail: agentStatus.detail } : {}),
+        } as CheckResult,
       };
     } catch {
       return {
