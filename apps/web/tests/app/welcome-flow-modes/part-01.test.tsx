@@ -271,6 +271,69 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByLabelText(/Setup progress/i)).toBeInTheDocument();
   });
 
+  it('discards wizard progress saved before the current self-hosted install', async () => {
+    mockConfigFetch(true);
+    window.localStorage.setItem(
+      'sotto.onboarding.v1',
+      JSON.stringify({
+        onboardingResumeKey: 'previous-owner',
+        step: 8,
+        profileName: 'Learner',
+        avatarSlug: 'capybara',
+        baseLang: 'en',
+        language: 'de',
+      })
+    );
+
+    render(
+      <WelcomeFlow
+        initialConfig={{
+          selfHosted: true,
+          isOwner: false,
+          onboardingResumeKey: 'fresh-owner',
+        }}
+      />
+    );
+
+    expect(await screen.findByText(/First launch/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem('sotto.onboarding.v1') ?? '{}')).toMatchObject({
+        onboardingResumeKey: 'fresh-owner',
+        step: 0,
+        language: '',
+      });
+    });
+  });
+
+  it('resumes wizard progress saved by the current self-hosted install', async () => {
+    mockConfigFetch(true);
+    window.localStorage.setItem(
+      'sotto.onboarding.v1',
+      JSON.stringify({
+        onboardingResumeKey: 'current-owner',
+        step: 8,
+        profileName: 'Learner',
+        avatarSlug: 'capybara',
+        baseLang: 'en',
+        language: 'de',
+      })
+    );
+
+    render(
+      <WelcomeFlow
+        initialConfig={{
+          selfHosted: true,
+          isOwner: false,
+          onboardingResumeKey: 'current-owner',
+        }}
+      />
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /Take the quick placement test/i })
+    ).toBeInTheDocument();
+  });
+
   it('saves the admin learner profile before continuing self-host onboarding', async () => {
     const user = userEvent.setup();
     const onNext = vi.fn();
