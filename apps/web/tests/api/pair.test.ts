@@ -38,6 +38,11 @@ vi.mock('@/lib/api-response', () => ({
     new Response(JSON.stringify({ error: message }), { status }),
 }));
 
+const mockCheckRateLimit = vi.fn();
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: (...a: unknown[]) => mockCheckRateLimit(...a),
+}));
+
 function postReq(path: string, body: unknown): NextRequest {
   return new NextRequest(new URL(`https://sotto.example${path}`), {
     method: 'POST',
@@ -114,6 +119,7 @@ describe('POST /api/v1/auth/pair/redeem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDetectTailscaleServeUrl.mockResolvedValue(null);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true });
   });
 
   it('mints an API key for a valid token', async () => {
@@ -149,6 +155,15 @@ describe('POST /api/v1/auth/pair/redeem', () => {
     const { POST } = await import('@/app/api/v1/auth/pair/redeem/route');
     const res = await POST(postReq('/api/v1/auth/pair/redeem', { token: 'x' }));
     expect(res.status).toBe(400);
+    expect(mockRedeemPairingToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a rate-limited redemption attempt with 429', async () => {
+    mockCheckRateLimit.mockResolvedValue({ allowed: false });
+    const { POST } = await import('@/app/api/v1/auth/pair/redeem/route');
+    const res = await POST(postReq('/api/v1/auth/pair/redeem', { token: 'rawtoken123' }));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'Too many attempts. Try again later.' });
     expect(mockRedeemPairingToken).not.toHaveBeenCalled();
   });
 });
