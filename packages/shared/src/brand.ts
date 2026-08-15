@@ -15,7 +15,7 @@ export const BRAND = {
   cta: 'Practice. Rehearse. Progress.',
 
   // Pre-composed
-  title: 'Sotto. Practice a language before the pressure of speaking.',
+  title: 'Sotto: self-hosted AI language learning. Practice before the pressure of speaking.',
   description:
     'Self-hosted language learning for private rehearsal before class, tutoring, or real conversation, not another AI language chatbot. Choose what your agent may read, then study CEFR courses across grammar, reading, listening, speaking, and writing with your keys, data, and stack.',
   longDescription:
