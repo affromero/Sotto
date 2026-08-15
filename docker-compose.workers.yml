@@ -10,6 +10,8 @@ x-worker-image: &worker-image
     dockerfile: apps/web/Dockerfile.workers
     args:
       WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}
+  volumes:
+    - cli-credentials:/run/cli-credentials
 
 services:
   workers-heavy:
@@ -25,6 +27,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       WORKER_PROFILE: heavy
       WORKER_PRESET: ${WORKER_PRESET_HEAVY:-full}
       WORKER_QUEUES: ${WORKER_QUEUES_HEAVY:-}
@@ -51,6 +54,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       WORKER_PROFILE: pipeline
       WORKER_PRESET: ${WORKER_PRESET_PIPELINE:-full}
       WORKER_QUEUES: ${WORKER_QUEUES_PIPELINE:-}
@@ -77,6 +81,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       WORKER_PROFILE: light
       WORKER_PRESET: ${WORKER_PRESET_LIGHT:-full}
       WORKER_QUEUES: ${WORKER_QUEUES_LIGHT:-}
@@ -90,7 +95,34 @@ services:
         max-size: '20m'
         max-file: '3'
 
+  credential-sync:
+    image: alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH
+    volumes:
+      - ${CLAUDE_AUTH_DIR:-/dev/null}:/host-claude:ro
+      - ${CODEX_AUTH_DIR:-/dev/null}:/host-codex:ro
+      - cli-credentials:/credential-sync
+      - ./scripts/agent/sync-cli-credentials.sh:/usr/local/bin/sync-cli-credentials:ro
+    command: ['/bin/sh', '/usr/local/bin/sync-cli-credentials']
+    healthcheck:
+      test: ['CMD', 'test', '-f', '/credential-sync/ready']
+      interval: 2s
+      timeout: 1s
+      retries: 15
+
 networks:
   sotto-network:
     external: true
     name: sotto-network
+
+volumes:
+  cli-credentials:
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials

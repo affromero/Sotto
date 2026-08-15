@@ -16,8 +16,6 @@ export interface BaseLang {
 export interface ProviderCli {
   label: string;
   bin: string;
-  ver: string;
-  path: string;
 }
 
 export interface Provider {
@@ -601,7 +599,7 @@ export const PROVIDERS: Provider[] = [
     icon: 'plug',
     apiUrl: 'https://platform.claude.com/',
     apiLabel: 'API',
-    cli: { label: 'Claude Code', bin: 'claude', ver: '1.2.4', path: '/usr/local/bin/claude' },
+    cli: { label: 'Claude Code', bin: 'claude' },
     keyHint: 'sk-ant-…',
   },
   {
@@ -611,7 +609,7 @@ export const PROVIDERS: Provider[] = [
     icon: 'plug',
     apiUrl: 'https://platform.openai.com/api-keys',
     apiLabel: 'API',
-    cli: { label: 'Codex CLI', bin: 'codex', ver: '0.9.1', path: '/opt/homebrew/bin/codex' },
+    cli: { label: 'Codex CLI', bin: 'codex' },
     keyHint: 'sk-…',
   },
   {

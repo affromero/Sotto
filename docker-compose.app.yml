@@ -32,6 +32,9 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_ACCESS_PASSWORD: ${SOTTO_ACCESS_PASSWORD:-}
       BYOK_ENCRYPTION_KEY: ${BYOK_ENCRYPTION_KEY:?Set BYOK_ENCRYPTION_KEY}
+      SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+    volumes:
+      - cli-credentials:/run/cli-credentials
     healthcheck:
       test:
         [
@@ -58,3 +61,8 @@ networks:
   sotto-network:
     external: true
     name: sotto-network
+
+volumes:
+  cli-credentials:
+    external: true
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials

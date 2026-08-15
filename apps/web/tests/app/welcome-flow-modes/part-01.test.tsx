@@ -463,6 +463,34 @@ describe('welcome hosted-demo mode', () => {
     expect(agent.model).toBe('codex:gpt-5.6-sol#effort=ultra');
   });
 
+  it('shows the probed Sotto runtime instead of a hardcoded developer-machine path', () => {
+    render(
+      <StepAgent
+        agent={{
+          provider: 'codex',
+          method: 'cli',
+          value: '',
+          model: 'codex',
+          status: 'idle',
+        }}
+        demoMode={false}
+        agentStatuses={{
+          codex: {
+            readiness: 'not_installed',
+            version: null,
+            detail: 'spawn codex ENOENT',
+          },
+        }}
+        setAgent={vi.fn()}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('codex is not installed in the Sotto runtime')).toBeInTheDocument();
+    expect(screen.queryByText(/opt\/homebrew|usr\/local/i)).not.toBeInTheDocument();
+  });
+
   it('keeps welcome course copy away from podcast and video framing', () => {
     const copy = [
       ...COMPOSE_LOG.map((line) => line.text),

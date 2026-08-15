@@ -458,10 +458,23 @@ describe('open-source language-learning OSS surfaces', () => {
       'utf8'
     );
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');
+    const ossImageWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/oss-image.yml'),
+      'utf8'
+    );
     const caddyTemplate = readFileSync(resolve(repoRoot, 'Caddyfile'), 'utf8');
     const appComposeSource = readFileSync(resolve(repoRoot, 'docker-compose.app.yml'), 'utf8');
     const workersComposeSource = readFileSync(
       resolve(repoRoot, 'docker-compose.workers.yml'),
+      'utf8'
+    );
+    const webDockerSource = readFileSync(resolve(repoRoot, 'apps/web/Dockerfile'), 'utf8');
+    const workerBaseDockerSource = readFileSync(
+      resolve(repoRoot, 'apps/web/Dockerfile.workers-base'),
+      'utf8'
+    );
+    const workerDockerSource = readFileSync(
+      resolve(repoRoot, 'apps/web/Dockerfile.workers'),
       'utf8'
     );
     const deploymentSources = [
@@ -474,6 +487,15 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(publicInstallerSource).toBe(installerSource);
     expect(installerSource).toContain('https://sotto.fm/install.sh');
+    expect(installerSource).toContain('SOTTO_REF="${SOTTO_REF:-main}"');
+    expect(installerSource).toContain('SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-latest}"');
+    expect(installerSource).toContain('Your local Codex CLI');
+    expect(installerSource).toContain('AI_PROVIDER=\\"$AGENT_CLI\\"');
+    expect(installerSource).toContain('$HOME/.codex/auth.json');
+    expect(installerSource).not.toContain('/releases?');
+    expect(ossImageWorkflow).toContain('branches: [main]');
+    expect(ossImageWorkflow).not.toContain("- 'v*'");
+    expect(ossImageWorkflow).not.toContain('github.ref_type');
     expect(deploySource).toContain('ENV_FILE="${SOTTO_ENV_FILE:-$REPO_ROOT/.env.production}"');
     expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
     expect(deploySource).toContain('render_caddy_config');
@@ -505,6 +527,21 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(workersComposeSource).toContain(
       'WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}'
     );
+    expect(appComposeSource).toContain('SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials');
+    expect(appComposeSource).toContain('${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials');
+    expect(workersComposeSource).toContain('credential-sync:');
+    expect(workersComposeSource).toContain('${CODEX_AUTH_DIR:-/dev/null}:/host-codex:ro');
+    expect(workersComposeSource).toContain(
+      './scripts/agent/sync-cli-credentials.sh:/usr/local/bin/sync-cli-credentials:ro'
+    );
+    expect(deploySource).toContain('=== Syncing host CLI credentials ===');
+    expect(deploySource).toContain('up -d --no-build credential-sync');
+    expect(webDockerSource).toContain('"@openai/codex@${CODEX_VERSION}"');
+    expect(workerBaseDockerSource).toContain('"@openai/codex@${CODEX_VERSION}"');
+    expect(webDockerSource).toContain('openssh-client');
+    expect(workerBaseDockerSource).toContain('openssh-client');
+    expect(webDockerSource).toContain('ENV HOME=/home/sotto');
+    expect(workerDockerSource).toContain('ENV HOME=/home/sotto');
     expect(setupServerSource).toContain('cp .env.example .env.production');
     expect(setupServerSource).toContain(
       'SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh'

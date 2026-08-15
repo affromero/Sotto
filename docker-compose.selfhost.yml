@@ -38,7 +38,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/affromero/sotto-web:${SOTTO_IMAGE_TAG:?Set SOTTO_IMAGE_TAG to a release}
+    image: ghcr.io/affromero/sotto-web:${SOTTO_IMAGE_TAG:-latest}
     env_file: [.env]
     environment:
       NODE_ENV: production
@@ -73,7 +73,7 @@ services:
     restart: unless-stopped
 
   workers:
-    image: ghcr.io/affromero/sotto-workers:${SOTTO_IMAGE_TAG:?Set SOTTO_IMAGE_TAG to a release}
+    image: ghcr.io/affromero/sotto-workers:${SOTTO_IMAGE_TAG:-latest}
     env_file: [.env]
     environment:
       NODE_ENV: production

@@ -30,6 +30,10 @@ ENV NODE_ENV=production
 # Create non-root user
 RUN addgroup --system --gid 1001 sotto
 RUN adduser --system --uid 1001 sotto
+RUN mkdir -p /home/sotto/.codex /home/sotto/.claude /home/sotto/.ssh \
+    && chown -R sotto:sotto /home/sotto
+
+ENV HOME=/home/sotto
 
 # Copy dependencies with Prisma client (root + workspace-specific node_modules)
 COPY --from=deps --chown=sotto:sotto /app/node_modules ./node_modules

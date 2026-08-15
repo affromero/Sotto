@@ -51,7 +51,7 @@ Just Docker. No clone, no build:
 curl -fsSL https://sotto.fm/install.sh | bash
 ```
 
-The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code** CLI with no key, or your Claude agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything. Local CLI login refreshes travel through a networkless credential-sync sidecar that copies only the CLI auth JSON into the app containers.
+The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code or Codex CLI** with no key, or your Claude agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything. Local CLI login refreshes travel through a networkless credential-sync sidecar that copies only the CLI auth JSON into the app containers.
 
 **Prefer one click?** Unsigned preview desktop installers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Your OS may require an explicit security override. _Sotto Host_ runs the whole stack for you, no terminal.
 
@@ -235,7 +235,7 @@ curl -fsSL https://sotto.fm/install.sh | bash
 During install you choose how Sotto reaches your AI:
 
 - **An API key** (OpenAI or Anthropic): simplest.
-- **Your local Claude Code CLI:** bring your own agent; a networkless sidecar snapshots only its auth JSON into the container, no API key.
+- **Your local Claude Code or Codex CLI:** bring your own agent; a networkless sidecar snapshots only its auth JSON into the container, no API key.
 - **Your agent on a VPS, over SSH:** Sotto runs `ssh you@vps claude ...` for every LLM call (`CLAUDE_CODE_SSH_HOST`), so your data can stay on your machine.
 
 ### From source (contributors)
@@ -352,7 +352,7 @@ The typed client is generated from the same Zod schemas the web app uses (`packa
 
 Sotto is built around BYOK from the start, surfaced three ways:
 
-1. **Keyless local agent:** the Docker installer supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code); source installs can set `AI_PROVIDER=claude-code` or `codex` to use Claude Code or [Codex](https://github.com/openai/codex), with no API key. Sotto checks CLI version and login separately, discovers Codex models live, and can refresh local Docker credentials through a networkless sidecar from the admin provider screen.
+1. **Keyless local agent:** the Docker installer and source installs support `AI_PROVIDER=claude-code` or `codex` to use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex](https://github.com/openai/codex), with no API key. Sotto checks CLI version and login separately, discovers Codex models live, and refreshes local Docker credentials through a networkless sidecar.
 2. **[MCP](https://modelcontextprotocol.io/) server:** add `packages/mcp` to your Claude Code or Codex config and call `ingest_agent_output` to push content from any agent workflow straight into Sotto.
 3. **BYOK in Settings:** store encrypted per account API keys (LLM, TTS, STT), encrypted at rest with `BYOK_ENCRYPTION_KEY`. You pay your providers; Sotto is the infrastructure layer.
 
