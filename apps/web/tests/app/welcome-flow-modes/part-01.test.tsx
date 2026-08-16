@@ -425,8 +425,10 @@ describe('welcome hosted-demo mode', () => {
     expect(
       screen.getByRole('link', { name: /open google ai studio api key page/i })
     ).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+    expect(
+      screen.getByRole('link', { name: /learn how the gemini live api works/i })
+    ).toHaveAttribute('href', 'https://ai.google.dev/gemini-api/docs/live-api');
   });
-
   it('picks CLI model and reasoning effort separately while preserving the encoded id', async () => {
     const user = userEvent.setup();
     let agent: AgentState = {
@@ -462,7 +464,6 @@ describe('welcome hosted-demo mode', () => {
     await user.selectOptions(effort, 'ultra');
     expect(agent.model).toBe('codex:gpt-5.6-sol#effort=ultra');
   });
-
   it('shows the probed Sotto runtime instead of a hardcoded developer-machine path', () => {
     render(
       <StepAgent
@@ -491,17 +492,20 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.queryByText(/opt\/homebrew|usr\/local/i)).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('data-readiness', 'not_installed');
   });
-
-  it('exposes ready CLI state as a semantic live status', () => {
+  it('treats a ready CLI probe as the connected state and enables continuing', () => {
+    let agent: AgentState = {
+      provider: 'codex',
+      method: 'cli',
+      value: '',
+      model: 'codex',
+      status: 'idle',
+    };
+    const setAgent = vi.fn((updater: (prev: AgentState) => AgentState) => {
+      agent = updater(agent);
+    });
     render(
       <StepAgent
-        agent={{
-          provider: 'codex',
-          method: 'cli',
-          value: '',
-          model: 'codex',
-          status: 'idle',
-        }}
+        agent={agent}
         demoMode={false}
         agentStatuses={{
           codex: {
@@ -510,7 +514,7 @@ describe('welcome hosted-demo mode', () => {
             detail: null,
           },
         }}
-        setAgent={vi.fn()}
+        setAgent={setAgent}
         onNext={vi.fn()}
         onBack={vi.fn()}
       />
@@ -519,8 +523,9 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByRole('status')).toHaveAttribute('data-readiness', 'ready');
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
     expect(screen.getByRole('button', { name: 'Linked' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
+    expect(agent.status).toBe('connected');
   });
-
   it('keeps welcome course copy away from podcast and video framing', () => {
     const copy = [
       ...COMPOSE_LOG.map((line) => line.text),

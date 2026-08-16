@@ -79,6 +79,20 @@ export function StepAgent({
       : cliReadiness === 'not_authenticated' || cliReadiness === 'not_installed'
         ? c.cliDetectError
         : c.cliDetectPending;
+  const connectionReady =
+    !demoMode && agent.method === 'cli' ? cliReadiness === 'ready' : agent.status === 'connected';
+
+  // The runtime probe is the source of truth for keyless CLI connections.
+  // Keep the persisted wizard state in sync so Enter-key navigation and the
+  // eventual onboarding snapshot agree with the readiness card.
+  useEffect(() => {
+    if (demoMode || agent.method !== 'cli') return;
+    const nextStatus = cliReadiness === 'ready' ? 'connected' : 'idle';
+    if (agent.status !== nextStatus) {
+      setAgent((current) => ({ ...current, status: nextStatus }));
+    }
+  }, [agent.method, agent.status, cliReadiness, demoMode, setAgent]);
+
   const cliStatusDetail = cliStatus?.version
     ? cliStatus.version
     : cliStatus?.readiness === 'not_authenticated'
@@ -387,7 +401,7 @@ export function StepAgent({
                 : `handshaking with ${prov.name}…`}
             </div>
           )}
-          {!demoMode && agent.status === 'connected' && (
+          {!demoMode && connectionReady && (
             <div className={`${c.statusPill} ${c.statusPillConnected}`}>
               <Glyph name="check" size={14} />
               {agent.method === 'cli'
@@ -434,10 +448,21 @@ export function StepAgent({
               </a>
             </div>
           </div>
-          <div className={c.locknote}>
+          <div className={`${c.locknote} ${c.liveKeyNote}`}>
             <Glyph name="lock" size={15} />
-            Optional. Saves a Google key for live spoken translation; your course agent choice stays
-            separate.
+            <span className={c.locknoteText}>
+              Optional. Saves a Google key for live spoken translation; your course agent choice
+              stays separate.
+            </span>
+            <a
+              className={c.learnLink}
+              href="https://ai.google.dev/gemini-api/docs/live-api"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Learn how the Gemini Live API works"
+            >
+              How Gemini Live works ↗
+            </a>
           </div>
         </div>
       )}
@@ -447,11 +472,7 @@ export function StepAgent({
           ← Back
         </button>
         <span className={t.spacer} />
-        <button
-          className={`${t.btn} ${t.btnPrimary}`}
-          disabled={agent.status !== 'connected'}
-          onClick={onNext}
-        >
+        <button className={`${t.btn} ${t.btnPrimary}`} disabled={!connectionReady} onClick={onNext}>
           Continue{' '}
           <span className={t.btnArrow}>
             <Glyph name="arrow" size={17} />
