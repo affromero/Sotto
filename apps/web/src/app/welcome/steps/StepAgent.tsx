@@ -72,6 +72,13 @@ export function StepAgent({
     agent.method === 'cli' ? (agent.provider === 'codex' ? 'codex' : 'claude-code') : null;
   const agentSelection = agentProvider ? parseAgentModelId(agent.model, agentProvider) : null;
   const cliStatus = agentProvider ? agentStatuses?.[agentProvider] : undefined;
+  const cliReadiness = cliStatus?.readiness ?? 'checking';
+  const cliToneClass =
+    cliReadiness === 'ready'
+      ? c.cliDetectReady
+      : cliReadiness === 'not_authenticated' || cliReadiness === 'not_installed'
+        ? c.cliDetectError
+        : c.cliDetectPending;
   const cliStatusDetail = cliStatus?.version
     ? cliStatus.version
     : cliStatus?.readiness === 'not_authenticated'
@@ -228,7 +235,12 @@ export function StepAgent({
           )}
 
           {!demoMode && agent.method === 'cli' && prov.cli && (
-            <div className={c.cliDetect}>
+            <div
+              className={`${c.cliDetect} ${cliToneClass}`}
+              role="status"
+              aria-live="polite"
+              data-readiness={cliReadiness}
+            >
               <span className={c.cliIco}>
                 <Glyph name={cliStatus?.readiness === 'ready' ? 'check' : 'retry'} size={18} />
               </span>

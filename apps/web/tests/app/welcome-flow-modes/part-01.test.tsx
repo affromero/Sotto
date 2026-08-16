@@ -489,6 +489,36 @@ describe('welcome hosted-demo mode', () => {
 
     expect(screen.getByText('codex is not installed in the Sotto runtime')).toBeInTheDocument();
     expect(screen.queryByText(/opt\/homebrew|usr\/local/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('data-readiness', 'not_installed');
+  });
+
+  it('exposes ready CLI state as a semantic live status', () => {
+    render(
+      <StepAgent
+        agent={{
+          provider: 'codex',
+          method: 'cli',
+          value: '',
+          model: 'codex',
+          status: 'idle',
+        }}
+        demoMode={false}
+        agentStatuses={{
+          codex: {
+            readiness: 'ready',
+            version: 'codex-cli 0.144.6',
+            detail: null,
+          },
+        }}
+        setAgent={vi.fn()}
+        onNext={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('status')).toHaveAttribute('data-readiness', 'ready');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('button', { name: 'Linked' })).toBeDisabled();
   });
 
   it('keeps welcome course copy away from podcast and video framing', () => {
