@@ -462,6 +462,7 @@ describe('open-source language-learning OSS surfaces', () => {
       resolve(repoRoot, '.github/workflows/oss-image.yml'),
       'utf8'
     );
+    const deployWorkflow = readFileSync(resolve(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
     const caddyTemplate = readFileSync(resolve(repoRoot, 'Caddyfile'), 'utf8');
     const appComposeSource = readFileSync(resolve(repoRoot, 'docker-compose.app.yml'), 'utf8');
     const workersComposeSource = readFileSync(
@@ -496,6 +497,9 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(ossImageWorkflow).toContain('branches: [main]');
     expect(ossImageWorkflow).not.toContain("- 'v*'");
     expect(ossImageWorkflow).not.toContain('github.ref_type');
+    expect(deployWorkflow).toContain('Reclaim runner disk before worker image');
+    expect(deployWorkflow).toContain('docker buildx prune --all --force');
+    expect(deployWorkflow).toContain('docker system prune --all --force');
     expect(deploySource).toContain('ENV_FILE="${SOTTO_ENV_FILE:-$REPO_ROOT/.env.production}"');
     expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
     expect(deploySource).toContain('render_caddy_config');
