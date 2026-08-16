@@ -579,6 +579,33 @@
   color: var(--accent);
   flex: none;
 }
+.liveKeyNote {
+  flex-wrap: wrap;
+}
+.locknoteText {
+  flex: 1 1 420px;
+}
+.learnLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-decoration-line: underline;
+  text-decoration-color: var(--accent-line);
+  text-underline-offset: 4px;
+  white-space: nowrap;
+}
+.learnLink:hover {
+  text-decoration-color: currentColor;
+}
+.learnLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
 /* ---------- voice (STT/TTS) step ---------- */
 .voiceBlock {
   margin-top: 26px;
