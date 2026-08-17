@@ -77,7 +77,7 @@ npx prisma studio      # Visual database browser
 1. Edit `schema.prisma`
 2. Run `npx prisma db push` (dev) or `npx prisma migrate dev` (production)
 3. Run `npx prisma generate`
-4. Update this CLAUDE.md if models/enums changed
+4. Update this AGENTS.md if models/enums changed
 5. Update `src/types/` if API response shapes changed
 6. If adding/changing enums, also update `packages/shared/src/types/enums.ts` (string union equivalents)
 

@@ -344,7 +344,7 @@ sotto                         # launch the TUI against your server
 - **Contextual Q&A:** pause a listening segment and ask a question; the answer streams back inline.
 - **Accounts:** `sotto accounts`, `sotto switch`, `sotto logout`, and `sotto whoami` manage multiple servers/profiles (stored in `~/.config/sotto`), plus an in TUI switcher.
 
-The typed client is generated from the same Zod schemas the web app uses (`packages/shared` -> OpenAPI -> [progenitor](https://github.com/oxidecomputer/progenitor)), so the contract never drifts. See [`tui/CLAUDE.md`](tui/CLAUDE.md) and [§9 of the architecture diagrams](docs/07-architecture-diagrams.md).
+The typed client is generated from the same Zod schemas the web app uses (`packages/shared` -> OpenAPI -> [progenitor](https://github.com/oxidecomputer/progenitor)), so the contract never drifts. See [`tui/AGENTS.md`](tui/AGENTS.md) and [§9 of the architecture diagrams](docs/07-architecture-diagrams.md).
 
 ---
 

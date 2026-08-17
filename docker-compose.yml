@@ -116,7 +116,7 @@ services:
   local-tts:
     # Keyless Kokoro TTS sidecar (services/local-tts). Multilingual, CPU-friendly.
     # Context is the service dir (its Dockerfile uses bare `COPY app.py`, matching
-    # `docker build ... services/local-tts` in services/local-tts/CLAUDE.md).
+    # `docker build ... services/local-tts` in services/local-tts/AGENTS.md).
     build:
       context: ./services/local-tts
       dockerfile: Dockerfile

@@ -260,7 +260,7 @@ No worker silently routes to a different provider because another key exists.
 
 Premium Rust + ratatui client (the `sotto` binary). HTTP-only against `/api/v1`;
 native audio playback and recording; types generated from the Zod-backed OpenAPI
-spec. Lives in `tui/`; see `tui/CLAUDE.md` for the crate-level guide.
+spec. Lives in `tui/`; see `tui/AGENTS.md` for the crate-level guide.
 
 ```mermaid
 flowchart TD

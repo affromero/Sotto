@@ -58,4 +58,4 @@ export function ComponentName({ variant = 'primary', children }: ComponentNamePr
 1. Create `src/components/domain/ComponentName.tsx`
 2. Create `src/components/domain/ComponentName.module.css`
 3. Export from component (no barrel files needed — import directly)
-4. Update this CLAUDE.md
+4. Update this AGENTS.md

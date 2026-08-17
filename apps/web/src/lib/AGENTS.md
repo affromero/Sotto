@@ -170,7 +170,7 @@ All lib functions throw descriptive errors. API routes catch and return proper H
 
 1. Create `src/lib/new-service.ts`
 2. Add types to `src/types/` if needed
-3. Update this CLAUDE.md with the file description
+3. Update this AGENTS.md with the file description
 4. If it's an external service, add env vars to `.env.example`
 
 ## MANDATORY — Adding a New TTS Provider Voice Pool
