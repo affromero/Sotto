@@ -31,6 +31,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // IANA timezone (e.g. "America/Mexico_City") — picked in the welcome wizard,
+  // used to bucket activity into local calendar days (heatmap, streaks).
+  // Null = never chosen; readers fall back to the server's own timezone.
+  timezone String?
+
   preferredLanguage    String?
   preferredTtsProvider String?
   preferredTtsModel    String?
