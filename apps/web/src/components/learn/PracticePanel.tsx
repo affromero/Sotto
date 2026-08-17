@@ -39,6 +39,29 @@ const UNAVAILABLE_COPY: Record<string, string> = {
 
 type Phase = 'overview' | 'starting' | 'running' | 'unavailable';
 
+/**
+ * Estimated build progress. The start POST is a single blocking request with
+ * no server-side progress signal, so this eases asymptotically toward 95%
+ * (tau ~40s, matching typical script + audio build times) and only ever hits
+ * 100 when the response lands.
+ */
+function useEstimatedProgress(active: boolean): number {
+  const [percent, setPercent] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      setPercent(Math.round(95 * (1 - Math.exp(-elapsed / 40))));
+    }, 500);
+    return () => {
+      window.clearInterval(timer);
+      setPercent(0);
+    };
+  }, [active]);
+  return percent;
+}
+
 export function PracticePanel({
   courseId,
   courseName,
@@ -53,6 +76,7 @@ export function PracticePanel({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
+  const buildPercent = useEstimatedProgress(phase === 'starting');
 
   const loadOverview = useCallback(async () => {
     try {
@@ -170,6 +194,19 @@ export function PracticePanel({
             <p className={styles.startingText}>
               Sotto is preparing the questions and any audio or prompts this session needs.
             </p>
+            <div className={styles.progressRow}>
+              <div
+                className={styles.progressTrack}
+                role="progressbar"
+                aria-valuenow={buildPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Estimated build progress"
+              >
+                <div className={styles.progressFill} style={{ width: `${buildPercent}%` }} />
+              </div>
+              <span className={styles.progressLabel}>~{buildPercent}%</span>
+            </div>
           </div>
         </div>
       )}
