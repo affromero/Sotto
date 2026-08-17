@@ -7,6 +7,7 @@ import { errorResponse } from '@/lib/api-response';
 import { avatarImagePath, isAnimalSlug } from '@/lib/avatars';
 import { validateDisplayName } from '@/lib/name-validation';
 import { moderateDisplayName } from '@/lib/name-moderation';
+import { isValidTimezone } from '@/lib/activity/heatmap';
 
 const nameSchema = z.object({
   name: z
@@ -14,6 +15,7 @@ const nameSchema = z.object({
     .transform((val) => val.trim())
     .pipe(z.string().min(1, 'Name is required').max(100)),
   avatarSlug: z.string().refine(isAnimalSlug, 'Unknown avatar').optional(),
+  timezone: z.string().max(64).refine(isValidTimezone, 'Unknown timezone').optional(),
 });
 
 /**
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { name, avatarSlug } = validation.data;
+    const { name, avatarSlug, timezone } = validation.data;
 
     // Gibberish / format check
     const formatCheck = validateDisplayName(name);
@@ -53,6 +55,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         ...(avatarSlug !== undefined && { image: avatarImagePath(avatarSlug) }),
+        ...(timezone !== undefined && { timezone }),
       },
     });
 

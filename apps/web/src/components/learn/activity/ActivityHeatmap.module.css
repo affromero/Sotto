@@ -1,0 +1,158 @@
+.root {
+  margin-bottom: 32px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.heading {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.streaks {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.streaks strong {
+  color: var(--color-text-primary);
+}
+
+.srSummary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* direction:rtl starts the scroller at its right edge (today) with no JS;
+   the grid restores ltr so weeks still read oldest → newest. */
+.scroller {
+  overflow-x: auto;
+  direction: rtl;
+  padding-bottom: 4px;
+}
+
+.grid {
+  direction: ltr;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.month {
+  font-size: 0.6rem;
+  line-height: 1;
+  height: 10px;
+  color: var(--color-text-tertiary);
+  white-space: pre;
+}
+
+.cell,
+.pad {
+  width: 11px;
+  height: 11px;
+  border-radius: 2.5px;
+}
+
+.pad {
+  visibility: hidden;
+}
+
+.cell {
+  background: var(--color-surface-sunken);
+}
+
+/* Dominant-category hue per day. All colors are theme tokens so dark mode
+   and the user accent adapt automatically. */
+.cell[data-cat='class'],
+.legendSwatch[data-cat='class'] {
+  --cat-color: var(--color-primary);
+}
+.cell[data-cat='grammar'],
+.legendSwatch[data-cat='grammar'] {
+  --cat-color: var(--color-info);
+}
+.cell[data-cat='reading'],
+.legendSwatch[data-cat='reading'] {
+  --cat-color: var(--color-warning);
+}
+.cell[data-cat='listening'],
+.legendSwatch[data-cat='listening'] {
+  --cat-color: var(--color-teal);
+}
+.cell[data-cat='speaking'],
+.legendSwatch[data-cat='speaking'] {
+  --cat-color: var(--color-speaker-3);
+}
+.cell[data-cat='writing'],
+.legendSwatch[data-cat='writing'] {
+  --cat-color: var(--color-warning-hover);
+}
+.cell[data-cat='vocab'],
+.legendSwatch[data-cat='vocab'] {
+  --cat-color: var(--color-success);
+}
+.cell[data-cat='full'],
+.legendSwatch[data-cat='full'] {
+  --cat-color: var(--color-accent);
+}
+.cell[data-cat='exam'],
+.legendSwatch[data-cat='exam'] {
+  --cat-color: var(--color-error);
+}
+
+/* Intensity tiers blend the category hue over the empty-cell base. */
+.cell[data-tier='1'] {
+  background: color-mix(in srgb, var(--cat-color) 35%, var(--color-surface-sunken));
+}
+.cell[data-tier='2'] {
+  background: color-mix(in srgb, var(--cat-color) 60%, var(--color-surface-sunken));
+}
+.cell[data-tier='3'] {
+  background: color-mix(in srgb, var(--cat-color) 82%, var(--color-surface-sunken));
+}
+.cell[data-tier='4'],
+.legendSwatch[data-tier='4'] {
+  background: var(--cat-color);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 14px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2.5px;
+}

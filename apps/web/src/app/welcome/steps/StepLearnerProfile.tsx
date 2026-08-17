@@ -4,15 +4,18 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { Glyph } from '../Glyph';
+import { TimezoneGlobe } from '../timezone/TimezoneGlobe';
 import t from '../theme.module.css';
 import c from '../components.styles';
 
 interface Props {
   name: string;
   avatarSlug: string;
+  timezone: string;
   demoMode: boolean;
   setName: (name: string) => void;
   setAvatarSlug: (slug: string) => void;
+  setTimezone: (tz: string) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -20,9 +23,11 @@ interface Props {
 export function StepLearnerProfile({
   name,
   avatarSlug,
+  timezone,
   demoMode,
   setName,
   setAvatarSlug,
+  setTimezone,
   onNext,
   onBack,
 }: Props) {
@@ -47,7 +52,11 @@ export function StepLearnerProfile({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: cleanName, avatarSlug }),
+        body: JSON.stringify({
+          name: cleanName,
+          avatarSlug,
+          ...(timezone && { timezone }),
+        }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -129,6 +138,16 @@ export function StepLearnerProfile({
                 </button>
               );
             })}
+          </div>
+          <span className={c.fieldLabel} id="timezone-globe-label">
+            Where in the world?
+          </span>
+          <p className={c.fieldHint}>
+            Spin the globe to your city. Daily streaks and the activity calendar count days in this
+            timezone.
+          </p>
+          <div aria-labelledby="timezone-globe-label">
+            <TimezoneGlobe value={timezone} onChange={setTimezone} />
           </div>
         </div>
       </div>

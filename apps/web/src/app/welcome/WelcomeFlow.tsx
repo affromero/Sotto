@@ -151,6 +151,7 @@ interface WelcomeSnapshot {
   step: number;
   profileName: string;
   avatarSlug: string;
+  timezone: string;
   baseLang: string;
   language: string;
   agent: AgentState;
@@ -313,6 +314,7 @@ function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
           ? record.profileName
           : 'Learner',
       avatarSlug: isKnownAvatarSlug(record.avatarSlug) ? record.avatarSlug : ANIMAL_AVATARS[0].slug,
+      timezone: typeof record.timezone === 'string' ? record.timezone : '',
       baseLang: typeof record.baseLang === 'string' ? record.baseLang : 'en',
       language: typeof record.language === 'string' ? record.language : '',
       agent: parseAgent(record.agent),
@@ -335,6 +337,7 @@ function designSnapshotForStep(step: number, languageParam: string | null): Welc
     step: clamped,
     profileName: 'Learner',
     avatarSlug: ANIMAL_AVATARS[0].slug,
+    timezone: '',
     baseLang: 'en',
     language,
     agent:
@@ -376,6 +379,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [step, setStep] = useState(0);
   const [profileName, setProfileName] = useState('Learner');
   const [avatarSlug, setAvatarSlug] = useState(ANIMAL_AVATARS[0].slug);
+  const [timezone, setTimezone] = useState('');
   const [baseLang, setBaseLang] = useState('en');
   const [language, setLanguage] = useState('');
   const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
@@ -437,6 +441,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setLanguage(snapshot.language);
     setAgent(snapshot.agent);
     setVoice(snapshot.voice);
+    setTimezone(snapshot.timezone);
     setStorage(snapshot.storage);
     setSources(snapshot.sources);
     setContextItems(snapshot.contextItems);
@@ -486,6 +491,9 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         }
       }
 
+      // Default the timezone to the browser's detected zone unless a stored
+      // snapshot already carries a pick.
+      setTimezone((prev) => prev || Intl.DateTimeFormat().resolvedOptions().timeZone);
       setStorageReady(true);
       hydratedRef.current = true;
     });
@@ -507,6 +515,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         step,
         profileName,
         avatarSlug,
+        timezone,
         baseLang,
         language,
         agent,
@@ -531,6 +540,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     step,
     storageReady,
     storage,
+    timezone,
     understood,
     voice,
   ]);
@@ -587,6 +597,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setStep(0);
     setProfileName('Learner');
     setAvatarSlug(ANIMAL_AVATARS[0].slug);
+    setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
     setLanguage('');
     setBaseLang('en');
     setAgent({ ...DEFAULT_AGENT });
@@ -665,9 +676,11 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         <StepLearnerProfile
           name={profileName}
           avatarSlug={avatarSlug}
+          timezone={timezone}
           demoMode={demoMode}
           setName={setProfileName}
           setAvatarSlug={setAvatarSlug}
+          setTimezone={setTimezone}
           onNext={() => go(3)}
           onBack={() => go(1)}
         />

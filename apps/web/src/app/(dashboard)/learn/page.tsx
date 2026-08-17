@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { ActivityHeatmap } from '@/components/learn/activity/ActivityHeatmap';
+import { getActivityData } from '@/lib/activity/heatmap';
 import { CourseClassHistory } from '@/components/learn/CourseClassHistory';
 import { StartNextClass } from '@/components/learn/StartNextClass';
 import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
@@ -47,6 +49,7 @@ export default async function LearnPage() {
   const userId = session?.user?.id;
   if (!userId) return null;
 
+  const activity = await getActivityData(userId);
   const courses = await prisma.course.findMany({
     where: { userId },
     select: {
@@ -98,6 +101,8 @@ export default async function LearnPage() {
         </p>
         <CefrDisclaimer />
       </header>
+
+      {courses.length > 0 && <ActivityHeatmap data={activity} />}
 
       {courses.length === 0 ? (
         <section className={styles.empty}>
