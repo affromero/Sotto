@@ -371,16 +371,22 @@ function VoicePicker({
 function VisualCuePicker({
   voice,
   demoMode,
+  envDetected,
   onProvider,
   onKey,
 }: {
   voice: VoiceState;
   demoMode: boolean;
+  /** Wizard visual provider ids whose platform key already exists in the server env. */
+  envDetected: string[];
   onProvider: (provider: VoiceState['visualCueProvider']) => void;
   onKey: (value: string) => void;
 }) {
+  const [keyOverride, setKeyOverride] = useState(false);
   const enabled = voice.visualCueProvider === 'pexels';
   const key = voice.keys[VISUAL_CUE_KEY_ID] ?? '';
+  const envKeyDetected = envDetected.includes('pexels');
+  const showDetectedKey = envKeyDetected && !key.trim() && !keyOverride;
 
   return (
     <section className={c.learningBlock} aria-labelledby="learning-tools-title">
@@ -462,28 +468,52 @@ function VisualCuePicker({
               <span className={c.vkLabel}>
                 <Glyph name="key" size={13} /> Pexels key
               </span>
-              <input
-                className={c.vkInput}
-                type="password"
-                placeholder="pexels_..."
-                value={key}
-                onChange={(event) => onKey(event.target.value)}
-                aria-label="Pexels API key"
-              />
-              <a
-                className={c.vkActionLink}
-                href="https://www.pexels.com/api/"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open Pexels API page"
-              >
-                Get key
-              </a>
+              {showDetectedKey ? (
+                <>
+                  <span className={c.vkDetected}>
+                    <Glyph name="check" size={13} />
+                    Detected from the server environment
+                  </span>
+                  <button
+                    type="button"
+                    className={c.vkActionLink}
+                    onClick={() => setKeyOverride(true)}
+                    aria-label="Override the detected Pexels API key"
+                  >
+                    Override
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input
+                    className={c.vkInput}
+                    type="password"
+                    placeholder="pexels_..."
+                    value={key}
+                    onChange={(event) => onKey(event.target.value)}
+                    aria-label="Pexels API key"
+                    autoFocus={envKeyDetected && keyOverride}
+                  />
+                  <a
+                    className={c.vkActionLink}
+                    href="https://www.pexels.com/api/"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open Pexels API page"
+                  >
+                    Get key
+                  </a>
+                </>
+              )}
             </div>
             <div className={c.vkNote}>
               {key.trim()
                 ? 'Saved as an encrypted visual cue key when setup finishes.'
-                : 'Paste now or add it later; image cues stay optional.'}
+                : showDetectedKey
+                  ? 'Already configured on the server (env) · nothing to paste'
+                  : envKeyDetected
+                    ? 'Paste a key to replace the server one, or leave blank to keep it.'
+                    : 'Paste now or add it later; image cues stay optional.'}
             </div>
           </div>
         )
@@ -503,6 +533,8 @@ interface Props {
   /** Wizard TTS/STT ids whose platform key already exists in the server env (owner only). */
   envDetectedTts?: string[];
   envDetectedStt?: string[];
+  /** Wizard visual provider ids (pexels) whose platform key already exists in the server env. */
+  envDetectedVisual?: string[];
   /** Registry TTS models keyed by provider id (elevenlabs, openai, cartesia, hume). */
   ttsModels?: Record<string, ModelOption[]>;
   /** Registry STT models keyed by registry provider id (openai, deepgram, assemblyai, elevenlabs). */
@@ -537,6 +569,7 @@ export function StepVoice({
   language,
   envDetectedTts = [],
   envDetectedStt = [],
+  envDetectedVisual = [],
   ttsModels = {},
   sttModels = {},
   setVoice,
@@ -738,6 +771,7 @@ export function StepVoice({
       <VisualCuePicker
         voice={voice}
         demoMode={demoMode}
+        envDetected={envDetectedVisual}
         onProvider={(provider) => setVoice((s) => ({ ...s, visualCueProvider: provider }))}
         onKey={(value) => setKey(VISUAL_CUE_KEY_ID, value)}
       />

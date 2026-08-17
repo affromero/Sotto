@@ -17,6 +17,7 @@ export interface OnboardingEnvPresence {
   tts: string[];
   stt: string[];
   ai: string[];
+  visual: string[];
   storage: Record<string, boolean>;
 }
 
@@ -39,6 +40,11 @@ const STT_ENV: Record<string, string[]> = {
   cartesia: ['CARTESIA_API_KEY'],
   gladia: ['GLADIA_API_KEY'],
   speechmatics: ['SPEECHMATICS_API_KEY'],
+};
+
+// Mirrors the runtime fallback in lib/learning-targets.ts.
+const VISUAL_ENV: Record<string, string[]> = {
+  pexels: ['PEXELS_API_KEY'],
 };
 
 const AI_WIZARD_IDS = ['claude', 'codex', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia'];
@@ -74,6 +80,7 @@ export function buildEnvPresence(): OnboardingEnvPresence {
     tts: detectedIds(TTS_ENV),
     stt: detectedIds(STT_ENV),
     ai,
+    visual: detectedIds(VISUAL_ENV),
     storage: Object.fromEntries(STORAGE_ENV_VARS.map((name) => [name, envSet(name)])),
   };
 }

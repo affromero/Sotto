@@ -107,6 +107,7 @@ export interface OnboardingConfig {
     tts: string[];
     stt: string[];
     ai: string[];
+    visual: string[];
     storage: Record<string, boolean>;
   } | null;
   agentStatuses?: Record<'claude-code' | 'codex', AgentStatus> | null;
@@ -678,6 +679,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           demoMode={demoMode}
           envDetectedTts={config.env?.tts ?? []}
           envDetectedStt={config.env?.stt ?? []}
+          envDetectedVisual={config.env?.visual ?? []}
           ttsModels={modelMeta.tts}
           sttModels={modelMeta.stt}
           language={language}
