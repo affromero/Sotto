@@ -855,6 +855,40 @@
 .vkInput::placeholder {
   color: var(--ink-mute);
 }
+.vkDisclosure {
+  margin-top: 6px;
+}
+.vkDisclosureSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.vkDisclosureSummary::-webkit-details-marker {
+  display: none;
+}
+.vkDisclosureSummary svg {
+  color: var(--accent);
+  transition: transform 0.15s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vkDisclosureSummary svg {
+    transition: none;
+  }
+}
+.vkDisclosure[open] > .vkDisclosureSummary svg {
+  transform: rotate(90deg);
+}
+.vkDisclosure > .vkRow {
+  margin-top: 6px;
+}
 .vkInput:focus {
   outline: none;
   border-color: var(--accent);

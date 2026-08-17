@@ -280,7 +280,10 @@ function VoicePicker({
             </div>
           )}
           {kind === 'tts' && sel.id === 'cartesia' ? (
-            <>
+            <details className={c.vkDisclosure}>
+              <summary className={c.vkDisclosureSummary}>
+                <Glyph name="arrow" size={12} /> Usage tracking (optional)
+              </summary>
               <div className={c.vkRow}>
                 <span className={c.vkLabel}>
                   <Glyph name="key" size={13} /> Cartesia admin key
@@ -351,7 +354,7 @@ function VoicePicker({
                   />
                 </div>
               ) : null}
-            </>
+            </details>
           ) : null}
           <div className={c.vkNote}>
             {k.trim()
