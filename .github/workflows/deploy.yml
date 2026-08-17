@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
   # Stop docker/build-push-action uploading a *.dockerbuild record as an artifact on every run.
