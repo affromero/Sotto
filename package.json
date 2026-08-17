@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "scripts/run-with-env.sh npm run build --workspace=@sotto/web",
-    "ci": "npm audit --audit-level=high && npm run ci:web && npm run ci:packages",
+    "ci": "node scripts/ci/audit-gate.mjs && npm run ci:web && npm run ci:packages",
     "ci:packages": "npm test --workspace=@sotto/shared -- --run && npm run type-check --workspace=@sotto/mcp && npm run build --workspace=@sotto/mcp && npm test --workspace=groundcheck -- --run && npm run typecheck --workspace=groundcheck && npm run build --workspace=groundcheck && npm test --workspace=@sotto/learning-model -- --run && npm run typecheck --workspace=@sotto/learning-model && npm run build --workspace=@sotto/learning-model",
     "ci:web": "npm run ci --workspace=@sotto/web",
     "dev": "scripts/run-with-env.sh npm run dev --workspace=@sotto/web",
