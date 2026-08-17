@@ -191,7 +191,10 @@ async function aiGroundBatch(
   const routing = requireReferenceGroundingRouting(model, provider);
 
   const results = new Map<string, VerificationCheck>();
-  const BATCH_TIMEOUT_MS = 20_000;
+  // Grounding routes through CLI agents with web search (e.g. codex), which
+  // regularly need well over 20s; a short timeout fails verification closed
+  // and 500s the whole practice/class start.
+  const BATCH_TIMEOUT_MS = 120_000;
 
   const refsContext = batch
     .map(({ ref, claimContext }) => {
