@@ -190,6 +190,7 @@
   },
   "sttLanguageSupport": {
     "assemblyUniversal3Pro": ["en", "es", "fr", "de", "pt", "it"],
+    "inkTwo": ["en"],
     "deepgramNova2": [
       "en",
       "es",
