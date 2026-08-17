@@ -24,9 +24,16 @@ try {
 }
 const report = JSON.parse(raw);
 
+// An offline/errored audit emits {error} (or no vulnerabilities key at all);
+// passing then would be vacuous — fail closed instead.
+if (report.error || !report.vulnerabilities) {
+  console.error('audit gate: npm audit did not produce a report:', report.error?.summary ?? raw.slice(0, 200));
+  process.exit(1);
+}
+
 const now = new Date();
 const failures = [];
-for (const [name, vuln] of Object.entries(report.vulnerabilities ?? {})) {
+for (const [name, vuln] of Object.entries(report.vulnerabilities)) {
   if (vuln.severity !== 'high' && vuln.severity !== 'critical') continue;
   const advisories = vuln.via
     .filter((via) => typeof via === 'object' && via.url)
