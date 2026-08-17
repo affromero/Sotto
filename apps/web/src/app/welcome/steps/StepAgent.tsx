@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PROVIDERS } from '../data';
 import type { AgentState, ModelOption } from '../WelcomeFlow';
 import { aiModelProviderId } from '../providerMap';
@@ -48,6 +48,8 @@ export function StepAgent({
   // any pasted key simply overrides the server one.
   const envReady =
     !demoMode && agent.method === 'key' && !agent.value && envDetected.includes(agent.provider);
+  const [keyOverrides, setKeyOverrides] = useState<Record<string, boolean>>({});
+  const showDetectedKey = envReady && !keyOverrides[agent.provider];
   useEffect(() => {
     if (envReady && agent.status === 'idle') {
       setAgent((a) => ({ ...a, status: 'connected' }));
@@ -286,29 +288,43 @@ export function StepAgent({
                 {agent.method === 'key' ? 'API key' : 'Endpoint URL'}
               </div>
               <div className={c.field}>
-                <input
-                  className={c.fieldInput}
-                  type={agent.method === 'key' ? 'password' : 'text'}
-                  placeholder={
-                    agent.method === 'key'
-                      ? envDetected.includes(agent.provider)
-                        ? 'detected on the server · paste a key only to override'
-                        : prov.keyHint
-                      : prov.hint
-                  }
-                  value={agent.value}
-                  onChange={(e) =>
-                    setAgent((a) => ({ ...a, value: e.target.value, status: 'idle' }))
-                  }
-                  aria-label={agent.method === 'key' ? `${prov.name} API key` : 'Endpoint URL'}
-                />
-                <button
-                  className={`${t.btn} ${t.btnGhost}`}
-                  disabled={!agent.value || agent.status === 'connected'}
-                  onClick={verify}
-                >
-                  {agent.status === 'connected' ? 'Connected' : 'Verify'}
-                </button>
+                {showDetectedKey ? (
+                  <>
+                    <span className={c.vkDetected}>
+                      <Glyph name="check" size={13} />
+                      Detected from the server environment
+                    </span>
+                    <button
+                      type="button"
+                      className={c.vkActionLink}
+                      onClick={() => setKeyOverrides((s) => ({ ...s, [agent.provider]: true }))}
+                      aria-label={`Override the detected ${prov.name} API key`}
+                    >
+                      Override
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      className={c.fieldInput}
+                      type={agent.method === 'key' ? 'password' : 'text'}
+                      placeholder={agent.method === 'key' ? prov.keyHint : prov.hint}
+                      value={agent.value}
+                      onChange={(e) =>
+                        setAgent((a) => ({ ...a, value: e.target.value, status: 'idle' }))
+                      }
+                      aria-label={agent.method === 'key' ? `${prov.name} API key` : 'Endpoint URL'}
+                      autoFocus={agent.method === 'key' && Boolean(keyOverrides[agent.provider])}
+                    />
+                    <button
+                      className={`${t.btn} ${t.btnGhost}`}
+                      disabled={!agent.value || agent.status === 'connected'}
+                      onClick={verify}
+                    >
+                      {agent.status === 'connected' ? 'Connected' : 'Verify'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
