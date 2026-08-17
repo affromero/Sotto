@@ -51,14 +51,16 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip static files and SEO routes. Icon assets must stay reachable without
-  // the gate cookie or browsers fall back to another domain's favicon.
+  // the gate cookie or browsers fall back to another domain's favicon, and
+  // /avatars must too: next/image fetches them server-side without cookies.
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.startsWith('/icon') ||
     pathname.startsWith('/apple-icon') ||
     pathname.startsWith('/apple-touch-icon') ||
-    pathname.startsWith('/fonts')
+    pathname.startsWith('/fonts') ||
+    pathname.startsWith('/avatars')
   ) {
     return NextResponse.next();
   }

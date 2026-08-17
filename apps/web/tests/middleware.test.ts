@@ -161,6 +161,7 @@ describe('Proxy', () => {
       '/apple-icon.png',
       '/apple-touch-icon.png',
       '/favicon.ico',
+      '/avatars/capybara.png',
     ];
     for (const path of exemptPaths) {
       it(`never gate-redirects ${path}`, async () => {
