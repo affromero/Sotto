@@ -1,0 +1,116 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.globeWrap {
+  position: relative;
+  width: min(340px, 82vw);
+}
+
+.globe {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.globe:active {
+  cursor: grabbing;
+}
+
+.ocean {
+  fill: var(--color-primary-lighter);
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.graticule {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 0.4;
+  opacity: 0.6;
+}
+
+.land {
+  fill: var(--color-primary-light);
+  stroke: var(--color-primary);
+  stroke-width: 0.5;
+}
+
+.dot {
+  fill: var(--color-primary);
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.dot:hover {
+  opacity: 1;
+  fill: var(--color-primary-hover);
+}
+
+.dotSelected {
+  fill: var(--color-error);
+  stroke: var(--color-surface);
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+
+.dotLabel {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--color-text-primary);
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+
+.spinButtons {
+  position: absolute;
+  inset: 50% 0 auto 0;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.spin {
+  pointer-events: auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.spin:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.selectLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  width: min(340px, 82vw);
+}
+
+.select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
