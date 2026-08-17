@@ -255,6 +255,32 @@ describe('POST /api/v1/onboarding/name', () => {
     });
   });
 
+  it('saves a valid IANA timezone alongside the name', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockUserUpdate.mockResolvedValue({ id: 'user-1', name: 'Alice' });
+
+    const response = await setName(
+      createNameRequest({ name: 'Alice', timezone: 'America/Mexico_City' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { name: 'Alice', timezone: 'America/Mexico_City' },
+    });
+  });
+
+  it('returns 400 for an invalid timezone', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await setName(createNameRequest({ name: 'Alice', timezone: 'Not/AZone' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('Unknown timezone');
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for an unknown avatar slug', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 

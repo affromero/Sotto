@@ -1,3 +1,6 @@
+/* Styled with the welcome wizard's local theme tokens (theme.module.css),
+   falling back to the app-wide palette outside the wizard. */
+
 .root {
   display: flex;
   flex-direction: column;
@@ -24,38 +27,40 @@
 }
 
 .ocean {
-  fill: var(--color-primary-lighter);
-  stroke: var(--color-border);
+  fill: var(--accent-soft, var(--color-primary-lighter));
+  stroke: var(--line, var(--color-border));
   stroke-width: 1;
 }
 
 .graticule {
   fill: none;
-  stroke: var(--color-border);
+  stroke: var(--line, var(--color-border));
   stroke-width: 0.4;
-  opacity: 0.6;
 }
 
 .land {
-  fill: var(--color-primary-light);
-  stroke: var(--color-primary);
+  fill: color-mix(
+    in oklab,
+    var(--accent, var(--color-primary)) 22%,
+    var(--card, var(--color-surface))
+  );
+  stroke: var(--accent-line, var(--color-primary));
   stroke-width: 0.5;
 }
 
 .dot {
-  fill: var(--color-primary);
+  fill: var(--accent, var(--color-primary));
   opacity: 0.75;
   cursor: pointer;
 }
 
 .dot:hover {
   opacity: 1;
-  fill: var(--color-primary-hover);
 }
 
 .dotSelected {
-  fill: var(--color-error);
-  stroke: var(--color-surface);
+  fill: var(--bad, var(--color-error));
+  stroke: var(--card, var(--color-surface));
   stroke-width: 1.5;
   cursor: pointer;
 }
@@ -63,9 +68,9 @@
 .dotLabel {
   font-size: 12px;
   font-weight: 600;
-  fill: var(--color-text-primary);
+  fill: var(--ink, var(--color-text-primary));
   paint-order: stroke;
-  stroke: var(--color-surface);
+  stroke: var(--card, var(--color-surface));
   stroke-width: 3px;
   pointer-events: none;
 }
@@ -84,17 +89,17 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  border: 1px solid var(--line-strong, var(--color-border));
+  background: var(--card, var(--color-surface));
+  color: var(--ink-soft, var(--color-text-secondary));
   font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
 }
 
 .spin:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
+  color: var(--ink, var(--color-text-primary));
+  border-color: var(--accent, var(--color-primary));
 }
 
 .selectLabel {
@@ -102,15 +107,15 @@
   flex-direction: column;
   gap: 6px;
   font-size: 0.85rem;
-  color: var(--color-text-secondary);
+  color: var(--ink-soft, var(--color-text-secondary));
   width: min(340px, 82vw);
 }
 
 .select {
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  border: 1px solid var(--line-strong, var(--color-border));
+  background: var(--card, var(--color-surface));
+  color: var(--ink, var(--color-text-primary));
   font-size: 0.9rem;
 }

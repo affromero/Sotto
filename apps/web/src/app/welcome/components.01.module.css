@@ -528,6 +528,12 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.fieldHint {
+  color: var(--ink-mute);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
 .fieldLabel {
   font-family: var(--mono);
   font-size: 11px;

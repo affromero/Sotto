@@ -84,6 +84,47 @@ void COMPOSE_LOG;
 void MODULES;
 
 describe('welcome hosted-demo mode', () => {
+  it('saves the admin learner profile before continuing self-host onboarding', async () => {
+    const user = userEvent.setup();
+    const onNext = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <StepLearnerProfile
+        name="Andres"
+        avatarSlug="capybara"
+        timezone="America/Bogota"
+        demoMode={false}
+        setName={vi.fn()}
+        setAvatarSlug={vi.fn()}
+        setTimezone={vi.fn()}
+        onNext={onNext}
+        onBack={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/onboarding/name',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Andres',
+          avatarSlug: 'capybara',
+          timezone: 'America/Bogota',
+        }),
+      })
+    );
+    expect(onNext).toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(window, 'localStorage', {

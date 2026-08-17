@@ -12,7 +12,6 @@ import type { AgentState, ContextItem, VoiceState } from '@/app/welcome/WelcomeF
 import { StepAgent } from '@/app/welcome/steps/StepAgent';
 import { StepContext } from '@/app/welcome/steps/StepContext';
 import { StepContextReview } from '@/app/welcome/steps/StepContextReview';
-import { StepLearnerProfile } from '@/app/welcome/steps/StepLearnerProfile';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
 import { StepReady } from '@/app/welcome/steps/StepReady';
 import { StepVoice } from '@/app/welcome/steps/StepVoice';
@@ -332,41 +331,6 @@ describe('welcome hosted-demo mode', () => {
     expect(
       await screen.findByRole('button', { name: /Take the quick placement test/i })
     ).toBeInTheDocument();
-  });
-
-  it('saves the admin learner profile before continuing self-host onboarding', async () => {
-    const user = userEvent.setup();
-    const onNext = vi.fn();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    render(
-      <StepLearnerProfile
-        name="Andres"
-        avatarSlug="capybara"
-        demoMode={false}
-        setName={vi.fn()}
-        setAvatarSlug={vi.fn()}
-        onNext={onNext}
-        onBack={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /continue with admin profile/i }));
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/onboarding/name',
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Andres', avatarSlug: 'capybara' }),
-      })
-    );
-    expect(onNext).toHaveBeenCalled();
   });
 
   it('keeps the placement ladder to one selected rung', async () => {
