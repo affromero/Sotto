@@ -199,6 +199,9 @@
   // selected provider has a configured model that supports the selected language.
   "sttLanguageSupport": {
     "assemblyUniversal3Pro": ["en", "es", "fr", "de", "pt", "it"],
+    // Cartesia ink-2 (May 2026) is English-only; ink-whisper stays the
+    // multilingual default.
+    "inkTwo": ["en"],
     "deepgramNova2": [
       "en",
       "es",

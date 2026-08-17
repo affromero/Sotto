@@ -37,6 +37,7 @@ const {
   assemblyUniversal3Pro: LANG_ASSEMBLY_UNIVERSAL_3_PRO,
   deepgramNova2: LANG_DEEPGRAM_NOVA_2,
   gladiaSolaria3: LANG_GLADIA_SOLARIA_3,
+  inkTwo: LANG_INK_2,
 } = STT_LANGUAGE_SUPPORT_SETS;
 
 const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
@@ -120,14 +121,17 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     platformCostPerMinute: 0.0025,
   },
 
-  // Cartesia Ink — batch /stt with the ink-whisper family (word timestamps, 99+
-  // languages). The Cartesia API key lives in the TTS/BYOK store (UserTtsKey).
+  // Cartesia Ink — batch /stt. ink-whisper stays the multilingual default
+  // (word timestamps, 99+ languages); ink-2 (May 2026) is faster and more
+  // accurate but English-only, so language fit routes non-English courses back
+  // to ink-whisper. The Cartesia API key lives in the TTS/BYOK store (UserTtsKey).
   cartesia: {
     id: 'cartesia',
     displayName: 'Cartesia (Ink)',
     defaultModel: 'ink-whisper',
     models: [
       { id: 'ink-whisper', displayName: 'Ink Whisper', tier: 'best', supportedLanguages: LANG_ALL },
+      { id: 'ink-2', displayName: 'Ink-2 (English)', tier: 'max', supportedLanguages: LANG_INK_2 },
     ],
     platformCostPerMinute: 0.0,
   },
