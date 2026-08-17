@@ -312,4 +312,122 @@ describe('welcome hosted-demo mode', () => {
       });
     });
   });
+
+  it('persists the owner CLI agent selection when leaving the connect-agent step', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/onboarding/config')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            selfHosted: true,
+            isOwner: true,
+            onboardingResumeKey: 'current-owner',
+            agentStatuses: {
+              'claude-code': { readiness: 'ready', version: 'claude 2.0.0', detail: null },
+              codex: { readiness: 'not_installed', version: null, detail: null },
+            },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.localStorage.setItem(
+      'sotto.onboarding.v1',
+      JSON.stringify({
+        onboardingResumeKey: 'current-owner',
+        step: 4,
+        baseLang: 'en',
+        language: 'de',
+        agent: {
+          provider: 'claude',
+          method: 'cli',
+          value: '',
+          model: 'claude-code:opus',
+          status: 'connected',
+        },
+      })
+    );
+
+    render(
+      <WelcomeFlow
+        initialConfig={{ selfHosted: true, isOwner: true, onboardingResumeKey: 'current-owner' }}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: /^Continue/i }));
+
+    // Placement's "estimate from material" resolves the AI server-side before the
+    // final StepReady save, so the selection must already be in SiteConfig.
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/admin/site-config',
+        expect.objectContaining({
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ aiProvider: 'claude-code', aiModel: 'claude-code:opus' }),
+        })
+      );
+    });
+  });
+
+  it('persists a BYOK agent key when leaving the connect-agent step', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/onboarding/config')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            selfHosted: true,
+            isOwner: false,
+            onboardingResumeKey: 'current-owner',
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.localStorage.setItem(
+      'sotto.onboarding.v1',
+      JSON.stringify({
+        onboardingResumeKey: 'current-owner',
+        step: 4,
+        baseLang: 'en',
+        language: 'de',
+        agent: {
+          provider: 'claude',
+          method: 'key',
+          value: 'sk-ant-test',
+          model: 'claude-sonnet-5',
+          status: 'connected',
+        },
+      })
+    );
+
+    render(
+      <WelcomeFlow
+        initialConfig={{ selfHosted: true, isOwner: false, onboardingResumeKey: 'current-owner' }}
+      />
+    );
+
+    await user.click(await screen.findByRole('button', { name: /^Continue/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/settings/ai-keys',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'anthropic', apiKey: 'sk-ant-test' }),
+        })
+      );
+    });
+    // A learner without owner rights never touches server infra.
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/admin/site-config', expect.anything());
+  });
 });
