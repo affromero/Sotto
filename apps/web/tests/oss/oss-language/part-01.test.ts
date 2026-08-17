@@ -246,7 +246,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
     const envRunner = readFileSync(resolve(repoRoot, 'scripts/run-with-env.sh'), 'utf8');
     const agentDocs = readFileSync(resolve(repoRoot, 'AGENTS.md'), 'utf8');
-    const rootClaude = readFileSync(resolve(repoRoot, 'CLAUDE.md'), 'utf8');
     const commandSources = [packageJson, envRunner].join('\n');
 
     expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
@@ -262,9 +261,9 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(commandSources).not.toContain('NEXTAUTH_SECRET');
     expect(agentDocs).not.toContain('uses Doppler, syncs prod DB by default');
     expect(agentDocs).not.toContain('Secrets are managed via Doppler');
-    expect(rootClaude).not.toContain('Compatibility scripts for the old hosted setup');
-    expect(rootClaude).not.toContain('Hosted deployments may still use Doppler');
-    expect(rootClaude).toContain(
+    expect(agentDocs).not.toContain('Compatibility scripts for the old hosted setup');
+    expect(agentDocs).not.toContain('Hosted deployments may still use Doppler');
+    expect(agentDocs).toContain(
       'Critical local variables: `DATABASE_URL`, `REDIS_URL`, `BYOK_ENCRYPTION_KEY`'
     );
   });
@@ -348,7 +347,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
       'apps/web/src/components/layout/Footer.tsx',
-      'apps/web/src/workers/CLAUDE.md',
+      'apps/web/src/workers/AGENTS.md',
       'packages/shared/src/brand.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -392,11 +391,11 @@ describe('open-source language-learning OSS surfaces', () => {
     const namespaceFiles = [
       'apps/web/package.json',
       'apps/web/next.config.js',
-      'apps/web/src/lib/CLAUDE.md',
+      'apps/web/src/lib/AGENTS.md',
       'apps/web/src/lib/reference-verification/ai-layer.ts',
       'apps/web/src/lib/reference-verification/grounding.ts',
       'apps/web/src/lib/reference-verification/pipeline.ts',
-      'CLAUDE.md',
+      'AGENTS.md',
       'package-lock.json',
       'packages/groundcheck/package.json',
       'packages/groundcheck/package-lock.json',
@@ -424,9 +423,9 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps security and operations guidance self-host neutral', () => {
     const releaseHygieneSources = [
       'SECURITY.md',
-      'CLAUDE.md',
+      'AGENTS.md',
       'docs/04-local-development.md',
-      'apps/web/src/lib/CLAUDE.md',
+      'apps/web/src/lib/AGENTS.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -565,7 +564,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const releaseDocs = ['docs/02-hosting-infrastructure.md', 'docs/03-self-host-deployment.md']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const releaseIndexSources = ['docs/CLAUDE.md']
+    const releaseIndexSources = ['docs/AGENTS.md']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -593,7 +592,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/next.config.js',
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
-      'apps/web/src/lib/CLAUDE.md',
+      'apps/web/src/lib/AGENTS.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -661,7 +660,7 @@ describe('open-source language-learning OSS surfaces', () => {
       .concat([
         readFileSync(resolve(repoRoot, 'packages/shared/src/types/enums.ts'), 'utf8'),
         readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'),
-        readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8'),
+        readFileSync(resolve(repoRoot, 'apps/web/prisma/AGENTS.md'), 'utf8'),
       ])
       .join('\n');
     const removedTests = [
@@ -687,7 +686,7 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps automation harnesses private-first', () => {
     const harnessSources = [
       'apps/web/src/app/welcome/WelcomeFlow.tsx',
-      'apps/web/src/lib/CLAUDE.md',
+      'apps/web/src/lib/AGENTS.md',
       'apps/web/src/lib/auth-guards.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -751,7 +750,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const docsDir = resolve(repoRoot, 'docs');
     const releaseDocPaths = [
       'README.md',
-      'CLAUDE.md',
+      'AGENTS.md',
       ...readdirSync(docsDir)
         .filter((name) => name.endsWith('.md'))
         .map((name) => `docs/${name}`),

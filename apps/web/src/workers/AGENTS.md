@@ -71,4 +71,4 @@ When a episode fails, `POST /api/v1/episodes/[id]/generate` uses `determineResum
 3. Add queue instance to `src/lib/queue.ts`
 4. Register in `src/workers/index.ts`
 5. If the worker is **dev-only or experimental**, add it to `EXPERIMENTAL_WORKERS` in `worker-routing.ts` — otherwise it runs by default under the `core` preset
-6. Update this CLAUDE.md
+6. Update this AGENTS.md

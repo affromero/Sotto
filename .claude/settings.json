@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"$CLAUDE_PROJECT_DIR/AGENTS.md\"; echo; echo 'Subdirectories carry their own AGENTS.md files (see the index above); read the closest one before editing files there.'"
+          }
+        ]
+      }
+    ]
+  }
+}

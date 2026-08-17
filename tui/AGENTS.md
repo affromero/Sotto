@@ -1,4 +1,4 @@
-# CLAUDE.md - `sotto` terminal client (`tui/`)
+# AGENTS.md - `sotto` terminal client (`tui/`)
 
 > Premium headless Rust + ratatui client for the Sotto platform. Standalone crate **outside** the npm workspaces. Talks to a Sotto server's `/api/v1` over HTTP only — it holds no business logic, only presentation, audio, and the typed client. Crate is `sotto-tui` on crates.io; the installed binary is `sotto`.
 

@@ -32,7 +32,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const byokSources = [
       'src/app/api/v1/settings/byok/route.ts',
       'src/lib/validations.ts',
-      'src/lib/CLAUDE.md',
+      'src/lib/AGENTS.md',
     ]
       .map(readSource)
       .join('\n');
@@ -79,7 +79,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const seedSources = ['apps/web/prisma/seed.ts', 'apps/web/prisma/seed-demo.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const prismaGuideSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8');
+    const prismaGuideSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/AGENTS.md'), 'utf8');
     const databaseSources = [schemaSource, seedSources, prismaGuideSource].join('\n');
 
     expect(databaseSources).not.toContain('model Follow');
@@ -105,7 +105,7 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps episode summary contracts free of social payload fields', () => {
     const summaryContractSources = [
       'src/types/episode.ts',
-      'src/types/CLAUDE.md',
+      'src/types/AGENTS.md',
       'src/lib/episode-select.ts',
       'src/lib/episode-data.ts',
       'src/app/api/v1/saved/route.ts',
@@ -172,7 +172,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/v1/users/me/export/route.ts',
       'src/lib/notification-utils.ts',
       'src/components/notifications/NotificationList.tsx',
-      'src/components/CLAUDE.md',
+      'src/components/AGENTS.md',
     ]
       .map(readSource)
       .join('\n');
@@ -270,10 +270,10 @@ describe('open-source language-learning OSS surfaces', () => {
     const publicProfileSources = [
       'src/app/profile/page.tsx',
       'src/lib/urls.ts',
-      'src/lib/CLAUDE.md',
+      'src/lib/AGENTS.md',
       'src/app/sitemap.ts',
-      'src/app/CLAUDE.md',
-      'src/components/CLAUDE.md',
+      'src/app/AGENTS.md',
+      'src/components/AGENTS.md',
     ]
       .map(readSource)
       .join('\n');
