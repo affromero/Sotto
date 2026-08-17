@@ -632,7 +632,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  background: var(--well);
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r);
   color: var(--ink-soft);
@@ -686,29 +686,30 @@
 .voiceChipNote {
   color: var(--ink-mute);
   font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.04em;
-  line-height: 1.25;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
 }
+/* supported languages are the norm — render the note as quiet text, not a badge */
 .vcLang {
   width: fit-content;
-  margin-top: 4px;
-  border: 1px solid var(--accent-line);
-  border-radius: 999px;
-  padding: 2px 7px;
-  color: var(--accent);
-  background: var(--paper);
+  margin-top: 3px;
+  color: var(--ink-mute);
   font-family: var(--mono);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
   line-height: 1;
   text-transform: uppercase;
 }
+/* the unsupported case is the one that must be seen — it keeps the badge */
 .vcLangBad {
-  color: #9b2c2c;
-  border-color: rgba(155, 44, 44, 0.28);
-  background: rgba(155, 44, 44, 0.08);
+  margin-top: 4px;
+  border: 1px solid var(--bad-line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--bad);
+  background: var(--bad-soft);
+  font-weight: 700;
 }
 .voiceInlineLink,
 .vkActionLink {
@@ -771,6 +772,9 @@
   display: flex;
   color: var(--accent);
 }
+.voiceChoice:not(.voiceChoiceSel) .vcSet {
+  color: var(--ink-mute);
+}
 .voiceNote {
   display: flex;
   align-items: center;
@@ -790,7 +794,7 @@
   align-items: flex-start;
   gap: 8px;
   margin-top: 11px;
-  color: var(--ink-mute);
+  color: var(--ink-soft);
   font-size: 12.5px;
   line-height: 1.4;
 }
@@ -801,16 +805,16 @@
 }
 .voiceReasonWarn,
 .compatWarning {
-  color: #7f1d1d;
+  color: var(--bad);
 }
 .voiceReasonWarn svg,
 .compatWarning svg {
-  color: #9b2c2c;
+  color: var(--bad);
 }
 .compatWarning {
-  border: 1px solid rgba(155, 44, 44, 0.28);
+  border: 1px solid var(--bad-line);
   border-radius: var(--r);
-  background: rgba(155, 44, 44, 0.07);
+  background: var(--bad-soft);
   padding: 11px 12px;
 }
 /* voice key entry */
@@ -843,7 +847,7 @@
   font-family: var(--mono);
   font-size: 13px;
   color: var(--ink);
-  background: var(--well);
+  background: var(--card);
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
   padding: 11px 13px;

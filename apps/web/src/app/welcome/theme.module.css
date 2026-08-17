@@ -26,6 +26,10 @@
   --ink-mute: #8a8f9c;
   --line: rgba(30, 33, 40, 0.12);
   --line-strong: rgba(30, 33, 40, 0.24);
+  --card: #ffffff;
+  --bad: #9b2c2c;
+  --bad-line: rgba(155, 44, 44, 0.28);
+  --bad-soft: rgba(155, 44, 44, 0.08);
   --voice-bg: #1c1f27;
   --voice-bg-2: #262a35;
   --voice-fg: #ecedf2;
@@ -65,6 +69,7 @@
   --ink-mute: #9a8e7a;
   --line: rgba(34, 28, 21, 0.12);
   --line-strong: rgba(34, 28, 21, 0.24);
+  --card: #faf5ea;
 }
 
 /* dark mode — terminal palette, driven by the global ThemeProvider toggle */
@@ -82,6 +87,10 @@
   --ink-mute: #6e6857;
   --line: rgba(233, 227, 211, 0.13);
   --line-strong: rgba(233, 227, 211, 0.26);
+  --card: #1b1d17;
+  --bad: #e2938a;
+  --bad-line: rgba(226, 147, 138, 0.35);
+  --bad-soft: rgba(226, 147, 138, 0.1);
   --voice-bg: #0b0c09;
   --voice-bg-2: #131510;
   --voice-fg: #e9e3d3;
