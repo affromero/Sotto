@@ -20,6 +20,7 @@ import { StepContextReview } from './steps/StepContextReview';
 import { StepCompose } from './steps/StepCompose';
 import { StepReady } from './steps/StepReady';
 import { OnboardingThemeSwitch } from './OnboardingThemeSwitch';
+import { resolveAi } from './providerMap';
 import t from './theme.module.css';
 import type { AgentStatus } from '@/lib/agent-availability';
 
@@ -610,6 +611,32 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setUnderstood(new Set([lvl]));
   }
 
+  // Persist the AI slice the moment the agent step is completed, not only at the
+  // final StepReady save: placement's "estimate from material" (step 8) resolves
+  // the provider server-side, so an unsaved selection means "No AI provider
+  // available" mid-wizard. Best-effort and idempotent — StepReady saves it again.
+  function persistAgentSelection() {
+    if (!config.selfHosted) return;
+    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
+    if (ai.keyPost) {
+      const { endpoint, provider, apiKey, extra } = ai.keyPost;
+      void fetch(`/api/v1/settings/${endpoint}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey, ...(extra ?? {}) }),
+      }).catch(() => {});
+    }
+    if (config.isOwner && Object.keys(ai.infra).length > 0) {
+      void fetch('/api/v1/admin/site-config', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ai.infra),
+      }).catch(() => {});
+    }
+  }
+
   function addContextItems(items: Array<Omit<ContextItem, 'id'>>) {
     if (!items.length) return;
     const stamp = Date.now();
@@ -667,7 +694,10 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           agentStatuses={config.agentStatuses ?? undefined}
           aiModels={modelMeta.ai}
           setAgent={(updater) => setAgent((prev) => updater(prev))}
-          onNext={() => go(5)}
+          onNext={() => {
+            persistAgentSelection();
+            go(5);
+          }}
           onBack={() => go(3)}
         />
       );
