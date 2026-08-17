@@ -21,6 +21,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - run: npm ci
         working-directory: apps/desktop
+      # Icons are gitignored (generated from the orb SVG); tauri::generate_context!
+      # fails without them.
+      - run: npm run icon
+        working-directory: apps/desktop
       - run: cargo check --locked
         working-directory: apps/desktop/src-tauri
 
