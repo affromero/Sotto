@@ -80,6 +80,7 @@ function VoicePicker({
   modelValue,
   onModel,
 }: VoicePickerProps) {
+  const [keyOverrides, setKeyOverrides] = useState<Record<string, boolean>>({});
   const sel = providers.find((p) => p.id === value) ?? providers[0];
   const languageCode = normalizeSottoLanguageCode(language);
   const languageLabel = languageCode ? displayLanguageName(languageCode) : null;
@@ -91,6 +92,8 @@ function VoicePicker({
     : 'Choose a course language first; Sotto checks model-language fit before any provider call.';
   const k = keys[sel.id] ?? '';
   const bu = baseUrls[sel.id] ?? '';
+  const envKeyDetected = envDetected.includes(sel.id);
+  const showDetectedKey = envKeyDetected && !k.trim() && !keyOverrides[sel.id];
   const cartesiaMonthlyLimit = keys[CARTESIA_MONTHLY_LIMIT_ID]?.trim() ?? '';
   const cartesiaUsagePlan = keys[CARTESIA_USAGE_PLAN_ID]?.trim() ?? '';
   const cartesiaPlanSelectValue =
@@ -217,29 +220,45 @@ function VoicePicker({
             <span className={c.vkLabel}>
               <Glyph name="key" size={13} /> {sel.name} key
             </span>
-            <input
-              className={c.vkInput}
-              type="password"
-              placeholder={
-                envDetected.includes(sel.id)
-                  ? 'detected on the server · paste a key only to override'
-                  : sel.keyHint
-              }
-              value={k}
-              onChange={(e) => onKey(sel.id, e.target.value)}
-              aria-label={`${sel.name} API key`}
-            />
-            {sel.apiUrl ? (
-              <a
-                className={c.vkActionLink}
-                href={sel.apiUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={selectedLinkAria}
-              >
-                {selectedLinkLabel}
-              </a>
-            ) : null}
+            {showDetectedKey ? (
+              <>
+                <span className={c.vkDetected}>
+                  <Glyph name="check" size={13} />
+                  Detected from the server environment
+                </span>
+                <button
+                  type="button"
+                  className={c.vkActionLink}
+                  onClick={() => setKeyOverrides((s) => ({ ...s, [sel.id]: true }))}
+                  aria-label={`Override the detected ${sel.name} API key`}
+                >
+                  Override
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  className={c.vkInput}
+                  type="password"
+                  placeholder={sel.keyHint}
+                  value={k}
+                  onChange={(e) => onKey(sel.id, e.target.value)}
+                  aria-label={`${sel.name} API key`}
+                  autoFocus={envKeyDetected && Boolean(keyOverrides[sel.id])}
+                />
+                {sel.apiUrl ? (
+                  <a
+                    className={c.vkActionLink}
+                    href={sel.apiUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={selectedLinkAria}
+                  >
+                    {selectedLinkLabel}
+                  </a>
+                ) : null}
+              </>
+            )}
           </div>
           {modelOptions.length > 0 && (
             <div className={c.vkRow}>
@@ -337,9 +356,11 @@ function VoicePicker({
           <div className={c.vkNote}>
             {k.trim()
               ? `Saved to your config · ${sel.note} · edit anytime in admin providers`
-              : envDetected.includes(sel.id)
+              : showDetectedKey
                 ? `Already configured on the server (env) · ${sel.note} · nothing to paste`
-                : `${sel.note} · paste now or add it later in admin providers`}
+                : envKeyDetected
+                  ? `Paste a key to replace the server one, or leave blank to keep it · ${sel.note}`
+                  : `${sel.note} · paste now or add it later in admin providers`}
           </div>
         </div>
       )}
