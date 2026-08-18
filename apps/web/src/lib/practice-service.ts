@@ -530,40 +530,44 @@ async function startFull(
     uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)])
   );
 
-  const [grammarItems, readingItems, listening, speakingComposed, writingComposed] =
-    await Promise.all([
-      buildSectionMcItems(course, 'GRAMMAR', seed, `${seedToken}-grammar`, note, 'g'),
-      buildSectionMcItems(course, 'READING', seed, `${seedToken}-reading`, note, 'r'),
-      composeListeningContent({
-        userId: course.userId,
-        courseId: course.id,
-        level: course.currentLevel,
-        nativeLang: course.nativeLang,
-        targetLang: course.targetLang,
-        objective: seed.objective,
-        mustIncludeVocab: seed.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
-        note,
-      }),
-      composeSpeakingPrompts({
-        userId: course.userId,
-        level: course.currentLevel,
-        nativeLang: course.nativeLang,
-        targetLang: course.targetLang,
-        objective: seed.objective,
-        targetVocab: seed.targetVocab,
-        refId: seedToken,
-        note,
-      }),
-      composeWritingPrompts({
-        userId: course.userId,
-        level: course.currentLevel,
-        nativeLang: course.nativeLang,
-        targetLang: course.targetLang,
-        objective: seed.objective,
-        targetVocab: seed.targetVocab,
-        note,
-      }),
-    ]);
+  // Listening (which includes reference verification and can fail the whole
+  // build) runs BEFORE the speaking prompts: speaking is the only section that
+  // spends TTS credits up front, so it must not start until verification has
+  // passed. The LLM-only sections stay parallel with listening.
+  const [grammarItems, readingItems, listening, writingComposed] = await Promise.all([
+    buildSectionMcItems(course, 'GRAMMAR', seed, `${seedToken}-grammar`, note, 'g'),
+    buildSectionMcItems(course, 'READING', seed, `${seedToken}-reading`, note, 'r'),
+    composeListeningContent({
+      userId: course.userId,
+      courseId: course.id,
+      level: course.currentLevel,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: seed.objective,
+      mustIncludeVocab: seed.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
+      note,
+    }),
+    composeWritingPrompts({
+      userId: course.userId,
+      level: course.currentLevel,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: seed.objective,
+      targetVocab: seed.targetVocab,
+      note,
+    }),
+  ]);
+
+  const speakingComposed = await composeSpeakingPrompts({
+    userId: course.userId,
+    level: course.currentLevel,
+    nativeLang: course.nativeLang,
+    targetLang: course.targetLang,
+    objective: seed.objective,
+    targetVocab: seed.targetVocab,
+    refId: seedToken,
+    note,
+  });
 
   const listeningItems: PracticeMcItem[] = listening.comprehensionQuestions.map((q, i) => ({
     id: `l${i}`,
