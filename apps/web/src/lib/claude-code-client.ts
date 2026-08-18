@@ -25,18 +25,10 @@ export { getClaudeSshHost, isClaudeAvailable };
 export { serializeMessages } from './agent-messages';
 
 /**
- * Prepare a writable HOME directory for the claude subprocess.
- *
- * The claude CLI needs a writable ~/.claude directory to store session data
- * (todos, debug logs, history). Volume-mounted host credentials are often
- * root-owned and read-only, which causes permission errors at runtime.
- *
- * Strategy (in priority order):
- *  1. CLAUDE_CODE_CREDENTIALS_JSON env var → write to /tmp/claude-runtime/.claude/
- *  2. CLAUDE_HOME env var → use as-is (legacy volume mount)
- *  3. Fall back to process HOME
- *
- * Result is cached — the writable dir persists for the container lifetime.
+ * The shared credentials file that seeds every per-invocation config dir and
+ * receives refreshed tokens back. Sourced from CLAUDE_CODE_CREDENTIALS_JSON
+ * (written once to writable /tmp) or the CLAUDE_HOME volume mount. Cached for
+ * the container lifetime.
  */
 let _sharedCredentialsPath: string | null | undefined = undefined;
 function sharedCredentialsPath(): string | null {
