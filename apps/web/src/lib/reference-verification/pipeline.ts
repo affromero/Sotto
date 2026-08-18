@@ -95,10 +95,17 @@ export async function runReferenceVerification(
   const layerTasks = acceptedRefs.map((ref) => async () => {
     const domain = domainMap.get(ref.id)!;
 
-    // Run applicable checks in parallel — each is independent with its own timeout
-    const checkPromises: Promise<VerificationCheck>[] = [verifyUrl(ref)];
+    // Run applicable checks in parallel — each is independent with its own
+    // timeout. A layer only runs when the reference carries its input: an
+    // absent URL or DOI is missing evidence (Bayesian-neutral), not proof of
+    // fabrication, so the layer is skipped rather than scored as failed.
+    const checkPromises: Promise<VerificationCheck>[] = [];
 
-    if (domain === 'ACADEMIC') {
+    if (ref.url?.trim()) {
+      checkPromises.push(verifyUrl(ref));
+    }
+
+    if (domain === 'ACADEMIC' && ref.doi?.trim()) {
       checkPromises.push(verifyDoi(ref));
     }
 
@@ -234,10 +241,12 @@ export async function runReferenceVerification(
 
     let verdict: VerificationVerdict;
 
-    const claimContext = claimContexts.get(ref.number);
+    // The AI check already sees the extracted claims (or "No claim sentences
+    // extracted"); a reference the script never cites inline has no claims to
+    // contradict, so its verdict rests on the AI source-existence judgment
+    // rather than auto-failing on the empty claim list.
     const aiClaimCheck = checks.find((check) => check.layer === 'ai');
-    const claimsSupported =
-      (claimContext?.sentences.length ?? 0) > 0 && aiClaimCheck?.passed === true;
+    const claimsSupported = aiClaimCheck?.passed === true;
 
     if (rawVerdict === 'VERIFIED' && claimsSupported) {
       verdict = { status: 'VERIFIED', confidence: posterior };
