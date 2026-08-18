@@ -15,10 +15,13 @@ function providerDisplayName(provider: AgentUsageProvider): string {
 }
 
 function shouldShowProvider(provider: AgentUsageProvider): boolean {
+  // action_required is shown for every category: hiding an agent's auth
+  // problem here left e.g. an expired Claude OAuth invisible while the
+  // selected provider silently failed.
   return (
     provider.limitReached ||
     provider.status === 'ready' ||
-    (provider.status === 'action_required' && provider.category === 'audio') ||
+    provider.status === 'action_required' ||
     provider.status === 'unavailable' ||
     provider.windows.length > 0 ||
     provider.credits !== null
