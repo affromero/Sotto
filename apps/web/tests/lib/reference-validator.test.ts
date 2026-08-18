@@ -137,14 +137,14 @@ describe('reference-validator', () => {
       expect(result.detail).toContain('URL check failed');
     });
 
-    it('handles network errors gracefully', async () => {
+    it('scores network errors as neutral evidence', async () => {
       const ref = createMockReference();
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       const result = await verifyUrl(ref);
 
       expect(result.passed).toBe(false);
-      expect(result.confidence).toBe(0);
+      expect(result.confidence).toBe(0.5);
       expect(result.detail).toContain('Network error');
     });
 
@@ -221,7 +221,7 @@ describe('reference-validator', () => {
       );
     });
 
-    it('returns passed=false when DOI not found (404)', async () => {
+    it('returns passed=false when neither CrossRef nor DataCite know the DOI', async () => {
       const ref = createMockReference({ doi: '10.9999/notfound' });
 
       mockFetch.mockResolvedValue({
@@ -233,7 +233,67 @@ describe('reference-validator', () => {
 
       expect(result.passed).toBe(false);
       expect(result.confidence).toBe(0);
-      expect(result.detail).toContain('404');
+      expect(result.detail).toContain('CrossRef 404');
+      expect(result.detail).toContain('DataCite 404');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('verifies a DataCite-registered DOI CrossRef does not know', async () => {
+      const ref = createMockReference({
+        title: 'Propädeutische Grammatik',
+        doi: '10.14618/programm',
+      });
+
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 }).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            attributes: {
+              titles: [{ title: 'Propädeutische Grammatik' }],
+              creators: [{ name: 'Leibniz-Institut für Deutsche Sprache' }],
+              publicationYear: 2019,
+              publisher: 'IDS Mannheim',
+            },
+          },
+        }),
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(true);
+      expect(result.confidence).toBe(0.9);
+      expect(result.detail).toContain('DataCite');
+      expect(result.replacement?.title).toBe('Propädeutische Grammatik');
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api.datacite.org/dois/10.14618%2Fprogramm',
+        expect.any(Object)
+      );
+    });
+
+    it('fails a DataCite DOI whose title does not match', async () => {
+      const ref = createMockReference({
+        title: 'Completely Different Subject',
+        doi: '10.14618/other',
+      });
+
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 }).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            attributes: {
+              titles: [{ title: 'Propädeutische Grammatik' }],
+              creators: [],
+              publicationYear: 2019,
+            },
+          },
+        }),
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('title mismatch');
     });
 
     it('returns passed=false when no DOI provided', async () => {
@@ -273,7 +333,7 @@ describe('reference-validator', () => {
       expect(result.replacement?.title).toBe('Climate Change Studies');
     });
 
-    it('handles CrossRef timeout', async () => {
+    it('scores registrar timeouts as neutral evidence', async () => {
       const ref = createMockReference({ doi: '10.1234/timeout' });
 
       mockFetch.mockImplementation(() => {
@@ -285,7 +345,8 @@ describe('reference-validator', () => {
       const result = await verifyDoi(ref);
 
       expect(result.passed).toBe(false);
-      expect(result.detail).toContain('CrossRef check failed');
+      expect(result.confidence).toBe(0.5);
+      expect(result.detail).toContain('DOI check failed');
     });
 
     it('uses CrossRef API with proper headers', async () => {
@@ -335,6 +396,7 @@ describe('reference-validator', () => {
       const result = await verifyDoi(ref);
 
       expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0.5);
       expect(result.detail).toContain('DNS failure');
     });
   });
@@ -453,6 +515,7 @@ describe('reference-validator', () => {
       const result = await searchTitle(ref);
 
       expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0.5);
       expect(result.detail).toContain('503');
     });
 

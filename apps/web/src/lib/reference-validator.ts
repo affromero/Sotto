@@ -178,7 +178,9 @@ export async function verifyUrl(ref: ReferenceInput): Promise<VerificationCheck>
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return { layer: 'url', passed: false, confidence: 0, detail: `URL check failed: ${message}` };
+    // Network failure/timeout is missing evidence, not evidence of fabrication:
+    // confidence 0.5 is Bayesian-neutral, while 0 would score like a dead URL.
+    return { layer: 'url', passed: false, confidence: 0.5, detail: `URL check failed: ${message}` };
   }
 }
 
@@ -207,62 +209,120 @@ function titleSimilarity(a: string, b: string): number {
   return union.size > 0 ? intersection.size / union.size : 0;
 }
 
+function registrarUserAgent(): string {
+  const contactEmail = process.env.OPENALEX_EMAIL?.trim();
+  return contactEmail ? `Sotto/1.0 (mailto:${contactEmail})` : 'Sotto/1.0 (reference-validator)';
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': registrarUserAgent() },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck> {
   if (!ref.doi) {
     return { layer: 'doi', passed: false, confidence: 0, detail: 'No DOI provided' };
   }
 
+  // Clean DOI: strip "https://doi.org/" prefix if present
+  const cleanDoi = ref.doi.replace(/^https?:\/\/doi\.org\//, '');
+
   try {
-    // Clean DOI: strip "https://doi.org/" prefix if present
-    const cleanDoi = ref.doi.replace(/^https?:\/\/doi\.org\//, '');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const response = await fetchWithTimeout(
+      `https://api.crossref.org/works/${encodeURIComponent(cleanDoi)}`,
+      8000
+    );
 
-    const contactEmail = process.env.OPENALEX_EMAIL?.trim();
-    const userAgent = contactEmail
-      ? `Sotto/1.0 (mailto:${contactEmail})`
-      : 'Sotto/1.0 (reference-validator)';
-    const response = await fetch(`https://api.crossref.org/works/${encodeURIComponent(cleanDoi)}`, {
-      signal: controller.signal,
-      headers: { 'User-Agent': userAgent },
-    });
+    if (response.ok) {
+      const data = await response.json();
+      const work = data.message;
 
-    clearTimeout(timeout);
+      const crossRefTitle = Array.isArray(work.title) ? work.title[0] : work.title || '';
+      const similarity = titleSimilarity(ref.title, crossRefTitle);
 
-    if (!response.ok) {
+      const crossRefAuthors: string[] = (work.author || []).map(
+        (a: { given?: string; family?: string }) => [a.given, a.family].filter(Boolean).join(' ')
+      );
+
+      if (similarity >= 0.7) {
+        return {
+          layer: 'doi',
+          passed: true,
+          confidence: 0.95,
+          detail: `DOI verified: title similarity ${(similarity * 100).toFixed(0)}%`,
+          replacement: {
+            title: crossRefTitle,
+            authors: crossRefAuthors,
+            year: work.published?.['date-parts']?.[0]?.[0] ?? ref.year,
+            url: ref.url,
+            doi: cleanDoi,
+            publisher: work.publisher || ref.url,
+          },
+        };
+      }
+
+      return {
+        layer: 'doi',
+        passed: false,
+        confidence: 0.1,
+        detail: `DOI exists but title mismatch (similarity ${(similarity * 100).toFixed(0)}%)`,
+        replacement: {
+          title: crossRefTitle,
+          authors: crossRefAuthors,
+          year: work.published?.['date-parts']?.[0]?.[0] ?? null,
+          url: `https://doi.org/${cleanDoi}`,
+          doi: cleanDoi,
+          publisher: work.publisher || null,
+        },
+      };
+    }
+
+    // CrossRef doesn't know this DOI. Many real DOIs are DataCite-registered
+    // (institutional resources like grammis, datasets, reports), so check the
+    // other major registrar — with the same title gate — before treating the
+    // DOI as fabricated.
+    const dcResponse = await fetchWithTimeout(
+      `https://api.datacite.org/dois/${encodeURIComponent(cleanDoi)}`,
+      8000
+    );
+
+    if (!dcResponse.ok) {
       return {
         layer: 'doi',
         passed: false,
         confidence: 0,
-        detail: `CrossRef returned ${response.status}`,
+        detail: `DOI not found (CrossRef ${response.status}, DataCite ${dcResponse.status})`,
       };
     }
 
-    const data = await response.json();
-    const work = data.message;
-
-    // Extract title from CrossRef
-    const crossRefTitle = Array.isArray(work.title) ? work.title[0] : work.title || '';
-    const similarity = titleSimilarity(ref.title, crossRefTitle);
-
-    // Extract authors
-    const crossRefAuthors: string[] = (work.author || []).map(
-      (a: { given?: string; family?: string }) => [a.given, a.family].filter(Boolean).join(' ')
-    );
+    const attributes = (await dcResponse.json())?.data?.attributes ?? {};
+    const dataCiteTitle: string = attributes.titles?.[0]?.title ?? '';
+    const similarity = titleSimilarity(ref.title, dataCiteTitle);
+    const dataCiteAuthors: string[] = (attributes.creators ?? [])
+      .map((c: { name?: string }) => c.name ?? '')
+      .filter(Boolean);
 
     if (similarity >= 0.7) {
       return {
         layer: 'doi',
         passed: true,
-        confidence: 0.95,
-        detail: `DOI verified: title similarity ${(similarity * 100).toFixed(0)}%`,
+        confidence: 0.9,
+        detail: `DOI verified via DataCite: title similarity ${(similarity * 100).toFixed(0)}%`,
         replacement: {
-          title: crossRefTitle,
-          authors: crossRefAuthors,
-          year: work.published?.['date-parts']?.[0]?.[0] ?? ref.year,
+          title: dataCiteTitle,
+          authors: dataCiteAuthors,
+          year: attributes.publicationYear ?? ref.year,
           url: ref.url,
           doi: cleanDoi,
-          publisher: work.publisher || ref.url,
+          publisher: attributes.publisher || ref.url,
         },
       };
     }
@@ -271,23 +331,24 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
       layer: 'doi',
       passed: false,
       confidence: 0.1,
-      detail: `DOI exists but title mismatch (similarity ${(similarity * 100).toFixed(0)}%)`,
+      detail: `DOI exists in DataCite but title mismatch (similarity ${(similarity * 100).toFixed(0)}%)`,
       replacement: {
-        title: crossRefTitle,
-        authors: crossRefAuthors,
-        year: work.published?.['date-parts']?.[0]?.[0] ?? null,
+        title: dataCiteTitle,
+        authors: dataCiteAuthors,
+        year: attributes.publicationYear ?? null,
         url: `https://doi.org/${cleanDoi}`,
         doi: cleanDoi,
-        publisher: work.publisher || null,
+        publisher: attributes.publisher || null,
       },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
+    // Registrar network failure is missing evidence, not fabrication evidence.
     return {
       layer: 'doi',
       passed: false,
-      confidence: 0,
-      detail: `CrossRef check failed: ${message}`,
+      confidence: 0.5,
+      detail: `DOI check failed: ${message}`,
     };
   }
 }
@@ -323,10 +384,12 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
     clearTimeout(timeout);
 
     if (!response.ok) {
+      // An OpenAlex error (rate limit, 400 on odd characters) says nothing
+      // about the reference itself — neutral, not negative evidence.
       return {
         layer: 'title_search',
         passed: false,
-        confidence: 0,
+        confidence: 0.5,
         detail: `OpenAlex returned ${response.status}`,
       };
     }
@@ -387,7 +450,7 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
     return {
       layer: 'title_search',
       passed: false,
-      confidence: 0,
+      confidence: 0.5,
       detail: `OpenAlex check failed: ${message}`,
     };
   }
