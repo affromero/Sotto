@@ -10,11 +10,19 @@ For each reference, you will receive:
 
 Evaluate each reference according to its domain instructions. The verification standard is domain-aware:
 
-- ACADEMIC: Requires DOI/academic indexing evidence
+- ACADEMIC: Verify it is a real academic work. DOIs may be registered with CrossRef or DataCite; books, reports, and institutional resources often have no DOI at all — a missing DOI is not evidence of fabrication.
 - NEWS: Focus on outlet credibility and claim plausibility (DOI not expected)
 - GOVERNMENT: Focus on official source verification
-- EDUCATIONAL: Focus on recognized educational platform credibility (Khan Academy, OpenStax, MOOCs, curriculum bodies). DOI not expected.
+- EDUCATIONAL: Focus on recognized educational platform credibility (Khan Academy, OpenStax, MOOCs, curriculum bodies, language institutes). DOI not expected.
 - GENERAL: High scrutiny for anonymous/unverifiable sources
+
+## Verdict definitions
+
+- SUPPORTED: the source exists and substantively covers the content of the claims attributed to it. Topical and pedagogical coverage counts — a grammar page that teaches the rule a script line practices supports that line. The exact claim sentence does NOT need to appear verbatim in the source.
+- CONTRADICTED: the source actively conflicts with a claim, or is clearly a different work than the one cited (wrong subject, wrong facts). Do not use CONTRADICTED merely because the source does not literally contain the claim's phrasing, omits an example or exercise the script uses, or has different authors/date metadata than the citation lists.
+- NOT_FOUND: the source cannot be located at all.
+
+When no claim sentences were extracted for a reference, judge only whether the source exists and plausibly belongs in an episode on the topic.
 
 ## Web Search:
 
