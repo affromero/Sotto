@@ -66,11 +66,23 @@ export async function resolveLearningAi(userId: string): Promise<ResolvedLearnin
     return { provider: aiKey.provider, model, apiKey: aiKey.apiKey };
   }
 
-  // No BYOK key — fall back to a server-configured keyless backend. The owner's
-  // DB infra config wins over env (read-through warms the sync snapshot first);
-  // both are explicit selections, never an availability-based fallback.
+  // No BYOK key — fall back to a server-configured keyless backend. The
+  // owner-selected default model (Settings / admin providers) is authoritative
+  // when it names a keyless CLI provider: without this, switching providers in
+  // Settings writes AutoModelConfig but the infra AI_PROVIDER (onboarding-era)
+  // keeps winning and the change silently does nothing. Infra config / env
+  // remain the fallback; both are explicit selections, never availability-based.
   await getServerInfra();
-  const envProvider = (infra('aiProvider', 'AI_PROVIDER') ?? '').trim();
+  const selectedKeylessProvider = await (async () => {
+    try {
+      const cfg = await getAutoModelConfig();
+      const provider = cfg.model.aiProvider;
+      return provider === 'claude-code' || provider === 'codex' ? provider : null;
+    } catch {
+      return null;
+    }
+  })();
+  const envProvider = selectedKeylessProvider ?? (infra('aiProvider', 'AI_PROVIDER') ?? '').trim();
   if (envProvider === 'claude-code') {
     if (await isSystemAiProviderDisabled('claude-code')) {
       throw new Error('Claude Code is disabled in admin provider settings.');

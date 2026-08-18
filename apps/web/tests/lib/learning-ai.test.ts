@@ -148,6 +148,23 @@ describe('resolveLearningAi', () => {
     expect(resolved.apiKey).toBeUndefined();
   });
 
+  it('honors the owner-selected keyless provider over the infra AI_PROVIDER', async () => {
+    // Regression: switching to claude-code in Settings writes AutoModelConfig,
+    // but the onboarding-era infra AI_PROVIDER=codex kept winning, so the
+    // change silently did nothing and codex was still invoked.
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', 'codex');
+    stubAutoConfig('claude-code', 'claude-code:sonnet');
+    mockGetProviderForModel.mockImplementation((id: string) =>
+      id === 'claude-code:sonnet' ? 'claude-code' : null
+    );
+    mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'sonnet' });
+
+    const resolved = await resolveLearningAi('user-1');
+
+    expect(resolved).toEqual({ provider: 'claude-code', model: 'claude-code:sonnet' });
+  });
+
   it('uses CODEX_MODEL when Codex is selected without an owner model', async () => {
     mockGetAiKey.mockResolvedValue(null);
     vi.stubEnv('AI_PROVIDER', 'codex');
