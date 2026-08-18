@@ -103,6 +103,19 @@ describe('reference-validator', () => {
       expect(result.detail).toContain('500');
     });
 
+    it('scores bot-block statuses (403/405/429) as neutral evidence', async () => {
+      for (const status of [403, 405, 429]) {
+        const ref = createMockReference();
+        mockFetch.mockResolvedValue({ ok: false, status });
+
+        const result = await verifyUrl(ref);
+
+        expect(result.passed).toBe(false);
+        expect(result.confidence).toBe(0.5);
+        expect(result.detail).toContain('bot-blocked');
+      }
+    });
+
     it('returns passed=false when no URL provided', async () => {
       const ref = createMockReference({ url: null });
 

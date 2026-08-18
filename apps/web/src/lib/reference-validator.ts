@@ -170,6 +170,18 @@ export async function verifyUrl(ref: ReferenceInput): Promise<VerificationCheck>
       };
     }
 
+    // 403/405/429 are anti-bot responses to our HEAD probe, not dead links —
+    // real pages behind such blocks exist (paywalls, OpenLearn, publishers).
+    // Neutral, not negative evidence. A 404/410 remains a hard fail.
+    if (response.status === 403 || response.status === 405 || response.status === 429) {
+      return {
+        layer: 'url',
+        passed: false,
+        confidence: 0.5,
+        detail: `URL returned ${response.status} (likely bot-blocked)`,
+      };
+    }
+
     return {
       layer: 'url',
       passed: false,
