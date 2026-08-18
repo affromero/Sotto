@@ -99,6 +99,38 @@ describe('codex-client', () => {
     expect(proc._stdin.write).toHaveBeenCalledWith('System\n\nPrompt');
   });
 
+  it('disables codex shell snapshots for exec calls', async () => {
+    const { executeCodex } = await import('@/lib/codex-client');
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+
+    const promise = executeCodex('System', 'Prompt');
+    proc.emit('close', 0);
+    await promise;
+
+    const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+    expect(args).toEqual(expect.arrayContaining(['-c', 'features.shell_snapshot=false']));
+  });
+
+  it('surfaces a usage-limit failure as an actionable switch-model message', async () => {
+    const { executeCodex } = await import('@/lib/codex-client');
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+
+    const promise = executeCodex('System', 'Prompt');
+    proc._stderr.emit(
+      'data',
+      Buffer.from(
+        'ERROR codex_core::shell_snapshot: Shell snapshot validation failed\n' +
+          'OpenAI Codex v0.144.6\n--------\n' +
+          "ERROR: You've hit your usage limit. Visit settings to purchase more credits or try again at Aug 20th, 2026 2:09 PM."
+      )
+    );
+    proc.emit('close', 1);
+
+    await expect(promise).rejects.toThrow(/usage limit.*Aug 20th, 2026 2:09 PM.*Settings/s);
+  });
+
   it('uses CODEX_MODEL and CODEX_MODEL_REASONING_EFFORT for the bare codex sentinel', async () => {
     process.env.CODEX_MODEL = 'gpt-5.6';
     process.env.CODEX_MODEL_REASONING_EFFORT = 'high';

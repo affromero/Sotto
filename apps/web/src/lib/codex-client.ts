@@ -80,6 +80,11 @@ function codexArgs(
     ...NO_MCP,
     '-c',
     `web_search=${JSON.stringify(opts?.useWebSearch ? 'live' : 'disabled')}`,
+    // Shell snapshots capture the interactive shell environment — useless for
+    // stdin-driven exec calls, and snapshot validation crashes codex on
+    // busybox /bin/sh inside the alpine containers (exit 1 before any work).
+    '-c',
+    'features.shell_snapshot=false',
     ...SANDBOX,
     '--skip-git-repo-check',
   ];
@@ -88,6 +93,28 @@ function codexArgs(
   if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
   args.push('-');
   return effort ? { args, model, effort } : { args, model };
+}
+
+/**
+ * Turn a raw codex CLI failure into a message the UI can act on. Route
+ * handlers surface `error.message` directly to the learner, so rate limits and
+ * auth problems must say what to do (switch model / re-auth), not just dump
+ * stderr.
+ */
+function classifyCodexFailure(code: number | null, stderr: string): string {
+  if (/rate.?limit|usage.?limit|too many requests|quota|429/i.test(stderr)) {
+    const reset = stderr.match(/try again (?:at|in) ([^.\n]+)/i)?.[1];
+    return (
+      'The Codex AI provider has hit its usage limit' +
+      (reset ? ` (available again ${reset.trim()})` : '') +
+      '. Switch to another AI model in Settings, or try again later.'
+    );
+  }
+  if (/unauthorized|authentication|not logged in|401/i.test(stderr)) {
+    return 'The Codex AI provider is not authenticated. Re-connect Codex or switch to another AI model in Settings.';
+  }
+  // Real errors come last in stderr — the head is a version/session banner.
+  return `codex: exited with code ${code} — ${stderr.slice(-500)}`;
 }
 
 /**
@@ -141,7 +168,7 @@ export async function executeCodex(
       clearTimeout(timer);
       if (code !== 0) {
         logger.error('codex: non-zero exit', { code: String(code), stderr });
-        reject(new Error(`codex: exited with code ${code} — ${stderr.slice(0, 500)}`));
+        reject(new Error(classifyCodexFailure(code, stderr)));
         return;
       }
 
