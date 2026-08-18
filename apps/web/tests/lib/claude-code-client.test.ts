@@ -146,6 +146,38 @@ describe('claude-code-client', () => {
       expect(options.env.DATABASE_URL).toBeUndefined();
     });
 
+    it('isolates each invocation in its own CLAUDE_CONFIG_DIR and drops API-key env when OAuth credentials exist', async () => {
+      process.env.ANTHROPIC_API_KEY = 'platform-key-must-not-leak';
+      process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
+        claudeAiOauth: { accessToken: 'oauth-token' },
+      });
+      const { executeClaudeCode, resetClaudeRuntimeForTests } =
+        await import('@/lib/claude-code-client');
+      resetClaudeRuntimeForTests();
+
+      const proc1 = createMockProcess();
+      const proc2 = createMockProcess();
+      mockSpawn.mockReturnValueOnce(proc1).mockReturnValueOnce(proc2);
+
+      const p1 = executeClaudeCode('sys', 'one');
+      const p2 = executeClaudeCode('sys', 'two');
+      proc1._stdout.emit('data', Buffer.from('a'));
+      proc2._stdout.emit('data', Buffer.from('b'));
+      proc1.emit('close', 0);
+      proc2.emit('close', 0);
+      await Promise.all([p1, p2]);
+
+      const env1 = (mockSpawn.mock.calls[0] as [string, string[], { env: NodeJS.ProcessEnv }])[2]
+        .env;
+      const env2 = (mockSpawn.mock.calls[1] as [string, string[], { env: NodeJS.ProcessEnv }])[2]
+        .env;
+      expect(env1.CLAUDE_CONFIG_DIR).toBeTruthy();
+      expect(env2.CLAUDE_CONFIG_DIR).toBeTruthy();
+      expect(env1.CLAUDE_CONFIG_DIR).not.toBe(env2.CLAUDE_CONFIG_DIR);
+      expect(env1.ANTHROPIC_API_KEY).toBeUndefined();
+      resetClaudeRuntimeForTests();
+    });
+
     it('passes encoded effort through to the claude CLI', async () => {
       const { executeClaudeCode } = await import('@/lib/claude-code-client');
 
