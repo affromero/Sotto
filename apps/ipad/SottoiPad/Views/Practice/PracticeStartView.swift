@@ -98,7 +98,7 @@ struct PracticeStartView: View {
         if start.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."
         }
-        return "\(answers.count) of \(items.count) multiple-choice items answered. Speaking and writing prompts are shown for live practice."
+        return "\(answers.count) of \(items.count) multiple-choice items answered. Writing prompts are graded on submit; speaking prompts are shown for live practice."
     }
 
     private var practiceItems: some View {
@@ -136,7 +136,10 @@ struct PracticeStartView: View {
             }
 
             if let writingPrompts = start.writingPrompts, !writingPrompts.isEmpty {
-                PromptBlock(title: "Writing practice", icon: "square.and.pencil", prompts: writingPrompts.map(\.task))
+                WritingPracticeView(
+                    source: .practice(sessionId: start.sessionId),
+                    prompts: writingPrompts
+                )
             }
         }
     }

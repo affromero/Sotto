@@ -190,6 +190,30 @@ struct SottoAPIClient {
         )
     }
 
+    /// Writing is graded in the POST itself (one LLM call), unlike speaking,
+    /// which uploads and then polls.
+    func submitClassWriting(
+        classId: String,
+        promptId: String,
+        text: String
+    ) async throws -> SottoWritingGrade {
+        try await post(
+            "/api/v1/classes/\(classId)/writing/\(promptId)",
+            body: WritingSubmissionRequest(text: text)
+        )
+    }
+
+    func submitPracticeWriting(
+        sessionId: String,
+        promptId: String,
+        text: String
+    ) async throws -> SottoWritingGrade {
+        try await post(
+            "/api/v1/practice/\(sessionId)/writing/\(promptId)",
+            body: WritingSubmissionRequest(text: text)
+        )
+    }
+
     func submitClass(classId: String, answers: [SottoSubmitAnswer]) async throws -> SottoClassSubmitResult {
         try await post("/api/v1/classes/\(classId)/submit", body: SubmitClassRequest(answers: answers))
     }
@@ -369,6 +393,10 @@ private struct SubmitPracticeRequest: Encodable {
 
 private struct SubmitClassRequest: Encodable {
     let answers: [SottoSubmitAnswer]
+}
+
+private struct WritingSubmissionRequest: Encodable {
+    let text: String
 }
 
 private struct SelectionHelpRequest: Encodable {

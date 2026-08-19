@@ -83,10 +83,9 @@ struct ClassSectionView: View {
             }
 
             if !section.writingPrompts.isEmpty {
-                PromptBlock(
-                    title: "Writing",
-                    icon: "square.and.pencil",
-                    prompts: section.writingPrompts.map(\.task),
+                WritingPracticeView(
+                    source: .classSession(classId: classId),
+                    prompts: section.writingPrompts,
                     onSelectionHelp: onSelectionHelp
                 )
             }

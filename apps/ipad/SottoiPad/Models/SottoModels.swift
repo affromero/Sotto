@@ -438,6 +438,35 @@ struct SottoWritingPrompt: Decodable, Identifiable, Equatable {
     let order: Int?
     let task: String
     let guidance: String?
+    /// Latest submission first; the class detail sends at most one.
+    let responses: [SottoWritingResponse]?
+
+    var latestResponse: SottoWritingResponse? { responses?.first }
+}
+
+struct SottoWritingResponse: Decodable, Equatable {
+    let text: String
+    let overallScore: Double?
+    let corrections: [SottoWritingCorrection]?
+    let feedback: String?
+}
+
+/// One inline fix the grader suggests: what the learner wrote, what it should
+/// be, and why.
+struct SottoWritingCorrection: Decodable, Equatable, Identifiable {
+    let old: String
+    let new: String
+    let why: String
+
+    var id: String { "\(old)|\(new)" }
+}
+
+/// Response body of the class, practice, and exam writing submissions. All
+/// three grade synchronously and return this same shape.
+struct SottoWritingGrade: Decodable, Equatable {
+    let overallScore: Double
+    let corrections: [SottoWritingCorrection]
+    let feedback: String
 }
 
 struct SottoPracticeStart: Decodable, Identifiable, Equatable {
