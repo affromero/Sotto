@@ -3,35 +3,8 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 77;
 	objects = {
-
-/* Begin PBXBuildFile section */
-		A10000000000000000000001 /* SottoiPadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SottoiPadApp.swift */; };
-		A10000000000000000000002 /* SottoAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SottoAppModel.swift */; };
-		A10000000000000000000003 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* RootView.swift */; };
-		A10000000000000000000004 /* SottoTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SottoTheme.swift */; };
-		A1000000000000000000000F /* SottoBrandMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* SottoBrandMark.swift */; };
-		A10000000000000000000005 /* SottoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SottoModels.swift */; };
-		A10000000000000000000006 /* SottoAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* SottoAPIClient.swift */; };
-		A10000000000000000000007 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* CredentialStore.swift */; };
-		A10000000000000000000008 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* PairingView.swift */; };
-		A10000000000000000000009 /* CourseListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* CourseListView.swift */; };
-		A10000000000000000000015 /* CourseWorkspacePanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* CourseWorkspacePanels.swift */; };
-		A1000000000000000000000A /* ClassSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* ClassSessionView.swift */; };
-		A10000000000000000000010 /* ClassSessionIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* ClassSessionIntroView.swift */; };
-		A10000000000000000000011 /* ClassSessionSectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* ClassSessionSectionViews.swift */; };
-		A10000000000000000000012 /* ClassSessionSelectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* ClassSessionSelectionViews.swift */; };
-		A10000000000000000000013 /* ClassPDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ClassPDFExporter.swift */; };
-		A10000000000000000000014 /* ClassSpeakingPracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* ClassSpeakingPracticeView.swift */; };
-		A1000000000000000000000B /* PracticeStartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PracticeStartView.swift */; };
-		A1000000000000000000000C /* WorkbookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* WorkbookView.swift */; };
-		A1000000000000000000000D /* ProfileSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* ProfileSelectionView.swift */; };
-		A10000000000000000000016 /* SottoServerURLPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* SottoServerURLPolicy.swift */; };
-		A10000000000000000000017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* Assets.xcassets */; };
-		A10000000000000000000018 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* PrivacyInfo.xcprivacy */; };
-		B10000000000000000000001 /* SottoServerURLPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* SottoServerURLPolicyTests.swift */; };
-/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		B60000000000000000000001 /* PBXContainerItemProxy */ = {
@@ -45,33 +18,34 @@
 
 /* Begin PBXFileReference section */
 		A20000000000000000000000 /* SottoiPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SottoiPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A20000000000000000000001 /* SottoiPadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoiPadApp.swift; sourceTree = "<group>"; };
-		A20000000000000000000002 /* SottoAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoAppModel.swift; sourceTree = "<group>"; };
-		A20000000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		A20000000000000000000004 /* SottoTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoTheme.swift; sourceTree = "<group>"; };
-		A2000000000000000000000F /* SottoBrandMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoBrandMark.swift; sourceTree = "<group>"; };
-		A20000000000000000000005 /* SottoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoModels.swift; sourceTree = "<group>"; };
-		A20000000000000000000006 /* SottoAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoAPIClient.swift; sourceTree = "<group>"; };
-		A20000000000000000000007 /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
-		A20000000000000000000008 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
-		A20000000000000000000009 /* CourseListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseListView.swift; sourceTree = "<group>"; };
-		A20000000000000000000015 /* CourseWorkspacePanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseWorkspacePanels.swift; sourceTree = "<group>"; };
-		A2000000000000000000000A /* ClassSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionView.swift; sourceTree = "<group>"; };
-		A20000000000000000000010 /* ClassSessionIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionIntroView.swift; sourceTree = "<group>"; };
-		A20000000000000000000011 /* ClassSessionSectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionSectionViews.swift; sourceTree = "<group>"; };
-		A20000000000000000000012 /* ClassSessionSelectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSessionSelectionViews.swift; sourceTree = "<group>"; };
-		A20000000000000000000013 /* ClassPDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassPDFExporter.swift; sourceTree = "<group>"; };
-		A20000000000000000000014 /* ClassSpeakingPracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassSpeakingPracticeView.swift; sourceTree = "<group>"; };
-		A2000000000000000000000B /* PracticeStartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeStartView.swift; sourceTree = "<group>"; };
-		A2000000000000000000000C /* WorkbookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbookView.swift; sourceTree = "<group>"; };
-		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A2000000000000000000000E /* ProfileSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSelectionView.swift; sourceTree = "<group>"; };
-		A20000000000000000000016 /* SottoServerURLPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoServerURLPolicy.swift; sourceTree = "<group>"; };
-		A20000000000000000000017 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A20000000000000000000018 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B20000000000000000000000 /* SottoiPadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SottoiPadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B20000000000000000000001 /* SottoServerURLPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SottoServerURLPolicyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A41000000000000000000001 /* Exceptions for "SottoiPad" folder in "SottoiPad" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A50000000000000000000001 /* SottoiPad */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A40000000000000000000003 /* SottoiPad */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A41000000000000000000001 /* Exceptions for "SottoiPad" folder in "SottoiPad" target */,
+			);
+			path = SottoiPad;
+			sourceTree = "<group>";
+		};
+		B40000000000000000000001 /* SottoiPadTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SottoiPadTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A30000000000000000000001 /* Frameworks */ = {
@@ -109,133 +83,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A40000000000000000000003 /* SottoiPad */ = {
-			isa = PBXGroup;
-			children = (
-				A2000000000000000000000D /* Info.plist */,
-				A20000000000000000000017 /* Assets.xcassets */,
-				A20000000000000000000018 /* PrivacyInfo.xcprivacy */,
-				A40000000000000000000004 /* App */,
-				A40000000000000000000005 /* Design */,
-				A40000000000000000000006 /* Models */,
-				A40000000000000000000007 /* Networking */,
-				A40000000000000000000008 /* Storage */,
-				A40000000000000000000009 /* Views */,
-			);
-			path = SottoiPad;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000004 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000001 /* SottoiPadApp.swift */,
-				A20000000000000000000002 /* SottoAppModel.swift */,
-				A20000000000000000000003 /* RootView.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000005 /* Design */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000004 /* SottoTheme.swift */,
-				A2000000000000000000000F /* SottoBrandMark.swift */,
-			);
-			path = Design;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000006 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000005 /* SottoModels.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000007 /* Networking */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000006 /* SottoAPIClient.swift */,
-				A20000000000000000000016 /* SottoServerURLPolicy.swift */,
-			);
-			path = Networking;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000008 /* Storage */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000007 /* CredentialStore.swift */,
-			);
-			path = Storage;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000009 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				A4000000000000000000000A /* Pairing */,
-				A4000000000000000000000E /* Profile */,
-				A4000000000000000000000B /* Learn */,
-				A4000000000000000000000C /* Practice */,
-				A4000000000000000000000D /* Workbook */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000A /* Pairing */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000008 /* PairingView.swift */,
-			);
-			path = Pairing;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000B /* Learn */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000009 /* CourseListView.swift */,
-				A20000000000000000000015 /* CourseWorkspacePanels.swift */,
-				A2000000000000000000000A /* ClassSessionView.swift */,
-				A20000000000000000000010 /* ClassSessionIntroView.swift */,
-				A20000000000000000000011 /* ClassSessionSectionViews.swift */,
-				A20000000000000000000012 /* ClassSessionSelectionViews.swift */,
-				A20000000000000000000013 /* ClassPDFExporter.swift */,
-				A20000000000000000000014 /* ClassSpeakingPracticeView.swift */,
-			);
-			path = Learn;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000E /* Profile */ = {
-			isa = PBXGroup;
-			children = (
-				A2000000000000000000000E /* ProfileSelectionView.swift */,
-			);
-			path = Profile;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000C /* Practice */ = {
-			isa = PBXGroup;
-			children = (
-				A2000000000000000000000B /* PracticeStartView.swift */,
-			);
-			path = Practice;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000D /* Workbook */ = {
-			isa = PBXGroup;
-			children = (
-				A2000000000000000000000C /* WorkbookView.swift */,
-			);
-			path = Workbook;
-			sourceTree = "<group>";
-		};
-		B40000000000000000000001 /* SottoiPadTests */ = {
-			isa = PBXGroup;
-			children = (
-				B20000000000000000000001 /* SottoServerURLPolicyTests.swift */,
-			);
-			path = SottoiPadTests;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -250,6 +97,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A40000000000000000000003 /* SottoiPad */,
 			);
 			name = SottoiPad;
 			productName = SottoiPad;
@@ -268,6 +118,9 @@
 			);
 			dependencies = (
 				B70000000000000000000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B40000000000000000000001 /* SottoiPadTests */,
 			);
 			name = SottoiPadTests;
 			productName = SottoiPadTests;
@@ -294,7 +147,6 @@
 				};
 			};
 			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "SottoiPad" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -302,6 +154,8 @@
 				Base,
 			);
 			mainGroup = A40000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = A40000000000000000000002 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -317,8 +171,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000017 /* Assets.xcassets in Resources */,
-				A10000000000000000000018 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -336,27 +188,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000001 /* SottoiPadApp.swift in Sources */,
-				A10000000000000000000002 /* SottoAppModel.swift in Sources */,
-				A10000000000000000000003 /* RootView.swift in Sources */,
-				A10000000000000000000004 /* SottoTheme.swift in Sources */,
-				A1000000000000000000000F /* SottoBrandMark.swift in Sources */,
-				A10000000000000000000005 /* SottoModels.swift in Sources */,
-				A10000000000000000000006 /* SottoAPIClient.swift in Sources */,
-				A10000000000000000000007 /* CredentialStore.swift in Sources */,
-				A10000000000000000000008 /* PairingView.swift in Sources */,
-				A10000000000000000000009 /* CourseListView.swift in Sources */,
-				A10000000000000000000015 /* CourseWorkspacePanels.swift in Sources */,
-				A1000000000000000000000A /* ClassSessionView.swift in Sources */,
-				A10000000000000000000010 /* ClassSessionIntroView.swift in Sources */,
-				A10000000000000000000011 /* ClassSessionSectionViews.swift in Sources */,
-				A10000000000000000000012 /* ClassSessionSelectionViews.swift in Sources */,
-				A10000000000000000000013 /* ClassPDFExporter.swift in Sources */,
-				A10000000000000000000014 /* ClassSpeakingPracticeView.swift in Sources */,
-				A1000000000000000000000B /* PracticeStartView.swift in Sources */,
-				A1000000000000000000000C /* WorkbookView.swift in Sources */,
-				A1000000000000000000000D /* ProfileSelectionView.swift in Sources */,
-				A10000000000000000000016 /* SottoServerURLPolicy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -364,7 +195,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B10000000000000000000001 /* SottoServerURLPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
