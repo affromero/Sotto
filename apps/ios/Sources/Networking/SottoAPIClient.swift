@@ -223,6 +223,12 @@ struct SottoAPIClient {
         return try await get("\(path)?recordingId=\(encodedRecordingId)")
     }
 
+    // MARK: - Memory graph
+
+    func fetchMemoryGraph(courseId: String) async throws -> SottoMemoryGraph {
+        try await get("/api/v1/courses/\(courseId)/graph")
+    }
+
     // MARK: - Placement
 
     /// Generates the adaptive question batch, so this runs against a model.

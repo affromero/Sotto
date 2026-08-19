@@ -1,9 +1,20 @@
 import Foundation
 
-/// Exam and writing calls, split out of SottoAppModel to keep that file under
-/// the repo's 1000-line limit. These are all thin pass-throughs: they resolve
-/// the paired client and forward, with no state of their own.
+/// Assessment calls — memory graph, placement, exams, and writing — split out
+/// of SottoAppModel to keep that file under the repo's 1000-line limit. These
+/// are thin pass-throughs: they resolve the paired client and forward. The two
+/// placement calls additionally refresh the course list, because both create
+/// or raise a course server-side.
 extension SottoAppModel {
+    // MARK: - Memory graph
+
+    func fetchMemoryGraph(courseId: String) async throws -> SottoMemoryGraph {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before opening your memory graph.")
+        }
+        return try await client.fetchMemoryGraph(courseId: courseId)
+    }
+
     // MARK: - Placement
 
     func fetchPlacement(native: String, target: String) async throws -> SottoPlacementBatch {

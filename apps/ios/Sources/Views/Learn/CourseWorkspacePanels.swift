@@ -103,6 +103,7 @@ struct CourseActionGrid: View {
     let onExam: () -> Void
     let onPlacement: () -> Void
     let onWorkbook: () -> Void
+    let onMemory: () -> Void
 
     private let secondaryColumns = [
         GridItem(.adaptive(minimum: 116), spacing: 8),
@@ -133,6 +134,7 @@ struct CourseActionGrid: View {
                 SecondaryAction(title: "Exam", icon: "checklist", action: onExam)
                 SecondaryAction(title: "Placement", icon: "checkmark.seal", action: onPlacement)
                 SecondaryAction(title: "Workbook", icon: "pencil.and.scribble", action: onWorkbook)
+                SecondaryAction(title: "Memory", icon: "brain", action: onMemory)
             }
         }
     }

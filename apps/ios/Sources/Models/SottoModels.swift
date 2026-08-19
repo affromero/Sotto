@@ -557,6 +557,38 @@ struct SottoDocumentSection: Decodable, Identifiable, Equatable {
     let qrDataUrl: String?
 }
 
+// MARK: - Memory graph
+
+/// `GET /api/v1/courses/{id}/graph`: every word and grammar point the learner
+/// has met on this course, with its spaced-repetition state.
+struct SottoMemoryGraph: Decodable, Equatable {
+    let nodes: [SottoMemoryNode]
+
+    var dueNodes: [SottoMemoryNode] { nodes.filter(\.due) }
+
+    /// Weak-first, so the list opens on what needs work.
+    var byStrength: [SottoMemoryNode] {
+        nodes.sorted { $0.strength < $1.strength }
+    }
+}
+
+struct SottoMemoryNode: Decodable, Identifiable, Equatable {
+    let id: String
+    let kind: String
+    let label: String
+    let translation: String?
+    let strength: Double
+    let due: Bool
+    let cefrLevel: String?
+    let reviewCount: Int
+    let lapseCount: Int
+    let partOfSpeech: String?
+    let pronunciation: String?
+    let topicKey: String?
+
+    var isVocab: Bool { kind == "vocab" }
+}
+
 // MARK: - Placement
 
 struct SottoPlacementBatch: Decodable, Equatable {

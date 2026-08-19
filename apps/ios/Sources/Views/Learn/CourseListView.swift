@@ -322,6 +322,7 @@ private struct CourseDetailPane: View {
 
     @State private var showingExams = false
     @State private var showingPlacement = false
+    @State private var showingMemory = false
 
     private var generation: SottoLoadingOperation? {
         model.classGenerationOperations[course.id]
@@ -370,7 +371,8 @@ private struct CourseDetailPane: View {
                     onLive: openLive,
                     onExam: openExam,
                     onPlacement: openPlacement,
-                    onWorkbook: openWorkbook
+                    onWorkbook: openWorkbook,
+                    onMemory: { showingMemory = true }
                 )
 
                 SourcedClassPanel(course: course, activeClassId: course.activeClassId)
@@ -387,6 +389,10 @@ private struct CourseDetailPane: View {
         .background(SottoTheme.paper)
         .sheet(isPresented: $showingExams) {
             ExamHubView(course: course)
+                .environmentObject(model)
+        }
+        .sheet(isPresented: $showingMemory) {
+            MemoryGraphView(course: course)
                 .environmentObject(model)
         }
         .sheet(isPresented: $showingPlacement) {
