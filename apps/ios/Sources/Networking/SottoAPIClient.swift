@@ -223,6 +223,12 @@ struct SottoAPIClient {
         return try await get("\(path)?recordingId=\(encodedRecordingId)")
     }
 
+    // MARK: - Activity
+
+    func fetchActivity() async throws -> SottoActivity {
+        try await get("/api/v1/activity")
+    }
+
     // MARK: - Memory graph
 
     func fetchMemoryGraph(courseId: String) async throws -> SottoMemoryGraph {

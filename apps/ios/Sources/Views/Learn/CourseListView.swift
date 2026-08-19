@@ -343,6 +343,8 @@ private struct CourseDetailPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                ActivityHeatmapView()
+
                 CourseHeroPanel(
                     title: courseTitle,
                     course: course,

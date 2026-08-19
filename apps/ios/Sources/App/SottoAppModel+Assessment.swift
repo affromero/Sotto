@@ -6,6 +6,15 @@ import Foundation
 /// placement calls additionally refresh the course list, because both create
 /// or raise a course server-side.
 extension SottoAppModel {
+    // MARK: - Activity
+
+    func fetchActivity() async throws -> SottoActivity {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device to see your study activity.")
+        }
+        return try await client.fetchActivity()
+    }
+
     // MARK: - Memory graph
 
     func fetchMemoryGraph(courseId: String) async throws -> SottoMemoryGraph {

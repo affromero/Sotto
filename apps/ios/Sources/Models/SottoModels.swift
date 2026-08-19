@@ -557,6 +557,32 @@ struct SottoDocumentSection: Decodable, Identifiable, Equatable {
     let qrDataUrl: String?
 }
 
+// MARK: - Activity
+
+/// `GET /api/v1/activity`: one year of study days, bucketed in the learner's
+/// timezone by the server, plus streaks.
+struct SottoActivity: Decodable, Equatable {
+    let timeZone: String
+    let todayIso: String
+    /// ISO local day (YYYY-MM-DD) -> per-category counts. Quiet days are absent.
+    let days: [String: [String: Int]]
+    let currentStreak: Int
+    let longestStreak: Int
+
+    func total(on day: String) -> Int {
+        days[day]?.values.reduce(0, +) ?? 0
+    }
+
+    /// The category a day is coloured by: whichever the learner did most of,
+    /// ties broken by name so the colour does not flicker between loads.
+    func dominantCategory(on day: String) -> String? {
+        guard let counts = days[day], !counts.isEmpty else { return nil }
+        return counts.max { lhs, rhs in
+            lhs.value == rhs.value ? lhs.key > rhs.key : lhs.value < rhs.value
+        }?.key
+    }
+}
+
 // MARK: - Memory graph
 
 /// `GET /api/v1/courses/{id}/graph`: every word and grammar point the learner
