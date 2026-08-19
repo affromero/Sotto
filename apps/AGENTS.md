@@ -1,9 +1,10 @@
 # apps/ — Application Workspaces
 
-| App        | Package      | Description                                                                              |
-| ---------- | ------------ | ---------------------------------------------------------------------------------------- |
-| `web/`     | `@sotto/web` | Next.js web app — App Router, Prisma, BullMQ workers, CSS Modules                        |
-| `desktop/` | —            | Tauri desktop shell, built separately (excluded from npm workspaces via `!apps/desktop`) |
+| App        | Package      | Description                                                                                    |
+| ---------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `web/`     | `@sotto/web` | Next.js web app — App Router, Prisma, BullMQ workers, CSS Modules                              |
+| `desktop/` | —            | Tauri desktop shell, built separately (excluded from npm workspaces via `!apps/desktop`)       |
+| `ios/`     | —            | Universal iPhone + iPad SwiftUI client (`Sotto.xcodeproj`); pairs with a server over `/api/v1` |
 
 `web/` imports shared types, validations, and design tokens from `@sotto/shared` (`packages/shared/`).
 
