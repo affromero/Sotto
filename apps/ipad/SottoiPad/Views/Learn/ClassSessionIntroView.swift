@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ClassHeroHeader: View {
+    @Environment(\.sottoLayout) private var layout
     let classDetail: SottoClassDetail
     let answeredCount: Int
     let questionCount: Int
@@ -10,7 +11,7 @@ struct ClassHeroHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top, spacing: 24) {
+            SottoAdaptiveStack(spacing: layout == .compact ? 14 : 24) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         Text("Class \(classDetail.order)")
@@ -25,7 +26,7 @@ struct ClassHeroHeader: View {
                     .tracking(1.2)
 
                     Text(classDetail.lesson?.title ?? "Sotto class")
-                        .font(.system(size: 44, weight: .bold, design: .serif))
+                        .font(.system(size: layout == .compact ? 30 : 44, weight: .bold, design: .serif))
                         .foregroundStyle(SottoTheme.ink)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -236,6 +237,7 @@ struct TimelineFigure: View {
 }
 
 struct ContrastFigure: View {
+    @Environment(\.sottoLayout) private var layout
     let contrast: SottoClassContrast
     let onSelectionHelp: (String, String) -> Void
 
@@ -246,7 +248,7 @@ struct ContrastFigure: View {
                 .foregroundStyle(SottoTheme.muted)
                 .textCase(.uppercase)
 
-            HStack(alignment: .top, spacing: 0) {
+            SottoAdaptiveStack(spacing: 0) {
                 ContrastSide(
                     title: contrast.leftLabel,
                     items: contrast.leftItems,
@@ -310,6 +312,7 @@ struct ContrastSide: View {
 }
 
 struct ClassIntroBlock: View {
+    @Environment(\.sottoLayout) private var layout
     let intro: SottoClassIntro
     let onSelectionHelp: (String, String) -> Void
 
@@ -417,7 +420,10 @@ struct ClassIntroBlock: View {
 
             if !callouts.isEmpty {
                 LazyVGrid(
-                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    columns: Array(
+                        repeating: GridItem(.flexible()),
+                        count: layout.gridColumns
+                    ),
                     alignment: .leading,
                     spacing: 10
                 ) {

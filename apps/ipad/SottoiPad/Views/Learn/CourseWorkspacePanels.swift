@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct CourseHeroPanel: View {
+    @Environment(\.sottoLayout) private var layout
     let title: String
     let course: SottoCourse
     let isManualPlacement: Bool
@@ -8,7 +9,7 @@ struct CourseHeroPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            HStack(alignment: .top, spacing: 18) {
+            SottoAdaptiveStack(spacing: layout == .compact ? 10 : 18) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(languageName(course.targetLang).uppercased())
                         .font(.caption.bold())
@@ -16,14 +17,16 @@ struct CourseHeroPanel: View {
                         .foregroundStyle(SottoTheme.muted)
 
                     Text(title)
-                        .font(.system(size: 38, weight: .semibold, design: .serif))
+                        .font(.system(size: layout.heroTitleSize, weight: .semibold, design: .serif))
                         .foregroundStyle(SottoTheme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer(minLength: 16)
+                if layout != .compact {
+                    Spacer(minLength: 16)
+                }
 
-                VStack(alignment: .trailing, spacing: 10) {
+                VStack(alignment: layout == .compact ? .leading : .trailing, spacing: 10) {
                     Text(course.pedagogy.label)
                         .font(.caption.bold())
                         .padding(.horizontal, 10)

@@ -2,6 +2,11 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var model: SottoAppModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var layout: SottoLayoutMode {
+        SottoLayoutMode(horizontalSizeClass)
+    }
 
     var body: some View {
         ZStack {
@@ -32,6 +37,7 @@ struct RootView: View {
             }
         }
         .background(SottoTheme.paper)
+        .environment(\.sottoLayout, layout)
         .sheet(isPresented: practiceSheetBinding) {
             if let practiceStart = model.practiceStart {
                 PracticeStartView(start: practiceStart)
@@ -127,7 +133,8 @@ struct LoadingOverlay: View {
                 }
             }
             .padding(28)
-            .frame(width: 460)
+            .frame(maxWidth: 460)
+            .padding(.horizontal, 24)
             .background(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: .black.opacity(0.16), radius: 24, y: 12)

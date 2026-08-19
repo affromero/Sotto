@@ -6,6 +6,7 @@ import UIKit
 struct WorkbookView: View {
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.sottoLayout) private var layout
     let response: SottoWorksheetResponse
 
     @StateObject private var annotationStore = WorkbookAnnotationStore()
@@ -20,7 +21,9 @@ struct WorkbookView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                PencilStatusBar(isRecognized: pencilRecognized)
+                if layout.supportsHandwriting {
+                    PencilStatusBar(isRecognized: pencilRecognized)
+                }
                 workbookSurface
             }
             .background(SottoTheme.paper)
@@ -76,12 +79,19 @@ struct WorkbookView: View {
     @ViewBuilder
     private var workbookSurface: some View {
         if let pdfData {
-            AnnotatedWorkbookPDFView(
-                pdfData: pdfData,
-                annotationStore: annotationStore,
-                pencilRecognized: $pencilRecognized
-            )
-            .background(SottoTheme.paper)
+            if layout.supportsHandwriting {
+                AnnotatedWorkbookPDFView(
+                    pdfData: pdfData,
+                    annotationStore: annotationStore,
+                    pencilRecognized: $pencilRecognized
+                )
+                .background(SottoTheme.paper)
+            } else {
+                // ponytail: iPhone reads and shares the workbook; handwriting
+                // needs the iPad canvas, so no annotation layer here.
+                WorkbookPDFReaderView(pdfData: pdfData)
+                    .background(SottoTheme.paper)
+            }
         } else if isLoadingPDF {
             ProgressView("Loading workbook PDF")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -104,15 +114,21 @@ struct WorkbookView: View {
         }
     }
 
+    @ViewBuilder
     private var fallbackWorkbookSurface: some View {
-        HStack(spacing: 0) {
+        if layout.supportsHandwriting {
+            HStack(spacing: 0) {
+                worksheetPane
+                    .frame(minWidth: 360, idealWidth: 460, maxWidth: 520)
+
+                Divider()
+
+                PencilCanvasView(pencilRecognized: $pencilRecognized)
+                    .background(Color.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else {
             worksheetPane
-                .frame(minWidth: 360, idealWidth: 460, maxWidth: 520)
-
-            Divider()
-
-            PencilCanvasView(pencilRecognized: $pencilRecognized)
-                .background(Color.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -353,6 +369,41 @@ private extension PencilCanvasView {
             PKToolPickerLassoItem(),
             PKToolPickerRulerItem()
         ]
+    }
+}
+
+/// Plain scrolling PDF, no markup layer. The iPhone workbook.
+private struct WorkbookPDFReaderView: UIViewRepresentable {
+    let pdfData: Data
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.backgroundColor = UIColor(red: 0.961, green: 0.957, blue: 0.941, alpha: 1)
+        pdfView.displayMode = .singlePageContinuous
+        pdfView.displayDirection = .vertical
+        pdfView.displaysPageBreaks = true
+        pdfView.autoScales = true
+        pdfView.pageShadowsEnabled = true
+        load(into: pdfView, coordinator: context.coordinator)
+        return pdfView
+    }
+
+    func updateUIView(_ pdfView: PDFView, context: Context) {
+        load(into: pdfView, coordinator: context.coordinator)
+    }
+
+    /// Rebuild the document only when the bytes change, so scrolling position
+    /// survives SwiftUI's layout passes.
+    private func load(into pdfView: PDFView, coordinator: Coordinator) {
+        guard coordinator.loadedData != pdfData else { return }
+        coordinator.loadedData = pdfData
+        pdfView.document = PDFDocument(data: pdfData)
+    }
+
+    final class Coordinator {
+        var loadedData: Data?
     }
 }
 

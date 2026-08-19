@@ -317,6 +317,7 @@ private struct CourseRow: View {
 private struct CourseDetailPane: View {
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.openURL) private var openURL
+    @Environment(\.sottoLayout) private var layout
     let course: SottoCourse
 
     private var generation: SottoLoadingOperation? {
@@ -377,8 +378,8 @@ private struct CourseDetailPane: View {
 
                 CourseClassHistoryPanel(course: course)
             }
-            .padding(36)
-            .frame(maxWidth: 980, alignment: .leading)
+            .padding(layout.pagePadding)
+            .frame(maxWidth: layout.readableWidth, alignment: .leading)
         }
         .background(SottoTheme.paper)
     }
