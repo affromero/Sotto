@@ -27,8 +27,15 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 const mockGenerateApiKey = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 vi.mock('@/lib/api-keys', () => ({
   generateApiKey: () => mockGenerateApiKey(),
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
+
+const mockIsUserAdmin = vi.fn();
+vi.mock('@/lib/auth-guards', () => ({
+  isUserAdmin: (...args: unknown[]) => mockIsUserAdmin(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -91,19 +98,19 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns 401 when session has no user', async () => {
-    mockAuth.mockResolvedValue({ user: null });
+  it('returns 401 when the Bearer credential is not recognised', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(401);
     const body = await response.json();
@@ -111,9 +118,10 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns 403 when the authenticated user is not an admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(false);
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(403);
     const body = await response.json();
@@ -121,10 +129,11 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns empty array when user has no API keys', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findMany.mockResolvedValue([]);
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -132,10 +141,11 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns list of API keys for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey, mockApiKey2]);
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -145,10 +155,11 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('returns only selected fields (no keyHash exposed)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey]);
 
-    const response = await GET();
+    const response = await GET(createRequest());
     const body = await response.json();
 
     expect(body[0]).toHaveProperty('id');
@@ -161,10 +172,11 @@ describe('GET /api/v1/keys', () => {
   });
 
   it('includes revoked keys in the list', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey, mockRevokedApiKey]);
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -222,7 +234,6 @@ describe('POST /api/v1/keys', () => {
 
   it('returns 400 for invalid input (name too long)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
 
     const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
@@ -349,7 +360,6 @@ describe('POST /api/v1/keys', () => {
     const body = await response.json();
     expect(body.key).toMatch(/^sk_sotto_/);
   });
-
 });
 
 describe('DELETE /api/v1/keys/[keyId]', () => {
@@ -358,7 +368,7 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
@@ -369,7 +379,8 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('returns 403 when the authenticated user is not an admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(false);
 
     const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
@@ -380,7 +391,8 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('returns 404 when API key does not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findUnique.mockResolvedValue(null);
 
     const request = createRequest('http://localhost:3000/api/v1/keys/nonexistent', {
@@ -394,7 +406,8 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it("returns 403 when trying to delete another user's API key", async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-2', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findUnique.mockResolvedValue({
       userId: 'user-1',
       revokedAt: null,
@@ -409,7 +422,8 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('returns 400 when trying to revoke already revoked key', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findUnique.mockResolvedValue({
       userId: 'user-1',
       revokedAt: new Date('2025-01-08T10:00:00Z'),
@@ -426,7 +440,8 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
   });
 
   it('revokes API key successfully', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
     mockPrisma.apiKey.findUnique.mockResolvedValue({
       userId: 'user-1',
       revokedAt: null,
@@ -438,5 +453,32 @@ describe('DELETE /api/v1/keys/[keyId]', () => {
 
     expect(response.status).toBe(204);
   });
+});
 
+/**
+ * ApiKey has no scopes and no expiry, so a paired device that could mint keys
+ * would be able to outlive its own revocation: revoke the device, and the keys
+ * it minted keep working. Listing and revoking are Bearer-capable; minting is
+ * deliberately not, and new devices go through pairing instead.
+ */
+describe('API key minting is not reachable with a device credential', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects a Bearer-only caller even when that caller is an admin', async () => {
+    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
+
+    const response = await POST(
+      createRequest('http://localhost:3000/api/v1/keys', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'minted from a phone' }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockApiKeyCreate).not.toHaveBeenCalled();
+  });
 });

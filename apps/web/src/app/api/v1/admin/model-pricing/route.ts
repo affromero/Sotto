@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth-guards';
+import { authenticateRequest } from '@/lib/api-keys';
+import { isUserAdmin, requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { getCurrentModelPricing } from '@/lib/pricing-metrics';
 import { savePricingSnapshots } from '@/lib/pricing-fetcher';
@@ -11,9 +12,11 @@ import {
 } from '@/lib/providers/ai-registry';
 import { z } from 'zod';
 
-export async function GET() {
-  const adminId = await requireAdmin();
-  if (!adminId) {
+// Read side is Bearer-capable for paired devices; PATCH stays session-only.
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
+  if (!authed) return errorResponse('Unauthorized', 401);
+  if (!(await isUserAdmin(authed.userId))) {
     return errorResponse('Forbidden', 403);
   }
 

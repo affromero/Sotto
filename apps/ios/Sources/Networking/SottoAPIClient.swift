@@ -223,10 +223,65 @@ struct SottoAPIClient {
         return try await get("\(path)?recordingId=\(encodedRecordingId)")
     }
 
+    // MARK: - Server admin (read-only)
+
+    func fetchHealth() async throws -> SottoHealth {
+        try await get("/api/v1/health")
+    }
+
+    func fetchQueues() async throws -> SottoQueueSnapshot {
+        try await get("/api/v1/admin/queues")
+    }
+
+    func fetchModelPricing() async throws -> [SottoModelPrice] {
+        try await get("/api/v1/admin/model-pricing")
+    }
+
+    func fetchApiKeys() async throws -> [SottoApiKeySummary] {
+        try await get("/api/v1/keys")
+    }
+
+    /// Revoking is the one key operation a device may perform; minting stays on
+    /// the web, so a lost device cannot replace the credential it lost.
+    func revokeApiKey(id: String) async throws {
+        let request = try makeRequest(path: "/api/v1/keys/\(id)", method: "DELETE", authorized: true)
+        try await sendIgnoringBody(request, acceptedStatuses: [200, 204])
+    }
+
+    // MARK: - Account settings
+
+    func fetchAccount() async throws -> SottoAccount {
+        try await get("/api/v1/users/me")
+    }
+
+    /// The route's schema is strict, so only changed fields may be sent; nil
+    /// properties are omitted by Swift's synthesized encoder.
+    func updateAccount(_ update: SottoAccountUpdate) async throws -> SottoAccount {
+        try await patch("/api/v1/users/me", body: update)
+    }
+
+    func fetchAiModels() async throws -> SottoAiModelList {
+        try await get("/api/v1/ai-models")
+    }
+
+    func uploadAvatar(imageData: Data, fileName: String, contentType: String) async throws -> SottoAvatarUploadResponse {
+        var request = try makeRequest(path: "/api/v1/users/me/avatar", method: "POST", authorized: true)
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = multipartBody(
+            data: imageData,
+            boundary: boundary,
+            fieldName: "avatar",
+            fileName: fileName,
+            contentType: contentType
+        )
+        return try await send(request, acceptedStatuses: [200, 201])
+    }
+
     // MARK: - Activity
 
     func fetchActivity() async throws -> SottoActivity {
-        try await get("/api/v1/activity")
+        try await get("/api/v1/learn/activity")
     }
 
     // MARK: - Memory graph
@@ -478,6 +533,21 @@ struct SottoAPIClient {
         }
     }
 
+    /// For routes that answer 204: there is no body to decode, only a status
+    /// to check.
+    private func sendIgnoringBody(_ request: URLRequest, acceptedStatuses: Set<Int>) async throws {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw SottoAPIError.message("Sotto returned a non-HTTP response.")
+        }
+        guard acceptedStatuses.contains(http.statusCode) else {
+            if let error = try? JSONDecoder().decode(SottoErrorResponse.self, from: data) {
+                throw SottoAPIError.message(error.error.description)
+            }
+            throw SottoAPIError.message("Sotto returned HTTP \(http.statusCode).")
+        }
+    }
+
     private static func describeDecodingError(_ error: Error) -> String {
         guard case let DecodingError.keyNotFound(key, context) = error else {
             return error.localizedDescription
@@ -494,13 +564,31 @@ struct SottoAPIClient {
         fileName: String,
         contentType: String
     ) throws -> Data {
+        multipartBody(
+            data: try Data(contentsOf: audioURL),
+            boundary: boundary,
+            fieldName: fieldName,
+            fileName: fileName,
+            contentType: contentType
+        )
+    }
+
+    /// One file part. Both routes that take an upload — speaking audio and the
+    /// avatar — send exactly this shape.
+    private func multipartBody(
+        data: Data,
+        boundary: String,
+        fieldName: String,
+        fileName: String,
+        contentType: String
+    ) -> Data {
         var body = Data()
         body.appendString("--\(boundary)\r\n")
         body.appendString(
             "Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n"
         )
         body.appendString("Content-Type: \(contentType)\r\n\r\n")
-        body.append(try Data(contentsOf: audioURL))
+        body.append(data)
         body.appendString("\r\n--\(boundary)--\r\n")
         return body
     }

@@ -1,5 +1,5 @@
 /**
- * GET /api/v1/activity. Adversarial: 401 unauth, 500 on the unexpected, and the
+ * GET /api/v1/learn/activity. Adversarial: 401 unauth, 500 on the unexpected, and the
  * Map -> object serialization that JSON.stringify would otherwise flatten to {}.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -14,13 +14,13 @@ vi.mock('@/lib/activity/heatmap', () => ({
 }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { GET } from '@/app/api/v1/activity/route';
+import { GET } from '@/app/api/v1/learn/activity/route';
 
 function req(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/v1/activity');
+  return new NextRequest('http://localhost:3000/api/v1/learn/activity');
 }
 
-describe('GET /api/v1/activity', () => {
+describe('GET /api/v1/learn/activity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: 'u1' });

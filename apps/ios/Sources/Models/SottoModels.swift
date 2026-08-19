@@ -557,9 +557,112 @@ struct SottoDocumentSection: Decodable, Identifiable, Equatable {
     let qrDataUrl: String?
 }
 
+// MARK: - Server admin (read-only)
+
+/// `GET /api/v1/health`. Admin callers additionally get `checks`.
+struct SottoHealth: Decodable, Equatable {
+    let status: String
+    let checks: [String: SottoHealthCheck]?
+
+    var isHealthy: Bool { status == "healthy" }
+}
+
+struct SottoHealthCheck: Decodable, Equatable {
+    let status: String
+    let latencyMs: Int?
+    let detail: String?
+
+    var isOk: Bool { status == "ok" }
+}
+
+struct SottoQueueSnapshot: Decodable, Equatable {
+    let queues: [String: SottoQueueDepth]
+
+    var backlog: Int { queues.values.reduce(0) { $0 + $1.waiting + $1.active } }
+    var failed: Int { queues.values.reduce(0) { $0 + $1.failed } }
+}
+
+struct SottoQueueDepth: Decodable, Equatable {
+    let waiting: Int
+    let active: Int
+    let completed: Int
+    let failed: Int
+    let delayed: Int
+}
+
+/// One row of `GET /api/v1/admin/model-pricing`. Only the fields the read-only
+/// screen shows are decoded; the route sends more.
+struct SottoModelPrice: Decodable, Identifiable, Equatable {
+    let modelId: String
+    let inputPerMTok: Double?
+    let outputPerMTok: Double?
+
+    var id: String { modelId }
+}
+
+struct SottoApiKeySummary: Decodable, Identifiable, Equatable {
+    let id: String
+    let name: String?
+    let keyPrefix: String
+    let lastUsedAt: String?
+    let createdAt: String?
+    let revokedAt: String?
+
+    var isRevoked: Bool { revokedAt != nil }
+}
+
+// MARK: - Settings
+
+/// `GET /api/v1/users/me`. `role` is what gates the admin screens.
+struct SottoAccount: Decodable, Equatable {
+    let id: String
+    let name: String?
+    let email: String?
+    let image: String?
+    let role: String?
+    let preferredLanguage: String?
+    let preferredAiModel: String?
+    let preferredTtsModel: String?
+    let preferredSttModel: String?
+    let showAgentUsageStatus: Bool?
+
+    var isAdmin: Bool { role == "ADMIN" }
+}
+
+/// PATCH body for `users/me`. The route's schema is strict, and Swift omits
+/// nil optionals when encoding, so each save sends only what changed.
+struct SottoAccountUpdate: Encodable, Equatable {
+    var name: String?
+    var image: String?
+    var preferredLanguage: String?
+    var preferredAiModel: String?
+    var showAgentUsageStatus: Bool?
+}
+
+struct SottoAiModelList: Decodable, Equatable {
+    let provider: String?
+    let isByok: Bool?
+    let models: [SottoAiModel]
+}
+
+struct SottoAiModel: Decodable, Identifiable, Equatable {
+    let id: String
+    let displayName: String
+    let tier: String?
+    let isDefault: Bool?
+    let group: String?
+}
+
+struct SottoAvatarUploadResponse: Decodable, Equatable {
+    let image: String?
+    let url: String?
+
+    var resolvedImage: String? { image ?? url }
+}
+
 // MARK: - Activity
 
-/// `GET /api/v1/activity`: one year of study days, bucketed in the learner's
+/// `GET /api/v1/learn/activity`: one year of study days, bucketed in the learner's
 /// timezone by the server, plus streaks.
 struct SottoActivity: Decodable, Equatable {
     let timeZone: String

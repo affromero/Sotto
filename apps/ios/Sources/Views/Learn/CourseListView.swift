@@ -4,6 +4,7 @@ struct CourseListView: View {
     @EnvironmentObject private var model: SottoAppModel
     @State private var selectedCourseId: String?
     @State private var showingNewCourse = false
+    @State private var showingSettings = false
 
     private var selectedCourse: SottoCourse? {
         model.courses.first { $0.id == selectedCourseId } ?? model.courses.first
@@ -32,6 +33,18 @@ struct CourseListView: View {
                     Spacer()
 
                     ProfileToolbarMenu()
+
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .frame(width: 42, height: 42)
+                    }
+                    .buttonStyle(.plain)
+                    .background(SottoTheme.surface)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(SottoTheme.line))
+                    .accessibilityLabel("Settings")
 
                     Button {
                         showingNewCourse = true
@@ -96,6 +109,10 @@ struct CourseListView: View {
         }
         .sheet(isPresented: $showingNewCourse) {
             NewCourseView()
+                .environmentObject(model)
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
                 .environmentObject(model)
         }
     }

@@ -7,7 +7,7 @@ import { getActivityData } from '@/lib/activity/heatmap';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/v1/activity — the learner's daily activity heatmap and streaks, the
+ * GET /api/v1/learn/activity — the learner's daily activity heatmap and streaks, the
  * same data the learn hub renders server-side. Exposed for API clients (the
  * iOS app), which cannot read a React server component.
  */
