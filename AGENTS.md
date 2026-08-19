@@ -71,6 +71,7 @@ npm run ci                     # lint + type-check + test + build
 | `apps/web/src/types/`      | Type re-exports from `@sotto/shared`                                 |
 | `apps/web/src/styles/`     | Design system tokens                                                 |
 | `apps/web/prisma/`         | Prisma schema and database rules                                     |
+| `apps/ios/`                | Universal iPhone + iPad SwiftUI client: layout, timeouts, submission |
 | `packages/`                | Shared package boundaries                                            |
 | `tui/`                     | Rust `sotto` terminal client: API/audio/contract-codegen conventions |
 

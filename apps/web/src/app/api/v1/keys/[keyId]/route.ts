@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ keyId: string }> };
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+// Bearer-capable: revoking is the one key operation a paired device should be
+// able to do, including revoking itself if it is lost.
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { keyId } = await params;
-  const session = await auth();
+  const authed = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
-  if (session.user.role !== 'ADMIN') {
+  if (!(await isUserAdmin(authed.userId))) {
     return errorResponse('Forbidden', 403);
   }
 
@@ -25,7 +28,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('API key not found', 404);
   }
 
-  if (apiKey.userId !== session.user.id) {
+  if (apiKey.userId !== authed.userId) {
     return errorResponse('Forbidden', 403);
   }
 

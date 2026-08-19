@@ -775,6 +775,54 @@ export const memoryGraphResponseSchema = z
   .loose();
 
 // ---------------------------------------------------------------------------
+// GET /api/v1/courses/{courseId}/exams — the exam this course can sit plus the
+// learner's past attempts. Mirrors listCourseExams in
+// apps/web/src/lib/mock-exam-service.ts.
+// ---------------------------------------------------------------------------
+
+export const courseExamsResponseSchema = z
+  .object({
+    available: z
+      .object({
+        institution: z.string(),
+        institutionLabel: z.string(),
+        examName: z.string(),
+        level: z.string(),
+        sectionCount: z.number(),
+      })
+      .loose(),
+    history: z.array(
+      z
+        .object({
+          id: z.string(),
+          examName: z.string(),
+          level: z.string(),
+          status: z.string(),
+          band: z.string().nullable(),
+          overallScore: z.number().nullable(),
+          createdAt: z.string(),
+        })
+        .loose()
+    ),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/learn/activity — daily study activity + streaks, bucketed in the
+// learner's timezone. `days` is an ISO-day-keyed object; quiet days are absent.
+// ---------------------------------------------------------------------------
+
+export const activityResponseSchema = z
+  .object({
+    timeZone: z.string(),
+    todayIso: z.string(),
+    days: z.record(z.string(), z.record(z.string(), z.number())),
+    currentStreak: z.number(),
+    longestStreak: z.number(),
+  })
+  .loose();
+
+// ---------------------------------------------------------------------------
 // GET /api/v1/onboarding/config — instance + owner config for the wizard. No
 // secrets. Mirrors apps/web/src/app/api/v1/onboarding/config/route.ts:
 // { selfHosted, isOwner, infra: {...non-secret provider/storage fields} | null }

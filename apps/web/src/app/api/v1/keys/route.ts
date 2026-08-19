@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateApiKey } from '@/lib/api-keys';
+import { authenticateRequest, generateApiKey } from '@/lib/api-keys';
+import { isUserAdmin } from '@/lib/auth-guards';
 import { createApiKeySchema } from '@/lib/validations';
 
 import { errorResponse } from '@/lib/api-response';
 const MAX_ACTIVE_KEYS = 10;
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+// Listing and revoking are Bearer-capable so a paired device can audit and cut
+// off its own credentials. Minting (POST, below) deliberately is NOT: ApiKey
+// has no scopes and no expiry, so a stolen device key that could mint more
+// would survive revoking the device it came from, defeating per-device
+// revocation. New devices go through the pairing flow instead.
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return errorResponse('Unauthorized', 401);
   }
-  if (session.user.role !== 'ADMIN') {
+  if (!(await isUserAdmin(authed.userId))) {
     return errorResponse('Forbidden', 403);
   }
 
   const keys = await prisma.apiKey.findMany({
-    where: { userId: session.user.id },
+    where: { userId: authed.userId },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

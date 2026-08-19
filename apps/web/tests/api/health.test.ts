@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
 
 const mockQueryRaw = vi.fn();
 const mockPing = vi.fn();
@@ -6,6 +7,8 @@ const mockLlen = vi.fn();
 const mockZcard = vi.fn();
 const mockS3Send = vi.fn();
 const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
+const mockIsUserAdmin = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -41,6 +44,19 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
+
+vi.mock('@/lib/auth-guards', () => ({
+  isUserAdmin: (...args: unknown[]) => mockIsUserAdmin(...args),
+}));
+
+/** Anonymous probe, the shape deploy tooling sends. */
+function healthReq(headers: Record<string, string> = {}): NextRequest {
+  return new NextRequest('http://localhost:3000/api/v1/health', { headers });
+}
+
 import { GET } from '@/app/api/v1/health/route';
 import { GET as GET_LEGACY } from '@/app/api/health/route';
 
@@ -59,6 +75,8 @@ describe('GET /api/v1/health', () => {
     mockS3Send.mockResolvedValue({});
     // Default: admin session for detailed checks
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockAuthenticateRequest.mockResolvedValue(null);
+    mockIsUserAdmin.mockResolvedValue(false);
     // Default: mock fetch so tests are isolated from real external API calls
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
   });
@@ -71,7 +89,7 @@ describe('GET /api/v1/health', () => {
   it('returns only status and timestamp for unauthenticated requests', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -87,7 +105,7 @@ describe('GET /api/v1/health', () => {
   it('keeps /api/health as a legacy blue-green health alias', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await GET_LEGACY();
+    const response = await GET_LEGACY(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -98,7 +116,7 @@ describe('GET /api/v1/health', () => {
   it('returns only status and timestamp for non-admin users', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -114,14 +132,14 @@ describe('GET /api/v1/health', () => {
     const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     globalThis.fetch = fetchSpy;
 
-    await GET();
+    await GET(healthReq());
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(mockS3Send).not.toHaveBeenCalled();
   });
 
   it('returns 200 healthy when DB and Redis pass', async () => {
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -135,7 +153,7 @@ describe('GET /api/v1/health', () => {
   it('returns 503 degraded when DB fails', async () => {
     mockQueryRaw.mockRejectedValue(new Error('Connection refused'));
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -146,7 +164,7 @@ describe('GET /api/v1/health', () => {
   it('returns 503 degraded when Redis fails', async () => {
     mockPing.mockRejectedValue(new Error('ECONNREFUSED'));
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -158,7 +176,7 @@ describe('GET /api/v1/health', () => {
     mockAuth.mockResolvedValue(null);
     mockQueryRaw.mockRejectedValue(new Error('Connection refused'));
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -172,7 +190,7 @@ describe('GET /api/v1/health', () => {
     delete process.env.R2_ACCESS_KEY_ID;
     delete process.env.R2_SECRET_ACCESS_KEY;
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.storage.status).toBe('not_configured');
@@ -184,7 +202,7 @@ describe('GET /api/v1/health', () => {
     process.env.R2_SECRET_ACCESS_KEY = 'test-secret';
     mockS3Send.mockResolvedValue({});
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.storage.status).toBe('ok');
@@ -196,7 +214,7 @@ describe('GET /api/v1/health', () => {
     process.env.R2_SECRET_ACCESS_KEY = 'test-secret';
     mockS3Send.mockRejectedValue(new Error('Access denied'));
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.storage.status).toBe('error');
@@ -205,7 +223,7 @@ describe('GET /api/v1/health', () => {
   it('reports anthropic not_configured when key is missing', async () => {
     delete process.env.ANTHROPIC_API_KEY;
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.anthropic.status).toBe('not_configured');
@@ -215,7 +233,7 @@ describe('GET /api/v1/health', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 });
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.anthropic.status).toBe('error');
@@ -226,7 +244,7 @@ describe('GET /api/v1/health', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.anthropic.status).toBe('ok');
@@ -236,7 +254,7 @@ describe('GET /api/v1/health', () => {
   it('reports openai not_configured when key is missing', async () => {
     delete process.env.OPENAI_API_KEY;
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.openai.status).toBe('not_configured');
@@ -248,7 +266,7 @@ describe('GET /api/v1/health', () => {
     delete process.env.ELEVENLABS_API_KEY;
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.openai.status).toBe('ok');
@@ -261,7 +279,7 @@ describe('GET /api/v1/health', () => {
     delete process.env.ELEVENLABS_API_KEY;
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 });
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.openai.status).toBe('error');
@@ -271,7 +289,7 @@ describe('GET /api/v1/health', () => {
   it('reports elevenlabs not_configured when key is missing', async () => {
     delete process.env.ELEVENLABS_API_KEY;
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.elevenlabs.status).toBe('not_configured');
@@ -282,7 +300,7 @@ describe('GET /api/v1/health', () => {
     delete process.env.ANTHROPIC_API_KEY;
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 403 });
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.elevenlabs.status).toBe('error');
@@ -294,7 +312,7 @@ describe('GET /api/v1/health', () => {
     delete process.env.ELEVENLABS_API_KEY;
     globalThis.fetch = vi.fn().mockRejectedValue(new DOMException('Aborted', 'AbortError'));
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.anthropic.status).toBe('error');
@@ -304,7 +322,7 @@ describe('GET /api/v1/health', () => {
     // 12 queues, ~5 failed each = 60 total > 50
     mockZcard.mockResolvedValue(5);
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.queues.status).toBe('degraded');
@@ -313,7 +331,7 @@ describe('GET /api/v1/health', () => {
   it('reports queues ok when failed jobs are under threshold', async () => {
     mockZcard.mockResolvedValue(0);
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.checks.queues.status).toBe('ok');
@@ -323,7 +341,7 @@ describe('GET /api/v1/health', () => {
     process.env.DATABASE_URL = 'postgresql://test';
     delete process.env.ANTHROPIC_API_KEY;
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.env.DATABASE_URL).toBe(true);
@@ -334,17 +352,66 @@ describe('GET /api/v1/health', () => {
     delete process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     delete process.env.VAPID_PRIVATE_KEY;
 
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.vapid).toBe(false);
   });
 
   it('includes timestamp and version', async () => {
-    const response = await GET();
+    const response = await GET(healthReq());
     const body = await response.json();
 
     expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(body.version).toBeDefined();
+  });
+});
+
+/**
+ * The app authenticates with a `sk_sotto_` Bearer key, which the session lookup
+ * cannot see. Health stays dual-mode: the anonymous probe must keep working.
+ */
+describe('GET /api/v1/health with a Bearer credential', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQueryRaw.mockResolvedValue([{ ok: 1 }]);
+    mockPing.mockResolvedValue('PONG');
+    mockLlen.mockResolvedValue(0);
+    mockZcard.mockResolvedValue(0);
+    mockS3Send.mockResolvedValue({});
+    mockAuth.mockResolvedValue(null);
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubEnv('NODE_ENV', 'production');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('gives an admin Bearer client the detailed checks', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-1' });
+    mockIsUserAdmin.mockResolvedValue(true);
+
+    const body = await (await GET(healthReq({ authorization: 'Bearer sk_sotto_test' }))).json();
+
+    expect(body.checks).toBeDefined();
+  });
+
+  it('gives a non-admin Bearer client only the public payload', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'learner-1' });
+    mockIsUserAdmin.mockResolvedValue(false);
+
+    const body = await (await GET(healthReq({ authorization: 'Bearer sk_sotto_test' }))).json();
+
+    expect(body.checks).toBeUndefined();
+    expect(body.status).toBe('healthy');
+  });
+
+  it('never looks up a credential for an anonymous probe', async () => {
+    const body = await (await GET(healthReq())).json();
+
+    expect(mockAuthenticateRequest).not.toHaveBeenCalled();
+    expect(body.status).toBe('healthy');
+    expect(body.checks).toBeUndefined();
   });
 });
