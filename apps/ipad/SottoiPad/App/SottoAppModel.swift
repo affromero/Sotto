@@ -687,32 +687,6 @@ final class SottoAppModel: ObservableObject {
         )
     }
 
-    func submitClassWriting(
-        classId: String,
-        promptId: String,
-        text: String
-    ) async throws -> SottoWritingGrade {
-        guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this device before submitting writing.")
-        }
-        return try await client.submitClassWriting(classId: classId, promptId: promptId, text: text)
-    }
-
-    func submitPracticeWriting(
-        sessionId: String,
-        promptId: String,
-        text: String
-    ) async throws -> SottoWritingGrade {
-        guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this device before submitting writing.")
-        }
-        return try await client.submitPracticeWriting(
-            sessionId: sessionId,
-            promptId: promptId,
-            text: text
-        )
-    }
-
     func uploadClassSpeakingRecording(
         classId: String,
         promptId: String,
@@ -778,7 +752,7 @@ final class SottoAppModel: ObservableObject {
         classGenerationOperations[courseId] = nil
     }
 
-    private func makeClient(usesSelectedProfile: Bool = true) -> SottoAPIClient? {
+    func makeClient(usesSelectedProfile: Bool = true) -> SottoAPIClient? {
         guard let credentials else { return nil }
         return SottoAPIClient(
             serverURL: credentials.serverURL,

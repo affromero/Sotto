@@ -320,6 +320,8 @@ private struct CourseDetailPane: View {
     @Environment(\.sottoLayout) private var layout
     let course: SottoCourse
 
+    @State private var showingExams = false
+
     private var generation: SottoLoadingOperation? {
         model.classGenerationOperations[course.id]
     }
@@ -382,6 +384,10 @@ private struct CourseDetailPane: View {
             .frame(maxWidth: layout.readableWidth, alignment: .leading)
         }
         .background(SottoTheme.paper)
+        .sheet(isPresented: $showingExams) {
+            ExamHubView(course: course)
+                .environmentObject(model)
+        }
     }
 
     private var primaryActionTitle: String {
@@ -420,7 +426,7 @@ private struct CourseDetailPane: View {
     }
 
     private func openExam() {
-        openWeb(path: "/learn/exams", queryItems: [URLQueryItem(name: "course", value: course.id)])
+        showingExams = true
     }
 
     private func openPlacement() {

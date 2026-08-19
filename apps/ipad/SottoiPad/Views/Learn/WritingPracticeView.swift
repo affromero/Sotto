@@ -6,6 +6,7 @@ import SwiftUI
 enum WritingPromptSource: Equatable {
     case classSession(classId: String)
     case practice(sessionId: String)
+    case exam(examId: String)
 }
 
 struct WritingPracticeView: View {
@@ -189,6 +190,12 @@ private struct WritingPromptCard: View {
             case let .practice(sessionId):
                 grade = try await model.submitPracticeWriting(
                     sessionId: sessionId,
+                    promptId: prompt.id,
+                    text: answer
+                )
+            case let .exam(examId):
+                grade = try await model.submitExamWriting(
+                    examId: examId,
                     promptId: prompt.id,
                     text: answer
                 )

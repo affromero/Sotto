@@ -1,10 +1,27 @@
 import AVFoundation
 import SwiftUI
 
+/// Where a speaking prompt is being recorded from. Class and exam speaking
+/// share the upload-then-poll flow and differ only in the route.
+enum SpeakingPromptSource: Equatable {
+    case classSession(classId: String)
+    case exam(examId: String)
+}
+
 struct ClassSpeakingPracticeView: View {
-    let classId: String
+    let source: SpeakingPromptSource
     let prompts: [SottoSpeakingPrompt]
-    let onSelectionHelp: (String, String) -> Void
+    let onSelectionHelp: ((String, String) -> Void)?
+
+    init(
+        source: SpeakingPromptSource,
+        prompts: [SottoSpeakingPrompt],
+        onSelectionHelp: ((String, String) -> Void)? = nil
+    ) {
+        self.source = source
+        self.prompts = prompts
+        self.onSelectionHelp = onSelectionHelp
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -14,7 +31,7 @@ struct ClassSpeakingPracticeView: View {
 
             ForEach(prompts.sorted { ($0.order ?? 0) < ($1.order ?? 0) }) { prompt in
                 ClassSpeakingPromptCard(
-                    classId: classId,
+                    source: source,
                     prompt: prompt,
                     onSelectionHelp: onSelectionHelp
                 )
@@ -29,9 +46,9 @@ struct ClassSpeakingPracticeView: View {
 private struct ClassSpeakingPromptCard: View {
     @EnvironmentObject private var model: SottoAppModel
 
-    let classId: String
+    let source: SpeakingPromptSource
     let prompt: SottoSpeakingPrompt
-    let onSelectionHelp: (String, String) -> Void
+    let onSelectionHelp: ((String, String) -> Void)?
 
     @State private var recorder: AVAudioRecorder?
     @State private var audioURL: URL?
@@ -41,8 +58,12 @@ private struct ClassSpeakingPromptCard: View {
     @State private var feedback: SottoSpeakingPollResponse?
     @State private var task: Task<Void, Never>?
 
-    init(classId: String, prompt: SottoSpeakingPrompt, onSelectionHelp: @escaping (String, String) -> Void) {
-        self.classId = classId
+    init(
+        source: SpeakingPromptSource,
+        prompt: SottoSpeakingPrompt,
+        onSelectionHelp: ((String, String) -> Void)?
+    ) {
+        self.source = source
         self.prompt = prompt
         self.onSelectionHelp = onSelectionHelp
         if let recording = prompt.latestRecording {
@@ -197,11 +218,7 @@ private struct ClassSpeakingPromptCard: View {
             do {
                 statusText = "Uploading voice sample..."
                 errorMessage = nil
-                let uploaded = try await model.uploadClassSpeakingRecording(
-                    classId: classId,
-                    promptId: prompt.id,
-                    audioURL: url
-                )
+                let uploaded = try await upload(url)
 
                 statusText = "Scoring pronunciation..."
                 let result = try await waitForFeedback(recordingId: uploaded.recordingId)
@@ -219,17 +236,47 @@ private struct ClassSpeakingPromptCard: View {
     private func waitForFeedback(recordingId: String) async throws -> SottoSpeakingPollResponse {
         for _ in 0..<50 {
             try Task.checkCancellation()
-            let result = try await model.pollClassSpeakingRecording(
-                classId: classId,
-                promptId: prompt.id,
-                recordingId: recordingId
-            )
+            let result = try await poll(recordingId: recordingId)
             if result.status != "PENDING" && result.status != "PROCESSING" {
                 return result
             }
             try await Task.sleep(nanoseconds: 1_500_000_000)
         }
         throw SottoAPIError.message("Pronunciation scoring is still running. Come back in a moment.")
+    }
+
+    private func upload(_ url: URL) async throws -> SottoSpeakingUploadResponse {
+        switch source {
+        case let .classSession(classId):
+            return try await model.uploadClassSpeakingRecording(
+                classId: classId,
+                promptId: prompt.id,
+                audioURL: url
+            )
+        case let .exam(examId):
+            return try await model.uploadExamSpeakingRecording(
+                examId: examId,
+                promptId: prompt.id,
+                audioURL: url
+            )
+        }
+    }
+
+    private func poll(recordingId: String) async throws -> SottoSpeakingPollResponse {
+        switch source {
+        case let .classSession(classId):
+            return try await model.pollClassSpeakingRecording(
+                classId: classId,
+                promptId: prompt.id,
+                recordingId: recordingId
+            )
+        case let .exam(examId):
+            return try await model.pollExamSpeakingRecording(
+                examId: examId,
+                promptId: prompt.id,
+                recordingId: recordingId
+            )
+        }
     }
 
     private func requestMicrophoneAccess() async -> Bool {
@@ -247,7 +294,7 @@ private struct SpeakingPromptTextBlock: View {
     let font: UIFont
     let color: Color
     let emphasized: Bool
-    let onSelectionHelp: (String, String) -> Void
+    let onSelectionHelp: ((String, String) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -260,7 +307,7 @@ private struct SpeakingPromptTextBlock: View {
                 text,
                 font: font,
                 color: UIColor(color),
-                onExamples: onSelectionHelp
+                onExamples: onSelectionHelp ?? { _, _ in }
             )
         }
         .padding(emphasized ? 12 : 10)

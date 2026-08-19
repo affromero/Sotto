@@ -52,7 +52,8 @@ struct SottoAPIClient {
         let response: NextClassCreatedResponse = try await post(
             "/api/v1/courses/\(courseId)/next-class",
             body: EmptyBody(),
-            acceptedStatuses: [200, 201, 409]
+            acceptedStatuses: [200, 201, 409],
+            timeout: SottoAPIClient.generationTimeout
         )
 
         if let classId = response.classId ?? response.activeClassId {
@@ -93,7 +94,8 @@ struct SottoAPIClient {
         let _: ClassRegenerationResponse = try await post(
             "/api/v1/classes/\(classId)",
             body: RegenerateClassRequest(scope: "class"),
-            acceptedStatuses: [200]
+            acceptedStatuses: [200],
+            timeout: SottoAPIClient.generationTimeout
         )
     }
 
@@ -110,7 +112,13 @@ struct SottoAPIClient {
     }
 
     func startPractice(courseId: String, kind: String) async throws -> SottoPracticeStart {
-        try await post("/api/v1/courses/\(courseId)/practice", body: StartPracticeRequest(kind: kind))
+        // The server builds a script and its audio here; the web client warns
+        // this runs one to three minutes.
+        try await post(
+            "/api/v1/courses/\(courseId)/practice",
+            body: StartPracticeRequest(kind: kind),
+            timeout: SottoAPIClient.generationTimeout
+        )
     }
 
     func fetchCourseTopics(courseId: String) async throws -> [SottoTopicSuggestion] {
@@ -138,7 +146,11 @@ struct SottoAPIClient {
     }
 
     func submitPractice(sessionId: String, answers: [SottoPracticeAnswer]) async throws -> SottoPracticeSubmitResult {
-        try await post("/api/v1/practice/\(sessionId)/submit", body: SubmitPracticeRequest(answers: answers))
+        try await post(
+            "/api/v1/practice/\(sessionId)/submit",
+            body: SubmitPracticeRequest(answers: answers),
+            timeout: SottoAPIClient.generationTimeout
+        )
     }
 
     func fetchWorksheet(classId: String) async throws -> SottoWorksheetResponse {
@@ -161,10 +173,34 @@ struct SottoAPIClient {
         promptId: String,
         audioURL: URL
     ) async throws -> SottoSpeakingUploadResponse {
-        var request = try makeRequest(
+        try await uploadSpeakingRecording(
             path: "/api/v1/classes/\(classId)/speaking/\(promptId)",
+            audioURL: audioURL
+        )
+    }
+
+    func pollClassSpeakingRecording(
+        classId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        try await pollSpeakingRecording(
+            path: "/api/v1/classes/\(classId)/speaking/\(promptId)",
+            recordingId: recordingId
+        )
+    }
+
+    /// Class, practice, and exam speaking all upload to their own path and then
+    /// poll the same path for the grade, so the transport lives here once.
+    private func uploadSpeakingRecording(
+        path: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        var request = try makeRequest(
+            path: path,
             method: "POST",
-            authorized: true
+            authorized: true,
+            timeout: SottoAPIClient.generationTimeout
         )
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -178,15 +214,77 @@ struct SottoAPIClient {
         return try await send(request, acceptedStatuses: [201])
     }
 
-    func pollClassSpeakingRecording(
-        classId: String,
-        promptId: String,
+    private func pollSpeakingRecording(
+        path: String,
         recordingId: String
     ) async throws -> SottoSpeakingPollResponse {
         let encodedRecordingId =
             recordingId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? recordingId
-        return try await get(
-            "/api/v1/classes/\(classId)/speaking/\(promptId)?recordingId=\(encodedRecordingId)"
+        return try await get("\(path)?recordingId=\(encodedRecordingId)")
+    }
+
+    // MARK: - Mock exams
+
+    func fetchCourseExams(courseId: String) async throws -> SottoCourseExams {
+        try await get("/api/v1/courses/\(courseId)/exams")
+    }
+
+    /// Builds every section up front, so this is one of the long calls.
+    func startExam(courseId: String, level: String?) async throws -> String {
+        let response: SottoExamStartResponse = try await post(
+            "/api/v1/exams",
+            body: StartExamRequest(courseId: courseId, level: level),
+            timeout: SottoAPIClient.generationTimeout
+        )
+        return response.examId
+    }
+
+    func fetchExam(examId: String) async throws -> SottoExamDetail {
+        try await get("/api/v1/exams/\(examId)")
+    }
+
+    /// Carries the multiple-choice answers only. Speaking and writing are
+    /// graded through their own routes before this runs, and the server folds
+    /// those scores in.
+    func submitExam(examId: String, answers: [SottoSubmitAnswer]) async throws -> SottoExamScoreResult {
+        try await post(
+            "/api/v1/exams/\(examId)/submit",
+            body: SubmitClassRequest(answers: answers),
+            timeout: SottoAPIClient.generationTimeout
+        )
+    }
+
+    func uploadExamSpeakingRecording(
+        examId: String,
+        promptId: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        try await uploadSpeakingRecording(
+            path: "/api/v1/exams/\(examId)/speaking/\(promptId)",
+            audioURL: audioURL
+        )
+    }
+
+    func pollExamSpeakingRecording(
+        examId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        try await pollSpeakingRecording(
+            path: "/api/v1/exams/\(examId)/speaking/\(promptId)",
+            recordingId: recordingId
+        )
+    }
+
+    func submitExamWriting(
+        examId: String,
+        promptId: String,
+        text: String
+    ) async throws -> SottoWritingGrade {
+        try await post(
+            "/api/v1/exams/\(examId)/writing/\(promptId)",
+            body: WritingSubmissionRequest(text: text),
+            timeout: SottoAPIClient.generationTimeout
         )
     }
 
@@ -199,7 +297,8 @@ struct SottoAPIClient {
     ) async throws -> SottoWritingGrade {
         try await post(
             "/api/v1/classes/\(classId)/writing/\(promptId)",
-            body: WritingSubmissionRequest(text: text)
+            body: WritingSubmissionRequest(text: text),
+            timeout: SottoAPIClient.generationTimeout
         )
     }
 
@@ -210,16 +309,24 @@ struct SottoAPIClient {
     ) async throws -> SottoWritingGrade {
         try await post(
             "/api/v1/practice/\(sessionId)/writing/\(promptId)",
-            body: WritingSubmissionRequest(text: text)
+            body: WritingSubmissionRequest(text: text),
+            timeout: SottoAPIClient.generationTimeout
         )
     }
 
     func submitClass(classId: String, answers: [SottoSubmitAnswer]) async throws -> SottoClassSubmitResult {
-        try await post("/api/v1/classes/\(classId)/submit", body: SubmitClassRequest(answers: answers))
+        try await post(
+            "/api/v1/classes/\(classId)/submit",
+            body: SubmitClassRequest(answers: answers),
+            timeout: SottoAPIClient.generationTimeout
+        )
     }
 
-    private func get<Response: Decodable>(_ path: String) async throws -> Response {
-        let request = try makeRequest(path: path, method: "GET", authorized: true)
+    private func get<Response: Decodable>(
+        _ path: String,
+        timeout: TimeInterval = SottoAPIClient.defaultTimeout
+    ) async throws -> Response {
+        let request = try makeRequest(path: path, method: "GET", authorized: true, timeout: timeout)
         return try await send(request, acceptedStatuses: [200])
     }
 
@@ -232,9 +339,15 @@ struct SottoAPIClient {
         _ path: String,
         body: Body,
         authorized: Bool = true,
-        acceptedStatuses: Set<Int> = [200, 201]
+        acceptedStatuses: Set<Int> = [200, 201],
+        timeout: TimeInterval = SottoAPIClient.defaultTimeout
     ) async throws -> Response {
-        var request = try makeRequest(path: path, method: "POST", authorized: authorized)
+        var request = try makeRequest(
+            path: path,
+            method: "POST",
+            authorized: authorized,
+            timeout: timeout
+        )
         request.httpBody = try JSONEncoder().encode(body)
         return try await send(request, acceptedStatuses: acceptedStatuses)
     }
@@ -261,17 +374,25 @@ struct SottoAPIClient {
         return try await send(request, acceptedStatuses: acceptedStatuses)
     }
 
-    private func makeRequest(path: String, method: String, authorized: Bool) throws -> URLRequest {
+    /// Routes that generate content or call a model server-side. The Next.js
+    /// handlers give these `maxDuration = 300`, so the client has to wait that
+    /// long too rather than time out on work the server is still doing.
+    static let generationTimeout: TimeInterval = 300
+    static let defaultTimeout: TimeInterval = 60
+
+    private func makeRequest(
+        path: String,
+        method: String,
+        authorized: Bool,
+        timeout: TimeInterval = SottoAPIClient.defaultTimeout
+    ) throws -> URLRequest {
         guard let url = URL(string: path, relativeTo: serverURL)?.absoluteURL else {
             throw SottoAPIError.message("Invalid Sotto URL.")
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.timeoutInterval =
-            path.contains("/next-class") || (method == "POST" && path.contains("/api/v1/classes/"))
-            ? 300
-            : 60
+        request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -397,6 +518,11 @@ private struct SubmitClassRequest: Encodable {
 
 private struct WritingSubmissionRequest: Encodable {
     let text: String
+}
+
+private struct StartExamRequest: Encodable {
+    let courseId: String
+    let level: String?
 }
 
 private struct SelectionHelpRequest: Encodable {

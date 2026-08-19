@@ -71,7 +71,7 @@ struct ClassSectionView: View {
             if !section.prompts.isEmpty {
                 if skill == "SPEAKING" {
                     ClassSpeakingPracticeView(
-                        classId: classId,
+                        source: .classSession(classId: classId),
                         prompts: section.prompts,
                         onSelectionHelp: onSelectionHelp
                     )
