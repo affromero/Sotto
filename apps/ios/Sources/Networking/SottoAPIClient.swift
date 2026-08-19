@@ -223,6 +223,43 @@ struct SottoAPIClient {
         return try await get("\(path)?recordingId=\(encodedRecordingId)")
     }
 
+    // MARK: - Placement
+
+    /// Generates the adaptive question batch, so this runs against a model.
+    func fetchPlacement(native: String, target: String) async throws -> SottoPlacementBatch {
+        try await get(
+            "/api/v1/placement?native=\(native)&target=\(target)",
+            timeout: SottoAPIClient.generationTimeout
+        )
+    }
+
+    func submitPlacement(
+        native: String,
+        target: String,
+        answers: [SottoPlacementAnswer]
+    ) async throws -> SottoPlacementResult {
+        try await post(
+            "/api/v1/placement",
+            body: SubmitPlacementRequest(native: native, target: target, answers: answers),
+            timeout: SottoAPIClient.generationTimeout
+        )
+    }
+
+    /// Declaring a level skips the test but still creates the course, which
+    /// builds a curriculum on the server, so it gets the long timeout too.
+    func submitManualPlacement(
+        native: String,
+        target: String,
+        level: String
+    ) async throws -> SottoManualPlacementResult {
+        try await post(
+            "/api/v1/placement/manual",
+            body: ManualPlacementRequest(native: native, target: target, level: level),
+            acceptedStatuses: [200, 201],
+            timeout: SottoAPIClient.generationTimeout
+        )
+    }
+
     // MARK: - Mock exams
 
     func fetchCourseExams(courseId: String) async throws -> SottoCourseExams {
@@ -518,6 +555,18 @@ private struct SubmitClassRequest: Encodable {
 
 private struct WritingSubmissionRequest: Encodable {
     let text: String
+}
+
+private struct SubmitPlacementRequest: Encodable {
+    let native: String
+    let target: String
+    let answers: [SottoPlacementAnswer]
+}
+
+private struct ManualPlacementRequest: Encodable {
+    let native: String
+    let target: String
+    let level: String
 }
 
 private struct StartExamRequest: Encodable {

@@ -321,6 +321,7 @@ private struct CourseDetailPane: View {
     let course: SottoCourse
 
     @State private var showingExams = false
+    @State private var showingPlacement = false
 
     private var generation: SottoLoadingOperation? {
         model.classGenerationOperations[course.id]
@@ -388,6 +389,10 @@ private struct CourseDetailPane: View {
             ExamHubView(course: course)
                 .environmentObject(model)
         }
+        .sheet(isPresented: $showingPlacement) {
+            PlacementView(nativeLang: course.nativeLang, targetLang: course.targetLang)
+                .environmentObject(model)
+        }
     }
 
     private var primaryActionTitle: String {
@@ -430,13 +435,7 @@ private struct CourseDetailPane: View {
     }
 
     private func openPlacement() {
-        openWeb(
-            path: "/learn/placement",
-            queryItems: [
-                URLQueryItem(name: "native", value: course.nativeLang),
-                URLQueryItem(name: "target", value: course.targetLang),
-            ]
-        )
+        showingPlacement = true
     }
 
     private func openWeb(path: String, queryItems: [URLQueryItem] = []) {

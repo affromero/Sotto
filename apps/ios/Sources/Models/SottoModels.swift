@@ -557,6 +557,41 @@ struct SottoDocumentSection: Decodable, Identifiable, Equatable {
     let qrDataUrl: String?
 }
 
+// MARK: - Placement
+
+struct SottoPlacementBatch: Decodable, Equatable {
+    let native: String
+    let target: String
+    let questions: [SottoPlacementQuestion]
+}
+
+struct SottoPlacementQuestion: Decodable, Identifiable, Equatable {
+    let id: String
+    let cefr: String
+    let skill: String
+    let prompt: String
+    let options: [String]
+}
+
+struct SottoPlacementAnswer: Encodable, Equatable {
+    let id: String
+    /// 0-3 pick an option; 4 is the "I don't know" answer the scorer expects.
+    let selectedIndex: Int
+
+    static let dontKnowIndex = 4
+}
+
+struct SottoPlacementResult: Decodable, Equatable {
+    let courseId: String
+    let level: String
+    let scoreBySkill: [String: Double]?
+}
+
+struct SottoManualPlacementResult: Decodable, Equatable {
+    let courseId: String
+    let level: String
+}
+
 // MARK: - Mock exams
 
 /// `GET /api/v1/courses/{id}/exams`: the exam this course can sit, plus the

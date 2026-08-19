@@ -4,6 +4,49 @@ import Foundation
 /// the repo's 1000-line limit. These are all thin pass-throughs: they resolve
 /// the paired client and forward, with no state of their own.
 extension SottoAppModel {
+    // MARK: - Placement
+
+    func fetchPlacement(native: String, target: String) async throws -> SottoPlacementBatch {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before taking a placement test.")
+        }
+        return try await client.fetchPlacement(native: native, target: target)
+    }
+
+    func submitPlacement(
+        native: String,
+        target: String,
+        answers: [SottoPlacementAnswer]
+    ) async throws -> SottoPlacementResult {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before taking a placement test.")
+        }
+        let result = try await client.submitPlacement(
+            native: native,
+            target: target,
+            answers: answers
+        )
+        await loadCourses()
+        return result
+    }
+
+    func submitManualPlacement(
+        native: String,
+        target: String,
+        level: String
+    ) async throws -> SottoManualPlacementResult {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before setting a level.")
+        }
+        let result = try await client.submitManualPlacement(
+            native: native,
+            target: target,
+            level: level
+        )
+        await loadCourses()
+        return result
+    }
+
     // MARK: - Mock exams
 
     func fetchCourseExams(courseId: String) async throws -> SottoCourseExams {
