@@ -333,13 +333,13 @@ private struct CourseRow: View {
 
 private struct CourseDetailPane: View {
     @EnvironmentObject private var model: SottoAppModel
-    @Environment(\.openURL) private var openURL
     @Environment(\.sottoLayout) private var layout
     let course: SottoCourse
 
     @State private var showingExams = false
     @State private var showingPlacement = false
     @State private var showingMemory = false
+    @State private var showingLive = false
 
     private var generation: SottoLoadingOperation? {
         model.classGenerationOperations[course.id]
@@ -410,6 +410,10 @@ private struct CourseDetailPane: View {
             ExamHubView(course: course)
                 .environmentObject(model)
         }
+        .sheet(isPresented: $showingLive) {
+            LiveConversationView(course: course)
+                .environmentObject(model)
+        }
         .sheet(isPresented: $showingMemory) {
             MemoryGraphView(course: course)
                 .environmentObject(model)
@@ -452,7 +456,7 @@ private struct CourseDetailPane: View {
     }
 
     private func openLive() {
-        openWeb(path: "/learn/live", queryItems: [URLQueryItem(name: "course", value: course.id)])
+        showingLive = true
     }
 
     private func openExam() {
@@ -463,15 +467,6 @@ private struct CourseDetailPane: View {
         showingPlacement = true
     }
 
-    private func openWeb(path: String, queryItems: [URLQueryItem] = []) {
-        guard let base = model.credentials?.serverURL,
-              var components = URLComponents(url: base, resolvingAgainstBaseURL: false)
-        else { return }
-        components.path = path
-        components.queryItems = queryItems.isEmpty ? nil : queryItems
-        guard let url = components.url else { return }
-        openURL(url)
-    }
 }
 
 private struct ClassGenerationStatusPanel: View {

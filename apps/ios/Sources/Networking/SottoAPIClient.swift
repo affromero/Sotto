@@ -223,6 +223,26 @@ struct SottoAPIClient {
         return try await get("\(path)?recordingId=\(encodedRecordingId)")
     }
 
+    // MARK: - Live translation
+
+    /// Mints a single-use ephemeral Gemini token. The server's BYOK key never
+    /// reaches the device.
+    func mintLiveToken(courseId: String, direction: String) async throws -> LiveTranslateSession.Token {
+        try await post(
+            "/api/v1/live-translate/token",
+            body: LiveTokenRequest(courseId: courseId, direction: direction)
+        )
+    }
+
+    /// Files the finished conversation so its new vocabulary joins the memory
+    /// graph. Best-effort on the server, so a failure here is not fatal.
+    func saveLiveSession(courseId: String, transcript: String) async throws {
+        let _: LiveSessionSaveResponse = try await post(
+            "/api/v1/live-translate/session",
+            body: LiveSessionRequest(courseId: courseId, transcript: transcript)
+        )
+    }
+
     // MARK: - Server admin (read-only)
 
     func fetchHealth() async throws -> SottoHealth {
@@ -656,6 +676,18 @@ private struct SubmitClassRequest: Encodable {
 private struct WritingSubmissionRequest: Encodable {
     let text: String
 }
+
+private struct LiveTokenRequest: Encodable {
+    let courseId: String
+    let direction: String
+}
+
+private struct LiveSessionRequest: Encodable {
+    let courseId: String
+    let transcript: String
+}
+
+private struct LiveSessionSaveResponse: Decodable {}
 
 private struct SubmitPlacementRequest: Encodable {
     let native: String
