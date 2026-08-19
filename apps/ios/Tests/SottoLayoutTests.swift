@@ -1,7 +1,7 @@
 import SwiftUI
 import XCTest
 
-@testable import SottoiPad
+@testable import Sotto
 
 final class SottoLayoutTests: XCTestCase {
     func testCompactSizeClassStacksAndDropsHandwriting() {

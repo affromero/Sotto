@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B50000000000000000000001"
-               BuildableName = "SottoiPadTests.xctest"
-               BlueprintName = "SottoiPadTests"
-               ReferencedContainer = "container:SottoiPad.xcodeproj">
+               BuildableName = "SottoTests.xctest"
+               BlueprintName = "SottoTests"
+               ReferencedContainer = "container:Sotto.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -29,9 +29,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A50000000000000000000001"
-               BuildableName = "SottoiPad.app"
-               BlueprintName = "SottoiPad"
-               ReferencedContainer = "container:SottoiPad.xcodeproj">
+               BuildableName = "Sotto.app"
+               BlueprintName = "Sotto"
+               ReferencedContainer = "container:Sotto.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -48,9 +48,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B50000000000000000000001"
-               BuildableName = "SottoiPadTests.xctest"
-               BlueprintName = "SottoiPadTests"
-               ReferencedContainer = "container:SottoiPad.xcodeproj">
+               BuildableName = "SottoTests.xctest"
+               BlueprintName = "SottoTests"
+               ReferencedContainer = "container:Sotto.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -70,9 +70,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A50000000000000000000001"
-            BuildableName = "SottoiPad.app"
-            BlueprintName = "SottoiPad"
-            ReferencedContainer = "container:SottoiPad.xcodeproj">
+            BuildableName = "Sotto.app"
+            BlueprintName = "Sotto"
+            ReferencedContainer = "container:Sotto.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -87,9 +87,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A50000000000000000000001"
-            BuildableName = "SottoiPad.app"
-            BlueprintName = "SottoiPad"
-            ReferencedContainer = "container:SottoiPad.xcodeproj">
+            BuildableName = "Sotto.app"
+            BlueprintName = "Sotto"
+            ReferencedContainer = "container:Sotto.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

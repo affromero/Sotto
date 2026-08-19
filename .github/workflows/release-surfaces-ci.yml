@@ -28,14 +28,18 @@ jobs:
       - run: cargo check --locked
         working-directory: apps/desktop/src-tauri
 
-  ipad:
+  ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-      - name: Compile app and tests
+      # The app is universal, so it is compiled and tested on both device
+      # families: the layout, and the workbook in particular, take different
+      # paths per size class.
+      - name: Run app tests on iPhone and iPad
         run: >-
-          xcodebuild build-for-testing
-          -project apps/ipad/SottoiPad.xcodeproj
-          -scheme SottoiPad
-          -destination 'generic/platform=iOS Simulator'
+          xcodebuild test
+          -project apps/ios/Sotto.xcodeproj
+          -scheme Sotto
+          -destination 'platform=iOS Simulator,name=iPhone 17'
+          -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)'
           CODE_SIGNING_ALLOWED=NO

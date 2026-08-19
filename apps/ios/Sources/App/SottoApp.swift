@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SottoiPadApp: App {
+struct SottoApp: App {
     @StateObject private var model = SottoAppModel()
 
     var body: some Scene {

@@ -12,37 +12,37 @@
 			containerPortal = A60000000000000000000001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A50000000000000000000001;
-			remoteInfo = SottoiPad;
+			remoteInfo = Sotto;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A20000000000000000000000 /* SottoiPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SottoiPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B20000000000000000000000 /* SottoiPadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SottoiPadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000000 /* Sotto.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sotto.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000000 /* SottoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SottoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A41000000000000000000001 /* Exceptions for "SottoiPad" folder in "SottoiPad" target */ = {
+		A41000000000000000000001 /* Exceptions for "Sources" folder in "Sotto" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = A50000000000000000000001 /* SottoiPad */;
+			target = A50000000000000000000001 /* Sotto */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A40000000000000000000003 /* SottoiPad */ = {
+		A40000000000000000000003 /* Sources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				A41000000000000000000001 /* Exceptions for "SottoiPad" folder in "SottoiPad" target */,
+				A41000000000000000000001 /* Exceptions for "Sources" folder in "Sotto" target */,
 			);
-			path = SottoiPad;
+			path = Sources;
 			sourceTree = "<group>";
 		};
-		B40000000000000000000001 /* SottoiPadTests */ = {
+		B40000000000000000000001 /* Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SottoiPadTests;
+			path = Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -68,8 +68,8 @@
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				A40000000000000000000003 /* SottoiPad */,
-				B40000000000000000000001 /* SottoiPadTests */,
+				A40000000000000000000003 /* Sources */,
+				B40000000000000000000001 /* Tests */,
 				A40000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -77,8 +77,8 @@
 		A40000000000000000000002 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000000 /* SottoiPad.app */,
-				B20000000000000000000000 /* SottoiPadTests.xctest */,
+				A20000000000000000000000 /* Sotto.app */,
+				B20000000000000000000000 /* SottoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -86,9 +86,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A50000000000000000000001 /* SottoiPad */ = {
+		A50000000000000000000001 /* Sotto */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A90000000000000000000003 /* Build configuration list for PBXNativeTarget "SottoiPad" */;
+			buildConfigurationList = A90000000000000000000003 /* Build configuration list for PBXNativeTarget "Sotto" */;
 			buildPhases = (
 				A30000000000000000000002 /* Sources */,
 				A30000000000000000000001 /* Frameworks */,
@@ -99,16 +99,16 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A40000000000000000000003 /* SottoiPad */,
+				A40000000000000000000003 /* Sources */,
 			);
-			name = SottoiPad;
-			productName = SottoiPad;
-			productReference = A20000000000000000000000 /* SottoiPad.app */;
+			name = Sotto;
+			productName = Sotto;
+			productReference = A20000000000000000000000 /* Sotto.app */;
 			productType = "com.apple.product-type.application";
 		};
-		B50000000000000000000001 /* SottoiPadTests */ = {
+		B50000000000000000000001 /* SottoTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B90000000000000000000001 /* Build configuration list for PBXNativeTarget "SottoiPadTests" */;
+			buildConfigurationList = B90000000000000000000001 /* Build configuration list for PBXNativeTarget "SottoTests" */;
 			buildPhases = (
 				B30000000000000000000003 /* Sources */,
 				B30000000000000000000001 /* Frameworks */,
@@ -120,11 +120,11 @@
 				B70000000000000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				B40000000000000000000001 /* SottoiPadTests */,
+				B40000000000000000000001 /* Tests */,
 			);
-			name = SottoiPadTests;
-			productName = SottoiPadTests;
-			productReference = B20000000000000000000000 /* SottoiPadTests.xctest */;
+			name = SottoTests;
+			productName = SottoTests;
+			productReference = B20000000000000000000000 /* SottoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -146,7 +146,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "SottoiPad" */;
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "Sotto" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -160,8 +160,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A50000000000000000000001 /* SottoiPad */,
-				B50000000000000000000001 /* SottoiPadTests */,
+				A50000000000000000000001 /* Sotto */,
+				B50000000000000000000001 /* SottoTests */,
 			);
 		};
 /* End PBXProject section */
@@ -203,7 +203,7 @@
 /* Begin PBXTargetDependency section */
 		B70000000000000000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A50000000000000000000001 /* SottoiPad */;
+			target = A50000000000000000000001 /* Sotto */;
 			targetProxy = B60000000000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -330,7 +330,7 @@
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 2HVQQ4W769;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = SottoiPad/Info.plist;
+				INFOPLIST_FILE = Sources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -360,7 +360,7 @@
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 2HVQQ4W769;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = SottoiPad/Info.plist;
+				INFOPLIST_FILE = Sources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -406,7 +406,7 @@
 				);
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SottoiPad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SottoiPad";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sotto.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sotto";
 			};
 			name = Debug;
 		};
@@ -434,14 +434,14 @@
 				);
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SottoiPad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SottoiPad";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sotto.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sotto";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A90000000000000000000001 /* Build configuration list for PBXProject "SottoiPad" */ = {
+		A90000000000000000000001 /* Build configuration list for PBXProject "Sotto" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A70000000000000000000001 /* Debug */,
@@ -450,7 +450,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A90000000000000000000003 /* Build configuration list for PBXNativeTarget "SottoiPad" */ = {
+		A90000000000000000000003 /* Build configuration list for PBXNativeTarget "Sotto" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A80000000000000000000001 /* Debug */,
@@ -459,7 +459,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B90000000000000000000001 /* Build configuration list for PBXNativeTarget "SottoiPadTests" */ = {
+		B90000000000000000000001 /* Build configuration list for PBXNativeTarget "SottoTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B80000000000000000000001 /* Debug */,

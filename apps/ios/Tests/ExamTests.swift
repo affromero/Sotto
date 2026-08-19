@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import SottoiPad
+@testable import Sotto
 
 final class ExamTests: XCTestCase {
     private func decode<T: Decodable>(_ json: String, as type: T.Type) throws -> T {

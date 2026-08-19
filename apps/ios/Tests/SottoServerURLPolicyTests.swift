@@ -1,5 +1,5 @@
 import XCTest
-@testable import SottoiPad
+@testable import Sotto
 
 final class SottoServerURLPolicyTests: XCTestCase {
     func testAcceptsHTTPSServers() throws {
