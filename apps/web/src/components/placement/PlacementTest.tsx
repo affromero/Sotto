@@ -52,12 +52,16 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
   const [errorMessage, setErrorMessage] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const loadController = useRef<AbortController | null>(null);
 
   const loadQuestions = useCallback(async () => {
+    const controller = new AbortController();
+    loadController.current = controller;
     try {
       const focusParam = focusLevel ? `&focusLevel=${encodeURIComponent(focusLevel)}` : '';
       const res = await fetch(
-        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}${focusParam}`
+        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}${focusParam}`,
+        { signal: controller.signal }
       );
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
@@ -85,11 +89,22 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
       setAnswers({});
       setCurrentIndex(0);
       setPhase('testing');
-    } catch {
+    } catch (err) {
+      // cancelPlacement already moved the learner out of the wait.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setErrorMessage('A network error occurred. Please check your connection and try again.');
       setPhase('error');
+    } finally {
+      if (loadController.current === controller) loadController.current = null;
     }
   }, [native, target, focusLevel]);
+
+  const cancelPlacement = useCallback(() => {
+    loadController.current?.abort();
+    loadController.current = null;
+    setErrorMessage('Placement test cancelled.');
+    setPhase('error');
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -165,6 +180,9 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
     return (
       <div className={styles.center} role="status" aria-live="polite">
         <SottoSpinner size="large" label="Generating your placement test" orientation="stack" />
+        <button type="button" className={styles.retryButton} onClick={cancelPlacement}>
+          Cancel
+        </button>
       </div>
     );
   }

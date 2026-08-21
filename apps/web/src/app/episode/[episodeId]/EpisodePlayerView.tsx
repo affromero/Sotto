@@ -475,6 +475,11 @@ export function EpisodePlayerView({
                   import('@/types/episode').VerificationProgressSnapshot | null
               }
             />
+            {isOwner && (
+              <Button variant="ghost" onClick={handleDelete} loading={deleting} disabled={deleting}>
+                {deleting ? 'Cancelling...' : 'Cancel generation'}
+              </Button>
+            )}
           </div>
         )}
 
