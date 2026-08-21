@@ -1,0 +1,80 @@
+/* Sits under a task section's selection, so it stays quiet until used. */
+
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.button {
+  padding: 0.45rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pass,
+.fail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  min-width: 0;
+}
+
+.pass {
+  color: var(--success, #4ade80);
+}
+
+.fail {
+  color: var(--danger, #f87171);
+}
+
+.mark {
+  font-weight: 700;
+}
+
+.latency {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* The provider's reply, or the reason it failed. Truncated: this is a signal,
+   not a transcript, and a long error must not push the layout around. */
+.detail {
+  color: var(--text-muted, var(--text));
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 32ch;
+}
+
+.audio {
+  height: 32px;
+  max-width: 220px;
+}
+
+.audioHidden {
+  display: none;
+}

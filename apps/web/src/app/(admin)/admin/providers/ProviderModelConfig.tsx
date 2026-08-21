@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Glyph, type GlyphName } from '@/components/Glyph';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
+import { InlineModelTest } from './InlineModelTest';
 import shell from '../../adminTheme.styles';
 import {
   formatAgentModelId,
@@ -215,11 +216,13 @@ type UnifiedModelState = ReturnType<typeof useUnifiedModelState>;
 interface TaskSectionProps {
   title: string;
   icon: 'spark' | 'volume' | 'mic';
+  /** Which test the inline button runs against the current selection. */
+  testType: 'ai' | 'tts' | 'stt';
   lede?: string;
   state: UnifiedModelState;
 }
 
-function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
+function TaskSection({ title, icon, testType, lede, state }: TaskSectionProps) {
   const { providers, compositeIds } = state;
   const [open, setOpen] = useState(false);
 
@@ -420,6 +423,16 @@ function TaskSection({ title, icon, lede, state }: TaskSectionProps) {
             </select>
           </div>
         )}
+
+        {/* Confirm the selection above actually answers before leaving the page:
+            a provider can be selectable and still be missing a key, a CLI login,
+            or a local server that is not running. */}
+        <InlineModelTest
+          key={`${testType}:${state.defaultSelection.provider}:${state.defaultSelection.model}`}
+          type={testType}
+          provider={state.defaultSelection.provider}
+          model={state.defaultSelection.model}
+        />
 
         {/* Advanced: learner-available models */}
         <div className={shell.advWrap}>
@@ -629,9 +642,21 @@ export function ProviderModelConfig({
 
   return (
     <div>
-      <TaskSection title="Language model (AI)" icon="spark" state={aiState} />
-      <TaskSection title="Text-to-speech" icon="volume" lede={SPEECH_LEDE} state={ttsState} />
-      <TaskSection title="Speech-to-text" icon="mic" lede={SPEECH_LEDE} state={sttState} />
+      <TaskSection title="Language model (AI)" icon="spark" testType="ai" state={aiState} />
+      <TaskSection
+        title="Text-to-speech"
+        icon="volume"
+        testType="tts"
+        lede={SPEECH_LEDE}
+        state={ttsState}
+      />
+      <TaskSection
+        title="Speech-to-text"
+        icon="mic"
+        testType="stt"
+        lede={SPEECH_LEDE}
+        state={sttState}
+      />
 
       {error && (
         <div role="alert" className={shell.saveError}>
