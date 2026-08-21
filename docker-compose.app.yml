@@ -67,14 +67,16 @@ networks:
     name: sotto-network
 
 volumes:
-  # The agent CLIs rotate their OAuth refresh token on every refresh and retire
-  # the previous one, so the credentials file has to outlive the container.
+  # Host-wide, deliberately NOT stack-scoped: the CLIs rotate their refresh token
+  # in place and the previous one is retired server-side, so two stacks holding
+  # separate copies of one login would kill each other's token. One file, one
+  # lineage, shared by every stack on this host.
   agent-home:
     external: true
-    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-home
+    name: agent-claude-home
   agent-codex-home:
     external: true
-    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-codex-home
+    name: agent-codex-home
   cli-credentials:
     external: true
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials

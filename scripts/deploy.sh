@@ -380,12 +380,14 @@ done
 
 fi
 
-# The agent CLI rotates its OAuth refresh token in place and retires the old
-# one, so its credentials outlive every container in a stack-scoped volume. The
-# app compose file consumes it as external state; create it here so a web-only
-# deploy does not fail on a missing volume.
-docker volume create "${SOTTO_STACK}-agent-home" >/dev/null
-docker volume create "${SOTTO_STACK}-agent-codex-home" >/dev/null
+# The agent CLIs rotate their OAuth refresh token in place and the previous one
+# is retired server-side, so a second copy of the same login goes permanently
+# dead the moment either side refreshes. These volumes are therefore host-wide,
+# NOT stack-scoped: every stack mounts the same file and shares one lineage.
+# The app compose file consumes them as external state; create them here so a
+# web-only deploy does not fail on a missing volume.
+docker volume create agent-claude-home >/dev/null
+docker volume create agent-codex-home >/dev/null
 
 # Refresh host CLI authentication before any migration, web, or worker process
 # starts. The networkless sidecar copies only the two supported auth JSON files

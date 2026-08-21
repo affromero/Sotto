@@ -132,11 +132,11 @@ networks:
     name: sotto-network
 
 volumes:
-  # Shared with the web stack: whichever process refreshes the OAuth token
-  # first, the rotated credentials persist for every other one.
+  # Host-wide, shared with every stack: whichever process refreshes the OAuth
+  # token first, the rotation is immediately the truth for all the others.
   agent-home:
-    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-home
+    name: agent-claude-home
   agent-codex-home:
-    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-codex-home
+    name: agent-codex-home
   cli-credentials:
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials
