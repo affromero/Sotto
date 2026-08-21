@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './NotesPlacement.module.css';
@@ -39,12 +39,24 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
   const [deduction, setDeduction] = useState<Deduction | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const deduceController = useRef<AbortController | null>(null);
+
+  // Only the deduction is cancellable. `confirming` is creating the course
+  // itself — aborting mid-create would leave a half-built course behind, which
+  // is worse for the learner than the few seconds it takes to finish.
+  const cancelDeduction = useCallback(() => {
+    deduceController.current?.abort();
+    deduceController.current = null;
+    setPhase('input');
+  }, []);
 
   const hasMaterials = text.trim().length > 0 || files.length > 0;
 
   async function deduce() {
     setPhase('deducing');
     setErrorMessage('');
+    const controller = new AbortController();
+    deduceController.current = controller;
     try {
       const form = new FormData();
       form.set('native', native);
@@ -55,6 +67,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       const res = await fetch('/api/v1/placement/from-notes/upload', {
         method: 'POST',
         body: form,
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -66,9 +79,13 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       }
       setDeduction(await res.json());
       setPhase('result');
-    } catch {
+    } catch (err) {
+      // cancelDeduction already returned the learner to the form.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setErrorMessage('A network error occurred. Please check your connection and try again.');
       setPhase('error');
+    } finally {
+      if (deduceController.current === controller) deduceController.current = null;
     }
   }
 
@@ -101,6 +118,11 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
           label={phase === 'deducing' ? 'Reading your materials' : 'Setting up your course'}
           orientation="stack"
         />
+        {phase === 'deducing' && (
+          <button type="button" className={styles.secondaryButton} onClick={cancelDeduction}>
+            Cancel
+          </button>
+        )}
       </div>
     );
   }

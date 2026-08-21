@@ -77,6 +77,7 @@ export function PracticePanel({
   const [error, setError] = useState('');
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
   const buildPercent = useEstimatedProgress(phase === 'starting');
+  const startController = useRef<AbortController | null>(null);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -99,11 +100,14 @@ export function PracticePanel({
       setSelectedKind(kind);
       setError('');
       setMessage('');
+      const controller = new AbortController();
+      startController.current = controller;
       try {
         const res = await fetch(`/api/v1/courses/${courseId}/practice`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kind, ...(focusTargetId ? { focusTargetId } : {}) }),
+          signal: controller.signal,
         });
         const data = (await res.json()) as StartResponse;
         if (!res.ok) {
@@ -120,13 +124,25 @@ export function PracticePanel({
         }
         setStart(data);
         setPhase('running');
-      } catch {
+      } catch (err) {
+        // An abort is the learner cancelling; cancelPractice already reset the
+        // panel, so there is nothing to report.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setError('Network error. Please try again.');
         setPhase('overview');
+      } finally {
+        if (startController.current === controller) startController.current = null;
       }
     },
     [courseId]
   );
+
+  const cancelPractice = useCallback(() => {
+    startController.current?.abort();
+    startController.current = null;
+    setSelectedKind(null);
+    setPhase('overview');
+  }, []);
 
   useEffect(() => {
     if (!initialFocusTargetId || autoStarted.current) return;
@@ -207,6 +223,9 @@ export function PracticePanel({
               </div>
               <span className={styles.progressLabel}>~{buildPercent}%</span>
             </div>
+            <button type="button" className={styles.cancelButton} onClick={cancelPractice}>
+              Cancel
+            </button>
           </div>
         </div>
       )}

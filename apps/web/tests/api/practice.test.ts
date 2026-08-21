@@ -14,6 +14,7 @@ const mockCourseFindFirst = vi.fn();
 const mockLearnerVocabCount = vi.fn();
 const mockLearnerGrammarCount = vi.fn();
 const mockPracticeSessionFindMany = vi.fn();
+const mockPracticeSessionDelete = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
@@ -29,7 +30,10 @@ vi.mock('@/lib/prisma', () => ({
     course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
     learnerVocab: { count: (...a: unknown[]) => mockLearnerVocabCount(...a) },
     learnerGrammar: { count: (...a: unknown[]) => mockLearnerGrammarCount(...a) },
-    practiceSession: { findMany: (...a: unknown[]) => mockPracticeSessionFindMany(...a) },
+    practiceSession: {
+      findMany: (...a: unknown[]) => mockPracticeSessionFindMany(...a),
+      delete: (...a: unknown[]) => mockPracticeSessionDelete(...a),
+    },
   },
 }));
 vi.mock('@/lib/logger', () => ({
@@ -72,6 +76,45 @@ describe('POST /api/v1/courses/[courseId]/practice', () => {
     );
     expect(res.status).toBe(201);
     expect((await res.json()).sessionId).toBe('ps1');
+  });
+
+  it('discards the built session when the learner cancelled while it was building', async () => {
+    mockStartPractice.mockResolvedValue({
+      status: 'ready',
+      sessionId: 'ps-abandoned',
+      kind: 'VOCAB',
+      items: [{ id: 'v0', prompt: 'hi', options: ['a', 'b'] }],
+    });
+    mockPracticeSessionDelete.mockResolvedValue({});
+
+    const controller = new AbortController();
+    controller.abort();
+    const req = new NextRequest('http://localhost/api/v1/courses/c1/practice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'VOCAB' }),
+      signal: controller.signal,
+    });
+
+    const res = await startPost(req, COURSE_PARAMS);
+
+    expect(res.status).toBe(499);
+    expect(mockPracticeSessionDelete).toHaveBeenCalledWith({ where: { id: 'ps-abandoned' } });
+  });
+
+  it('still returns the session when the learner did not cancel', async () => {
+    mockStartPractice.mockResolvedValue({
+      status: 'ready',
+      sessionId: 'ps-kept',
+      kind: 'VOCAB',
+      items: [{ id: 'v0', prompt: 'hi', options: ['a', 'b'] }],
+    });
+    const res = await startPost(
+      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'VOCAB' }),
+      COURSE_PARAMS
+    );
+    expect(res.status).toBe(201);
+    expect(mockPracticeSessionDelete).not.toHaveBeenCalled();
   });
 
   it('returns 200 + unavailable when there is not enough content', async () => {

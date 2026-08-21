@@ -29,6 +29,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (result.status === 'unavailable') {
       return NextResponse.json(result, { status: 200 });
     }
+
+    // The learner cancelled while this was building. The generation itself
+    // cannot be recalled — it runs inline here — but the session it produced
+    // would otherwise sit in their history as one they never asked to keep.
+    if (request.signal.aborted) {
+      await prisma.practiceSession
+        .delete({ where: { id: result.sessionId } })
+        .catch((error: unknown) => {
+          logger.warn('Could not discard a cancelled practice session', {
+            sessionId: result.sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      return errorResponse('Practice cancelled', 499);
+    }
+
     return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof PracticeCourseNotFoundError) return errorResponse('Course not found', 404);
