@@ -20,7 +20,8 @@
 // recorded under older code replay faithfully.
 /* eslint-disable no-console -- CLI report tool; stdout is the deliverable */
 import { readFileSync } from 'node:fs';
-import { classifyReference, computeBayesianScore, type LayerResult } from 'groundcheck';
+import { computeBayesianScore, type LayerResult } from 'groundcheck';
+import { classifyEpisodeReference } from '../src/lib/reference-verification/classify-episode-reference';
 
 interface StoredCheck {
   layer: string;
@@ -87,7 +88,7 @@ function main() {
       );
     }
 
-    const domain = classifyReference({ doi: ref.doi, url: ref.url, type: ref.type });
+    const domain = classifyEpisodeReference({ doi: ref.doi, url: ref.url, type: ref.type });
     const layerResults = normalizeChecks(ref.details.checks, ref);
     const { posterior, verdict: rawVerdict } = computeBayesianScore(domain, layerResults);
     const aiCheck = ref.details.checks.find((c) => c.layer === 'ai');

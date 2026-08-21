@@ -1,9 +1,4 @@
-import {
-  classifyReference,
-  computeBayesianScore,
-  type ContentDomain,
-  type LayerResult,
-} from 'groundcheck';
+import { computeBayesianScore, type ContentDomain, type LayerResult } from 'groundcheck';
 import {
   verifyUrl,
   verifyDoi,
@@ -14,6 +9,7 @@ import {
   type VerificationVerdict,
 } from '@/lib/reference-validator';
 import { logger } from '@/lib/logger';
+import { classifyEpisodeReference } from './classify-episode-reference';
 import { extractClaimContexts, type ClaimContext } from './claim-extractor';
 import { aiEvaluateWithDomainContext } from './ai-layer';
 import { groundFailedReferences, type GroundingInput } from './grounding';
@@ -80,7 +76,7 @@ export async function runReferenceVerification(
   // Classify each accepted reference by domain
   const domainMap = new Map<string, ContentDomain>();
   for (const ref of acceptedRefs) {
-    const domain = classifyReference({ doi: ref.doi, url: ref.url, type: ref.type });
+    const domain = classifyEpisodeReference({ doi: ref.doi, url: ref.url, type: ref.type });
     domainMap.set(ref.id, domain);
     logger.info('Reference classified', {
       refNumber: String(ref.number),
