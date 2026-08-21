@@ -30,7 +30,7 @@ describe('agent-usage helpers', () => {
       { label: '5h', usedPercent: 42, remainingPercent: 58, resetIn: '2h00m' },
       { label: 'Wk', usedPercent: 77, remainingPercent: 23 },
     ]);
-    expect(windows[1].resetIn).toContain('2d05h');
+    expect(windows[1].resetIn).toBe('Jun 29');
   });
 
   it('parses Codex usage windows and unlimited credits', () => {
@@ -155,18 +155,15 @@ describe('agent-usage helpers', () => {
 
   it('parses ElevenLabs subscription credits and reset time', () => {
     const now = new Date('2026-06-27T10:00:00.000Z');
-    const parsed = parseElevenLabsSubscriptionPayload(
-      {
-        tier: 'creator',
-        status: 'active',
-        character_count: 25_000,
-        character_limit: 100_000,
-        character_refresh_period: 'monthly_period',
-        next_character_count_reset_unix: now.getTime() / 1000 + 86_400,
-        can_extend_character_limit: false,
-      },
-      now
-    );
+    const parsed = parseElevenLabsSubscriptionPayload({
+      tier: 'creator',
+      status: 'active',
+      character_count: 25_000,
+      character_limit: 100_000,
+      character_refresh_period: 'monthly_period',
+      next_character_count_reset_unix: now.getTime() / 1000 + 86_400,
+      can_extend_character_limit: false,
+    });
 
     expect(parsed.errorCode).toBeNull();
     expect(parsed.planLabel).toBe('Creator');

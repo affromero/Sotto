@@ -45,7 +45,7 @@ function codexWindowResetIn(
   const resetAfter = getNumber(window?.reset_after_seconds);
   if (resetAfter !== null) return formatUsageDuration(resetAfter);
   const resetAt = getNumber(window?.reset_at);
-  return style === 'friendly' ? friendlyReset(resetAt, now) : resetInFromTimestamp(resetAt, now);
+  return style === 'friendly' ? friendlyReset(resetAt) : resetInFromTimestamp(resetAt, now);
 }
 
 function firstNonEmptyString(...values: unknown[]): string | null {

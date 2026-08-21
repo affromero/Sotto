@@ -100,7 +100,7 @@ export function parseClaudeUsageHeaders(
     usageWindow({
       label: 'Wk',
       usedPercent: weeklyUsed,
-      resetIn: friendlyReset(weeklyReset, now),
+      resetIn: friendlyReset(weeklyReset),
       resetAt: formatResetAt(weeklyReset),
       limitWindowSeconds: 604_800,
     }),

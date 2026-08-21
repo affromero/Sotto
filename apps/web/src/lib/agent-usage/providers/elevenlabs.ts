@@ -51,10 +51,7 @@ function billingPeriodLabel(period: string | null): string {
   }
 }
 
-export function parseElevenLabsSubscriptionPayload(
-  payload: unknown,
-  now: Date = new Date()
-): {
+export function parseElevenLabsSubscriptionPayload(payload: unknown): {
   windows: AgentUsageWindow[];
   credits: AgentUsageCredits | null;
   planLabel: string | null;
@@ -107,7 +104,7 @@ export function parseElevenLabsSubscriptionPayload(
           getString(payload.character_refresh_period) ?? getString(payload.billing_period)
         ),
         usedPercent,
-        resetIn: friendlyReset(resetAt, now),
+        resetIn: friendlyReset(resetAt),
         resetAt: formatResetAt(resetAt),
         limitWindowSeconds: null,
         valueLabel: `${usedPercent}%`,

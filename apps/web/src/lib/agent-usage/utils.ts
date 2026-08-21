@@ -106,11 +106,12 @@ export function resetInFromTimestamp(timestampSeconds: number | null, now: Date)
   return formatUsageDuration(timestampSeconds - now.getTime() / 1000);
 }
 
-export function friendlyReset(timestampSeconds: number | null, now: Date): string | null {
+export function friendlyReset(timestampSeconds: number | null): string | null {
   if (!timestampSeconds || timestampSeconds <= 0) return null;
+  // ponytail: date only; the sidebar wraps this in parens and the duration
+  // pushed the row past the panel width.
   const reset = new Date(timestampSeconds * 1000);
-  const duration = resetInFromTimestamp(timestampSeconds, now);
-  return `${MONTHS[reset.getMonth()]} ${reset.getDate()} (${duration})`;
+  return `${MONTHS[reset.getMonth()]} ${reset.getDate()}`;
 }
 
 export function resetInFromDate(date: Date | null, now: Date): string | null {
