@@ -24,15 +24,19 @@ updates:
         update-types:
           - version-update:semver-major
     groups:
-      # Minor + patch bumps are batched into one low-risk PR that should stay
-      # green and be safe to merge on sight. Major bumps are deliberately left
-      # OUT of every group so Dependabot opens them as individual PRs — majors
-      # routinely need code migration and must be reviewed in isolation, never
-      # bundled (a single broken lockfile entry blocks the whole batch).
-      npm-minor-patch:
+      # One PR for every npm bump, majors included. The previous arrangement
+      # kept majors out of the group so each could be reviewed in isolation —
+      # a major usually needs code migration, and bundling means one
+      # unmigrated dependency blocks every other update in the batch. That
+      # tradeoff is accepted deliberately: a single weekly PR is worth more
+      # here than isolated review. When one major does block the batch, split
+      # just that dependency out with `exclude-patterns` rather than
+      # ungrouping everything again.
+      npm-all:
         patterns:
           - '*'
         update-types:
+          - major
           - minor
           - patch
   # GitHub Actions used by the workflows.
@@ -47,6 +51,10 @@ updates:
       actions:
         patterns:
           - '*'
+        update-types:
+          - major
+          - minor
+          - patch
   # Container base images (Dockerfiles live at the repo root).
   - package-ecosystem: docker
     directory: /
@@ -55,3 +63,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # Grouped for the same reason as npm: one PR per ecosystem per week.
+    groups:
+      docker:
+        patterns:
+          - '*'
+        update-types:
+          - major
+          - minor
+          - patch
