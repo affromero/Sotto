@@ -113,7 +113,8 @@ export const LOCAL_AGENT_SOURCES: PrivateSourceConnectorDefinition[] = [
       {
         name: 'CLAUDE_HOME',
         required: false,
-        purpose: 'Writable Claude home directory when credentials are volume-mounted.',
+        purpose:
+          'Writable Claude config directory (~/.claude) when credentials are volume-mounted.',
       },
     ],
     setupActions: [

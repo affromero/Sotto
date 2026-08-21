@@ -33,8 +33,10 @@ services:
       SOTTO_ACCESS_PASSWORD: ${SOTTO_ACCESS_PASSWORD:-}
       BYOK_ENCRYPTION_KEY: ${BYOK_ENCRYPTION_KEY:?Set BYOK_ENCRYPTION_KEY}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      CLAUDE_HOME: /home/sotto/.claude
     volumes:
       - cli-credentials:/run/cli-credentials
+      - agent-home:/home/sotto/.claude
     healthcheck:
       test:
         [
@@ -63,6 +65,11 @@ networks:
     name: sotto-network
 
 volumes:
+  # The agent CLIs rotate their OAuth refresh token on every refresh and retire
+  # the previous one, so the credentials file has to outlive the container.
+  agent-home:
+    external: true
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-home
   cli-credentials:
     external: true
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials

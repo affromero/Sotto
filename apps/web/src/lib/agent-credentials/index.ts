@@ -7,6 +7,39 @@ const SYNC_TIMEOUT_MS = 8_000;
 const POLL_MS = 100;
 let reloadQueue = Promise.resolve();
 
+/**
+ * How long the file's refresh token claims to live, or -1 when unreadable.
+ *
+ * The CLI mints a refresh token with a later expiry every time it rotates, so
+ * this orders two credential files by generation closely enough to answer the
+ * only question that matters: is the one I am about to write older than the one
+ * already there? It cannot detect a token the server retired out of band, which
+ * is why an unreadable file always loses.
+ */
+export function refreshTokenLifetime(contents: string): number {
+  try {
+    const parsed: unknown = JSON.parse(contents);
+    const oauth = (parsed as { claudeAiOauth?: { refreshTokenExpiresAt?: unknown } })
+      ?.claudeAiOauth;
+    return typeof oauth?.refreshTokenExpiresAt === 'number' ? oauth.refreshTokenExpiresAt : -1;
+  } catch {
+    return -1;
+  }
+}
+
+/** True when `candidate` should replace whatever `pathname` currently holds. */
+export function supersedesCredentials(pathname: string, candidate: string): boolean {
+  let existing: string;
+  try {
+    existing = fs.readFileSync(pathname, 'utf8');
+  } catch {
+    return true; // Nothing there yet.
+  }
+  const current = refreshTokenLifetime(existing);
+  if (current < 0) return true; // Unreadable or malformed — anything beats it.
+  return refreshTokenLifetime(candidate) > current;
+}
+
 function syncRoot(): string | null {
   return process.env.SOTTO_CREDENTIAL_SYNC_DIR?.trim() || null;
 }
@@ -33,7 +66,10 @@ function credentialPaths(provider: AgentProviderId): { snapshot: string; runtime
   if (provider === 'claude-code') {
     return {
       snapshot: path.join(root, 'claude-credentials.json'),
-      runtime: path.join(process.env.CLAUDE_HOME || home, '.claude', '.credentials.json'),
+      runtime: path.join(
+        process.env.CLAUDE_HOME || path.join(home, '.claude'),
+        '.credentials.json'
+      ),
     };
   }
   return {
@@ -57,6 +93,11 @@ function installSnapshot(snapshot: string, runtime: string): void {
     return;
   }
   const contents = fs.readFileSync(snapshot, 'utf8');
+  if (!supersedesCredentials(runtime, contents)) {
+    // The host mount is read-only, so its copy is retired the moment this
+    // container refreshes from it. Restoring it would undo the rotation.
+    return;
+  }
   const parsed: unknown = JSON.parse(contents);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('The host credential file is not a JSON object.');

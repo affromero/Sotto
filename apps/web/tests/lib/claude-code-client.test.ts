@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import type { ChildProcess } from 'child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 // ---- Mocks ----
 
@@ -175,6 +178,78 @@ describe('claude-code-client', () => {
       expect(env2.CLAUDE_CONFIG_DIR).toBeTruthy();
       expect(env1.CLAUDE_CONFIG_DIR).not.toBe(env2.CLAUDE_CONFIG_DIR);
       expect(env1.ANTHROPIC_API_KEY).toBeUndefined();
+      resetClaudeRuntimeForTests();
+    });
+
+    it('keeps a rotated token instead of reseeding from the configured secret', async () => {
+      // CLAUDE_HOME is the .claude config directory itself.
+      const home = mkdtempSync(join(tmpdir(), 'claude-home-'));
+      const credentials = join(home, '.credentials.json');
+      // What the CLI rotated to on a previous run: outlives the frozen secret.
+      const rotated = JSON.stringify({
+        claudeAiOauth: { refreshToken: 'rotated', refreshTokenExpiresAt: 2_000 },
+      });
+      writeFileSync(credentials, rotated);
+      process.env.CLAUDE_HOME = home;
+      process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
+        claudeAiOauth: { refreshToken: 'retired', refreshTokenExpiresAt: 1_000 },
+      });
+
+      const { executeClaudeCode, resetClaudeRuntimeForTests } =
+        await import('@/lib/claude-code-client');
+      resetClaudeRuntimeForTests();
+
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+      const promise = executeClaudeCode('sys', 'prompt');
+      const [, , options] = mockSpawn.mock.calls[0] as [
+        string,
+        string[],
+        { env: NodeJS.ProcessEnv },
+      ];
+      const handed = readFileSync(
+        join(options.env.CLAUDE_CONFIG_DIR as string, '.credentials.json'),
+        'utf8'
+      );
+      proc._stdout.emit('data', Buffer.from('ok'));
+      proc.emit('close', 0);
+      await promise;
+
+      expect(handed).toBe(rotated);
+      expect(readFileSync(credentials, 'utf8')).toBe(rotated);
+      resetClaudeRuntimeForTests();
+    });
+
+    it('persists a token the CLI refreshed so it survives the next start', async () => {
+      const home = mkdtempSync(join(tmpdir(), 'claude-home-'));
+      const credentials = join(home, '.credentials.json');
+      process.env.CLAUDE_HOME = home;
+      process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
+        claudeAiOauth: { refreshToken: 'seed', refreshTokenExpiresAt: 1_000 },
+      });
+
+      const { executeClaudeCode, resetClaudeRuntimeForTests } =
+        await import('@/lib/claude-code-client');
+      resetClaudeRuntimeForTests();
+
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+      const promise = executeClaudeCode('sys', 'prompt');
+      const [, , options] = mockSpawn.mock.calls[0] as [
+        string,
+        string[],
+        { env: NodeJS.ProcessEnv },
+      ];
+      // Stand in for the CLI rotating its OAuth token mid-invocation.
+      const refreshed = JSON.stringify({
+        claudeAiOauth: { refreshToken: 'rotated', refreshTokenExpiresAt: 5_000 },
+      });
+      writeFileSync(join(options.env.CLAUDE_CONFIG_DIR as string, '.credentials.json'), refreshed);
+      proc._stdout.emit('data', Buffer.from('ok'));
+      proc.emit('close', 0);
+      await promise;
+
+      expect(readFileSync(credentials, 'utf8')).toBe(refreshed);
       resetClaudeRuntimeForTests();
     });
 

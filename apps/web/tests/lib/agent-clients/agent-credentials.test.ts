@@ -56,6 +56,26 @@ describe('CLI credential reload', () => {
     expect(fs.statSync(runtime).mode & 0o777).toBe(0o600);
   });
 
+  it('leaves a rotated token in place when the host snapshot is the retired one', async () => {
+    const runtime = path.join(runtimeHome, '.claude', '.credentials.json');
+    fs.mkdirSync(path.dirname(runtime), { recursive: true });
+    // The read-only host mount cannot receive rotations, so its copy is retired
+    // as soon as this container refreshes from it.
+    const rotated = JSON.stringify({
+      claudeAiOauth: { refreshToken: 'rotated', refreshTokenExpiresAt: 2_000 },
+    });
+    fs.writeFileSync(runtime, rotated);
+
+    const credentials = await import('@/lib/agent-credentials');
+    const reload = credentials.reloadProviderCredentials('claude-code');
+    await answerSync('claude-code', {
+      claudeAiOauth: { refreshToken: 'retired', refreshTokenExpiresAt: 1_000 },
+    });
+    await reload;
+
+    expect(fs.readFileSync(runtime, 'utf8')).toBe(rotated);
+  });
+
   it('removes runtime credentials when the host is logged out', async () => {
     const runtime = path.join(runtimeHome, '.claude', '.credentials.json');
     fs.mkdirSync(path.dirname(runtime), { recursive: true });

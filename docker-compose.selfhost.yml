@@ -46,11 +46,13 @@ services:
       SOTTO_ACCESS_PASSWORD: ${SOTTO_ACCESS_PASSWORD:?Set SOTTO_ACCESS_PASSWORD in .env}
       BYOK_ENCRYPTION_KEY: ${BYOK_ENCRYPTION_KEY:?Set BYOK_ENCRYPTION_KEY in .env}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      CLAUDE_HOME: /home/sotto/.claude
     ports:
       - '127.0.0.1:${WEB_PORT:-3000}:3000'
     volumes:
       - storage:/app/apps/web/.sotto/storage
       - cli-credentials:/run/cli-credentials
+      - agent-home:/home/sotto/.claude
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -78,9 +80,11 @@ services:
     environment:
       NODE_ENV: production
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      CLAUDE_HOME: /home/sotto/.claude
     volumes:
       - storage:/app/apps/web/.sotto/storage
       - cli-credentials:/run/cli-credentials
+      - agent-home:/home/sotto/.claude
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -107,6 +111,9 @@ services:
     restart: unless-stopped
 
 volumes:
+  # The agent CLI rotates its OAuth refresh token in place and retires the old
+  # one, so its credentials file has to outlive the container.
+  agent-home:
   pgdata:
   redisdata:
   storage:

@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import {
   copyFileSync,
   mkdirSync,
@@ -9,13 +10,16 @@ import {
   writeFileSync,
 } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { getClaudeSshHost, isClaudeAvailable } from './agent-availability';
 import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
 import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
-import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
+import {
+  installCurrentProviderCredentialSnapshot,
+  supersedesCredentials,
+} from './agent-credentials';
 import type { ImageContentPart } from './providers/ai';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
@@ -26,41 +30,62 @@ export { serializeMessages } from './agent-messages';
 
 /**
  * The shared credentials file that seeds every per-invocation config dir and
- * receives refreshed tokens back. Sourced from CLAUDE_CODE_CREDENTIALS_JSON
- * (written once to writable /tmp) or the CLAUDE_HOME volume mount. Cached for
- * the container lifetime.
+ * receives refreshed tokens back. It lives under CLAUDE_HOME when that points
+ * at a persistent volume, otherwise in writable /tmp. Cached for the container
+ * lifetime.
  */
 let _sharedCredentialsPath: string | null | undefined = undefined;
-function sharedCredentialsPath(): string | null {
-  if (_sharedCredentialsPath !== undefined) return _sharedCredentialsPath;
 
-  const credsJson = process.env.CLAUDE_CODE_CREDENTIALS_JSON;
-  if (credsJson) {
-    try {
-      const claudeDir = '/tmp/claude-runtime/.claude';
-      mkdirSync(/* turbopackIgnore: true */ claudeDir, { recursive: true });
-      const credsPath = join(/* turbopackIgnore: true */ claudeDir, '.credentials.json');
-      writeFileSync(/* turbopackIgnore: true */ credsPath, credsJson, { mode: 0o600 });
-      _sharedCredentialsPath = credsPath;
-      logger.info('claude-code: initialized shared credentials from CLAUDE_CODE_CREDENTIALS_JSON');
-      return credsPath;
-    } catch (err) {
-      logger.warn('claude-code: failed to write credentials to /tmp', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+/**
+ * The CLI rotates its refresh token on every OAuth refresh and retires the
+ * previous one, so CLAUDE_CODE_CREDENTIALS_JSON is a bootstrap seed, never the
+ * running state: overwriting a rotated file with the frozen secret leaves the
+ * app holding a token the server has already invalidated. Seed only when the
+ * secret is newer than what is on disk, which covers both an empty volume and
+ * an operator pasting fresh credentials after the stored ones died.
+ */
+function seedSharedCredentials(credsPath: string, credsJson: string): void {
+  if (!supersedesCredentials(credsPath, credsJson)) {
+    logger.info('claude-code: keeping the rotated credentials over the configured seed');
+    return;
   }
-
-  // Fall back to CLAUDE_HOME (volume-mount approach)
-  const claudeHome = process.env.CLAUDE_HOME;
-  _sharedCredentialsPath = claudeHome
-    ? join(/* turbopackIgnore: true */ claudeHome, '.claude', '.credentials.json')
-    : null;
-  return _sharedCredentialsPath;
+  mkdirSync(/* turbopackIgnore: true */ dirname(credsPath), { recursive: true });
+  writeFileSync(/* turbopackIgnore: true */ credsPath, credsJson, { mode: 0o600 });
+  logger.info('claude-code: seeded credentials from CLAUDE_CODE_CREDENTIALS_JSON');
 }
 
 export function resetClaudeRuntimeForTests(): void {
   _sharedCredentialsPath = undefined;
+}
+
+function sharedCredentialsPath(): string | null {
+  if (_sharedCredentialsPath !== undefined) return _sharedCredentialsPath;
+
+  // CLAUDE_HOME is the durable location (a mounted volume); /tmp only holds the
+  // seed for the container's lifetime and loses every refresh on restart.
+  const claudeHome = process.env.CLAUDE_HOME;
+  const credsJson = process.env.CLAUDE_CODE_CREDENTIALS_JSON;
+  if (!claudeHome && !credsJson) {
+    _sharedCredentialsPath = null;
+    return null;
+  }
+
+  const credsPath = join(
+    /* turbopackIgnore: true */ claudeHome || '/tmp/claude-runtime/.claude',
+    '.credentials.json'
+  );
+  if (credsJson) {
+    try {
+      seedSharedCredentials(credsPath, credsJson);
+    } catch (err) {
+      logger.warn('claude-code: failed to seed the shared credentials file', {
+        path: credsPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  _sharedCredentialsPath = credsPath;
+  return credsPath;
 }
 
 interface InvocationConfig {
@@ -94,8 +119,7 @@ function createInvocationConfig(): InvocationConfig {
       copyFileSync(/* turbopackIgnore: true */ shared, join(dir, '.credentials.json'));
       seeded = readFileSync(/* turbopackIgnore: true */ join(dir, '.credentials.json'), 'utf8');
     } catch {
-      // No shared credentials file yet (e.g. CLAUDE_HOME without one) — the CLI
-      // may still authenticate via env tokens.
+      // No shared credentials file yet (e.g. an empty CLAUDE_HOME volume).
     }
   } catch (err) {
     logger.warn('claude-code: failed to create per-invocation config dir', {
@@ -104,14 +128,20 @@ function createInvocationConfig(): InvocationConfig {
     return { env, release: () => {} };
   }
 
+  if (!seeded) {
+    // An isolated config dir with no credentials in it authenticates as nobody
+    // ("Not logged in · Please run /login"). Leave the ambient config alone and
+    // let the CLI use whatever login the host already has.
+    rmSync(/* turbopackIgnore: true */ dir, { recursive: true, force: true });
+    return { env, release: () => {} };
+  }
+
   env.CLAUDE_CONFIG_DIR = dir;
   // OAuth subscription credentials exist — do not let a platform Anthropic API
   // key leak into the CLI, or billing silently routes to API credits and an
   // expired OAuth session surfaces as "Credit balance is too low".
-  if (seeded) {
-    delete env.ANTHROPIC_API_KEY;
-    delete env.ANTHROPIC_AUTH_TOKEN;
-  }
+  delete env.ANTHROPIC_API_KEY;
+  delete env.ANTHROPIC_AUTH_TOKEN;
 
   const release = () => {
     try {
@@ -119,8 +149,8 @@ function createInvocationConfig(): InvocationConfig {
         /* turbopackIgnore: true */ join(dir, '.credentials.json'),
         'utf8'
       );
-      if (seeded !== null && current !== seeded) {
-        const tmp = `${shared}.tmp-${process.pid}-${Date.now()}`;
+      if (current !== seeded && supersedesCredentials(shared, current)) {
+        const tmp = `${shared}.tmp-${randomUUID()}`;
         writeFileSync(/* turbopackIgnore: true */ tmp, current, { mode: 0o600 });
         renameSync(/* turbopackIgnore: true */ tmp, shared);
         logger.info('claude-code: persisted refreshed OAuth credentials');
