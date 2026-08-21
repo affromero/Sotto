@@ -44,7 +44,7 @@ npm run build       # produce an unsigned installer for the current OS
 - **Source** lives here; **downloads come from sotto.fm** (`/download/{mac,windows,linux}`).
 - `.github/workflows/desktop-release.yml` builds macOS / Windows / Linux installers
   on tag push and uploads them to R2 (the bucket sotto.fm serves) — credentials
-  come from repo secrets (mirrored from Doppler):
+  come from repo secrets (mirrored from Infisical):
   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`.
 - Release artifacts are currently unsigned. **Code signing / notarization**
   (Apple Developer ID, Windows Authenticode) is required for a smooth install

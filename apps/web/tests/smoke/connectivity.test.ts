@@ -1,7 +1,7 @@
 /**
  * Smoke tests — validate real external service connectivity.
  *
- * Run with: npm run test:smoke (via doppler run for secrets)
+ * Run with: npm run test:smoke (via `infisical run` for secrets)
  * Each provider skips gracefully when env vars are missing.
  */
 import { describe, it, expect } from 'vitest';
@@ -77,7 +77,6 @@ describe('AI Providers', () => {
       expect(valid).toBe(true);
     });
   });
-
 });
 
 // ---------------------------------------------------------------------------

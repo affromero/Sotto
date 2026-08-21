@@ -2,11 +2,11 @@
 /*
  * Local sign-in recovery for self-hosted instances. Use this on the server when
  * nobody can sign in (forgotten owner password, or you want to fall back to OAuth).
- * Needs DATABASE_URL in the environment, for example through Doppler:
+ * Needs DATABASE_URL in the environment, for example through Infisical:
  *
- *   doppler run -- node apps/web/scripts/local-auth-recovery.mjs list
- *   doppler run -- node apps/web/scripts/local-auth-recovery.mjs reset <userId> <newPassword>
- *   doppler run -- node apps/web/scripts/local-auth-recovery.mjs disable-local-auth
+ *   infisical run --projectId b1b8cc4c-b65d-4d63-8382-7c3d4ac9dcac --env dev -- node apps/web/scripts/local-auth-recovery.mjs list
+ *   infisical run --projectId b1b8cc4c-b65d-4d63-8382-7c3d4ac9dcac --env dev -- node apps/web/scripts/local-auth-recovery.mjs reset <userId> <newPassword>
+ *   infisical run --projectId b1b8cc4c-b65d-4d63-8382-7c3d4ac9dcac --env dev -- node apps/web/scripts/local-auth-recovery.mjs disable-local-auth
  *
  * reset re-hashes the password and bumps tokenVersion so old sessions are revoked.
  * disable-local-auth turns the profile picker off so OAuth sign-in is primary again.

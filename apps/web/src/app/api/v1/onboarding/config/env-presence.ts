@@ -3,7 +3,7 @@ import { aiModelProviderId } from '@/app/welcome/providerMap';
 
 /**
  * Which wizard provider pills already have a platform key in the server env
- * (Doppler/.env), so the welcome wizard can show them as configured instead of
+ * (a secret manager or .env), so the welcome wizard can show them as configured instead of
  * asking the owner to re-paste keys. Presence booleans only — values never
  * leave the server. Keys are WIZARD display ids (see app/welcome/data.ts);
  * keyless/local ids (kokoro, local, whisper) are deliberately absent — their

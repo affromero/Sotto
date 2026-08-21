@@ -4,8 +4,8 @@
  * (nano banana pro). They go inline with the aula styling and drop into
  * apps/web/public/avatars/, replacing the emoji fallback tiles automatically.
  *
- * Run once the key is available, for example through Doppler:
- *   doppler run -- node scripts/generate-avatars.mjs
+ * Run once the key is available, for example through Infisical:
+ *   infisical run --projectId b1b8cc4c-b65d-4d63-8382-7c3d4ac9dcac --env dev -- node scripts/generate-avatars.mjs
  * Needs GEMINI_API_KEY in the environment. Optional GEMINI_IMAGE_MODEL override.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 
 const KEY = process.env.GEMINI_API_KEY;
 if (!KEY) {
-  console.error('GEMINI_API_KEY is not set. Add it to Doppler (dev and prd) or the environment.');
+  console.error('GEMINI_API_KEY is not set. Add it to Infisical (dev and prod) or the environment.');
   process.exit(1);
 }
 

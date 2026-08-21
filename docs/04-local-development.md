@@ -2,7 +2,7 @@
 
 > **Date**: 2026-06-13
 >
-> **Summary**: Run Sotto locally without Doppler, production database sync, cloud storage, or hosted infrastructure. The default local path uses PostgreSQL, Redis, local file storage, and explicit provider configuration.
+> **Summary**: Run Sotto locally without a hosted secret manager, production database sync, cloud storage, or hosted infrastructure. The default local path uses PostgreSQL, Redis, local file storage, and explicit provider configuration.
 
 ---
 
@@ -42,7 +42,7 @@ Open `http://localhost:3000`.
 6. generate the Prisma client
 7. keep storage local by default
 
-The quickstart must not require Doppler.
+The quickstart must not require a hosted secret manager.
 
 ---
 

@@ -386,7 +386,7 @@ The architecture is considered aligned when:
 - Prisma validates and generates.
 - OSS guard tests pass.
 - Root docs describe free, self-hostable language-learning onboarding.
-- Local setup works without Doppler.
+- Local setup works without a hosted secret manager.
 - Placement, courses, classes, practice, exams, memory, speaking, writing, and listening are documented against current routes and schema.
 - Provider setup errors are explicit.
 - Listening audio works through the reused audio pipeline without positioning Sotto as a episode platform.
