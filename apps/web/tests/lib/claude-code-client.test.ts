@@ -289,6 +289,20 @@ describe('claude-code-client', () => {
       await expect(promise).rejects.toThrow('claude-code: exited with code 1');
     });
 
+    it('surfaces stdout when a failing exit wrote nothing to stderr', async () => {
+      const { executeClaudeCode } = await import('@/lib/claude-code-client');
+
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+
+      const promise = executeClaudeCode('System', 'Prompt');
+
+      proc._stdout.emit('data', Buffer.from('Not logged in \u00b7 Please run /login'));
+      proc.emit('close', 1);
+
+      await expect(promise).rejects.toThrow('Not logged in');
+    });
+
     it('rejects when spawn fails (CLI not found)', async () => {
       const { executeClaudeCode } = await import('@/lib/claude-code-client');
 

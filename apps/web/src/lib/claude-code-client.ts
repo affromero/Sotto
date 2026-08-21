@@ -287,8 +287,11 @@ export async function executeClaudeCode(
       invocation.release();
 
       if (code !== 0) {
-        logger.error('claude-code: non-zero exit', { code: String(code), stderr });
-        reject(new Error(`claude-code: exited with code ${code} — ${stderr.slice(0, 500)}`));
+        // The CLI reports failures ("Not logged in", "OAuth session expired")
+        // on stdout in print mode, so stderr alone yields a blank message.
+        const detail = (stderr.trim() || stdout.trim() || '(no output)').slice(0, 500);
+        logger.error('claude-code: non-zero exit', { code: String(code), detail });
+        reject(new Error(`claude-code: exited with code ${code} — ${detail}`));
         return;
       }
 
@@ -467,10 +470,14 @@ export async function* streamClaudeCode(
     // Surface errors when no text was produced
     if (!produced) {
       if (exitCode !== null && exitCode !== 0) {
-        const errorMsg = stderr.trim() || `claude-code exited with code ${exitCode}`;
+        // Auth failures print plain text on stdout, which lands unparsed in buffer.
+        const errorMsg =
+          stderr.trim() ||
+          buffer.trim().slice(0, 500) ||
+          `claude-code exited with code ${exitCode}`;
         logger.error('claude-code: stream failed', {
           exitCode: String(exitCode),
-          stderr: stderr.slice(0, 500),
+          detail: errorMsg.slice(0, 500),
         });
         throw new Error(errorMsg);
       } else if (stderr.trim()) {
