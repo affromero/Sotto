@@ -8,36 +8,49 @@ const POLL_MS = 100;
 let reloadQueue = Promise.resolve();
 
 /**
- * How long the file's refresh token claims to live, or -1 when unreadable.
+ * How far along a credentials file is in its rotation, or -1 when unreadable.
  *
- * The CLI mints a refresh token with a later expiry every time it rotates, so
- * this orders two credential files by generation closely enough to answer the
- * only question that matters: is the one I am about to write older than the one
- * already there? It cannot detect a token the server retired out of band, which
- * is why an unreadable file always loses.
+ * Both CLIs mint a new refresh token in place and retire the previous one, so a
+ * copy taken before a rotation is dead the moment it is restored. Neither file
+ * carries a generation counter, but both carry a timestamp that only moves
+ * forward: Claude's refresh token expiry, and Codex's last_refresh. That is
+ * enough to answer the only question here — is what I am about to write older
+ * than what is already on disk? It cannot see a token retired out of band,
+ * which is why an unreadable file always loses.
  */
-export function refreshTokenLifetime(contents: string): number {
+export function credentialGeneration(provider: AgentProviderId, contents: string): number {
   try {
-    const parsed: unknown = JSON.parse(contents);
-    const oauth = (parsed as { claudeAiOauth?: { refreshTokenExpiresAt?: unknown } })
-      ?.claudeAiOauth;
-    return typeof oauth?.refreshTokenExpiresAt === 'number' ? oauth.refreshTokenExpiresAt : -1;
+    const parsed = JSON.parse(contents) as {
+      claudeAiOauth?: { refreshTokenExpiresAt?: unknown };
+      last_refresh?: unknown;
+    };
+    if (provider === 'claude-code') {
+      const expiry = parsed?.claudeAiOauth?.refreshTokenExpiresAt;
+      return typeof expiry === 'number' ? expiry : -1;
+    }
+    const refreshed =
+      typeof parsed?.last_refresh === 'string' ? Date.parse(parsed.last_refresh) : NaN;
+    return Number.isNaN(refreshed) ? -1 : refreshed;
   } catch {
     return -1;
   }
 }
 
 /** True when `candidate` should replace whatever `pathname` currently holds. */
-export function supersedesCredentials(pathname: string, candidate: string): boolean {
+export function supersedesCredentials(
+  provider: AgentProviderId,
+  pathname: string,
+  candidate: string
+): boolean {
   let existing: string;
   try {
     existing = fs.readFileSync(pathname, 'utf8');
   } catch {
     return true; // Nothing there yet.
   }
-  const current = refreshTokenLifetime(existing);
+  const current = credentialGeneration(provider, existing);
   if (current < 0) return true; // Unreadable or malformed — anything beats it.
-  return refreshTokenLifetime(candidate) > current;
+  return credentialGeneration(provider, candidate) > current;
 }
 
 function syncRoot(): string | null {
@@ -87,13 +100,13 @@ async function waitFor(pathname: string): Promise<void> {
   throw new Error('The credential sync service did not answer in time.');
 }
 
-function installSnapshot(snapshot: string, runtime: string): void {
+function installSnapshot(provider: AgentProviderId, snapshot: string, runtime: string): void {
   if (!fs.existsSync(snapshot)) {
     fs.rmSync(runtime, { force: true });
     return;
   }
   const contents = fs.readFileSync(snapshot, 'utf8');
-  if (!supersedesCredentials(runtime, contents)) {
+  if (!supersedesCredentials(provider, runtime, contents)) {
     // The host mount is read-only, so its copy is retired the moment this
     // container refreshes from it. Restoring it would undo the rotation.
     return;
@@ -112,7 +125,9 @@ function installSnapshot(snapshot: string, runtime: string): void {
 export function installCurrentProviderCredentialSnapshot(provider: AgentProviderId): void {
   if (!credentialReloadAvailable(provider)) return;
   const { snapshot, runtime } = credentialPaths(provider);
-  if (fs.existsSync(/* turbopackIgnore: true */ snapshot)) installSnapshot(snapshot, runtime);
+  if (fs.existsSync(/* turbopackIgnore: true */ snapshot)) {
+    installSnapshot(provider, snapshot, runtime);
+  }
 }
 
 async function performReload(provider: AgentProviderId): Promise<void> {
@@ -127,7 +142,7 @@ async function performReload(provider: AgentProviderId): Promise<void> {
   try {
     await waitFor(response);
     const { snapshot, runtime } = credentialPaths(provider);
-    installSnapshot(snapshot, runtime);
+    installSnapshot(provider, snapshot, runtime);
     const [{ resetAgentStatusCache }, { resetCodexModelDiscoveryCache }] = await Promise.all([
       import('../agent-availability'),
       import('../agent-models/codex-app-server'),

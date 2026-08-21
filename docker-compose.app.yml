@@ -34,9 +34,11 @@ services:
       BYOK_ENCRYPTION_KEY: ${BYOK_ENCRYPTION_KEY:?Set BYOK_ENCRYPTION_KEY}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       CLAUDE_HOME: /home/sotto/.claude
+      CODEX_HOME: /home/sotto/.codex
     volumes:
       - cli-credentials:/run/cli-credentials
       - agent-home:/home/sotto/.claude
+      - agent-codex-home:/home/sotto/.codex
     healthcheck:
       test:
         [
@@ -70,6 +72,9 @@ volumes:
   agent-home:
     external: true
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-home
+  agent-codex-home:
+    external: true
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-codex-home
   cli-credentials:
     external: true
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials

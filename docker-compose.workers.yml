@@ -13,6 +13,7 @@ x-worker-image: &worker-image
   volumes:
     - cli-credentials:/run/cli-credentials
     - agent-home:/home/sotto/.claude
+    - agent-codex-home:/home/sotto/.codex
 
 services:
   workers-heavy:
@@ -30,6 +31,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       CLAUDE_HOME: /home/sotto/.claude
+      CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: heavy
       WORKER_PRESET: ${WORKER_PRESET_HEAVY:-full}
       WORKER_QUEUES: ${WORKER_QUEUES_HEAVY:-}
@@ -58,6 +60,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       CLAUDE_HOME: /home/sotto/.claude
+      CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: pipeline
       WORKER_PRESET: ${WORKER_PRESET_PIPELINE:-full}
       WORKER_QUEUES: ${WORKER_QUEUES_PIPELINE:-}
@@ -86,6 +89,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       CLAUDE_HOME: /home/sotto/.claude
+      CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: light
       WORKER_PRESET: ${WORKER_PRESET_LIGHT:-full}
       WORKER_QUEUES: ${WORKER_QUEUES_LIGHT:-}
@@ -132,5 +136,7 @@ volumes:
   # first, the rotated credentials persist for every other one.
   agent-home:
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-home
+  agent-codex-home:
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-agent-codex-home
   cli-credentials:
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials

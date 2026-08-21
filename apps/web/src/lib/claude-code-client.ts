@@ -45,7 +45,7 @@ let _sharedCredentialsPath: string | null | undefined = undefined;
  * an operator pasting fresh credentials after the stored ones died.
  */
 function seedSharedCredentials(credsPath: string, credsJson: string): void {
-  if (!supersedesCredentials(credsPath, credsJson)) {
+  if (!supersedesCredentials('claude-code', credsPath, credsJson)) {
     logger.info('claude-code: keeping the rotated credentials over the configured seed');
     return;
   }
@@ -149,7 +149,7 @@ function createInvocationConfig(): InvocationConfig {
         /* turbopackIgnore: true */ join(dir, '.credentials.json'),
         'utf8'
       );
-      if (current !== seeded && supersedesCredentials(shared, current)) {
+      if (current !== seeded && supersedesCredentials('claude-code', shared, current)) {
         const tmp = `${shared}.tmp-${randomUUID()}`;
         writeFileSync(/* turbopackIgnore: true */ tmp, current, { mode: 0o600 });
         renameSync(/* turbopackIgnore: true */ tmp, shared);

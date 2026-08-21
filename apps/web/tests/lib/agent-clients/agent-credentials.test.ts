@@ -76,6 +76,26 @@ describe('CLI credential reload', () => {
     expect(fs.readFileSync(runtime, 'utf8')).toBe(rotated);
   });
 
+  it('leaves a rotated Codex token in place when the host snapshot is older', async () => {
+    const runtime = path.join(runtimeHome, '.codex', 'auth.json');
+    fs.mkdirSync(path.dirname(runtime), { recursive: true });
+    const rotated = JSON.stringify({
+      tokens: { refresh_token: 'rotated' },
+      last_refresh: '2026-08-20T00:00:00.000Z',
+    });
+    fs.writeFileSync(runtime, rotated);
+
+    const credentials = await import('@/lib/agent-credentials');
+    const reload = credentials.reloadProviderCredentials('codex');
+    await answerSync('codex', {
+      tokens: { refresh_token: 'retired' },
+      last_refresh: '2026-08-12T00:00:00.000Z',
+    });
+    await reload;
+
+    expect(fs.readFileSync(runtime, 'utf8')).toBe(rotated);
+  });
+
   it('removes runtime credentials when the host is logged out', async () => {
     const runtime = path.join(runtimeHome, '.claude', '.credentials.json');
     fs.mkdirSync(path.dirname(runtime), { recursive: true });
