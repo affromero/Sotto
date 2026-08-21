@@ -57,7 +57,7 @@
     "lucide-react": "^1.30.0",
     "markit-ai": "^0.5.3",
     "next": "^16.3.0",
-    "openai": "^6.46.0",
+    "openai": "^7.4.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^6.2.108",
     "pg": "^8.22.0",
