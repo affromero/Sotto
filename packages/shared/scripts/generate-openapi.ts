@@ -25,6 +25,8 @@ import {
   episodeDetailResponseSchema,
   episodeSegmentSchema,
   episodeStatusSchema,
+  activityResponseSchema,
+  courseExamsResponseSchema,
   examDetailResponseSchema,
   examEpisodeRefSchema,
   examResultSchema,
@@ -166,6 +168,8 @@ const namedSchemas: Record<string, z.ZodType> = {
   ExamSection: examSectionSchema,
   ExamResult: examResultSchema,
   ExamDetailResponse: examDetailResponseSchema,
+  CourseExamsResponse: courseExamsResponseSchema,
+  ActivityResponse: activityResponseSchema,
   StartExamRequest: startExamRequestSchema,
   StartExamResponse: startExamResponseSchema,
   SubmitExamRequest: submitExamRequestSchema,
@@ -202,11 +206,11 @@ const nameBySchema = new Map<z.ZodType, string>(
   Object.entries(namedSchemas).map(([name, schema]) => [schema, name])
 );
 
-function refFor(schema: z.ZodType): { $ref: string } {
+function refFor(schema: z.ZodType, endpointId?: string): { $ref: string } {
   const name = nameBySchema.get(schema);
   if (!name) {
     throw new Error(
-      'Endpoint schema is not registered as a named component. Add it to namedSchemas in generate-openapi.ts.'
+      `Endpoint ${endpointId ?? '(unknown)'} uses a schema that is not registered as a named component. Add it to namedSchemas in generate-openapi.ts.`
     );
   }
   return { $ref: `#/components/schemas/${name}` };
@@ -354,14 +358,14 @@ function operationFor(endpoint: EndpointDef): JsonValue {
       const code = Number(status);
       responses[status] = {
         description: code >= 500 ? 'Degraded' : 'Success',
-        content: { 'application/json': { schema: refFor(schema) } },
+        content: { 'application/json': { schema: refFor(schema, endpoint.id) } },
       };
     }
   } else {
     if (!endpoint.response) {
       throw new Error(`Endpoint ${endpoint.id} must define either \`response\` or \`responses\`.`);
     }
-    const responseRef = refFor(endpoint.response);
+    const responseRef = refFor(endpoint.response, endpoint.id);
     for (const status of endpoint.successStatuses ?? [200]) {
       responses[String(status)] = {
         description: status >= 500 ? 'Degraded' : 'Success',
@@ -382,7 +386,7 @@ function operationFor(endpoint: EndpointDef): JsonValue {
   if (endpoint.request) {
     operation.requestBody = {
       required: true,
-      content: { 'application/json': { schema: refFor(endpoint.request) } },
+      content: { 'application/json': { schema: refFor(endpoint.request, endpoint.id) } },
     };
   }
 

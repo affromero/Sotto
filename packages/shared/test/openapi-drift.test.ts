@@ -147,6 +147,8 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/episodes/{episodeId}/interact',
         'GET /api/v1/episodes/{episodeId}/interact/{interactionId}',
         'POST /api/v1/auth/pair/redeem',
+        'GET /api/v1/learn/activity',
+        'GET /api/v1/courses/{courseId}/exams',
       ].sort()
     );
   });
