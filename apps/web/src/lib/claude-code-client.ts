@@ -50,7 +50,11 @@ function seedSharedCredentials(credsPath: string, credsJson: string): void {
     return;
   }
   mkdirSync(/* turbopackIgnore: true */ dirname(credsPath), { recursive: true });
-  writeFileSync(/* turbopackIgnore: true */ credsPath, credsJson, { mode: 0o600 });
+  // 0660, not 0600: this volume is shared with the other apps on the host that
+  // drive the same login, and they run as a different uid. The directory is
+  // setgid to the group they have in common, so the group bit is what makes one
+  // lineage possible at all. Still unreadable to anyone outside that group.
+  writeFileSync(/* turbopackIgnore: true */ credsPath, credsJson, { mode: 0o660 });
   logger.info('claude-code: seeded credentials from CLAUDE_CODE_CREDENTIALS_JSON');
 }
 
@@ -151,7 +155,7 @@ function createInvocationConfig(): InvocationConfig {
       );
       if (current !== seeded && supersedesCredentials('claude-code', shared, current)) {
         const tmp = `${shared}.tmp-${randomUUID()}`;
-        writeFileSync(/* turbopackIgnore: true */ tmp, current, { mode: 0o600 });
+        writeFileSync(/* turbopackIgnore: true */ tmp, current, { mode: 0o660 });
         renameSync(/* turbopackIgnore: true */ tmp, shared);
         logger.info('claude-code: persisted refreshed OAuth credentials');
       }

@@ -10,6 +10,10 @@ x-worker-image: &worker-image
     dockerfile: apps/web/Dockerfile.workers
     args:
       WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}
+  # See docker-compose.app.yml: shared agent credential volumes are setgid to
+  # gid 1000, the group the other apps' images run as.
+  group_add:
+    - '1000'
   volumes:
     - cli-credentials:/run/cli-credentials
     - agent-home:/home/sotto/.claude

@@ -35,6 +35,13 @@ services:
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
+    # The agent credential volumes are shared with papernook and flight-finder,
+    # whose images run as uid 1000. This container runs as 1001, so it joins
+    # their group as a supplementary one; the volume dirs are setgid to it, and
+    # the credential files are written 0660. Without this the lineage splits
+    # back into one dead copy per app.
+    group_add:
+      - '1000'
     volumes:
       - cli-credentials:/run/cli-credentials
       - agent-home:/home/sotto/.claude

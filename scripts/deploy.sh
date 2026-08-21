@@ -388,6 +388,16 @@ fi
 # web-only deploy does not fail on a missing volume.
 docker volume create agent-claude-home >/dev/null
 docker volume create agent-codex-home >/dev/null
+# The apps sharing these volumes run as different uids (this image is 1001,
+# papernook and flight-finder are 1000). Setgid to their common group so files
+# created here inherit it, and 0770 so both can create the temp file that the
+# atomic writeback renames into place. Idempotent; runs as root in a throwaway
+# container because the host does not need docker volume internals poked at.
+docker run --rm -v agent-claude-home:/x -v agent-codex-home:/y alpine:3.22 sh -c '
+  chgrp -R 1000 /x /y 2>/dev/null || true
+  chmod 2770 /x /y
+  find /x /y -type f -exec chmod 660 {} + 2>/dev/null || true
+' >/dev/null 2>&1 || echo "WARNING: could not normalise agent credential volume permissions"
 
 # Refresh host CLI authentication before any migration, web, or worker process
 # starts. The networkless sidecar copies only the two supported auth JSON files
