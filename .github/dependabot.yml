@@ -24,21 +24,18 @@ updates:
         update-types:
           - version-update:semver-major
     groups:
-      # One PR for every npm bump, majors included. The previous arrangement
-      # kept majors out of the group so each could be reviewed in isolation —
-      # a major usually needs code migration, and bundling means one
-      # unmigrated dependency blocks every other update in the batch. That
-      # tradeoff is accepted deliberately: a single weekly PR is worth more
-      # here than isolated review. When one major does block the batch, split
-      # just that dependency out with `exclude-patterns` rather than
-      # ungrouping everything again.
+      # One PR for every npm bump. No `update-types` filter: omitting it
+      # groups every kind of update, majors included. Listing them explicitly
+      # looks equivalent but is not — an update Dependabot does not classify
+      # as major/minor/patch (a digest or SHA-pin bump) falls outside a
+      # filtered group and gets its own PR. The previous arrangement kept
+      # majors out so each could be migrated in isolation; that tradeoff is
+      # given up deliberately for one PR a week. When a major does block the
+      # batch, split just that dependency out with `exclude-patterns` rather
+      # than ungrouping everything again.
       npm-all:
         patterns:
           - '*'
-        update-types:
-          - major
-          - minor
-          - patch
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
     directory: /
@@ -51,10 +48,6 @@ updates:
       actions:
         patterns:
           - '*'
-        update-types:
-          - major
-          - minor
-          - patch
   # Container base images (Dockerfiles live at the repo root).
   - package-ecosystem: docker
     directory: /
@@ -64,11 +57,9 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     # Grouped for the same reason as npm: one PR per ecosystem per week.
+    # Unfiltered on purpose — base-image bumps are usually digest updates,
+    # which an `update-types` filter would push out into their own PRs.
     groups:
       docker:
         patterns:
           - '*'
-        update-types:
-          - major
-          - minor
-          - patch
