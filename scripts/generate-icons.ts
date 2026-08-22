@@ -1,12 +1,32 @@
 import sharp from 'sharp';
 import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
-const SOURCE_MARK = join(__dirname, '..', 'assets', 'sotto-mark.svg');
-const OUTPUT_DIR = join(__dirname, '..', 'apps', 'web', 'public');
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+
+const SOURCE_MARK = join(scriptDir, '..', 'assets', 'sotto-mark.svg');
+const OUTPUT_DIR = join(scriptDir, '..', 'apps', 'web', 'public');
 const BRAND_DIR = join(OUTPUT_DIR, 'brand');
-const DESKTOP_DIR = join(__dirname, '..', 'apps', 'desktop', 'src');
-const APP_DIR = join(__dirname, '..', 'apps', 'web', 'src', 'app');
+const DESKTOP_DIR = join(scriptDir, '..', 'apps', 'desktop', 'src');
+const APP_DIR = join(scriptDir, '..', 'apps', 'web', 'src', 'app');
+const IOS_ICON_DIR = join(
+  scriptDir,
+  '..',
+  'apps',
+  'ios',
+  'Sources',
+  'Assets.xcassets',
+  'AppIcon.appiconset'
+);
+
+// Every unique pixel size referenced by AppIcon.appiconset/Contents.json.
+const IOS_ICON_SIZES = [20, 29, 40, 58, 60, 80, 87, 120, 152, 167, 180, 1024];
+
+// SottoTheme.paper. iOS app icons must be fully opaque, since an alpha channel
+// is rejected at upload as ITMS-90717, so the mark is flattened onto the brand
+// ground rather than shipped with transparent corners like the web icons.
+const IOS_ICON_BACKGROUND = { r: 245, g: 244, b: 240 };
 
 interface IcoImage {
   size: number;
@@ -55,6 +75,16 @@ async function generatePngIcon(size: number, filename: string): Promise<void> {
   log(`Generated ${filename} (${size}x${size})`);
 }
 
+async function generateIosIcon(size: number): Promise<void> {
+  const filename = `sotto-icon-${size}.png`;
+  await sharp(markSvg)
+    .resize(size, size)
+    .flatten({ background: IOS_ICON_BACKGROUND })
+    .png()
+    .toFile(join(IOS_ICON_DIR, filename));
+  log(`Generated ios/${filename} (${size}x${size})`);
+}
+
 async function main() {
   writeFileSync(join(BRAND_DIR, 'sotto-mark.svg'), markSvg);
   writeFileSync(join(APP_DIR, 'icon.svg'), markSvg);
@@ -72,6 +102,10 @@ async function main() {
   ]);
   writeFileSync(join(OUTPUT_DIR, 'favicon.ico'), favicon);
   log('Generated favicon.ico (16x16, 32x32, 64x64)');
+
+  for (const size of IOS_ICON_SIZES) {
+    await generateIosIcon(size);
+  }
 
   log('All icons generated.');
 }
