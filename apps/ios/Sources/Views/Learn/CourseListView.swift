@@ -14,6 +14,15 @@ struct CourseListView: View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
+                    if let activeProfile = model.activeProfile {
+                        SottoAvatar(
+                            name: activeProfile.name,
+                            avatarPath: activeProfile.avatarUrl,
+                            serverURL: model.credentials?.serverURL,
+                            size: 46
+                        )
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Sotto")
                             .font(.title.bold())
@@ -387,12 +396,21 @@ private struct CourseDetailPane: View {
                     generating: generation != nil,
                     onPrimary: startOrResumeClass,
                     onPractice: startPractice,
+                    due: model.practiceOverview,
                     onLive: openLive,
                     onExam: openExam,
                     onPlacement: openPlacement,
                     onWorkbook: openWorkbook,
                     onMemory: { showingMemory = true }
                 )
+
+                if let overview = model.practiceOverview {
+                    PracticeDuePanel(overview: overview) { sessionId in
+                        model.run {
+                            await model.resumePractice(sessionId: sessionId)
+                        }
+                    }
+                }
 
                 SourcedClassPanel(course: course, activeClassId: course.activeClassId)
 
@@ -406,6 +424,15 @@ private struct CourseDetailPane: View {
             .frame(maxWidth: layout.readableWidth, alignment: .leading)
         }
         .background(SottoTheme.paper)
+        .task(id: course.id) {
+            await refreshPracticeOverview()
+        }
+        .onChange(of: model.practiceResult) { _, result in
+            // A finished session changes what is due; keep the panel honest.
+            if result != nil {
+                Task { await refreshPracticeOverview() }
+            }
+        }
         .sheet(isPresented: $showingExams) {
             ExamHubView(course: course)
                 .environmentObject(model)
@@ -434,7 +461,7 @@ private struct CourseDetailPane: View {
     }
 
     private func startOrResumeClass() {
-        Task {
+        model.run {
             if let activeClassId = course.activeClassId {
                 await model.openClass(activeClassId)
             } else {
@@ -443,14 +470,18 @@ private struct CourseDetailPane: View {
         }
     }
 
+    private func refreshPracticeOverview() async {
+        await model.loadPracticeOverview(courseId: course.id)
+    }
+
     private func startPractice(_ kind: String) {
-        Task {
+        model.run {
             await model.startPractice(courseId: course.id, kind: kind)
         }
     }
 
     private func openWorkbook() {
-        Task {
+        model.run {
             await model.openWorkbook(for: course)
         }
     }
@@ -620,7 +651,7 @@ private struct NewCourseView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        Task {
+                        model.run {
                             await model.createCourse(native: native, target: target)
                             if model.errorMessage == nil {
                                 dismiss()

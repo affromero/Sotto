@@ -42,6 +42,15 @@ struct SottoAPIClient {
         )
     }
 
+    func fetchPracticeOverview(courseId: String) async throws -> SottoPracticeOverview {
+        try await get("/api/v1/courses/\(courseId)/practice")
+    }
+
+    /// Reopens a practice session that was started earlier.
+    func fetchPractice(sessionId: String) async throws -> SottoPracticeStart {
+        try await get("/api/v1/practice/\(sessionId)")
+    }
+
     func listProfiles() async throws -> [SottoProfile] {
         let response: SottoProfileListResponse = try await get("/api/v1/profiles")
         return response.profiles
@@ -211,6 +220,34 @@ struct SottoAPIClient {
             path: "/api/v1/classes/\(classId)/speaking/\(promptId)",
             recordingId: recordingId
         )
+    }
+
+    func uploadPracticeSpeakingRecording(
+        sessionId: String,
+        promptId: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        try await uploadSpeakingRecording(
+            path: "/api/v1/practice/\(sessionId)/speaking/\(promptId)",
+            audioURL: audioURL
+        )
+    }
+
+    func pollPracticeSpeakingRecording(
+        sessionId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        try await pollSpeakingRecording(
+            path: "/api/v1/practice/\(sessionId)/speaking/\(promptId)",
+            recordingId: recordingId
+        )
+    }
+
+    /// An adaptive listening episode. Practice hands out an episode id and the
+    /// audio is produced in the background, so the URL appears late.
+    func fetchEpisode(episodeId: String) async throws -> SottoEpisode {
+        try await get("/api/v1/episodes/\(episodeId)")
     }
 
     /// Class, practice, and exam speaking all upload to their own path and then

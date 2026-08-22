@@ -10,16 +10,16 @@ enum WritingPromptSource: Equatable {
 }
 
 struct WritingPracticeView: View {
-    let source: WritingPromptSource
+    @ObservedObject var drafts: WritingDraftStore
     let prompts: [SottoWritingPrompt]
     let onSelectionHelp: ((String, String) -> Void)?
 
     init(
-        source: WritingPromptSource,
+        drafts: WritingDraftStore,
         prompts: [SottoWritingPrompt],
         onSelectionHelp: ((String, String) -> Void)? = nil
     ) {
-        self.source = source
+        self.drafts = drafts
         self.prompts = prompts
         self.onSelectionHelp = onSelectionHelp
     }
@@ -32,61 +32,26 @@ struct WritingPracticeView: View {
 
             ForEach(prompts.sorted { ($0.order ?? 0) < ($1.order ?? 0) }) { prompt in
                 WritingPromptCard(
-                    source: source,
+                    drafts: drafts,
                     prompt: prompt,
                     onSelectionHelp: onSelectionHelp
                 )
             }
         }
-        .padding(16)
-        .background(SottoTheme.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
+/// One prompt and its editor. Grading belongs to the screen's single Submit,
+/// so this card only edits and shows the grade it already has.
 private struct WritingPromptCard: View {
-    @EnvironmentObject private var model: SottoAppModel
+    @ObservedObject var drafts: WritingDraftStore
     @Environment(\.sottoLayout) private var layout
 
-    let source: WritingPromptSource
     let prompt: SottoWritingPrompt
     let onSelectionHelp: ((String, String) -> Void)?
 
-    @State private var text: String
-    @State private var grade: SottoWritingGrade?
-    @State private var isSubmitting = false
-    @State private var errorMessage: String?
-
-    init(
-        source: WritingPromptSource,
-        prompt: SottoWritingPrompt,
-        onSelectionHelp: ((String, String) -> Void)?
-    ) {
-        self.source = source
-        self.prompt = prompt
-        self.onSelectionHelp = onSelectionHelp
-        _text = State(initialValue: prompt.latestResponse?.text ?? "")
-        if let previous = prompt.latestResponse, let score = previous.overallScore {
-            _grade = State(
-                initialValue: SottoWritingGrade(
-                    overallScore: score,
-                    corrections: previous.corrections ?? [],
-                    feedback: previous.feedback ?? ""
-                )
-            )
-        }
-    }
-
-    private var trimmedText: String {
-        text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// The route caps the body at 4000 characters, so stop the learner here
-    /// rather than losing a long answer to a 400.
-    private var isOverLimit: Bool { trimmedText.count > 4000 }
-
-    private var canSubmit: Bool {
-        !trimmedText.isEmpty && !isOverLimit && !isSubmitting
+    private var draft: WritingDraftStore.Draft? {
+        drafts.draft(for: prompt.id)
     }
 
     var body: some View {
@@ -110,14 +75,14 @@ private struct WritingPromptCard: View {
                     Spacer(minLength: 12)
                 }
 
-                if let score = grade?.overallScore {
+                if let score = draft?.grade?.overallScore {
                     Text(percentLabel(score))
                         .font(.headline.monospacedDigit())
                         .foregroundStyle(SottoTheme.primary)
                 }
             }
 
-            TextEditor(text: $text)
+            TextEditor(text: drafts.binding(for: prompt.id))
                 .font(.body)
                 .frame(minHeight: layout == .compact ? 130 : 160)
                 .scrollContentBackground(.hidden)
@@ -126,40 +91,21 @@ private struct WritingPromptCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(isOverLimit ? Color.red.opacity(0.6) : SottoTheme.line)
+                        .stroke(draft?.isOverLimit == true ? Color.red.opacity(0.6) : SottoTheme.line)
                 )
-                .disabled(isSubmitting)
+                .disabled(drafts.isSubmitting)
 
-            HStack(spacing: 12) {
-                Button {
-                    Task { await submit() }
-                } label: {
-                    Label(
-                        isSubmitting ? "Grading" : (grade == nil ? "Submit" : "Submit again"),
-                        systemImage: "checkmark.circle"
-                    )
-                }
-                .buttonStyle(SottoPrimaryButtonStyle())
-                .disabled(!canSubmit)
-
-                if isOverLimit {
-                    Text("\(trimmedText.count) / 4000 characters")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.red)
-                } else if isSubmitting {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
+            if let draft, draft.isOverLimit {
+                Text("\(draft.trimmed.count) / 4000 characters")
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
+            } else if let draft, draft.hasChanged {
+                Text("Not graded yet. It goes with the next submit.")
+                    .font(.caption)
+                    .foregroundStyle(SottoTheme.muted)
             }
 
-            if let grade {
+            if let grade = draft?.grade {
                 WritingGradeView(grade: grade, onSelectionHelp: onSelectionHelp)
             }
         }
@@ -170,39 +116,7 @@ private struct WritingPromptCard: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(SottoTheme.line)
         )
-    }
-
-    private func submit() async {
-        guard canSubmit else { return }
-        isSubmitting = true
-        errorMessage = nil
-        defer { isSubmitting = false }
-
-        do {
-            let answer = trimmedText
-            switch source {
-            case let .classSession(classId):
-                grade = try await model.submitClassWriting(
-                    classId: classId,
-                    promptId: prompt.id,
-                    text: answer
-                )
-            case let .practice(sessionId):
-                grade = try await model.submitPracticeWriting(
-                    sessionId: sessionId,
-                    promptId: prompt.id,
-                    text: answer
-                )
-            case let .exam(examId):
-                grade = try await model.submitExamWriting(
-                    examId: examId,
-                    promptId: prompt.id,
-                    text: answer
-                )
-            }
-        } catch {
-            errorMessage = SottoWritingFailure.message(for: error)
-        }
+        .onAppear { drafts.register(prompt) }
     }
 }
 

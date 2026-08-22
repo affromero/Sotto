@@ -82,7 +82,7 @@ struct MemoryGraphView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         dismiss()
-                        Task { await model.startPractice(courseId: course.id, kind: "VOCAB") }
+                        model.run { await model.startPractice(courseId: course.id, kind: "VOCAB") }
                     } label: {
                         Label("Review", systemImage: "target")
                     }

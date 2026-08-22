@@ -6,6 +6,8 @@ struct ClassSessionView: View {
     let classDetail: SottoClassDetail
 
     @State private var answers: [String: Int] = [:]
+    @State private var submittedAnswers: [String: Int] = [:]
+    @StateObject private var drafts = WritingDraftStore()
     @State private var showingRemoveConfirmation = false
     @State private var selectionHelpRequest: LearnerSelectionHelpRequest?
     @State private var selectionHelp: SottoSelectionHelpResponse?
@@ -23,8 +25,19 @@ struct ClassSessionView: View {
         currentClass.sections.flatMap(\.questions)
     }
 
-    private var allAnswered: Bool {
-        !questions.isEmpty && questions.allSatisfy { answers[$0.id] != nil }
+    /// Only the choices that moved since the last submit.
+    private var changedAnswers: [SottoSubmitAnswer] {
+        answers
+            .filter { submittedAnswers[$0.key] != $0.value }
+            .map { SottoSubmitAnswer(questionId: $0.key, selectedIndex: $0.value) }
+    }
+
+    private var everyAnswer: [SottoSubmitAnswer] {
+        answers.map { SottoSubmitAnswer(questionId: $0.key, selectedIndex: $0.value) }
+    }
+
+    private var hasChanges: Bool {
+        !changedAnswers.isEmpty || drafts.hasChanges
     }
 
     private var completionProgress: Double {
@@ -62,6 +75,7 @@ struct ClassSessionView: View {
                             classId: currentClass.id,
                             section: section,
                             answers: $answers,
+                            drafts: drafts,
                             onSelectionHelp: openSelectionHelp
                         )
                     }
@@ -97,7 +111,7 @@ struct ClassSessionView: View {
 
                     Button {
                         let classId = currentClass.id
-                        Task {
+                        model.run {
                             await model.openWorkbook(for: classId)
                         }
                     } label: {
@@ -106,7 +120,7 @@ struct ClassSessionView: View {
 
                     Menu {
                         Button {
-                            Task {
+                            model.run {
                                 await model.regenerateSelectedClass()
                                 answers = [:]
                             }
@@ -125,14 +139,25 @@ struct ClassSessionView: View {
                     .disabled(model.isLoading)
 
                     Button {
-                        Task {
-                            let payload = answers.map { SottoSubmitAnswer(questionId: $0.key, selectedIndex: $0.value) }
-                            await model.submitClassAnswers(payload)
+                        let classId = currentClass.id
+                        model.run {
+                            let graded = await drafts.submit(
+                                source: .classSession(classId: classId),
+                                model: model,
+                                includingUnchanged: !hasChanges
+                            )
+                            guard graded else { return }
+
+                            let payload = hasChanges ? changedAnswers : everyAnswer
+                            if !payload.isEmpty {
+                                await model.submitClassAnswers(payload)
+                                submittedAnswers = answers
+                            }
                         }
                     } label: {
                         Label("Submit", systemImage: "checkmark.circle.fill")
                     }
-                    .disabled(!allAnswered)
+                    .disabled(drafts.isOverLimit || drafts.isSubmitting)
                 }
             }
             .sheet(isPresented: workbookSheetBinding) {
@@ -173,7 +198,7 @@ struct ClassSessionView: View {
             }
             .confirmationDialog("Remove class?", isPresented: $showingRemoveConfirmation, titleVisibility: .visible) {
                 Button("Remove class", role: .destructive) {
-                    Task {
+                    model.run {
                         await model.deleteSelectedClass()
                     }
                 }

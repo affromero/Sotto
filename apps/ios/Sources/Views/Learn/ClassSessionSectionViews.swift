@@ -6,6 +6,7 @@ struct ClassSectionView: View {
     let classId: String
     let section: SottoClassSection
     @Binding var answers: [String: Int]
+    @ObservedObject var drafts: WritingDraftStore
     let onSelectionHelp: (String, String) -> Void
 
     private var skill: String {
@@ -69,22 +70,16 @@ struct ClassSectionView: View {
             }
 
             if !section.prompts.isEmpty {
-                if skill == "SPEAKING" {
-                    ClassSpeakingPracticeView(
-                        source: .classSession(classId: classId),
-                        prompts: section.prompts,
-                        onSelectionHelp: onSelectionHelp
-                    )
-                } else {
-                    PromptBlock(title: "Speaking", icon: "waveform", prompts: section.prompts.map {
-                        "\($0.targetPhrase) - \($0.translation)"
-                    }, onSelectionHelp: onSelectionHelp)
-                }
+                ClassSpeakingPracticeView(
+                    source: .classSession(classId: classId),
+                    prompts: section.prompts,
+                    onSelectionHelp: onSelectionHelp
+                )
             }
 
             if !section.writingPrompts.isEmpty {
                 WritingPracticeView(
-                    source: .classSession(classId: classId),
+                    drafts: drafts,
                     prompts: section.writingPrompts,
                     onSelectionHelp: onSelectionHelp
                 )
@@ -507,45 +502,5 @@ struct QuestionView: View {
                 )
             }
         }
-    }
-}
-
-struct PromptBlock: View {
-    let title: String
-    let icon: String
-    let prompts: [String]
-    let onSelectionHelp: (String, String) -> Void
-
-    init(
-        title: String,
-        icon: String,
-        prompts: [String],
-        onSelectionHelp: @escaping (String, String) -> Void = { _, _ in }
-    ) {
-        self.title = title
-        self.icon = icon
-        self.prompts = prompts
-        self.onSelectionHelp = onSelectionHelp
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: icon)
-                .font(.headline)
-                .foregroundStyle(SottoTheme.ink)
-
-            ForEach(prompts, id: \.self) { prompt in
-                SelectableLearnerText(
-                    prompt,
-                    font: LearnerTextFonts.body,
-                    color: UIColor(SottoTheme.muted),
-                    onExamples: onSelectionHelp
-                )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(16)
-        .background(SottoTheme.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

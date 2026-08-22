@@ -17,33 +17,40 @@
  * of recomputing anything client-side.
  */
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
-import { ClassGlyph } from './ClassGlyph';
+
 import { ContinueBar, ScoreDial } from './ClassWidgets';
-import type { WritingCorrection, WritingPromptData, WritingResponse } from './classTypes';
+import type { WritingCorrection, WritingPromptData } from './classTypes';
+import type { WritingDrafts } from './writing/useWritingDrafts';
 import styles from './WritingSection.module.css';
 
 interface WritingSectionProps {
-  /** Endpoint prefix; the prompt id is appended, e.g.
-   *  `/api/v1/classes/{classId}/writing` or `/api/v1/practice/{sessionId}/writing`. */
-  endpointBase: string;
+  /** The screen's drafts. Grading belongs to the screen's single submit, so
+   *  this section only edits and shows the grade a prompt already has. */
+  drafts: WritingDrafts;
   prompts: WritingPromptData[];
   /** Reports the running average 0..100 score upward (class gate / rail). */
   onScore?: (score: number) => void;
-  onFeedback?: (promptId: string, response: WritingResponse) => void;
   feedbackHref?: string;
   /** Class-flow gating. When `onContinue` is set, the gated ContinueBar is
    *  rendered; in practice these are omitted (the runner owns "Finish"). */
   gate?: number; // 0..100
   nextName?: string | null;
   onContinue?: () => void;
+  /** The screen's submit, rendered above the gated continue bar. The class
+   *  flow grades here before its gate can open. */
+  submitAction?: {
+    label: string;
+    busyLabel: string;
+    busy: boolean;
+    disabled: boolean;
+    onSubmit: () => void;
+  };
 }
 
-type CardPhase = 'editing' | 'checking' | 'checked' | 'error';
-
-const MIN_CHARS = 8;
+const MAX_CHARS = 4000;
 
 // ---- inline corrected text ----
 
@@ -125,70 +132,24 @@ function Corr({ c }: { c: WritingCorrection }) {
 // ---- one writing prompt card ----
 
 interface PromptCardProps {
-  endpointBase: string;
+  drafts: WritingDrafts;
   prompt: WritingPromptData;
   index: number;
   total: number;
-  onScored: (promptId: string, overall: number) => void;
-  onFeedback?: (promptId: string, response: WritingResponse) => void;
   feedbackHref: string;
 }
 
-function PromptCard({
-  endpointBase,
-  prompt,
-  index,
-  total,
-  onScored,
-  onFeedback,
-  feedbackHref,
-}: PromptCardProps) {
-  const [text, setText] = useState(prompt.response?.text ?? '');
-  const [phase, setPhase] = useState<CardPhase>(prompt.response ? 'checked' : 'editing');
-  const [result, setResult] = useState<WritingResponse | null>(prompt.response);
-  const [error, setError] = useState('');
+function PromptCard({ drafts, prompt, index, total, feedbackHref }: PromptCardProps) {
+  const draft = drafts.drafts[prompt.id];
+  const text = draft?.text ?? '';
+  const result = draft?.result ?? null;
   const taResid = useId();
 
-  async function check() {
-    setPhase('checking');
-    setError('');
-    try {
-      const res = await fetch(`${endpointBase}/${prompt.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? 'Could not check your writing. Please try again.');
-        setPhase('error');
-        return;
-      }
-      const data = (await res.json()) as Omit<WritingResponse, 'text'>;
-      const graded: WritingResponse = {
-        text,
-        overallScore: data.overallScore,
-        corrections: data.corrections ?? [],
-        feedback: data.feedback,
-      };
-      setResult(graded);
-      setPhase('checked');
-      onScored(prompt.id, Math.round((graded.overallScore ?? 0) * 100));
-      onFeedback?.(prompt.id, graded);
-    } catch {
-      setError('Network error. Please try again.');
-      setPhase('error');
-    }
-  }
-
-  function edit() {
-    setPhase('editing');
-  }
-
+  const trimmed = text.trim();
+  const overLimit = trimmed.length > MAX_CHARS;
+  const pending = trimmed.length > 0 && !overLimit && trimmed !== draft?.submittedText;
   const overall = result ? Math.round((result.overallScore ?? 0) * 100) : 0;
   const issueCount = result?.corrections.length ?? 0;
-  const isChecking = phase === 'checking';
-  const showEditor = phase === 'editing' || phase === 'checking' || phase === 'error';
 
   return (
     <article
@@ -227,111 +188,80 @@ function PromptCard({
         )}
       </div>
 
-      {showEditor ? (
-        <>
-          <label className={styles.srOnly} htmlFor={taResid}>
-            Your written response for prompt {index + 1}
-          </label>
-          <textarea
-            id={taResid}
-            className={styles.writer}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Write your response…"
-            disabled={isChecking}
-            lang="auto"
-          />
-          <div className={styles.writeCount} aria-live="polite">
-            {text.trim().length} characters
-          </div>
+      <label className={styles.srOnly} htmlFor={taResid}>
+        Your written response for prompt {index + 1}
+      </label>
+      <textarea
+        id={taResid}
+        className={styles.writer}
+        value={text}
+        onChange={(e) => drafts.setText(prompt.id, e.target.value)}
+        placeholder="Write your response…"
+        disabled={drafts.isSubmitting}
+        lang="auto"
+      />
+      <div className={styles.writeCount} aria-live="polite">
+        {overLimit
+          ? `${trimmed.length} / ${MAX_CHARS} characters`
+          : pending
+            ? `${trimmed.length} characters · goes with the next submit`
+            : `${trimmed.length} characters`}
+      </div>
 
-          {phase === 'error' && error && (
-            <p className={styles.errorBanner} role="alert">
-              {error}
+      {result && (
+        <div className={styles.results}>
+          <CorrectedText text={result.text} corrections={result.corrections} />
+
+          <div className={styles.writeFeedback}>
+            <div className={styles.wfDial}>
+              <ScoreDial value={overall} size={64} />
+            </div>
+            <p className={styles.writePraise}>
+              {result.feedback}
+              <span className={styles.tally}>
+                {issueCount === 0
+                  ? 'no issues found, clean'
+                  : `${issueCount} correction${issueCount > 1 ? 's' : ''} · hover to see why`}
+              </span>
             </p>
-          )}
-
-          <div className={styles.cactions}>
-            <span className={styles.grow} />
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              disabled={text.trim().length < MIN_CHARS || isChecking}
-              aria-disabled={text.trim().length < MIN_CHARS || isChecking}
-              aria-busy={isChecking}
-              onClick={() => void check()}
-            >
-              {isChecking ? 'Checking…' : 'Check writing'} <ClassGlyph name="check" size={16} />
-            </button>
+            <a className={styles.feedbackLink} href={feedbackHref}>
+              Go to Feedback Clinic
+            </a>
           </div>
-        </>
-      ) : (
-        result && (
-          <div className={styles.results}>
-            <CorrectedText text={result.text} corrections={result.corrections} />
-
-            <div className={styles.writeFeedback}>
-              <div className={styles.wfDial}>
-                <ScoreDial value={overall} size={64} />
-              </div>
-              <p className={styles.writePraise}>
-                {result.feedback}
-                <span className={styles.tally}>
-                  {issueCount === 0
-                    ? 'no issues found, clean'
-                    : `${issueCount} correction${issueCount > 1 ? 's' : ''} · hover to see why`}
-                </span>
-              </p>
-              <a className={styles.feedbackLink} href={feedbackHref}>
-                Go to Feedback Clinic
-              </a>
-            </div>
-
-            <div className={styles.cactions}>
-              <button type="button" className={`${styles.btn} ${styles.btnBare}`} onClick={edit}>
-                <ClassGlyph name="back" size={16} /> Edit again
-              </button>
-              <span className={styles.grow} />
-            </div>
-          </div>
-        )
+        </div>
       )}
     </article>
   );
 }
 
-// ---- module ----
-
 export function WritingSection({
-  endpointBase,
+  drafts,
   prompts,
   onScore,
-  onFeedback,
   feedbackHref = '#feedback-clinic',
   gate,
   nextName = null,
   onContinue,
+  submitAction,
 }: WritingSectionProps) {
-  // overall score per prompt id (0..100)
-  const [scores, setScores] = useState<Record<string, number>>(() => {
-    const initial: Record<string, number> = {};
-    for (const p of prompts) {
-      if (p.response) initial[p.id] = Math.round((p.response.overallScore ?? 0) * 100);
+  // Grades come from the drafts the screen submitted, not from the cards.
+  const scores = useMemo(() => {
+    const values: Record<string, number> = {};
+    for (const prompt of prompts) {
+      const result = drafts.drafts[prompt.id]?.result;
+      if (result) values[prompt.id] = Math.round((result.overallScore ?? 0) * 100);
     }
-    return initial;
-  });
+    return values;
+  }, [drafts.drafts, prompts]);
 
-  function handleScored(promptId: string, value: number) {
-    setScores((prev) => {
-      const next = { ...prev, [promptId]: value };
-      if (onScore) {
-        const vals = Object.values(next);
-        const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
-        onScore(avg);
-      }
-      return next;
-    });
-  }
+  const averageScore = useMemo(() => {
+    const values = Object.values(scores);
+    return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0;
+  }, [scores]);
+
+  useEffect(() => {
+    onScore?.(averageScore);
+  }, [averageScore, onScore]);
 
   if (prompts.length === 0) {
     return (
@@ -368,17 +298,37 @@ export function WritingSection({
         {prompts.map((prompt, idx) => (
           <li key={prompt.id} className={styles.promptItem}>
             <PromptCard
-              endpointBase={endpointBase}
+              drafts={drafts}
               prompt={prompt}
               index={idx}
               total={prompts.length}
-              onScored={handleScored}
-              onFeedback={onFeedback}
               feedbackHref={feedbackHref}
             />
           </li>
         ))}
       </ol>
+
+      {submitAction && (
+        <div className={styles.cactions}>
+          <span className={styles.grow} />
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            onClick={submitAction.onSubmit}
+            disabled={submitAction.disabled || submitAction.busy}
+            aria-disabled={submitAction.disabled || submitAction.busy}
+            aria-busy={submitAction.busy}
+          >
+            {submitAction.busy ? submitAction.busyLabel : submitAction.label}
+          </button>
+        </div>
+      )}
+
+      {drafts.error && (
+        <p className={styles.errorBanner} role="alert">
+          {drafts.error}
+        </p>
+      )}
 
       {onContinue && (
         <ContinueBar

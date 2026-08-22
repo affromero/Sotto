@@ -99,6 +99,7 @@ struct CourseActionGrid: View {
     let generating: Bool
     let onPrimary: () -> Void
     let onPractice: (String) -> Void
+    let due: SottoPracticeOverview?
     let onLive: () -> Void
     let onExam: () -> Void
     let onPlacement: () -> Void
@@ -108,6 +109,14 @@ struct CourseActionGrid: View {
     private let secondaryColumns = [
         GridItem(.adaptive(minimum: 116), spacing: 8),
     ]
+
+    /// Shows what is waiting behind each kind, the way the web panel does.
+    private func practiceLabel(_ option: PracticeKindOption) -> String {
+        guard let due, let count = option.dueCount(in: due), count > 0 else {
+            return option.label
+        }
+        return "\(option.label) (\(count) due)"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -121,7 +130,7 @@ struct CourseActionGrid: View {
             LazyVGrid(columns: secondaryColumns, alignment: .leading, spacing: 8) {
                 Menu {
                     ForEach(practiceOptions) { option in
-                        Button(option.label) {
+                        Button(practiceLabel(option)) {
                             onPractice(option.kind)
                         }
                     }
@@ -313,7 +322,7 @@ struct SourcedClassPanel: View {
     private func start(source: SottoClassGenerationSource) {
         error = nil
         if let activeClassId {
-            Task {
+            model.run {
                 await model.openClass(activeClassId)
             }
             return
@@ -590,7 +599,7 @@ private struct CourseClassHistoryRow: View {
 
             HStack(spacing: 8) {
                 Button {
-                    Task {
+                    model.run {
                         await model.openClass(item.id)
                     }
                 } label: {
@@ -599,7 +608,7 @@ private struct CourseClassHistoryRow: View {
                 .buttonStyle(.borderedProminent)
 
                 Button {
-                    Task {
+                    model.run {
                         await model.openWorkbook(for: item.id)
                     }
                 } label: {
@@ -733,14 +742,30 @@ private struct FlowLayout: Layout {
     }
 }
 
-private struct PracticeKindOption: Identifiable {
+/// One practice type, and how many items are waiting for it.
+struct PracticeKindOption: Identifiable {
     var id: String { kind }
 
     let kind: String
     let label: String
+
+    /// Only vocabulary and grammar carry a due count server-side; a full
+    /// catch-up draws on both, and the rest are generated on demand.
+    func dueCount(in overview: SottoPracticeOverview) -> Int? {
+        switch kind {
+        case "FULL":
+            return overview.totalDue
+        case "VOCAB":
+            return overview.due.vocab
+        case "GRAMMAR":
+            return overview.due.grammar
+        default:
+            return nil
+        }
+    }
 }
 
-private let practiceOptions: [PracticeKindOption] = [
+let practiceOptions: [PracticeKindOption] = [
     PracticeKindOption(kind: "FULL", label: "Full catch-up"),
     PracticeKindOption(kind: "GRAMMAR", label: "Grammar"),
     PracticeKindOption(kind: "READING", label: "Reading"),
