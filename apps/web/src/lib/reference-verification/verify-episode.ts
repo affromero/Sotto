@@ -39,15 +39,28 @@ async function resolveEpisodeVerificationAi(
   return { provider, model: episode.aiModel, apiKey: key?.apiKey };
 }
 
+/**
+ * Outcome of verifying one episode's references. Callers need the counts, not
+ * just a pass/fail: a script whose sources are all genuine and one whose single
+ * bad citation sits among four good ones are different situations, and the
+ * caller decides which of them is fatal.
+ */
+export interface ReferenceVerificationSummary {
+  total: number;
+  verified: number;
+  /** Every reference verified. The strictest reading, used by the compile step. */
+  allVerified: boolean;
+}
+
 export async function verifyEpisodeReferences(
   episodeId: string,
   userId: string,
   topic: string,
   turns: Array<{ speaker: string; text: string }>,
   useAdminCredits = false
-): Promise<boolean> {
+): Promise<ReferenceVerificationSummary> {
   const references = await prisma.reference.findMany({ where: { episodeId } });
-  if (references.length === 0) return false;
+  if (references.length === 0) return { total: 0, verified: 0, allVerified: false };
 
   const ai = await resolveEpisodeVerificationAi(episodeId, userId, Boolean(useAdminCredits));
   const inputs: ReferenceInput[] = references.map((reference) => ({
@@ -73,12 +86,14 @@ export async function verifyEpisodeReferences(
 
   const verifiedAt = new Date().toISOString();
   let allVerified = rejectedRefIds.size === 0;
+  let verifiedCount = 0;
 
   await Promise.all(
     references.map(async (reference) => {
       const result = results.get(reference.id);
       const verified = !rejectedRefIds.has(reference.id) && result?.verdict.status === 'VERIFIED';
-      if (!verified) allVerified = false;
+      if (verified) verifiedCount++;
+      else allVerified = false;
 
       await prisma.reference.update({
         where: { id: reference.id },
@@ -101,5 +116,5 @@ export async function verifyEpisodeReferences(
     })
   );
 
-  return allVerified;
+  return { total: references.length, verified: verifiedCount, allVerified };
 }

@@ -135,7 +135,11 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test (must come AFTER vi.mock calls) ----
 
-import { generateClassListening, composeListeningContent } from '@/lib/class-listening-generator';
+import {
+  generateClassListening,
+  composeListeningContent,
+  minimumVerifiedReferences,
+} from '@/lib/class-listening-generator';
 import type { ClassListeningParams, ListeningContentParams } from '@/lib/class-listening-generator';
 
 // ---- Fixtures ----
@@ -242,7 +246,7 @@ function setupHappyPath() {
   mockVocabEntryCreateMany.mockResolvedValue({ count: SAMPLE_VOCABULARY.length });
   mockCreateSegmentsAndQueueAudio.mockResolvedValue(undefined);
   mockPersistGeneratedReferences.mockResolvedValue(undefined);
-  mockVerifyEpisodeReferences.mockResolvedValue(true);
+  mockVerifyEpisodeReferences.mockResolvedValue({ total: 1, verified: 1, allVerified: true });
   mockLearnerVocabUpsert.mockResolvedValue({});
   mockLoadAndRender.mockReturnValue('You are a quiz generator.');
   mockGenerateResponse.mockResolvedValue({
@@ -666,18 +670,59 @@ describe('composeListeningContent', () => {
       );
     });
 
-    it('does not create audio when a cited claim cannot be verified', async () => {
+    it('does not create audio when no cited claim can be verified', async () => {
       setupHappyPath();
       mockGenerateScript.mockResolvedValue({
         ...SAMPLE_SCRIPT_RESULT,
         references: SOURCED_REFERENCES,
       });
-      mockVerifyEpisodeReferences.mockResolvedValue(false);
+      mockVerifyEpisodeReferences.mockResolvedValue({
+        total: 1,
+        verified: 0,
+        allVerified: false,
+      });
 
       await expect(composeListeningContent(SOURCED_PARAMS)).rejects.toThrow(
         'Class reference verification failed'
       );
       expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('does not create audio when most of the sources fail', async () => {
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({
+        ...SAMPLE_SCRIPT_RESULT,
+        references: SOURCED_REFERENCES,
+      });
+      // 2 of 5 verified is below the majority the class requires.
+      mockVerifyEpisodeReferences.mockResolvedValue({
+        total: 5,
+        verified: 2,
+        allVerified: false,
+      });
+
+      await expect(composeListeningContent(SOURCED_PARAMS)).rejects.toThrow(
+        'only 2 of 5 sources could be verified'
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('still builds the class when a minority of sources fail', async () => {
+      // The case that kept discarding paid German classes: one invented DOI
+      // among five otherwise sound grammar sources.
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({
+        ...SAMPLE_SCRIPT_RESULT,
+        references: SOURCED_REFERENCES,
+      });
+      mockVerifyEpisodeReferences.mockResolvedValue({
+        total: 5,
+        verified: 4,
+        allVerified: false,
+      });
+
+      await expect(composeListeningContent(SOURCED_PARAMS)).resolves.toBeDefined();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
     });
 
     it('still creates segments exactly once (no double-queue)', async () => {
@@ -692,5 +737,27 @@ describe('composeListeningContent', () => {
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-1', SAMPLE_TURNS);
     });
+  });
+});
+
+describe('minimumVerifiedReferences', () => {
+  it('lets a class ship when a majority of its sources verify', () => {
+    // 4 of 5 is the shape that kept being discarded: one bad citation among
+    // four sound ones.
+    expect(minimumVerifiedReferences(5)).toBeLessThanOrEqual(4);
+  });
+
+  it('rejects a class when half or more of its sources fail', () => {
+    expect(minimumVerifiedReferences(5)).toBeGreaterThan(2);
+    expect(minimumVerifiedReferences(4)).toBeGreaterThan(1);
+  });
+
+  it('always demands at least one verified source', () => {
+    expect(minimumVerifiedReferences(1)).toBe(1);
+    expect(minimumVerifiedReferences(2)).toBe(1);
+  });
+
+  it('demands nothing when there are no references to check', () => {
+    expect(minimumVerifiedReferences(0)).toBe(0);
   });
 });
