@@ -42,6 +42,15 @@ struct SottoAPIClient {
         )
     }
 
+    func fetchPracticeOverview(courseId: String) async throws -> SottoPracticeOverview {
+        try await get("/api/v1/courses/\(courseId)/practice")
+    }
+
+    /// Reopens a practice session that was started earlier.
+    func fetchPractice(sessionId: String) async throws -> SottoPracticeStart {
+        try await get("/api/v1/practice/\(sessionId)")
+    }
+
     func listProfiles() async throws -> [SottoProfile] {
         let response: SottoProfileListResponse = try await get("/api/v1/profiles")
         return response.profiles

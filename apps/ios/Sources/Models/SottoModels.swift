@@ -477,6 +477,35 @@ struct SottoWritingGrade: Decodable, Equatable {
     let feedback: String
 }
 
+/// What is due for review on a course, and the sessions already started.
+/// The same payload the web practice panel reads.
+struct SottoPracticeOverview: Decodable, Equatable {
+    struct Due: Decodable, Equatable {
+        let vocab: Int
+        let grammar: Int
+    }
+
+    let due: Due
+    let totalVocab: Int
+    let recent: [SottoPracticeSessionSummary]
+
+    var totalDue: Int { due.vocab + due.grammar }
+
+    /// Sessions that were started and never finished, newest first.
+    var unfinished: [SottoPracticeSessionSummary] {
+        recent.filter { $0.completedAt == nil }
+    }
+}
+
+struct SottoPracticeSessionSummary: Decodable, Equatable, Identifiable {
+    let id: String
+    let kind: String
+    let status: String
+    let score: Double?
+    let startedAt: String?
+    let completedAt: String?
+}
+
 struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     var id: String { sessionId }
 

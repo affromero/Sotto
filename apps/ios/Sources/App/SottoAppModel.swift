@@ -7,6 +7,7 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var courses: [SottoCourse] = []
     @Published var selectedClass: SottoClassDetail?
     @Published var practiceStart: SottoPracticeStart?
+    @Published private(set) var practiceOverview: SottoPracticeOverview?
     @Published var classResult: SottoClassSubmitResult?
     @Published var practiceResult: SottoPracticeSubmitResult?
     @Published var workbook: SottoWorksheetResponse?
@@ -578,6 +579,29 @@ final class SottoAppModel: ObservableObject {
 
     func startFullCatchUp(for course: SottoCourse) async {
         await startPractice(courseId: course.id, kind: "FULL")
+    }
+
+    /// What is due and what was left unfinished on a course. Quiet on failure:
+    /// this decorates the practice menu, it does not gate it.
+    func loadPracticeOverview(courseId: String) async {
+        guard let client = makeClient() else { return }
+        practiceOverview = try? await client.fetchPracticeOverview(courseId: courseId)
+    }
+
+    /// Reopens a session the learner started and never finished.
+    func resumePractice(sessionId: String) async {
+        guard let client = makeClient() else { return }
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            practiceStart = try await client.fetchPractice(sessionId: sessionId)
+            practiceResult = nil
+        } catch {
+            report(error)
+        }
+
+        isLoading = false
     }
 
     func startPractice(courseId: String, kind: String) async {

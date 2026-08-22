@@ -396,12 +396,21 @@ private struct CourseDetailPane: View {
                     generating: generation != nil,
                     onPrimary: startOrResumeClass,
                     onPractice: startPractice,
+                    due: model.practiceOverview,
                     onLive: openLive,
                     onExam: openExam,
                     onPlacement: openPlacement,
                     onWorkbook: openWorkbook,
                     onMemory: { showingMemory = true }
                 )
+
+                if let overview = model.practiceOverview {
+                    PracticeDuePanel(overview: overview) { sessionId in
+                        model.run {
+                            await model.resumePractice(sessionId: sessionId)
+                        }
+                    }
+                }
 
                 SourcedClassPanel(course: course, activeClassId: course.activeClassId)
 
@@ -415,6 +424,15 @@ private struct CourseDetailPane: View {
             .frame(maxWidth: layout.readableWidth, alignment: .leading)
         }
         .background(SottoTheme.paper)
+        .task(id: course.id) {
+            await refreshPracticeOverview()
+        }
+        .onChange(of: model.practiceResult) { _, result in
+            // A finished session changes what is due; keep the panel honest.
+            if result != nil {
+                Task { await refreshPracticeOverview() }
+            }
+        }
         .sheet(isPresented: $showingExams) {
             ExamHubView(course: course)
                 .environmentObject(model)
@@ -450,6 +468,10 @@ private struct CourseDetailPane: View {
                 await model.startOrResumeClass(for: course)
             }
         }
+    }
+
+    private func refreshPracticeOverview() async {
+        await model.loadPracticeOverview(courseId: course.id)
     }
 
     private func startPractice(_ kind: String) {
