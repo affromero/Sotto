@@ -243,3 +243,97 @@
   background: color-mix(in srgb, var(--bad) 13%, var(--paper));
   border-color: color-mix(in srgb, var(--bad) 54%, var(--line));
 }
+
+/* ---- recent sessions ---- */
+.recent {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.recentHeading {
+  margin: 0 0 12px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.recentKind {
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.recentScore {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+
+.badge {
+  padding: 3px 9px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  border-radius: var(--r);
+}
+
+.progress {
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+.passed {
+  color: var(--good);
+  background: color-mix(in srgb, var(--good) 14%, var(--paper));
+}
+
+.done {
+  color: var(--ink-mute);
+  background: color-mix(in srgb, var(--ink-mute) 12%, var(--paper));
+}
+
+.resumeButton {
+  margin-left: auto;
+  min-height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease);
+}
+
+.resumeButton:hover:not(:disabled) {
+  border-color: var(--ink-mute);
+}
+
+.resumeButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

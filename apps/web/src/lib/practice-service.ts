@@ -5,6 +5,20 @@
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { getDueItems, applyReviewOutcome } from './knowledge-graph';
+import { scoreMultipleChoice, submitFull, submitSpeaking, submitWriting } from './practice/grading';
+import type {
+  PracticeAnswer,
+  PracticeMcItem,
+  PracticeMcItemPublic,
+  SubmitPracticeResult,
+} from './practice/types';
+
+export type {
+  PracticeAnswer,
+  PracticeMcItem,
+  PracticeMcItemPublic,
+  SubmitPracticeResult,
+} from './practice/types';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent } from './class-listening-generator';
 import { composeSpeakingPrompts } from './class-speaking-generator';
@@ -30,21 +44,6 @@ export class PracticeCourseNotFoundError extends Error {}
 export class PracticeSessionNotFoundError extends Error {}
 
 // Stored item shape (full — includes the answer). The public projection drops it.
-interface PracticeMcItem {
-  id: string;
-  prompt: string;
-  options: string[];
-  correctIndex: number;
-  explanation: string;
-  vocabLemma: string | null;
-  focusTargetId: string | null;
-}
-
-export interface PracticeMcItemPublic {
-  id: string;
-  prompt: string;
-  options: string[];
-}
 
 export interface PracticeSpeakingItem {
   id: string;
@@ -81,28 +80,8 @@ export type StartPracticeResult =
       writingPrompts: PracticeWritingItem[];
     };
 
-export interface PracticeAnswer {
-  itemId: string;
-  selectedIndex: number;
-}
-
-export interface SubmitPracticeResult {
-  score: number;
-  correct: number;
-  total: number;
-}
-
 export interface StartPracticeOptions {
   focusTargetId?: string | null;
-}
-
-interface MultipleChoiceScore {
-  correct: number;
-  total: number;
-  score: number;
-  correctLemmas: string[];
-  incorrectLemmas: string[];
-  sections: Record<string, { correct: number; total: number }>;
 }
 
 function toPublic(it: PracticeMcItem): PracticeMcItemPublic {
@@ -192,45 +171,6 @@ function buildFocusItems(
       },
     ];
   });
-}
-
-function mcSection(itemId: string): string {
-  const prefix = itemId.charAt(0);
-  return prefix === 'v' || prefix === 'g' || prefix === 'r' || prefix === 'l' ? prefix : 'q';
-}
-
-function scoreMultipleChoice(
-  items: PracticeMcItem[],
-  answers: PracticeAnswer[]
-): MultipleChoiceScore {
-  const sections: Record<string, { correct: number; total: number }> = {};
-  const answered = new Map(answers.map((answer) => [answer.itemId, answer.selectedIndex]));
-  let correct = 0;
-  const correctLemmas: string[] = [];
-  const incorrectLemmas: string[] = [];
-
-  for (const item of items) {
-    const selectedIndex = answered.get(item.id);
-    const section = mcSection(item.id);
-    sections[section] ??= { correct: 0, total: 0 };
-    sections[section].total += 1;
-    const ok = selectedIndex === item.correctIndex;
-    if (ok) {
-      correct += 1;
-      sections[section].correct += 1;
-    }
-    if (item.vocabLemma) (ok ? correctLemmas : incorrectLemmas).push(item.vocabLemma);
-  }
-
-  const total = items.length;
-  return {
-    correct,
-    total,
-    score: total > 0 ? correct / total : 0,
-    correctLemmas,
-    incorrectLemmas,
-    sections,
-  };
 }
 
 interface CourseCtx {
@@ -819,6 +759,12 @@ export async function submitPractice(
     where: { id: sessionId, course: { userId } },
   });
   if (!session) throw new PracticeSessionNotFoundError('Practice session not found');
+  // Grading is not idempotent: it drives SRS through applyReviewOutcome and
+  // markFocusTargetsPracticed. Now that a session can be re-entered, a stale
+  // runner tab could otherwise submit a second time and review it twice.
+  if (session.status !== 'ACTIVE') {
+    throw new PracticeSessionNotFoundError('Practice session is already complete');
+  }
 
   const now = new Date();
   if (session.kind === 'SPEAKING') {
@@ -880,118 +826,4 @@ export async function submitPractice(
     data: { status: 'COMPLETED', score: mc.score, completedAt: now },
   });
   return { score: mc.score, correct: mc.correct, total: mc.total };
-}
-
-async function submitFull(
-  sessionId: string,
-  courseId: string,
-  vocabLemmas: string[],
-  grammarKeys: string[],
-  focusTargetIds: string[],
-  items: PracticeMcItem[],
-  answers: PracticeAnswer[],
-  now: Date
-): Promise<SubmitPracticeResult> {
-  const mc = scoreMultipleChoice(items, answers);
-  const [recordings, responses, speakingTotal, writingTotal] = await Promise.all([
-    prisma.speakingRecording.findMany({
-      where: { practiceSessionId: sessionId, overallScore: { not: null } },
-      select: { overallScore: true },
-    }),
-    prisma.writingResponse.findMany({
-      where: { practiceSessionId: sessionId, overallScore: { not: null } },
-      select: { overallScore: true },
-    }),
-    prisma.speakingPrompt.count({ where: { practiceSessionId: sessionId } }),
-    prisma.writingPrompt.count({ where: { practiceSessionId: sessionId } }),
-  ]);
-
-  const speakingAvg =
-    recordings.length > 0
-      ? recordings.reduce((sum, r) => sum + (r.overallScore ?? 0), 0) / recordings.length
-      : null;
-  const writingAvg =
-    responses.length > 0
-      ? responses.reduce((sum, r) => sum + (r.overallScore ?? 0), 0) / responses.length
-      : null;
-  const scoredParts = [mc.total > 0 ? mc.score : null, speakingAvg, writingAvg].filter(
-    (score): score is number => score !== null
-  );
-  const score =
-    scoredParts.length > 0
-      ? scoredParts.reduce((sum, part) => sum + part, 0) / scoredParts.length
-      : 0;
-
-  if (mc.correctLemmas.length) await applyReviewOutcome(courseId, mc.correctLemmas, [], 1, 0, now);
-  if (mc.incorrectLemmas.length)
-    await applyReviewOutcome(courseId, mc.incorrectLemmas, [], 0, 0, now);
-
-  const taggedLemmas = new Set([...mc.correctLemmas, ...mc.incorrectLemmas]);
-  const aggregateVocab = vocabLemmas.filter((lemma) => !taggedLemmas.has(lemma));
-  const grammarSection = mc.sections.g;
-  const grammarScore =
-    grammarSection && grammarSection.total > 0
-      ? grammarSection.correct / grammarSection.total
-      : score;
-  if (aggregateVocab.length > 0 || grammarKeys.length > 0) {
-    await applyReviewOutcome(courseId, aggregateVocab, grammarKeys, score, grammarScore, now);
-  }
-  await markFocusTargetsPracticed(courseId, focusTargetIds, score, now);
-
-  await prisma.practiceSession.update({
-    where: { id: sessionId },
-    data: { status: 'COMPLETED', score, completedAt: now },
-  });
-
-  return {
-    score,
-    correct: mc.correct + recordings.length + responses.length,
-    total: mc.total + speakingTotal + writingTotal,
-  };
-}
-
-async function submitSpeaking(
-  sessionId: string,
-  courseId: string,
-  vocabLemmas: string[],
-  focusTargetIds: string[],
-  now: Date
-): Promise<SubmitPracticeResult> {
-  const recordings = await prisma.speakingRecording.findMany({
-    where: { practiceSessionId: sessionId, overallScore: { not: null } },
-    select: { overallScore: true },
-  });
-  const graded = recordings.length;
-  const avg = graded > 0 ? recordings.reduce((s, r) => s + (r.overallScore ?? 0), 0) / graded : 0;
-  if (vocabLemmas.length > 0) await applyReviewOutcome(courseId, vocabLemmas, [], avg, 0, now);
-  await markFocusTargetsPracticed(courseId, focusTargetIds, avg, now);
-  await prisma.practiceSession.update({
-    where: { id: sessionId },
-    data: { status: 'COMPLETED', score: avg, completedAt: now },
-  });
-  const total = await prisma.speakingPrompt.count({ where: { practiceSessionId: sessionId } });
-  return { score: avg, correct: graded, total };
-}
-
-async function submitWriting(
-  sessionId: string,
-  courseId: string,
-  vocabLemmas: string[],
-  focusTargetIds: string[],
-  now: Date
-): Promise<SubmitPracticeResult> {
-  const responses = await prisma.writingResponse.findMany({
-    where: { practiceSessionId: sessionId, overallScore: { not: null } },
-    select: { overallScore: true },
-  });
-  const graded = responses.length;
-  const avg = graded > 0 ? responses.reduce((s, r) => s + (r.overallScore ?? 0), 0) / graded : 0;
-  if (vocabLemmas.length > 0) await applyReviewOutcome(courseId, vocabLemmas, [], avg, 0, now);
-  await markFocusTargetsPracticed(courseId, focusTargetIds, avg, now);
-  await prisma.practiceSession.update({
-    where: { id: sessionId },
-    data: { status: 'COMPLETED', score: avg, completedAt: now },
-  });
-  const total = await prisma.writingPrompt.count({ where: { practiceSessionId: sessionId } });
-  return { score: avg, correct: graded, total };
 }
