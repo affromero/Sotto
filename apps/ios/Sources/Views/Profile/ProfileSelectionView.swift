@@ -325,17 +325,13 @@ struct ProfileToolbarMenu: View {
                 Label("Unpair device", systemImage: "rectangle.portrait.and.arrow.right")
             }
         } label: {
-            HStack(spacing: 8) {
-                SottoAvatar(
-                    name: profileName,
-                    avatarPath: model.activeProfile?.avatarUrl,
-                    serverURL: model.credentials?.serverURL,
-                    size: 28
-                )
-                Text(profileName)
-                    .lineLimit(1)
-            }
+            SottoAvatar(
+                name: profileName,
+                avatarPath: model.activeProfile?.avatarUrl,
+                serverURL: model.credentials?.serverURL,
+                size: 42
+            )
         }
-        .accessibilityLabel("Profile menu")
+        .accessibilityLabel("Profile menu for \(profileName)")
     }
 }

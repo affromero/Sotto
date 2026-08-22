@@ -14,15 +14,6 @@ struct CourseListView: View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    if let activeProfile = model.activeProfile {
-                        SottoAvatar(
-                            name: activeProfile.name,
-                            avatarPath: activeProfile.avatarUrl,
-                            serverURL: model.credentials?.serverURL,
-                            size: 46
-                        )
-                    }
-
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Sotto")
                             .font(.title.bold())
