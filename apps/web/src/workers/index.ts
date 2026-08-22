@@ -124,12 +124,15 @@ const workers = [
     createWorker('worksheet-pdf', processWorksheetPdf, { concurrency: 2 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
-// Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
+// Cron jobs and webhooks run only on light (or all) profile to prevent duplicate
+// repeat registrations. BullMQ 6 dropped `repeat` from `add()`; recurring work is
+// registered through `upsertJobScheduler`, which is keyed by scheduler id and so
+// is idempotent across worker restarts on its own.
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
   // Schedule BYOK key re-validation every 24 hours
   if (shouldRun('key-validation')) {
     keyValidationQueue
-      .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
+      .upsertJobScheduler(JobType.VALIDATE_KEYS, { every: 24 * 60 * 60 * 1000 })
       .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
       .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
   }
@@ -137,7 +140,7 @@ if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
   // Schedule daily TTS provider monitor (6am UTC)
   if (shouldRun('tts-provider-monitor')) {
     ttsProviderMonitorQueue
-      .add(JobType.MONITOR_TTS_PROVIDERS, {}, { repeat: { pattern: '0 6 * * *' } })
+      .upsertJobScheduler(JobType.MONITOR_TTS_PROVIDERS, { pattern: '0 6 * * *' })
       .then(() => logger.info('TTS provider monitor scheduled', { schedule: '6:00 UTC daily' }))
       .catch((err) =>
         logger.error('Failed to schedule TTS provider monitor', { error: err.message })
@@ -147,7 +150,7 @@ if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
   // Schedule daily pricing fetch (every 24 hours)
   if (shouldRun('pricing-fetch')) {
     pricingFetchQueue
-      .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
+      .upsertJobScheduler(JobType.FETCH_PRICING, { every: 86400000 })
       .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
       .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
   }
