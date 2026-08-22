@@ -462,15 +462,6 @@ async function startFull(
   note: string,
   focusTargets: FocusPracticeTarget[]
 ): Promise<StartPracticeResult> {
-  const vocab = await buildVocabItems(course, FULL_VOCAB_COUNT, 'v');
-  const vocabItems = vocab.status === 'ready' ? vocab.items : [];
-  const vocabLemmas = vocab.status === 'ready' ? vocab.lemmas : [];
-  const focusItems = buildFocusItems(
-    focusTargets,
-    'f',
-    uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)])
-  );
-
   // Listening (which includes reference verification and can fail the whole
   // build) runs BEFORE the speaking prompts: speaking is the only section that
   // spends TTS credits up front, so it must not start until verification has
@@ -509,6 +500,36 @@ async function startFull(
     refId: seedToken,
     note,
   });
+
+  // Vocabulary is built LAST, not first. Generating the sections above is what
+  // seeds LearnerVocab on a course that has none yet, so asking beforehand saw
+  // an empty graph, fell under MIN_VOCAB, and silently produced a full
+  // catch-up with no vocabulary in it.
+  const vocab = await buildVocabItems(course, FULL_VOCAB_COUNT, 'v');
+  const vocabItems = vocab.status === 'ready' ? vocab.items : [];
+  const vocabLemmas = vocab.status === 'ready' ? vocab.lemmas : [];
+  const focusItems = buildFocusItems(
+    focusTargets,
+    'f',
+    uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)])
+  );
+
+  // A full catch-up is meant to cover every skill, so name whatever it could
+  // not build. Dropping a section silently is what hid the above for so long.
+  const missing = [
+    vocab.status !== 'ready' ? `vocab (${vocab.reason})` : null,
+    grammarItems.length === 0 ? 'grammar' : null,
+    readingItems.length === 0 ? 'reading' : null,
+    listening.comprehensionQuestions.length === 0 ? 'listening' : null,
+    speakingComposed.length === 0 ? 'speaking' : null,
+    writingComposed.length === 0 ? 'writing' : null,
+  ].filter((section): section is string => section !== null);
+  if (missing.length > 0) {
+    logger.warn('Full practice is missing sections', {
+      courseId: course.id,
+      missing: missing.join(', '),
+    });
+  }
 
   const listeningItems: PracticeMcItem[] = listening.comprehensionQuestions.map((q, i) => ({
     id: `l${i}`,

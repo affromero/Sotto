@@ -318,6 +318,45 @@ describe('startPractice — FULL', () => {
     expect(mockSpeakingPromptCreateMany).toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).toHaveBeenCalled();
   });
+
+  it('includes vocabulary that only exists once the other sections are generated', async () => {
+    // A course with no memory graph yet: the vocabulary rows appear as a side
+    // effect of generating this very session, so the count is 0 up front and
+    // healthy afterwards. Asking too early is what produced a catch-up with no
+    // vocabulary in it.
+    let vocabSeeded = false;
+    mockLearnerVocabCount.mockImplementation(async () => (vocabSeeded ? 6 : 0));
+    mockGenerateSectionQuestions.mockImplementation(async () => {
+      vocabSeeded = true;
+      return [
+        {
+          question: 'Soy ___ Madrid',
+          options: ['de', 'en', 'a', 'por'],
+          correctIndex: 0,
+          explanation: 'origin',
+        },
+      ];
+    });
+    mockGetDueItems.mockResolvedValue({
+      vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
+      grammar: [],
+    });
+    mockLearnerVocabFindMany.mockResolvedValue(
+      ['hola', 'gracias', 'adios', 'si', 'no'].map((lemma) => ({ lemma }))
+    );
+    mockComposeListeningContent.mockResolvedValue({
+      episodeId: 'ep1',
+      comprehensionQuestions: [],
+    });
+    mockPracticeSessionCreate.mockResolvedValue({ id: 'pfull2' });
+    mockSpeakingPromptFindMany.mockResolvedValue([]);
+    mockWritingPromptFindMany.mockResolvedValue([]);
+
+    const r = await startPractice('c1', 'u1', 'FULL');
+    if (r.status !== 'ready_full') throw new Error(`expected ready_full, got ${r.status}`);
+
+    expect(r.items.some((item) => item.id.startsWith('v'))).toBe(true);
+  });
 });
 
 describe('submitPractice — SRS', () => {
