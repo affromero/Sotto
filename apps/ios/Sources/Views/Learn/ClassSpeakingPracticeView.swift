@@ -5,6 +5,7 @@ import SwiftUI
 /// share the upload-then-poll flow and differ only in the route.
 enum SpeakingPromptSource: Equatable {
     case classSession(classId: String)
+    case practice(sessionId: String)
     case exam(examId: String)
 }
 
@@ -253,6 +254,12 @@ private struct ClassSpeakingPromptCard: View {
                 promptId: prompt.id,
                 audioURL: url
             )
+        case let .practice(sessionId):
+            return try await model.uploadPracticeSpeakingRecording(
+                sessionId: sessionId,
+                promptId: prompt.id,
+                audioURL: url
+            )
         case let .exam(examId):
             return try await model.uploadExamSpeakingRecording(
                 examId: examId,
@@ -267,6 +274,12 @@ private struct ClassSpeakingPromptCard: View {
         case let .classSession(classId):
             return try await model.pollClassSpeakingRecording(
                 classId: classId,
+                promptId: prompt.id,
+                recordingId: recordingId
+            )
+        case let .practice(sessionId):
+            return try await model.pollPracticeSpeakingRecording(
+                sessionId: sessionId,
                 promptId: prompt.id,
                 recordingId: recordingId
             )

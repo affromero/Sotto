@@ -222,6 +222,34 @@ struct SottoAPIClient {
         )
     }
 
+    func uploadPracticeSpeakingRecording(
+        sessionId: String,
+        promptId: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        try await uploadSpeakingRecording(
+            path: "/api/v1/practice/\(sessionId)/speaking/\(promptId)",
+            audioURL: audioURL
+        )
+    }
+
+    func pollPracticeSpeakingRecording(
+        sessionId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        try await pollSpeakingRecording(
+            path: "/api/v1/practice/\(sessionId)/speaking/\(promptId)",
+            recordingId: recordingId
+        )
+    }
+
+    /// An adaptive listening episode. Practice hands out an episode id and the
+    /// audio is produced in the background, so the URL appears late.
+    func fetchEpisode(episodeId: String) async throws -> SottoEpisode {
+        try await get("/api/v1/episodes/\(episodeId)")
+    }
+
     /// Class, practice, and exam speaking all upload to their own path and then
     /// poll the same path for the grade, so the transport lives here once.
     private func uploadSpeakingRecording(

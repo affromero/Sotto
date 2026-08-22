@@ -381,6 +381,15 @@ struct SottoClassSection: Decodable, Identifiable, Equatable {
     let writingPrompts: [SottoWritingPrompt]
 }
 
+/// The little an audio player needs from GET /api/v1/episodes/{id}. Practice
+/// hands out an episode id whose audio is still being produced, so `audioUrl`
+/// arrives on a later poll.
+struct SottoEpisode: Decodable, Equatable {
+    let id: String
+    let audioUrl: String?
+    let status: String?
+}
+
 struct SottoClassEpisode: Decodable, Equatable {
     let id: String
     let audioUrl: String?

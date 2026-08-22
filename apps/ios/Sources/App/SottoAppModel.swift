@@ -749,6 +749,43 @@ final class SottoAppModel: ObservableObject {
         )
     }
 
+    func uploadPracticeSpeakingRecording(
+        sessionId: String,
+        promptId: String,
+        audioURL: URL
+    ) async throws -> SottoSpeakingUploadResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before recording speaking feedback.")
+        }
+        return try await client.uploadPracticeSpeakingRecording(
+            sessionId: sessionId,
+            promptId: promptId,
+            audioURL: audioURL
+        )
+    }
+
+    func pollPracticeSpeakingRecording(
+        sessionId: String,
+        promptId: String,
+        recordingId: String
+    ) async throws -> SottoSpeakingPollResponse {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before checking speaking feedback.")
+        }
+        return try await client.pollPracticeSpeakingRecording(
+            sessionId: sessionId,
+            promptId: promptId,
+            recordingId: recordingId
+        )
+    }
+
+    func fetchEpisode(episodeId: String) async throws -> SottoEpisode {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before playing episode audio.")
+        }
+        return try await client.fetchEpisode(episodeId: episodeId)
+    }
+
     func cancelClassGeneration(for courseId: String) async {
         guard let client = makeClient() else { return }
 

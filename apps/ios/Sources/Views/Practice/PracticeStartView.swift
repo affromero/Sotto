@@ -42,6 +42,10 @@ struct PracticeStartView: View {
                     if start.status == "unavailable" {
                         UnavailablePractice(reason: start.reason)
                     } else {
+                        if let episodeId = start.episodeId {
+                            PracticeListeningPlayer(episodeId: episodeId)
+                        }
+
                         practiceItems
                         promptSections
                         submitBar
@@ -163,7 +167,7 @@ struct PracticeStartView: View {
         if start.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."
         }
-        return "\(answers.count) of \(items.count) multiple-choice items answered. Everything is graded together when you submit."
+        return "\(answers.count) of \(items.count) multiple-choice items answered. Speaking is graded as you record; the rest goes with the submit at the end."
     }
 
     private var practiceItems: some View {
@@ -195,9 +199,10 @@ struct PracticeStartView: View {
     private var promptSections: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let speakingPrompts = start.speakingPrompts, !speakingPrompts.isEmpty {
-                PromptBlock(title: "Speaking practice", icon: "waveform", prompts: speakingPrompts.map {
-                    "\($0.targetPhrase) - \($0.translation)"
-                })
+                ClassSpeakingPracticeView(
+                    source: .practice(sessionId: start.sessionId),
+                    prompts: speakingPrompts
+                )
             }
 
             if let writingPrompts = start.writingPrompts, !writingPrompts.isEmpty {
