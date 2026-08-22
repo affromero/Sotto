@@ -97,7 +97,7 @@ struct ClassSessionView: View {
 
                     Button {
                         let classId = currentClass.id
-                        Task {
+                        model.run {
                             await model.openWorkbook(for: classId)
                         }
                     } label: {
@@ -106,7 +106,7 @@ struct ClassSessionView: View {
 
                     Menu {
                         Button {
-                            Task {
+                            model.run {
                                 await model.regenerateSelectedClass()
                                 answers = [:]
                             }
@@ -125,7 +125,7 @@ struct ClassSessionView: View {
                     .disabled(model.isLoading)
 
                     Button {
-                        Task {
+                        model.run {
                             let payload = answers.map { SottoSubmitAnswer(questionId: $0.key, selectedIndex: $0.value) }
                             await model.submitClassAnswers(payload)
                         }
@@ -173,7 +173,7 @@ struct ClassSessionView: View {
             }
             .confirmationDialog("Remove class?", isPresented: $showingRemoveConfirmation, titleVisibility: .visible) {
                 Button("Remove class", role: .destructive) {
-                    Task {
+                    model.run {
                         await model.deleteSelectedClass()
                     }
                 }

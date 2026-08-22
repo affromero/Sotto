@@ -50,7 +50,7 @@ struct PracticeStartView: View {
                     }
 
                     Button {
-                        Task {
+                        model.run {
                             let payload = answers.map { SottoPracticeAnswer(itemId: $0.key, selectedIndex: $0.value) }
                             await model.submitPracticeAnswers(payload)
                         }

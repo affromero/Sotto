@@ -313,7 +313,7 @@ struct SourcedClassPanel: View {
     private func start(source: SottoClassGenerationSource) {
         error = nil
         if let activeClassId {
-            Task {
+            model.run {
                 await model.openClass(activeClassId)
             }
             return
@@ -590,7 +590,7 @@ private struct CourseClassHistoryRow: View {
 
             HStack(spacing: 8) {
                 Button {
-                    Task {
+                    model.run {
                         await model.openClass(item.id)
                     }
                 } label: {
@@ -599,7 +599,7 @@ private struct CourseClassHistoryRow: View {
                 .buttonStyle(.borderedProminent)
 
                 Button {
-                    Task {
+                    model.run {
                         await model.openWorkbook(for: item.id)
                     }
                 } label: {

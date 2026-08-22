@@ -443,7 +443,7 @@ private struct CourseDetailPane: View {
     }
 
     private func startOrResumeClass() {
-        Task {
+        model.run {
             if let activeClassId = course.activeClassId {
                 await model.openClass(activeClassId)
             } else {
@@ -453,13 +453,13 @@ private struct CourseDetailPane: View {
     }
 
     private func startPractice(_ kind: String) {
-        Task {
+        model.run {
             await model.startPractice(courseId: course.id, kind: kind)
         }
     }
 
     private func openWorkbook() {
-        Task {
+        model.run {
             await model.openWorkbook(for: course)
         }
     }
@@ -629,7 +629,7 @@ private struct NewCourseView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        Task {
+                        model.run {
                             await model.createCourse(native: native, target: target)
                             if model.errorMessage == nil {
                                 dismiss()

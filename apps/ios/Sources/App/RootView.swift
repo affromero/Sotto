@@ -28,11 +28,11 @@ struct RootView: View {
             if model.isLoading {
                 LoadingOverlay(
                     operation: model.loadingOperation,
-                    onCancel: model.canCancelLoading ? {
+                    onCancel: {
                         Task {
-                            await model.cancelCurrentClassGeneration()
+                            await model.cancelWork()
                         }
-                    } : nil
+                    }
                 )
             }
         }
@@ -93,7 +93,7 @@ struct RootView: View {
 
 struct LoadingOverlay: View {
     let operation: SottoLoadingOperation?
-    let onCancel: (() -> Void)?
+    let onCancel: () -> Void
 
     var body: some View {
         ZStack {
@@ -124,13 +124,11 @@ struct LoadingOverlay: View {
                     .monospacedDigit()
                 }
 
-                if let onCancel {
-                    Button(role: .destructive, action: onCancel) {
-                        Label("Cancel generation", systemImage: "xmark.circle")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
+                Button(role: .destructive, action: onCancel) {
+                    Label("Stop waiting", systemImage: "xmark.circle")
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
             .padding(28)
             .frame(maxWidth: 460)

@@ -12,7 +12,6 @@ final class SottoAppModel: ObservableObject {
     @Published var workbook: SottoWorksheetResponse?
     @Published var isLoading = false
     @Published var loadingOperation: SottoLoadingOperation?
-    @Published private(set) var canCancelLoading = false
     @Published private(set) var agentUsage: SottoAgentUsageStatus?
     @Published private(set) var isAgentUsageRefreshing = false
     @Published private(set) var agentUsageFailed = false
@@ -21,6 +20,7 @@ final class SottoAppModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let credentialStore = CredentialStore()
+    private var work: Task<Void, Never>?
     private var activeClassGenerationCourseId: String?
     private var cancelledClassGenerationCourseIds = Set<String>()
     private var classGenerationTasks: [String: Task<Void, Never>] = [:]
@@ -47,7 +47,6 @@ final class SottoAppModel: ObservableObject {
         }
 
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -64,10 +63,43 @@ final class SottoAppModel: ObservableObject {
             resetLearnerState()
             await loadProfiles()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
+    }
+
+    /// Runs user-initiated work that raises the loading overlay. The model owns
+    /// the task so the overlay's Cancel can abandon it, and starting new work
+    /// replaces whatever was still running.
+    func run(_ operation: @escaping @MainActor () async -> Void) {
+        work?.cancel()
+        work = Task { @MainActor [weak self] in
+            await operation()
+            self?.work = nil
+        }
+    }
+
+    /// Abandons whatever the overlay is waiting on. A class being generated is
+    /// also stopped server-side, so the queue is not left building something
+    /// nobody is waiting for.
+    func cancelWork() async {
+        if let courseId = activeClassGenerationCourseId {
+            await cancelClassGeneration(for: courseId)
+        }
+
+        work?.cancel()
+        work = nil
+        isLoading = false
+        loadingOperation = nil
+    }
+
+    /// Cancellation is a choice the learner made, not a failure to report.
+    func report(_ error: Error) {
+        if error is CancellationError || (error as? URLError)?.code == .cancelled {
+            return
+        }
+        report(error)
     }
 
     func signOut() {
@@ -75,7 +107,6 @@ final class SottoAppModel: ObservableObject {
         credentials = nil
         profiles = []
         resetLearnerState()
-        canCancelLoading = false
         activeClassGenerationCourseId = nil
         cancelledClassGenerationCourseIds.removeAll()
         classGenerationTasks.values.forEach { $0.cancel() }
@@ -100,13 +131,12 @@ final class SottoAppModel: ObservableObject {
     func loadProfiles() async {
         guard let client = makeClient(usesSelectedProfile: false) else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
             profiles = try await client.listProfiles()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -128,7 +158,7 @@ final class SottoAppModel: ObservableObject {
             resetLearnerState()
             await loadCourses()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
     }
 
@@ -141,7 +171,6 @@ final class SottoAppModel: ObservableObject {
         }
 
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -155,7 +184,7 @@ final class SottoAppModel: ObservableObject {
             await selectProfile(profiles.first { $0.id == created.id } ?? created)
             return
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -186,13 +215,12 @@ final class SottoAppModel: ObservableObject {
     func loadCourses() async {
         guard hasSelectedProfile, let client = makeClient() else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
             courses = try await client.listCourses()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -229,7 +257,7 @@ final class SottoAppModel: ObservableObject {
             _ = try await client.createCourse(native: nativeCode, target: targetCode)
             courses = try await client.listCourses()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -348,7 +376,6 @@ final class SottoAppModel: ObservableObject {
     func openClass(_ classId: String) async {
         guard let client = makeClient() else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -384,7 +411,7 @@ final class SottoAppModel: ObservableObject {
             selectedClass = classDetail
             classResult = nil
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         loadingOperation = nil
@@ -489,7 +516,6 @@ final class SottoAppModel: ObservableObject {
     func regenerateSelectedClass() async {
         guard let client = makeClient(), let selectedClass else { return }
         isLoading = true
-        canCancelLoading = false
         loadingOperation = SottoLoadingOperation(
             title: "Regenerating class",
             detail: "Building a fresh version of the current class.",
@@ -515,7 +541,7 @@ final class SottoAppModel: ObservableObject {
             courses = try await client.listCourses()
             refreshAgentUsageInBackground()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         loadingOperation = nil
@@ -525,7 +551,6 @@ final class SottoAppModel: ObservableObject {
     func deleteSelectedClass() async {
         guard let client = makeClient(), let selectedClass else { return }
         isLoading = true
-        canCancelLoading = false
         loadingOperation = SottoLoadingOperation(
             title: "Removing class",
             detail: "Clearing the active class so a new one can be generated.",
@@ -544,7 +569,7 @@ final class SottoAppModel: ObservableObject {
             workbook = nil
             courses = try await client.listCourses()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         loadingOperation = nil
@@ -558,14 +583,13 @@ final class SottoAppModel: ObservableObject {
     func startPractice(courseId: String, kind: String) async {
         guard let client = makeClient() else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
             practiceStart = try await client.startPractice(courseId: courseId, kind: kind)
             practiceResult = nil
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -607,7 +631,6 @@ final class SottoAppModel: ObservableObject {
     func submitClassAnswers(_ answers: [SottoSubmitAnswer]) async {
         guard let client = makeClient(), let selectedClass else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
@@ -615,7 +638,7 @@ final class SottoAppModel: ObservableObject {
             self.selectedClass = try await client.fetchClass(classId: selectedClass.id)
             await loadCourses()
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -624,13 +647,12 @@ final class SottoAppModel: ObservableObject {
     func submitPracticeAnswers(_ answers: [SottoPracticeAnswer]) async {
         guard let client = makeClient(), let practiceStart else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
             practiceResult = try await client.submitPractice(sessionId: practiceStart.sessionId, answers: answers)
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -639,13 +661,12 @@ final class SottoAppModel: ObservableObject {
     func openWorkbook(for classId: String) async {
         guard let client = makeClient() else { return }
         isLoading = true
-        canCancelLoading = false
         errorMessage = nil
 
         do {
             workbook = try await client.fetchWorksheet(classId: classId)
         } catch {
-            errorMessage = error.localizedDescription
+            report(error)
         }
 
         isLoading = false
@@ -702,11 +723,6 @@ final class SottoAppModel: ObservableObject {
             promptId: promptId,
             recordingId: recordingId
         )
-    }
-
-    func cancelCurrentClassGeneration() async {
-        guard let courseId = activeClassGenerationCourseId else { return }
-        await cancelClassGeneration(for: courseId)
     }
 
     func cancelClassGeneration(for courseId: String) async {

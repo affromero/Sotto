@@ -220,7 +220,7 @@ private struct CreateProfileView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        Task {
+                        model.run {
                             await model.createProfile(name: name, avatarSlug: avatarSlug)
                             if model.errorMessage == nil {
                                 dismiss()
