@@ -238,6 +238,30 @@ During install you choose how Sotto reaches your AI:
 - **Your local Claude Code or Codex CLI:** bring your own agent; a networkless sidecar snapshots only its auth JSON into the container, no API key.
 - **Your agent on a VPS, over SSH:** Sotto runs `ssh you@vps claude ...` for every LLM call (`CLAUDE_CODE_SSH_HOST`), so your data can stay on your machine.
 
+### Keeping it up to date
+
+The installer puts a `sotto-host` command on your PATH:
+
+```bash
+sotto-host update              # move to the newest published build
+sotto-host update --check      # say what would change, change nothing
+sotto-host update --to v0.3.1  # pin a released version
+sotto-host update --to 2ce63555 # or an exact commit
+sotto-host status              # pinned tag, running version, health
+sotto-host rollback            # back to the tag the last update replaced
+```
+
+An update dumps the database, refreshes the compose file, pulls the images, runs
+migrations, and waits for the health endpoint before calling it done. If the
+stack does not come up, the dump and `sotto-host rollback` are both there.
+Migrations are forward-only, so a rollback returns the images, not the schema.
+
+Installed before this command existed? Fetch it once:
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://sotto.fm/sotto-host -o ~/.local/bin/sotto-host && chmod +x ~/.local/bin/sotto-host
+```
+
 ### From source (contributors)
 
 Prerequisites: [Node.js](https://nodejs.org/) 22+, [Docker](https://www.docker.com/), [FFmpeg](https://ffmpeg.org/).

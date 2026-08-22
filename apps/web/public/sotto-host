@@ -1,0 +1,309 @@
+#!/usr/bin/env bash
+# sotto-host — move a self-hosted Sotto to newer images and report what it runs.
+#
+# A self-host install has no clone: install.sh writes ~/.sotto/docker-compose.yml
+# and ~/.sotto/.env, and the stack runs pre-built images from GHCR. Updating is
+# therefore repointing SOTTO_IMAGE_TAG, refreshing the compose file, pulling,
+# and restarting -- never a git operation.
+#
+# Install:  curl -fsSL https://sotto.fm/sotto-host -o ~/.local/bin/sotto-host && chmod +x ~/.local/bin/sotto-host
+set -euo pipefail
+
+SOTTO_DIR="${SOTTO_DIR:-$HOME/.sotto}"
+SOTTO_REPOSITORY="${SOTTO_REPOSITORY:-affromero/Sotto}"
+SOTTO_REF="${SOTTO_REF:-main}"
+RAW_BASE="${SOTTO_RAW_BASE:-https://raw.githubusercontent.com/${SOTTO_REPOSITORY}/${SOTTO_REF}}"
+API_BASE="${SOTTO_API_BASE:-https://api.github.com/repos/${SOTTO_REPOSITORY}}"
+
+BOLD=$(printf '\033[1m'); DIM=$(printf '\033[2m'); RESET=$(printf '\033[0m')
+CYAN=$(printf '\033[36m'); GREEN=$(printf '\033[32m'); YELLOW=$(printf '\033[33m'); RED=$(printf '\033[31m')
+info() { printf "${CYAN}${BOLD}>${RESET} %b\n" "$1"; }
+ok()   { printf "${GREEN}${BOLD}✓${RESET} %b\n" "$1"; }
+warn() { printf "${YELLOW}${BOLD}!${RESET} %b\n" "$1"; }
+fail() { printf "${RED}${BOLD}✗${RESET} %b\n" "$1" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+sotto-host — manage a self-hosted Sotto
+
+  sotto-host update [--to REF] [--check] [--no-backup]
+      Move the stack to newer images and restart it.
+      --to REF     a released version (v0.3.1), a commit (2ce63555), or
+                   "latest"; defaults to the newest published image
+      --check      report what an update would do, change nothing
+      --no-backup  skip the database dump taken before restarting
+
+  sotto-host status
+      Show the pinned image tag, what the stack reports, and its health.
+
+  sotto-host rollback
+      Return to the tag the last update replaced.
+
+  sotto-host help
+
+  Environment:
+    SOTTO_DIR   install directory (default ~/.sotto)
+USAGE
+}
+
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    fail "Docker Compose v2 is required.\n  Install: ${BOLD}https://docs.docker.com/compose/install/${RESET}"
+  fi
+}
+
+require_install() {
+  [ -f "$SOTTO_DIR/docker-compose.yml" ] ||
+    fail "No Sotto install at ${SOTTO_DIR}.\n  Install it first: ${BOLD}curl -fsSL https://sotto.fm/install.sh | bash${RESET}\n  Or point at another directory: ${BOLD}SOTTO_DIR=/path sotto-host ...${RESET}"
+}
+
+# Read one key from .env without sourcing it, which would pull every secret in
+# the file into this process's environment.
+env_value() {
+  [ -f "$SOTTO_DIR/.env" ] || return 0
+  sed -n "s/^${1}=//p" "$SOTTO_DIR/.env" | tail -n 1 | tr -d '"'"'"''
+}
+
+set_env_value() {
+  local key=$1 value=$2 tmp
+  tmp=$(mktemp "$SOTTO_DIR/.env.XXXXXX")
+  if [ -f "$SOTTO_DIR/.env" ]; then
+    awk -v key="$key" '$0 !~ ("^" key "=") { print }' "$SOTTO_DIR/.env" > "$tmp"
+  fi
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$SOTTO_DIR/.env"
+}
+
+web_port() {
+  local port
+  port=$(env_value WEB_PORT)
+  echo "${port:-3000}"
+}
+
+health() {
+  curl -fsS --max-time 5 "http://localhost:$(web_port)/api/v1/health" 2>/dev/null
+}
+
+current_tag() {
+  local tag
+  tag=$(env_value SOTTO_IMAGE_TAG)
+  echo "${tag:-latest}"
+}
+
+# The published images carry `latest` and 8-character commit shas; git version
+# tags never reach the registry. So a version has to be resolved to the commit
+# it points at before it can name an image.
+resolve_ref() {
+  local ref=$1 sha
+  case "$ref" in
+    latest) echo latest; return 0 ;;
+  esac
+
+  if printf '%s' "$ref" | grep -Eq '^[0-9a-f]{8}$'; then
+    echo "$ref"
+    return 0
+  fi
+
+  sha=$(curl -fsSL "${API_BASE}/commits/${ref}" 2>/dev/null |
+    sed -n 's/^  "sha": "\([0-9a-f]\{40\}\)",$/\1/p' | head -1)
+  [ -n "$sha" ] ||
+    fail "Could not resolve '${ref}' in ${SOTTO_REPOSITORY}.\n  Use a version (v0.3.1), an 8-character commit, or 'latest'."
+  printf '%s\n' "${sha:0:8}"
+}
+
+# What `latest` currently points at, so an update can say which commit it moves
+# to rather than just "latest" again.
+latest_commit() {
+  curl -fsSL "${API_BASE}/commits/main" 2>/dev/null |
+    sed -n 's/^  "sha": "\([0-9a-f]\{40\}\)",$/\1/p' | head -1 | cut -c1-8
+}
+
+running_version() {
+  local response
+  response=$(health) || return 1
+  printf '%s' "$response" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' | cut -c1-8
+}
+
+cmd_status() {
+  require_install
+  echo "install:  ${SOTTO_DIR}"
+  echo "pinned:   $(current_tag)"
+
+  local running latest
+  if running=$(running_version); then
+    echo "running:  ${running}"
+  else
+    echo "running:  unreachable at http://localhost:$(web_port)"
+  fi
+
+  latest=$(latest_commit)
+  if [ -z "$latest" ]; then
+    warn "Could not reach GitHub; reporting local state only"
+  elif [ "$latest" = "${running:-}" ]; then
+    echo "newest:   ${latest} (current)"
+  else
+    echo "newest:   ${latest} — run 'sotto-host update'"
+  fi
+
+  local response
+  if response=$(health); then
+    echo "health:   ${response}"
+  fi
+}
+
+backup_database() {
+  local dir file
+  dir="${SOTTO_BACKUP_DIR:-$SOTTO_DIR/backups}"
+  mkdir -p "$dir"
+  file="${dir}/sotto_$(date +%Y%m%d_%H%M%S).sql.gz"
+
+  # Nothing to dump before the first successful start.
+  if ! compose ps --status running postgres 2>/dev/null | grep -q postgres; then
+    warn "Postgres is not running; skipping the backup"
+    return 0
+  fi
+
+  info "Backing up the database..."
+  if compose exec -T postgres pg_dump -U sotto sotto 2>/dev/null | gzip > "$file"; then
+    ok "Backup written to ${file}"
+  else
+    rm -f "$file"
+    fail "Backup failed; not touching a running install.\n  Skip it with ${BOLD}--no-backup${RESET} if that is deliberate."
+  fi
+}
+
+cmd_update() {
+  require_install
+  cd "$SOTTO_DIR"
+
+  local target from
+  from=$(current_tag)
+  if [ -n "$TO_REF" ]; then
+    target=$(resolve_ref "$TO_REF")
+  else
+    target=$(latest_commit)
+    [ -n "$target" ] || fail "Could not reach GitHub to find the newest build.\n  Pin one yourself: ${BOLD}sotto-host update --to <commit>${RESET}"
+  fi
+
+  local running
+  running=$(running_version || true)
+
+  echo "install:  ${SOTTO_DIR}"
+  echo "pinned:   ${from}"
+  if [ -n "$running" ]; then
+    echo "running:  ${running}"
+  fi
+  echo "update:   ${from} → ${target}"
+
+  if [ "$from" = "$target" ] && [ "${running:-}" = "$target" ]; then
+    ok "Already running ${target}; nothing to do."
+    return 0
+  fi
+
+  if [ "$CHECK_ONLY" = "1" ]; then
+    printf "${DIM}(--check: nothing changed)${RESET}\n"
+    return 0
+  fi
+
+  if [ "$BACKUP" = "1" ]; then
+    backup_database
+  fi
+
+  # The compose file describes the services, so a stack updated only by image
+  # tag would miss a service added since it was installed.
+  info "Refreshing the compose file..."
+  local tmp
+  tmp=$(mktemp "$SOTTO_DIR/docker-compose.yml.XXXXXX")
+  if curl -fsSL "$RAW_BASE/docker-compose.selfhost.yml" -o "$tmp"; then
+    mv "$tmp" "$SOTTO_DIR/docker-compose.yml"
+  else
+    rm -f "$tmp"
+    warn "Could not download the newest compose file; keeping the current one"
+  fi
+
+  set_env_value SOTTO_IMAGE_TAG "$target"
+  set_env_value SOTTO_PREVIOUS_IMAGE_TAG "$from"
+
+  info "Pulling images..."
+  compose pull || fail "Could not pull images tagged ${target}.\n  A commit's images are published a few minutes after it lands, and versions\n  released before the public images existed have none at all.\n  Published tags: ${BOLD}https://github.com/${SOTTO_REPOSITORY}/pkgs/container/sotto-web${RESET}"
+
+  info "Applying database migrations..."
+  compose run --rm workers sh -c \
+    "cd /app && npx --no-install prisma migrate deploy --config=/app/prisma.config.ts" ||
+    fail "Migrations failed; the previous containers are still running.\n  Roll back with ${BOLD}sotto-host rollback${RESET}."
+
+  info "Restarting Sotto..."
+  compose up -d
+
+  printf "${CYAN}${BOLD}>${RESET} Waiting for health"
+  local response=""
+  for _ in $(seq 1 45); do
+    if response=$(health); then break; fi
+    printf '.'
+    sleep 2
+  done
+  printf '\n'
+
+  if [ -n "$response" ]; then
+    ok "Sotto is up on ${target}: ${response}"
+  else
+    fail "Sotto did not report healthy at http://localhost:$(web_port)\n  Logs:     ${BOLD}cd ${SOTTO_DIR} && docker compose logs --tail 50 web${RESET}\n  Roll back: ${BOLD}sotto-host rollback${RESET}"
+  fi
+}
+
+cmd_rollback() {
+  require_install
+  cd "$SOTTO_DIR"
+
+  local previous
+  previous=$(env_value SOTTO_PREVIOUS_IMAGE_TAG)
+  [ -n "$previous" ] || fail "No previous tag recorded; nothing to roll back to.\n  Pin one yourself: ${BOLD}sotto-host update --to <commit>${RESET}"
+
+  info "Rolling back $(current_tag) → ${previous}"
+  set_env_value SOTTO_IMAGE_TAG "$previous"
+  compose pull
+  compose up -d
+
+  # A rollback does not undo migrations: Prisma migrations are forward-only, so
+  # the older image runs against the newer schema. Say so rather than imply the
+  # database moved back too.
+  warn "Images rolled back. Database migrations are forward-only and were not reverted."
+  ok "Sotto is on ${previous}."
+}
+
+CHECK_ONLY=0
+BACKUP=1
+TO_REF=""
+command=${1:-help}
+shift || true
+while [ $# -gt 0 ]; do
+  argument=$1
+  shift
+  case "$argument" in
+    --check) CHECK_ONLY=1 ;;
+    --no-backup) BACKUP=0 ;;
+    --to)
+      TO_REF=${1:?--to needs a version, commit, or 'latest'}
+      shift
+      ;;
+    --to=*) TO_REF=${argument#--to=} ;;
+    *) fail "unknown option ${argument}" ;;
+  esac
+done
+
+case "$command" in
+  update) cmd_update ;;
+  status) cmd_status ;;
+  rollback) cmd_rollback ;;
+  help | -h | --help) usage ;;
+  *)
+    printf "sotto-host: unknown command %s\n" "$command" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
