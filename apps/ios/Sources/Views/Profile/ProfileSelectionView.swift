@@ -274,54 +274,13 @@ private struct ProfileAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        RemoteAvatar(
-            url: avatarURL(path: profile.avatarUrl, serverURL: serverURL),
-            fallback: String(profile.name.prefix(1)),
+        SottoAvatar(
+            name: profile.name,
+            avatarPath: profile.avatarUrl,
+            serverURL: serverURL,
             size: size
         )
     }
-}
-
-private struct RemoteAvatar: View {
-    let url: URL?
-    let fallback: String
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(SottoTheme.primary.opacity(0.1))
-
-            if let url {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case let .success(image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        fallbackView
-                    }
-                }
-            } else {
-                fallbackView
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(SottoTheme.line))
-    }
-
-    private var fallbackView: some View {
-        Text(fallback.uppercased())
-            .font(.system(size: max(18, size * 0.34), weight: .bold, design: .serif))
-            .foregroundStyle(SottoTheme.primary)
-    }
-}
-
-private func avatarURL(path: String, serverURL: URL?) -> URL? {
-    guard let serverURL else { return nil }
-    return URL(string: path, relativeTo: serverURL)?.absoluteURL
 }
 
 private struct AvatarOption: Identifiable {
@@ -366,8 +325,16 @@ struct ProfileToolbarMenu: View {
                 Label("Unpair device", systemImage: "rectangle.portrait.and.arrow.right")
             }
         } label: {
-            Label(profileName, systemImage: "person.crop.circle")
-                .lineLimit(1)
+            HStack(spacing: 8) {
+                SottoAvatar(
+                    name: profileName,
+                    avatarPath: model.activeProfile?.avatarUrl,
+                    serverURL: model.credentials?.serverURL,
+                    size: 28
+                )
+                Text(profileName)
+                    .lineLimit(1)
+            }
         }
         .accessibilityLabel("Profile menu")
     }

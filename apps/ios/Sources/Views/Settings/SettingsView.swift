@@ -92,10 +92,19 @@ struct SettingsView: View {
             TextField("Name", text: $name)
                 .textFieldStyle(.roundedBorder)
 
-            PhotosPicker(selection: $photoItem, matching: .images) {
-                Label("Upload a photo", systemImage: "photo")
+            HStack(spacing: 14) {
+                SottoAvatar(
+                    name: name,
+                    avatarPath: model.activeProfile?.avatarUrl,
+                    serverURL: model.credentials?.serverURL,
+                    size: 64
+                )
+
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    Label("Upload a photo", systemImage: "photo")
+                }
+                .buttonStyle(SottoSecondaryButtonStyle())
             }
-            .buttonStyle(SottoSecondaryButtonStyle())
 
             Text("Or pick an avatar")
                 .font(.caption)
