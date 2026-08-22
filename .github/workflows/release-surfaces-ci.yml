@@ -1,9 +1,27 @@
 name: Release surfaces
 
+# Both jobs below run on macOS runners, which bill at ten times the Linux rate,
+# and each only builds one app directory. Without these filters every unrelated
+# push — a tsconfig line, a dependabot config — paid for a desktop build and an
+# iOS simulator test run.
 on:
   pull_request:
+    # Duplicated rather than shared via a YAML anchor: GitHub Actions does not
+    # expand anchors, so both lists have to be spelled out.
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/ios/**'
+      - '.github/workflows/release-surfaces-ci.yml'
   push:
     branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/ios/**'
+      - '.github/workflows/release-surfaces-ci.yml'
+
+concurrency:
+  group: release-surfaces-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
