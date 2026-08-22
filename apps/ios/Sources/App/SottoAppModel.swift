@@ -41,20 +41,7 @@ final class SottoAppModel: ObservableObject {
         credentials?.selectedProfile
     }
 
-    func pair(with scannedValue: String) async {
-        switch PairingScan(scannedValue: scannedValue) {
-        case let .pairing(pairing):
-            await redeemPairingPayload(pairing)
-        case let .unsupportedServerURL(url):
-            errorMessage = SottoServerURLPolicy.unsupportedMessage(for: url)
-        case let .serverURL(url):
-            errorMessage = "That QR opens \(url.host() ?? "your Sotto server") in a browser. Open Settings > Devices there, tap Show pairing code, and scan the QR it shows instead."
-        case .invalid:
-            errorMessage = "That is not a Sotto pairing QR. In Settings > Devices on your server, tap Show pairing code and scan that QR."
-        }
-    }
-
-    private func redeemPairingPayload(_ pairing: PairingPayload) async {
+    func redeemPairingPayload(_ pairing: PairingPayload) async {
         guard !isLoading else {
             return
         }
@@ -871,35 +858,6 @@ final class SottoAppModel: ObservableObject {
     }
 }
 
-private enum PairingScan {
-    case pairing(PairingPayload)
-    case unsupportedServerURL(URL)
-    case serverURL(URL)
-    case invalid
-
-    init(scannedValue: String) {
-        if let pairing = PairingPayload(scannedValue: scannedValue) {
-            self = SottoServerURLPolicy.isSupported(pairing.serverURL)
-                ? .pairing(pairing)
-                : .unsupportedServerURL(pairing.serverURL)
-            return
-        }
-
-        guard
-            let url = URL(string: scannedValue),
-            let scheme = url.scheme?.lowercased(),
-            scheme == "http" || scheme == "https",
-            url.host() != nil
-        else {
-            self = .invalid
-            return
-        }
-
-        self = SottoServerURLPolicy.isSupported(url)
-            ? .serverURL(url)
-            : .unsupportedServerURL(url)
-    }
-}
 
 private let requiredClassSkills = ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"]
 
@@ -944,31 +902,4 @@ private func isClassPresentationStillRendering(_ classDetail: SottoClassDetail) 
     let listening = classDetail.sections.first { $0.skill.uppercased() == "LISTENING" }
     guard let episode = listening?.episode, episode.audioUrl == nil else { return false }
     return episode.status != "READY" && episode.status != "FAILED"
-}
-
-private struct PairingPayload {
-    let serverURL: URL
-    let token: String
-
-    init?(scannedValue: String) {
-        guard
-            let url = URL(string: scannedValue),
-            let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-            let token = components.queryItems?.first(where: { $0.name == "token" })?.value,
-            !token.isEmpty,
-            let scheme = components.scheme,
-            let host = components.host
-        else {
-            return nil
-        }
-
-        var base = URLComponents()
-        base.scheme = scheme
-        base.host = host
-        base.port = components.port
-
-        guard let serverURL = base.url else { return nil }
-        self.serverURL = serverURL
-        self.token = token
-    }
 }
