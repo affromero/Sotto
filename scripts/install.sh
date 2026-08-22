@@ -71,6 +71,22 @@ curl -fsSL "$RAW_BASE/scripts/agent/sync-cli-credentials.sh" \
   -o "$SOTTO_DIR/sync-cli-credentials.sh" \
   || fail "Could not download the CLI credential sync service from $RAW_BASE"
 chmod 700 "$SOTTO_DIR/sync-cli-credentials.sh"
+
+# The update command, so a running install can move to newer images without
+# re-running this installer.
+SOTTO_BIN_DIR="${SOTTO_BIN_DIR:-${XDG_BIN_HOME:-$HOME/.local/bin}}"
+if curl -fsSL "$RAW_BASE/scripts/sotto-host" -o "$SOTTO_DIR/sotto-host"; then
+  chmod 755 "$SOTTO_DIR/sotto-host"
+  mkdir -p "$SOTTO_BIN_DIR"
+  if cp "$SOTTO_DIR/sotto-host" "$SOTTO_BIN_DIR/sotto-host" 2>/dev/null; then
+    SOTTO_HOST_ON_PATH=1
+  else
+    warn "Could not write $SOTTO_BIN_DIR; run updates with $SOTTO_DIR/sotto-host"
+  fi
+else
+  warn "Could not download the sotto-host command; updates run from $SOTTO_DIR by hand"
+fi
+
 rm -f "$SOTTO_DIR/docker-compose.override.yml"
 
 # Port (offer a different one if 3000 is taken)
@@ -236,6 +252,15 @@ if [ "${READY:-}" = "1" ]; then ok "Sotto is running."; else warn "Sotto is star
 printf "\n  ${BOLD}Open:${RESET}    http://localhost:%s\n" "$WEB_PORT"
 printf "  ${BOLD}Password:${RESET} %s  ${DIM}(saved in %s/.env)${RESET}\n" "$ACCESS_PASSWORD" "$SOTTO_DIR"
 printf "  ${BOLD}Manage:${RESET}  cd %s  (then \`%s logs -f\`, \`%s down\`)\n" "$SOTTO_DIR" "$DC" "$DC"
+if [ "${SOTTO_HOST_ON_PATH:-}" = "1" ]; then
+  printf "  ${BOLD}Update:${RESET}  sotto-host update   ${DIM}(also: status, rollback, --to <version|commit>)${RESET}\n"
+  case ":${PATH}:" in
+    *":${SOTTO_BIN_DIR}:"*) ;;
+    *) printf "           ${DIM}Add it to your PATH: export PATH=\"%s:\$PATH\"${RESET}\n" "$SOTTO_BIN_DIR" ;;
+  esac
+else
+  printf "  ${BOLD}Update:${RESET}  %s/sotto-host update\n" "$SOTTO_DIR"
+fi
 
 # ---------------------------------------------------------------------------
 # Reachability — open it on your phone / share with family (opt-in)
