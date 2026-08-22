@@ -3,6 +3,7 @@
 import 'thesidedoor/styles.css';
 import { ConnectPanel } from 'thesidedoor/react';
 import type { ShareChannel } from 'thesidedoor/react';
+import styles from './page.module.css';
 
 const SHARE_CHANNELS: ShareChannel[] = ['whatsapp', 'telegram', 'email', 'copy'];
 
@@ -18,6 +19,7 @@ export function DeviceShare({ url }: { url: string }) {
       url={url}
       shareChannels={SHARE_CHANNELS}
       guideWhenInsecure={false}
+      className={styles.sharePanel}
     />
   );
 }

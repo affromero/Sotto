@@ -363,3 +363,31 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/*
+ * sidedoor ships a light palette on its own custom properties. Map them onto
+ * Sotto's tokens so the panel follows the active theme instead of punching a
+ * white card into a dark page. The QR keeps its own light background: the
+ * contrast is what makes it scannable.
+ */
+.sharePanel {
+  --sd-bg: var(--color-background);
+  --sd-surface: var(--color-surface-nested);
+  --sd-elevated: var(--color-surface-elevated);
+  --sd-border: var(--color-border);
+  --sd-text: var(--color-text-primary);
+  --sd-muted: var(--color-text-secondary);
+  --sd-accent: var(--color-primary);
+  --sd-accent-contrast: var(--color-text-inverse);
+  --sd-warn: var(--color-error);
+  --sd-radius: var(--radius-md);
+}
+
+.sharePanel :global(.sd-install-title) {
+  color: var(--sd-text);
+}
+
+/* The global list reset drops the marker outside the card; put it back. */
+.sharePanel :global(.sd-install-os) ol {
+  padding-inline-start: 1.5rem;
+}
