@@ -57,6 +57,7 @@ export interface PracticeWritingItem {
   id: string;
   task: string;
   guidance: string | null;
+  ideas: string[];
 }
 
 export type StartPracticeResult =
@@ -613,6 +614,7 @@ async function startFull(
         order: i + 1,
         task: c.task,
         guidance: c.guidance,
+        ideas: c.ideas,
       })),
     }),
   ]);
@@ -626,7 +628,7 @@ async function startFull(
     prisma.writingPrompt.findMany({
       where: { practiceSessionId: session.id },
       orderBy: { order: 'asc' },
-      select: { id: true, task: true, guidance: true },
+      select: { id: true, task: true, guidance: true, ideas: true },
     }),
   ]);
 
@@ -791,13 +793,14 @@ async function startWriting(
       order: i + 1,
       task: c.task,
       guidance: c.guidance,
+      ideas: c.ideas,
     })),
   });
 
   const prompts = await prisma.writingPrompt.findMany({
     where: { practiceSessionId: session.id },
     orderBy: { order: 'asc' },
-    select: { id: true, task: true, guidance: true },
+    select: { id: true, task: true, guidance: true, ideas: true },
   });
 
   logger.info('Writing practice generated', {

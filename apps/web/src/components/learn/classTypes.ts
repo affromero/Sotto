@@ -27,6 +27,8 @@ export interface WritingPromptData {
   order: number;
   task: string;
   guidance?: string | null;
+  /** Short example openings in the target language, revealed on request. */
+  ideas?: string[];
   response: WritingResponse | null;
 }
 

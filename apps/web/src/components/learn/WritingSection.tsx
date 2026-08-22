@@ -212,6 +212,19 @@ function PromptCard({
             {prompt.guidance}
           </div>
         )}
+        {prompt.ideas && prompt.ideas.length > 0 && (
+          <details className={styles.ideas}>
+            <summary className={styles.ideasSummary}>Need ideas?</summary>
+            <ul
+              className={`${styles.ideasList} ${guardStyles.guarded}`}
+              {...learningTextGuardProps<HTMLUListElement>()}
+            >
+              {prompt.ideas.map((idea) => (
+                <li key={idea}>{idea}</li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
 
       {showEditor ? (

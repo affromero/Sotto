@@ -26,11 +26,25 @@ export interface WritingPromptsParams {
 export interface ComposedWritingPrompt {
   task: string;
   guidance: string | null;
+  /** Short example openings in the target language, for a learner who is stuck. */
+  ideas: string[];
 }
 
 interface RawWritingPrompt {
   task: string;
   guidance?: string;
+  ideas?: unknown;
+}
+
+const MAX_IDEAS = 3;
+
+/** Ideas are a nicety, so a malformed list degrades to none rather than failing the build. */
+function parseIdeas(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((idea): idea is string => typeof idea === 'string' && idea.trim() !== '')
+    .map((idea) => idea.trim())
+    .slice(0, MAX_IDEAS);
 }
 
 function isValidRawPrompt(item: unknown): item is RawWritingPrompt {
@@ -91,7 +105,11 @@ export async function composeWritingPrompts(
   const prompts = raw
     .filter(isValidRawPrompt)
     .slice(0, WRITING_PROMPT_COUNT)
-    .map((r) => ({ task: r.task, guidance: typeof r.guidance === 'string' ? r.guidance : null }));
+    .map((r) => ({
+      task: r.task,
+      guidance: typeof r.guidance === 'string' ? r.guidance : null,
+      ideas: parseIdeas(r.ideas),
+    }));
 
   if (prompts.length === 0) {
     throw new Error('Writing prompt generation produced no usable tasks.');
@@ -145,6 +163,7 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
       order: i + 1,
       task: c.task,
       guidance: c.guidance,
+      ideas: c.ideas,
     })),
   });
 

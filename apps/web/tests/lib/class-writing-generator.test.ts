@@ -38,7 +38,11 @@ vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: 
 import { composeWritingPrompts, generateClassWriting } from '@/lib/class-writing-generator';
 
 const SAMPLE = JSON.stringify([
-  { task: 'Reply to a friend inviting you to dinner.', guidance: 'Accept and suggest a time.' },
+  {
+    task: 'Reply to a friend inviting you to dinner.',
+    guidance: 'Accept and suggest a time.',
+    ideas: ['Gracias, me encantaría.', 'El jueves me viene bien.'],
+  },
   { task: 'Write a short note to your neighbour.' },
 ]);
 
@@ -69,11 +73,44 @@ describe('composeWritingPrompts', () => {
   it('returns parsed tasks without persisting class rows', async () => {
     const prompts = await composeWritingPrompts(PARAMS);
     expect(prompts).toEqual([
-      { task: 'Reply to a friend inviting you to dinner.', guidance: 'Accept and suggest a time.' },
-      { task: 'Write a short note to your neighbour.', guidance: null },
+      {
+        task: 'Reply to a friend inviting you to dinner.',
+        guidance: 'Accept and suggest a time.',
+        ideas: ['Gracias, me encantaría.', 'El jueves me viene bien.'],
+      },
+      { task: 'Write a short note to your neighbour.', guidance: null, ideas: [] },
     ]);
     expect(mockClassSectionCreate).not.toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps at most three ideas and drops entries that are not text', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify([
+        { task: 'Reply to the message.', ideas: ['one', 2, '  ', 'two', 'three', 'four'] },
+      ]),
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
+
+    const [prompt] = await composeWritingPrompts(PARAMS);
+
+    expect(prompt.ideas).toEqual(['one', 'two', 'three']);
+  });
+
+  it('falls back to no ideas rather than failing when the field is malformed', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify([{ task: 'Reply to the message.', ideas: 'not a list' }]),
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
+
+    const [prompt] = await composeWritingPrompts(PARAMS);
+
+    expect(prompt.task).toBe('Reply to the message.');
+    expect(prompt.ideas).toEqual([]);
   });
 
   it('throws when the model returns no usable tasks', async () => {

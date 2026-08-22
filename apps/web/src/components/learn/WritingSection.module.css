@@ -116,6 +116,31 @@
   line-height: 1.5;
 }
 
+.ideas {
+  margin-top: 12px;
+}
+
+.ideasSummary {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--ink-mute);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ideasSummary:hover {
+  color: var(--ink-soft);
+}
+
+.ideasList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
 /* ---- editor ---- */
 .writer {
   margin-top: 16px;

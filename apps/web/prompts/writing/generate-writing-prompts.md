@@ -19,6 +19,7 @@ Generate exactly {{COUNT}} short, scaffolded writing tasks the learner should re
 - Follow the language policy for task instructions and guidance.
 - Vary in type so the learner practices different registers and structures
 - Include enough cues that the learner knows what to say before they start.
+- Come with 2-3 "ideas": very short example openings written in {{TARGET}}, one clause each, that a stuck learner could adapt. Make them deliberately plain and different from each other, so they suggest a direction rather than hand over the answer. They are content suggestions, never the full expected response.
 
 ## Output
 
@@ -27,6 +28,7 @@ Return ONLY a JSON array — no markdown fences, no preamble, no trailing commen
 ```
 {
   "task": "the writing task / prompt the learner responds to",
-  "guidance": "optional one-line hint on what to include"
+  "guidance": "optional one-line hint on what to include",
+  "ideas": ["short opening in the target language", "a different one", "a third"]
 }
 ```
