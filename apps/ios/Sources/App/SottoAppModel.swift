@@ -48,9 +48,9 @@ final class SottoAppModel: ObservableObject {
         case let .unsupportedServerURL(url):
             errorMessage = SottoServerURLPolicy.unsupportedMessage(for: url)
         case let .serverURL(url):
-            errorMessage = "That QR opens \(url.host() ?? "your Sotto server") in a browser. In Settings > Devices, scroll to Step 2: Pair the app, tap Show pairing code, then scan that QR."
+            errorMessage = "That QR opens \(url.host() ?? "your Sotto server") in a browser. Open Settings > Devices there, tap Show pairing code, and scan the QR it shows instead."
         case .invalid:
-            errorMessage = "That is not a Sotto pairing QR. In Settings > Devices, use Step 2: Pair the app."
+            errorMessage = "That is not a Sotto pairing QR. In Settings > Devices on your server, tap Show pairing code and scan that QR."
         }
     }
 
