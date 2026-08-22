@@ -1,7 +1,8 @@
 import type { Readable } from 'stream';
 import * as path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 import { infra } from '../server-config';
+import { LOCAL_STORAGE_URL_PREFIX } from '../r2';
 
 export interface StorageProvider {
   uploadFile(key: string, data: Buffer, contentType: string): Promise<string>;
@@ -216,12 +217,23 @@ class LocalProvider implements StorageProvider {
     return resolved;
   }
 
+  /**
+   * Local storage has no public origin, so objects are served back through the
+   * app's own storage route. Must match `localUrlForKey` in `lib/r2.ts`.
+   */
+  private urlForKey(key: string): string {
+    const relative = key.startsWith('file://')
+      ? path.relative(this.baseDir, fileURLToPath(key)).split(path.sep).join('/')
+      : key;
+    return `${LOCAL_STORAGE_URL_PREFIX}/${relative.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
   async uploadFile(key: string, data: Buffer, _contentType: string): Promise<string> {
     const fs = await import('fs/promises');
     const filePath = this.pathForKey(key);
     await fs.mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
     await fs.writeFile(/* turbopackIgnore: true */ filePath, data);
-    return pathToFileURL(filePath).href;
+    return this.urlForKey(key);
   }
 
   async uploadStream(key: string, body: Readable, _contentType: string): Promise<string> {
@@ -231,7 +243,7 @@ class LocalProvider implements StorageProvider {
     const filePath = this.pathForKey(key);
     await fsPromises.mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
     await pipeline(body, fs.createWriteStream(/* turbopackIgnore: true */ filePath));
-    return pathToFileURL(filePath).href;
+    return this.urlForKey(key);
   }
 
   async downloadFile(key: string): Promise<Buffer> {
@@ -240,7 +252,7 @@ class LocalProvider implements StorageProvider {
   }
 
   async getPresignedUrl(key: string): Promise<string> {
-    return pathToFileURL(this.pathForKey(key)).href;
+    return this.urlForKey(key);
   }
 
   async deleteFile(key: string): Promise<void> {

@@ -1333,6 +1333,9 @@ model WritingPrompt {
   order             Int
   task              String   @db.Text // the writing task the learner responds to
   guidance          String?  @db.Text // optional hints / what to include
+  // Short example openings in the target language, shown on request so the
+  // learner adapts a starting point instead of inventing one from nothing.
+  ideas             String[] @default([])
   createdAt         DateTime @default(now())
 
   section         ClassSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)

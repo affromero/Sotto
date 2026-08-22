@@ -29,6 +29,7 @@ export interface PracticeWritingItem {
   id: string;
   task: string;
   guidance?: string | null;
+  ideas?: string[];
 }
 
 export type PracticeStart =
@@ -351,6 +352,7 @@ function WritingRunner({
     order: idx,
     task: p.task,
     guidance: p.guidance ?? null,
+    ideas: p.ideas ?? [],
     response: null,
   }));
 
@@ -406,6 +408,7 @@ function FullRunner({
     order: idx,
     task: p.task,
     guidance: p.guidance ?? null,
+    ideas: p.ideas ?? [],
     response: null,
   }));
 

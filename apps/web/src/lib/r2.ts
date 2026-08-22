@@ -9,11 +9,21 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
 import { constants, createWriteStream } from 'fs';
-import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from 'fs/promises';
+import {
+  access,
+  copyFile,
+  mkdir,
+  open,
+  readFile,
+  readdir,
+  stat,
+  unlink,
+  writeFile,
+} from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 import { logger } from './logger';
 import { infra } from './server-config';
 
@@ -112,9 +122,32 @@ function localKeyForPath(filePath: string): string {
   return path.relative(localBaseDir(), filePath).split(path.sep).join('/');
 }
 
+/**
+ * Browser-reachable URL for a locally stored object. Local storage has no
+ * public origin, so it is served back through `GET /api/v1/storage/<key>`
+ * rather than a `file://` URL, which no browser will fetch from an https page.
+ * Rows written before this route existed hold `file://`, so those normalise to
+ * the same route form on read.
+ */
+export const LOCAL_STORAGE_URL_PREFIX = '/api/v1/storage';
+
 function localUrlForKey(keyOrUrl: string): string {
-  if (keyOrUrl.startsWith('file://')) return keyOrUrl;
-  return pathToFileURL(localPathForKey(keyOrUrl)).href;
+  const key = keyOrUrl.startsWith('file://') ? localKeyForPath(fileURLToPath(keyOrUrl)) : keyOrUrl;
+  const encoded = key.split('/').map(encodeURIComponent).join('/');
+  return `${LOCAL_STORAGE_URL_PREFIX}/${encoded}`;
+}
+
+/** Content type for a storage key, by extension. */
+export function contentTypeForKey(key: string): string {
+  if (key.endsWith('.mp3')) return 'audio/mpeg';
+  if (key.endsWith('.m4a')) return 'audio/mp4';
+  if (key.endsWith('.wav')) return 'audio/wav';
+  if (key.endsWith('.webm')) return 'audio/webm';
+  if (key.endsWith('.pdf')) return 'application/pdf';
+  if (key.endsWith('.png')) return 'image/png';
+  if (key.endsWith('.jpg') || key.endsWith('.jpeg')) return 'image/jpeg';
+  if (key.endsWith('.json')) return 'application/json';
+  return 'application/octet-stream';
 }
 
 async function listLocalFiles(prefix: string): Promise<string[]> {
@@ -207,7 +240,7 @@ export async function uploadFile(
     await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
     await writeFile(/* turbopackIgnore: true */ filePath, body);
     logger.info('File uploaded to local storage', { key });
-    return pathToFileURL(filePath).href;
+    return localUrlForKey(key);
   }
 
   const config = getObjectStorageConfig();
@@ -239,7 +272,7 @@ export async function uploadStream(
     await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
     await pipeline(body, createWriteStream(filePath));
     logger.info('Stream uploaded to local storage', { key });
-    return pathToFileURL(filePath).href;
+    return localUrlForKey(key);
   }
 
   const config = getObjectStorageConfig();
@@ -292,11 +325,69 @@ export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<st
 }
 
 /**
+ * Read a locally stored object for the storage route. `localPathForKey` and
+ * `configuredStorageProvider` are private to this module, so the route cannot
+ * assemble this itself. An optional HTTP Range yields the requested slice.
+ * Returns null when local storage is not the configured provider, the key does
+ * not exist, or the range is unsatisfiable.
+ */
+export async function readLocalObject(
+  key: string,
+  range?: string | null
+): Promise<{ body: Buffer; size: number; contentType: string; start: number; end: number } | null> {
+  if (configuredStorageProvider() !== 'local') return null;
+
+  let size: number;
+  const filePath = localPathForKey(key);
+  try {
+    size = (await stat(/* turbopackIgnore: true */ filePath)).size;
+  } catch {
+    return null;
+  }
+
+  let start = 0;
+  let end = size - 1;
+  if (range) {
+    // Only the single `bytes=a-b` form media elements actually send.
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (!match) return null;
+    const [, rawStart, rawEnd] = match;
+    if (rawStart === '') {
+      // Suffix range: the last N bytes.
+      const suffix = Number(rawEnd);
+      if (!Number.isFinite(suffix) || suffix <= 0) return null;
+      start = Math.max(0, size - suffix);
+    } else {
+      start = Number(rawStart);
+      if (rawEnd !== '') end = Math.min(end, Number(rawEnd));
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size)
+      return null;
+  }
+
+  const handle = await open(/* turbopackIgnore: true */ filePath, 'r');
+  try {
+    const body = Buffer.alloc(end - start + 1);
+    await handle.read(body, 0, body.length, start);
+    return { body, size, contentType: contentTypeForKey(key), start, end };
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
  * Extract the R2 object key from a public URL or pass through raw keys.
  */
 export function extractR2Key(urlOrKey: string): string {
   if (urlOrKey.startsWith('file://')) {
     return localKeyForPath(fileURLToPath(urlOrKey));
+  }
+  if (urlOrKey.startsWith(`${LOCAL_STORAGE_URL_PREFIX}/`)) {
+    return urlOrKey
+      .slice(LOCAL_STORAGE_URL_PREFIX.length + 1)
+      .split('/')
+      .map(decodeURIComponent)
+      .join('/');
   }
   const r2PublicUrl = process.env.R2_PUBLIC_URL;
   if (r2PublicUrl && urlOrKey.startsWith(r2PublicUrl)) {

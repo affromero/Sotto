@@ -318,12 +318,52 @@ describe('startPractice — FULL', () => {
     expect(mockSpeakingPromptCreateMany).toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).toHaveBeenCalled();
   });
+
+  it('includes vocabulary that only exists once the other sections are generated', async () => {
+    // A course with no memory graph yet: the vocabulary rows appear as a side
+    // effect of generating this very session, so the count is 0 up front and
+    // healthy afterwards. Asking too early is what produced a catch-up with no
+    // vocabulary in it.
+    let vocabSeeded = false;
+    mockLearnerVocabCount.mockImplementation(async () => (vocabSeeded ? 6 : 0));
+    mockGenerateSectionQuestions.mockImplementation(async () => {
+      vocabSeeded = true;
+      return [
+        {
+          question: 'Soy ___ Madrid',
+          options: ['de', 'en', 'a', 'por'],
+          correctIndex: 0,
+          explanation: 'origin',
+        },
+      ];
+    });
+    mockGetDueItems.mockResolvedValue({
+      vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
+      grammar: [],
+    });
+    mockLearnerVocabFindMany.mockResolvedValue(
+      ['hola', 'gracias', 'adios', 'si', 'no'].map((lemma) => ({ lemma }))
+    );
+    mockComposeListeningContent.mockResolvedValue({
+      episodeId: 'ep1',
+      comprehensionQuestions: [],
+    });
+    mockPracticeSessionCreate.mockResolvedValue({ id: 'pfull2' });
+    mockSpeakingPromptFindMany.mockResolvedValue([]);
+    mockWritingPromptFindMany.mockResolvedValue([]);
+
+    const r = await startPractice('c1', 'u1', 'FULL');
+    if (r.status !== 'ready_full') throw new Error(`expected ready_full, got ${r.status}`);
+
+    expect(r.items.some((item) => item.id.startsWith('v'))).toBe(true);
+  });
 });
 
 describe('submitPractice — SRS', () => {
   it('applies per-item SRS for VOCAB: correct lemmas pass, incorrect lemmas lapse', async () => {
     mockPracticeSessionFindFirst.mockResolvedValue({
       id: 'ps1',
+      status: 'ACTIVE',
       kind: 'VOCAB',
       courseId: 'c1',
       vocabLemmas: ['hola', 'gracias'],
@@ -373,6 +413,7 @@ describe('submitPractice — SRS', () => {
   it('applies aggregate SRS for GRAMMAR across the session due items', async () => {
     mockPracticeSessionFindFirst.mockResolvedValue({
       id: 'ps2',
+      status: 'ACTIVE',
       kind: 'GRAMMAR',
       courseId: 'c1',
       vocabLemmas: ['hola'],
@@ -398,6 +439,7 @@ describe('submitPractice — SRS', () => {
   it('marks focus targets practiced using the practice score', async () => {
     mockPracticeSessionFindFirst.mockResolvedValue({
       id: 'ps-focus',
+      status: 'ACTIVE',
       kind: 'READING',
       courseId: 'c1',
       vocabLemmas: [],
@@ -413,9 +455,51 @@ describe('submitPractice — SRS', () => {
     expect(mockMarkFocusTargetsPracticed).toHaveBeenCalledWith('c1', ['ft1'], 1, expect.any(Date));
   });
 
+  it('scores only the latest recording per prompt when one was re-recorded', async () => {
+    mockPracticeSessionFindFirst.mockResolvedValue({
+      id: 'ps-speaking',
+      status: 'ACTIVE',
+      kind: 'SPEAKING',
+      courseId: 'c1',
+      vocabLemmas: [],
+      grammarKeys: [],
+      items: [],
+      focusTargetIds: [],
+    });
+    // Ordered newest first, as the query returns them: prompt p1 was attempted
+    // twice, and only the 0.9 retake should count.
+    mockSpeakingRecordingFindMany.mockResolvedValue([
+      { promptId: 'p1', overallScore: 0.9 },
+      { promptId: 'p2', overallScore: 0.5 },
+      { promptId: 'p1', overallScore: 0.1 },
+    ]);
+    mockSpeakingPromptCount.mockResolvedValue(2);
+
+    const r = await submitPractice('ps-speaking', 'u1', []);
+
+    expect(r.correct).toBe(2);
+    expect(r.score).toBeCloseTo(0.7);
+  });
+
+  it('refuses to grade a session that is already complete', async () => {
+    mockPracticeSessionFindFirst.mockResolvedValue({
+      id: 'ps-done',
+      status: 'COMPLETED',
+      kind: 'GRAMMAR',
+      courseId: 'c1',
+      vocabLemmas: [],
+      grammarKeys: [],
+      items: [],
+    });
+
+    await expect(submitPractice('ps-done', 'u1', [])).rejects.toThrow(/already complete/i);
+    expect(mockApplyReviewOutcome).not.toHaveBeenCalled();
+  });
+
   it('applies precise vocab and section-weighted aggregate SRS for FULL sessions', async () => {
     mockPracticeSessionFindFirst.mockResolvedValue({
       id: 'ps-full',
+      status: 'ACTIVE',
       kind: 'FULL',
       courseId: 'c1',
       vocabLemmas: ['hola', 'seed-word'],

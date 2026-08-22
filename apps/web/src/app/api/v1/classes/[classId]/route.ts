@@ -91,6 +91,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           order: p.order,
           task: p.task,
           guidance: p.guidance,
+          ideas: p.ideas,
           response: r
             ? {
                 text: r.text,

@@ -16,7 +16,14 @@ interface PracticePanelProps {
 interface Overview {
   due: { vocab: number; grammar: number };
   totalVocab: number;
-  recent: Array<{ id: string; kind: string; status: string; score: number | null }>;
+  recent: Array<{
+    id: string;
+    kind: string;
+    status: string;
+    score: number | null;
+    startedAt?: string;
+    completedAt?: string | null;
+  }>;
 }
 
 type StartResponse = PracticeStart | { status: 'unavailable'; reason: string };
@@ -38,6 +45,17 @@ const UNAVAILABLE_COPY: Record<string, string> = {
 };
 
 type Phase = 'overview' | 'starting' | 'running' | 'unavailable';
+
+/** At or above this, the session counts as passed rather than merely finished. */
+const PASS_SCORE = 0.7;
+
+type SessionState = { label: string; tone: 'progress' | 'passed' | 'done' };
+
+function sessionState(session: Overview['recent'][number]): SessionState {
+  if (session.status === 'ACTIVE') return { label: 'In progress', tone: 'progress' };
+  if ((session.score ?? 0) >= PASS_SCORE) return { label: 'Passed', tone: 'passed' };
+  return { label: 'Done', tone: 'done' };
+}
 
 /**
  * Estimated build progress. The start POST is a single blocking request with
@@ -135,6 +153,26 @@ export function PracticePanel({
       }
     },
     [courseId]
+  );
+
+  const resumeSession = useCallback(
+    async (sessionId: string) => {
+      setError('');
+      setMessage('');
+      try {
+        const res = await fetch(`/api/v1/practice/${sessionId}`);
+        if (!res.ok) {
+          setError('That session could not be reopened. Start a new one.');
+          void loadOverview();
+          return;
+        }
+        setStart((await res.json()) as PracticeStart);
+        setPhase('running');
+      } catch {
+        setError('Network error. Please try again.');
+      }
+    },
+    [loadOverview]
   );
 
   const cancelPractice = useCallback(() => {
@@ -270,6 +308,41 @@ export function PracticePanel({
           );
         })}
       </ul>
+
+      {overview && overview.recent.length > 0 && (
+        <section className={styles.recent} aria-labelledby="recent-practice-heading">
+          <h3 id="recent-practice-heading" className={styles.recentHeading}>
+            Recent sessions
+          </h3>
+          <ul className={styles.recentList} role="list">
+            {overview.recent.map((session) => {
+              const state = sessionState(session);
+              const label = kindLabel(session.kind);
+              const resumable = session.status === 'ACTIVE';
+              return (
+                <li key={session.id} className={styles.recentRow}>
+                  <span className={styles.recentKind}>{label}</span>
+                  <span className={`${styles.badge} ${styles[state.tone]}`}>{state.label}</span>
+                  {session.score !== null && (
+                    <span className={styles.recentScore}>{Math.round(session.score * 100)}%</span>
+                  )}
+                  {resumable && (
+                    <button
+                      type="button"
+                      className={styles.resumeButton}
+                      onClick={() => void resumeSession(session.id)}
+                      disabled={phase === 'starting'}
+                      aria-label={`Resume ${label} practice`}
+                    >
+                      Resume
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

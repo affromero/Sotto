@@ -5,6 +5,7 @@ import { createStorageProvider } from '../providers/storage';
 import { getSiteConfig, setSiteConfig } from '../site-config';
 import { invalidateServerInfra } from '../server-config';
 import { logger } from '../logger';
+import { contentTypeForKey, LOCAL_STORAGE_URL_PREFIX } from '../r2';
 
 export type StorageProviderId = 'local' | 'r2' | 's3';
 
@@ -63,6 +64,15 @@ function localBaseDir(): string {
 }
 
 function keyFromLocalUrl(value: string): string | null {
+  // Objects stored locally are referenced by the app's own storage route; rows
+  // written before that route existed still hold a `file://` URL.
+  if (value.startsWith(`${LOCAL_STORAGE_URL_PREFIX}/`)) {
+    return value
+      .slice(LOCAL_STORAGE_URL_PREFIX.length + 1)
+      .split('/')
+      .map(decodeURIComponent)
+      .join('/');
+  }
   if (!value.startsWith('file://')) return null;
   const filePath = fileURLToPath(value);
   const relative = path.relative(localBaseDir(), filePath).split(path.sep).join('/');
@@ -103,17 +113,6 @@ function storageKey(
   if (value.includes('://')) return null;
   if (STORAGE_KEY_PREFIXES.some((prefix) => value.startsWith(prefix))) return value;
   return null;
-}
-
-function contentTypeForKey(key: string): string {
-  if (key.endsWith('.mp3')) return 'audio/mpeg';
-  if (key.endsWith('.m4a')) return 'audio/mp4';
-  if (key.endsWith('.wav')) return 'audio/wav';
-  if (key.endsWith('.pdf')) return 'application/pdf';
-  if (key.endsWith('.png')) return 'image/png';
-  if (key.endsWith('.jpg') || key.endsWith('.jpeg')) return 'image/jpeg';
-  if (key.endsWith('.json')) return 'application/json';
-  return 'application/octet-stream';
 }
 
 function pushRef(
