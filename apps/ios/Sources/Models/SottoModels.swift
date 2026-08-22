@@ -20,6 +20,14 @@ struct PairingRedeemResponse: Decodable {
     let user: SottoUser?
 }
 
+/// What POST /api/v1/auth/pair hands back: the same one-time token the web app
+/// paints into a QR, for a client that asked for it directly.
+struct PairingTokenResponse: Decodable {
+    let token: String
+    let serverUrl: String
+    let expiresAt: String
+}
+
 struct SottoProfileListResponse: Decodable {
     let profiles: [SottoProfile]
 }

@@ -5,6 +5,8 @@ import UIKit
 struct PairingView: View {
     @EnvironmentObject private var model: SottoAppModel
     @State private var manualCode = ""
+    @State private var serverAddress = ""
+    @State private var accessPassword = ""
 
     var body: some View {
         GeometryReader { proxy in
@@ -12,6 +14,7 @@ struct PairingView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         pairingHeader(isCompact: true)
+                        serverPairingForm
                         manualPairingForm
 
                         scannerPanel
@@ -26,6 +29,7 @@ struct PairingView: View {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 24) {
                         pairingHeader(isCompact: false)
+                        serverPairingForm
                         manualPairingForm
 
                         Spacer()
@@ -52,11 +56,54 @@ struct PairingView: View {
                 Text("Pair this device")
                     .font(isCompact ? .title2.bold() : .title.bold())
                     .foregroundStyle(SottoTheme.ink)
-                Text("Open Settings > Devices on your self-hosted Sotto server, then scan the pairing QR code shown there.")
+                Text("Enter your Sotto server address and its access password, or scan the pairing QR from Settings > Devices on that server.")
                     .font(isCompact ? .body : .title3)
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var serverPairingForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("sotto.example.com", text: $serverAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .font(.body.monospaced())
+                .padding(14)
+                .background(SottoTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(SottoTheme.line)
+                )
+
+            SecureField("Access password", text: $accessPassword)
+                .textContentType(.password)
+                .padding(14)
+                .background(SottoTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(SottoTheme.line)
+                )
+
+            Button {
+                Task {
+                    await model.pairWithServer(urlText: serverAddress, password: accessPassword)
+                    accessPassword = ""
+                }
+            } label: {
+                Label("Pair this device", systemImage: "checkmark.shield")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SottoPrimaryButtonStyle())
+            .disabled(serverAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isLoading)
+
+            Text("Leave the password empty if this server has none.")
+                .font(.footnote)
+                .foregroundStyle(SottoTheme.muted)
         }
     }
 

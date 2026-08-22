@@ -11,6 +11,29 @@ struct SottoAPIClient {
         self.profileId = profileId
     }
 
+    /// Opens the instance access gate. The `sotto_gate` cookie the server sets
+    /// lands in the shared cookie store, so the pairing request that follows is
+    /// let through by the proxy without a Bearer key.
+    func openGate(password: String) async throws {
+        let _: GateResponse = try await post(
+            "/api/v1/gate",
+            body: GateRequest(password: password),
+            authorized: false
+        )
+    }
+
+    /// Asks the server for a one-time pairing token, the same one the web app
+    /// renders as a QR. Needs the gate cookie from `openGate` on a
+    /// password-protected instance.
+    func requestPairingToken(deviceName: String) async throws -> PairingTokenResponse {
+        try await post(
+            "/api/v1/auth/pair",
+            body: PairingTokenRequest(name: deviceName),
+            authorized: false,
+            acceptedStatuses: [201]
+        )
+    }
+
     func redeemPairingToken(_ token: String) async throws -> PairingRedeemResponse {
         try await post(
             "/api/v1/auth/pair/redeem",
@@ -622,6 +645,18 @@ private extension Data {
 
 private struct PairingRedeemRequest: Encodable {
     let token: String
+}
+
+private struct GateRequest: Encodable {
+    let password: String
+}
+
+private struct GateResponse: Decodable {
+    let ok: Bool
+}
+
+private struct PairingTokenRequest: Encodable {
+    let name: String
 }
 
 private struct CreateProfileRequest: Encodable {
