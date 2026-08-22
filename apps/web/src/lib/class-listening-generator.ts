@@ -81,6 +81,22 @@ export interface ListeningContent {
   comprehensionQuestions: ListeningComprehensionQuestion[];
 }
 
+/**
+ * How many of a class's references must verify for the class to ship.
+ *
+ * A simple majority, and never fewer than one. The reasoning: a class whose
+ * sources are mostly sound is still worth listening to — the failed entries are
+ * shown as failed — while one where half or more of the citations cannot be
+ * stood up is not something to teach from, however much was spent generating
+ * it. Deliberately not reusing `getMinReferenceCount`: that governs how many
+ * references a script must *contain*, which is a question about depth and
+ * duration, not about how many of them survived checking.
+ */
+export function minimumVerifiedReferences(total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(1, Math.ceil(total / 2));
+}
+
 export async function composeListeningContent(
   p: ListeningContentParams
 ): Promise<ListeningContent> {
@@ -162,17 +178,29 @@ export async function composeListeningContent(
       }
     });
 
-    // Step 4b: fail closed before spending money on audio.
+    // Step 4b: fail closed before spending money on audio — but only when the
+    // sourcing is broadly unsound, not when a single citation is. Requiring
+    // every reference to verify meant one model-invented DOI, or one real page
+    // cited under a title that does not match its DOI, discarded a class whose
+    // script had already been paid for. References that fail are kept and
+    // carry a "Verification failed" badge in the player, so the learner sees
+    // exactly which sources did not hold up rather than being handed a class
+    // that silently claims all of them are sound. They are deliberately not
+    // deleted: the citations in the script are numbered, so removing one would
+    // leave a dangling [N] in the dialogue.
     await persistGeneratedReferences(episodeId, result.references);
     if (result.references.length > 0) {
-      const verified = await verifyEpisodeReferences(
+      const referenceCheck = await verifyEpisodeReferences(
         episodeId,
         p.userId,
         p.objective,
         result.turns
       );
-      if (!verified) {
-        throw new Error('Class reference verification failed');
+      if (referenceCheck.verified < minimumVerifiedReferences(referenceCheck.total)) {
+        throw new Error(
+          `Class reference verification failed: only ${referenceCheck.verified} of ` +
+            `${referenceCheck.total} sources could be verified`
+        );
       }
     }
 

@@ -99,14 +99,14 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
       });
     }
 
-    const referencesVerified = await verifyEpisodeReferences(
+    const referenceCheck = await verifyEpisodeReferences(
       episodeId,
       userId,
       episode.topic || episode.title,
       result.turns,
       useAdminCredits
     );
-    if (!referencesVerified) {
+    if (!referenceCheck.allVerified) {
       throw new Error('Reference verification failed: one or more cited claims are unsupported');
     }
 

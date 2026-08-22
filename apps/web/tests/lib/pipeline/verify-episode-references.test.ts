@@ -71,7 +71,7 @@ describe('verifyEpisodeReferences', () => {
       verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [
         { speaker: 'HOST', text: 'Supported claim [1].' },
       ])
-    ).resolves.toBe(true);
+    ).resolves.toMatchObject({ total: 1, verified: 1, allVerified: true });
 
     expect(mockReferenceUpdate).toHaveBeenCalledWith({
       where: { id: 'ref-1' },
@@ -103,7 +103,7 @@ describe('verifyEpisodeReferences', () => {
       verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [
         { speaker: 'HOST', text: 'Unsupported claim [1].' },
       ])
-    ).resolves.toBe(false);
+    ).resolves.toMatchObject({ verified: 0, allVerified: false });
 
     expect(mockReferenceUpdate).toHaveBeenCalledWith({
       where: { id: 'ref-1' },
@@ -114,7 +114,11 @@ describe('verifyEpisodeReferences', () => {
   it('does not call an AI provider when the episode has no references', async () => {
     mockReferenceFindMany.mockResolvedValue([]);
 
-    await expect(verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [])).resolves.toBe(false);
+    await expect(verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [])).resolves.toEqual({
+      total: 0,
+      verified: 0,
+      allVerified: false,
+    });
     expect(mockResolveLearningAi).not.toHaveBeenCalled();
   });
 });
