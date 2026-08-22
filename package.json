@@ -59,7 +59,7 @@
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
     "geoip-lite": "^2.0.3",
-    "pg": "^8.22.0",
+    "pg": "^8.23.0",
     "pricetoken": "^0.13.9",
     "zod": "4.4.3"
   },
@@ -67,7 +67,8 @@
     "@copilotkit/llmock": "^1.1.1",
     "@playwright/test": "^1.62.1",
     "@types/geoip-lite": "^1.4.4",
-    "esbuild": "0.28.1",
+    "esbuild": "0.28.2",
+    "jsdom": "^30.0.1",
     "lint-staged": "^17.3.0",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
@@ -75,6 +76,6 @@
     "sort-package-json": "^4.0.0"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.3.0"
+    "@next/swc-darwin-arm64": "^16.3.1"
   }
 }
