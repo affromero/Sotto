@@ -7,7 +7,19 @@ name: Publish OSS image
 on:
   push:
     branches: [main]
+    # Conservative on purpose: skipping a publish that was needed is worse than
+    # an extra build, so only changes that cannot reach the image are ignored.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/dependabot.yml'
   workflow_dispatch:
+
+# Only the newest push to main needs its image published; an in-flight build for
+# a commit that has already been superseded is publishing a stale tag.
+concurrency:
+  group: oss-image-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # Stop docker/build-push-action uploading a *.dockerbuild record as an artifact on every run.

@@ -11,6 +11,13 @@ on:
     branches: ['main']
   workflow_dispatch:
 
+# A superseded push cannot have introduced a secret the newer one does not also
+# carry, so cancelling the older scan loses no coverage. Deliberately NOT path
+# filtered: secret scanning has to see every file.
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   # gitleaks-action lists the PR's commits via the API to scan only the event's
