@@ -2,15 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Flag, QrCode as QrCodeIcon, ShieldAlert } from 'lucide-react';
-import 'thesidedoor/styles.css';
-import { ConnectPanel } from 'thesidedoor/react';
-import type { ShareChannel } from 'thesidedoor/react';
 import { Button } from '@/components/ui/Button';
+import { DeviceShare } from './DeviceShare';
 import type { TailscaleReachStatus, TailscaleSetupResult } from '@/lib/tailscale-reach';
 import styles from './page.module.css';
 
 const REACH_URL_STORAGE_KEY = 'sotto.reachUrl';
-const SHARE_CHANNELS: ShareChannel[] = ['whatsapp', 'telegram', 'email', 'copy'];
 
 type SetupPhase = 'idle' | 'checking' | 'setting-up';
 
@@ -174,12 +171,7 @@ export function DeviceReach({ initialStatus, canSetUp }: DeviceReachProps) {
       </section>
 
       {ready && status.serveUrl ? (
-        <ConnectPanel
-          appName="Sotto"
-          url={status.serveUrl}
-          shareChannels={SHARE_CHANNELS}
-          guideWhenInsecure={false}
-        />
+        <DeviceShare url={status.serveUrl} />
       ) : (
         <div className={styles.reachQrPlaceholder} role="status">
           <QrCodeIcon size={28} aria-hidden="true" />
