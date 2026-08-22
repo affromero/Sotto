@@ -6,6 +6,7 @@ struct ClassSectionView: View {
     let classId: String
     let section: SottoClassSection
     @Binding var answers: [String: Int]
+    @ObservedObject var drafts: WritingDraftStore
     let onSelectionHelp: (String, String) -> Void
 
     private var skill: String {
@@ -84,7 +85,7 @@ struct ClassSectionView: View {
 
             if !section.writingPrompts.isEmpty {
                 WritingPracticeView(
-                    source: .classSession(classId: classId),
+                    drafts: drafts,
                     prompts: section.writingPrompts,
                     onSelectionHelp: onSelectionHelp
                 )

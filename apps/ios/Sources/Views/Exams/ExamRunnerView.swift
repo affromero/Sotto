@@ -18,6 +18,7 @@ struct ExamRunnerView: View {
     @State private var score: SottoExamScoreResult?
     @State private var loadError: String?
     @State private var isSubmitting = false
+    @StateObject private var drafts = WritingDraftStore()
 
     private var questions: [SottoExamQuestion] {
         (exam?.sections ?? []).flatMap(\.questions)
@@ -133,10 +134,7 @@ struct ExamRunnerView: View {
             }
 
             if !section.writingPrompts.isEmpty {
-                WritingPracticeView(
-                    source: .exam(examId: exam.id),
-                    prompts: section.writingPrompts
-                )
+                WritingPracticeView(drafts: drafts, prompts: section.writingPrompts)
             }
         }
         .padding(18)
@@ -155,7 +153,7 @@ struct ExamRunnerView: View {
             examResultCard(result)
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Record every speaking prompt and submit every writing prompt before you finish. Only the multiple-choice answers travel with this button; the rest are graded as you go.")
+                Text("Finishing grades your written answers and scores the exam together. Speaking prompts are recorded in place.")
                     .font(.caption)
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -166,7 +164,14 @@ struct ExamRunnerView: View {
                     Label(isSubmitting ? "Scoring" : "Finish exam", systemImage: "checkmark.seal")
                 }
                 .buttonStyle(SottoPrimaryButtonStyle())
-                .disabled(isSubmitting || answers.count < questions.count)
+                .disabled(isSubmitting || drafts.isSubmitting || drafts.isOverLimit)
+
+                if let message = drafts.errorMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if answers.count < questions.count {
                     Text("\(answers.count) of \(questions.count) questions answered.")
@@ -249,6 +254,15 @@ struct ExamRunnerView: View {
     private func submit() async {
         isSubmitting = true
         defer { isSubmitting = false }
+
+        // Written answers are graded with the exam, not one button at a time.
+        let graded = await drafts.submit(
+            source: .exam(examId: examId),
+            model: model,
+            includingUnchanged: !drafts.hasChanges
+        )
+        guard graded else { return }
+
         do {
             score = try await model.submitExam(
                 examId: examId,

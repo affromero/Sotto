@@ -6,13 +6,27 @@ struct PracticeStartView: View {
     let start: SottoPracticeStart
 
     @State private var answers: [String: Int] = [:]
+    @State private var submittedAnswers: [String: Int] = [:]
+    @StateObject private var drafts = WritingDraftStore()
 
     private var items: [SottoPracticeItem] {
         start.items ?? []
     }
 
-    private var allAnswered: Bool {
-        !items.isEmpty && items.allSatisfy { answers[$0.id] != nil }
+    /// Only the choices that moved since the last submit. A second pass after
+    /// a result should not re-grade answers the learner left alone.
+    private var changedAnswers: [SottoPracticeAnswer] {
+        answers
+            .filter { submittedAnswers[$0.key] != $0.value }
+            .map { SottoPracticeAnswer(itemId: $0.key, selectedIndex: $0.value) }
+    }
+
+    private var hasChanges: Bool {
+        !changedAnswers.isEmpty || drafts.hasChanges
+    }
+
+    private var everyAnswer: [SottoPracticeAnswer] {
+        answers.map { SottoPracticeAnswer(itemId: $0.key, selectedIndex: $0.value) }
     }
 
     var body: some View {
@@ -30,6 +44,7 @@ struct PracticeStartView: View {
                     } else {
                         practiceItems
                         promptSections
+                        submitBar
                     }
                 }
                 .padding(28)
@@ -44,23 +59,73 @@ struct PracticeStartView: View {
                         dismiss()
                     }
                 }
-                ToolbarItemGroup(placement: .primaryAction) {
+                ToolbarItem(placement: .primaryAction) {
                     ProfileToolbarMenu {
                         dismiss()
                     }
-
-                    Button {
-                        model.run {
-                            let payload = answers.map { SottoPracticeAnswer(itemId: $0.key, selectedIndex: $0.value) }
-                            await model.submitPracticeAnswers(payload)
-                        }
-                    } label: {
-                        Label("Submit", systemImage: "checkmark.circle.fill")
-                    }
-                    .disabled(!allAnswered)
                 }
             }
         }
+    }
+
+    /// The one place this sheet submits from. It sends the multiple-choice
+    /// answers that moved and the writing drafts that were edited, nothing else.
+    private var submitBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let message = drafts.errorMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 14) {
+                Button {
+                    model.run {
+                        let graded = await drafts.submit(
+                            source: .practice(sessionId: start.sessionId),
+                            model: model,
+                            includingUnchanged: !hasChanges
+                        )
+                        guard graded else { return }
+
+                        let payload = hasChanges ? changedAnswers : everyAnswer
+                        if !payload.isEmpty {
+                            await model.submitPracticeAnswers(payload)
+                            submittedAnswers = answers
+                        }
+                    }
+                } label: {
+                    Label("Submit", systemImage: "checkmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SottoPrimaryButtonStyle())
+                .disabled(drafts.isOverLimit || drafts.isSubmitting)
+
+                Text(submitSummary)
+                    .font(.callout)
+                    .foregroundStyle(SottoTheme.muted)
+            }
+        }
+    }
+
+    private var submitSummary: String {
+        if drafts.isOverLimit {
+            return "One answer is over the 4000 character limit."
+        }
+        if !hasChanges {
+            return "Nothing changed since the last submit. Sending again re-grades what is here."
+        }
+
+        var parts: [String] = []
+        if !changedAnswers.isEmpty {
+            parts.append("\(changedAnswers.count) choice\(changedAnswers.count == 1 ? "" : "s")")
+        }
+        let writing = drafts.changedPromptIds.count
+        if writing > 0 {
+            parts.append("\(writing) written answer\(writing == 1 ? "" : "s")")
+        }
+        return "Sends \(parts.joined(separator: " and "))."
     }
 
     private var header: some View {
@@ -98,7 +163,7 @@ struct PracticeStartView: View {
         if start.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."
         }
-        return "\(answers.count) of \(items.count) multiple-choice items answered. Writing prompts are graded on submit; speaking prompts are shown for live practice."
+        return "\(answers.count) of \(items.count) multiple-choice items answered. Everything is graded together when you submit."
     }
 
     private var practiceItems: some View {
@@ -136,10 +201,7 @@ struct PracticeStartView: View {
             }
 
             if let writingPrompts = start.writingPrompts, !writingPrompts.isEmpty {
-                WritingPracticeView(
-                    source: .practice(sessionId: start.sessionId),
-                    prompts: writingPrompts
-                )
+                WritingPracticeView(drafts: drafts, prompts: writingPrompts)
             }
         }
     }
