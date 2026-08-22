@@ -106,6 +106,23 @@ repos:
         always_run: true
         pass_filenames: false
 
+      # `npm install` silently tolerates package.json declaring a version the
+      # lockfile does not carry — min-release-age gates the resolution and says
+      # nothing — but `npm ci` refuses that tree, so the break only ever showed
+      # up in CI. `npm ci --dry-run` does NOT catch it (it reports "up to date"
+      # and exits 0); `npm ls` does, exiting 1 and marking the dependency
+      # invalid. `--package-lock-only` reads the lockfile rather than the
+      # installed tree, so a stale node_modules cannot fail the commit for
+      # unrelated reasons. Runs only when a manifest is staged, needs no
+      # network, finishes in under a second.
+      - id: lockfile-sync
+        name: package.json / lockfile in sync (npm ls)
+        entry: npm ls --workspaces --package-lock-only
+        language: system
+        stages: [pre-commit]
+        files: ^(package\.json|package-lock\.json|apps/[^/]+/package\.json|packages/[^/]+/package\.json)$
+        pass_filenames: false
+
       - id: typecheck
         name: typecheck (tsc --noEmit)
         entry: npm run type-check
