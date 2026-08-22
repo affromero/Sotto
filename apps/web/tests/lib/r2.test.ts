@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
 // Set environment variables in hoisted block to ensure they're set before module evaluation
 vi.hoisted(() => {
@@ -505,6 +505,41 @@ describe('r2.ts', () => {
     it('passes through raw keys unchanged', () => {
       const key = 'episodes/abc/audio.mp3';
       expect(extractR2Key(key)).toBe('episodes/abc/audio.mp3');
+    });
+
+    it('recovers the key from a local storage route URL', () => {
+      expect(extractR2Key('/api/v1/storage/episodes/abc/audio.mp3')).toBe('episodes/abc/audio.mp3');
+    });
+
+    it('decodes escaped segments in a local storage route URL', () => {
+      expect(extractR2Key('/api/v1/storage/worksheets/a%20b/notes.pdf')).toBe(
+        'worksheets/a b/notes.pdf'
+      );
+    });
+  });
+
+  describe('local storage provider', () => {
+    beforeEach(() => {
+      process.env.STORAGE_PROVIDER = 'local';
+      process.env.LOCAL_STORAGE_DIR = '/tmp/sotto-r2-test-store';
+    });
+
+    afterEach(() => {
+      delete process.env.STORAGE_PROVIDER;
+      delete process.env.LOCAL_STORAGE_DIR;
+    });
+
+    it('hands back a browser-fetchable URL, never a file:// one', async () => {
+      const url = await uploadFile('speaking-ref/abc/0.mp3', Buffer.from('x'), 'audio/mpeg');
+
+      expect(url).toBe('/api/v1/storage/speaking-ref/abc/0.mp3');
+      expect(url.startsWith('file://')).toBe(false);
+    });
+
+    it('round-trips that URL back to its key', async () => {
+      const url = await uploadFile('speaking-ref/abc/0.mp3', Buffer.from('x'), 'audio/mpeg');
+
+      expect(extractR2Key(url)).toBe('speaking-ref/abc/0.mp3');
     });
   });
 

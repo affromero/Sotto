@@ -33,6 +33,7 @@ services:
       SOTTO_ACCESS_PASSWORD: ${SOTTO_ACCESS_PASSWORD:-}
       BYOK_ENCRYPTION_KEY: ${BYOK_ENCRYPTION_KEY:?Set BYOK_ENCRYPTION_KEY}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
     # The agent credential volumes are shared with papernook and flight-finder,
@@ -43,6 +44,8 @@ services:
     group_add:
       - '1000'
     volumes:
+      # Shared with the workers that write it; see docker-compose.workers.yml.
+      - storage:/app/apps/web/.sotto/storage
       - cli-credentials:/run/cli-credentials
       - agent-home:/home/sotto/.claude
       - agent-codex-home:/home/sotto/.codex
@@ -87,3 +90,8 @@ volumes:
   cli-credentials:
     external: true
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials
+  # Shared by both blue and green and by the worker stack, so it is named
+  # rather than project-scoped. Not external: whichever stack starts first
+  # creates it.
+  storage:
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-storage

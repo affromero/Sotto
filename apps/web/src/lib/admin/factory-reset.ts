@@ -1,7 +1,7 @@
 import { ensureLocalUser } from '@/lib/local-user';
 import { logger } from '@/lib/logger';
 import { prismaUnfiltered } from '@/lib/prisma';
-import { deleteFile, extractR2Key, listFiles } from '@/lib/r2';
+import { deleteFile, extractR2Key, listFiles, LOCAL_STORAGE_URL_PREFIX } from '@/lib/r2';
 
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
@@ -22,8 +22,14 @@ function uniqueDefined(values: Array<string | null | undefined>): string[] {
 }
 
 function isAppStorageRef(value: string): boolean {
-  if (value.startsWith('/avatars/') || value.startsWith('data:') || value.startsWith('file://')) {
+  if (value.startsWith('/avatars/') || value.startsWith('data:')) {
     return false;
+  }
+  // Local storage: both the route form written today and the `file://` rows
+  // written before that route existed are ours, and `extractR2Key` resolves
+  // either back to a key.
+  if (value.startsWith(`${LOCAL_STORAGE_URL_PREFIX}/`) || value.startsWith('file://')) {
+    return true;
   }
   if (R2_PUBLIC_URL && value.startsWith(`${R2_PUBLIC_URL}/`)) {
     return true;

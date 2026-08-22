@@ -15,6 +15,9 @@ x-worker-image: &worker-image
   group_add:
     - '1000'
   volumes:
+    # Workers generate the TTS and episode audio that web serves back over
+    # /api/v1/storage, so with STORAGE_PROVIDER=local both must see one store.
+    - storage:/app/apps/web/.sotto/storage
     - cli-credentials:/run/cli-credentials
     - agent-home:/home/sotto/.claude
     - agent-codex-home:/home/sotto/.codex
@@ -34,6 +37,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: heavy
@@ -63,6 +67,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: pipeline
@@ -92,6 +97,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
+      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: light
@@ -144,3 +150,8 @@ volumes:
     name: agent-codex-home
   cli-credentials:
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials
+  # Stack-scoped but NOT project-scoped: web runs blue/green under two project
+  # names and the workers are a third, so an unnamed volume would give each its
+  # own empty store and every local asset would vanish on the next swap.
+  storage:
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-storage
