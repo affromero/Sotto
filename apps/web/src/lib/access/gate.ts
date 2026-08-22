@@ -15,7 +15,7 @@
 
 export const GATE_COOKIE = 'sotto_gate';
 
-const GATE_TTL_MS = 12 * 60 * 60 * 1000;
+const GATE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const encoder = new TextEncoder();
 
