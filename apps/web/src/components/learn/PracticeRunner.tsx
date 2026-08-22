@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ScoreDial } from './ClassWidgets';
 import { LearningSelectionMenu } from './LearningSelectionMenu';
 import { WritingSection } from './WritingSection';
+import { useWritingDrafts } from './writing/useWritingDrafts';
 import type { WritingPromptData } from './classTypes';
 import styles from './PracticeRunner.module.css';
 
@@ -212,25 +213,34 @@ function McRunner({
   onDone: () => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [submitted, setSubmitted] = useState<Record<string, number>>({});
   const [phase, setPhase] = useState<'answering' | 'submitting' | 'result' | 'error'>('answering');
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [error, setError] = useState('');
 
-  const allAnswered = start.items.every((it) => answers[it.id] !== undefined);
+  /// Only the choices that moved since the last submit; everything when
+  /// nothing moved, so the always-available button still re-grades.
+  const changedAnswers = useMemo(
+    () =>
+      Object.entries(answers)
+        .filter(([itemId, selectedIndex]) => submitted[itemId] !== selectedIndex)
+        .map(([itemId, selectedIndex]) => ({ itemId, selectedIndex })),
+    [answers, submitted]
+  );
 
   const submit = useCallback(async () => {
     setPhase('submitting');
     setError('');
+
+    const payload = changedAnswers.length
+      ? changedAnswers
+      : Object.entries(answers).map(([itemId, selectedIndex]) => ({ itemId, selectedIndex }));
+
     try {
       const res = await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: Object.entries(answers).map(([itemId, selectedIndex]) => ({
-            itemId,
-            selectedIndex,
-          })),
-        }),
+        body: JSON.stringify({ answers: payload }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -239,12 +249,13 @@ function McRunner({
         return;
       }
       setResult((await res.json()) as SubmitResult);
+      setSubmitted(answers);
       setPhase('result');
     } catch {
       setError('Network error. Please try again.');
       setPhase('answering');
     }
-  }, [answers, start.sessionId]);
+  }, [answers, changedAnswers, start.sessionId]);
 
   if (phase === 'result' && result) {
     return <ResultPanel result={result} onDone={onDone} />;
@@ -282,8 +293,8 @@ function McRunner({
           type="button"
           className={styles.primaryButton}
           onClick={() => void submit()}
-          disabled={!allAnswered || phase === 'submitting'}
-          aria-disabled={!allAnswered || phase === 'submitting'}
+          disabled={phase === 'submitting'}
+          aria-disabled={phase === 'submitting'}
           aria-busy={phase === 'submitting'}
         >
           {phase === 'submitting' ? 'Grading…' : 'Submit'}
@@ -347,18 +358,30 @@ function WritingRunner({
 }) {
   const [finishing, setFinishing] = useState(false);
 
-  const prompts: WritingPromptData[] = start.prompts.map((p, idx) => ({
-    id: p.id,
-    order: idx,
-    task: p.task,
-    guidance: p.guidance ?? null,
-    ideas: p.ideas ?? [],
-    response: null,
-  }));
+  const prompts: WritingPromptData[] = useMemo(
+    () =>
+      start.prompts.map((p, idx) => ({
+        id: p.id,
+        order: idx,
+        task: p.task,
+        guidance: p.guidance ?? null,
+        ideas: p.ideas ?? [],
+        response: null,
+      })),
+    [start.prompts]
+  );
+
+  const drafts = useWritingDrafts(prompts, `/api/v1/practice/${start.sessionId}/writing`);
 
   async function finish() {
     setFinishing(true);
-    // Apply SRS from whatever responses have been graded so far.
+    // Grade what was written, then apply SRS from the graded responses.
+    const graded = await drafts.submit(!drafts.hasChanges);
+    if (!graded) {
+      setFinishing(false);
+      return;
+    }
+
     await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -369,19 +392,21 @@ function WritingRunner({
 
   return (
     <div className={styles.runner}>
-      <WritingSection
-        endpointBase={`/api/v1/practice/${start.sessionId}/writing`}
-        prompts={prompts}
-      />
+      <WritingSection drafts={drafts} prompts={prompts} />
+      {drafts.error && (
+        <p className={styles.errorBanner} role="alert">
+          {drafts.error}
+        </p>
+      )}
       <div className={styles.actions}>
         <button
           type="button"
           className={styles.primaryButton}
           onClick={() => void finish()}
-          disabled={finishing}
-          aria-busy={finishing}
+          disabled={finishing || drafts.isSubmitting || drafts.isOverLimit}
+          aria-busy={finishing || drafts.isSubmitting}
         >
-          {finishing ? 'Finishing…' : 'Finish practice'}
+          {finishing || drafts.isSubmitting ? 'Grading…' : 'Submit and finish'}
         </button>
       </div>
     </div>
@@ -398,33 +423,56 @@ function FullRunner({
   onDone: () => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [submitted, setSubmitted] = useState<Record<string, number>>({});
   const [phase, setPhase] = useState<'answering' | 'submitting' | 'result' | 'error'>('answering');
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [error, setError] = useState('');
 
-  const allAnswered = start.items.every((it) => answers[it.id] !== undefined);
-  const writingPrompts: WritingPromptData[] = start.writingPrompts.map((p, idx) => ({
-    id: p.id,
-    order: idx,
-    task: p.task,
-    guidance: p.guidance ?? null,
-    ideas: p.ideas ?? [],
-    response: null,
-  }));
+  const writingPrompts: WritingPromptData[] = useMemo(
+    () =>
+      start.writingPrompts.map((p, idx) => ({
+        id: p.id,
+        order: idx,
+        task: p.task,
+        guidance: p.guidance ?? null,
+        ideas: p.ideas ?? [],
+        response: null,
+      })),
+    [start.writingPrompts]
+  );
+
+  const drafts = useWritingDrafts(writingPrompts, `/api/v1/practice/${start.sessionId}/writing`);
+
+  /// Only the choices that moved since the last submit.
+  const changedAnswers = useMemo(
+    () =>
+      Object.entries(answers)
+        .filter(([itemId, selectedIndex]) => submitted[itemId] !== selectedIndex)
+        .map(([itemId, selectedIndex]) => ({ itemId, selectedIndex })),
+    [answers, submitted]
+  );
+
+  const hasChanges = changedAnswers.length > 0 || drafts.hasChanges;
 
   const submit = useCallback(async () => {
     setPhase('submitting');
     setError('');
+
+    const graded = await drafts.submit(!hasChanges);
+    if (!graded) {
+      setPhase('answering');
+      return;
+    }
+
+    const payload = hasChanges
+      ? changedAnswers
+      : Object.entries(answers).map(([itemId, selectedIndex]) => ({ itemId, selectedIndex }));
+
     try {
       const res = await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: Object.entries(answers).map(([itemId, selectedIndex]) => ({
-            itemId,
-            selectedIndex,
-          })),
-        }),
+        body: JSON.stringify({ answers: payload }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -433,12 +481,13 @@ function FullRunner({
         return;
       }
       setResult((await res.json()) as SubmitResult);
+      setSubmitted(answers);
       setPhase('result');
     } catch {
       setError('Network error. Please try again.');
       setPhase('answering');
     }
-  }, [answers, start.sessionId]);
+  }, [answers, changedAnswers, drafts, hasChanges, start.sessionId]);
 
   if (phase === 'result' && result) {
     return <ResultPanel result={result} onDone={onDone} />;
@@ -475,10 +524,7 @@ function FullRunner({
 
       {writingPrompts.length > 0 && (
         <section className={styles.fullSection} aria-label="Writing">
-          <WritingSection
-            endpointBase={`/api/v1/practice/${start.sessionId}/writing`}
-            prompts={writingPrompts}
-          />
+          <WritingSection drafts={drafts} prompts={writingPrompts} />
         </section>
       )}
 
@@ -496,11 +542,11 @@ function FullRunner({
           type="button"
           className={styles.primaryButton}
           onClick={() => void submit()}
-          disabled={!allAnswered || phase === 'submitting'}
-          aria-disabled={!allAnswered || phase === 'submitting'}
-          aria-busy={phase === 'submitting'}
+          disabled={phase === 'submitting' || drafts.isSubmitting || drafts.isOverLimit}
+          aria-disabled={phase === 'submitting' || drafts.isSubmitting || drafts.isOverLimit}
+          aria-busy={phase === 'submitting' || drafts.isSubmitting}
         >
-          {phase === 'submitting' ? 'Finishing…' : 'Finish practice'}
+          {phase === 'submitting' || drafts.isSubmitting ? 'Finishing…' : 'Submit and finish'}
         </button>
       </div>
     </div>

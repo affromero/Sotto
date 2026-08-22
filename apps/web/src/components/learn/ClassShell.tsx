@@ -23,6 +23,7 @@ import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
 import { WritingSection } from './WritingSection';
+import { useWritingDrafts } from './writing/useWritingDrafts';
 import { ClassSources } from './ClassSources';
 import {
   SKILL_GLYPH,
@@ -35,6 +36,7 @@ import {
   type ClassSection,
   type ClassSpeakingRecording,
   type ClassSubmitResult,
+  type WritingPromptData,
   type WritingResponse,
 } from './classTypes';
 import styles from './ClassShell.module.css';
@@ -79,6 +81,49 @@ function isClassPresentationStillRendering(cls: ClassData): boolean {
   const episode = listening?.episode;
   return Boolean(
     episode && !episode.audioUrl && episode.status !== 'READY' && episode.status !== 'FAILED'
+  );
+}
+
+/**
+ * The class flow's writing stage. It owns the segment's drafts so one button
+ * grades them, which is also what opens the score gate below.
+ */
+function ClassWritingStage({
+  classId,
+  prompts,
+  gate,
+  nextName,
+  onScore,
+  onFeedback,
+  onContinue,
+}: {
+  classId: string;
+  prompts: WritingPromptData[];
+  gate: number;
+  nextName: string | null;
+  onScore: (score: number) => void;
+  onFeedback: (promptId: string, response: WritingResponse) => void;
+  onContinue: () => void;
+}) {
+  const drafts = useWritingDrafts(prompts, `/api/v1/classes/${classId}/writing`, onFeedback);
+
+  return (
+    <WritingSection
+      drafts={drafts}
+      prompts={prompts}
+      gate={gate}
+      nextName={nextName}
+      onScore={onScore}
+      feedbackHref="#feedback-clinic"
+      onContinue={onContinue}
+      submitAction={{
+        label: 'Check writing',
+        busyLabel: 'Checking…',
+        busy: drafts.isSubmitting,
+        disabled: drafts.isOverLimit,
+        onSubmit: () => void drafts.submit(!drafts.hasChanges),
+      }}
+    />
   );
 }
 
@@ -596,15 +641,14 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         );
       } else if (seg.skill === 'WRITING') {
         stage = (
-          <WritingSection
+          <ClassWritingStage
             key={seg.id}
-            endpointBase={`/api/v1/classes/${classId}/writing`}
+            classId={classId}
             prompts={seg.writingPrompts}
             gate={gate}
             nextName={nextName}
             onScore={setCurScore}
             onFeedback={recordWritingFeedback}
-            feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
           />
         );
