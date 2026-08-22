@@ -1,9 +1,12 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { isLocalHost, resolveReachUrl } from 'thesidedoor/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getTailscaleReachStatus } from '@/lib/tailscale-reach';
 import { DeviceReach } from './DeviceReach';
+import { DeviceShare } from './DeviceShare';
 import { DeviceConnect } from './DeviceConnect';
 import { ApiKeyManager } from './ApiKeyManager';
 import styles from './page.module.css';
@@ -18,7 +21,13 @@ export default async function DevicesPage() {
   }
 
   const isOwner = session.user.role === 'ADMIN';
-  const tailscaleStatus = await getTailscaleReachStatus(3000);
+
+  // A server on a real hostname is already reachable from any device, so the
+  // Tailscale step is noise there: hand out the URL and be done. Only a laptop
+  // serving on localhost needs help getting a phone to it.
+  const reachUrl = resolveReachUrl({ headers: await headers() });
+  const needsReachHelp = isLocalHost(new URL(reachUrl).host);
+  const tailscaleStatus = needsReachHelp ? await getTailscaleReachStatus(3000) : null;
 
   const keys = isOwner
     ? await prisma.apiKey.findMany({
@@ -49,45 +58,68 @@ export default async function DevicesPage() {
       <header className={styles.intro}>
         <h1 className={styles.pageTitle}>Connect a device</h1>
         <p className={styles.introText}>
-          Use Sotto on a phone or tablet in two steps: open this server from the other device, then
-          pair the app to your account.
+          {needsReachHelp
+            ? 'Use Sotto on a phone or tablet in two steps: open this server from the other device, then pair the app to your account.'
+            : 'Scan this from a phone or tablet to open Sotto there, or send yourself the link.'}
         </p>
       </header>
 
-      <section className={styles.step} aria-labelledby="reach-heading">
-        <div className={styles.stepHead}>
-          <span className={styles.stepNum} aria-hidden="true">
-            1
-          </span>
-          <div>
-            <h2 id="reach-heading" className={styles.stepTitle}>
-              Open this server in a browser
-            </h2>
-            <p className={styles.stepText}>
-              This QR opens Sotto in Safari or Chrome. The native iPad app needs the separate
-              pairing QR in Step 2.
-            </p>
-          </div>
-        </div>
-        <DeviceReach initialStatus={tailscaleStatus} canSetUp={isOwner} />
-      </section>
+      {needsReachHelp && tailscaleStatus ? (
+        <>
+          <section className={styles.step} aria-labelledby="reach-heading">
+            <div className={styles.stepHead}>
+              <span className={styles.stepNum} aria-hidden="true">
+                1
+              </span>
+              <div>
+                <h2 id="reach-heading" className={styles.stepTitle}>
+                  Open this server in a browser
+                </h2>
+                <p className={styles.stepText}>
+                  This QR opens Sotto in Safari or Chrome. The native iPad app needs the separate
+                  pairing QR in Step 2.
+                </p>
+              </div>
+            </div>
+            <DeviceReach initialStatus={tailscaleStatus} canSetUp={isOwner} />
+          </section>
 
-      <section className={styles.step} aria-labelledby="pair-heading">
-        <div className={styles.stepHead}>
-          <span className={styles.stepNum} aria-hidden="true">
-            2
-          </span>
-          <div>
-            <h2 id="pair-heading" className={styles.stepTitle}>
-              Pair the native app
-            </h2>
-            <p className={styles.stepText}>
-              Generate a one-time code and scan it from the Sotto app to sign in on the new device.
-            </p>
-          </div>
-        </div>
-        <DeviceConnect reachUrl={tailscaleStatus.serveUrl} />
-      </section>
+          <section className={styles.step} aria-labelledby="pair-heading">
+            <div className={styles.stepHead}>
+              <span className={styles.stepNum} aria-hidden="true">
+                2
+              </span>
+              <div>
+                <h2 id="pair-heading" className={styles.stepTitle}>
+                  Pair the native app
+                </h2>
+                <p className={styles.stepText}>
+                  Generate a one-time code and scan it from the Sotto app to sign in on the new
+                  device.
+                </p>
+              </div>
+            </div>
+            <DeviceConnect reachUrl={tailscaleStatus.serveUrl} />
+          </section>
+        </>
+      ) : (
+        <>
+          <DeviceShare url={reachUrl} />
+
+          <section className={styles.step} aria-labelledby="pair-heading">
+            <div>
+              <h2 id="pair-heading" className={styles.stepTitle}>
+                Using the native app?
+              </h2>
+              <p className={styles.stepText}>
+                The iPad app signs in with a one-time code instead. Generate one and scan it from
+                the app.
+              </p>
+            </div>
+            <DeviceConnect reachUrl={reachUrl} />
+          </section>
+        </>
+      )}
 
       {isOwner && (
         <section className={styles.keysSection} aria-labelledby="keys-heading">

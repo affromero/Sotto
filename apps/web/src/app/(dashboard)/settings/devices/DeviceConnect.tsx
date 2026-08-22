@@ -29,9 +29,11 @@ export function DeviceConnect({ reachUrl }: DeviceConnectProps) {
     setError(null);
     setCopied(false);
     try {
+      // The server-rendered URL wins; the stored one is only a fallback for a
+      // Tailscale URL that came up after this page rendered. Preferring storage
+      // would pair a public deployment against a stale localhost/tailnet origin.
       const storedReachUrl = window.localStorage.getItem(REACH_URL_STORAGE_KEY)?.trim();
-      const configuredReachUrl =
-        storedReachUrl && storedReachUrl.length > 0 ? storedReachUrl : reachUrl?.trim();
+      const configuredReachUrl = reachUrl?.trim() || storedReachUrl;
       const res = await fetch('/api/v1/auth/pair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
