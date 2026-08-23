@@ -588,6 +588,23 @@ final class SottoAppModel: ObservableObject {
         practiceOverview = try? await client.fetchPracticeOverview(courseId: courseId)
     }
 
+    /// Discards a session the learner is not going to finish, then refreshes
+    /// what is waiting so the row disappears.
+    func deletePractice(sessionId: String, courseId: String) async {
+        guard let client = makeClient() else { return }
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await client.deletePractice(sessionId: sessionId)
+            await loadPracticeOverview(courseId: courseId)
+        } catch {
+            report(error)
+        }
+
+        isLoading = false
+    }
+
     /// Reopens a session the learner started and never finished.
     func resumePractice(sessionId: String) async {
         guard let client = makeClient() else { return }

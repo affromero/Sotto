@@ -337,3 +337,35 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Sits after Resume, so it inherits the row's right edge only when it is the
+   only control -- a finished session has nothing to resume. */
+.deleteButton {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-mute);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.18s var(--ease),
+    border-color 0.18s var(--ease);
+}
+
+.deleteButton:first-of-type {
+  margin-left: auto;
+}
+
+.deleteButton:hover:not(:disabled) {
+  color: var(--danger, #dc2626);
+  border-color: color-mix(in srgb, var(--danger, #dc2626) 40%, transparent);
+}
+
+.deleteButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

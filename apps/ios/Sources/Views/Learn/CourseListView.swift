@@ -396,11 +396,19 @@ private struct CourseDetailPane: View {
                 )
 
                 if let overview = model.practiceOverview {
-                    PracticeDuePanel(overview: overview) { sessionId in
-                        model.run {
-                            await model.resumePractice(sessionId: sessionId)
+                    PracticeDuePanel(
+                        overview: overview,
+                        onResume: { sessionId in
+                            model.run {
+                                await model.resumePractice(sessionId: sessionId)
+                            }
+                        },
+                        onDelete: { sessionId in
+                            model.run {
+                                await model.deletePractice(sessionId: sessionId, courseId: course.id)
+                            }
                         }
-                    }
+                    )
                 }
 
                 SourcedClassPanel(course: course, activeClassId: course.activeClassId)

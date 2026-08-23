@@ -51,6 +51,11 @@ struct SottoAPIClient {
         try await get("/api/v1/practice/\(sessionId)")
     }
 
+    /// Discards a practice session and everything written or recorded in it.
+    func deletePractice(sessionId: String) async throws {
+        let _: PracticeDeleteResponse = try await delete("/api/v1/practice/\(sessionId)")
+    }
+
     func listProfiles() async throws -> [SottoProfile] {
         let response: SottoProfileListResponse = try await get("/api/v1/profiles")
         return response.profiles
@@ -682,6 +687,10 @@ private extension Data {
 
 private struct PairingRedeemRequest: Encodable {
     let token: String
+}
+
+private struct PracticeDeleteResponse: Decodable {
+    let deleted: Bool
 }
 
 private struct GateRequest: Encodable {
