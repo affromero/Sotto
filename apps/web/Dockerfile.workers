@@ -55,6 +55,12 @@ COPY --from=deps --chown=sotto:sotto /app/apps/web/src/generated ./apps/web/src/
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
 COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
 
+# Default local-storage root (STORAGE_PROVIDER=local). It must exist in the
+# image and be owned by the runtime user: Docker seeds a fresh named volume
+# from the image path it covers, so if the path is missing the volume is
+# created root-owned and every write fails with EACCES.
+RUN mkdir -p /app/apps/web/.sotto/storage && chown -R sotto:sotto /app/apps/web/.sotto
+
 USER sotto
 
 WORKDIR /app/apps/web

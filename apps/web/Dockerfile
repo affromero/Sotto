@@ -71,6 +71,12 @@ RUN adduser --system --uid 1001 sotto
 RUN mkdir -p /home/sotto/.codex /home/sotto/.claude /home/sotto/.ssh \
     && chown -R sotto:sotto /home/sotto
 
+# Default local-storage root (STORAGE_PROVIDER=local). It must exist in the
+# image and be owned by the runtime user: Docker seeds a fresh named volume
+# from the image path it covers, so if the path is missing the volume is
+# created root-owned and every write fails with EACCES.
+RUN mkdir -p /app/apps/web/.sotto/storage && chown -R sotto:sotto /app/apps/web/.sotto
+
 ENV HOME=/home/sotto
 
 ARG COMMIT_SHA=dev
