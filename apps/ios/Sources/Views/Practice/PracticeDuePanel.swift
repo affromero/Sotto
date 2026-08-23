@@ -8,6 +8,9 @@ struct PracticeDuePanel: View {
 
     let overview: SottoPracticeOverview
     let onResume: (String) -> Void
+    let onDelete: (String) -> Void
+
+    @State private var pendingDeletion: SottoPracticeSessionSummary?
 
     var body: some View {
         if overview.totalDue == 0 && overview.unfinished.isEmpty {
@@ -42,6 +45,14 @@ struct PracticeDuePanel: View {
                             onResume(session.id)
                         }
                         .buttonStyle(SottoSecondaryButtonStyle())
+
+                        Button(role: .destructive) {
+                            pendingDeletion = session
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Delete this \(kindLabel(session.kind)) session")
                     }
                 }
             }
@@ -53,6 +64,27 @@ struct PracticeDuePanel: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(SottoTheme.line)
             )
+            // Deleting takes the answers and recordings with it, so ask first.
+            .confirmationDialog(
+                "Delete this session?",
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let session = pendingDeletion {
+                        onDelete(session.id)
+                    }
+                    pendingDeletion = nil
+                }
+                Button("Keep it", role: .cancel) {
+                    pendingDeletion = nil
+                }
+            } message: {
+                Text("Its answers and recordings go with it.")
+            }
         }
     }
 

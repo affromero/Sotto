@@ -155,6 +155,34 @@ export function PracticePanel({
     [courseId]
   );
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  /// Discarding a session the learner does not intend to finish. The row goes
+  /// immediately; a failure puts it back by reloading the overview.
+  const deleteSession = useCallback(
+    async (sessionId: string, label: string) => {
+      if (!window.confirm(`Delete this ${label} session? Its answers and recordings go with it.`)) {
+        return;
+      }
+
+      setDeletingId(sessionId);
+      setError('');
+      try {
+        const res = await fetch(`/api/v1/practice/${sessionId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(body.error ?? 'Could not delete that session. Please try again.');
+        }
+      } catch {
+        setError('Network error. Please try again.');
+      } finally {
+        setDeletingId(null);
+        void loadOverview();
+      }
+    },
+    [loadOverview]
+  );
+
   const resumeSession = useCallback(
     async (sessionId: string) => {
       setError('');
@@ -331,12 +359,21 @@ export function PracticePanel({
                       type="button"
                       className={styles.resumeButton}
                       onClick={() => void resumeSession(session.id)}
-                      disabled={phase === 'starting'}
+                      disabled={phase === 'starting' || deletingId === session.id}
                       aria-label={`Resume ${label} practice`}
                     >
                       Resume
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className={styles.deleteButton}
+                    onClick={() => void deleteSession(session.id, label)}
+                    disabled={deletingId === session.id}
+                    aria-label={`Delete ${label} session`}
+                  >
+                    {deletingId === session.id ? 'Deleting…' : 'Delete'}
+                  </button>
                 </li>
               );
             })}

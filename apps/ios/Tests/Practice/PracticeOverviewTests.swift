@@ -56,6 +56,39 @@ final class PracticeOverviewTests: XCTestCase {
         XCTAssertNil(option("SPEAKING").dueCount(in: result))
     }
 
+    func testDeletingLeavesTheOtherSessionsAlone() throws {
+        let before = try overview(
+            """
+            {
+              "due": { "vocab": 1, "grammar": 0 },
+              "totalVocab": 10,
+              "recent": [
+                { "id": "s1", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                  "startedAt": "2026-08-22T10:00:00.000Z", "completedAt": null },
+                { "id": "s2", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                  "startedAt": "2026-08-22T09:00:00.000Z", "completedAt": null }
+              ]
+            }
+            """
+        )
+        XCTAssertEqual(before.unfinished.map(\.id), ["s1", "s2"])
+
+        // What the panel shows after the server confirms one deletion.
+        let after = try overview(
+            """
+            {
+              "due": { "vocab": 1, "grammar": 0 },
+              "totalVocab": 10,
+              "recent": [
+                { "id": "s2", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                  "startedAt": "2026-08-22T09:00:00.000Z", "completedAt": null }
+              ]
+            }
+            """
+        )
+        XCTAssertEqual(after.unfinished.map(\.id), ["s2"])
+    }
+
     func testPrismaTimestampsWithFractionalSecondsParse() throws {
         let date = ISO8601DateFormatter.sottoInternet.date(from: "2026-08-22T10:00:00.000Z")
         XCTAssertNotNil(date)
