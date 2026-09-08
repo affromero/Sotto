@@ -6,7 +6,13 @@ const nextConfig = {
   output: 'standalone',
   // Prisma 7's runtime + pg driver adapter must not be bundled by Turbopack/
   // webpack in server code — they load native/generated modules at runtime.
-  serverExternalPackages: ['@prisma/client', '@prisma/adapter-pg', 'pg'],
+  serverExternalPackages: [
+    '@prisma/client',
+    '@prisma/adapter-pg',
+    'pg',
+    'markit-ai',
+    '@shiftlabs/markit',
+  ],
   // Per-instance build dir, so two dev servers (e.g. the self-hosted instance and
   // the SELF_HOSTED=false mock) can run side by side without fighting over .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',

@@ -49,11 +49,19 @@
   },
   "overrides": {
     "@hono/node-server": "1.19.14",
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
     "esbuild": "$esbuild",
     "postcss": "$postcss",
+    "prisma": {
+      "mysql2": "3.24.2"
+    },
+    "react-dom": "19.2.8",
     "tsup": {
       "esbuild": "$esbuild"
-    }
+    },
+    "tsx": "4.23.13"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
