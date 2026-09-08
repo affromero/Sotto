@@ -1,6 +1,6 @@
 # Hosting Infrastructure
 
-**Date:** 2026-06-13
+**Date:** 2026-09-08
 
 **Summary:** Self-hosting options, the recommended single-VPS topology, and the production services Sotto expects when released as private-first open source software.
 
@@ -118,34 +118,19 @@ cd ~/sotto
 SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
 ```
 
-By default, the script uses `SOTTO_IMAGE_SOURCE=build` and builds images on the server. That keeps the deployment self-host neutral because `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` are baked into the Next.js client bundle at build time from your own `.env.production`. Worker runtime dependencies are isolated in a local `SOTTO_WORKER_BASE_IMAGE`, so later builds can reuse the slow apt, Playwright, yt-dlp, and CLI layers.
+Prepare the committed release, immutable image references, measured capacity inputs and database backup allowance described in [Self-host deployment](03-self-host-deployment.md). Production deployment requires images built and tested on a separate machine. Web images must bake the target `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Local compose builds remain available for development and self-hosting.
 
-Maintainers who publish deployment images from CI can opt into registry mode:
-
-```bash
-SOTTO_IMAGE_SOURCE=registry
-SOTTO_WEB_IMAGE=ghcr.io/affromero/sotto-web-prod
-SOTTO_WORKERS_IMAGE=ghcr.io/affromero/sotto-workers-prod
-SOTTO_IMAGE_TAG=<full git commit sha>
-```
-
-Registry images must be built with the same public URL and VAPID public key used by the target deployment. In the upstream maintainer workflow, `SOTTO_IMAGE_TAG` defaults to the full commit SHA after `git pull`, and the script waits up to `SOTTO_IMAGE_PULL_TIMEOUT` seconds for that immutable tag to become available.
-
-For the upstream maintainer workflow, set repository variables `SOTTO_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` before relying on `SOTTO_IMAGE_SOURCE=registry`. Production image publication is skipped when `SOTTO_PUBLIC_APP_URL` is missing.
+The upstream production workflow requires repository variables `SOTTO_PUBLIC_APP_URL` and `SOTTO_PERSONAL_APP_URL`; `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is optional. It verifies runtime smoke checks before publishing each image. Deploy the resulting digest with its full committed source SHA.
 
 Expected deploy phases:
 
-1. Pull latest code and submodules.
-2. Load `.env.production` into `.env` for Docker Compose.
-3. Render and validate Caddy config.
-4. Start infra services and wait for Postgres, Redis, and PgBouncer.
-5. Build or pull the inactive blue-green app slot image.
-6. Run Prisma schema sync against `DIRECT_DATABASE_URL` when present.
-7. Start and health-check the new slot.
-8. Run production smoke checks.
-9. Restart workers from the prepared worker image.
-10. Stop the previous app slot.
-11. Prune old unused Docker images after the deployment has succeeded.
+1. Hold the shared deployment lock and verify the clean committed checkout.
+2. Load `.env.production`, reserve capacity, import missing exact image digests and recheck free space.
+3. Verify image revision/platform and save current and rollback image protection records.
+4. Verify infrastructure and shared credentials, reject schema changes, and create and verify the database backup.
+5. Run the verified migration command, isolate and health-check the candidate web slot, and run production smoke checks.
+6. Replace and verify workers, route Caddy to the candidate, and verify public health before stopping the old slot.
+7. Save the slot and retention state after final capacity checks. Image cleanup remains separate host maintenance.
 
 ## Storage
 

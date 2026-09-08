@@ -496,29 +496,14 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(ossImageWorkflow).toContain('branches: [main]');
     expect(ossImageWorkflow).not.toContain("- 'v*'");
     expect(ossImageWorkflow).not.toContain('github.ref_type');
-    expect(deployWorkflow).toContain('Reclaim runner disk before worker image');
-    expect(deployWorkflow).toContain('docker buildx prune --all --force');
-    expect(deployWorkflow).toContain('docker system prune --all --force');
+    expect(deployWorkflow).not.toMatch(/docker\s+(?:image|builder|buildx|system)\s+prune\b/);
     expect(deploySource).toContain('ENV_FILE="${SOTTO_ENV_FILE:-$REPO_ROOT/.env.production}"');
     expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
     expect(deploySource).toContain('render_caddy_config');
     expect(deploySource).toContain(
       'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/${SOTTO_STACK}.conf}"'
     );
-    expect(deploySource).toContain('SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"');
-    expect(deploySource).toContain(
-      'docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" build web'
-    );
-    expect(deploySource).toContain('docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"');
-    expect(deploySource).toContain('docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"');
-    expect(deploySource).toContain('DEFAULT_WEB_IMAGE="ghcr.io/affromero/sotto-web-personal-prod"');
-    expect(deploySource).toContain('SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"');
-    expect(deploySource).toContain(
-      'SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-${SOTTO_STACK}-workers-base:$SOTTO_IMAGE_TAG}"'
-    );
-    expect(deploySource).toContain(
-      'docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .'
-    );
+    expect(deploySource).not.toMatch(/docker\s+(?:build|buildx\s+build)\b/);
     expect(deploySource).not.toMatch(/docker\s+(?:image|builder|buildx|system)\s+prune\b/);
     expect(appComposeSource).toContain(
       'image: ${SOTTO_WEB_IMAGE:-sotto-web}:${SOTTO_IMAGE_TAG:-local}'
@@ -538,7 +523,6 @@ describe('open-source language-learning OSS surfaces', () => {
       './scripts/agent/sync-cli-credentials.sh:/usr/local/bin/sync-cli-credentials:ro'
     );
     expect(deploySource).toContain('=== Syncing host CLI credentials ===');
-    expect(deploySource).toContain('up -d --no-build credential-sync');
     expect(webDockerSource).toContain('"@openai/codex@${CODEX_VERSION}"');
     expect(workerBaseDockerSource).toContain('"@openai/codex@${CODEX_VERSION}"');
     expect(webDockerSource).toContain('openssh-client');
@@ -573,9 +557,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocs).toContain('docker-compose.infra.yml');
     expect(releaseDocs).toContain('docker-compose.app.yml');
     expect(releaseDocs).toContain('docker-compose.workers.yml');
-    expect(releaseDocs).toContain('SOTTO_IMAGE_SOURCE=build');
-    expect(releaseDocs).toContain('SOTTO_IMAGE_SOURCE=registry');
-    expect(releaseDocs).toContain('SOTTO_IMAGE_TAG');
     expect(releaseDocs).not.toContain('https://sotto.fm');
     expect(releaseDocs).not.toContain('sotto.fm');
     expect(releaseDocs).not.toContain('dashboard.doppler.com');

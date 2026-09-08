@@ -1,5 +1,5 @@
 # Dependencies (installed inside container)
-node_modules
+**/node_modules
 
 # Next.js build output (workspace app output is nested under apps/web)
 **/.next
@@ -7,12 +7,13 @@ out
 build
 
 # Environment files (passed via env_file or environment)
-.env
-.env.local
-.env.*.local
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.oss.example
 
 # Git
-.git
+**/.git
 .gitignore
 
 # IDE
@@ -39,3 +40,14 @@ docs
 .vercel
 
 # Mobile app (not needed for web Docker builds)
+apps/ios
+apps/desktop
+tui/target
+**/.cache
+**/.venv
+**/__pycache__
+**/.sotto
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo

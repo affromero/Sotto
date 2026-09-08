@@ -1,6 +1,6 @@
 # App services — deployed by blue-green swap.
-# deploy.sh builds this image by default so NEXT_PUBLIC_* values are baked from
-# the operator env. Set SOTTO_IMAGE_SOURCE=registry to pull the image instead.
+# Production deploy.sh requires an immutable image built on a separate machine.
+# The build definition remains available for local development and self-hosting.
 #
 # Usage:
 #   WEB_PORT=3000 docker compose -f docker-compose.app.yml -p sotto-blue up -d
