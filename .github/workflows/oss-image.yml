@@ -34,6 +34,9 @@ jobs:
   publish:
     if: github.repository == 'affromero/Sotto'
     runs-on: ubuntu-latest
+    outputs:
+      base_digest: ${{ steps.worker_base.outputs.digest }}
+      short_sha: ${{ steps.sha.outputs.short }}
     env:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
@@ -64,23 +67,35 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push worker base
+      - name: Build worker base candidate
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile.workers-base
-          push: true
+          load: true
           tags: |
+            ghcr.io/affromero/sotto-workers-base:${{ github.sha }}
             ghcr.io/affromero/sotto-workers-base:node22
           cache-from: type=gha,scope=sotto-workers-base
           cache-to: type=gha,mode=max,scope=sotto-workers-base
 
-      - name: Build and push sotto-web
+      - name: Verify and publish worker base
+        id: worker_base
+        run: |
+          set -euo pipefail
+          base="ghcr.io/affromero/sotto-workers-base:${{ github.sha }}"
+          bash scripts/deploy/smoke-worker-base.sh "$base"
+          docker push "$base"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$base")
+          echo "digest=${reference##*@}" >> "$GITHUB_OUTPUT"
+          docker push ghcr.io/affromero/sotto-workers-base:node22
+
+      - name: Build sotto-web candidate
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile
-          push: true
+          load: true
           build-args: |
             COMMIT_SHA=${{ steps.sha.outputs.short }}
             NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -90,16 +105,42 @@ jobs:
           cache-from: type=gha,scope=sotto-web
           cache-to: type=gha,mode=max,scope=sotto-web
 
-      - name: Build and push sotto-workers
+      - name: Verify and publish sotto-web
+        run: |
+          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
+          docker push ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
+          docker push ghcr.io/affromero/sotto-web:latest
+
+  workers:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build worker candidate
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile.workers
-          push: true
+          load: true
           build-args: |
-            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base:node22
+            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base@${{ needs.publish.outputs.base_digest }}
+            COMMIT_SHA=${{ github.sha }}
           tags: |
             ghcr.io/affromero/sotto-workers:latest
-            ghcr.io/affromero/sotto-workers:${{ steps.sha.outputs.short }}
+            ghcr.io/affromero/sotto-workers:${{ needs.publish.outputs.short_sha }}
           cache-from: type=gha,scope=sotto-workers
           cache-to: type=gha,mode=max,scope=sotto-workers
+      - name: Verify worker runtime before publication
+        run: bash scripts/deploy/smoke-worker-image.sh ghcr.io/affromero/sotto-workers:${{ needs.publish.outputs.short_sha }}
+      - name: Publish verified worker
+        run: |
+          docker push ghcr.io/affromero/sotto-workers:${{ needs.publish.outputs.short_sha }}
+          docker push ghcr.io/affromero/sotto-workers:latest

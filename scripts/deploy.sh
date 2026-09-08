@@ -2,7 +2,7 @@
 # Blue-green deploy script for Sotto.
 # Runs on the server. Alternates between blue and green slots (ports
 # SOTTO_WEB_PORT_BLUE/SOTTO_WEB_PORT_GREEN, default 3000/3010).
-# Caddy health-checks both and routes to whichever is alive.
+# Caddy routes only to the verified active slot.
 #
 # Multiple stacks can share one server: SOTTO_STACK (default "sotto") names the
 # stack and scopes the slot state file, compose project names, image names,
@@ -13,6 +13,10 @@
 # Usage: bash ~/sotto/scripts/deploy.sh
 
 set -euo pipefail
+
+# One lock covers admission, image imports, service changes and health checks.
+exec 9>"${PRODUCTION_DEPLOY_LOCK:-/var/lock/production-build.lock}"
+flock -n 9 || { echo "Another production deployment or maintenance operation is active." >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -107,6 +111,7 @@ render_caddy_config() {
   rendered="$(<"$CADDY_TEMPLATE")"
   rendered="${rendered//__SOTTO_APP_DOMAIN__/$app_host}"
   rendered="${rendered//__SOTTO_STACK__/$SOTTO_STACK}"
+  rendered="${rendered//localhost:__SOTTO_WEB_PORT_BLUE__ localhost:__SOTTO_WEB_PORT_GREEN__/localhost:$NEW_WEB_PORT}"
   rendered="${rendered//__SOTTO_WEB_PORT_BLUE__/$WEB_PORT_BLUE}"
   rendered="${rendered//__SOTTO_WEB_PORT_GREEN__/$WEB_PORT_GREEN}"
 
@@ -119,16 +124,6 @@ render_caddy_config() {
   fi
 
   printf '%s\n' "$rendered" | remove_optional_markers
-}
-
-validate_image_source() {
-  case "$SOTTO_IMAGE_SOURCE" in
-    build|registry) ;;
-    *)
-      echo "ERROR: SOTTO_IMAGE_SOURCE must be 'build' or 'registry', got: $SOTTO_IMAGE_SOURCE"
-      exit 1
-      ;;
-  esac
 }
 
 registry_login_if_configured() {
@@ -158,41 +153,11 @@ pull_with_retry() {
   done
 }
 
-cleanup_stale_caddy_configs() {
-  local target_path="$1"
-  local target_dir target_base stale_fragment_name
-  target_dir="$(dirname "$target_path")"
-  target_base="$(basename "$target_path")"
-  # Earlier deploys wrote the Caddy fragment with the app domain as its
-  # FILENAME; current deploys write <stack>.conf. Delete any abandoned
-  # duplicate files so Caddy never imports the same site twice. This is
-  # about stale files only — the domain itself is the live site.
-  # (Split literal keeps the domain string out of this public script.)
-  stale_fragment_name="sotto"".fm"
-
-  # Legacy site-file cleanup belongs to the primary stack only — from a
-  # secondary stack this would delete the primary's live site file.
-  if [ "$SOTTO_STACK" != "sotto" ]; then
-    return
-  fi
-
-  if [ "$target_dir" != "/etc/caddy/conf.d" ]; then
-    return
-  fi
-
-  sudo find "$target_dir" -maxdepth 1 -type f \
-    \( -name "sotto.conf" -o -name "$stale_fragment_name" -o -name "sotto.conf.disabled.*" -o -name "$stale_fragment_name.disabled.*" \) \
-    ! -name "$target_base" \
-    -exec rm -f {} +
-}
-
-# --- Pull code ---
+# --- Verify code ---
 
 echo ""
-echo "=== Pulling latest code ==="
+echo "=== Verifying committed release checkout ==="
 PREV_COMMIT_SHA=$(git rev-parse HEAD)
-git pull origin main
-git submodule update --init --recursive
 GIT_COMMIT_SHA=$(git rev-parse HEAD)
 
 # --- Environment ---
@@ -222,6 +187,10 @@ require_env_min_length BYOK_ENCRYPTION_KEY 32
 # --- Stack identity (may come from the env file or the caller's environment) ---
 
 SOTTO_STACK="${SOTTO_STACK:-sotto}"
+if [[ ! "$SOTTO_STACK" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "ERROR: SOTTO_STACK contains invalid characters." >&2
+  exit 1
+fi
 export SOTTO_STACK
 SLOT_FILE="$HOME/.${SOTTO_STACK}-deploy-slot"
 WEB_PORT_BLUE="${SOTTO_WEB_PORT_BLUE:-3000}"
@@ -244,7 +213,7 @@ elif [ "$ACTIVE_SLOT" = "green" ]; then
   NEW_WEB_PORT=$WEB_PORT_BLUE
   OLD_SLOT="green"
 else
-  # First deploy — start with blue
+  # First deploy starts with blue.
   NEW_SLOT="blue"
   NEW_WEB_PORT=$WEB_PORT_BLUE
   OLD_SLOT="none"
@@ -258,37 +227,210 @@ echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT)"
 
 COMMIT_SHA="$GIT_COMMIT_SHA"
 export COMMIT_SHA
-SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-build}"
-validate_image_source
-SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-$COMMIT_SHA}"
-if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
-  if [ "$SOTTO_STACK" = "sotto-personal" ]; then
-    DEFAULT_WEB_IMAGE="ghcr.io/affromero/sotto-web-personal-prod"
-  else
-    DEFAULT_WEB_IMAGE="ghcr.io/affromero/sotto-web-prod"
+SOTTO_IMAGE_SOURCE="${SOTTO_IMAGE_SOURCE:-registry}"
+if [ "$SOTTO_IMAGE_SOURCE" != registry ]; then
+  echo "ERROR: production deployment accepts verified registry images only. Build on a separate machine." >&2
+  exit 1
+fi
+require_env SOTTO_RELEASE_SHA
+if [[ ! "$SOTTO_RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]] || [ "$SOTTO_RELEASE_SHA" != "$COMMIT_SHA" ]; then
+  echo "ERROR: checkout HEAD must equal the full SOTTO_RELEASE_SHA." >&2
+  exit 1
+fi
+if [ -n "$(git status --porcelain)" ] || git submodule status --recursive | grep -q '^[+U-]'; then
+  echo "ERROR: deploy a clean checkout with its committed submodule revisions." >&2
+  exit 1
+fi
+for variable in SOTTO_WEB_IMAGE_REF SOTTO_WORKERS_IMAGE_REF; do
+  require_env "$variable"
+  if [[ ! "${!variable}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:[a-f0-9]{64}$ ]]; then
+    echo "ERROR: $variable must be a complete sha256 image reference." >&2
+    exit 1
   fi
-  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-$DEFAULT_WEB_IMAGE}"
-  SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-ghcr.io/affromero/sotto-workers-prod}"
-  SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}"
-else
-  # Per-stack image names: the same commit built for two stacks bakes a
-  # different NEXT_PUBLIC_APP_URL, so the images must not share a tag.
-  SOTTO_WEB_IMAGE="${SOTTO_WEB_IMAGE:-${SOTTO_STACK}-web}"
-  SOTTO_WORKERS_IMAGE="${SOTTO_WORKERS_IMAGE:-${SOTTO_STACK}-workers}"
-  SOTTO_WORKER_BASE_IMAGE="${SOTTO_WORKER_BASE_IMAGE:-${SOTTO_STACK}-workers-base:$SOTTO_IMAGE_TAG}"
-  # The workers image builds FROM the locally-tagged base image, which only a
-  # docker-driver builder can see — a docker-container buildx builder resolves
-  # FROM against registries and fails. Pin the default builder for build mode.
-  export BUILDX_BUILDER="${BUILDX_BUILDER:-default}"
+done
+for variable in SOTTO_WEB_IMAGE_BYTES SOTTO_WEB_TRANSFER_BYTES SOTTO_WORKERS_IMAGE_BYTES SOTTO_WORKERS_TRANSFER_BYTES SOTTO_BACKUP_BYTES; do
+  require_env "$variable"
+  if [[ ! "${!variable}" =~ ^[1-9][0-9]{0,14}$ ]]; then
+    echo "ERROR: $variable must contain measured positive bytes from the builder." >&2
+    exit 1
+  fi
+done
+PRODUCTION_CAPACITY_CHECKER="${PRODUCTION_CAPACITY_CHECKER:-/usr/local/lib/production/production_capacity.py}"
+if [ ! -f "$PRODUCTION_CAPACITY_CHECKER" ]; then
+  echo "ERROR: install the reviewed production capacity checker before deployment." >&2
+  exit 1
 fi
 IMAGE_PULL_TIMEOUT="${SOTTO_IMAGE_PULL_TIMEOUT:-600}"
-export SOTTO_IMAGE_TAG SOTTO_WEB_IMAGE SOTTO_WORKERS_IMAGE SOTTO_WORKER_BASE_IMAGE
+SOTTO_BACKUP_DIR="${SOTTO_BACKUP_DIR:-$HOME/.local/state/sotto-backups/$SOTTO_STACK}"
+export SOTTO_BACKUP_DIR
+mkdir -p "$SOTTO_BACKUP_DIR"
+chmod 700 "$SOTTO_BACKUP_DIR"
+backup_capacity=(--backup-path "$SOTTO_BACKUP_DIR" --backup-bytes "$SOTTO_BACKUP_BYTES")
+SOTTO_IMAGE_TAG="$COMMIT_SHA"
+export SOTTO_IMAGE_TAG
+IMAGE_OVERRIDES=$(mktemp -d)
+trap 'rm -rf "$IMAGE_OVERRIDES"' EXIT
+APP_IMAGES="$IMAGE_OVERRIDES/app.json"
+WORKER_IMAGES="$IMAGE_OVERRIDES/workers.json"
+export APP_IMAGES WORKER_IMAGES
+python3 - <<'OVERRIDES'
+import json, os
+with open(os.environ["APP_IMAGES"], "w") as stream:
+    json.dump({"services": {"web": {"image": os.environ["SOTTO_WEB_IMAGE_REF"]}}}, stream)
+with open(os.environ["WORKER_IMAGES"], "w") as stream:
+    json.dump({"services": {name: {"image": os.environ["SOTTO_WORKERS_IMAGE_REF"]} for name in ("workers-heavy", "workers-pipeline", "workers-light")}}, stream)
+OVERRIDES
+
+# Already imported exact digests need no transfer or unpack allocation.
+incoming_images=0
+incoming_transfer=0
+missing_images=()
+for kind in WEB WORKERS; do
+  reference="SOTTO_${kind}_IMAGE_REF"
+  if ! docker image inspect "${!reference}" >/dev/null 2>&1; then
+    image_bytes="SOTTO_${kind}_IMAGE_BYTES"
+    transfer_bytes="SOTTO_${kind}_TRANSFER_BYTES"
+    incoming_images=$((incoming_images + ${!image_bytes}))
+    incoming_transfer=$((incoming_transfer + ${!transfer_bytes}))
+    missing_images+=("${!reference}")
+  fi
+done
+if [ "$incoming_images" -gt 0 ]; then
+  python3 "$PRODUCTION_CAPACITY_CHECKER" before-import \
+    --image-bytes "$incoming_images" --transfer-bytes "$incoming_transfer" "${backup_capacity[@]}"
+  registry_login_if_configured
+  for image in "${missing_images[@]}"; do
+    pull_with_retry "$image" docker pull "$image"
+  done
+else
+  python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch "${backup_capacity[@]}"
+fi
+python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch "${backup_capacity[@]}"
+host_platform=$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')
+for image in "$SOTTO_WEB_IMAGE_REF" "$SOTTO_WORKERS_IMAGE_REF"; do
+  revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
+  if [ "$revision" != "$SOTTO_RELEASE_SHA" ]; then
+    echo "ERROR: imported image revision does not match the committed release." >&2
+    exit 1
+  fi
+  if [ "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" != "$host_platform" ]; then
+    echo "ERROR: imported image platform does not match the serving host." >&2
+    exit 1
+  fi
+done
+
+export PRODUCTION_IMAGE_RETENTION_DIR="${PRODUCTION_IMAGE_RETENTION_DIR:-$HOME/.local/state/production-image-retention}"
+export RETENTION_ATTEMPT_KEY="$(date +%s)-$$"
+python3 scripts/deploy/production-retention.py begin
 
 APP_DOMAIN="$(app_host_from_url "$NEXT_PUBLIC_APP_URL")"
 WWW_DOMAIN="${SOTTO_WWW_DOMAIN:-}"
 CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/${SOTTO_STACK}.conf}"
 
 validate_caddy_host SOTTO_WWW_DOMAIN "$WWW_DOMAIN"
+
+export PREVIOUS_WORKER_IMAGES="$IMAGE_OVERRIDES/previous-workers.json"
+export PREVIOUS_APP_IMAGES="$IMAGE_OVERRIDES/previous-app.json"
+export OLD_SLOT
+python3 - <<'PREVIOUS_IMAGES'
+import json, os, subprocess
+stack = os.environ["SOTTO_STACK"]
+def previous(project, service):
+    ids = subprocess.check_output(["docker", "ps", "-aq", "--filter", "label=com.docker.compose.project=" + project, "--filter", "label=com.docker.compose.service=" + service], text=True).split()
+    if len(ids) > 1:
+        raise SystemExit("Ambiguous previous service containers")
+    return subprocess.check_output(["docker", "inspect", "--format", "{{.Image}}", ids[0]], text=True).strip() if ids else None
+workers = {name: {"image": image} for name in ("workers-heavy", "workers-pipeline", "workers-light") if (image := previous(stack, name))}
+with open(os.environ["PREVIOUS_WORKER_IMAGES"], "w") as stream:
+    json.dump({"services": workers}, stream)
+web = previous(stack + "-" + os.environ["OLD_SLOT"], "web")
+with open(os.environ["PREVIOUS_APP_IMAGES"], "w") as stream:
+    json.dump({"services": {"web": {"image": web}} if web else {}}, stream)
+PREVIOUS_IMAGES
+previous_worker_id=$(python3 -c 'import json,sys; images={item["image"] for item in json.load(open(sys.argv[1]))["services"].values()}; print(next(iter(images)) if len(images)==1 else "")' "$PREVIOUS_WORKER_IMAGES")
+previous_web_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["services"].get("web",{}).get("image",""))' "$PREVIOUS_APP_IMAGES")
+for kind in WEB WORKERS; do
+  tag_variable="SOTTO_${kind}_ROLLBACK_TAG"
+  tag="${!tag_variable:-}"
+  if [ -n "$tag" ]; then
+    if [[ ! "$tag" =~ ^[a-zA-Z0-9][a-zA-Z0-9._:/-]*:[a-zA-Z0-9._-]*rollback[a-zA-Z0-9._-]*$ ]] || ! docker image inspect "$tag" >/dev/null 2>&1; then
+      echo "ERROR: $tag_variable must name an existing rollback tag." >&2
+      exit 1
+    fi
+    if { [ "$kind" = WEB ] && [ -z "$previous_web_id" ]; } || { [ "$kind" = WORKERS ] && [ -z "$previous_worker_id" ]; }; then
+      echo "ERROR: no unique previous image is available for $tag_variable." >&2
+      exit 1
+    fi
+  fi
+done
+schema_hash_script='const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");const root="/app/apps/web/prisma",hash=crypto.createHash("sha256");function add(file){const full=path.join(root,file);if(fs.statSync(full).isDirectory()){for(const name of fs.readdirSync(full).sort())add(path.join(file,name));}else{hash.update(file);hash.update(fs.readFileSync(full));}}add("schema.prisma");if(fs.existsSync(path.join(root,"migrations")))add("migrations");console.log(hash.digest("hex"));'
+candidate_schema=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$schema_hash_script")
+while IFS= read -r previous_image; do
+  [ -z "$previous_image" ] && continue
+  previous_schema=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$schema_hash_script")
+  if [ "$previous_schema" != "$candidate_schema" ]; then
+    echo "ERROR: schema or migration assets differ. Review and deploy the database migration separately." >&2
+    exit 1
+  fi
+done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
+
+WORKERS_CHANGED=false
+CADDY_CHANGED=false
+WEB_STARTED=false
+DEPLOYMENT_COMPLETE=false
+if [ -f "$CADDY_SITE_PATH" ]; then cp "$CADDY_SITE_PATH" "$IMAGE_OVERRIDES/caddy.previous"; fi
+if [ -f "$SLOT_FILE" ]; then cp "$SLOT_FILE" "$IMAGE_OVERRIDES/slot.previous"; fi
+finish_deployment() {
+  local status=$?
+  trap - EXIT
+  set +e
+  if [ "$status" -ne 0 ] && [ "$DEPLOYMENT_COMPLETE" != true ]; then
+    echo "Deployment failed. Restoring the previous services and routing." >&2
+    if [ "$WORKERS_CHANGED" = true ]; then
+      previous_services=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["services"]))' "$PREVIOUS_WORKER_IMAGES")
+      if [ -n "$previous_services" ]; then
+        # Service names come from the fixed allowlist above.
+        docker compose -f "$COMPOSE_WORKERS" -f "$PREVIOUS_WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-build --pull never $previous_services || echo "ERROR: worker rollback failed" >&2
+        sleep 10
+        for service in $previous_services; do
+          container=$(docker compose -f "$COMPOSE_WORKERS" -f "$PREVIOUS_WORKER_IMAGES" -p "$SOTTO_STACK" ps -q "$service")
+          expected_image=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["services"][sys.argv[2]]["image"])' "$PREVIOUS_WORKER_IMAGES" "$service")
+          if [ -z "$container" ] || [ "$(docker inspect --format '{{.State.Running}} {{.State.OOMKilled}} {{.RestartCount}} {{.Image}}' "$container")" != "true false 0 $expected_image" ]; then
+            echo "ERROR: restored worker $service failed runtime or image verification" >&2
+          fi
+        done
+      else
+        docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" stop workers-heavy workers-pipeline workers-light
+      fi
+    fi
+    if [ "$CADDY_CHANGED" = true ]; then
+      if [ -f "$IMAGE_OVERRIDES/caddy.previous" ]; then
+        sudo install -m 0644 "$IMAGE_OVERRIDES/caddy.previous" "$CADDY_SITE_PATH"
+      else
+        sudo rm -f "$CADDY_SITE_PATH"
+      fi
+      sudo caddy validate --config /etc/caddy/Caddyfile && sudo caddy reload --config /etc/caddy/Caddyfile --force || echo "ERROR: routing rollback failed" >&2
+    fi
+    if [ "$OLD_SLOT" != none ]; then
+      if [ "$OLD_SLOT" = blue ]; then export WEB_PORT=$WEB_PORT_BLUE; else export WEB_PORT=$WEB_PORT_GREEN; fi
+      docker compose -f "$COMPOSE_APP" -f "$PREVIOUS_APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" up -d --no-build --pull never web || echo "ERROR: web rollback failed" >&2
+    fi
+    if [ "$WEB_STARTED" = true ]; then
+      docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" down --timeout 10 || echo "ERROR: candidate teardown failed" >&2
+    fi
+    if [ -f "$IMAGE_OVERRIDES/slot.previous" ]; then
+      cp "$IMAGE_OVERRIDES/slot.previous" "$SLOT_FILE.next-$$" && mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
+    else
+      rm -f "$SLOT_FILE"
+    fi
+    if [ "$OLD_SLOT" != none ]; then
+      curl --retry 10 --retry-delay 2 --retry-all-errors -fsS --max-time 10 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health" >/dev/null || echo "ERROR: restored public service failed health verification" >&2
+    fi
+  fi
+  rm -rf "$IMAGE_OVERRIDES"
+  exit "$status"
+}
+trap finish_deployment EXIT
 
 echo "Loaded env file: $ENV_FILE"
 echo "Deploy source:   $SOTTO_IMAGE_SOURCE"
@@ -306,18 +448,13 @@ fi
 
 echo ""
 echo "=== Syncing Caddy config ==="
-TMP_CADDY="$(mktemp)"
+TMP_CADDY="$IMAGE_OVERRIDES/caddy.next"
 render_caddy_config "$APP_DOMAIN" "$WWW_DOMAIN" > "$TMP_CADDY"
 if grep -q "__SOTTO_\|__sotto_" "$TMP_CADDY"; then
   echo "ERROR: rendered Caddy config still contains Sotto placeholders."
   rm -f "$TMP_CADDY"
   exit 1
 fi
-cleanup_stale_caddy_configs "$CADDY_SITE_PATH"
-sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
-rm -f "$TMP_CADDY"
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo caddy reload --config /etc/caddy/Caddyfile --force
 
 # --- Infrastructure ---
 # Shared across all stacks; only the primary stack manages it. A secondary
@@ -337,7 +474,7 @@ else
 
 echo ""
 echo "=== Ensuring infrastructure is running ==="
-docker compose -f "$COMPOSE_INFRA" up -d
+docker compose -f "$COMPOSE_INFRA" up -d --no-build --pull never
 
 echo "Waiting for postgres..."
 for i in $(seq 1 30); do
@@ -393,7 +530,7 @@ docker volume create agent-codex-home >/dev/null
 # created here inherit it, and 0770 so both can create the temp file that the
 # atomic writeback renames into place. Idempotent; runs as root in a throwaway
 # container because the host does not need docker volume internals poked at.
-docker run --rm -v agent-claude-home:/x -v agent-codex-home:/y alpine:3.22 sh -c '
+docker run --rm --pull never -v agent-claude-home:/x -v agent-codex-home:/y alpine:3.22 sh -c '
   chgrp -R 1000 /x /y 2>/dev/null || true
   chmod 2770 /x /y
   find /x /y -type f -exec chmod 660 {} + 2>/dev/null || true
@@ -404,9 +541,9 @@ docker run --rm -v agent-claude-home:/x -v agent-codex-home:/y alpine:3.22 sh -c
 # into the stack-scoped volume shared by those containers.
 echo ""
 echo "=== Syncing host CLI credentials ==="
-docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" up -d --no-build credential-sync
+docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-build --pull never credential-sync
 for i in $(seq 1 15); do
-  if docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" exec -T credential-sync \
+  if docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" exec -T credential-sync \
     test -f /credential-sync/ready >/dev/null 2>&1; then
     echo "CLI credential sync ready"
     break
@@ -418,55 +555,50 @@ for i in $(seq 1 15); do
   sleep 1
 done
 
-# --- Image/cache status ---
-
-echo ""
-echo "=== Docker disk usage before deploy ==="
-docker system df || true
-
-# --- Prepare new slot image ---
-
-echo ""
-echo "=== Preparing $NEW_SLOT slot image ==="
 export WEB_PORT=$NEW_WEB_PORT
-if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
-  registry_login_if_configured
-  pull_with_retry "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG" \
-    docker pull "$SOTTO_WEB_IMAGE:$SOTTO_IMAGE_TAG"
-else
-  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" build web
-fi
-
-# Prepare the worker image before migrations so the Prisma CLI comes from the
-# pinned workspace install, not an npx network fallback.
-echo ""
-echo "=== Preparing migration runner ==="
-if [ "$SOTTO_IMAGE_SOURCE" = "registry" ]; then
-  pull_with_retry "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG" \
-    docker pull "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG"
-else
-  docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .
-  # Build directly (not via compose): the workers image FROMs the local base
-  # tag above, and compose's build path does not reliably honor BUILDX_BUILDER,
-  # falling back to a container-driver builder that cannot see local images.
-  docker build -f apps/web/Dockerfile.workers \
-    --build-arg WORKER_BASE_IMAGE="$SOTTO_WORKER_BASE_IMAGE" \
-    -t "$SOTTO_WORKERS_IMAGE:$SOTTO_IMAGE_TAG" .
-fi
 
 # --- Database migrations ---
 
+echo "=== Backing up the application database ==="
+database_url="${DIRECT_DATABASE_URL:-$DATABASE_URL}"
+database_bytes=$(printf '%s\n' "$database_url" | docker exec -i sotto-prod-postgres sh -ec 'IFS= read -r PGDATABASE; export PGDATABASE; exec psql -Atc "SELECT pg_database_size(current_database())"')
+if [[ ! "$database_bytes" =~ ^[0-9]+$ ]] || [ "$database_bytes" -gt "$SOTTO_BACKUP_BYTES" ]; then
+  echo "ERROR: database size exceeds the measured backup allowance." >&2
+  exit 1
+fi
+python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch "${backup_capacity[@]}"
+backup_file="$SOTTO_BACKUP_DIR/${SOTTO_RELEASE_SHA}-${RETENTION_ATTEMPT_KEY}.dump"
+umask 077
+printf '%s\n' "$database_url" | docker exec -i sotto-prod-postgres sh -ec 'IFS= read -r PGDATABASE; export PGDATABASE; exec pg_dump --format=custom' > "$backup_file.partial"
+test -s "$backup_file.partial"
+docker exec -i sotto-prod-postgres pg_restore --file=/dev/null < "$backup_file.partial"
+mv "$backup_file.partial" "$backup_file"
+sha256sum "$backup_file" > "$backup_file.sha256"
+python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch
+
 echo ""
 echo "=== Running database migrations ==="
-docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" run --rm --no-deps \
+docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   workers-heavy npx --no-install prisma migrate deploy --config=/app/prisma.config.ts
 
 # --- Start new slot ---
 
+# Pin legacy dual-slot routing to the current service before starting a candidate.
+if [ "$OLD_SLOT" != none ]; then
+  if [ "$OLD_SLOT" = blue ]; then old_web_port=$WEB_PORT_BLUE; else old_web_port=$WEB_PORT_GREEN; fi
+  ( NEW_WEB_PORT=$old_web_port; render_caddy_config "$APP_DOMAIN" "$WWW_DOMAIN" ) > "$IMAGE_OVERRIDES/caddy.current"
+  CADDY_CHANGED=true
+  sudo install -m 0644 "$IMAGE_OVERRIDES/caddy.current" "$CADDY_SITE_PATH"
+  sudo caddy validate --config /etc/caddy/Caddyfile
+  sudo caddy reload --config /etc/caddy/Caddyfile --force
+  curl -fsS --max-time 15 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health" >/dev/null
+fi
+
 echo ""
 echo "=== Starting $NEW_SLOT slot ==="
-docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" up -d --no-build web
+WEB_STARTED=true
+docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" up -d --no-build --pull never web
 
 # --- Health check new slot ---
 
@@ -479,14 +611,14 @@ for i in $(seq 1 $((HEALTH_TIMEOUT / 5))); do
     LIVE_VERSION=$(echo "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
     [ -z "$LIVE_VERSION" ] && LIVE_VERSION="unknown"
     if [ "$LIVE_VERSION" = "$COMMIT_SHA" ]; then
-      echo "Web health check passed — version $LIVE_VERSION (attempt $i)"
+      echo "Web health check passed: version $LIVE_VERSION (attempt $i)"
       HEALTH_OK=true
       break
     else
-      echo "Attempt $i — healthy but serving $LIVE_VERSION, expected $COMMIT_SHA"
+      echo "Attempt $i: healthy but serving $LIVE_VERSION, expected $COMMIT_SHA"
     fi
   else
-    echo "Attempt $i — not ready yet"
+    echo "Attempt $i: not ready yet"
   fi
   sleep 5
 done
@@ -497,10 +629,10 @@ if [ "$HEALTH_OK" = false ]; then
   echo "Expected version: $COMMIT_SHA"
   echo ""
   echo "=== Web logs ==="
-  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" logs --tail=50 web
+  docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" logs --tail=50 web
   echo ""
   echo "=== Tearing down failed $NEW_SLOT slot ==="
-  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${NEW_SLOT}" down --timeout 10
+  docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" down --timeout 10
   echo "Old slot ($OLD_SLOT) still serving traffic"
   exit 1
 fi
@@ -513,15 +645,34 @@ BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 
 # --- Restart workers ---
 # Workers are stateless BullMQ consumers; jobs are durable in Redis.
-# No drain needed — restart immediately with new code.
+# No drain needed. Restart immediately with new code.
 
 echo ""
 echo "=== Restarting workers ==="
 echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESET_PIPELINE:-full} light=${WORKER_PRESET_LIGHT:-full}"
-docker compose -f "$COMPOSE_WORKERS" -p "$SOTTO_STACK" up -d --force-recreate --no-build
+WORKERS_CHANGED=true
+docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --force-recreate --no-build --pull never
+sleep 10
+for service in workers-heavy workers-pipeline workers-light; do
+  container=$(docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" ps -q "$service")
+  if [ -z "$container" ] || [ "$(docker inspect --format '{{.State.Running}} {{.State.OOMKilled}} {{.RestartCount}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$container")" != "true false 0 $SOTTO_RELEASE_SHA" ]; then
+    echo "ERROR: $service did not remain healthy on the expected release." >&2
+    exit 1
+  fi
+done
+
+CADDY_CHANGED=true
+sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo caddy reload --config /etc/caddy/Caddyfile --force
+public_health=$(curl -fsS --max-time 15 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health")
+if [ "$(printf '%s' "$public_health" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version", ""))')" != "$SOTTO_RELEASE_SHA" ]; then
+  echo "ERROR: public routing did not select the healthy candidate." >&2
+  exit 1
+fi
 
 # --- Stop old slot ---
-# Workers are already out of app compose — no job drain needed here.
+# Workers are already out of app compose. No job drain needed here.
 
 if [ "$OLD_SLOT" != "none" ]; then
   echo ""
@@ -529,23 +680,35 @@ if [ "$OLD_SLOT" != "none" ]; then
 
   # Determine old slot ports for env
   if [ "$OLD_SLOT" = "blue" ]; then
-    export WEB_PORT=3000
+    export WEB_PORT=$WEB_PORT_BLUE
   else
-    export WEB_PORT=3010
+    export WEB_PORT=$WEB_PORT_GREEN
   fi
 
-  docker compose -f "$COMPOSE_APP" -p "${SOTTO_STACK}-${OLD_SLOT}" down --timeout 10
+  docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" down --timeout 10
 fi
 
 # --- Save state ---
 
-echo "$NEW_SLOT" > "$SLOT_FILE"
+public_health=$(curl -fsS --max-time 15 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health")
+if [ "$(printf '%s' "$public_health" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version", ""))')" != "$SOTTO_RELEASE_SHA" ]; then
+  echo "ERROR: public health did not report the deployed release." >&2
+  exit 1
+fi
+echo "$NEW_SLOT" > "$SLOT_FILE.next-$$"
+mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
 echo ""
 echo "=== Saved active slot: $NEW_SLOT ==="
 
 # --- Cleanup ---
 
 echo ""
+python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch
+python3 scripts/deploy/production-retention.py success
+DEPLOYMENT_COMPLETE=true
+python3 scripts/deploy/production-retention.py backups-success
+if [ -n "${SOTTO_WORKERS_ROLLBACK_TAG:-}" ]; then docker tag "$previous_worker_id" "$SOTTO_WORKERS_ROLLBACK_TAG"; fi
+if [ -n "${SOTTO_WEB_ROLLBACK_TAG:-}" ]; then docker tag "$previous_web_id" "$SOTTO_WEB_ROLLBACK_TAG"; fi
 echo "Images and build cache retained. Run host maintenance separately with rollback protection."
 
 echo ""

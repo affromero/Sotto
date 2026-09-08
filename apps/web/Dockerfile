@@ -17,7 +17,7 @@ COPY packages/learning-model/package.json ./packages/learning-model/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
-RUN npx prisma generate --schema=apps/web/prisma/schema.prisma
+RUN npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
 
 # ---- Stage 2: Build the application ----
 FROM node:22-alpine AS builder
@@ -36,7 +36,7 @@ COPY tsconfig.base.json ./
 # which is gitignored on the host (so the apps/web COPY above omitted it).
 # Regenerate it here, against the schema + node_modules already present, so
 # `next build` can resolve @/generated/prisma/client.
-RUN npx prisma generate --schema=apps/web/prisma/schema.prisma
+RUN npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
 
 ARG COMMIT_SHA=dev
 ARG NEXT_PUBLIC_APP_URL
@@ -56,7 +56,7 @@ RUN apk add --no-cache libc6-compat openssl openssh-client
 # Pin executable tooling so rebuilding a release cannot silently change it.
 ARG CLAUDE_CODE_VERSION=2.1.225
 ARG CODEX_VERSION=0.144.6
-RUN npm install -g \
+RUN --mount=type=cache,target=/root/.npm npm install -g \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}"
 
@@ -80,6 +80,7 @@ RUN mkdir -p /app/apps/web/.sotto/storage && chown -R sotto:sotto /app/apps/web/
 ENV HOME=/home/sotto
 
 ARG COMMIT_SHA=dev
+LABEL org.opencontainers.image.revision=${COMMIT_SHA}
 ENV COMMIT_SHA=${COMMIT_SHA}
 
 # Standalone output mirrors monorepo structure (apps/web/server.js + node_modules/)
@@ -102,7 +103,6 @@ COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
 # Copy Prisma schema and generated client for runtime
 COPY --from=builder --chown=sotto:sotto /app/apps/web/prisma ./apps/web/prisma
 COPY --from=builder --chown=sotto:sotto /app/apps/web/src/generated ./apps/web/src/generated
-COPY --from=deps --chown=sotto:sotto /app/node_modules/@prisma ./node_modules/@prisma
 
 USER sotto
 

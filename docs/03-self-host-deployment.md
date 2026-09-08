@@ -1,6 +1,6 @@
 # Self-Host Deployment Guide
 
-**Date:** 2026-06-13
+**Date:** 2026-09-08
 
 **Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private episode storage, and no hosted Sotto services.
 
@@ -147,22 +147,32 @@ cd ~/sotto
 SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
 ```
 
-The default deploy path uses `SOTTO_IMAGE_SOURCE=build`, which builds the web and worker images on your server. Keep that default for self-hosted deployments because `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` are baked into the browser bundle during `next build`. Worker runtime dependencies are built into a local `SOTTO_WORKER_BASE_IMAGE` first so later deploys can reuse the slow apt, Playwright, yt-dlp, and CLI layers.
+Production deployment uses `SOTTO_IMAGE_SOURCE=registry` and rejects server builds. Build the web and worker images on a separate machine or CI runner. The web image must include your `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` at build time. Local development and the OSS installer keep their existing compose workflows.
 
-Operators with their own CI-built images can opt into registry mode by setting `SOTTO_IMAGE_SOURCE=registry`, `SOTTO_WEB_IMAGE`, `SOTTO_WORKERS_IMAGE`, and `SOTTO_IMAGE_TAG`. Registry images must be built for the same public URL and VAPID public key as the target server. The deploy script waits up to `SOTTO_IMAGE_PULL_TIMEOUT` seconds for the selected image tag before failing. In the upstream maintainer workflow, set repository variables `SOTTO_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` before using registry mode; production image publication is skipped when `SOTTO_PUBLIC_APP_URL` is missing.
+Set `SOTTO_RELEASE_SHA` to the full committed checkout SHA and provide complete digest references in `SOTTO_WEB_IMAGE_REF` and `SOTTO_WORKERS_IMAGE_REF`. Both images must carry that revision in the `org.opencontainers.image.revision` label. Supply measured positive byte counts from the builder: `SOTTO_WEB_IMAGE_BYTES`, `SOTTO_WEB_TRANSFER_BYTES`, `SOTTO_WORKERS_IMAGE_BYTES`, and `SOTTO_WORKERS_TRANSFER_BYTES`. Expanded image sizes and compressed transfer sizes are separate inputs. The checkout and submodules must be clean and match the selected release; the script does not pull a moving branch.
+
+Install your reviewed shared-host capacity checker before using this production script. `PRODUCTION_CAPACITY_CHECKER` defaults to `/usr/local/lib/production/production_capacity.py`. Its `before-import` command receives `--image-bytes` and `--transfer-bytes`; `before-switch` checks remaining capacity after imports. A missing checker or rejected allocation stops deployment. Use a policy that reserves at least 10 GiB, rejects disk or inode usage at 85%, and requires 100,000 free inodes. The script holds `/var/lock/production-build.lock` through health verification. Preinstall any required infrastructure/helper images through the same admission process; service commands cannot pull unbudgeted images.
+
+Provide `SOTTO_BACKUP_BYTES` as a measured allowance for the database archive. The checker reserves that allocation alongside absent images; exact digests already present need no import budget. `SOTTO_BACKUP_DIR` defaults to `$HOME/.local/state/sotto-backups/$SOTTO_STACK`. Before migrations, the script checks database size, creates a custom-format `pg_dump`, reads the full archive with `pg_restore` without restoring a database, and retains its checksum. Completed deployments retain the newest ten successful backups and all backups younger than thirty days, including the current and previous deployment. Cleanup removes only older backups with matching success metadata and checksums. Failed, unmarked, malformed, and symlinked backups remain for review.
+
+Existing-stack deployments require identical Prisma schema and migration assets between current and candidate workers. Handle schema changes through a separately reviewed migration procedure. For these code-only releases, a failed candidate restores prior worker images and Caddy routing before retiring the old web slot. Public routing is switched to the verified candidate and checked while the previous slot remains available.
+
+Rollback protection records live in `PRODUCTION_IMAGE_RETENTION_DIR`, defaulting to `$HOME/.local/state/production-image-retention`. Each attempt protects its incoming and existing image IDs before service changes. Success retains the new images and pre-deploy images; failed-attempt records remain until reviewed maintenance retires them. Deployment does not prune images, build caches or volumes.
+
+If your host already uses rollback tags, set `SOTTO_WORKERS_ROLLBACK_TAG` and `SOTTO_WEB_ROLLBACK_TAG` to those exact existing references. After successful health verification, the script updates them to the captured pre-deploy image IDs. Failed deployments leave those tags unchanged.
 
 The deploy script:
 
-1. pulls the latest `main`;
+1. verifies the exact committed release and acquires the shared lock;
 2. copies `.env.production` to `.env` for Docker Compose;
-3. renders and validates Caddy;
-4. starts infra services from `docker-compose.infra.yml`;
-5. builds or pulls the inactive app slot from `docker-compose.app.yml`;
-6. runs Prisma schema sync;
+3. admits the measured image budget, pulls verified digests and rechecks capacity;
+4. records rollback image protection and validates Caddy;
+5. starts existing infra images from `docker-compose.infra.yml`;
+6. runs Prisma migrations using the verified worker image;
 7. health-checks the new web slot;
 8. runs `scripts/smoke-prod.sh`;
 9. restarts workers from the prepared `docker-compose.workers.yml` image;
-10. stops the previous app slot.
+10. stops the previous app slot and records successful image retention after final capacity verification.
 
 ## 7. Verify
 

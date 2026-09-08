@@ -22,6 +22,9 @@ jobs:
   ci:
     if: github.repository == 'affromero/Sotto'
     name: CI Checks
+    outputs:
+      base_digest: ${{ steps.worker_base.outputs.digest }}
+      publish: ${{ steps.production_image_env.outputs.publish }}
     runs-on: ubuntu-latest
     # `next build` statically generates /_not-found, which resolves absolute
     # Sotto URLs at build time and throws without this. ci.yml sets the same.
@@ -37,7 +40,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx prisma generate --schema=apps/web/prisma/schema.prisma
+      - run: npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
       - run: npm run ci
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
@@ -49,33 +52,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Decide whether to rebuild worker base
-        id: worker_base
-        run: |
-          set -euo pipefail
-          before="${{ github.event.before }}"
-          build_base=false
-          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
-            build_base=true
-          elif ! git diff --quiet "$before" "$GITHUB_SHA" -- apps/web/Dockerfile.workers-base; then
-            build_base=true
-          elif ! docker manifest inspect ghcr.io/affromero/sotto-workers-base:node22 >/dev/null 2>&1; then
-            build_base=true
-          fi
-          echo "build=$build_base" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push worker base
-        if: steps.worker_base.outputs.build == 'true'
+      - name: Build worker base candidate
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile.workers-base
-          push: true
+          load: true
           tags: |
-            ghcr.io/affromero/sotto-workers-base:node22
             ghcr.io/affromero/sotto-workers-base:${{ github.sha }}
+            ghcr.io/affromero/sotto-workers-base:node22
           cache-from: type=gha,scope=sotto-workers-base
           cache-to: type=gha,mode=max,scope=sotto-workers-base
+
+      - name: Verify and publish worker base
+        id: worker_base
+        run: |
+          set -euo pipefail
+          base="ghcr.io/affromero/sotto-workers-base:${{ github.sha }}"
+          bash scripts/deploy/smoke-worker-base.sh "$base"
+          docker push "$base"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$base")
+          echo "digest=${reference##*@}" >> "$GITHUB_OUTPUT"
+          docker push ghcr.io/affromero/sotto-workers-base:node22
 
       - name: Validate production image env
         id: production_image_env
@@ -91,13 +89,13 @@ jobs:
           SOTTO_PUBLIC_APP_URL: ${{ vars.SOTTO_PUBLIC_APP_URL }}
           SOTTO_PERSONAL_APP_URL: ${{ vars.SOTTO_PERSONAL_APP_URL }}
 
-      - name: Build and push showcase web image
+      - name: Build showcase web candidate
         if: steps.production_image_env.outputs.publish == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile
-          push: true
+          load: true
           build-args: |
             COMMIT_SHA=${{ github.sha }}
             NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PUBLIC_APP_URL }}
@@ -107,13 +105,19 @@ jobs:
           cache-from: type=gha,scope=sotto-web-prod
           cache-to: type=gha,mode=max,scope=sotto-web-prod
 
-      - name: Build and push personal web image
+      - name: Verify and publish showcase web
+        if: steps.production_image_env.outputs.publish == 'true'
+        run: |
+          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
+          docker push ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
+
+      - name: Build personal web candidate
         if: steps.production_image_env.outputs.publish == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile
-          push: true
+          load: true
           build-args: |
             COMMIT_SHA=${{ github.sha }}
             NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PERSONAL_APP_URL }}
@@ -123,23 +127,39 @@ jobs:
           cache-from: type=gha,scope=sotto-web-personal-prod
           cache-to: type=gha,mode=max,scope=sotto-web-personal-prod
 
-      - name: Reclaim runner disk before worker image
+      - name: Verify and publish personal web
         if: steps.production_image_env.outputs.publish == 'true'
         run: |
-          docker buildx prune --all --force
-          docker system prune --all --force
-          df -h /
+          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }}
+          docker push ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }}
 
-      - name: Build and push production worker image
-        if: steps.production_image_env.outputs.publish == 'true'
+  workers:
+    needs: ci
+    if: needs.ci.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build production worker candidate
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: apps/web/Dockerfile.workers
-          push: true
+          load: true
           build-args: |
-            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base:node22
-          tags: |
-            ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
+            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base@${{ needs.ci.outputs.base_digest }}
+            COMMIT_SHA=${{ github.sha }}
+          tags: ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
           cache-from: type=gha,scope=sotto-workers-prod
           cache-to: type=gha,mode=max,scope=sotto-workers-prod
+      - name: Verify worker runtime before publication
+        run: bash scripts/deploy/smoke-worker-image.sh ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
+      - name: Publish verified worker
+        run: docker push ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}

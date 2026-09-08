@@ -7,7 +7,7 @@ FROM node:22-slim
 
 ARG YT_DLP_VERSION=2026.06.09
 ARG YT_DLP_SHA256=e5d57466682cfa9d61e9cf7c8a4f09b00f4a62af37d3bbdc4bcffdf63615feac
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl openssh-client ffmpeg libchromaprint-tools python3 python3-pip wget \
     && wget -qO /usr/local/bin/yt-dlp \
         "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" \
@@ -16,12 +16,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN npx playwright@1.61.0 install --with-deps chromium
+COPY package-lock.json /tmp/playwright-package-lock.json
+RUN --mount=type=cache,target=/root/.npm \
+    PLAYWRIGHT_VERSION="$(node -p 'require("/tmp/playwright-package-lock.json").packages["node_modules/playwright"].version')" \
+    && npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /tmp/playwright-package-lock.json
 
 # Pin executable tooling so rebuilding a release cannot silently change it.
 ARG CLAUDE_CODE_VERSION=2.1.225
 ARG CODEX_VERSION=0.144.6
-RUN npm install -g \
+RUN --mount=type=cache,target=/root/.npm npm install -g \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}"
 
