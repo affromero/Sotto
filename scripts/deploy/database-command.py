@@ -1,6 +1,7 @@
 """Run PostgreSQL backup commands without exposing passwords in process arguments."""
 
 import argparse
+import os
 import subprocess
 import sys
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
@@ -40,7 +41,12 @@ def main():
     payload = connection_input(sys.stdin.read().rstrip('\n'))
     command = 'psql --no-psqlrc --dbname="$connection" -Atc "SELECT pg_database_size(current_database())"' if args.operation == 'size' else 'pg_dump --dbname="$connection" --format=custom'
     script = 'IFS= read -r PGPASSWORD; export PGPASSWORD; IFS= read -r connection; exec ' + command
-    return subprocess.run(['docker', 'exec', '-i', args.container, 'sh', '-ec', script], input=payload).returncode
+    try:
+        os.fstat(9)
+        lock_fds = (9,)
+    except OSError:
+        lock_fds = ()
+    return subprocess.run(['docker', 'exec', '-i', args.container, 'sh', '-ec', script], input=payload, pass_fds=lock_fds).returncode
 
 
 if __name__ == '__main__':

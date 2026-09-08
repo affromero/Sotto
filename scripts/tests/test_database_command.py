@@ -1,9 +1,12 @@
 """Connection handling and opt-in real PostgreSQL backup verification."""
 
 import importlib.util
+import fcntl
 import os
 from pathlib import Path
 import subprocess
+import signal
+import tempfile
 import time
 import unittest
 import uuid
@@ -26,6 +29,52 @@ class ConnectionTests(unittest.TestCase):
         for url in ('postgres://u:p@host/db?password=q', 'postgres://u:p%0Ass@host/db', 'postgres://u:p\tss@host/db'):
             with self.assertRaises(ValueError):
                 module.connection_input(url)
+
+    def test_database_child_keeps_lock_after_helper_is_killed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock = root / 'lock'
+            child_pid = root / 'child.pid'
+            release = root / 'release'
+            child_released = False
+            docker = root / 'docker'
+            docker.write_text('#!/usr/bin/env python3\nimport os,time\nfrom pathlib import Path\nPath(os.environ["CHILD_PID"]).write_text(str(os.getpid()))\nwhile not Path(os.environ["CHILD_RELEASE"]).exists(): time.sleep(0.02)\n')
+            docker.chmod(0o755)
+            launch = 'exec 9>"$1"; python3 -c \'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)\'; exec python3 "$2" size'
+            process = subprocess.Popen(['bash', '-c', launch, 'bash', str(lock), str(HELPER)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                       env={**os.environ, 'PATH': directory + os.pathsep + os.environ['PATH'], 'CHILD_PID': str(child_pid), 'CHILD_RELEASE': str(release)})
+            try:
+                process.stdin.write(b'postgresql://fixture@localhost/db\n')
+                process.stdin.close()
+                deadline = time.monotonic() + 10
+                while not child_pid.exists() and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(child_pid.exists(), 'Database child did not start')
+                process.kill()
+                process.wait(timeout=5)
+                with lock.open('w') as stream:
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    release.touch()
+                    deadline = time.monotonic() + 10
+                    while True:
+                        try:
+                            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            child_released = True
+                            break
+                        except BlockingIOError:
+                            if time.monotonic() >= deadline:
+                                self.fail('Lock remained held after database child exited')
+                            time.sleep(0.02)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+                if child_pid.exists() and not child_released:
+                    try:
+                        os.kill(int(child_pid.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
 
 @unittest.skipUnless(os.environ.get('SOTTO_TEST_POSTGRES') == '1', 'Set SOTTO_TEST_POSTGRES=1 for disposable Docker PostgreSQL integration')
