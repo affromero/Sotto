@@ -76,7 +76,7 @@ if args[0] == 'inspect':
 if args[0] == 'run': finish('different' if mode == 'schema' and old in args else 'same')
 if args[0] == 'exec':
     script = args[-1]
-    if 'pg_database_size' in script: finish('1024')
+    if 'pg_database_size' in script: finish('1024', code=1 if mode == 'backup' else 0)
     if 'pg_dump' in script: finish('verified fixture dump')
     finish()
 if args[0] in ('volume', 'tag'): finish()
@@ -90,7 +90,9 @@ if 'up' in args:
     if project.endswith('-green'):
         state['web'] = new
         state['premature_route'] = 'localhost:3010' in (root / 'caddy.conf').read_text()
-    if project.endswith('-blue'): state['old_web'] = old
+    if project.endswith('-blue'):
+        state['old_web'] = old
+        state['old_web_recreated'] = True
     if 'workers-heavy' in config.get('services', {}) and ('--force-recreate' in args or 'workers-heavy' in args):
         image = config['services']['workers-heavy']['image']
         state['workers'] = old if image == old else new
@@ -105,7 +107,7 @@ class DeploymentFailureTests(unittest.TestCase):
             root = Path(directory)
             source = Path(__file__).parents[2]
             (root / 'scripts/deploy').mkdir(parents=True)
-            for name in ('deploy.sh', 'deploy/production-retention.py', 'smoke-prod.sh'):
+            for name in ('deploy.sh', 'deploy/production-retention.py', 'deploy/database-command.py', 'smoke-prod.sh'):
                 shutil.copyfile(source / 'scripts' / name, root / 'scripts' / name)
             shutil.copyfile(source / 'Caddyfile', root / 'Caddyfile')
             (root / '.sotto-test-deploy-slot').write_text('blue\n')
@@ -148,6 +150,11 @@ class DeploymentFailureTests(unittest.TestCase):
         state, output = self.run_deployment('pre-capacity')
         self.assertEqual(state['capacity'], 1, output)
         self.assertFalse(state['pulled'], output)
+
+    def test_backup_failure_preserves_the_running_web_container(self):
+        state, output = self.run_deployment('backup')
+        self.assertIn('Backing up the application database', output)
+        self.assertFalse(state.get('old_web_recreated', False), output)
 
     def test_capacity_rejection_after_import_keeps_current_services(self):
         state, output = self.run_deployment('post-capacity')

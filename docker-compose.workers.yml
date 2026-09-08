@@ -116,6 +116,11 @@ services:
   credential-sync:
     image: alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '3'
     network_mode: none
     read_only: true
     security_opt:

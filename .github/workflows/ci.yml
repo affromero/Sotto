@@ -8,6 +8,7 @@ on:
     paths:
       - 'apps/web/**'
       - 'packages/**'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/ci.yml'
@@ -43,3 +44,8 @@ jobs:
 
       - name: Run repository CI
         run: npm run ci
+
+      - name: Verify PostgreSQL backup and restore
+        env:
+          SOTTO_TEST_POSTGRES: '1'
+        run: python3 -m unittest discover -s scripts/tests -p test_database_command.py
