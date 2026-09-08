@@ -377,6 +377,7 @@ done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for 
 WORKERS_CHANGED=false
 CADDY_CHANGED=false
 WEB_STARTED=false
+OLD_SLOT_STOPPED=false
 DEPLOYMENT_COMPLETE=false
 if [ -f "$CADDY_SITE_PATH" ]; then cp "$CADDY_SITE_PATH" "$IMAGE_OVERRIDES/caddy.previous"; fi
 if [ -f "$SLOT_FILE" ]; then cp "$SLOT_FILE" "$IMAGE_OVERRIDES/slot.previous"; fi
@@ -411,7 +412,7 @@ finish_deployment() {
       fi
       sudo caddy validate --config /etc/caddy/Caddyfile && sudo caddy reload --config /etc/caddy/Caddyfile --force || echo "ERROR: routing rollback failed" >&2
     fi
-    if [ "$OLD_SLOT" != none ]; then
+    if [ "$OLD_SLOT_STOPPED" = true ]; then
       if [ "$OLD_SLOT" = blue ]; then export WEB_PORT=$WEB_PORT_BLUE; else export WEB_PORT=$WEB_PORT_GREEN; fi
       docker compose -f "$COMPOSE_APP" -f "$PREVIOUS_APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" up -d --no-build --pull never web || echo "ERROR: web rollback failed" >&2
     fi
@@ -561,7 +562,7 @@ export WEB_PORT=$NEW_WEB_PORT
 
 echo "=== Backing up the application database ==="
 database_url="${DIRECT_DATABASE_URL:-$DATABASE_URL}"
-database_bytes=$(printf '%s\n' "$database_url" | docker exec -i sotto-prod-postgres sh -ec 'IFS= read -r PGDATABASE; export PGDATABASE; exec psql -Atc "SELECT pg_database_size(current_database())"')
+database_bytes=$(printf '%s\n' "$database_url" | python3 scripts/deploy/database-command.py size)
 if [[ ! "$database_bytes" =~ ^[0-9]+$ ]] || [ "$database_bytes" -gt "$SOTTO_BACKUP_BYTES" ]; then
   echo "ERROR: database size exceeds the measured backup allowance." >&2
   exit 1
@@ -569,7 +570,7 @@ fi
 python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch "${backup_capacity[@]}"
 backup_file="$SOTTO_BACKUP_DIR/${SOTTO_RELEASE_SHA}-${RETENTION_ATTEMPT_KEY}.dump"
 umask 077
-printf '%s\n' "$database_url" | docker exec -i sotto-prod-postgres sh -ec 'IFS= read -r PGDATABASE; export PGDATABASE; exec pg_dump --format=custom' > "$backup_file.partial"
+printf '%s\n' "$database_url" | python3 scripts/deploy/database-command.py dump > "$backup_file.partial"
 test -s "$backup_file.partial"
 docker exec -i sotto-prod-postgres pg_restore --file=/dev/null < "$backup_file.partial"
 mv "$backup_file.partial" "$backup_file"
@@ -685,6 +686,7 @@ if [ "$OLD_SLOT" != "none" ]; then
     export WEB_PORT=$WEB_PORT_GREEN
   fi
 
+  OLD_SLOT_STOPPED=true
   docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" down --timeout 10
 fi
 
