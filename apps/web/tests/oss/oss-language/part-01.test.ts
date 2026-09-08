@@ -519,7 +519,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(deploySource).toContain(
       'docker build -f apps/web/Dockerfile.workers-base -t "$SOTTO_WORKER_BASE_IMAGE" .'
     );
-    expect(deploySource).toContain('SOTTO_DEPLOY_CLEAN_BUILDER');
+    expect(deploySource).not.toMatch(/docker\s+(?:image|builder|buildx|system)\s+prune\b/);
     expect(appComposeSource).toContain(
       'image: ${SOTTO_WEB_IMAGE:-sotto-web}:${SOTTO_IMAGE_TAG:-local}'
     );

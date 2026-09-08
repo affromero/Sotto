@@ -546,13 +546,7 @@ echo "=== Saved active slot: $NEW_SLOT ==="
 # --- Cleanup ---
 
 echo ""
-echo "=== Cleaning up old images ==="
-docker image prune -af --filter "until=168h" || true
-if [ "${SOTTO_DEPLOY_CLEAN_BUILDER:-0}" = "1" ]; then
-  docker builder prune -af --filter "until=168h" || true
-else
-  echo "Builder cache retained. Set SOTTO_DEPLOY_CLEAN_BUILDER=1 to prune old builder cache."
-fi
+echo "Images and build cache retained. Run host maintenance separately with rollback protection."
 
 echo ""
 echo "=== Deploy complete ==="
