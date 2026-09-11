@@ -20,21 +20,68 @@ SOTTO_REPOSITORY="${SOTTO_REPOSITORY:-affromero/Sotto}"
 SOTTO_REF="${SOTTO_REF:-main}"
 SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-latest}"
 RAW_BASE="${SOTTO_RAW_BASE:-https://raw.githubusercontent.com/${SOTTO_REPOSITORY}/${SOTTO_REF}}"
-WEB_PORT="${WEB_PORT:-3000}"
+existing_env_value() {
+  local key=$1 value
+  [ -f "$SOTTO_DIR/.env" ] || return 0
+  value=$(sed -n "s/^${key}=//p" "$SOTTO_DIR/.env" | tail -n 1)
+  case "$value" in
+    \"*\") value=${value:1:${#value}-2} ;;
+    \'*\') value=${value:1:${#value}-2}; value=${value//\\\'/\'} ;;
+  esac
+  printf '%s' "$value"
+}
+EXISTING_WEB_PORT=$(existing_env_value WEB_PORT)
+WEB_PORT="${WEB_PORT:-${EXISTING_WEB_PORT:-3000}}"
+[[ "$WEB_PORT" =~ ^[0-9]+$ ]] && [ "$WEB_PORT" -ge 1 ] && [ "$WEB_PORT" -le 65535 ] || fail "WEB_PORT must be a number between 1 and 65535."
+
+# A failed download, pull, or configuration prompt must not modify an install.
+INSTALL_DIR="$SOTTO_DIR"
+STAGING_DIR=""
+SECRET_INPUT_ACTIVE=0
+cleanup() {
+  if [ "$SECRET_INPUT_ACTIVE" = 1 ]; then stty echo < /dev/tty || true; fi
+  [ -z "${INSTALL_LOCK_DIR:-}" ] || rmdir "$INSTALL_LOCK_DIR"
+  [ -z "$STAGING_DIR" ] || rm -rf "$STAGING_DIR"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Read a prompt from the real terminal so it works through `curl | bash`.
-ask() { local __var=$1 __prompt=$2 __default=${3:-} __reply; printf "%b" "$__prompt" > /dev/tty; read -r __reply < /dev/tty || true; printf -v "$__var" '%s' "${__reply:-$__default}"; }
+ask() {
+  local __var=$1 __prompt=$2 __default=${3:-} __reply __setting="SOTTO_$1"
+  if [ "${SOTTO_YES:-}" = 1 ]; then
+    printf -v "$__var" '%s' "${!__setting:-$__default}"
+    return
+  fi
+  printf "%b" "$__prompt" > /dev/tty
+  read -r __reply < /dev/tty || true
+  printf -v "$__var" '%s' "${__reply:-$__default}"
+}
 ask_secret() {
   local __var=$1 __prompt=$2 __reply
+  if [ "${SOTTO_YES:-}" = 1 ]; then
+    local __setting="SOTTO_$1"
+    printf -v "$__var" '%s' "${!__setting:-}"
+    return
+  fi
   printf "%b" "$__prompt" > /dev/tty
+  SECRET_INPUT_ACTIVE=1
   stty -echo < /dev/tty
   read -r __reply < /dev/tty || true
   stty echo < /dev/tty
+  SECRET_INPUT_ACTIVE=0
   printf "\n" > /dev/tty
   printf -v "$__var" '%s' "$__reply"
 }
 
 gen_secret() { openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+dotenv_quote() {
+  local value=$1
+  [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || fail "Configuration values cannot contain line breaks."
+  value=${value//\'/\\\'}
+  printf "'%s'" "$value"
+}
 
 # ---------------------------------------------------------------------------
 # 0. Transparency + consent
@@ -59,11 +106,24 @@ elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose";
 else fail "Docker Compose v2 is required.\n  Install: ${BOLD}https://docs.docker.com/compose/install/${RESET}"; fi
 ok "Docker is ready ($DC)."
 
+info "Checking the published Sotto images..."
+STAGING_DIR=$(mktemp -d)
+curl -fsSL "$RAW_BASE/scripts/selfhost/images.sh" -o "$STAGING_DIR/images.sh" || fail "Could not download the image verification helper."
+. "$STAGING_DIR/images.sh"
+acquire_install_lock "$INSTALL_DIR" || fail "Installation is locked. Configuration has not changed."
+revision=$(resolve_images "$SOTTO_IMAGE_TAG") || fail "The public images are unavailable. Your existing configuration has not changed."
+SOTTO_IMAGE_TAG="${revision:0:8}"
+RAW_BASE="${SOTTO_RAW_BASE:-https://raw.githubusercontent.com/${SOTTO_REPOSITORY}/${revision}}"
+
 # ---------------------------------------------------------------------------
 # 2. Install dir + compose file
 # ---------------------------------------------------------------------------
-mkdir -p "$SOTTO_DIR"
-chmod 700 "$SOTTO_DIR"
+mkdir -p "$INSTALL_DIR"
+chmod 700 "$INSTALL_DIR"
+for file in .env docker-compose.override.yml; do
+  [ ! -f "$INSTALL_DIR/$file" ] || cp "$INSTALL_DIR/$file" "$STAGING_DIR/$file"
+done
+SOTTO_DIR="$STAGING_DIR"
 info "Downloading the self-host compose file..."
 curl -fsSL "$RAW_BASE/docker-compose.selfhost.yml" -o "$SOTTO_DIR/docker-compose.yml" \
   || fail "Could not download docker-compose.selfhost.yml from $RAW_BASE"
@@ -77,22 +137,15 @@ chmod 700 "$SOTTO_DIR/sync-cli-credentials.sh"
 SOTTO_BIN_DIR="${SOTTO_BIN_DIR:-${XDG_BIN_HOME:-$HOME/.local/bin}}"
 if curl -fsSL "$RAW_BASE/scripts/sotto-host" -o "$SOTTO_DIR/sotto-host"; then
   chmod 755 "$SOTTO_DIR/sotto-host"
-  mkdir -p "$SOTTO_BIN_DIR"
-  if cp "$SOTTO_DIR/sotto-host" "$SOTTO_BIN_DIR/sotto-host" 2>/dev/null; then
-    SOTTO_HOST_ON_PATH=1
-  else
-    warn "Could not write $SOTTO_BIN_DIR; run updates with $SOTTO_DIR/sotto-host"
-  fi
 else
-  warn "Could not download the sotto-host command; updates run from $SOTTO_DIR by hand"
+  warn "Could not download the sotto-host command; updates run from $INSTALL_DIR by hand"
 fi
 
-rm -f "$SOTTO_DIR/docker-compose.override.yml"
-
 # Port (offer a different one if 3000 is taken)
-if (command -v lsof >/dev/null 2>&1 && lsof -i ":$WEB_PORT" >/dev/null 2>&1); then
+if [ "$WEB_PORT" != "$EXISTING_WEB_PORT" ] && (command -v lsof >/dev/null 2>&1 && lsof -i ":$WEB_PORT" >/dev/null 2>&1); then
   warn "Port $WEB_PORT is in use."
   ask WEB_PORT "  Use a different port [default: 3001]: " "3001"
+  [[ "$WEB_PORT" =~ ^[0-9]+$ ]] && [ "$WEB_PORT" -ge 1 ] && [ "$WEB_PORT" -le 65535 ] || fail "WEB_PORT must be a number between 1 and 65535."
 fi
 
 # ---------------------------------------------------------------------------
@@ -103,7 +156,8 @@ printf "  ${DIM}1)${RESET} An API key (OpenAI or Anthropic) — simplest\n"
 printf "  ${DIM}2)${RESET} Your local Claude Code CLI (bring your own agent)\n"
 printf "  ${DIM}3)${RESET} Your local Codex CLI (bring your own agent)\n"
 printf "  ${DIM}4)${RESET} Your Claude agent on a VPS, over SSH\n"
-ask AGENT_CHOICE "  Choose [1/2/3/4, default 1]: " "1"
+printf "  ${DIM}5)${RESET} Configure providers in the browser after installation\n"
+ask AGENT_CHOICE "  Choose [1/2/3/4/5, default 1]: " "1"
 
 AI_BLOCK=""
 TUNNEL_NOTE=""
@@ -145,28 +199,28 @@ services:
 YAML
     ok "Sotto will run 'ssh $SSH_HOST claude ...' for every LLM call."
     ;;
-  *)
+  5)
+    ok "Configure generation and audio providers in the browser after installation."
+    ;;
+  1)
     ask AI_KEY_PROVIDER "  Provider [openai/anthropic, default openai]: " "openai"
+    case "$AI_KEY_PROVIDER" in openai|anthropic) ;; *) fail "Choose openai or anthropic." ;; esac
     ask_secret AI_KEY "  API key: "
     [ -n "$AI_KEY" ] || fail "An API key is required for option 1."
+    AI_KEY=$(dotenv_quote "$AI_KEY")
     if [ "$AI_KEY_PROVIDER" = "anthropic" ]; then
-      AI_BLOCK=$'AI_PROVIDER="anthropic"\nTTS_PROVIDER="openai"\nSTT_PROVIDER="openai"\n'"ANTHROPIC_API_KEY=\"$AI_KEY\""
-      warn "Anthropic covers the LLM; set OPENAI_API_KEY in $SOTTO_DIR/.env for audio (listening/speaking)."
+      AI_BLOCK=$'AI_PROVIDER="anthropic"\nTTS_PROVIDER="openai"\nSTT_PROVIDER="openai"\n'"ANTHROPIC_API_KEY=$AI_KEY"
+      warn "Anthropic covers the LLM; configure audio in the browser or set OPENAI_API_KEY in $INSTALL_DIR/.env."
     else
-      AI_BLOCK=$'AI_PROVIDER="openai"\nTTS_PROVIDER="openai"\nSTT_PROVIDER="openai"\n'"OPENAI_API_KEY=\"$AI_KEY\""
+      AI_BLOCK=$'AI_PROVIDER="openai"\nTTS_PROVIDER="openai"\nSTT_PROVIDER="openai"\n'"OPENAI_API_KEY=$AI_KEY"
     fi
     ;;
+  *) fail "Choose an agent option from 1 through 5." ;;
 esac
 
 # ---------------------------------------------------------------------------
 # 4. Write .env
 # ---------------------------------------------------------------------------
-existing_env_value() {
-  local key=$1
-  [ -f "$SOTTO_DIR/.env" ] || return 0
-  sed -n "s/^${key}=//p" "$SOTTO_DIR/.env" | tail -n 1
-}
-
 set_env_value() {
   local key=$1 value=$2 tmp
   tmp=$(mktemp "$SOTTO_DIR/.env.XXXXXX")
@@ -214,24 +268,49 @@ set_env_value DIRECT_DATABASE_URL "$DB_URL"
 set_env_value POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
 set_env_value REDIS_URL "redis://redis:6379"
 set_env_value BYOK_ENCRYPTION_KEY "$BYOK_ENCRYPTION_KEY"
-set_env_value SOTTO_ACCESS_PASSWORD "$ACCESS_PASSWORD"
-set_env_value NEXT_PUBLIC_APP_URL "http://localhost:$WEB_PORT"
+set_env_value SOTTO_ACCESS_PASSWORD "$(dotenv_quote "$ACCESS_PASSWORD")"
+EXISTING_APP_URL=$(existing_env_value NEXT_PUBLIC_APP_URL)
+case "$EXISTING_APP_URL" in
+  ""|"http://localhost:$EXISTING_WEB_PORT") set_env_value NEXT_PUBLIC_APP_URL "http://localhost:$WEB_PORT" ;;
+esac
 ensure_env_value STORAGE_PROVIDER "local"
 ensure_env_value LOCAL_STORAGE_DIR "./.sotto/storage"
 apply_env_block "$AI_BLOCK"
 chmod 600 "$SOTTO_DIR/.env"
-ok "Updated $SOTTO_DIR/.env without removing custom settings"
+ok "Prepared configuration for $INSTALL_DIR/.env without removing custom settings"
 
 # ---------------------------------------------------------------------------
 # 5. Pull, start, initialize the database, seed the curriculum
 # ---------------------------------------------------------------------------
 cd "$SOTTO_DIR"
+info "Validating the installation configuration..."
+$DC config --quiet
 info "Pulling images (first run can take a few minutes)..."
 $DC pull
+
+# All downloads and pulls succeeded. Activate the reviewed configuration.
+for file in .env docker-compose.yml docker-compose.override.yml sync-cli-credentials.sh sotto-host images.sh; do
+  [ ! -f "$SOTTO_DIR/$file" ] || mv "$SOTTO_DIR/$file" "$INSTALL_DIR/$file"
+done
+SOTTO_DIR="$INSTALL_DIR"
+cd "$SOTTO_DIR"
+if [ -f "$SOTTO_DIR/sotto-host" ]; then
+  mkdir -p "$SOTTO_BIN_DIR"
+  if cp "$SOTTO_DIR/sotto-host" "$SOTTO_BIN_DIR/sotto-host" 2>/dev/null; then
+    SOTTO_HOST_ON_PATH=1
+  else
+    warn "Could not write $SOTTO_BIN_DIR; run updates with $SOTTO_DIR/sotto-host"
+  fi
+fi
 info "Starting Postgres and Redis..."
 $DC up -d postgres redis
 info "Waiting for the database..."
-for _ in $(seq 1 30); do $DC exec -T postgres pg_isready -U sotto -d sotto >/dev/null 2>&1 && break; sleep 2; done
+DATABASE_READY=0
+for _ in $(seq 1 30); do
+  if $DC exec -T postgres pg_isready -h 127.0.0.1 -U sotto -d sotto >/dev/null 2>&1; then DATABASE_READY=1; break; fi
+  sleep 2
+done
+[ "$DATABASE_READY" = 1 ] || fail "PostgreSQL did not become ready. Run '$DC logs postgres' in $SOTTO_DIR."
 
 info "Applying database migrations and seeding the language curriculum..."
 $DC run --rm workers sh -c \
@@ -243,12 +322,14 @@ $DC up -d
 
 info "Waiting for Sotto to come up..."
 for _ in $(seq 1 30); do
-  if curl -fsS "http://localhost:$WEB_PORT/api/v1/health" >/dev/null 2>&1; then READY=1; break; fi
+  if response=$(curl -fsS --max-time 5 "http://localhost:$WEB_PORT/api/v1/health") &&
+    release_healthy "$response" "$SOTTO_IMAGE_TAG"; then READY=1; break; fi
   sleep 2
 done
 
 printf "\n"
-if [ "${READY:-}" = "1" ]; then ok "Sotto is running."; else warn "Sotto is starting; give it a moment."; fi
+[ "${READY:-}" = "1" ] || fail "Sotto did not become healthy. Run '$DC logs --tail 50 web workers' in $SOTTO_DIR."
+ok "Sotto is running."
 printf "\n  ${BOLD}Open:${RESET}    http://localhost:%s\n" "$WEB_PORT"
 printf "  ${BOLD}Password:${RESET} %s  ${DIM}(saved in %s/.env)${RESET}\n" "$ACCESS_PASSWORD" "$SOTTO_DIR"
 printf "  ${BOLD}Manage:${RESET}  cd %s  (then \`%s logs -f\`, \`%s down\`)\n" "$SOTTO_DIR" "$DC" "$DC"

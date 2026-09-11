@@ -81,6 +81,7 @@ ENV HOME=/home/sotto
 
 ARG COMMIT_SHA=dev
 LABEL org.opencontainers.image.revision=${COMMIT_SHA}
+LABEL org.opencontainers.image.source="https://github.com/affromero/Sotto"
 ENV COMMIT_SHA=${COMMIT_SHA}
 
 # Standalone output mirrors monorepo structure (apps/web/server.js + node_modules/)

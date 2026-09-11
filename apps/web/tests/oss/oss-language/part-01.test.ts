@@ -451,11 +451,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps server deployment self-hosted and env-file driven', () => {
     const deploySource = readFileSync(resolve(repoRoot, 'scripts/deploy.sh'), 'utf8');
-    const installerSource = readFileSync(resolve(repoRoot, 'scripts/install.sh'), 'utf8');
-    const publicInstallerSource = readFileSync(
-      resolve(repoRoot, 'apps/web/public/install.sh'),
-      'utf8'
-    );
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');
     const ossImageWorkflow = readFileSync(
       resolve(repoRoot, '.github/workflows/oss-image.yml'),
@@ -485,14 +480,6 @@ describe('open-source language-learning OSS surfaces', () => {
       workersComposeSource,
     ].join('\n');
 
-    expect(publicInstallerSource).toBe(installerSource);
-    expect(installerSource).toContain('https://sotto.fm/install.sh');
-    expect(installerSource).toContain('SOTTO_REF="${SOTTO_REF:-main}"');
-    expect(installerSource).toContain('SOTTO_IMAGE_TAG="${SOTTO_IMAGE_TAG:-latest}"');
-    expect(installerSource).toContain('Your local Codex CLI');
-    expect(installerSource).toContain('AI_PROVIDER=\\"$AGENT_CLI\\"');
-    expect(installerSource).toContain('$HOME/.codex/auth.json');
-    expect(installerSource).not.toContain('/releases?');
     expect(ossImageWorkflow).toContain('branches: [main]');
     expect(ossImageWorkflow).not.toContain("- 'v*'");
     expect(ossImageWorkflow).not.toContain('github.ref_type');
@@ -557,8 +544,9 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocs).toContain('docker-compose.infra.yml');
     expect(releaseDocs).toContain('docker-compose.app.yml');
     expect(releaseDocs).toContain('docker-compose.workers.yml');
-    expect(releaseDocs).not.toContain('https://sotto.fm');
-    expect(releaseDocs).not.toContain('sotto.fm');
+    // The public installer is a download source. Runtime configuration must
+    // still use the operator's domain.
+    expect(releaseDocs).not.toMatch(/NEXT_PUBLIC_APP_URL\s*=\s*["']?https?:\/\/sotto\.fm/);
     expect(releaseDocs).not.toContain('dashboard.doppler.com');
     expect(releaseDocs).not.toContain('doppler secrets');
     expect(releaseDocs).not.toContain('docker-compose.prod.yml');

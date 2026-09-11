@@ -1,146 +1,304 @@
-# Publishes the open-source Sotto images to GHCR.
-#
-# deploy.yml publishes separate maintainer production images tagged by full SHA.
-# This workflow owns the public self-host image tags used by curl|bash.
+# Public images must pass the installer path anonymously before moving latest.
 name: Publish OSS image
 
 on:
   push:
     branches: [main]
-    # Conservative on purpose: skipping a publish that was needed is worse than
-    # an extra build, so only changes that cannot reach the image are ignored.
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - '.github/dependabot.yml'
   workflow_dispatch:
 
-# Only the newest push to main needs its image published; an in-flight build for
-# a commit that has already been superseded is publishing a stale tag.
+# Serialize promotion across refs and never interrupt a running release.
 concurrency:
-  group: oss-image-${{ github.ref }}
-  cancel-in-progress: true
+  group: oss-image
+  cancel-in-progress: false
 
 env:
-  # Stop docker/build-push-action uploading a *.dockerbuild record as an artifact on every run.
   DOCKER_BUILD_RECORD_UPLOAD: false
   DOCKER_BUILD_SUMMARY: false
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  publish:
-    if: github.repository == 'affromero/Sotto'
+  source:
+    if: github.repository == 'affromero/Sotto' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    outputs:
-      base_digest: ${{ steps.worker_base.outputs.digest }}
-      short_sha: ${{ steps.sha.outputs.short }}
-    env:
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           submodules: recursive
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
           cache: npm
-
       - name: Verify source
         run: |
           npm ci
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
           npm run ci
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+  build:
+    needs: source
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      CANDIDATE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Short SHA
-        id: sha
-        run: echo "short=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
-
-      - name: Build worker base candidate
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+      - name: Build workers-base candidate
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: .
           file: apps/web/Dockerfile.workers-base
+          platforms: linux/${{ matrix.arch }}
           load: true
-          tags: |
-            ghcr.io/affromero/sotto-workers-base:${{ github.sha }}
-            ghcr.io/affromero/sotto-workers-base:node22
-          cache-from: type=gha,scope=sotto-workers-base
-          cache-to: type=gha,mode=max,scope=sotto-workers-base
-
-      - name: Verify and publish worker base
-        id: worker_base
+          tags: ghcr.io/affromero/sotto-workers-base:${{ env.CANDIDATE_TAG }}
+          cache-from: type=gha,scope=sotto-workers-base-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=sotto-workers-base-${{ matrix.arch }}
+      - name: Verify and publish workers-base candidate
         run: |
           set -euo pipefail
-          base="ghcr.io/affromero/sotto-workers-base:${{ github.sha }}"
-          bash scripts/deploy/smoke-worker-base.sh "$base"
-          docker push "$base"
-          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$base")
-          echo "digest=${reference##*@}" >> "$GITHUB_OUTPUT"
-          docker push ghcr.io/affromero/sotto-workers-base:node22
-
-      - name: Build sotto-web candidate
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+          image="ghcr.io/affromero/sotto-workers-base:$CANDIDATE_TAG"
+          bash scripts/deploy/smoke-worker-base.sh "$image"
+          docker push "$image"
+          mkdir -p digests
+          docker image inspect --format '{{index .RepoDigests 0}}' "$image" > digests/base.txt
+      - name: Build web candidate
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: .
           file: apps/web/Dockerfile
+          platforms: linux/${{ matrix.arch }}
           load: true
           build-args: |
-            COMMIT_SHA=${{ steps.sha.outputs.short }}
+            COMMIT_SHA=${{ github.sha }}
             NEXT_PUBLIC_APP_URL=http://localhost:3000
-          tags: |
-            ghcr.io/affromero/sotto-web:latest
-            ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
-          cache-from: type=gha,scope=sotto-web
-          cache-to: type=gha,mode=max,scope=sotto-web
-
-      - name: Verify and publish sotto-web
+          tags: ghcr.io/affromero/sotto-web:${{ env.CANDIDATE_TAG }}
+          cache-from: type=gha,scope=sotto-web-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=sotto-web-${{ matrix.arch }}
+      - name: Verify and publish web candidate
         run: |
-          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
-          docker push ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
-          docker push ghcr.io/affromero/sotto-web:latest
+          set -euo pipefail
+          image="ghcr.io/affromero/sotto-web:$CANDIDATE_TAG"
+          bash scripts/deploy/smoke-web-image.sh "$image"
+          docker push "$image"
+          mkdir -p digests
+          docker image inspect --format '{{index .RepoDigests 0}}' "$image" > digests/web.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: oss-digests-web-${{ matrix.arch }}
+          path: digests/*.txt
+          if-no-files-found: error
+          retention-days: 1
 
-  workers:
-    needs: publish
-    runs-on: ubuntu-latest
+  build-workers:
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      CANDIDATE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           submodules: recursive
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: oss-digests-web-${{ matrix.arch }}
+          path: digests
+      - name: Read verified base digest
+        id: worker_base
+        run: echo "reference=$(cat digests/base.txt)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build worker candidate
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+      - name: Build workers candidate
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: .
           file: apps/web/Dockerfile.workers
+          platforms: linux/${{ matrix.arch }}
           load: true
           build-args: |
-            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base@${{ needs.publish.outputs.base_digest }}
             COMMIT_SHA=${{ github.sha }}
-          tags: |
-            ghcr.io/affromero/sotto-workers:latest
-            ghcr.io/affromero/sotto-workers:${{ needs.publish.outputs.short_sha }}
-          cache-from: type=gha,scope=sotto-workers
-          cache-to: type=gha,mode=max,scope=sotto-workers
-      - name: Verify worker runtime before publication
-        run: bash scripts/deploy/smoke-worker-image.sh ghcr.io/affromero/sotto-workers:${{ needs.publish.outputs.short_sha }}
-      - name: Publish verified worker
+            WORKER_BASE_IMAGE=${{ steps.worker_base.outputs.reference }}
+          tags: ghcr.io/affromero/sotto-workers:${{ env.CANDIDATE_TAG }}
+          cache-from: type=gha,scope=sotto-workers-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=sotto-workers-${{ matrix.arch }}
+      - name: Verify and publish workers candidate
         run: |
-          docker push ghcr.io/affromero/sotto-workers:${{ needs.publish.outputs.short_sha }}
-          docker push ghcr.io/affromero/sotto-workers:latest
+          set -euo pipefail
+          image="ghcr.io/affromero/sotto-workers:$CANDIDATE_TAG"
+          bash scripts/deploy/smoke-worker-image.sh "$image"
+          docker push "$image"
+          mkdir -p digests
+          docker image inspect --format '{{index .RepoDigests 0}}' "$image" > digests/workers.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: oss-digests-workers-${{ matrix.arch }}
+          path: digests/workers.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-public:
+    needs: build-workers
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: oss-digests-*-${{ matrix.arch }}
+          merge-multiple: true
+          path: digests
+      - name: Verify anonymous fresh install
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG
+          DOCKER_CONFIG=$(mktemp -d)
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          bash scripts/ci/smoke-selfhost.sh "$(cat digests/web.txt)" "$(cat digests/workers.txt)" "$GITHUB_SHA"
+
+  publish-release:
+    needs: verify-public
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: oss-digests-*
+          path: digests
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish both tested architectures under release tags
+        run: |
+          set -euo pipefail
+          for component in workers web; do
+            image="ghcr.io/affromero/sotto-$component"
+            docker buildx imagetools create \
+              --tag "$image:${GITHUB_SHA::8}" \
+              --tag "$image:$GITHUB_SHA" \
+              "$(cat "digests/oss-digests-$component-amd64/$component.txt")" \
+              "$(cat "digests/oss-digests-$component-arm64/$component.txt")"
+          done
+
+  verify-installer:
+    needs: publish-release
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Run the release installer without credentials or prompts
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG
+          DOCKER_CONFIG=$(mktemp -d)
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          bash scripts/ci/smoke-installer.sh "$GITHUB_SHA"
+
+  promote:
+    needs: verify-installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promote latest after both platform installers pass
+        run: |
+          set -euo pipefail
+          for component in workers web; do
+            image="ghcr.io/affromero/sotto-$component"
+            docker buildx imagetools create --tag "$image:latest" "$image:$GITHUB_SHA"
+          done
+
+  verify-release:
+    needs: promote
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify public latest manifests and matching revisions
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG
+          DOCKER_CONFIG=$(mktemp -d)
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          for component in workers web; do
+            image="ghcr.io/affromero/sotto-$component:latest"
+            docker pull "$image"
+            revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
+            architecture=$(docker image inspect --format '{{.Architecture}}' "$image")
+            test "$revision" = "$GITHUB_SHA"
+            test "$architecture" = "$EXPECTED_ARCH"
+          done
+      - name: Run the published installer without credentials or prompts
+        run: |
+          set -euo pipefail
+          export DOCKER_CONFIG
+          DOCKER_CONFIG=$(mktemp -d)
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          bash scripts/ci/smoke-installer.sh "$GITHUB_SHA" latest

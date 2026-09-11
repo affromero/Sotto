@@ -16,7 +16,7 @@ docker run -d --name "${suffix}-postgres" --network "$suffix" --network-alias po
   -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=sotto pgvector/pgvector:pg17 >/dev/null
 ready=false
 for attempt in $(seq 1 60); do
-  if docker exec "${suffix}-postgres" pg_isready -U postgres >/dev/null 2>&1; then ready=true; break; fi
+  if docker exec "${suffix}-postgres" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then ready=true; break; fi
   sleep 1
 done
 if [ "$ready" != true ]; then echo "Smoke PostgreSQL did not become ready" >&2; exit 1; fi

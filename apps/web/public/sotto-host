@@ -8,12 +8,32 @@
 #
 # Install:  curl -fsSL https://sotto.fm/sotto-host -o ~/.local/bin/sotto-host && chmod +x ~/.local/bin/sotto-host
 set -euo pipefail
+umask 077
 
 SOTTO_DIR="${SOTTO_DIR:-$HOME/.sotto}"
 SOTTO_REPOSITORY="${SOTTO_REPOSITORY:-affromero/Sotto}"
 SOTTO_REF="${SOTTO_REF:-main}"
 RAW_BASE="${SOTTO_RAW_BASE:-https://raw.githubusercontent.com/${SOTTO_REPOSITORY}/${SOTTO_REF}}"
 API_BASE="${SOTTO_API_BASE:-https://api.github.com/repos/${SOTTO_REPOSITORY}}"
+STAGING_DIR=""
+cleanup() {
+  [ -z "${INSTALL_LOCK_DIR:-}" ] || rmdir "$INSTALL_LOCK_DIR"
+  [ -z "$STAGING_DIR" ] || rm -rf "$STAGING_DIR"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+load_image_helper() {
+  STAGING_DIR=$(mktemp -d)
+  if [ -f "$SOTTO_DIR/images.sh" ]; then
+    cp "$SOTTO_DIR/images.sh" "$STAGING_DIR/images.sh"
+  else
+    curl -fsSL "$RAW_BASE/scripts/selfhost/images.sh" -o "$STAGING_DIR/images.sh" ||
+      fail "Could not download the image verification helper. Configuration has not changed."
+  fi
+  . "$STAGING_DIR/images.sh"
+}
 
 BOLD=$(printf '\033[1m'); DIM=$(printf '\033[2m'); RESET=$(printf '\033[0m')
 CYAN=$(printf '\033[36m'); GREEN=$(printf '\033[32m'); YELLOW=$(printf '\033[33m'); RED=$(printf '\033[31m')
@@ -54,6 +74,15 @@ compose() {
   else
     fail "Docker Compose v2 is required.\n  Install: ${BOLD}https://docs.docker.com/compose/install/${RESET}"
   fi
+}
+
+candidate_compose() {
+  local arguments=(--project-directory "$install_dir" --env-file "$STAGING_DIR/.env" -f "$STAGING_DIR/docker-compose.yml")
+  arguments+=(-f "$STAGING_DIR/candidate-env.yml")
+  if [ -f "$STAGING_DIR/docker-compose.override.yml" ]; then
+    arguments+=(-f "$STAGING_DIR/docker-compose.override.yml")
+  fi
+  compose "${arguments[@]}" "$@"
 }
 
 require_install() {
@@ -116,17 +145,10 @@ resolve_ref() {
   printf '%s\n' "${sha:0:8}"
 }
 
-# What `latest` currently points at, so an update can say which commit it moves
-# to rather than just "latest" again.
-latest_commit() {
-  curl -fsSL "${API_BASE}/commits/main" 2>/dev/null |
-    sed -n 's/^  "sha": "\([0-9a-f]\{40\}\)",$/\1/p' | head -1 | cut -c1-8
-}
-
 running_version() {
   local response
   response=$(health) || return 1
-  printf '%s' "$response" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' | cut -c1-8
+  printf '%s' "$response" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | cut -c1-8
 }
 
 cmd_status() {
@@ -134,21 +156,14 @@ cmd_status() {
   echo "install:  ${SOTTO_DIR}"
   echo "pinned:   $(current_tag)"
 
-  local running latest
+  local running
   if running=$(running_version); then
     echo "running:  ${running}"
   else
     echo "running:  unreachable at http://localhost:$(web_port)"
   fi
 
-  latest=$(latest_commit)
-  if [ -z "$latest" ]; then
-    warn "Could not reach GitHub; reporting local state only"
-  elif [ "$latest" = "${running:-}" ]; then
-    echo "newest:   ${latest} (current)"
-  else
-    echo "newest:   ${latest} — run 'sotto-host update'"
-  fi
+  echo "updates:  run 'sotto-host update' to resolve the newest published release"
 
   local response
   if response=$(health); then
@@ -181,13 +196,12 @@ cmd_update() {
   require_install
   cd "$SOTTO_DIR"
 
-  local target from
+  local target from revision source_base install_dir previous_revision
   from=$(current_tag)
   if [ -n "$TO_REF" ]; then
     target=$(resolve_ref "$TO_REF")
   else
-    target=$(latest_commit)
-    [ -n "$target" ] || fail "Could not reach GitHub to find the newest build.\n  Pin one yourself: ${BOLD}sotto-host update --to <commit>${RESET}"
+    target=latest
   fi
 
   local running
@@ -206,7 +220,24 @@ cmd_update() {
   fi
 
   if [ "$CHECK_ONLY" = "1" ]; then
-    printf "${DIM}(--check: nothing changed)${RESET}\n"
+    printf "${DIM}(--check: nothing changed; image availability and revision are verified when updating)${RESET}\n"
+    return 0
+  fi
+
+  load_image_helper
+  acquire_install_lock "$SOTTO_DIR" || fail "Update is locked. Configuration has not changed."
+  revision=$(resolve_images "$target") || fail "Could not verify the requested release. Configuration has not changed."
+  target="${revision:0:8}"
+  # Old installers pinned latest. Record the running immutable revision so a
+  # rollback cannot accidentally pull the newly published release again.
+  if [ "$from" = latest ]; then
+    previous_revision=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$(compose ps -q web)") ||
+      fail "Cannot identify the previous release. Start the existing web container before updating."
+    [[ "$previous_revision" =~ ^[0-9a-f]{8}([0-9a-f]{32})?$ ]] || fail "The previous release has no valid revision."
+    from="${previous_revision:0:8}"
+  fi
+  if [ "$from" = "$target" ] && [ "${running:-}" = "$target" ]; then
+    ok "Already running ${target}; nothing to do."
     return 0
   fi
 
@@ -214,28 +245,48 @@ cmd_update() {
     backup_database
   fi
 
-  # The compose file describes the services, so a stack updated only by image
-  # tag would miss a service added since it was installed.
-  info "Refreshing the compose file..."
-  local tmp
-  tmp=$(mktemp "$SOTTO_DIR/docker-compose.yml.XXXXXX")
-  if curl -fsSL "$RAW_BASE/docker-compose.selfhost.yml" -o "$tmp"; then
-    mv "$tmp" "$SOTTO_DIR/docker-compose.yml"
-  else
-    rm -f "$tmp"
-    warn "Could not download the newest compose file; keeping the current one"
-  fi
-
+  info "Downloading configuration for release ${target}..."
+  source_base="${SOTTO_RAW_BASE:-https://raw.githubusercontent.com/${SOTTO_REPOSITORY}/${revision}}"
+  curl -fsSL "$source_base/docker-compose.selfhost.yml" -o "$STAGING_DIR/docker-compose.yml" || fail "Could not download release Compose configuration."
+  curl -fsSL "$source_base/scripts/agent/sync-cli-credentials.sh" -o "$STAGING_DIR/sync-cli-credentials.sh" || fail "Could not download release credential synchronization."
+  curl -fsSL "$source_base/scripts/selfhost/images.sh" -o "$STAGING_DIR/images.sh" || fail "Could not download release image verification helper."
+  cp "$SOTTO_DIR/.env" "$STAGING_DIR/.env"
+  [ ! -f "$SOTTO_DIR/docker-compose.override.yml" ] || cp "$SOTTO_DIR/docker-compose.override.yml" "$STAGING_DIR/docker-compose.override.yml"
+  install_dir="$SOTTO_DIR"
+  SOTTO_DIR="$STAGING_DIR"
   set_env_value SOTTO_IMAGE_TAG "$target"
   set_env_value SOTTO_PREVIOUS_IMAGE_TAG "$from"
-
+  # --env-file controls interpolation; service env_file paths still resolve
+  # relative to --project-directory. Add the staged base environment before
+  # user overrides so their env_file and environment settings retain priority.
+  local staged_env_path="$STAGING_DIR/.env"
+  staged_env_path=${staged_env_path//\'/\'\'}
+  printf "services:\n  web:\n    env_file: ['%s']\n  workers:\n    env_file: ['%s']\n" \
+    "$staged_env_path" "$staged_env_path" > "$STAGING_DIR/candidate-env.yml"
+  cd "$STAGING_DIR"
+  candidate_compose config --quiet || fail "Release configuration is invalid. Existing configuration has not changed."
   info "Pulling images..."
-  compose pull || fail "Could not pull images tagged ${target}.\n  A commit's images are published a few minutes after it lands, and versions\n  released before the public images existed have none at all.\n  Published tags: ${BOLD}https://github.com/${SOTTO_REPOSITORY}/pkgs/container/sotto-web${RESET}"
+  candidate_compose pull || fail "Could not pull images tagged ${target}. Existing configuration has not changed.\n  Published tags: ${BOLD}https://github.com/${SOTTO_REPOSITORY}/pkgs/container/sotto-web${RESET}"
 
-  info "Applying database migrations..."
-  compose run --rm workers sh -c \
-    "cd /app && npx --no-install prisma migrate deploy --config=/app/prisma.config.ts" ||
-    fail "Migrations failed; the previous containers are still running.\n  Roll back with ${BOLD}sotto-host rollback${RESET}."
+  info "Applying database migrations and updating the language curriculum..."
+  candidate_compose run --rm --no-deps workers sh -c \
+    "cd /app && npx --no-install prisma migrate deploy --config=/app/prisma.config.ts && npx --no-install tsx apps/web/prisma/seed-curriculum.ts" ||
+    fail "Database initialization failed. Existing configuration and rollback history have not changed. Inspect the migration or curriculum error before retrying."
+
+  SOTTO_DIR="$install_dir"
+  cd "$SOTTO_DIR"
+  mkdir -p "$SOTTO_DIR/previous"
+  for file in .env docker-compose.yml sync-cli-credentials.sh images.sh docker-compose.override.yml; do
+    rm -f "$SOTTO_DIR/previous/$file"
+    [ ! -f "$SOTTO_DIR/$file" ] || cp "$SOTTO_DIR/$file" "$SOTTO_DIR/previous/$file"
+  done
+  # Keep rollback immutable even when upgrading a legacy latest installation.
+  SOTTO_DIR="$install_dir/previous"
+  set_env_value SOTTO_IMAGE_TAG "$from"
+  SOTTO_DIR="$install_dir"
+  for file in .env docker-compose.yml sync-cli-credentials.sh images.sh; do
+    mv "$STAGING_DIR/$file" "$SOTTO_DIR/$file"
+  done
 
   info "Restarting Sotto..."
   compose up -d
@@ -243,7 +294,8 @@ cmd_update() {
   printf "${CYAN}${BOLD}>${RESET} Waiting for health"
   local response=""
   for _ in $(seq 1 45); do
-    if response=$(health); then break; fi
+    if response=$(health) && release_healthy "$response" "$target"; then break; fi
+    response=""
     printf '.'
     sleep 2
   done
@@ -265,15 +317,35 @@ cmd_rollback() {
   [ -n "$previous" ] || fail "No previous tag recorded; nothing to roll back to.\n  Pin one yourself: ${BOLD}sotto-host update --to <commit>${RESET}"
 
   info "Rolling back $(current_tag) → ${previous}"
-  set_env_value SOTTO_IMAGE_TAG "$previous"
-  compose pull
+  load_image_helper
+  acquire_install_lock "$SOTTO_DIR" || fail "Rollback is locked. Configuration has not changed."
+  resolve_images "$previous" >/dev/null || fail "Cannot pull the previous release. Configuration has not changed."
+  if [ -f "$SOTTO_DIR/previous/docker-compose.yml" ]; then
+    for file in .env docker-compose.yml sync-cli-credentials.sh images.sh docker-compose.override.yml; do
+      if [ -f "$SOTTO_DIR/previous/$file" ]; then
+        cp "$SOTTO_DIR/previous/$file" "$SOTTO_DIR/$file"
+      elif [ "$file" = docker-compose.override.yml ]; then
+        rm -f "$SOTTO_DIR/$file"
+      fi
+    done
+  else
+    set_env_value SOTTO_IMAGE_TAG "$previous"
+  fi
   compose up -d
 
   # A rollback does not undo migrations: Prisma migrations are forward-only, so
   # the older image runs against the newer schema. Say so rather than imply the
   # database moved back too.
   warn "Images rolled back. Database migrations are forward-only and were not reverted."
-  ok "Sotto is on ${previous}."
+  for _ in $(seq 1 45); do
+    if response=$(health) && release_healthy "$response" "$previous"; then
+      set_env_value SOTTO_PREVIOUS_IMAGE_TAG ""
+      ok "Sotto is on ${previous}."
+      return 0
+    fi
+    sleep 2
+  done
+  fail "The previous release did not become healthy. Inspect docker compose logs."
 }
 
 CHECK_ONLY=0

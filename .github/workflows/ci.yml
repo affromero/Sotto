@@ -12,6 +12,9 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/oss-image.yml'
+      - 'docker-compose*.yml'
+      - '.dockerignore'
 
 concurrency:
   group: ci-${{ github.head_ref }}
@@ -38,6 +41,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
 
       - name: Generate Prisma client
         run: npx prisma generate --schema=apps/web/prisma/schema.prisma

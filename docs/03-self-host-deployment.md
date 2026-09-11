@@ -1,10 +1,65 @@
 # Self-Host Deployment Guide
 
-**Date:** 2026-09-08
+**Date:** 2026-09-10
 
-**Summary:** Step-by-step deployment guide for running Sotto on your own VPS with explicit env files, Caddy, Docker Compose, private episode storage, and no hosted Sotto services.
+**Summary:** Install Sotto on your computer with Docker, or deploy it to a VPS with explicit settings and private storage.
 
 ---
+
+## Install on your computer
+
+Start Docker and confirm `docker info` and `docker compose version` succeed.
+Use Linux or macOS, or a WSL2 terminal with Docker Desktop integration on Windows.
+Then run:
+
+```bash
+curl -fsSL https://sotto.fm/install.sh | bash
+```
+
+The installer verifies a matching published image pair before changing your
+configuration. It downloads the release's Compose file, migrates the database,
+seeds the curriculum, and waits for health. It stores settings in `~/.sotto/.env`.
+Keep this file private and back it up along with your database and audio files.
+
+Use the URL and instance password printed at completion. The default URL is
+`http://localhost:3000`. The welcome wizard lets you configure languages and
+providers. An OpenAI key covers generation and speech. Anthropic and local agent
+logins cover generation; configure a speech provider for listening and speaking.
+
+Choose option 5 to configure providers later in the browser. For unattended
+installation, download the script first and pass the prompt settings to Bash:
+
+```bash
+curl -fsSL https://sotto.fm/install.sh -o install.sh
+SOTTO_YES=1 SOTTO_AGENT_CHOICE=5 bash install.sh
+```
+
+Sotto Host is a desktop controller for an installed stack. Run the installer
+first, then use the launcher to start or stop it. A Windows home directory differs
+from a WSL home; use the browser from WSL if the launcher cannot find the stack.
+
+```bash
+sotto-host status
+sotto-host update --check
+sotto-host update
+```
+
+Updates use published images, rather than assuming the newest source commit has
+a finished build. Failed downloads and pulls preserve your configuration.
+`sotto-host rollback` restores the previous deployment files and images after an
+update. Database migrations are forward-only; image rollback does not restore the
+database. Keep the backup created before an update.
+
+| Problem                                               | Action                                                                                                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Docker is installed but unavailable                   | Start Docker Desktop or the Docker daemon. Confirm `docker info` works as your user.                                               |
+| `denied` or `unauthorized` while pulling Sotto images | The public package or release is unavailable. Maintainers must fix registry visibility; a new user should not need a GitHub token. |
+| `no matching manifest`                                | The selected release lacks an image for your architecture. Use a release with matching platform support.                           |
+| Port is already in use                                | Choose another port when prompted. Open the URL printed by the installer.                                                          |
+| Startup or migration fails                            | Run `cd ~/.sotto && docker compose logs --tail 100 web workers postgres`. Resolve the reported error before retrying.              |
+| Linux AppImage reports missing `appsink`              | Use a launcher release that bundles the media framework. Reinstalling the Docker stack does not fix an older launcher binary.      |
+
+The VPS instructions below are for operators deploying behind their own domain.
 
 ## Before You Start
 

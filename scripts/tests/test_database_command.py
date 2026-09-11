@@ -86,10 +86,15 @@ class PostgreSQLTests(unittest.TestCase):
         subprocess.run(['docker', 'run', '-d', '--name', name, '--network', 'none', '-e', 'POSTGRES_PASSWORD', '-e', 'POSTGRES_USER=fixture', '-e', 'POSTGRES_DB=fixture', 'postgres:17-alpine'], env=environment, check=True, capture_output=True)
         try:
             for _ in range(60):
-                ready = subprocess.run(['docker', 'exec', name, 'pg_isready', '-U', 'fixture'], capture_output=True)
+                # Initialization uses a temporary socket-only server that stops
+                # before the permanent server begins accepting TCP connections.
+                ready = subprocess.run(['docker', 'exec', name, 'pg_isready', '-h', '127.0.0.1', '-U', 'fixture', '-d', 'fixture'], capture_output=True)
                 if ready.returncode == 0:
                     break
                 time.sleep(1)
+            else:
+                logs = subprocess.run(['docker', 'logs', name], capture_output=True)
+                self.fail('PostgreSQL did not become ready:\n' + (logs.stdout + logs.stderr).decode(errors='replace'))
             subprocess.run(['docker', 'exec', name, 'psql', '-U', 'fixture', '-d', 'fixture', '-c', "CREATE TABLE saved(value text); INSERT INTO saved VALUES ('retained');"], check=True, capture_output=True)
             url = b'postgresql://fixture:fixture%3Ap%40ss%2Fword@127.0.0.1:5432/fixture?schema=public&sslmode=disable&connect_timeout=3\n'
             size = subprocess.run(['python3', str(HELPER), 'size', '--container', name], input=url, capture_output=True, check=True)
@@ -100,6 +105,8 @@ class PostgreSQLTests(unittest.TestCase):
             subprocess.run(['docker', 'exec', '-i', name, 'pg_restore', '-U', 'fixture', '-d', 'restored'], input=dump.stdout, check=True, capture_output=True)
             result = subprocess.run(['docker', 'exec', name, 'psql', '-U', 'fixture', '-d', 'restored', '-Atc', 'SELECT value FROM saved'], check=True, capture_output=True)
             self.assertEqual(result.stdout.strip(), b'retained')
+        except subprocess.CalledProcessError as error:
+            self.fail(f'{error}\n{(error.stderr or b"").decode(errors="replace")}')
         finally:
             subprocess.run(['docker', 'rm', '-f', name], check=True, capture_output=True)
 

@@ -4,10 +4,11 @@
   "private": true,
   "description": "Sotto Host — desktop launcher for a self-hosted Sotto stack",
   "scripts": {
-    "tauri": "tauri",
-    "dev": "tauri dev",
     "build": "tauri build",
-    "icon": "tauri icon ../web/public/brand/sotto-mark.svg"
+    "dev": "tauri dev",
+    "icon": "tauri icon ../web/public/brand/sotto-mark.svg",
+    "tauri": "tauri",
+    "test": "node --test tests/*.test.cjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

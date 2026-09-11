@@ -26,6 +26,16 @@ export async function POST(request: NextRequest) {
     return errorResponse('Request rejected', 403);
   }
 
+  // Forwarded addresses can be supplied by direct clients. Bound attempts
+  // across the instance before allocating any address-specific Redis buckets.
+  const instanceLimit = await checkRateLimit('gate:instance', 60, 15 * 60);
+  if (!instanceLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many attempts. Try again later.' },
+      { status: 429, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
   const ip =
     request.headers.get('cf-connecting-ip')?.trim() ||
     request.headers.get('x-real-ip')?.trim() ||
