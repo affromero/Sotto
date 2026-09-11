@@ -2,7 +2,7 @@
 // Idempotent: upserts Curriculum (by pair) and Lessons (by curriculumId + slug).
 // Run: npm run seed:curriculum   (or via scripts/setup.sh on fresh installs)
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@/generated/prisma/client';
+import { PrismaClient } from '../src/generated/prisma/client';
 import { loadAllCurricula } from './curricula/schema';
 
 const prisma = new PrismaClient({

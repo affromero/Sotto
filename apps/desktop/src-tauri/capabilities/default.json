@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Core permissions for the Sotto Host launcher window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-set-title"]
 }

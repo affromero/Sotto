@@ -45,7 +45,7 @@ Open source language-learning infrastructure you run yourself, with a full **[CE
 
 ## Quick Start
 
-Just Docker. No clone, no build:
+Install and start Docker with Compose v2, then run this in a terminal on Linux or macOS. On Windows, use a WSL2 terminal with Docker Desktop integration enabled:
 
 ```bash
 curl -fsSL https://sotto.fm/install.sh | bash
@@ -53,13 +53,17 @@ curl -fsSL https://sotto.fm/install.sh | bash
 
 The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code or Codex CLI** with no key, or your Claude agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything. Local CLI login refreshes travel through a networkless credential-sync sidecar that copies only the CLI auth JSON into the app containers.
 
-**Prefer one click?** Unsigned preview desktop installers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Your OS may require an explicit security override. _Sotto Host_ runs the whole stack for you, no terminal.
+The installer checks image availability before changing configuration and pins a matching web and worker release. OpenAI can supply generation and speech with one key. Other agents need a separately configured speech provider for listening and speaking.
 
-1. Open **[localhost:3000](http://localhost:3000)**
-2. Take a 2-minute placement test → it puts you at the right CEFR level
+**Desktop controls:** Unsigned preview launchers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Install the stack with the terminal command above first. Sotto Host starts and stops that installation. Your OS may require an explicit security override. On Windows, the launcher must be pointed at the installation inside WSL; using the browser from WSL is the simpler path.
+
+1. Open the local URL printed by the installer and enter its generated instance password.
+2. Choose your languages and providers in the welcome wizard, then take the placement test.
 3. Start your first class gated by mastery, or sharpen one skill in ungated practice
 
 Manage it from `~/.sotto`: `docker compose logs -f`, `docker compose down`.
+
+Update with `sotto-host update`. See the [installation and troubleshooting guide](docs/03-self-host-deployment.md#install-on-your-computer) if Docker, image downloads, or startup fail.
 
 For the full self-hosted journey, see [User Flows](docs/06-user-flows.md): start the stack, create a course, take a class, use the iPad workbook, connect devices, and maintain the deployment.
 

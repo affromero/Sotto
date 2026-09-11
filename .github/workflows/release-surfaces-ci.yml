@@ -12,12 +12,16 @@ on:
       - 'apps/desktop/**'
       - 'apps/ios/**'
       - '.github/workflows/release-surfaces-ci.yml'
+      - '.github/workflows/desktop-release.yml'
+      - 'scripts/ci/test-desktop-appimage.sh'
   push:
     branches: [main]
     paths:
       - 'apps/desktop/**'
       - 'apps/ios/**'
       - '.github/workflows/release-surfaces-ci.yml'
+      - '.github/workflows/desktop-release.yml'
+      - 'scripts/ci/test-desktop-appimage.sh'
 
 concurrency:
   group: release-surfaces-${{ github.ref }}
@@ -43,8 +47,36 @@ jobs:
       # fails without them.
       - run: npm run icon
         working-directory: apps/desktop
-      - run: cargo check --locked
+      - run: npm test
+        working-directory: apps/desktop
+      - run: cargo test --locked
         working-directory: apps/desktop/src-tauri
+
+  desktop-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-tools xvfb dbus-x11 xdotool
+      - name: Build and test Linux package
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npm run icon
+          npm test
+          cargo test --locked --manifest-path src-tauri/Cargo.toml
+          npm run build -- --bundles appimage
+      - name: Launch AppImage
+        run: |
+          for image in apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage; do
+            bash scripts/ci/test-desktop-appimage.sh "$image"
+          done
 
   ios:
     runs-on: macos-latest

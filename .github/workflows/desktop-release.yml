@@ -75,17 +75,17 @@ jobs:
             slug: mac
           - os: windows-latest
             slug: windows
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             slug: linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Linux build deps
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.slug == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-tools xvfb dbus-x11 xdotool
 
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -97,12 +97,26 @@ jobs:
         run: |
           npm ci
           npm run icon
+          npm test
+
+      - name: Test desktop backend
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --locked
 
       # Builds the installer for the current OS. Add signing secrets here to
       # produce a signed/notarized build (see apps/desktop/README.md).
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         with:
           projectPath: apps/desktop
+
+      - name: Launch Linux AppImage before publishing
+        if: matrix.slug == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage; do
+            bash scripts/ci/test-desktop-appimage.sh "$image"
+          done
 
       - name: Normalize desktop artifacts
         shell: bash

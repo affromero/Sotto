@@ -89,6 +89,16 @@ else
 fi
 mkdir -p .sotto/storage
 
+# Prisma reads the datasource from process.env, including on the first setup.
+set -a
+. "$ENV_FILE"
+set +a
+if [ -z "${BYOK_ENCRYPTION_KEY:-}" ]; then
+  BYOK_ENCRYPTION_KEY=$(openssl rand -hex 32)
+  set_env_value BYOK_ENCRYPTION_KEY "$BYOK_ENCRYPTION_KEY"
+  export BYOK_ENCRYPTION_KEY
+fi
+
 # Apply the clean-slate migration history.
 echo "Applying database migrations..."
 npx prisma migrate deploy --config=prisma.config.ts
@@ -98,7 +108,6 @@ npx prisma generate --schema=apps/web/prisma/schema.prisma
 
 # Seed the fixed language curriculum (idempotent)
 echo "Seeding curriculum..."
-set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
 npx tsx apps/web/prisma/seed-curriculum.ts
 
 echo ""

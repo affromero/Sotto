@@ -12,17 +12,17 @@ import { verifyGateToken } from '@/lib/access/gate';
 const TEST_ACCESS_PASSWORD = 'test-access-password'; // gitleaks:allow
 const TEST_SIGNING_KEY = 'test-signing-key-material-0123456789abcdef'; // gitleaks:allow
 
-function gateRequest(body: unknown): NextRequest {
+function gateRequest(body: unknown, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest('http://localhost:3000/api/v1/gate', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
 
 describe('access gate routes', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     process.env.SOTTO_ACCESS_PASSWORD = TEST_ACCESS_PASSWORD;
     process.env.BYOK_ENCRYPTION_KEY = TEST_SIGNING_KEY;
     mockCheckRateLimit.mockResolvedValue({
@@ -88,6 +88,61 @@ describe('access gate routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
+
+    it('limits password guesses even when clients rotate forwarded addresses', async () => {
+      const buckets = new Map<string, { count: number; expiresAt: number }>();
+      let now = Date.now();
+      mockCheckRateLimit.mockImplementation(
+        async (identifier: string, limit: number, windowSeconds: number) => {
+          const previous = buckets.get(identifier);
+          const bucket =
+            previous && previous.expiresAt > now
+              ? previous
+              : { count: 0, expiresAt: now + windowSeconds * 1000 };
+          const allowed = bucket.count < limit;
+          if (allowed) bucket.count += 1;
+          buckets.set(identifier, bucket);
+          return {
+            allowed,
+            remaining: Math.max(0, limit - bucket.count),
+            resetAt: bucket.expiresAt,
+          };
+        }
+      );
+
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const response = await POST(
+          gateRequest(
+            { password: 'wrong-password' },
+            {
+              'cf-connecting-ip': `192.0.2.${attempt}`,
+              'x-real-ip': `198.51.100.${attempt}`,
+              'x-forwarded-for': `203.0.113.${attempt}`,
+            }
+          )
+        );
+        expect(response.status).toBe(401);
+      }
+
+      const response = await POST(
+        gateRequest(
+          { password: TEST_ACCESS_PASSWORD },
+          {
+            'cf-connecting-ip': '192.0.2.200',
+            'x-real-ip': '198.51.100.200',
+            'x-forwarded-for': '203.0.113.200',
+          }
+        )
+      );
+      expect(response.status).toBe(429);
+      expect(response.cookies.get('sotto_gate')).toBeUndefined();
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+
+      now += 15 * 60 * 1000;
+      const recovered = await POST(gateRequest({ password: TEST_ACCESS_PASSWORD }));
+      expect(recovered.status).toBe(200);
+      expect(await verifyGateToken(recovered.cookies.get('sotto_gate')?.value)).toBe(true);
     });
 
     it('is 404 when no password is configured', async () => {

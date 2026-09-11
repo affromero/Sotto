@@ -13,6 +13,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -60,9 +64,15 @@ body {
   border-radius: 50%;
   background: var(--muted);
 }
-.dot-up { background: var(--good); }
-.dot-working { background: var(--amber); }
-.dot-idle { background: var(--muted); }
+.dot-up {
+  background: var(--good);
+}
+.dot-working {
+  background: var(--amber);
+}
+.dot-idle {
+  background: var(--muted);
+}
 
 .actions {
   display: flex;
@@ -80,10 +90,22 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
-.btn:disabled { opacity: 0.5; cursor: default; }
-.btn-primary { background: var(--amber); color: #fff; }
-.btn-secondary { background: var(--navy); color: #fff; }
-.btn-ghost { background: transparent; color: var(--muted); }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-primary {
+  background: var(--amber);
+  color: #fff;
+}
+.btn-secondary {
+  background: var(--navy);
+  color: #fff;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+}
 
 .notice {
   max-width: 320px;
@@ -93,6 +115,8 @@ body {
 }
 
 .notice pre {
+  user-select: text;
+  -webkit-user-select: text;
   margin: 10px 0 0;
   padding: 10px;
   background: var(--navy);
