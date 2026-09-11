@@ -26,6 +26,8 @@ jobs:
   source:
     if: github.repository == 'affromero/Sotto' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
