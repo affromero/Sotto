@@ -307,7 +307,7 @@ $DC up -d postgres redis
 info "Waiting for the database..."
 DATABASE_READY=0
 for _ in $(seq 1 30); do
-  if $DC exec -T postgres pg_isready -U sotto -d sotto >/dev/null 2>&1; then DATABASE_READY=1; break; fi
+  if $DC exec -T postgres pg_isready -h 127.0.0.1 -U sotto -d sotto >/dev/null 2>&1; then DATABASE_READY=1; break; fi
   sleep 2
 done
 [ "$DATABASE_READY" = 1 ] || fail "PostgreSQL did not become ready. Run '$DC logs postgres' in $SOTTO_DIR."

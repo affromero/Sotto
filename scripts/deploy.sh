@@ -479,7 +479,7 @@ docker compose -f "$COMPOSE_INFRA" up -d --no-build --pull never
 
 echo "Waiting for postgres..."
 for i in $(seq 1 30); do
-  if docker compose -f "$COMPOSE_INFRA" exec -T postgres pg_isready -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
+  if docker compose -f "$COMPOSE_INFRA" exec -T postgres pg_isready -h 127.0.0.1 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
     echo "Postgres ready"
     break
   fi

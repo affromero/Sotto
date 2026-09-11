@@ -43,7 +43,7 @@ services:
       - -c
       - log_lock_waits=on
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-sotto}']
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-sotto}']
       interval: 10s
       timeout: 5s
       retries: 5

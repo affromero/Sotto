@@ -72,7 +72,7 @@ compose up -d postgres redis
 
 # Wait for services
 echo "Waiting for services to be ready..."
-wait_for_service postgres "pg_isready -U postgres"
+wait_for_service postgres "pg_isready -h 127.0.0.1 -U postgres"
 wait_for_service redis "redis-cli ping | grep -q PONG"
 
 # Generate .env.local if not exists

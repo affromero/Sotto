@@ -85,7 +85,17 @@ project = args[args.index('-p') + 1] if '-p' in args else ''
 overrides = [args[index + 1] for index, value in enumerate(args[:-1]) if value == '-f' and args[index + 1].endswith('.json')]
 config = json.loads(pathlib.Path(overrides[-1]).read_text()) if overrides else {}
 if 'ps' in args: finish(args[-1])
-if 'exec' in args: finish()
+if 'exec' in args:
+    command = args[args.index('exec') + 1:]
+    if command[:2] == ['-T', 'postgres'] and 'pg_isready' in command:
+        host = command[command.index('-h') + 1] if '-h' in command else None
+        # The temporary initialization server answers socket probes before TCP is ready.
+        if host is None: finish()
+        ready = host == '127.0.0.1' and mode != 'postgres-unavailable'
+        state['postgres_ready'] = ready
+        finish(code=0 if ready else 1)
+    if command[:2] == ['-T', 'redis']: finish('PONG')
+    finish()
 if 'up' in args:
     if project.endswith('-green'):
         state['web'] = new
@@ -102,7 +112,7 @@ finish()
 
 
 class DeploymentFailureTests(unittest.TestCase):
-    def run_deployment(self, failure):
+    def run_deployment(self, failure, stack='sotto-test'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).parents[2]
@@ -110,7 +120,8 @@ class DeploymentFailureTests(unittest.TestCase):
             for name in ('deploy.sh', 'deploy/production-retention.py', 'deploy/database-command.py', 'smoke-prod.sh'):
                 shutil.copyfile(source / 'scripts' / name, root / 'scripts' / name)
             shutil.copyfile(source / 'Caddyfile', root / 'Caddyfile')
-            (root / '.sotto-test-deploy-slot').write_text('blue\n')
+            slot_file = root / f'.{stack}-deploy-slot'
+            slot_file.write_text('blue\n')
             original_caddy = 'reverse_proxy localhost:3000 localhost:3010\n'
             (root / 'caddy.conf').write_text(original_caddy)
             state = {'capacity': 0, 'pulled': False, 'web': None, 'old_web': OLD, 'workers': OLD, 'public_health': [], 'verified_workers': [], 'premature_route': False}
@@ -127,7 +138,8 @@ class DeploymentFailureTests(unittest.TestCase):
                                PRODUCTION_DEPLOY_LOCK=str(root / 'deploy.lock'),
                                PRODUCTION_CAPACITY_CHECKER=str(bin_path / 'capacity'))
             values = {'NEXT_PUBLIC_APP_URL': 'https://fixture.example', 'SELF_HOSTED': 'false',
-                      'BYOK_ENCRYPTION_KEY': '0' * 32, 'SOTTO_STACK': 'sotto-test',
+                      'BYOK_ENCRYPTION_KEY': '0' * 32, 'SOTTO_STACK': stack,
+                      'REDIS_PASSWORD': 'fixture-redis-password',
                       'SOTTO_RELEASE_SHA': SHA, 'SOTTO_WEB_IMAGE_REF': 'fixture/web@sha256:' + 'c' * 64,
                       'SOTTO_WORKERS_IMAGE_REF': 'fixture/workers@sha256:' + 'c' * 64,
                       'SOTTO_BACKUP_DIR': str(root / 'backups'), 'PRODUCTION_IMAGE_RETENTION_DIR': str(root / 'retention'),
@@ -141,10 +153,22 @@ class DeploymentFailureTests(unittest.TestCase):
             self.assertEqual(after['old_web'], OLD, result.stdout + result.stderr)
             self.assertEqual(after['workers'], OLD, result.stdout + result.stderr)
             self.assertIsNone(after['web'], result.stdout + result.stderr)
-            self.assertEqual((root / '.sotto-test-deploy-slot').read_text(), 'blue\n')
+            self.assertEqual(slot_file.read_text(), 'blue\n')
             self.assertEqual((root / 'caddy.conf').read_text(), original_caddy)
             self.assertFalse(after['premature_route'], result.stdout + result.stderr)
             return after, result.stdout + result.stderr
+
+    def test_primary_deployment_stops_when_only_initialization_socket_is_ready(self):
+        state, output = self.run_deployment('postgres-unavailable', stack='sotto')
+        self.assertIn('Postgres not ready', output)
+        self.assertNotIn('Backing up the application database', output)
+        self.assertFalse(state.get('postgres_ready', False), output)
+
+    def test_primary_deployment_reaches_backup_after_database_accepts_tcp(self):
+        state, output = self.run_deployment('backup', stack='sotto')
+        self.assertTrue(state.get('postgres_ready', False), output)
+        self.assertIn('Backing up the application database', output)
+        self.assertNotIn('Postgres not ready', output)
 
     def test_capacity_rejection_before_import_keeps_current_services(self):
         state, output = self.run_deployment('pre-capacity')

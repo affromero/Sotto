@@ -13,7 +13,7 @@ REVISION = "12345678" + "a" * 32
 OLD_REVISION = "87654321" + "b" * 32
 
 BOUNDARY = r'''#!/usr/bin/env python3
-import json, os, pathlib, shutil, sys
+import json, os, pathlib, shlex, shutil, sys
 args = sys.argv[1:]
 name = pathlib.Path(sys.argv[0]).name
 root = pathlib.Path(os.environ["TEST_REPO"])
@@ -61,8 +61,15 @@ if name == "docker":
             sys.exit(1)
         if command[0] == "run" and os.environ.get("TEST_MIGRATION_FAIL"):
             sys.exit(1)
-        if command[:3] == ["exec", "-T", "postgres"] and os.environ.get("TEST_DB_FAIL"):
-            sys.exit(1)
+        if command[:3] == ["exec", "-T", "postgres"]:
+            if os.environ.get("TEST_DB_FAIL"):
+                sys.exit(1)
+            probe = command[3:]
+            if probe[:2] == ["sh", "-c"]:
+                probe = shlex.split(probe[2])
+            if probe and probe[0] == "pg_isready":
+                # Model a running TCP server without a local Unix socket.
+                sys.exit(0 if "-h" in probe and probe[probe.index("-h") + 1] == "127.0.0.1" else 2)
         if command[0] == "ps":
             print("sotto-web")
     sys.exit(0)
