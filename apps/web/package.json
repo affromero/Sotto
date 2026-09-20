@@ -70,7 +70,7 @@
     "resend": "^6.25.0",
     "styled-jsx": "^5.1.7",
     "thesidedoor": "0.2.0",
-    "thesidedoor-core": "0.1.0",
+    "thesidedoor-core": "0.2.0",
     "topojson-client": "^3.1.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
