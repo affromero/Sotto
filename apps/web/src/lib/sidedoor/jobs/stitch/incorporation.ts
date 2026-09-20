@@ -44,7 +44,7 @@ function incorporationAttemptStore(database: Prisma.TransactionClient, interacti
   });
 }
 
-/** Phase names alone cannot distinguish an old queue delivery from a later attempt. */
+/** Phase names alone cannot distinguish a stale queue delivery from a later attempt. */
 export async function requireIncorporationAttempt(
   database: Prisma.TransactionClient,
   interactionId: string,
