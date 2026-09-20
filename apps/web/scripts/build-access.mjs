@@ -7,6 +7,6 @@ await build({
   platform: 'node',
   target: 'node22',
   format: 'cjs',
-  external: ['fs-ext', 'pg-native'],
+  external: ['thesidedoor-flock', 'pg-native'],
   logLevel: 'info',
 });
