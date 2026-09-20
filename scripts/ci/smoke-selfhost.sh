@@ -76,6 +76,7 @@ compose run --rm workers sh -ec \
 compose run --rm workers sh -ec \
   'cd /app && npx --no-install tsx apps/web/prisma/seed-curriculum.ts'
 compose run --rm web node dist/access.cjs initialize
+compose run --rm web node dist/access.cjs finalize
 claim_json="$(compose run --rm web node dist/access.cjs claim | tail -n 1)"
 claim_code="$(printf '%s\n' "$claim_json" | sed -nE 's/.*"code"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')"
 [ -n "$claim_code" ]

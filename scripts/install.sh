@@ -246,6 +246,8 @@ $DC run --rm workers sh -c \
 info "Initializing Sidedoor access..."
 $DC run --rm web node dist/access.cjs initialize \
   || fail "Access initialization failed. Check '$DC logs' and re-run."
+$DC run --rm web node dist/access.cjs finalize \
+  || fail "Access finalization failed. Check '$DC logs' and re-run."
 ACCESS_LIST=$($DC run --rm web node dist/access.cjs list) \
   || fail "Access state inspection failed. Check '$DC logs' and re-run."
 CLAIM_CODE=""

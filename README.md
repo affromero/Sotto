@@ -259,6 +259,10 @@ An update dumps the database, refreshes the compose file, pulls the images, runs
 migrations, and waits for the health endpoint before calling it done. If the
 stack does not come up, the dump and `sotto-host rollback` are both there.
 Migrations are forward-only, so a rollback returns the images, not the schema.
+The Sidedoor cutover copies installed provider, model, storage, learner, and
+encrypted credential state in one transaction while the active release keeps
+running. Source tables are removed only after the candidate passes its health
+check. A conversion error rolls back the transaction and stops the update.
 
 Installed before this command existed? Fetch it once:
 

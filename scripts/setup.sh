@@ -106,6 +106,10 @@ npx prisma migrate deploy --config=prisma.config.ts
 # Generate Prisma client
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 
+# Convert installed configuration and initialize canonical access atomically.
+npx tsx apps/web/scripts/access.ts initialize
+npx tsx apps/web/scripts/access.ts finalize
+
 # Seed the fixed language curriculum (idempotent)
 echo "Seeding curriculum..."
 npx tsx apps/web/prisma/seed-curriculum.ts

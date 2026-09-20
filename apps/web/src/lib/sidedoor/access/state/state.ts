@@ -10,6 +10,7 @@ export const CREDENTIAL_SCOPES = [
   'storage',
   'pricing',
 ] as const;
+export const INSTALLED_PROFILE_INITIALIZATION = 'sotto-installed-profiles-v1';
 export const credentialScopeSchema = z.enum(CREDENTIAL_SCOPES);
 export const sharedConfigurationValueSchema = z.record(z.string(), z.json());
 

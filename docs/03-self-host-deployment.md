@@ -50,6 +50,12 @@ a finished build. Failed downloads and pulls preserve your configuration.
 update. Database migrations are forward-only; image rollback does not restore the
 database. Keep the backup created before an update.
 
+The Sidedoor conversion prepares canonical provider, model, storage, learner,
+and encrypted credential state before switching releases. The active release
+keeps its source tables during the candidate health check. Finalization removes
+those tables only after health succeeds. Any preparation or finalization error
+rolls back its database transaction and stops the update.
+
 | Problem                                               | Action                                                                                                                             |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Docker is installed but unavailable                   | Start Docker Desktop or the Docker daemon. Confirm `docker info` works as your user.                                               |

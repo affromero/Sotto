@@ -576,6 +576,9 @@ echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   workers-heavy npx --no-install prisma migrate deploy --config=/app/prisma.config.ts
+docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" run --rm --no-deps --pull never \
+  -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
+  web node dist/access.cjs initialize
 
 # --- Start new slot ---
 
@@ -670,6 +673,12 @@ if [ "$(printf '%s' "$public_health" | python3 -c 'import json,sys; print(json.l
   echo "ERROR: public routing did not select the healthy candidate." >&2
   exit 1
 fi
+
+echo ""
+echo "=== Finalizing Sidedoor conversion ==="
+docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" run --rm --no-deps --pull never \
+  -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
+  web node dist/access.cjs finalize
 
 # --- Stop old slot ---
 # Workers are already out of app compose. No job drain needed here.

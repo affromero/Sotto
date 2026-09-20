@@ -158,15 +158,20 @@ class SelfHostTests(unittest.TestCase):
         self.assertTrue(any(f"/{REVISION}/docker-compose.selfhost.yml" in url for url in urls))
         self.assertFalse(any("/commits/main" in url for url in urls))
         self.assertEqual((self.install / "previous" / "docker-compose.yml").read_text(), self.original["docker-compose.yml"])
-        migrations = [c["args"] for c in commands if c["command"] == "docker" and "--no-deps" in c["args"]]
-        self.assertEqual(len(migrations), 1)
-        migration = migrations[0]
+        candidate_commands = [c["args"] for c in commands if c["command"] == "docker" and "--no-deps" in c["args"]]
+        self.assertEqual(len(candidate_commands), 3)
+        migration = next(command for command in candidate_commands if "prisma migrate deploy" in command[-1])
+        conversion = next(command for command in candidate_commands if command[-1] == "initialize")
+        finalization = next(command for command in candidate_commands if command[-1] == "finalize")
         self.assertEqual(migration[migration.index("--project-directory") + 1], str(self.install))
         self.assertNotEqual(migration[migration.index("--env-file") + 1], str(self.install / ".env"))
         self.assertIn("prisma migrate deploy", migration[-1])
         self.assertIn("tsx apps/web/prisma/seed-curriculum.ts", migration[-1])
         compose_files = [Path(migration[index + 1]).name for index, argument in enumerate(migration) if argument == "-f"]
         self.assertEqual(compose_files, ["docker-compose.yml", "candidate-env.yml", "docker-compose.override.yml"])
+        self.assertEqual(conversion[-3:], ["node", "dist/access.cjs", "initialize"])
+        self.assertEqual(conversion[conversion.index("--project-directory") + 1], str(self.install))
+        self.assertEqual(finalization[-3:], ["node", "dist/access.cjs", "finalize"])
 
     def test_check_does_not_pull_or_modify_installation(self):
         result = self.run_script("sotto-host", "update", "--check")

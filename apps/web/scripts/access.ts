@@ -2,7 +2,7 @@ import { parseAccessCommand } from 'thesidedoor-core/access';
 
 async function main() {
   const args = process.argv.slice(2);
-  parseAccessCommand(args);
+  if (!(args.length === 1 && args[0] === 'finalize')) parseAccessCommand(args);
   const { prismaUnfiltered } = await import('../src/lib/prisma');
   try {
     const { runSottoAccessCommand } = await import('../src/lib/sidedoor/access/core/operator');
