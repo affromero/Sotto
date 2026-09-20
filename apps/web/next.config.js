@@ -12,6 +12,7 @@ const nextConfig = {
     'pg',
     'markit-ai',
     '@shiftlabs/markit',
+    'thesidedoor-flock',
   ],
   // Per-instance build dir, so two dev servers (e.g. the self-hosted instance and
   // the SELF_HOSTED=false mock) can run side by side without fighting over .next.
