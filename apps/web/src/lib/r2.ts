@@ -11,7 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
 import { constants } from 'fs';
-import { access, mkdir, open, readdir, stat, unlink, writeFile } from 'fs/promises';
+import { access, mkdir, readdir, stat, unlink, writeFile } from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import {
@@ -41,6 +41,7 @@ import {
 } from '@/lib/storage/sidedoor/configuration';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { readLocalStorageFile } from '@/lib/storage/sidedoor/local-object-read';
 
 function localBaseDir(): string {
   return configuredLocalStorageRoot();
@@ -609,45 +610,9 @@ export async function readLocalObject(
   key: string,
   range?: string | null
 ): Promise<{ body: Buffer; size: number; contentType: string; start: number; end: number } | null> {
-  let size: number;
-  const filePath =
-    (await attributedLocalPath(key)) ??
-    (configuredStorageProvider() === 'local' ? localPathForKey(key) : null);
+  const filePath = await attributedLocalPath(key);
   if (!filePath) return null;
-  try {
-    size = (await stat(/* turbopackIgnore: true */ filePath)).size;
-  } catch {
-    return null;
-  }
-
-  let start = 0;
-  let end = size - 1;
-  if (range) {
-    // Only the single `bytes=a-b` form media elements actually send.
-    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
-    if (!match) return null;
-    const [, rawStart, rawEnd] = match;
-    if (rawStart === '') {
-      // Suffix range: the last N bytes.
-      const suffix = Number(rawEnd);
-      if (!Number.isFinite(suffix) || suffix <= 0) return null;
-      start = Math.max(0, size - suffix);
-    } else {
-      start = Number(rawStart);
-      if (rawEnd !== '') end = Math.min(end, Number(rawEnd));
-    }
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size)
-      return null;
-  }
-
-  const handle = await open(/* turbopackIgnore: true */ filePath, 'r');
-  try {
-    const body = Buffer.alloc(end - start + 1);
-    await handle.read(body, 0, body.length, start);
-    return { body, size, contentType: contentTypeForKey(key), start, end };
-  } finally {
-    await handle.close();
-  }
+  return readLocalStorageFile(filePath, key, range);
 }
 
 /**

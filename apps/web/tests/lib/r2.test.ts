@@ -91,17 +91,12 @@ describe('shared storage runtime', () => {
     });
   });
 
-  it('writes and serves local bytes through the browser route', async () => {
+  it('does not serve local bytes without canonical attribution', async () => {
     Object.assign(boundary.config, { storageProvider: 'local', localStorageRoot: directory });
     const url = await uploadFile('episodes/one/audio.mp3', Buffer.from('audio'), 'audio/mpeg');
     expect(url).toBe('/api/v1/storage/episodes/one/audio.mp3');
     expect(await readFile(join(directory, 'episodes/one/audio.mp3'), 'utf8')).toBe('audio');
-    expect(await readLocalObject('episodes/one/audio.mp3')).toMatchObject({
-      body: Buffer.from('audio'),
-      size: 5,
-      start: 0,
-      end: 4,
-    });
+    expect(await readLocalObject('episodes/one/audio.mp3')).toBeNull();
     expect(await resolveAudioUrl(url)).toBe(url);
   });
 
