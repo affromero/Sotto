@@ -99,6 +99,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
     binding.database = instance.database;
   });
   beforeEach(async () => {
+    vi.stubEnv('DATABASE_URL', process.env.SIDEDOOR_TEST_DATABASE_URL!);
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'sotto-audio-worker-test-key');
     vi.stubEnv('REDIS_URL', process.env.SIDEDOOR_TEST_REDIS_URL!);
     vi.stubEnv('TTS_BASE_URL', 'http://tts.example.test');

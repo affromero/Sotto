@@ -72,6 +72,7 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
     binding.database = instance.database;
   });
   beforeEach(async () => {
+    vi.stubEnv('DATABASE_URL', process.env.SIDEDOOR_TEST_DATABASE_URL!);
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
     vi.stubEnv('SIDEDOOR_TRUSTED_PROXY', 'false');
