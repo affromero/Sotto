@@ -907,7 +907,7 @@ describe('processContentExtraction', () => {
         publishedDate: null,
         wordCount: 0,
         sourceType: 'youtube',
-        extractionMethod: 'summarize-core',
+        extractionMethod: 'youtube-transcript',
       });
 
       const job = createMockJob({

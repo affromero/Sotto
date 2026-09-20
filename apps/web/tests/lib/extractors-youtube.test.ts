@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFetchLinkContent = vi.fn();
+const mockFetchTranscript = vi.fn();
 
-vi.mock('@steipete/summarize-core', () => ({
-  createLinkPreviewClient: () => ({
-    fetchLinkContent: (...args: unknown[]) => mockFetchLinkContent(...args),
-  }),
+vi.mock('youtube-transcript-ts', () => ({
+  YouTubeTranscriptApi: class {
+    fetchTranscript(...args: unknown[]) {
+      return mockFetchTranscript(...args);
+    }
+  },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -18,6 +20,30 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { isYouTubeUrl, extractVideoId, extractYouTubeContent } from '@/lib/extractors/youtube';
+
+function transcriptResult(text: string, generated = false) {
+  return {
+    transcript: {
+      snippets: text ? [{ text, start: 0, duration: 1 }] : [],
+      videoId: 'test123',
+      language: 'English',
+      languageCode: 'en',
+      isGenerated: generated,
+    },
+    metadata: {
+      id: 'test123',
+      title: 'Test Video',
+      description: 'A test video',
+      author: 'Test Author',
+      channelId: 'channel',
+      lengthSeconds: 10,
+      viewCount: 1,
+      isPrivate: false,
+      isLiveContent: false,
+      publishDate: '2026-09-01',
+    },
+  };
+}
 
 describe('youtube extractor', () => {
   beforeEach(() => {
@@ -74,16 +100,10 @@ describe('youtube extractor', () => {
   });
 
   describe('extractYouTubeContent', () => {
-    it('returns transcript text from summarize-core', async () => {
-      mockFetchLinkContent.mockResolvedValue({
-        content: 'Hello everyone. Welcome to the video.',
-        title: 'Test Video',
-        description: 'A test video',
-        siteName: 'YouTube',
-        transcriptSource: 'youtubei',
-        transcriptionProvider: null,
-        wordCount: 6,
-      });
+    it('returns transcript text and video metadata', async () => {
+      mockFetchTranscript.mockResolvedValue(
+        transcriptResult('Hello everyone. Welcome to the video.')
+      );
 
       const result = await extractYouTubeContent('https://www.youtube.com/watch?v=test123');
 
@@ -92,34 +112,18 @@ describe('youtube extractor', () => {
       expect(result.title).toBe('Test Video');
     });
 
-    it('sets sourceType to youtube with summarize-core method', async () => {
-      mockFetchLinkContent.mockResolvedValue({
-        content: 'Content',
-        title: null,
-        description: null,
-        siteName: 'YouTube',
-        transcriptSource: 'captionTracks',
-        transcriptionProvider: null,
-        wordCount: 1,
-      });
+    it('sets sourceType to youtube with the transcript method', async () => {
+      mockFetchTranscript.mockResolvedValue(transcriptResult('Content'));
 
       const result = await extractYouTubeContent('https://www.youtube.com/watch?v=test123');
 
       expect(result.sourceType).toBe('youtube');
-      expect(result.extractionMethod).toBe('summarize-core');
+      expect(result.extractionMethod).toBe('youtube-transcript');
       expect(result.siteName).toBe('YouTube');
     });
 
     it('handles videos without transcript gracefully', async () => {
-      mockFetchLinkContent.mockResolvedValue({
-        content: '',
-        title: null,
-        description: null,
-        siteName: 'YouTube',
-        transcriptSource: null,
-        transcriptionProvider: null,
-        wordCount: 0,
-      });
+      mockFetchTranscript.mockResolvedValue(transcriptResult(''));
 
       const result = await extractYouTubeContent('https://www.youtube.com/watch?v=test123');
 
@@ -129,7 +133,7 @@ describe('youtube extractor', () => {
     });
 
     it('handles extraction errors', async () => {
-      mockFetchLinkContent.mockRejectedValue(new Error('Network error'));
+      mockFetchTranscript.mockRejectedValue(new Error('Network error'));
 
       const result = await extractYouTubeContent('https://www.youtube.com/watch?v=test123');
 
@@ -142,28 +146,20 @@ describe('youtube extractor', () => {
 
       expect(result.text).toBe('');
       expect(result.description).toContain('Invalid YouTube URL');
-      expect(mockFetchLinkContent).not.toHaveBeenCalled();
+      expect(mockFetchTranscript).not.toHaveBeenCalled();
     });
 
-    it('passes auto mode and max characters to summarize-core', async () => {
-      mockFetchLinkContent.mockResolvedValue({
-        content: 'Transcribed content',
-        title: null,
-        description: null,
-        siteName: 'YouTube',
-        transcriptSource: 'yt-dlp',
-        transcriptionProvider: 'openai',
-        wordCount: 2,
-      });
+    it('requests every supported course language without formatting', async () => {
+      mockFetchTranscript.mockResolvedValue(transcriptResult('Transcribed content'));
 
       await extractYouTubeContent('https://www.youtube.com/watch?v=test123');
 
-      expect(mockFetchLinkContent).toHaveBeenCalledWith(
+      expect(mockFetchTranscript).toHaveBeenCalledWith(
         'https://www.youtube.com/watch?v=test123',
         expect.objectContaining({
-          youtubeTranscript: 'auto',
-          maxCharacters: 50000,
-          format: 'text',
+          languages: expect.arrayContaining(['en', 'de', 'es', 'fr', 'ja']),
+          preserveFormatting: false,
+          formatter: 'text',
         })
       );
     });
