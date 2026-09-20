@@ -16,7 +16,10 @@ export function sottoJobExecutions(database: Prisma.TransactionClient) {
 }
 
 export function resolveSottoExecutionDirectory(): string {
-  return resolve(process.cwd(), process.env.SIDEDOOR_EXECUTION_DIR || '.sotto/executions');
+  return resolve(
+    /* turbopackIgnore: true */ process.cwd(),
+    process.env.SIDEDOOR_EXECUTION_DIR || '.sotto/executions'
+  );
 }
 
 /** Application authority and transactions adapt the shared execution lifecycle. */
