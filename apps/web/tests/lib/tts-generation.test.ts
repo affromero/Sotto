@@ -1,33 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { access, rm } from 'node:fs/promises';
+
+let chunkAudio: Buffer;
+beforeAll(async () => {
+  const result = await promisify(execFile)(
+    'ffmpeg',
+    ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440', '-t', '0.2', '-f', 'mp3', 'pipe:1'],
+    { encoding: 'buffer' }
+  );
+  chunkAudio = result.stdout;
+});
 
 // ---- Mocks ----
 
-const mockSemaphoreAcquire = vi.fn().mockResolvedValue(true);
+const mockSemaphoreWait = vi.fn().mockResolvedValue(true);
 const mockSemaphoreRelease = vi.fn().mockResolvedValue(undefined);
-
-vi.mock('@/lib/redis', () => ({
-  semaphore: {
-    acquire: (...args: unknown[]) => mockSemaphoreAcquire(...args),
-    release: (...args: unknown[]) => mockSemaphoreRelease(...args),
-  },
+const mockOpenSottoSemaphore = vi.fn().mockImplementation(async () => ({
+  wait: (...args: unknown[]) => mockSemaphoreWait(...args),
+  release: (...args: unknown[]) => mockSemaphoreRelease(...args),
 }));
 
-vi.mock('@/lib/byok', () => ({
-  getByokKey: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('@/lib/elevenlabs', () => ({
-  getElevenLabsConcurrencyLimit: vi.fn().mockResolvedValue(5),
-}));
-
-vi.mock('@/lib/providers/tts/cartesia.provider', () => ({
-  getCartesiaConcurrencyLimit: vi.fn().mockResolvedValue(2),
-  updateCartesiaConcurrencyFromError: vi.fn(),
-}));
-
-vi.mock('@/lib/providers/tts/hume.provider', () => ({
-  getHumeConcurrencyLimit: vi.fn().mockResolvedValue(5),
-  updateHumeConcurrencyFromError: vi.fn(),
+vi.mock('@/lib/sidedoor/jobs/core/redis-semaphore', () => ({
+  openSottoSemaphore: (...args: unknown[]) => mockOpenSottoSemaphore(...args),
 }));
 
 vi.mock('@/lib/tts-text-cleaner', () => ({
@@ -40,22 +36,6 @@ const mockGetAudioDuration = vi.fn().mockResolvedValue(5.0);
 vi.mock('@/lib/audio-stitcher', () => ({
   getAudioDuration: (...args: unknown[]) => mockGetAudioDuration(...args),
 }));
-
-vi.mock('fs/promises', () => {
-  const writeFile = vi.fn().mockResolvedValue(undefined);
-  const rm = vi.fn().mockResolvedValue(undefined);
-  const readFile = vi.fn().mockResolvedValue(Buffer.from('concatenated-audio'));
-  return { default: { writeFile, rm, readFile }, writeFile, rm, readFile };
-});
-
-vi.mock('child_process', () => {
-  const execFile = vi.fn(
-    (_cmd: string, _args: string[], cb: (err: null, stdout: string, stderr: string) => void) => {
-      cb(null, '', '');
-    }
-  );
-  return { default: { execFile }, execFile };
-});
 
 vi.mock('@/lib/duration', () => ({
   estimateDurationFromText: vi.fn((text: string) => text.length / 12.5),
@@ -76,10 +56,6 @@ vi.mock('@/lib/usage-logger', () => ({
   logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
 
-vi.mock('@/lib/byok-errors', () => ({
-  isModelAccessError: vi.fn((msg: string) => /\b404\b/.test(msg)),
-}));
-
 const mockResolveTtsProvider = vi.fn();
 vi.mock('@/lib/providers/tts', () => ({
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
@@ -90,21 +66,16 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---- Import under test ----
-import {
-  generateTtsAudio,
-  getPlatformTtsKey,
-  type TtsGenerationParams,
-} from '@/lib/tts-generation';
+import { generateTtsAudio, type TtsGenerationParams } from '@/lib/tts-generation';
 import { splitTextForTts } from '@/lib/tts-text-cleaner';
-import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
-import {
-  getCartesiaConcurrencyLimit,
-  updateCartesiaConcurrencyFromError,
-} from '@/lib/providers/tts/cartesia.provider';
-import { updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
+import { MediaCleanupError } from '@/lib/audio/media-process';
+import { TtsMediaCleanupError } from '@/lib/audio/tts-media';
 
 // ---- Helpers ----
+
+const mockGetConcurrencyLimit = vi.fn().mockResolvedValue(5);
+const mockObserveConcurrencyError = vi.fn().mockResolvedValue(undefined);
 
 const mockGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('audio-data'));
 
@@ -114,13 +85,15 @@ function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationP
     voiceId: 'voice-1',
     speaker: 'HOST',
     provider: {
+      getConcurrencyLimit: mockGetConcurrencyLimit,
+      observeConcurrencyError: mockObserveConcurrencyError,
       generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
       getVoiceId: vi.fn().mockReturnValue('voice-1'),
       getModelId: () => 'eleven_v3',
       providerId: 'elevenlabs' as TtsProviderId,
     },
     providerId: 'elevenlabs',
-    source: 'platform',
+    source: 'credential',
     userId: 'user-1',
     episodeId: 'episode-1',
     usageCategory: 'audio_generation',
@@ -134,7 +107,10 @@ function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationP
 describe('generateTtsAudio', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSemaphoreAcquire.mockResolvedValue(true);
+    mockGetConcurrencyLimit.mockResolvedValue(5);
+    mockObserveConcurrencyError.mockResolvedValue(undefined);
+    mockSemaphoreWait.mockResolvedValue(true);
+    mockSemaphoreRelease.mockResolvedValue(undefined);
     mockGenerateSpeech.mockResolvedValue(Buffer.from('audio-data'));
     mockGetAudioDuration.mockResolvedValue(5.0);
   });
@@ -147,6 +123,51 @@ describe('generateTtsAudio', () => {
     expect(result!.segmentDuration).toBe(5.0);
     expect(result!.service).toBe('elevenlabs');
     expect(result!.wordTimings).toBeNull();
+  });
+
+  it('makes the provider slot available before local duration processing', async () => {
+    let occupied = 0;
+    mockSemaphoreWait.mockImplementation(async () => {
+      occupied += 1;
+      return true;
+    });
+    mockSemaphoreRelease.mockImplementation(async () => {
+      occupied -= 1;
+    });
+    mockGetAudioDuration.mockImplementation(async () => {
+      expect(occupied).toBe(0);
+      return 5;
+    });
+    expect((await generateTtsAudio(defaultParams()))?.segmentDuration).toBe(5);
+  });
+
+  it('preserves provider failure and releases an acquired slot only once when Redis loses the release acknowledgement', async () => {
+    const providerFailure = new Error('Provider failed');
+    const releaseFailure = new Error('Redis response lost');
+    let occupied = 1;
+    mockGenerateSpeech.mockRejectedValue(providerFailure);
+    mockSemaphoreRelease.mockImplementation(async () => {
+      occupied -= 1;
+      throw releaseFailure;
+    });
+    const error = await generateTtsAudio(defaultParams()).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors).toEqual([providerFailure, releaseFailure]);
+    expect(occupied).toBe(0);
+  });
+
+  it('does not dispatch speech when shared admission returns cancellation', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('Cancelled during acquisition');
+    mockSemaphoreWait.mockImplementation(async () => {
+      controller.abort(cancellation);
+      throw cancellation;
+    });
+    await expect(generateTtsAudio(defaultParams({ signal: controller.signal }))).rejects.toBe(
+      cancellation
+    );
+    expect(mockSemaphoreRelease).not.toHaveBeenCalled();
+    expect(mockGenerateSpeech).not.toHaveBeenCalled();
   });
 
   it('passes all speech params to provider.generateSpeech', async () => {
@@ -176,14 +197,26 @@ describe('generateTtsAudio', () => {
   it('acquires and releases semaphore', async () => {
     await generateTtsAudio(defaultParams());
 
-    expect(mockSemaphoreAcquire).toHaveBeenCalledWith('tts:sem:user-1:elevenlabs', 5);
-    expect(mockSemaphoreRelease).toHaveBeenCalledWith('tts:sem:user-1:elevenlabs');
+    expect(mockOpenSottoSemaphore).toHaveBeenCalledWith({
+      resource: 'tts:sem:user-1:elevenlabs',
+      limit: 5,
+      ttlMs: 120_000,
+    });
+    expect(mockSemaphoreWait).toHaveBeenCalledOnce();
+    const waitOptions = mockSemaphoreWait.mock.calls[0][0] as { delaysMs: number[] };
+    expect(waitOptions.delaysMs).toHaveLength(29);
+    expect(waitOptions.delaysMs.every(Number.isSafeInteger)).toBe(true);
+    expect(mockSemaphoreRelease).toHaveBeenCalledWith();
   });
 
   it('returns null when isAborted returns true during semaphore wait', async () => {
-    // Semaphore never acquired — triggers abort check
-    mockSemaphoreAcquire.mockResolvedValue(false);
     const isAborted = vi.fn().mockResolvedValue(true);
+    mockSemaphoreWait.mockImplementation(
+      async ({ shouldStop }: { shouldStop: () => Promise<boolean> }) => {
+        await shouldStop();
+        return false;
+      }
+    );
 
     const result = await generateTtsAudio(defaultParams({ isAborted }));
 
@@ -192,49 +225,41 @@ describe('generateTtsAudio', () => {
   });
 
   it('throws when semaphore times out after 30 attempts', async () => {
-    vi.useFakeTimers();
-    mockSemaphoreAcquire.mockResolvedValue(false);
+    mockSemaphoreWait.mockResolvedValue(false);
     const isAborted = vi.fn().mockResolvedValue(false);
 
-    const promise = generateTtsAudio(defaultParams({ isAborted })).catch((e: Error) => e);
-
-    // Advance through all 30 backoff iterations
-    for (let i = 0; i < 30; i++) {
-      await vi.advanceTimersByTimeAsync(16000);
-    }
-
-    const error = await promise;
+    const error = await generateTtsAudio(defaultParams({ isAborted })).catch((e: Error) => e);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toMatch('Timed out waiting for TTS semaphore');
-    vi.useRealTimers();
   });
 
   it('uses ElevenLabs concurrency limit when provider is elevenlabs', async () => {
-    process.env.ELEVENLABS_API_KEY = 'test-key';
-    (getElevenLabsConcurrencyLimit as ReturnType<typeof vi.fn>).mockResolvedValue(10);
+    mockGetConcurrencyLimit.mockResolvedValue(10);
 
     await generateTtsAudio(defaultParams());
 
-    expect(getElevenLabsConcurrencyLimit).toHaveBeenCalledWith('test-key');
-    expect(mockSemaphoreAcquire).toHaveBeenCalledWith('tts:sem:user-1:elevenlabs', 10);
-
-    delete process.env.ELEVENLABS_API_KEY;
+    expect(mockOpenSottoSemaphore).toHaveBeenCalledWith({
+      resource: 'tts:sem:user-1:elevenlabs',
+      limit: 10,
+      ttlMs: 120_000,
+    });
   });
 
   it('uses Cartesia concurrency limit when provider is cartesia', async () => {
-    process.env.CARTESIA_API_KEY = 'cartesia-key';
-
+    mockGetConcurrencyLimit.mockResolvedValue(2);
     await generateTtsAudio(defaultParams({ providerId: 'cartesia' }));
 
-    expect(getCartesiaConcurrencyLimit).toHaveBeenCalledWith('cartesia-key');
-
-    delete process.env.CARTESIA_API_KEY;
+    expect(mockOpenSottoSemaphore).toHaveBeenCalledWith({
+      resource: 'tts:sem:user-1:cartesia',
+      limit: 2,
+      ttlMs: 120_000,
+    });
   });
 
-  it('returns byok service string when source is byok', async () => {
-    const result = await generateTtsAudio(defaultParams({ source: 'byok' }));
+  it('records the provider as the usage service for saved credentials', async () => {
+    const result = await generateTtsAudio(defaultParams({ source: 'credential' }));
 
-    expect(result!.service).toBe('elevenlabs_byok');
+    expect(result!.service).toBe('elevenlabs');
   });
 
   it('falls back to text estimation when FFprobe fails', async () => {
@@ -244,6 +269,34 @@ describe('generateTtsAudio', () => {
 
     // 125 chars / 12.5 chars/sec = 10 sec
     expect(result!.segmentDuration).toBe(10);
+  });
+
+  it('does not turn duration cancellation into successful estimated audio', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('Stop duration processing');
+    mockGetAudioDuration.mockImplementation(async () => {
+      controller.abort(cancellation);
+      throw cancellation;
+    });
+    await expect(generateTtsAudio(defaultParams({ signal: controller.signal }))).rejects.toBe(
+      cancellation
+    );
+    expect(mockLogUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not hide unconfirmed duration process cleanup behind an estimate', async () => {
+    const failure = new MediaCleanupError({ cause: new Error('Process closure unconfirmed') });
+    mockGetAudioDuration.mockRejectedValue(failure);
+    const error = await generateTtsAudio(defaultParams()).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(TtsMediaCleanupError);
+    const cleanup = error as TtsMediaCleanupError;
+    try {
+      expect(cleanup.cause).toBe(failure);
+      await expect(access(cleanup.directory)).resolves.toBeUndefined();
+    } finally {
+      await rm(cleanup.directory, { recursive: true, force: true });
+    }
+    expect(mockLogUsage).not.toHaveBeenCalled();
   });
 
   it('logs usage with correct category and metadata', async () => {
@@ -264,19 +317,26 @@ describe('generateTtsAudio', () => {
     );
   });
 
-  it('throws on BYOK model-access 404 — no retry', async () => {
+  it('surfaces a saved-credential model-access 404 without retrying', async () => {
     mockGenerateSpeech.mockRejectedValue(
       new Error('ElevenLabs API error (404): The model does not exist')
     );
 
-    await expect(generateTtsAudio(defaultParams({ source: 'byok' }))).rejects.toThrow('(404)');
+    await expect(generateTtsAudio(defaultParams({ source: 'credential' }))).rejects.toThrow(
+      '(404)'
+    );
 
     expect(mockResolveTtsProvider).not.toHaveBeenCalled();
   });
 
   describe('429 error handling', () => {
+    it('preserves the provider failure when concurrency observation fails', async () => {
+      const failure = new Error('Provider API error (429): retry later');
+      mockGenerateSpeech.mockRejectedValue(failure);
+      mockObserveConcurrencyError.mockRejectedValue(new Error('Cache unavailable'));
+      await expect(generateTtsAudio(defaultParams())).rejects.toBe(failure);
+    });
     it('updates Cartesia concurrency on 429', async () => {
-      process.env.CARTESIA_API_KEY = 'cartesia-key';
       const cartesiaSpeech = vi
         .fn()
         .mockRejectedValue(new Error('Cartesia API error (429): Rate limited. Current limit: 3'));
@@ -286,6 +346,7 @@ describe('generateTtsAudio', () => {
           defaultParams({
             providerId: 'cartesia',
             provider: {
+              observeConcurrencyError: mockObserveConcurrencyError,
               generateSpeech: (...args: unknown[]) => cartesiaSpeech(...args),
               getVoiceId: vi.fn(),
               getModelId: () => 'sonic-3',
@@ -295,17 +356,14 @@ describe('generateTtsAudio', () => {
         )
       ).rejects.toThrow('(429)');
 
-      expect(updateCartesiaConcurrencyFromError).toHaveBeenCalledWith(
-        'cartesia-key',
-        'Cartesia API error (429): Rate limited. Current limit: 3'
+      expect(mockObserveConcurrencyError).toHaveBeenCalledWith(
+        'Cartesia API error (429): Rate limited. Current limit: 3',
+        undefined
       );
       expect(mockSemaphoreRelease).toHaveBeenCalled();
-
-      delete process.env.CARTESIA_API_KEY;
     });
 
     it('updates Hume concurrency on 429', async () => {
-      process.env.HUME_API_KEY = 'hume-key';
       const humeSpeech = vi
         .fn()
         .mockRejectedValue(new Error('Hume AI API error (429): concurrency limit exceeded'));
@@ -315,6 +373,7 @@ describe('generateTtsAudio', () => {
           defaultParams({
             providerId: 'hume',
             provider: {
+              observeConcurrencyError: mockObserveConcurrencyError,
               generateSpeech: (...args: unknown[]) => humeSpeech(...args),
               getVoiceId: vi.fn(),
               getModelId: () => 'octave-v1',
@@ -324,12 +383,10 @@ describe('generateTtsAudio', () => {
         )
       ).rejects.toThrow('(429)');
 
-      expect(updateHumeConcurrencyFromError).toHaveBeenCalledWith(
-        'hume-key',
-        'Hume AI API error (429): concurrency limit exceeded'
+      expect(mockObserveConcurrencyError).toHaveBeenCalledWith(
+        'Hume AI API error (429): concurrency limit exceeded',
+        undefined
       );
-
-      delete process.env.HUME_API_KEY;
     });
 
     it('does not update concurrency on non-429 errors', async () => {
@@ -337,8 +394,7 @@ describe('generateTtsAudio', () => {
 
       await expect(generateTtsAudio(defaultParams())).rejects.toThrow('(500)');
 
-      expect(updateCartesiaConcurrencyFromError).not.toHaveBeenCalled();
-      expect(updateHumeConcurrencyFromError).not.toHaveBeenCalled();
+      expect(mockObserveConcurrencyError).not.toHaveBeenCalled();
     });
 
     it('releases semaphore on error', async () => {
@@ -370,9 +426,7 @@ describe('generateTtsAudio', () => {
         return `req-${callCount}`;
       });
 
-      mockGenerateSpeech
-        .mockResolvedValueOnce(Buffer.from('audio-chunk-1'))
-        .mockResolvedValueOnce(Buffer.from('audio-chunk-2'));
+      mockGenerateSpeech.mockResolvedValueOnce(chunkAudio).mockResolvedValueOnce(chunkAudio);
 
       const result = await generateTtsAudio(
         defaultParams({
@@ -380,6 +434,8 @@ describe('generateTtsAudio', () => {
           previousText: 'Before segment.',
           nextText: 'After segment.',
           provider: {
+            getConcurrencyLimit: mockGetConcurrencyLimit,
+            observeConcurrencyError: mockObserveConcurrencyError,
             generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
             getVoiceId: vi.fn().mockReturnValue('voice-1'),
             getModelId: () => 'eleven_v3',
@@ -413,7 +469,7 @@ describe('generateTtsAudio', () => {
         })
       );
 
-      expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
+      expect(result!.audioBuffer.byteLength).toBeGreaterThan(chunkAudio.byteLength);
     });
 
     it('passes text context for non-v3 models', async () => {
@@ -421,9 +477,7 @@ describe('generateTtsAudio', () => {
       const chunk2 = 'Second chunk of text.';
       (splitTextForTts as ReturnType<typeof vi.fn>).mockReturnValue([chunk1, chunk2]);
 
-      mockGenerateSpeech
-        .mockResolvedValueOnce(Buffer.from('audio-chunk-1'))
-        .mockResolvedValueOnce(Buffer.from('audio-chunk-2'));
+      mockGenerateSpeech.mockResolvedValueOnce(chunkAudio).mockResolvedValueOnce(chunkAudio);
 
       const result = await generateTtsAudio(
         defaultParams({
@@ -431,6 +485,8 @@ describe('generateTtsAudio', () => {
           previousText: 'Before segment.',
           nextText: 'After segment.',
           provider: {
+            getConcurrencyLimit: mockGetConcurrencyLimit,
+            observeConcurrencyError: mockObserveConcurrencyError,
             generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
             getVoiceId: vi.fn().mockReturnValue('voice-1'),
             getModelId: () => 'eleven_turbo_v2',
@@ -461,7 +517,7 @@ describe('generateTtsAudio', () => {
         })
       );
 
-      expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
+      expect(result!.audioBuffer.byteLength).toBeGreaterThan(chunkAudio.byteLength);
     });
 
     it('single chunk takes fast path without FFmpeg concat', async () => {
@@ -474,35 +530,5 @@ describe('generateTtsAudio', () => {
       expect(mockGenerateSpeech).toHaveBeenCalledTimes(1);
       expect(result!.audioBuffer).toEqual(Buffer.from('single-audio'));
     });
-  });
-});
-
-describe('getPlatformTtsKey', () => {
-  it('returns ELEVENLABS_API_KEY for elevenlabs', () => {
-    process.env.ELEVENLABS_API_KEY = 'el-key';
-    expect(getPlatformTtsKey('elevenlabs')).toBe('el-key');
-    delete process.env.ELEVENLABS_API_KEY;
-  });
-
-  it('returns OPENAI_API_KEY for openai', () => {
-    process.env.OPENAI_API_KEY = 'openai-key';
-    expect(getPlatformTtsKey('openai')).toBe('openai-key');
-    delete process.env.OPENAI_API_KEY;
-  });
-
-  it('returns undefined for openai', () => {
-    expect(getPlatformTtsKey('openai')).toBeUndefined();
-  });
-
-  it('returns FAL_KEY for fal', () => {
-    process.env.FAL_KEY = 'fal-key';
-    expect(getPlatformTtsKey('fal')).toBe('fal-key');
-    delete process.env.FAL_KEY;
-  });
-
-  it('returns FAL_KEY for minimax', () => {
-    process.env.FAL_KEY = 'fal-key';
-    expect(getPlatformTtsKey('minimax')).toBe('fal-key');
-    delete process.env.FAL_KEY;
   });
 });

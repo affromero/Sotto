@@ -14,8 +14,7 @@ describe('desktop download redirects', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
-    process.env.R2_PUBLIC_URL = 'https://cdn.sotto.fm';
-    delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
+    process.env.DESKTOP_DOWNLOAD_BASE_URL = 'https://cdn.sotto.fm';
     delete process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_BASE_URL;
     delete process.env.DESKTOP_GITHUB_RELEASE_BASE_URL;
     delete process.env.DESKTOP_LATEST_VERSION;
@@ -24,7 +23,7 @@ describe('desktop download redirects', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    delete process.env.R2_PUBLIC_URL;
+    delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
     delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
     delete process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_BASE_URL;
     delete process.env.DESKTOP_GITHUB_RELEASE_BASE_URL;
@@ -73,7 +72,7 @@ describe('desktop download redirects', () => {
     );
   });
 
-  it('normalizes legacy two-part version input to the canonical patch release', async () => {
+  it('normalizes a two-part version input to the canonical patch release', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
         primary: { href: '/download/desktop/v0.1.0/windows/sotto-host-v0.1.0-windows.msi' },
@@ -126,7 +125,7 @@ describe('desktop download redirects', () => {
   });
 
   it('falls back to GitHub release downloads when CDN downloads are not configured', async () => {
-    delete process.env.R2_PUBLIC_URL;
+    delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
     const fetchMock = vi.fn();
     global.fetch = fetchMock;
 

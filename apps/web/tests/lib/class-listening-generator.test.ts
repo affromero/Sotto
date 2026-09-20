@@ -37,6 +37,23 @@ const {
 });
 
 const { mockGenerateScript } = vi.hoisted(() => ({ mockGenerateScript: vi.fn() }));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedLearningAi: async () => {
+    const key = await mockGetAiKey();
+    if (key) {
+      const model = mockGetAiProviderMeta(key.provider)?.defaultModel;
+      if (!model) throw new Error(`No default AI model configured for provider "${key.provider}".`);
+      return { provider: key.provider, model, apiKey: key.apiKey };
+    }
+    if (process.env.AI_PROVIDER === 'claude-code')
+      return { provider: 'claude-code', model: 'claude-sonnet-4-6' };
+    throw new Error('No AI provider available');
+  },
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
+}));
 const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({
   mockCreateSegmentsAndQueueAudio: vi.fn(),
 }));
@@ -141,6 +158,7 @@ import {
   minimumVerifiedReferences,
 } from '@/lib/class-listening-generator';
 import type { ClassListeningParams, ListeningContentParams } from '@/lib/class-listening-generator';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 // ---- Fixtures ----
 
@@ -211,6 +229,7 @@ const SAMPLE_QUESTIONS_JSON = JSON.stringify([
 
 const PARAMS: ClassListeningParams = {
   userId: 'u1',
+  execution: blockedProviderExecution('u1'),
   classId: 'class-1',
   courseId: 'course-1',
   level: 'A1',
@@ -356,7 +375,11 @@ describe('generateClassListening', () => {
 
       await generateClassListening(PARAMS);
 
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-1', SAMPLE_TURNS);
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
+        'episode-1',
+        SAMPLE_TURNS,
+        expect.objectContaining({ authorize: expect.any(Function) })
+      );
     });
 
     it('marks the episode as generating audio before queueing segment audio', async () => {
@@ -559,6 +582,7 @@ describe('composeListeningContent', () => {
 
   const CONTENT_PARAMS: ListeningContentParams = {
     userId: 'u1',
+    execution: blockedProviderExecution('u1'),
     courseId: 'course-1',
     level: 'A1',
     nativeLang: 'en',
@@ -663,7 +687,8 @@ describe('composeListeningContent', () => {
         'episode-1',
         CONTENT_PARAMS.userId,
         CONTENT_PARAMS.objective,
-        SAMPLE_SCRIPT_RESULT.turns
+        SAMPLE_SCRIPT_RESULT.turns,
+        CONTENT_PARAMS.execution
       );
       expect(mockVerifyEpisodeReferences.mock.invocationCallOrder[0]).toBeLessThan(
         mockCreateSegmentsAndQueueAudio.mock.invocationCallOrder[0]
@@ -735,7 +760,11 @@ describe('composeListeningContent', () => {
       await composeListeningContent(SOURCED_PARAMS);
 
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('episode-1', SAMPLE_TURNS);
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
+        'episode-1',
+        SAMPLE_TURNS,
+        expect.objectContaining({ authorize: expect.any(Function) })
+      );
     });
   });
 });

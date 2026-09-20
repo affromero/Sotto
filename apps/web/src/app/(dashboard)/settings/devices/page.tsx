@@ -3,7 +3,9 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { isLocalHost, resolveReachUrl } from 'thesidedoor/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered } from '@/lib/prisma';
+import { listSottoKeys } from '@/lib/sidedoor/access/core/keys';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { getTailscaleReachStatus } from '@/lib/tailscale-reach';
 import { DeviceReach } from './DeviceReach';
 import { DeviceShare } from './DeviceShare';
@@ -17,10 +19,10 @@ export const metadata = { title: 'Connect a device' };
 export default async function DevicesPage() {
   const session = await auth();
   if (!session?.user?.id) {
-    redirect('/auth/login?callbackUrl=/settings/devices');
+    redirect('/access');
   }
 
-  const isOwner = session.user.role === 'ADMIN';
+  const isOwner = session.isOwner;
 
   // A server on a real hostname is already reachable from any device, so the
   // Tailscale step is noise there: hand out the URL and be done. Only a laptop
@@ -30,18 +32,12 @@ export default async function DevicesPage() {
   const tailscaleStatus = needsReachHelp ? await getTailscaleReachStatus(3000) : null;
 
   const keys = isOwner
-    ? await prisma.apiKey.findMany({
-        where: { userId: session.user.id },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          keyPrefix: true,
-          lastUsedAt: true,
-          createdAt: true,
-          revokedAt: true,
-        },
-      })
+    ? await sottoTransaction(prismaUnfiltered, async (database) =>
+        listSottoKeys(
+          database,
+          new Request('http://localhost/settings/devices', { headers: await headers() })
+        )
+      )
     : [];
 
   const serializedKeys = keys.map((k) => ({
@@ -51,6 +47,8 @@ export default async function DevicesPage() {
     lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
     createdAt: k.createdAt.toISOString(),
     revokedAt: k.revokedAt?.toISOString() ?? null,
+    expiresAt: k.expiresAt?.toISOString() ?? null,
+    status: k.status,
   }));
 
   return (

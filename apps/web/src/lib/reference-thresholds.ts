@@ -1,7 +1,7 @@
 /**
  * Reference count and quality thresholds for episode scripts.
  * Extracted from script-verifier.ts so they can be used by both
- * the compile/QC step and the legacy verification pipeline.
+ * the compile and verification steps.
  */
 
 const BASE_REFERENCE_COUNTS: Record<string, number> = {

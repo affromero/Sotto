@@ -405,7 +405,11 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith('class-1', 'u1');
+    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith(
+      'class-1',
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) })
+    );
     expect(mockRegenerateFailedSections).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body).toEqual({ regenerated: true, scope: 'class' });
@@ -423,7 +427,11 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
     );
 
     expect(res.status).toBe(202);
-    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith('class-1', 'u1');
+    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith(
+      'class-1',
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) })
+    );
     const body = await res.json();
     expect(body).toEqual({ started: true, scope: 'class', status: 'AVAILABLE' });
   });
@@ -657,7 +665,12 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
     expect(res.status).toBe(202);
     const body = await res.json();
     expect(body.started).toBe(true);
-    expect(mockCreateNextClass).toHaveBeenCalledWith('course-1', 'u1', {});
+    expect(mockCreateNextClass).toHaveBeenCalledWith(
+      'course-1',
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      {}
+    );
   });
 
   it('returns 404 for background class generation when the course is missing', async () => {

@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import { createHash } from 'crypto';
 import { readFile } from 'fs/promises';
 import type { AgentUsageProvider, AgentUsageWindow } from './types';
@@ -159,10 +159,14 @@ export function providerCacheKey(parts: Array<string | number | null>): string {
   return parts.map((part) => (part === null ? 'null' : String(part))).join(':');
 }
 
-export async function readJson(pathname: string): Promise<unknown | null> {
+export async function readJson(pathname: string, signal?: AbortSignal): Promise<unknown | null> {
+  signal?.throwIfAborted();
   try {
-    return JSON.parse(await readFile(pathname, 'utf8')) as unknown;
+    const text = await readFile(pathname, { encoding: 'utf8', signal });
+    signal?.throwIfAborted();
+    return JSON.parse(text) as unknown;
   } catch {
+    signal?.throwIfAborted();
     return null;
   }
 }
@@ -170,36 +174,44 @@ export async function readJson(pathname: string): Promise<unknown | null> {
 export async function execFileText(
   command: string,
   args: string[],
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ): Promise<string | null> {
-  return new Promise((resolve) => {
-    const child = execFile(
+  signal?.throwIfAborted();
+  try {
+    const result = await new ProcessRunner().execute({
       command,
       args,
-      { timeout: timeoutMs, maxBuffer: 1024 * 1024 },
-      (error, stdout) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-        resolve(stdout.trim() || null);
-      }
-    );
-    child.stdin?.end();
-  });
+      environment: { ...process.env },
+      timeoutMs,
+      maxOutputBytes: 1024 * 1024,
+      signal,
+    });
+    signal?.throwIfAborted();
+    return result.stdout.trim() || null;
+  } catch (error) {
+    if (error instanceof ProcessExecutionError && error.code === 'cleanup_failed') throw error;
+    signal?.throwIfAborted();
+    return null;
+  }
 }
 
 export async function fetchWithTimeout(
   url: string,
   init: RequestInit,
-  timeoutMs: number
+  timeoutMs: number,
+  implementation: typeof fetch
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, {
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, controller.signal])
+      : controller.signal;
+    signal.throwIfAborted();
+    return await implementation(url, {
       ...init,
-      signal: controller.signal,
+      signal,
       cache: 'no-store',
     });
   } finally {
@@ -210,9 +222,10 @@ export async function fetchWithTimeout(
 export async function fetchJsonWithTimeout(
   url: string,
   init: RequestInit,
-  timeoutMs: number
+  timeoutMs: number,
+  implementation: typeof fetch
 ): Promise<{ response: Response; payload: unknown | null }> {
-  const response = await fetchWithTimeout(url, init, timeoutMs);
+  const response = await fetchWithTimeout(url, init, timeoutMs, implementation);
   const text = await response.text();
   if (!text.trim()) return { response, payload: null };
   try {

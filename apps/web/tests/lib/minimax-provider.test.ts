@@ -61,6 +61,17 @@ vi.mock('@/lib/tts-expression-mapper', () => ({
 import { MinimaxProvider } from '@/lib/providers/tts/minimax.provider';
 
 const mockAudioBytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+const transport = {
+  authenticatedFetch: (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+    fetch(input, init),
+};
+const media = {
+  async downloadMedia(url: string) {
+    return new Uint8Array(await (await fetch(url)).arrayBuffer());
+  },
+};
+const createProvider = (apiKey: string, model?: string) =>
+  new MinimaxProvider(apiKey, transport, media, model);
 
 function mockFetchResponses(apiResponse: unknown, audioBytes: Uint8Array = mockAudioBytes) {
   const fetchMock = vi.fn();
@@ -96,7 +107,7 @@ describe('MinimaxProvider', () => {
       },
     });
 
-    const provider = new MinimaxProvider('fal_sk_test');
+    const provider = createProvider('fal_sk_test');
     const result = await provider.generateSpeech({
       text: 'Hello world',
       voiceId: 'Deep_Voice_Man',
@@ -122,7 +133,7 @@ describe('MinimaxProvider', () => {
       text: async () => 'Unauthorized',
     });
 
-    const provider = new MinimaxProvider('bad_key');
+    const provider = createProvider('bad_key');
     await expect(
       provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' })
     ).rejects.toThrow('MiniMax API error (401): Unauthorized');
@@ -134,14 +145,14 @@ describe('MinimaxProvider', () => {
       json: async () => ({ audio: {} }),
     });
 
-    const provider = new MinimaxProvider('fal_sk_test');
+    const provider = createProvider('fal_sk_test');
     await expect(
       provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' })
     ).rejects.toThrow('MiniMax returned no audio URL');
   });
 
   it('returns correct voice IDs for HOST/EXPERT speakers', () => {
-    const provider = new MinimaxProvider('fal_sk_test');
+    const provider = createProvider('fal_sk_test');
     expect(provider.getVoiceId('HOST', 'pod-1')).toBe('Deep_Voice_Man');
     expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Wise_Woman');
   });
@@ -156,7 +167,7 @@ describe('MinimaxProvider', () => {
       },
     });
 
-    const provider = new MinimaxProvider('fal_sk_test', 'speech-02-hd');
+    const provider = createProvider('fal_sk_test', 'speech-02-hd');
     await provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' });
 
     expect(fetchMock.mock.calls[0][0]).toBe('https://fal.run/fal-ai/minimax/speech-02-hd');
@@ -172,7 +183,7 @@ describe('MinimaxProvider', () => {
       },
     });
 
-    const provider = new MinimaxProvider('fal_sk_test', 'speech-02-turbo');
+    const provider = createProvider('fal_sk_test', 'speech-02-turbo');
     await provider.generateSpeech({ text: 'Test', voiceId: 'Deep_Voice_Man' });
 
     expect(fetchMock.mock.calls[0][0]).toBe('https://fal.run/fal-ai/minimax/speech-02-turbo');

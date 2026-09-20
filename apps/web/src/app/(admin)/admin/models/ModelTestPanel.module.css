@@ -286,7 +286,7 @@
   align-items: center;
 }
 
-.badgePlatform {
+.badgeLocal {
   display: inline-block;
   padding: 2px 7px;
   border-radius: var(--radius-full);
@@ -318,7 +318,9 @@
   font: var(--text-body-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
   white-space: nowrap;
 }
 

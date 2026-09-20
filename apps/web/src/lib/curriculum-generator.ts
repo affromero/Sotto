@@ -5,7 +5,8 @@
 import { z } from 'zod';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -78,6 +79,7 @@ function parseGeneratedLevelLessons(
  */
 export async function getOrCreateCurriculum(
   userId: string,
+  execution: SottoProviderExecution,
   nativeLang: string,
   targetLang: string
 ): Promise<{ id: string }> {
@@ -87,7 +89,7 @@ export async function getOrCreateCurriculum(
   });
   if (existing) return existing;
 
-  const ai = await resolveLearningAi(userId);
+  const ai = await resolveCapturedLearningAi(userId, execution);
 
   const systemPrompt = loadAndRender('curriculum/generate-curriculum.md', {
     NATIVE: langName(nativeLang),
@@ -97,7 +99,7 @@ export async function getOrCreateCurriculum(
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Compose the ${langName(targetLang)} curriculum skeleton.` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 8000, temperature: 0.6 }
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 8000, temperature: 0.6 }
   );
   logUsage({
     service: ai.provider,
@@ -171,6 +173,7 @@ export async function getOrCreateCurriculum(
  */
 export async function ensureCurriculumHasLevelLessons(p: {
   userId: string;
+  execution: SottoProviderExecution;
   curriculumId: string;
   nativeLang: string;
   targetLang: string;
@@ -181,7 +184,7 @@ export async function ensureCurriculumHasLevelLessons(p: {
   });
   if (existingCount > 0) return;
 
-  const ai = await resolveLearningAi(p.userId);
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const systemPrompt = loadAndRender('curriculum/generate-level-lessons.md', {
     NATIVE: langName(p.nativeLang),
     TARGET: langName(p.targetLang),
@@ -192,7 +195,7 @@ export async function ensureCurriculumHasLevelLessons(p: {
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Compose ${p.level} ${langName(p.targetLang)} lessons.` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 7000, temperature: 0.6 }
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 7000, temperature: 0.6 }
   );
 
   logUsage({

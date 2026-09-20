@@ -2,7 +2,8 @@
 // transcript and adds it to the learner's course memory graph, closing the loop
 // between live practice and spaced-repetition review. Best-effort: any failure
 // (no AI key, malformed model output) returns 0 and logs, never throws.
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -113,6 +114,7 @@ export function parseNoteLearningTargets(content: string): NoteLearningTargets {
 
 export interface ExtractLiveVocabParams {
   userId: string;
+  execution: SottoProviderExecution;
   courseId: string;
   targetLang: string;
   nativeLang: string;
@@ -123,6 +125,7 @@ export interface ExtractLiveVocabParams {
 
 export interface ExtractNoteVocabParams {
   userId: string;
+  execution: SottoProviderExecution;
   courseId: string;
   targetLang: string;
   nativeLang: string;
@@ -150,6 +153,7 @@ ${sanitized.slice(0, MAX_SOURCE_CHARS)}
 
 async function extractAndStoreVocabFromText(p: {
   userId: string;
+  execution: SottoProviderExecution;
   courseId: string;
   targetLang: string;
   nativeLang: string;
@@ -162,7 +166,7 @@ async function extractAndStoreVocabFromText(p: {
   if (!text) return 0;
 
   try {
-    const ai = await resolveLearningAi(p.userId);
+    const ai = await resolveCapturedLearningAi(p.userId, p.execution);
     const systemPrompt = loadAndRender('live/extract-vocab.md', {
       TARGET: p.targetLang,
       NATIVE: p.nativeLang,
@@ -173,7 +177,7 @@ async function extractAndStoreVocabFromText(p: {
     const res = await client.generateResponse(
       systemPrompt,
       [{ role: 'user', content: fenceUntrustedText(p.label, text) }],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1024, temperature: 0.2 }
+      { ...(await capturedLearningAiOptions(ai)), maxTokens: 1024, temperature: 0.2 }
     );
 
     logUsage({
@@ -209,7 +213,7 @@ export async function extractAndStoreNoteLearningTargets(
   if (!text) return { addedVocabulary: 0, addedGrammar: 0 };
 
   try {
-    const ai = await resolveLearningAi(p.userId);
+    const ai = await resolveCapturedLearningAi(p.userId, p.execution);
     const systemPrompt = loadAndRender('live/extract-learning-targets.md', {
       TARGET: p.targetLang,
       NATIVE: p.nativeLang,
@@ -230,7 +234,7 @@ export async function extractAndStoreNoteLearningTargets(
           ),
         },
       ],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1400, temperature: 0.2 }
+      { ...(await capturedLearningAiOptions(ai)), maxTokens: 1400, temperature: 0.2 }
     );
 
     logUsage({

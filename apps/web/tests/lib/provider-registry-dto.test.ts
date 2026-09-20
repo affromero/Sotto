@@ -1,6 +1,51 @@
 import { describe, it, expect } from 'vitest';
-import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
-import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import {
+  getAllAiProviderClientMeta,
+  getAiProviderMeta,
+  isValidAiProviderId,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
+import {
+  getAllTtsProviderClientMeta,
+  getProviderMeta,
+  isValidProviderId,
+  type TtsProviderId,
+} from '@/lib/providers/tts-registry';
+import credentialForms from '../fixtures/provider-credential-forms.json';
+
+it.each(['constructor', '__proto__', 'toString', 'unknown-provider'])(
+  'rejects non-provider registry keys: %s',
+  (id) => {
+    expect(isValidAiProviderId(id)).toBe(false);
+    expect(isValidProviderId(id)).toBe(false);
+    expect(() => getAiProviderMeta(id as AiProviderId)).toThrow('Unknown AI provider');
+    expect(() => getProviderMeta(id as TtsProviderId)).toThrow('Unknown TTS provider');
+  }
+);
+
+it('retains valid provider selection and metadata lookup', () => {
+  expect(isValidAiProviderId('openai')).toBe(true);
+  expect(isValidProviderId('openai')).toBe(true);
+  expect(getAiProviderMeta('openai').auth.fields).toEqual(
+    credentialForms['sotto-ai'].openai.authFields
+  );
+  expect(getProviderMeta('openai').auth.fields).toEqual(
+    credentialForms['sotto-tts'].openai.authFields
+  );
+});
+
+it('preserves every existing credential form and help link after shared catalog migration', () => {
+  for (const [section, providers] of [
+    ['sotto-ai', getAllAiProviderClientMeta()],
+    ['sotto-tts', getAllTtsProviderClientMeta()],
+  ] as const) {
+    expect(
+      Object.fromEntries(
+        providers.map(({ id, authFields, getApiKeyUrl }) => [id, { authFields, getApiKeyUrl }])
+      )
+    ).toEqual(credentialForms[section]);
+  }
+});
 
 describe('AI Provider Client DTO', () => {
   const meta = getAllAiProviderClientMeta();

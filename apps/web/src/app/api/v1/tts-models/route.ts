@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
-import { isUserAdmin } from '@/lib/auth-guards';
 import {
   getProviderMeta,
   isValidProviderId,
@@ -9,11 +8,7 @@ import {
 } from '@/lib/providers/tts-registry';
 
 import { errorResponse } from '@/lib/api-response';
-// Env var names for each platform-level TTS provider key
-const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
-  elevenlabs: 'ELEVENLABS_API_KEY',
-  openai: 'OPENAI_API_KEY',
-};
+import { getSiteConfig } from '@/lib/site-config';
 
 function modelsResponse(providerId: TtsProviderId) {
   const meta = getProviderMeta(providerId);
@@ -46,14 +41,13 @@ export async function GET(request: NextRequest) {
     return modelsResponse(providerId as TtsProviderId);
   }
 
-  // No BYOK key — admins fall back to platform env vars
-  const isAdmin = await isUserAdmin(userId);
-  if (isAdmin) {
-    const envVar = PLATFORM_TTS_ENV[providerId as TtsProviderId];
-    if (envVar && process.env[envVar]) {
-      return modelsResponse(providerId as TtsProviderId);
-    }
-  }
+  const configuration = await getSiteConfig();
+  if (
+    (providerId === 'local' || providerId === 'kokoro') &&
+    configuration.ttsProvider === providerId &&
+    Boolean(configuration.ttsBaseUrl?.trim())
+  )
+    return modelsResponse(providerId);
 
   return NextResponse.json({ models: [], provider: null });
 }

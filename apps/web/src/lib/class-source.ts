@@ -1,5 +1,6 @@
 import { extractContent } from './extractors';
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -41,24 +42,25 @@ export async function prepareClassSource(p: {
   targetLang: string;
   nativeLang: string;
   userId: string;
+  execution: SottoProviderExecution;
 }): Promise<PreparedClassSource> {
   let extracted;
   try {
     extracted = await extractContent(p.url);
   } catch (err) {
     throw new ClassSourceError(
-      `Could not read that link: ${err instanceof Error ? err.message : 'extraction failed'}.`,
+      `Could not read that link: ${err instanceof Error ? err.message : 'extraction failed'}.`
     );
   }
 
   const raw = (extracted.text ?? '').trim();
   if (raw.length < MIN_SOURCE_CHARS) {
     throw new ClassSourceError(
-      'That link did not have enough readable text to build a class from. Try a different article, paper, or video.',
+      'That link did not have enough readable text to build a class from. Try a different article, paper, or video.'
     );
   }
 
-  const ai = await resolveLearningAi(p.userId);
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const systemPrompt = loadAndRender('class/level-source.md', {
     LEVEL: p.level,
     TARGET: p.targetLang,
@@ -71,7 +73,7 @@ export async function prepareClassSource(p: {
   const response = await provider.generateResponse(
     systemPrompt,
     [{ role: 'user', content: 'Adapt the source above into the leveled passage.' }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1200, temperature: 0.4 },
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 1200, temperature: 0.4 }
   );
 
   logUsage({

@@ -44,18 +44,17 @@ cp "$repo_root/docker-compose.selfhost.yml" "$smoke_dir/docker-compose.yml"
 cp "$repo_root/scripts/agent/sync-cli-credentials.sh" "$smoke_dir/sync-cli-credentials.sh"
 mkdir -p "$smoke_dir/empty-claude" "$smoke_dir/empty-codex"
 password="$(openssl rand -hex 32)"
+owner_password="$(openssl rand -hex 32)"
 cat > "$smoke_dir/.env" <<EOF
 POSTGRES_PASSWORD=$password
 DATABASE_URL=postgresql://sotto:$password@postgres:5432/sotto?schema=public
 DIRECT_DATABASE_URL=postgresql://sotto:$password@postgres:5432/sotto?schema=public
 REDIS_URL=redis://redis:6379
 BYOK_ENCRYPTION_KEY=$(openssl rand -hex 32)
-SOTTO_ACCESS_PASSWORD=$(openssl rand -hex 32)
 WEB_PORT=0
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 SELF_HOSTED=true
-STORAGE_PROVIDER=local
-LOCAL_STORAGE_DIR=./.sotto/storage
+SIDEDOOR_EXECUTION_DIR=./.sotto/executions
 EOF
 cat > "$smoke_dir/smoke.yml" <<EOF
 services:
@@ -76,6 +75,10 @@ compose run --rm workers sh -ec \
   'cd /app && npx --no-install prisma migrate deploy --config=/app/prisma.config.ts && npx --no-install tsx apps/web/prisma/seed-curriculum.ts'
 compose run --rm workers sh -ec \
   'cd /app && npx --no-install tsx apps/web/prisma/seed-curriculum.ts'
+compose run --rm web node dist/access.cjs initialize
+claim_json="$(compose run --rm web node dist/access.cjs claim | tail -n 1)"
+claim_code="$(printf '%s\n' "$claim_json" | sed -nE 's/.*"code"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')"
+[ -n "$claim_code" ]
 compose up -d --wait --wait-timeout 180
 
 compose exec -T workers node --import tsx --input-type=module <<'NODE'
@@ -101,7 +104,7 @@ try {
 }
 NODE
 
-compose exec -T web node --input-type=module - "$revision" <<'NODE'
+compose exec -T -e SIDEDOOR_SMOKE_CLAIM_CODE="$claim_code" -e SIDEDOOR_SMOKE_OWNER_PASSWORD="$owner_password" web node --input-type=module - "$revision" <<'NODE'
 import assert from 'node:assert/strict';
 import { readFile, unlink } from 'node:fs/promises';
 const base = 'http://127.0.0.1:3000';
@@ -115,13 +118,13 @@ assert.equal(health.status, 'healthy');
 assert.equal(health.version.slice(0, 8), process.argv[2].slice(0, 8));
 const locked = await request('/api/v1/onboarding/config');
 assert.equal(locked.status, 401, 'Onboarding must require the instance password');
-const gate = await request('/api/v1/gate', {
+const claim = await request('/api/v1/access/claim', {
   method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ password: process.env.SOTTO_ACCESS_PASSWORD }),
+  body: JSON.stringify({ token: process.env.SIDEDOOR_SMOKE_CLAIM_CODE, name: 'Owner', password: process.env.SIDEDOOR_SMOKE_OWNER_PASSWORD, mode: 'household' }),
 });
-assert.equal(gate.status, 200, 'Fresh instance password cannot unlock the app');
-const cookie = gate.headers.get('set-cookie')?.split(';')[0];
-assert.ok(cookie, 'Instance gate did not issue a cookie');
+assert.equal(claim.status, 200, 'Fresh instance owner claim failed');
+const cookie = claim.headers.get('set-cookie')?.split(';')[0];
+assert.ok(cookie, 'Owner claim did not issue a cookie');
 const config = await request('/api/v1/onboarding/config', { headers: { cookie } });
 assert.equal(config.status, 200);
 const onboarding = await config.json();

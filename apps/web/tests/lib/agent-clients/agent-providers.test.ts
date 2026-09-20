@@ -4,12 +4,14 @@ const executeCodex = vi.fn();
 const executeClaudeCode = vi.fn();
 
 vi.mock('@/lib/codex-client', () => ({
+  isCodexCleanupError: () => false,
   executeCodex,
   streamCodex: async function* () {
     yield 'stream';
   },
 }));
 vi.mock('@/lib/claude-code-client', () => ({
+  isClaudeCleanupError: () => false,
   executeClaudeCode,
   streamClaudeCode: async function* () {
     yield 'stream';
@@ -19,20 +21,34 @@ vi.mock('@/lib/claude-code-client', () => ({
 describe('CLI agent providers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    executeCodex.mockResolvedValue({ content: 'ok', inputTokens: 0, outputTokens: 0 });
+    executeCodex.mockResolvedValue({
+      content: 'ok',
+      inputTokens: 20,
+      outputTokens: 7,
+      model: 'codex:captured#effort=high',
+    });
     executeClaudeCode.mockResolvedValue({ content: 'ok', inputTokens: 0, outputTokens: 0 });
   });
 
   it('propagates per-turn web access to Codex', async () => {
     const { CodexProvider } = await import('@/lib/providers/codex');
-    await new CodexProvider().generateResponse('', [{ role: 'user', content: 'Research this' }], {
-      model: 'codex:gpt-5.6-sol',
-      useWebSearch: true,
-    });
+    const result = await new CodexProvider().generateResponse(
+      '',
+      [{ role: 'user', content: 'Research this' }],
+      {
+        model: 'codex:gpt-5.6-sol',
+        useWebSearch: true,
+      }
+    );
 
     expect(executeCodex).toHaveBeenCalledWith('', 'Research this', {
       model: 'codex:gpt-5.6-sol',
       useWebSearch: true,
+    });
+    expect(result).toMatchObject({
+      inputTokens: 20,
+      outputTokens: 7,
+      model: 'codex:captured#effort=high',
     });
   });
 

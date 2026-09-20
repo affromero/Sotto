@@ -43,6 +43,8 @@ export interface WriteScriptParams {
     beats: Beat[];
   };
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
   model?: string;
   provider: string;
 }
@@ -53,8 +55,8 @@ export interface WriteScriptResult {
   references: GeneratedReference[];
   places: ScriptPlace[];
   markdown: string;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 }
 
@@ -143,6 +145,8 @@ export async function writeScript(params: WriteScriptParams): Promise<WriteScrip
     {
       maxTokens: 12288,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
       // No web search — all facts come from the dossier
     }

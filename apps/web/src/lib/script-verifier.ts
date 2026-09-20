@@ -1,4 +1,5 @@
 import { createAIProvider } from './providers/ai';
+import { knownTokenSum } from 'thesidedoor-core/ai/usage';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
 import { hashTurn, matchClaimsToTurns } from './turn-diff';
 import { loadPrompt, loadAndRender } from './prompt-loader';
@@ -105,8 +106,8 @@ async function retryParseWithStricterPrompt(
   opts: { maxTokens: number; apiKeyOverride?: string; model?: string; provider: string }
 ): Promise<{
   parsed: Record<string, unknown>;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 } | null> {
   try {
@@ -164,8 +165,8 @@ export interface VerificationVerdict {
   feedback: string;
   /** Set to 'parse_error' when the AI returned unparseable output (not a verification failure). */
   failureType?: 'parse_error';
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
   allClaims: ClaimAnalysis[];
 }
@@ -194,19 +195,10 @@ const DEPTH_THRESHOLDS: Record<string, number> = {
   eli5: 0.6,
 };
 
-// Import from canonical module for local use + re-export for backward compatibility
 import {
   getMinReferenceCount,
   getMinSeriousRatio,
   SERIOUS_REFERENCE_TYPES,
-  REFERENCE_TYPE_WEIGHTS,
-} from './reference-thresholds';
-export {
-  getMinReferenceCount,
-  getMinSeriousRatio,
-  MIN_REFERENCE_COUNTS,
-  SERIOUS_REFERENCE_TYPES,
-  MIN_SERIOUS_RATIO,
   REFERENCE_TYPE_WEIGHTS,
 } from './reference-thresholds';
 
@@ -278,7 +270,7 @@ function buildVerdict(
   maxDurationMinutes: number | undefined,
   turns: ScriptTurn[],
   aiFeedback: string,
-  tokenUsage: { inputTokens: number; outputTokens: number; model: string },
+  tokenUsage: { inputTokens: number | null; outputTokens: number | null; model: string },
   verificationMode?: string,
   tone?: string,
   durationTarget?: number
@@ -594,8 +586,8 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
     );
 
     let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
-    let extraInputTokens = 0;
-    let extraOutputTokens = 0;
+    let extraInputTokens: number | null = 0;
+    let extraOutputTokens: number | null = 0;
 
     try {
       parsed = JSON.parse(extractFirstJsonObject(response.content));
@@ -611,7 +603,8 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
         extraInputTokens = retry.inputTokens;
         extraOutputTokens = retry.outputTokens;
       } else {
-        const likelyTruncated = response.outputTokens >= VERIFICATION_MAX_TOKENS * 0.95;
+        const likelyTruncated =
+          response.outputTokens !== null && response.outputTokens >= VERIFICATION_MAX_TOKENS * 0.95;
         logger.error('Script verification parse failure (incremental path)', {
           provider: params.provider ?? 'default',
           model: response.model,
@@ -673,8 +666,8 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       turns,
       aiFeedback,
       {
-        inputTokens: response.inputTokens + extraInputTokens,
-        outputTokens: response.outputTokens + extraOutputTokens,
+        inputTokens: knownTokenSum(response.inputTokens, extraInputTokens),
+        outputTokens: knownTokenSum(response.outputTokens, extraOutputTokens),
         model: response.model,
       },
       params.verificationMode,
@@ -715,8 +708,8 @@ Analyze every factual claim. Return JSON only.`;
   );
 
   let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
-  let extraInputTokens = 0;
-  let extraOutputTokens = 0;
+  let extraInputTokens: number | null = 0;
+  let extraOutputTokens: number | null = 0;
 
   try {
     parsed = JSON.parse(extractFirstJsonObject(response.content));
@@ -732,7 +725,8 @@ Analyze every factual claim. Return JSON only.`;
       extraInputTokens = retry.inputTokens;
       extraOutputTokens = retry.outputTokens;
     } else {
-      const likelyTruncated = response.outputTokens >= VERIFICATION_MAX_TOKENS * 0.95;
+      const likelyTruncated =
+        response.outputTokens !== null && response.outputTokens >= VERIFICATION_MAX_TOKENS * 0.95;
       logger.error('Script verification parse failure (full path)', {
         provider: params.provider ?? 'default',
         model: response.model,
@@ -783,8 +777,8 @@ Analyze every factual claim. Return JSON only.`;
     turns,
     aiFeedback,
     {
-      inputTokens: response.inputTokens + extraInputTokens,
-      outputTokens: response.outputTokens + extraOutputTokens,
+      inputTokens: knownTokenSum(response.inputTokens, extraInputTokens),
+      outputTokens: knownTokenSum(response.outputTokens, extraOutputTokens),
       model: response.model,
     },
     params.verificationMode,

@@ -78,7 +78,7 @@ The active data model is learner and course oriented. Important groups:
 | Mock exams          | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution` |
 | Memory graph        | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType`                                           |
 | Reused audio engine | `Episode`, `EpisodeSegment`, `EpisodeVersion`, interaction/reference models used by listening audio |
-| Provider config     | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings                          |
+| Shared platform     | Sidedoor credentials, model config, provider settings, storage config, access policy                |
 | Operations          | queue/job metadata, reports, audit/admin records, usage and cost records                            |
 
 `Episode` is the audio engine the listening skill reuses — script generation, verification, TTS, stitching, playback, and references — backing listening sections, listening practice, and exam listening.
@@ -315,7 +315,7 @@ Local storage is the default for OSS.
 
 Storage rules:
 
-- Workers must respect `STORAGE_PROVIDER`.
+- Workers use the same saved Sidedoor storage configuration as the web process.
 - Local storage must support the full listening audio, worksheet, recording, and export paths.
 - No cleanup script may bulk-delete protected episode or segment audio by pattern.
 - Deletion paths must go through existing storage guards.

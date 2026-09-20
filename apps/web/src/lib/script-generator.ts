@@ -3,7 +3,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS } from './safety-prompts';
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { loadPrompt, loadAndRender } from './prompt-loader';
 import { minutesToWords, wordCountBounds } from './duration';
-import { getMinReferenceCount, getMinSeriousRatio } from './script-verifier';
+import { getMinReferenceCount, getMinSeriousRatio } from './reference-thresholds';
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
 import type { BiasAnalysis } from './media-bias';
@@ -579,6 +579,8 @@ export async function generateScript(params: {
   sourceMetadata?: SourceMetadata;
   speakers?: Array<{ name: string; description: string }>;
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
   model?: string;
   provider: string;
   webSearchEnabled?: boolean;
@@ -594,8 +596,8 @@ export async function generateScript(params: {
   vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 }> {
   const speakers = params.speakers ?? [
@@ -664,6 +666,8 @@ export async function generateScript(params: {
     {
       maxTokens: 12288,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
       useWebSearch: params.webSearchEnabled !== false,
     }
@@ -700,6 +704,8 @@ export async function generateScriptWithUserFeedback(params: {
   }>;
   userFeedback: string;
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
   model?: string;
   provider: string;
   webSearchEnabled?: boolean;
@@ -710,8 +716,8 @@ export async function generateScriptWithUserFeedback(params: {
   vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 }> {
   const feedbackSpeakers = params.speakers ?? [
@@ -772,6 +778,8 @@ Revise the script addressing ALL user feedback. Keep what works, change what the
     {
       maxTokens: 12288,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
       useWebSearch: params.webSearchEnabled !== false,
     }
@@ -786,8 +794,8 @@ Revise the script addressing ALL user feedback. Keep what works, change what the
  */
 export function parseScriptResponse(response: {
   content: string;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 }): {
   turns: ScriptTurn[];
@@ -796,8 +804,8 @@ export function parseScriptResponse(response: {
   vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 } {
   let parsed: {

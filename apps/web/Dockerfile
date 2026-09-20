@@ -75,7 +75,9 @@ RUN mkdir -p /home/sotto/.codex /home/sotto/.claude /home/sotto/.ssh \
 # image and be owned by the runtime user: Docker seeds a fresh named volume
 # from the image path it covers, so if the path is missing the volume is
 # created root-owned and every write fails with EACCES.
-RUN mkdir -p /app/apps/web/.sotto/storage && chown -R sotto:sotto /app/apps/web/.sotto
+RUN mkdir -p /app/apps/web/.sotto/storage /app/apps/web/.sotto/runtime \
+    && chown -R sotto:sotto /app/apps/web/.sotto \
+    && chmod 0700 /app/apps/web/.sotto/runtime
 
 ENV HOME=/home/sotto
 
@@ -94,6 +96,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 # Copy standalone build output
 COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=sotto:sotto /app/apps/web/dist/access.cjs ./apps/web/dist/access.cjs
 
 # Copy speaker recognition model
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/

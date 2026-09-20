@@ -1,5 +1,5 @@
 // Persist generator-produced references for a episode. Shared between the
-// episode script-generation worker pattern and sourced-class listening
+// episode script writing and sourced-class listening
 // generation. Maps ALL 8 GeneratedReference fields onto Reference rows.
 import { prisma } from './prisma';
 import type { GeneratedReference } from './script-generator';
@@ -11,7 +11,7 @@ import type { GeneratedReference } from './script-generator';
  */
 export async function persistGeneratedReferences(
   episodeId: string,
-  refs: GeneratedReference[],
+  refs: GeneratedReference[]
 ): Promise<void> {
   if (refs.length === 0) return;
 

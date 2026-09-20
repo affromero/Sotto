@@ -159,16 +159,10 @@ function configuredAgentModels(
     autoConfig.model.aiProvider === provider ? autoConfig.model.aiModel : null,
     autoConfig.platform.aiProvider === provider ? autoConfig.platform.aiModel : null,
   ];
-  const legacyClaudeModels = new Set(
-    getAiProviderMeta('claude-code').models.map((model) => model.id)
-  );
   const includedValues = (autoConfig.includedModels ?? [])
     .map((value) => {
       const parsed = parseAgentModelId(value);
       if (parsed?.provider === provider) return parsed;
-      if (provider === 'claude-code' && legacyClaudeModels.has(value)) {
-        return parseAgentModelId(value, provider);
-      }
       return null;
     })
     .filter((selection): selection is AgentModelSelection => !!selection);

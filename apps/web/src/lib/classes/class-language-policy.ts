@@ -14,7 +14,7 @@ export function classLanguagePolicy(p: {
     return [
       `Immediate immersion for ${p.level}: every learner-visible field must be in the target language (${p.targetLang}).`,
       `Do not write native-language (${p.nativeLang}) explanations, hints, translations, option text, guidance, or feedback.`,
-      'If an output schema has a legacy field named "translation" or "meaning", fill it with a target-language paraphrase or usage note, not a native-language translation.',
+      'If an output schema has a field named "translation" or "meaning", fill it with a target-language paraphrase or usage note, not a native-language translation.',
       'Native-language support is handled by selection/right-click tools outside this generated class content.',
     ].join(' ');
   }

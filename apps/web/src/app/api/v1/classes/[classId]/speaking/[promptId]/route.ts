@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { prisma } from '@/lib/prisma';
-import { uploadFile } from '@/lib/r2';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { detectAudioFormat, isRecognizedAudio } from '@/lib/audio-format';
-import { addJob, speakingGradingQueue, JobType } from '@/lib/queue';
+import { speakingGradingQueue } from '@/lib/queue';
+import { createSpeakingRecording } from '@/lib/sidedoor/storage/publication/speaking-recording-upload';
+import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 
 type RouteParams = { params: Promise<{ classId: string; promptId: string }> };
 
@@ -55,24 +56,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     const { ext, mime } = detectAudioFormat(buffer);
 
-    // Upload to R2
-    const key = `speaking/${userId}/${promptId}/${crypto.randomUUID()}.${ext}`;
-    const audioUrl = await uploadFile(key, buffer, mime);
-
-    // Create SpeakingRecording
-    const recording = await prisma.speakingRecording.create({
-      data: {
-        sectionId: prompt.sectionId,
-        promptId,
-        userId,
-        audioUrl,
-        status: 'PENDING',
-      },
-      select: { id: true, status: true },
+    if (!prompt.sectionId) return errorResponse('Prompt has no class section', 409);
+    const recording = await createSpeakingRecording({
+      request,
+      admission: authed,
+      promptId,
+      parent: { sectionId: prompt.sectionId },
+      audio: buffer,
+      extension: ext,
+      contentType: mime,
     });
 
     // Enqueue grading job
-    await addJob(speakingGradingQueue, JobType.SPEAKING_GRADING, { recordingId: recording.id });
+    await deliverSottoJob({
+      database: prismaUnfiltered,
+      queue: speakingGradingQueue,
+      operationId: recording.operationId,
+      fingerprint: recording.fingerprint,
+      version: 1,
+    });
 
     logger.info('Speaking recording uploaded', { recordingId: recording.id, promptId, userId });
 

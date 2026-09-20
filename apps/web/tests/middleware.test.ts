@@ -1,220 +1,218 @@
-/**
- * Proxy tests
- *
- * Sotto is self-hosted with an optional hard access gate. The proxy protects
- * pages and API routes when that gate is configured, skips static/SEO assets,
- * and steers the managed showcase into its /welcome demo.
- */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @vitest-environment node
+import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { AccessService, HouseholdProfileManagement } from 'thesidedoor-core/access';
 import { NextRequest } from 'next/server';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PrismaClient, type Prisma } from '@/generated/prisma/client';
+import { SottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
+import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { proxy } from '@/proxy';
 
-function createRequest(
-  path: string,
-  cookie?: string,
-  headers?: Record<string, string>
-): NextRequest {
-  const url = new URL(path, 'http://localhost:3000');
-  return new NextRequest(url, {
-    headers: { ...(cookie ? { cookie } : {}), ...headers },
-  });
+const connection = vi.hoisted(() => ({ database: null as PrismaClient | null, failed: false }));
+vi.mock('@/lib/prisma', () => ({
+  prismaUnfiltered: {
+    $transaction: (
+      callback: (tx: Prisma.TransactionClient) => Promise<unknown>,
+      options: { isolationLevel: 'Serializable' }
+    ) => {
+      if (connection.failed || !connection.database) throw new Error('Database unavailable');
+      return connection.database.$transaction(callback, options);
+    },
+  },
+}));
+
+function request(path: string, token?: string, authorization?: string) {
+  const headers = new Headers();
+  if (token) headers.set('cookie', `sotto_session=${token}`);
+  if (authorization !== undefined) headers.set('authorization', authorization);
+  return new NextRequest(new URL(path, 'http://localhost:3000'), { headers });
 }
-
-function getRedirectLocation(response: Response): string | null {
+function destination(response: Response) {
   const location = response.headers.get('location');
-  if (!location) return null;
-  try {
-    return new URL(location).pathname;
-  } catch {
-    return location;
-  }
+  return location ? new URL(location).pathname : null;
 }
+afterEach(() => {
+  vi.unstubAllEnvs();
+  connection.failed = false;
+});
 
-function isPassThrough(response: Response): boolean {
-  return !response.headers.get('location');
-}
+describe('public proxy routes without a database', () => {
+  beforeEach(() => {
+    connection.failed = true;
+    vi.stubEnv('SELF_HOSTED', 'true');
+  });
+  it.each([
+    '/_next/static/main.js',
+    '/_next/image?url=test',
+    '/fonts/font.woff2',
+    '/avatars/fox.png',
+    '/favicon.ico',
+    '/icon.svg',
+    '/apple-icon.png',
+    '/sitemap.xml',
+    '/robots.txt',
+    '/access',
+    '/api/version',
+    '/api/v1/health',
+    '/api/v1/auth/pair/redeem',
+    '/api/v1/access/login',
+  ])('preserves the public boundary for %s', async (path) => {
+    expect((await proxy(request(path))).headers.get('x-middleware-next')).toBe('1');
+  });
+  it.each([
+    '/access/security',
+    '/api/v1/storage/recordings/private.wav',
+    '/api/v1/onboarding/config',
+    '/avatars-private',
+    '/api/v1/accessibility/private',
+  ])('does not exempt the protected path %s', async (path) => {
+    const response = await proxy(request(path, 'opaque-candidate'));
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+  it('keeps the managed showcase available when shared state is unavailable', async () => {
+    vi.stubEnv('SELF_HOSTED', 'false');
+    expect(destination(await proxy(request('/dashboard')))).toBe('/welcome');
+    expect((await proxy(request('/welcome'))).headers.get('x-middleware-next')).toBe('1');
+    expect((await proxy(request('/'))).headers.get('x-middleware-next')).toBe('1');
+    expect(
+      (await proxy(request('/api/v1/onboarding/config'))).headers.get('x-middleware-next')
+    ).toBe('1');
+    const demoSave = new NextRequest('http://localhost:3000/api/v1/onboarding/save', {
+      method: 'POST',
+    });
+    expect((await proxy(demoSave)).headers.get('x-middleware-next')).toBe('1');
+    expect(
+      (
+        await proxy(
+          new NextRequest('http://localhost:3000/api/v1/onboarding/config', { method: 'POST' })
+        )
+      ).status
+    ).toBe(503);
+    expect(
+      (await proxy(request('/api/v1/onboarding/check-storage', 'opaque-candidate'))).status
+    ).toBe(503);
+  });
+});
 
-async function getProxy() {
-  const mod = await import('@/proxy');
-  return mod.proxy;
-}
-
-describe('Proxy', () => {
-  let proxy: Awaited<ReturnType<typeof getProxy>>;
-
+const databaseUrl = process.env.SIDEDOOR_TEST_DATABASE_URL;
+const suite = databaseUrl ? describe : describe.skip;
+suite('proxy admission with real shared PostgreSQL sessions', () => {
+  let database: PrismaClient;
+  let access: AccessService;
+  let ownerToken: string;
+  const schema = `proxy_test_${randomUUID().replaceAll('-', '')}`;
+  beforeAll(async () => {
+    const url = new URL(databaseUrl!);
+    if (!['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/sidedoor_test')
+      throw new Error('Use the isolated local sidedoor_test database');
+    database = new PrismaClient({
+      adapter: new PrismaPg(
+        { connectionString: databaseUrl, options: `-c search_path=${schema}` },
+        { schema }
+      ),
+    });
+    connection.database = database;
+    await database.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
+    const baseline = await readFile(
+      'prisma/migrations/20260720021500_baseline/migration.sql',
+      'utf8'
+    );
+    for (const match of baseline.matchAll(/CREATE TYPE [\s\S]*?;/g))
+      await database.$executeRawUnsafe(match[0]);
+    const users = baseline.match(/CREATE TABLE "User" \([\s\S]*?\n\);/);
+    if (!users) throw new Error('Missing baseline User table');
+    await database.$executeRawUnsafe(users[0]);
+    await database.$executeRawUnsafe(
+      await readFile('prisma/migrations/20260911222000_sidedoor_state/migration.sql', 'utf8')
+    );
+  });
   beforeEach(async () => {
-    vi.resetModules();
-    delete process.env.SELF_HOSTED;
-    delete process.env.SOTTO_ACCESS_PASSWORD;
-    proxy = await getProxy();
+    vi.stubEnv('SELF_HOSTED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
+    vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
+    vi.stubEnv('SIDEDOOR_TRUSTED_PROXY', 'false');
+    connection.failed = false;
+    await database.$executeRawUnsafe('DELETE FROM "SidedoorState"');
+    await database.$executeRawUnsafe('DELETE FROM "User"');
+    await sottoTransaction(database, (tx) =>
+      sidedoorStateStore(tx).transact((state) => {
+        state.access.householdProfiles = [];
+      })
+    );
+    access = new AccessService({
+      store: new SottoAccessStore(database),
+      allowOpenHousehold: true,
+    });
+    ownerToken = await access.claimOwner(
+      await access.issueOperatorToken(),
+      'Owner',
+      'owner password for proxy tests',
+      'household'
+    );
   });
-
-  afterEach(() => {
-    delete process.env.SELF_HOSTED;
-    delete process.env.SOTTO_ACCESS_PASSWORD;
+  afterAll(async () => {
+    connection.database = null;
+    if (!database) return;
+    await database.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    await database.$disconnect();
   });
-
-  describe('Static and SEO assets pass through', () => {
-    const staticPaths = [
-      '/_next/static/chunks/main.js',
-      '/_next/image?url=test',
-      '/favicon.ico',
-      '/fonts/inter.woff2',
-      '/sitemap.xml',
-      '/robots.txt',
-    ];
-
-    for (const path of staticPaths) {
-      it(`passes through ${path}`, async () => {
-        const res = await proxy(createRequest(path));
-        expect(isPassThrough(res)).toBe(true);
-      });
-    }
+  it('requires shared admission even when no environment password is configured', async () => {
+    expect(destination(await proxy(request('/dashboard')))).toBe('/access');
+    const response = await proxy(request('/api/v1/episodes'));
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect((await proxy(request('/dashboard', ownerToken))).headers.get('x-middleware-next')).toBe(
+      '1'
+    );
   });
-
-  describe('Self-hosted: no login, everything passes through', () => {
-    const paths = [
-      '/',
-      '/dashboard',
-      '/dashboard/',
-      '/admin',
-      '/admin/users',
-      '/create',
-      '/settings',
-      '/learn',
-      '/welcome',
-      '/episode/ep_1',
-      '/api/v1/health',
-      '/api/v1/episodes',
-    ];
-
-    for (const path of paths) {
-      it(`passes through ${path} with no auth redirect`, async () => {
-        const res = await proxy(createRequest(path));
-        expect(isPassThrough(res)).toBe(true);
-      });
-    }
+  it('rejects revoked sessions', async () => {
+    await access.logout(ownerToken);
+    expect(destination(await proxy(request('/dashboard', ownerToken)))).toBe('/access');
   });
-
-  describe('Managed showcase (SELF_HOSTED=false)', () => {
-    beforeEach(() => {
-      process.env.SELF_HOSTED = 'false';
-    });
-
-    const mockRoutes = [
-      '/dashboard',
-      '/admin',
-      '/admin/users',
-      '/learn',
-      '/create',
-      '/settings',
-      '/memory',
-      '/profile',
-      '/voices',
-      '/classes/class_1/worksheet',
-      '/episode/ep_1',
-      '/ref/alice',
-    ];
-
-    for (const path of mockRoutes) {
-      it(`redirects ${path} to the /welcome demo`, async () => {
-        const res = await proxy(createRequest(path));
-        expect(getRedirectLocation(res)).toBe('/welcome');
-      });
-    }
-
-    it('lets /welcome itself render the demo', async () => {
-      const res = await proxy(createRequest('/welcome'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('does not redirect the public landing page', async () => {
-      const res = await proxy(createRequest('/'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('does not redirect the public health route', async () => {
-      const res = await proxy(createRequest('/api/v1/health'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-  });
-
-  describe('Access gate (SOTTO_ACCESS_PASSWORD set)', () => {
-    beforeEach(() => {
-      process.env.SOTTO_ACCESS_PASSWORD = 'family-secret';
-      process.env.BYOK_ENCRYPTION_KEY = 'test-signing-key-material-0123456789abcdef';
-    });
-
-    const gatedPages = ['/', '/dashboard', '/profiles', '/welcome', '/settings', '/invite'];
-    for (const path of gatedPages) {
-      it(`redirects ${path} to /gate without a gate cookie`, async () => {
-        const res = await proxy(createRequest(path));
-        expect(getRedirectLocation(res)).toBe('/gate');
-      });
-    }
-
-    const exemptPaths = [
-      '/gate',
-      '/api/v1/health',
-      '/api/v1/gate',
-      '/icon.svg',
-      '/icon-192.png',
-      '/apple-icon.png',
-      '/apple-touch-icon.png',
-      '/favicon.ico',
-      '/avatars/capybara.png',
-    ];
-    for (const path of exemptPaths) {
-      it(`never gate-redirects ${path}`, async () => {
-        const res = await proxy(createRequest(path));
-        expect(getRedirectLocation(res)).not.toBe('/gate');
-      });
-    }
-
-    it('rejects a forged gate cookie', async () => {
-      const res = await proxy(createRequest('/dashboard', 'sotto_gate=123.deadbeef'));
-      expect(getRedirectLocation(res)).toBe('/gate');
-    });
-
-    it('passes through with a valid gate cookie', async () => {
-      const { createGateToken } = await import('@/lib/access/gate');
-      const token = await createGateToken();
-      const res = await proxy(createRequest('/dashboard', `sotto_gate=${token}`));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('returns 401 for a protected API without a gate cookie', async () => {
-      const res = await proxy(createRequest('/api/v1/keys'));
-      expect(res.status).toBe(401);
-      await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' });
-    });
-
-    it('returns 401 for a protected API with a forged gate cookie', async () => {
-      const res = await proxy(createRequest('/api/v1/keys', 'sotto_gate=123.deadbeef'));
-      expect(res.status).toBe(401);
-    });
-
-    it('passes a protected API through with a valid gate cookie', async () => {
-      const { createGateToken } = await import('@/lib/access/gate');
-      const token = await createGateToken();
-      const res = await proxy(createRequest('/api/v1/keys', `sotto_gate=${token}`));
-      expect(isPassThrough(res)).toBe(true);
-      expect(res.status).toBe(200);
-    });
-
-    it('passes bearer requests to handlers for full API-key validation', async () => {
-      const res = await proxy(
-        createRequest('/api/v1/episodes', undefined, {
-          authorization: 'Bearer sk_sotto_candidate',
-        })
+  it.each(['Bearer sk_sotto_forged', 'Basic invalid', ''])(
+    'never substitutes a valid browser session for supplied authorization %j',
+    async (authorization) => {
+      expect((await proxy(request('/api/v1/episodes', ownerToken, authorization))).status).toBe(
+        401
       );
-      expect(isPassThrough(res)).toBe(true);
-      expect(res.status).toBe(200);
-    });
-
-    it('is inert when no password is configured', async () => {
-      delete process.env.SOTTO_ACCESS_PASSWORD;
-      const res = await proxy(createRequest('/dashboard'));
-      expect(isPassThrough(res)).toBe(true);
-    });
+    }
+  );
+  it('allows household admission to reach profile selection without granting selected content', async () => {
+    const household = await access.enterOpenHousehold();
+    expect((await proxy(request('/profiles', household))).headers.get('x-middleware-next')).toBe(
+      '1'
+    );
+    expect(
+      (await proxy(request('/access/security', household))).headers.get('x-middleware-next')
+    ).toBe('1');
+    expect(
+      (await proxy(request('/api/v1/profiles', household))).headers.get('x-middleware-next')
+    ).toBe('1');
+    expect(
+      (await proxy(request('/api/v1/profiles/switch', household))).headers.get('x-middleware-next')
+    ).toBe('1');
+    expect(destination(await proxy(request('/dashboard', household)))).toBe('/profiles');
+    const manager = new HouseholdProfileManagement(access, { allowHouseholdManagement: true });
+    const prepared = manager.prepareCreate('Learner');
+    const profileId = await access.store.transact((state) =>
+      prepared.apply(state, { kind: 'session', token: ownerToken })
+    );
+    const { HouseholdProfileService } = await import('thesidedoor-core/access');
+    await new HouseholdProfileService(access).select(household, profileId);
+    expect((await proxy(request('/dashboard', household))).headers.get('x-middleware-next')).toBe(
+      '1'
+    );
+  });
+  it('keeps access management and stored media protected when shared configuration becomes unavailable', async () => {
+    connection.failed = true;
+    for (const path of ['/access/security', '/api/v1/storage/private.wav']) {
+      const response = await proxy(request(path, ownerToken));
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toContain('no-store');
+    }
   });
 });

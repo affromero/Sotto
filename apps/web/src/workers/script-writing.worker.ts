@@ -1,27 +1,33 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@/generated/prisma/client';
-import { WriteScriptPayload, addJob, JobType, compileScriptQueue } from '@/lib/queue';
+import { WriteScriptPayload, JobType, compileScriptQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { writeScript } from '@/lib/script-writer';
 import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import type { Beat } from '@/lib/creative-director';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey } from '@/lib/byok';
 import {
   getCheapestModelForProvider,
   getProviderForModel,
   providerRequiresAiKey,
-  resolveAiModelAndProvider,
   type AiProviderId,
 } from '@/lib/providers/ai-registry';
+import { capturedLearningAiOptions, resolveCapturedEpisodeAi } from '@/lib/learning-ai';
+import {
+  durableJobProviderExecution,
+  transitionDurableQueueJob,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
-export async function processScriptWriting(job: Job<WriteScriptPayload>): Promise<void> {
-  const { episodeId, userId, discoveryId, dossierId, outlineId, useAdminCredits } = job.data;
+export async function processScriptWriting(
+  job: Job<WriteScriptPayload>,
+  signal?: AbortSignal
+): Promise<void> {
+  const { episodeId, userId, discoveryId, dossierId, outlineId, allowSharedCredential } = job.data;
 
   logger.info('Script writing starting', { episodeId });
   await job.updateProgress(5);
@@ -35,23 +41,25 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   if (existingScript) {
     logger.info('Script already exists, skipping to compile', { episodeId });
 
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'COMPILING' },
+    await transitionDurableQueueJob({
+      job,
+      queue: compileScriptQueue,
+      type: JobType.COMPILE_SCRIPT,
+      payload: {
+        episodeId,
+        userId,
+        allowSharedCredential,
+      },
+      jobId: `compile-${episodeId}-${String(job.id)}`,
+      mutate: async (database) => {
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { status: 'COMPILING' },
+        });
+      },
     });
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
-
-    await addJob(
-      compileScriptQueue,
-      JobType.COMPILE_SCRIPT,
-      {
-        episodeId,
-        userId,
-        useAdminCredits,
-      },
-      { jobId: `compile-${episodeId}-${String(job.id)}` }
-    );
 
     await job.updateProgress(100);
     return;
@@ -81,29 +89,26 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
     }),
     prisma.episode.findUniqueOrThrow({
       where: { id: episodeId },
-      select: { aiModel: true },
+      select: { aiModel: true, aiProvider: true },
     }),
   ]);
 
   await job.updateProgress(15);
 
-  const aiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
-  if (!episode.aiModel && !aiKey) {
-    throw new Error('AI model is required for script writing when no AI key is configured.');
-  }
-
-  const { model, provider } = await resolveAiModelAndProvider({
-    episodeAiModel: episode.aiModel,
-    aiKey,
+  const ai = await resolveCapturedEpisodeAi({
+    userId,
+    aiModel: episode.aiModel,
+    aiProvider: episode.aiProvider,
+    allowSharing: Boolean(allowSharedCredential),
+    execution: durableJobProviderExecution(job, userId, signal),
   });
-
-  const providerAiKey =
-    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
-      ? await getAiKey(userId, provider as AiProviderId)
-      : aiKey;
-  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
-    throw new Error(`AI key for provider "${provider}" is required for script writing.`);
-  }
+  const {
+    model,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
+  } = await capturedLearningAiOptions(ai);
+  const provider = ai.provider;
 
   const speakers = (discovery.speakers as Array<{ name: string; description: string }>) || [
     { name: 'Host', description: 'Curious and engaging episode host' },
@@ -129,7 +134,9 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
       thesis: outline.thesis,
       beats: outline.beats as unknown as Beat[],
     },
-    apiKeyOverride: providerAiKey?.apiKey,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
     model,
     provider,
   });
@@ -213,7 +220,9 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   const detectedLanguage = await detectLanguage(sampleText, {
     providerType: provider as AiProviderId,
     model: languageDetectionModel,
-    apiKeyOverride: providerAiKey?.apiKey,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
   });
 
   await job.updateProgress(85);
@@ -235,28 +244,30 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   );
 
   // Chain to compile/QC
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: {
-      status: 'COMPILING',
-      aiProvider: getProviderForModel(model) ?? provider,
-      aiModel: model,
-      language: detectedLanguage ?? undefined,
+  await transitionDurableQueueJob({
+    job,
+    queue: compileScriptQueue,
+    type: JobType.COMPILE_SCRIPT,
+    payload: {
+      episodeId,
+      userId,
+      allowSharedCredential,
+    },
+    jobId: `compile-${episodeId}-${String(job.id)}`,
+    mutate: async (database) => {
+      await database.episode.update({
+        where: { id: episodeId },
+        data: {
+          status: 'COMPILING',
+          aiProvider: getProviderForModel(model) ?? provider,
+          aiModel: model,
+          language: detectedLanguage ?? undefined,
+        },
+      });
     },
   });
   await invalidateEpisodeCache(episodeId);
   await publishEpisodeStatus(episodeId, { status: 'COMPILING' });
-
-  await addJob(
-    compileScriptQueue,
-    JobType.COMPILE_SCRIPT,
-    {
-      episodeId,
-      userId,
-      useAdminCredits,
-    },
-    { jobId: `compile-${episodeId}-${String(job.id)}` }
-  );
 
   logger.info('Script writing complete, queued compilation', {
     episodeId,

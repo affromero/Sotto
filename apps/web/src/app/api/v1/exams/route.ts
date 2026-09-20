@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
@@ -23,7 +24,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
 
   try {
-    const examId = await createMockExam(parsed.data.courseId, authed.userId, parsed.data.level);
+    const examId = await createMockExam(
+      parsed.data.courseId,
+      authed.userId,
+      sottoRequestExecution(request, authed),
+      parsed.data.level
+    );
     return NextResponse.json({ examId }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof ExamCourseNotFoundError) return errorResponse('Course not found', 404);

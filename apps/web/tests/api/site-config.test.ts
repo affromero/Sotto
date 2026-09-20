@@ -11,11 +11,9 @@ vi.mock('@/lib/auth-guards', () => ({
 }));
 
 const mockGetSiteConfig = vi.fn();
-const mockResetSiteConfig = vi.fn();
 const mockSetSiteConfig = vi.fn();
 vi.mock('@/lib/site-config', () => ({
   getSiteConfig: () => mockGetSiteConfig(),
-  resetSiteConfig: (...args: unknown[]) => mockResetSiteConfig(...args),
   setSiteConfig: (...args: unknown[]) => mockSetSiteConfig(...args),
 }));
 
@@ -31,7 +29,7 @@ vi.mock('@/lib/api-response', () => ({
 
 async function getHandlers() {
   const mod = await import('@/app/api/v1/admin/site-config/route');
-  return { DELETE: mod.DELETE, GET: mod.GET, PATCH: mod.PATCH };
+  return { GET: mod.GET, PATCH: mod.PATCH };
 }
 
 function patchRequest(body: unknown): NextRequest {
@@ -94,55 +92,5 @@ describe('PATCH /api/v1/admin/site-config', () => {
     const res = await PATCH(patchRequest({ aiProvider: 123 }));
     expect(res.status).toBe(400);
     expect(mockSetSiteConfig).not.toHaveBeenCalled();
-  });
-});
-
-describe('DELETE /api/v1/admin/site-config', () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => vi.clearAllMocks());
-
-  it('rejects a non-owner with 403 and never resets', async () => {
-    mockRequireAdmin.mockResolvedValue(null);
-    const { DELETE } = await getHandlers();
-    const res = await DELETE();
-    expect(res.status).toBe(403);
-    expect(mockResetSiteConfig).not.toHaveBeenCalled();
-    expect(mockInvalidateServerInfra).not.toHaveBeenCalled();
-  });
-
-  it('lets the owner clear admin overrides and returns defaults', async () => {
-    mockRequireAdmin.mockResolvedValue('owner-1');
-    mockResetSiteConfig.mockResolvedValue(undefined);
-    mockGetSiteConfig.mockResolvedValue({
-      aiProvider: null,
-      aiModel: null,
-      aiBaseUrl: null,
-      sttProvider: null,
-      sttBaseUrl: null,
-      sttModel: null,
-      ttsProvider: null,
-      ttsBaseUrl: null,
-      storageProvider: null,
-      s3Bucket: null,
-      s3Region: null,
-    });
-    const { DELETE } = await getHandlers();
-    const res = await DELETE();
-    expect(res.status).toBe(200);
-    expect(mockResetSiteConfig).toHaveBeenCalledWith('owner-1');
-    expect(mockInvalidateServerInfra).toHaveBeenCalledTimes(1);
-    await expect(res.json()).resolves.toEqual({
-      aiProvider: null,
-      aiModel: null,
-      aiBaseUrl: null,
-      sttProvider: null,
-      sttBaseUrl: null,
-      sttModel: null,
-      ttsProvider: null,
-      ttsBaseUrl: null,
-      storageProvider: null,
-      s3Bucket: null,
-      s3Region: null,
-    });
   });
 });

@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockEpisodeFindUnique = vi.fn();
 const mockInteractionCreate = vi.fn();
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockUserFindUnique = vi.fn();
 
@@ -37,7 +37,14 @@ vi.mock('@/lib/prisma', () => {
 vi.mock('@/lib/queue', () => ({
   interactionQueue: {},
   notificationQueue: {},
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: async (...args: unknown[]) => {
+    const result = await mockEnqueueDurableJob(...args);
+    const options = args[3] as { mutate(database: unknown): Promise<void> };
+    await options.mutate({
+      interaction: { create: (...values: unknown[]) => mockInteractionCreate(...values) },
+    });
+    return result;
+  },
   JobType: {
     PROCESS_INTERACTION: 'PROCESS_INTERACTION',
     SEND_NOTIFICATION: 'SEND_NOTIFICATION',
@@ -210,7 +217,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockEpisodeFindUnique.mockResolvedValue(mockEpisode);
     mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-123' });
 
     const { request, params } = createRequest('episode-123', {
       question: 'Can you explain quantum entanglement?',
@@ -226,7 +233,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockEpisodeFindUnique.mockResolvedValue(mockEpisode);
     mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-123' });
 
     const { request, params } = createRequest('episode-123', {
       question: 'Test question',
@@ -248,7 +255,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockEpisodeFindUnique.mockResolvedValue(mockEpisode);
     mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-123' });
 
     const { request, params } = createRequest('episode-123', {
       question: 'Can you explain quantum entanglement?',
@@ -267,7 +274,7 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
       ...mockInteraction,
       userId: 'owner-123',
     });
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-123' });
 
     const { request, params } = createRequest('episode-123', {
       question: 'Testing my own episode',
@@ -280,12 +287,13 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    // addJob should only be called for PROCESS_INTERACTION, not SEND_NOTIFICATION
-    expect(mockAddJob).toHaveBeenCalledTimes(1);
-    expect(mockAddJob).toHaveBeenCalledWith(
+    // The durable admission is only for PROCESS_INTERACTION. It does not create a notification.
+    expect(mockEnqueueDurableJob).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
       expect.anything(),
       'PROCESS_INTERACTION',
-      expect.anything()
+      expect.anything(),
+      expect.objectContaining({ mutate: expect.any(Function) })
     );
   });
 
@@ -310,6 +318,6 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
     expect(response.status).toBe(404);
     expect(body.error).toBe('Episode not found');
     expect(mockInteractionCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
   });
 });

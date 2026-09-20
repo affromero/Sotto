@@ -68,6 +68,7 @@ __pycache__/
 .fava-cache/
 
 # Build output
+apps/web/dist/
 packages/mcp/dist/
 services/remotion/dist/
 

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { authenticateRequest } from '@/lib/api-keys';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
+import { authenticateRequest, type AuthenticatedRequest } from '@/lib/api-keys';
+import { AccessError, isAccessError } from 'thesidedoor-core/access';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import {
+  admitInitialStitch,
+  prepareInitialStitchIdentities,
+} from '@/lib/sidedoor/jobs/initial/initial-stitch-admission';
+import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { isUserAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import {
@@ -10,17 +18,61 @@ import {
   scriptWritingQueue,
   compileScriptQueue,
   audioStitchingQueue,
-  addJob,
+  admitDurableJob,
   JobType,
 } from '@/lib/queue';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
 import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
-import type { ExtractContentPayload, StitchAudioPayload } from '@/lib/queue';
+import type { ExtractContentPayload } from '@/lib/queue';
 import { randomUUID } from 'crypto';
-import { createStitchJobId } from '@/lib/audio/stitch-identity';
 import { restartExistingSegmentAudio } from '@/lib/segment-creator';
+import type { Queue } from 'bullmq';
+import type { Prisma } from '@/generated/prisma/client';
 
 type RouteParams = { params: Promise<{ episodeId: string }> };
+
+async function admitPipelineStage<T>(options: {
+  queue: Queue;
+  type: JobType;
+  payload: T;
+  jobId: string;
+  status: 'EXTRACTING' | 'RESEARCHING' | 'PLANNING' | 'SCRIPTING' | 'COMPILING';
+  expected: readonly ('PENDING' | 'DISCOVERING' | 'FAILED')[];
+  episodeId: string;
+  ownerId: string;
+  request: Request;
+  identity: AuthenticatedRequest;
+  mutate?: (database: Prisma.TransactionClient) => Promise<void>;
+}) {
+  return admitDurableJob(options.queue, options.type, options.payload, {
+    jobId: options.jobId,
+    authorize: async (database) => {
+      await requireOriginalSottoAdmission(database, options.request, options.identity);
+      if (options.identity.userId !== options.ownerId && !options.identity.isOwner)
+        throw new AccessError('forbidden');
+      const episode = await database.episode.findUnique({
+        where: { id: options.episodeId },
+        select: { userId: true },
+      });
+      if (!episode || episode.userId !== options.ownerId) throw new AccessError('conflict');
+      return { userId: options.ownerId };
+    },
+    mutate: async (database, operationId) => {
+      const claimed = await database.episode.updateMany({
+        where: { id: options.episodeId, status: { in: [...options.expected] } },
+        data: {
+          status: options.status,
+          pipelineGeneration: operationId,
+          failedAtStatus: null,
+          failureReason: null,
+        },
+      });
+      if (claimed.count !== 1)
+        throw new AccessError('conflict', 'Episode is no longer in the expected pipeline state');
+      await options.mutate?.(database);
+    },
+  });
+}
 
 async function enqueueAfterClaim(
   episodeId: string,
@@ -60,10 +112,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Admin bypass: skip ownership checks. Resolve the role for the authenticated
   // principal (Bearer key or session), not the ambient session.
-  const isAdmin = await isUserAdmin(authResult.userId);
+  const isAdmin = await isUserAdmin(authResult);
 
   // Admin-only flag: use platform API keys.
-  const useAdminCredits = isAdmin && request.nextUrl.searchParams.get('useAdminCredits') === 'true';
+  const allowSharedCredential =
+    isAdmin && request.nextUrl.searchParams.get('allowSharedCredential') === 'true';
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
@@ -72,6 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       userId: true,
       status: true,
       failedAtStatus: true,
+      audioGenerationKey: true,
       discovery: {
         select: { id: true, sourceUrl: true, sourceContent: true, durationTarget: true },
       },
@@ -115,33 +169,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const forceRestart = request.nextUrl.searchParams.get('forceRestart') === 'true';
 
     if (forceRestart) {
-      const claimed = await prisma.$transaction(async (tx) => {
-        const cas = await tx.episode.updateMany({
-          where: { id: episodeId, status: 'FAILED' },
-          data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
-        });
-        if (cas.count === 0) return false;
-        await tx.episodeVersionSegment.deleteMany({ where: { version: { episodeId } } });
-        await tx.episodeVersion.deleteMany({ where: { episodeId } });
-        await tx.segment.deleteMany({ where: { episodeId } });
-        await tx.reference.deleteMany({ where: { episodeId } });
-        await tx.script.deleteMany({ where: { episodeId } });
-        return true;
-      });
-      if (!claimed) return errorResponse('Episode is no longer in a restartable state', 409);
-
       const payload: ExtractContentPayload = {
         episodeId,
-        userId: authResult.userId,
+        userId: episode.userId,
         sourceUrl: episode.discovery?.sourceUrl ?? undefined,
         sourceText: episode.discovery?.sourceContent ?? undefined,
-        useAdminCredits: useAdminCredits || undefined,
+        allowSharedCredential: allowSharedCredential || undefined,
       };
-      await enqueueAfterClaim(episodeId, 'EXTRACTING', () =>
-        addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
-          jobId: `extract-${episodeId}-${Date.now()}`,
-        })
-      );
+      await admitPipelineStage({
+        queue: contentExtractionQueue,
+        type: JobType.EXTRACT_CONTENT,
+        payload,
+        jobId: `extract-${episodeId}-${randomUUID()}`,
+        status: 'EXTRACTING',
+        expected: ['FAILED'],
+        episodeId,
+        ownerId: episode.userId,
+        request,
+        identity: authResult,
+        mutate: async (database) => {
+          await database.episodeVersionSegment.deleteMany({ where: { version: { episodeId } } });
+          await database.episodeVersion.deleteMany({ where: { episodeId } });
+          await database.segment.deleteMany({ where: { episodeId } });
+          await database.reference.deleteMany({ where: { episodeId } });
+          await database.script.deleteMany({ where: { episodeId } });
+        },
+      });
       return NextResponse.json({ success: true, message: 'Generation started' });
     } else {
       // Smart resume: inspect existing data and pick up where we left off
@@ -160,37 +213,42 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       return await routeResume(
         episodeId,
-        authResult.userId,
+        episode.userId,
         episode,
         resumePoint,
-        useAdminCredits,
+        allowSharedCredential,
+        {
+          request,
+          identity: authResult,
+          ownerId: episode.userId,
+          generationKey: episode.audioGenerationKey,
+        },
         bodyProvider ? { provider: bodyProvider, model: bodyModel } : undefined
       );
     }
   }
 
   // Standard generation pipeline: start from scratch (CAS prevents concurrent starts)
-  const cas = await prisma.episode.updateMany({
-    where: { id: episodeId, status: { in: ['PENDING', 'DISCOVERING'] } },
-    data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
-  });
-  if (cas.count === 0) {
-    return errorResponse('Episode is no longer in a startable state', 409);
-  }
-
   const payload: ExtractContentPayload = {
     episodeId,
-    userId: authResult.userId,
+    userId: episode.userId,
     sourceUrl: episode.discovery?.sourceUrl ?? undefined,
     sourceText: episode.discovery?.sourceContent ?? undefined,
-    useAdminCredits: useAdminCredits || undefined,
+    allowSharedCredential: allowSharedCredential || undefined,
   };
 
-  await enqueueAfterClaim(episodeId, 'EXTRACTING', () =>
-    addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
-      jobId: `extract-${episodeId}`,
-    })
-  );
+  await admitPipelineStage({
+    queue: contentExtractionQueue,
+    type: JobType.EXTRACT_CONTENT,
+    payload,
+    jobId: `extract-${episodeId}-${randomUUID()}`,
+    status: 'EXTRACTING',
+    expected: ['PENDING', 'DISCOVERING'],
+    episodeId,
+    ownerId: episode.userId,
+    request,
+    identity: authResult,
+  });
 
   return NextResponse.json({ success: true, message: 'Generation started' });
 }
@@ -205,32 +263,37 @@ async function routeResume(
     discovery: { id: string; sourceUrl: string | null; sourceContent: string | null } | null;
   },
   resumePoint: ResumePoint,
-  useAdminCredits: boolean,
+  allowSharedCredential: boolean,
+  admission: {
+    request: Request;
+    identity: AuthenticatedRequest;
+    ownerId: string;
+    generationKey: string | null;
+  },
   ttsOverride?: { provider: string; model?: string }
 ): Promise<NextResponse> {
   switch (resumePoint.step) {
     case 'EXTRACT_CONTENT': {
-      const casExtract = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
-      });
-      if (casExtract.count === 0) {
-        return errorResponse('Episode is no longer in a resumable state', 409);
-      }
-
       const payload: ExtractContentPayload = {
         episodeId,
         userId,
         sourceUrl: episode.discovery?.sourceUrl ?? undefined,
         sourceText: episode.discovery?.sourceContent ?? undefined,
-        useAdminCredits: useAdminCredits || undefined,
+        allowSharedCredential: allowSharedCredential || undefined,
       };
 
-      await enqueueAfterClaim(episodeId, 'EXTRACTING', () =>
-        addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
-          jobId: `extract-${episodeId}-${Date.now()}`,
-        })
-      );
+      await admitPipelineStage({
+        queue: contentExtractionQueue,
+        type: JobType.EXTRACT_CONTENT,
+        payload,
+        jobId: `extract-${episodeId}-${randomUUID()}`,
+        status: 'EXTRACTING',
+        expected: ['FAILED'],
+        episodeId,
+        ownerId: admission.ownerId,
+        request: admission.request,
+        identity: admission.identity,
+      });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from content extraction',
@@ -243,27 +306,24 @@ async function routeResume(
         where: { episodeId },
       });
 
-      const casResearch = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'RESEARCHING', failedAtStatus: null, failureReason: null },
+      const payload = {
+        episodeId,
+        userId,
+        discoveryId: discovery.id,
+        allowSharedCredential: allowSharedCredential || undefined,
+      };
+      await admitPipelineStage({
+        queue: deepResearchQueue,
+        type: JobType.DEEP_RESEARCH,
+        payload,
+        jobId: `research-${episodeId}-${randomUUID()}`,
+        status: 'RESEARCHING',
+        expected: ['FAILED'],
+        episodeId,
+        ownerId: admission.ownerId,
+        request: admission.request,
+        identity: admission.identity,
       });
-      if (casResearch.count === 0) {
-        return errorResponse('Episode is no longer in a resumable state', 409);
-      }
-
-      await enqueueAfterClaim(episodeId, 'RESEARCHING', () =>
-        addJob(
-          deepResearchQueue,
-          JobType.DEEP_RESEARCH,
-          {
-            episodeId,
-            userId,
-            discoveryId: discovery.id,
-            useAdminCredits: useAdminCredits || undefined,
-          },
-          { jobId: `research-${episodeId}-${Date.now()}` }
-        )
-      );
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from deep research',
@@ -277,28 +337,25 @@ async function routeResume(
         prisma.researchDossier.findUniqueOrThrow({ where: { episodeId } }),
       ]);
 
-      const casPlanning = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'PLANNING', failedAtStatus: null, failureReason: null },
+      const payload = {
+        episodeId,
+        userId,
+        discoveryId: discovery.id,
+        dossierId: dossier.id,
+        allowSharedCredential: allowSharedCredential || undefined,
+      };
+      await admitPipelineStage({
+        queue: creativePlanningQueue,
+        type: JobType.CREATIVE_PLANNING,
+        payload,
+        jobId: `plan-${episodeId}-${randomUUID()}`,
+        status: 'PLANNING',
+        expected: ['FAILED'],
+        episodeId,
+        ownerId: admission.ownerId,
+        request: admission.request,
+        identity: admission.identity,
       });
-      if (casPlanning.count === 0) {
-        return errorResponse('Episode is no longer in a resumable state', 409);
-      }
-
-      await enqueueAfterClaim(episodeId, 'PLANNING', () =>
-        addJob(
-          creativePlanningQueue,
-          JobType.CREATIVE_PLANNING,
-          {
-            episodeId,
-            userId,
-            discoveryId: discovery.id,
-            dossierId: dossier.id,
-            useAdminCredits: useAdminCredits || undefined,
-          },
-          { jobId: `plan-${episodeId}-${Date.now()}` }
-        )
-      );
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from creative planning',
@@ -313,33 +370,30 @@ async function routeResume(
         prisma.creativeOutline.findUniqueOrThrow({ where: { episodeId } }),
       ]);
 
-      const casWrite = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'SCRIPTING', failedAtStatus: null, failureReason: null },
+      const payload = {
+        episodeId,
+        userId,
+        discoveryId: discovery.id,
+        dossierId: dossier.id,
+        outlineId: outline.id,
+        allowSharedCredential: allowSharedCredential || undefined,
+      };
+      await admitPipelineStage({
+        queue: scriptWritingQueue,
+        type: JobType.WRITE_SCRIPT,
+        payload,
+        jobId: `write-${episodeId}-${randomUUID()}`,
+        status: 'SCRIPTING',
+        expected: ['FAILED'],
+        episodeId,
+        ownerId: admission.ownerId,
+        request: admission.request,
+        identity: admission.identity,
+        mutate: async (database) => {
+          await database.reference.deleteMany({ where: { episodeId } });
+          await database.script.deleteMany({ where: { episodeId } });
+        },
       });
-      if (casWrite.count === 0) {
-        return errorResponse('Episode is no longer in a resumable state', 409);
-      }
-      await prisma.$transaction([
-        prisma.reference.deleteMany({ where: { episodeId } }),
-        prisma.script.deleteMany({ where: { episodeId } }),
-      ]);
-
-      await enqueueAfterClaim(episodeId, 'SCRIPTING', () =>
-        addJob(
-          scriptWritingQueue,
-          JobType.WRITE_SCRIPT,
-          {
-            episodeId,
-            userId,
-            discoveryId: discovery.id,
-            dossierId: dossier.id,
-            outlineId: outline.id,
-            useAdminCredits: useAdminCredits || undefined,
-          },
-          { jobId: `write-${episodeId}-${Date.now()}` }
-        )
-      );
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from script writing',
@@ -348,26 +402,23 @@ async function routeResume(
     }
 
     case 'COMPILE_SCRIPT': {
-      const casCompile = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: { status: 'COMPILING', failedAtStatus: null, failureReason: null },
+      const payload = {
+        episodeId,
+        userId,
+        allowSharedCredential: allowSharedCredential || undefined,
+      };
+      await admitPipelineStage({
+        queue: compileScriptQueue,
+        type: JobType.COMPILE_SCRIPT,
+        payload,
+        jobId: `compile-${episodeId}-${randomUUID()}`,
+        status: 'COMPILING',
+        expected: ['FAILED'],
+        episodeId,
+        ownerId: admission.ownerId,
+        request: admission.request,
+        identity: admission.identity,
       });
-      if (casCompile.count === 0) {
-        return errorResponse('Episode is no longer in a resumable state', 409);
-      }
-
-      await enqueueAfterClaim(episodeId, 'COMPILING', () =>
-        addJob(
-          compileScriptQueue,
-          JobType.COMPILE_SCRIPT,
-          {
-            episodeId,
-            userId,
-            useAdminCredits: useAdminCredits || undefined,
-          },
-          { jobId: `compile-${episodeId}-${Date.now()}` }
-        )
-      );
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from script compilation',
@@ -430,7 +481,17 @@ async function routeResume(
 
       let segmentCount = 0;
       await enqueueAfterClaim(episodeId, 'GENERATING_AUDIO', async () => {
-        segmentCount = await restartExistingSegmentAudio(episodeId, audioGenerationKey);
+        segmentCount = await restartExistingSegmentAudio(episodeId, audioGenerationKey, {
+          authorize: async (database) => {
+            await requireOriginalSottoAdmission(database, admission.request, admission.identity);
+            const current = await database.episode.findUnique({
+              where: { id: episodeId },
+              select: { userId: true },
+            });
+            if (!current || current.userId !== admission.ownerId) throw new AccessError('conflict');
+            return { userId: admission.ownerId };
+          },
+        });
       });
 
       return NextResponse.json({
@@ -442,42 +503,58 @@ async function routeResume(
     }
 
     case 'STITCH_AUDIO': {
-      const casStitch = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: {
-          status: 'STITCHING',
-          failedAtStatus: null,
-          failureReason: null,
-          activeStitchKey: null,
-          activeStitchOwner: null,
-        },
-      });
-      if (casStitch.count === 0) {
-        return errorResponse('Episode is no longer in a resumable state', 409);
+      try {
+        if (!admission.generationKey)
+          return errorResponse('The audio generation identity is missing', 409);
+        const generationKey = admission.generationKey;
+        const identities = prepareInitialStitchIdentities();
+        const result = await sottoTransaction(
+          prismaUnfiltered,
+          (tx) =>
+            admitInitialStitch(tx, {
+              episodeId,
+              generationKey,
+              soundPolicy: 'elevenlabs',
+              identities,
+              fromPhase: 'FAILED',
+              signal: admission.request.signal,
+              authorize: async (database) => {
+                await requireOriginalSottoAdmission(
+                  database,
+                  admission.request,
+                  admission.identity
+                );
+                if (
+                  admission.ownerId !== admission.identity.userId &&
+                  !isUserAdmin(admission.identity)
+                )
+                  throw new AccessError('forbidden');
+                return { userId: admission.ownerId };
+              },
+            }),
+          { signal: admission.request.signal }
+        );
+        if (result.kind === 'waiting')
+          return errorResponse('Some segments still require audio generation', 409);
+        await deliverSottoJob({
+          database: prismaUnfiltered,
+          queue: audioStitchingQueue,
+          operationId: result.record.job.id,
+          fingerprint: result.record.fingerprint,
+          version: 2,
+        });
+        return NextResponse.json({
+          success: true,
+          message: 'Generation resumed from audio stitching',
+          resumedAt: 'STITCH_AUDIO',
+        });
+      } catch (error) {
+        if (!isAccessError(error)) throw error;
+        return errorResponse(
+          error.message,
+          error.code === 'unauthorized' ? 401 : error.code === 'forbidden' ? 403 : 409
+        );
       }
-
-      const stitchSegments = await prisma.segment.findMany({
-        where: { id: { in: resumePoint.segmentIds }, episodeId },
-        orderBy: { order: 'asc' },
-        select: { id: true, version: true, audioUrl: true },
-      });
-      const payload: StitchAudioPayload = {
-        episodeId,
-        segmentIds: stitchSegments.map((segment) => segment.id),
-        segmentVersions: stitchSegments.map((segment) => segment.version),
-        segmentAudioUrls: stitchSegments.map((segment) => segment.audioUrl!),
-      };
-
-      await enqueueAfterClaim(episodeId, 'STITCHING', () =>
-        addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload, {
-          jobId: createStitchJobId(episodeId, stitchSegments),
-        })
-      );
-      return NextResponse.json({
-        success: true,
-        message: 'Generation resumed from audio stitching',
-        resumedAt: 'STITCH_AUDIO',
-      });
     }
   }
 }

@@ -1,4 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+
+const serverConfiguration = vi.hoisted(() => ({
+  values: {} as Record<string, string | undefined>,
+}));
+vi.mock('@/lib/server-config', () => ({
+  infra: (key: string) => serverConfiguration.values[key],
+}));
 
 // Create mock TTS provider classes that will be injected via module.require
 class MockElevenLabsProvider {
@@ -88,7 +96,6 @@ vi.mock('@/lib/byok', () => ({
   getByokKey: vi.fn(),
   getSharedByokKey: vi.fn().mockResolvedValue(null),
   hasSharedByokKey: vi.fn().mockResolvedValue(false),
-  getByokExtraData: vi.fn(),
   listByokProviders: vi.fn().mockResolvedValue([]),
 }));
 
@@ -97,10 +104,10 @@ const Module = require('module');
 const originalRequire = Module.prototype.require;
 
 Module.prototype.require = function (id: string) {
-  if (id === './tts/elevenlabs.provider' || id.endsWith('/tts/elevenlabs.provider')) {
+  if (id === '@/lib/providers/tts/elevenlabs.provider' || id.endsWith('/tts/elevenlabs.provider')) {
     return { ElevenLabsProvider: MockElevenLabsProvider };
   }
-  if (id === './tts/openai.provider' || id.endsWith('/tts/openai.provider')) {
+  if (id === '@/lib/providers/tts/openai.provider' || id.endsWith('/tts/openai.provider')) {
     return { OpenAITtsProvider: MockOpenAITtsProvider };
   }
   return originalRequire.apply(this, arguments as any);
@@ -143,6 +150,7 @@ const mockExecuteClaudeCode = vi.fn(
 );
 
 vi.mock('@/lib/claude-code-client', () => ({
+  isClaudeCleanupError: () => false,
   executeClaudeCode: mockExecuteClaudeCode,
   streamClaudeCode: vi.fn(),
   serializeMessages: vi.fn((messages: unknown) => JSON.stringify(messages)),
@@ -160,43 +168,12 @@ vi.mock('@/lib/r2', () => ({
   deleteFile: vi.fn(),
 }));
 
-const { mockStorageSend, MockPutObjectCommand, MockGetObjectCommand, MockDeleteObjectCommand } =
-  vi.hoisted(() => ({
-    mockStorageSend: vi.fn().mockResolvedValue({}),
-    MockPutObjectCommand: vi.fn(function (this: { params?: unknown }, params: unknown) {
-      this.params = params;
-    }),
-    MockGetObjectCommand: vi.fn(function (this: { params?: unknown }, params: unknown) {
-      this.params = params;
-    }),
-    MockDeleteObjectCommand: vi.fn(function (this: { params?: unknown }, params: unknown) {
-      this.params = params;
-    }),
-  }));
-
-vi.mock('@aws-sdk/client-s3', () => {
-  class MockS3Client {
-    send = mockStorageSend;
-  }
-  return {
-    S3Client: MockS3Client,
-    PutObjectCommand: MockPutObjectCommand,
-    GetObjectCommand: MockGetObjectCommand,
-    DeleteObjectCommand: MockDeleteObjectCommand,
-  };
-});
-
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { createAIProvider } from '@/lib/providers/ai';
-import {
-  createTtsProvider,
-  resolveTtsProvider,
-  getConfiguredTtsProviderId,
-} from '@/lib/providers/tts';
-import { createStorageProvider } from '@/lib/providers/storage';
+import { resolveTtsProvider, getConfiguredTtsProviderId } from '@/lib/providers/tts';
 
 describe('Provider Factories', () => {
   describe('createAIProvider', () => {
@@ -256,33 +233,14 @@ describe('Provider Factories', () => {
     });
   });
 
-  describe('createTtsProvider', () => {
-    it('rejects missing provider instead of defaulting to hosted TTS', () => {
-      expect(() => createTtsProvider(undefined as unknown as string)).toThrow(
-        'TTS provider type is required'
-      );
-    });
-
-    it('elevenlabs provider delegates to elevenlabs.ts', async () => {
-      const provider = createTtsProvider('elevenlabs');
-      const result = await provider.generateSpeech({ text: 'hello', voiceId: 'test' });
-      expect(result).toEqual(Buffer.from('audio'));
-    });
-
-    it('elevenlabs provider returns distinct voice IDs per speaker', () => {
-      const provider = createTtsProvider('elevenlabs');
-      const hostVoice = provider.getVoiceId('HOST', 'episode-1');
-      const expertVoice = provider.getVoiceId('EXPERT', 'episode-1');
-      expect(hostVoice).toBeTruthy();
-      expect(expertVoice).toBeTruthy();
-      expect(hostVoice).not.toBe(expertVoice);
-    });
-  });
-
   describe('resolveTtsProvider', () => {
     it('rejects missing provider instead of auto-selecting one', async () => {
       await expect(
-        resolveTtsProvider({ userId: 'user-1', episodeId: 'episode-1' })
+        resolveTtsProvider({
+          userId: 'user-1',
+          episodeId: 'episode-1',
+          execution: blockedProviderExecution('user-1'),
+        })
       ).rejects.toThrow('TTS provider is required');
     });
 
@@ -290,6 +248,7 @@ describe('Provider Factories', () => {
       await expect(
         resolveTtsProvider({
           userId: 'user-1',
+          execution: blockedProviderExecution('user-1'),
           episodeId: 'episode-1',
           requestedProvider: 'auto',
         })
@@ -300,6 +259,7 @@ describe('Provider Factories', () => {
       await expect(
         resolveTtsProvider({
           userId: 'user-1',
+          execution: blockedProviderExecution('user-1'),
           episodeId: 'episode-1',
           requestedProvider: 'hume',
           language: 'uk',
@@ -309,57 +269,27 @@ describe('Provider Factories', () => {
   });
 
   describe('getConfiguredTtsProviderId', () => {
-    afterEach(() => vi.unstubAllEnvs());
+    afterEach(() => {
+      serverConfiguration.values = {};
+    });
 
-    it('returns null when TTS_PROVIDER is unset', () => {
-      vi.stubEnv('TTS_PROVIDER', '');
+    it('returns null when the shared TTS provider is unset', () => {
       expect(getConfiguredTtsProviderId()).toBeNull();
     });
 
-    it('returns the keyless local provider when TTS_PROVIDER=kokoro', () => {
-      vi.stubEnv('TTS_PROVIDER', 'kokoro');
+    it('returns the configured keyless local provider', () => {
+      serverConfiguration.values.ttsProvider = 'kokoro';
       expect(getConfiguredTtsProviderId()).toBe('kokoro');
     });
 
-    it('returns the generic local sidecar provider when TTS_PROVIDER=local', () => {
-      vi.stubEnv('TTS_PROVIDER', 'local');
+    it('returns the configured generic local sidecar provider', () => {
+      serverConfiguration.values.ttsProvider = 'local';
       expect(getConfiguredTtsProviderId()).toBe('local');
     });
 
-    it('returns null for an unknown TTS_PROVIDER value', () => {
-      vi.stubEnv('TTS_PROVIDER', 'bogus');
+    it('returns null for an unknown shared TTS provider', () => {
+      serverConfiguration.values.ttsProvider = 'bogus';
       expect(getConfiguredTtsProviderId()).toBeNull();
-    });
-  });
-
-  describe('createStorageProvider', () => {
-    it('r2 provider writes through an S3-compatible client', async () => {
-      process.env.R2_ACCOUNT_ID = 'account';
-      process.env.R2_ACCESS_KEY_ID = 'access';
-      process.env.R2_SECRET_ACCESS_KEY = 'secret';
-      process.env.R2_BUCKET_NAME = 'bucket';
-      process.env.R2_PUBLIC_URL = 'https://r2.example.com';
-      mockStorageSend.mockResolvedValue({});
-
-      const provider = createStorageProvider('r2');
-      const url = await provider.uploadFile('key', Buffer.from('data'), 'text/plain');
-      expect(url).toBe('https://r2.example.com/key');
-      expect(MockPutObjectCommand).toHaveBeenCalledWith({
-        Bucket: 'bucket',
-        Key: 'key',
-        Body: expect.any(Buffer),
-        ContentType: 'text/plain',
-      });
-
-      delete process.env.R2_ACCOUNT_ID;
-      delete process.env.R2_ACCESS_KEY_ID;
-      delete process.env.R2_SECRET_ACCESS_KEY;
-      delete process.env.R2_BUCKET_NAME;
-      delete process.env.R2_PUBLIC_URL;
-    });
-
-    it('rejects unknown storage providers instead of switching to local storage', () => {
-      expect(() => createStorageProvider('unknown')).toThrow('Unknown storage provider "unknown"');
     });
   });
 });

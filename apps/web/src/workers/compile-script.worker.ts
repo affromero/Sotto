@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@/generated/prisma/client';
-import { CompileScriptPayload, addJob, JobType, notificationQueue } from '@/lib/queue';
+import { CompileScriptPayload, JobType, notificationQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { compileScript } from '@/lib/script-compiler';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
@@ -13,9 +13,17 @@ import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { verifyEpisodeReferences } from '@/lib/reference-verification/verify-episode';
+import {
+  durableQueueOperationId,
+  durableJobProviderExecution,
+  transitionDurableQueueJob,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
 
-export async function processCompileScript(job: Job<CompileScriptPayload>): Promise<void> {
-  const { episodeId, userId, useAdminCredits } = job.data;
+export async function processCompileScript(
+  job: Job<CompileScriptPayload>,
+  signal?: AbortSignal
+): Promise<void> {
+  const { episodeId, userId, allowSharedCredential } = job.data;
 
   logger.info('Script compilation starting', { episodeId });
   await job.updateProgress(10);
@@ -104,7 +112,8 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
       userId,
       episode.topic || episode.title,
       result.turns,
-      useAdminCredits
+      durableJobProviderExecution(job, userId, signal),
+      allowSharedCredential
     );
     if (!referenceCheck.allVerified) {
       throw new Error('Reference verification failed: one or more cited claims are unsupported');
@@ -138,20 +147,32 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
 
   if (!shouldAutoApprove) {
     // Pause for user review
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'SCRIPT_READY' },
+    await transitionDurableQueueJob({
+      job,
+      queue: notificationQueue,
+      type: JobType.SEND_NOTIFICATION,
+      payload: {
+        notificationId: durableQueueOperationId(
+          'notification-record',
+          `script-ready-${episodeId}-${String(job.id)}`
+        ),
+        userId,
+        type: 'SCRIPT_READY',
+        title: 'Script ready for review',
+        message: 'Your episode script is ready. Review and approve it to start audio generation.',
+        data: { episodeId },
+      },
+      jobId: `script-ready-${episodeId}-${String(job.id)}`,
+      version: 4,
+      mutate: async (database) => {
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { status: 'SCRIPT_READY' },
+        });
+      },
     });
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'SCRIPT_READY' });
-
-    await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-      userId,
-      type: 'SCRIPT_READY',
-      title: 'Script ready for review',
-      message: 'Your episode script is ready. Review and approve it to start audio generation.',
-      data: { episodeId },
-    });
 
     logger.info('Script compiled, paused at SCRIPT_READY for review', { episodeId });
   } else {
@@ -179,15 +200,9 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     }));
     await assignVoicesForEpisode(episodeId, lateSpeakers, lateProvider);
 
-    // Set GENERATING_AUDIO before creating segments — audio worker expects this status
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'GENERATING_AUDIO' },
-    });
+    await createSegmentsAndQueueAudio(episodeId, compiledTurns, { parentJob: job });
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });
-
-    await createSegmentsAndQueueAudio(episodeId, compiledTurns);
 
     logger.info('Script compiled and auto-approved, audio generation queued', { episodeId });
   }

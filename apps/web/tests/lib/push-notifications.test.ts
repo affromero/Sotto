@@ -52,6 +52,64 @@ describe('push-notifications', () => {
     process.env = originalEnv;
   });
 
+  it('sends a captured device with its stable notification identity and request credentials', async () => {
+    const { sendPushToSubscription, pushSubscriptionVersion } =
+      await import('@/lib/push-notifications');
+    const device = {
+      id: 'device',
+      userId: 'learner',
+      endpoint: 'https://push.example.com/device',
+      p256dh: 'device-key',
+      auth: 'device-auth',
+    };
+    mockSendNotification.mockResolvedValue(undefined);
+    await expect(
+      sendPushToSubscription(device, {
+        title: 'Ready',
+        body: 'Your episode is ready',
+        notificationId: 'notification-1',
+      })
+    ).resolves.toBe('delivered');
+    expect(mockSendNotification.mock.calls[0]?.[0]).toEqual({
+      endpoint: device.endpoint,
+      keys: { p256dh: device.p256dh, auth: device.auth },
+    });
+    expect(JSON.parse(mockSendNotification.mock.calls[0]?.[1])).toMatchObject({
+      notificationId: 'notification-1',
+      title: 'Ready',
+    });
+    expect(mockSendNotification.mock.calls[0]?.[2]).toEqual({
+      timeout: 15_000,
+      vapidDetails: {
+        subject: 'mailto:test@example.com',
+        publicKey: 'test-public-key',
+        privateKey: 'test-private-key',
+      },
+    });
+    expect(pushSubscriptionVersion({ ...device })).toBe(pushSubscriptionVersion(device));
+    expect(pushSubscriptionVersion({ ...device, auth: 'replacement' })).not.toBe(
+      pushSubscriptionVersion(device)
+    );
+  });
+
+  it('preserves a failed single-device delivery for the caller to retry', async () => {
+    const { sendPushToSubscription } = await import('@/lib/push-notifications');
+    const failure = { statusCode: 503 };
+    mockSendNotification.mockRejectedValue(failure);
+    await expect(
+      sendPushToSubscription(
+        {
+          id: 'device',
+          userId: 'learner',
+          endpoint: 'https://push.example.com/device',
+          p256dh: 'device-key',
+          auth: 'device-auth',
+        },
+        { title: 'Ready', body: 'Ready' }
+      )
+    ).rejects.toBe(failure);
+  });
+
   it('sends push notification to all user subscriptions', async () => {
     const { sendPushNotification } = await import('@/lib/push-notifications');
 
@@ -130,7 +188,17 @@ describe('push-notifications', () => {
     });
 
     expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ['sub2'] } },
+      where: {
+        OR: [
+          expect.objectContaining({
+            id: 'sub2',
+            userId: 'user1',
+            endpoint: mockSubscriptions[1]!.endpoint,
+            p256dh: mockSubscriptions[1]!.p256dh,
+            auth: mockSubscriptions[1]!.auth,
+          }),
+        ],
+      },
     });
   });
 
@@ -193,7 +261,8 @@ describe('push-notifications', () => {
 
     expect(mockSendNotification).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.stringContaining('"url":"/"')
+      expect.stringContaining('"url":"/"'),
+      expect.any(Object)
     );
   });
 
@@ -214,11 +283,25 @@ describe('push-notifications', () => {
     vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue(mockSubscriptions);
     mockSendNotification.mockRejectedValue(new Error('Invalid endpoint'));
 
-    await expect(sendPushNotification({
-      userId: 'user1',
-      title: 'Test',
-      body: 'Test',
-    })).resolves.not.toThrow();
+    await expect(
+      sendPushNotification({
+        userId: 'user1',
+        title: 'Test',
+        body: 'Test',
+      })
+    ).resolves.toMatchObject({
+      status: 'attempted',
+      sent: 0,
+      failed: 1,
+      expired: 0,
+      deliveries: [
+        expect.objectContaining({
+          subscriptionId: 'sub1',
+          status: 'retry',
+          version: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      ],
+    });
   });
 
   it('handles subscription gone error (410) during send', async () => {
@@ -246,7 +329,17 @@ describe('push-notifications', () => {
     });
 
     expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ['sub1'] } },
+      where: {
+        OR: [
+          expect.objectContaining({
+            id: 'sub1',
+            userId: 'user1',
+            endpoint: mockSubscriptions[0]!.endpoint,
+            p256dh: mockSubscriptions[0]!.p256dh,
+            auth: mockSubscriptions[0]!.auth,
+          }),
+        ],
+      },
     });
   });
 
@@ -278,11 +371,19 @@ describe('push-notifications', () => {
 
     vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([]);
 
-    await expect(sendPushNotification({
-      userId: 'user1',
-      title: 'Test',
-      body: 'Test',
-    })).resolves.not.toThrow();
+    await expect(
+      sendPushNotification({
+        userId: 'user1',
+        title: 'Test',
+        body: 'Test',
+      })
+    ).resolves.toEqual({
+      status: 'no-subscriptions',
+      sent: 0,
+      failed: 0,
+      expired: 0,
+      deliveries: [],
+    });
 
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
@@ -328,16 +429,35 @@ describe('push-notifications', () => {
     mockSendNotification
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce({ statusCode: 410 })
-      .mockResolvedValueOnce(undefined);
+      .mockRejectedValueOnce({ statusCode: 503 });
 
-    await sendPushNotification({
+    const result = await sendPushNotification({
       userId: 'user1',
       title: 'Test',
       body: 'Test',
     });
 
+    expect(result).toMatchObject({ status: 'attempted', sent: 1, expired: 1, failed: 1 });
+    expect(
+      result.deliveries.map(({ subscriptionId, status }) => ({ subscriptionId, status }))
+    ).toEqual([
+      { subscriptionId: 'sub1', status: 'delivered' },
+      { subscriptionId: 'sub2', status: 'expired' },
+      { subscriptionId: 'sub3', status: 'retry' },
+    ]);
+
     expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ['sub2'] } },
+      where: {
+        OR: [
+          expect.objectContaining({
+            id: 'sub2',
+            userId: 'user1',
+            endpoint: mockSubscriptions[1]!.endpoint,
+            p256dh: mockSubscriptions[1]!.p256dh,
+            auth: mockSubscriptions[1]!.auth,
+          }),
+        ],
+      },
     });
   });
 

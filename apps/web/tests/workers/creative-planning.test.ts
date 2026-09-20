@@ -54,6 +54,68 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   providerRequiresAiKey: (provider: string) =>
     provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
+vi.mock('@/lib/sidedoor/jobs/core/durable-queue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sidedoor/jobs/core/durable-queue')>()),
+  durableJobProviderExecution: (_job: unknown, userId: string, signal?: AbortSignal) => ({
+    userId,
+    signal,
+    authorize: vi.fn(),
+  }),
+  transitionDurableQueueJob: async ({
+    queue,
+    type,
+    payload,
+    jobId,
+    mutate,
+  }: {
+    queue: { name: string };
+    type: string;
+    payload: unknown;
+    jobId: string;
+    mutate: (database: { episode: { update: typeof mockPrismaEpisodeUpdate } }) => Promise<void>;
+  }) => {
+    await mutate({ episode: { update: mockPrismaEpisodeUpdate } });
+    return mockEnqueueDurableJob(queue, type, payload, { jobId });
+  },
+}));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedEpisodeAi: async ({
+    userId,
+    aiModel,
+    allowSharing,
+  }: {
+    userId: string;
+    aiModel?: string | null;
+    allowSharing?: boolean;
+  }) => {
+    if (!aiModel) {
+      if (allowSharing)
+        throw new Error('AI model is required for creative planning when no AI key is configured.');
+      const aiKey = await mockGetAiKey(userId);
+      if (!aiKey)
+        throw new Error('AI model is required for creative planning when no AI key is configured.');
+      return { ...(await mockResolveAiModelAndProvider({ episodeAiModel: null, aiKey })), aiKey };
+    }
+    const resolved = await mockResolveAiModelAndProvider({ episodeAiModel: aiModel, aiKey: null });
+    if (['claude-code', 'codex', 'local'].includes(resolved.provider) || allowSharing)
+      return { ...resolved, aiKey: null };
+    const aiKey = await mockGetAiKey(userId, resolved.provider);
+    if (!aiKey)
+      throw new Error(
+        `AI key for provider "${resolved.provider}" is required for creative planning.`
+      );
+    return { ...resolved, aiKey };
+  },
+  capturedLearningAiOptions: async (ai: {
+    model: string;
+    provider: string;
+    aiKey?: { apiKey: string } | null;
+  }) => ({
+    model: ai.model,
+    provider: ai.provider,
+    apiKeyOverride: ai.aiKey?.apiKey,
+  }),
+}));
 
 const { mockCreateCreativeOutline } = vi.hoisted(() => ({
   mockCreateCreativeOutline: vi.fn().mockResolvedValue({
@@ -87,9 +149,9 @@ vi.mock('@/lib/creative-director', () => ({
   createCreativeOutline: mockCreateCreativeOutline,
 }));
 
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  enqueueDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   JobType: { WRITE_SCRIPT: 'write_script' },
   scriptWritingQueue: { name: 'script-writing' },
 }));
@@ -161,7 +223,7 @@ describe('processCreativePlanning', () => {
     mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
     mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
-    mockAddJob.mockResolvedValue({ id: 'write-job-1' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'write-job-1' });
     mockLogUsage.mockResolvedValue(undefined);
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockResolveAiModelAndProvider.mockResolvedValue({
@@ -264,7 +326,9 @@ describe('processCreativePlanning', () => {
       mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
 
-      await processCreativePlanning(createMockJob({ ...defaultPayload, useAdminCredits: true }));
+      await processCreativePlanning(
+        createMockJob({ ...defaultPayload, allowSharedCredential: true })
+      );
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
@@ -282,7 +346,7 @@ describe('processCreativePlanning', () => {
 
     it('rejects admin-credit routes without an explicit model', async () => {
       await expect(
-        processCreativePlanning(createMockJob({ ...defaultPayload, useAdminCredits: true }))
+        processCreativePlanning(createMockJob({ ...defaultPayload, allowSharedCredential: true }))
       ).rejects.toThrow('AI model is required for creative planning when no AI key is configured.');
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -317,7 +381,7 @@ describe('processCreativePlanning', () => {
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockCreateCreativeOutline).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledWith(
+      expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
         { name: 'script-writing' },
         'write_script',
         {
@@ -326,7 +390,7 @@ describe('processCreativePlanning', () => {
           discoveryId: 'discovery-001',
           dossierId: 'dossier-001',
           outlineId: 'outline-001',
-          useAdminCredits: undefined,
+          allowSharedCredential: undefined,
         },
         { jobId: expect.stringMatching(/^write-episode-001-/) }
       );

@@ -16,7 +16,7 @@ import { z } from 'zod';
 export async function GET(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) return errorResponse('Unauthorized', 401);
-  if (!(await isUserAdmin(authed.userId))) {
+  if (!(await isUserAdmin(authed))) {
     return errorResponse('Forbidden', 403);
   }
 

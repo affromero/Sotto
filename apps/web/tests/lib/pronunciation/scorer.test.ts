@@ -176,8 +176,8 @@ describe('SelfContainedScorer', () => {
     });
   });
 
-  describe('malformed LLM JSON — deterministic fallback', () => {
-    it('does not throw when LLM returns garbage', async () => {
+  describe('provider failures', () => {
+    it('surfaces malformed rubric output', async () => {
       mockGenerateResponse.mockResolvedValue({
         content: 'I cannot score this.',
         model: 'claude-3-5-haiku-20241022',
@@ -185,41 +185,15 @@ describe('SelfContainedScorer', () => {
         outputTokens: 10,
       });
 
-      await expect(scorer.score(makeInput())).resolves.toBeDefined();
+      await expect(scorer.score(makeInput())).rejects.toThrow(
+        'Pronunciation rubric provider returned invalid JSON'
+      );
     });
 
-    it('returns a valid PronunciationScore on fallback', async () => {
-      mockGenerateResponse.mockResolvedValue({
-        content: '```json\n{ broken json',
-        model: 'claude-3-5-haiku-20241022',
-        inputTokens: 50,
-        outputTokens: 10,
-      });
-
-      const result = await scorer.score(makeInput());
-
-      expect(result.overallScore).toBeGreaterThanOrEqual(0);
-      expect(result.overallScore).toBeLessThanOrEqual(1);
-      expect(typeof result.feedback).toBe('string');
-      expect(result.feedback.length).toBeGreaterThan(0);
-    });
-
-    it('does not throw when LLM call itself rejects', async () => {
+    it('surfaces provider errors', async () => {
       mockGenerateResponse.mockRejectedValue(new Error('Network error'));
 
-      await expect(scorer.score(makeInput())).resolves.toBeDefined();
-    });
-
-    it('returns a score clamped to 0..1 on fallback', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('timeout'));
-
-      const result = await scorer.score(makeInput());
-
-      expect(result.overallScore).toBeGreaterThanOrEqual(0);
-      expect(result.overallScore).toBeLessThanOrEqual(1);
-      expect(result.rubricScores.accuracy).toBeGreaterThanOrEqual(0);
-      expect(result.rubricScores.fluency).toBeGreaterThanOrEqual(0);
-      expect(result.rubricScores.completeness).toBeGreaterThanOrEqual(0);
+      await expect(scorer.score(makeInput())).rejects.toThrow('Network error');
     });
   });
 

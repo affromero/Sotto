@@ -61,6 +61,15 @@ function mockFetchStatus(status: string, extra: Record<string, unknown> = {}) {
   } as Response);
 }
 
+function deferredStatus() {
+  let resolve!: (data: { status: string }) => void;
+  const body = new Promise<{ status: string }>((done) => {
+    resolve = done;
+  });
+  vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: () => body } as Response);
+  return resolve;
+}
+
 describe('useEpisodeStatus', () => {
   describe('initial state', () => {
     it('returns initialStatus when provided', () => {
@@ -117,7 +126,9 @@ describe('useEpisodeStatus', () => {
         await Promise.resolve();
       });
 
-      expect(fetch).toHaveBeenCalledWith('/api/v1/episodes/pod-1');
+      expect(fetch).toHaveBeenCalledWith('/api/v1/episodes/pod-1', {
+        signal: expect.any(AbortSignal),
+      });
     });
 
     it('closes SSE when reconciliation fetch returns terminal status', async () => {
@@ -139,6 +150,55 @@ describe('useEpisodeStatus', () => {
   });
 
   describe('SSE messages', () => {
+    it('refetches invalidations without assigning a delayed producer status', async () => {
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'STITCHING' })
+      );
+      const event = {
+        kind: 'episode-invalidated',
+        episodeId: 'pod-1',
+        operationId: '8d9d7fa5-e156-4dad-b58d-b01bdd35dcef',
+      };
+      mockFetchStatus('GENERATING_AUDIO');
+      await act(async () => {
+        MockEventSource.instances[0].simulateMessage(event);
+      });
+      expect(result.current.status).toBe('GENERATING_AUDIO');
+      expect(MockEventSource.instances[0].closed).toBe(false);
+      mockFetchStatus('READY');
+      await act(async () => {
+        MockEventSource.instances[0].simulateMessage(event);
+      });
+      expect(result.current.status).toBe('GENERATING_AUDIO');
+      await act(async () => {
+        MockEventSource.instances[0].simulateMessage({
+          ...event,
+          operationId: '11c4bcab-7d92-4f2e-bf06-662d9c259729',
+        });
+      });
+      expect(result.current.status).toBe('READY');
+    });
+
+    it('allows redelivery after an invalidation fetch fails', async () => {
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'STITCHING' })
+      );
+      const event = {
+        kind: 'episode-invalidated',
+        episodeId: 'pod-1',
+        operationId: '8d9d7fa5-e156-4dad-b58d-b01bdd35dcef',
+      };
+      vi.mocked(fetch).mockRejectedValueOnce(new Error('Connection lost'));
+      await act(async () => {
+        MockEventSource.instances[0].simulateMessage(event);
+      });
+      expect(result.current.status).toBe('STITCHING');
+      mockFetchStatus('READY');
+      await act(async () => {
+        MockEventSource.instances[0].simulateMessage(event);
+      });
+      expect(result.current.status).toBe('READY');
+    });
     it('fetches full object on status change event', async () => {
       // First call: reconciliation on open
       mockFetchStatus('SCRIPTING');
@@ -212,7 +272,9 @@ describe('useEpisodeStatus', () => {
         await Promise.resolve();
       });
 
-      expect(fetch).toHaveBeenCalledWith('/api/v1/episodes/pod-1');
+      expect(fetch).toHaveBeenCalledWith('/api/v1/episodes/pod-1', {
+        signal: expect.any(AbortSignal),
+      });
     });
 
     it('stops polling when terminal status is received', async () => {
@@ -307,6 +369,152 @@ describe('useEpisodeStatus', () => {
   });
 
   describe('cleanup', () => {
+    it('applies a slow polling response without starting competing polls', async () => {
+      vi.useFakeTimers();
+      const finish = deferredStatus();
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
+      );
+      act(() => MockEventSource.instances[0].simulateError());
+      await act(async () => vi.advanceTimersByTime(30_000));
+      await act(async () => finish({ status: 'STITCHING' }));
+      expect(result.current.status).toBe('STITCHING');
+      mockFetchStatus('READY');
+      await act(async () => vi.advanceTimersByTime(10_000));
+      expect(result.current.status).toBe('READY');
+    });
+
+    it('finishes terminal teardown before invoking a reentrant callback', async () => {
+      mockFetchStatus('READY');
+      const onStatusChange = vi.fn(() =>
+        MockEventSource.instances[0].simulateMessage({ status: 'STITCHING' })
+      );
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING', onStatusChange })
+      );
+      await act(async () => MockEventSource.instances[0].simulateOpen());
+      expect(onStatusChange).toHaveBeenCalledWith(expect.objectContaining({ status: 'READY' }));
+      expect(result.current.status).toBe('READY');
+      expect(result.current.isConnected).toBe(false);
+      expect(MockEventSource.instances[0].closed).toBe(true);
+    });
+
+    it('keeps newer status when an older response finishes parsing later', async () => {
+      const finishOld = deferredStatus();
+      const onStatusChange = vi.fn();
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING', onStatusChange })
+      );
+      const source = MockEventSource.instances[0];
+      await act(async () => source.simulateOpen());
+      mockFetchStatus('GENERATING_AUDIO');
+      await act(async () => source.simulateMessage({ status: 'GENERATING_AUDIO' }));
+      await act(async () => finishOld({ status: 'READY' }));
+      expect(result.current.status).toBe('GENERATING_AUDIO');
+      expect(source.closed).toBe(false);
+      expect(onStatusChange).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'READY' }));
+    });
+
+    it('discards responses from the previous episode and resets null and terminal selections', async () => {
+      const finishOld = deferredStatus();
+      const onStatusChange = vi.fn();
+      const { result, rerender } = renderHook(
+        ({ episodeId, initialStatus }: { episodeId: string | null; initialStatus: string }) =>
+          useEpisodeStatus({ episodeId, initialStatus, onStatusChange }),
+        { initialProps: { episodeId: 'pod-1' as string | null, initialStatus: 'SCRIPTING' } }
+      );
+      await act(async () => MockEventSource.instances[0].simulateOpen());
+      rerender({ episodeId: 'pod-2', initialStatus: 'STITCHING' });
+      await act(async () => finishOld({ status: 'READY' }));
+      expect(result.current.status).toBe('STITCHING');
+      expect(onStatusChange).not.toHaveBeenCalled();
+      rerender({ episodeId: 'pod-3', initialStatus: 'FAILED' });
+      expect(result.current.status).toBe('FAILED');
+      expect(result.current.isConnected).toBe(false);
+      rerender({ episodeId: null, initialStatus: 'FAILED' });
+      expect(result.current.status).toBeNull();
+    });
+
+    it('does not notify after unmount while a response is parsing', async () => {
+      const finish = deferredStatus();
+      const onStatusChange = vi.fn();
+      const { unmount } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', onStatusChange })
+      );
+      await act(async () => MockEventSource.instances[0].simulateOpen());
+      const requestSignal = vi.mocked(fetch).mock.calls[0][1]?.signal;
+      unmount();
+      expect(requestSignal?.aborted).toBe(true);
+      await act(async () => finish({ status: 'READY' }));
+      expect(onStatusChange).not.toHaveBeenCalled();
+    });
+
+    it('keeps a replacement stream open when the old stream responds or errors', async () => {
+      const finishOld = deferredStatus();
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
+      );
+      const old = MockEventSource.instances[0];
+      await act(async () => old.simulateOpen());
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        Object.defineProperty(document, 'visibilityState', { value: 'visible' });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      const replacement = MockEventSource.instances[1];
+      mockFetchStatus('STITCHING');
+      await act(async () => replacement.simulateOpen());
+      await act(async () => {
+        finishOld({ status: 'READY' });
+        old.simulateError();
+      });
+      expect(result.current.status).toBe('STITCHING');
+      expect(result.current.isConnected).toBe(true);
+      expect(replacement.closed).toBe(false);
+    });
+
+    it('cancels pending reconnects while hidden and creates one stream when visible', async () => {
+      vi.useFakeTimers();
+      renderHook(() => useEpisodeStatus({ episodeId: 'pod-1' }));
+      act(() => {
+        MockEventSource.instances[0].simulateError();
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await act(async () => vi.advanceTimersByTime(30_000));
+      expect(MockEventSource.instances).toHaveLength(1);
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].closed).toBe(false);
+    });
+
+    it('accepts invalidation redelivery after a newer reconciliation supersedes it', async () => {
+      const finishOld = deferredStatus();
+      const event = {
+        kind: 'episode-invalidated',
+        episodeId: 'pod-1',
+        operationId: '8d9d7fa5-e156-4dad-b58d-b01bdd35dcef',
+      };
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })
+      );
+      const source = MockEventSource.instances[0];
+      await act(async () => source.simulateMessage(event));
+      mockFetchStatus('STITCHING');
+      await act(async () => source.simulateMessage({ status: 'STITCHING' }));
+      await act(async () => finishOld({ status: 'READY' }));
+      expect(result.current.status).toBe('STITCHING');
+      mockFetchStatus('READY');
+      await act(async () => source.simulateMessage(event));
+      expect(result.current.status).toBe('READY');
+      expect(source.closed).toBe(true);
+    });
+
     it('closes EventSource on unmount', () => {
       const { unmount } = renderHook(() =>
         useEpisodeStatus({ episodeId: 'pod-1', initialStatus: 'SCRIPTING' })

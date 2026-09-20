@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { setTimeout as delay } from 'node:timers/promises';
 
 /** Status codes that indicate a transient server-side problem worth retrying. */
 export const RETRYABLE_STATUS = new Set([429, 500, 503, 529]);
@@ -27,6 +28,7 @@ function getRetryDelay(status: number, attempt: number, longBackoff: boolean): n
 }
 
 export interface RetryOptions {
+  signal?: AbortSignal;
   /** Use long backoff (30s/60s/90s) for 429 rate limits. Default: false. */
   longBackoff?: boolean;
 }
@@ -36,11 +38,17 @@ export interface RetryOptions {
  * By default uses short delays (1s/2s/4s) safe for API routes.
  * Pass { longBackoff: true } in worker contexts to wait for TPM window resets.
  */
-export async function withRetry<T>(label: string, fn: () => Promise<T>, opts?: RetryOptions): Promise<T> {
+export async function withRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  opts?: RetryOptions
+): Promise<T> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    opts?.signal?.throwIfAborted();
     try {
       return await fn();
     } catch (err) {
+      if (opts?.signal?.aborted) throw err;
       if (!isRetryableError(err) || attempt === MAX_RETRIES) throw err;
       const status = (err as { status?: number }).status ?? 0;
       const delayMs = getRetryDelay(status, attempt, opts?.longBackoff ?? false);
@@ -49,7 +57,7 @@ export async function withRetry<T>(label: string, fn: () => Promise<T>, opts?: R
         status: String(status),
         delayMs: String(Math.round(delayMs)),
       });
-      await new Promise((r) => setTimeout(r, delayMs));
+      await delay(delayMs, undefined, { signal: opts?.signal });
     }
   }
   throw new Error('unreachable');

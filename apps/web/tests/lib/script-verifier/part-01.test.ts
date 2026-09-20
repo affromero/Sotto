@@ -14,10 +14,9 @@ vi.mock('@/lib/providers/ai', () => ({
 import {
   verifyScript as verifyScriptImpl,
   assessReferenceQuality,
-  getMinReferenceCount,
-  getMinSeriousRatio,
   type ClaimAnalysis,
 } from '@/lib/script-verifier';
+import { getMinReferenceCount, getMinSeriousRatio } from '@/lib/reference-thresholds';
 import { hashTurn } from '@/lib/turn-diff';
 import type { GeneratedReference } from '@/lib/script-generator';
 

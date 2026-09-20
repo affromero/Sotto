@@ -7,7 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 
 const mockGenerateResponse = vi.fn();
@@ -28,6 +32,7 @@ vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: 
 import { generateSectionQuestions } from '@/lib/class-generation';
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 const GENERATED_PASSAGE =
   'En el laboratorio, la científica Marta encontró una nota antigua y decidió investigar.';
@@ -56,6 +61,7 @@ const SAMPLE = JSON.stringify({
 
 const BASE: SectionGenParams = {
   userId: 'u1',
+  execution: blockedProviderExecution('u1'),
   skill: 'READING' as SkillType,
   level: 'A2',
   nativeLang: 'en',

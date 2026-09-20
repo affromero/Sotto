@@ -18,7 +18,6 @@ export const PIPELINE_WORKERS = new Set([
   'creative-planning',
   'script-writing',
   'compile-script',
-  'script-generation',
   'interactions',
   'segment-regeneration',
   'speaking-grading',

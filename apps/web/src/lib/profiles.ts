@@ -1,5 +1,9 @@
-import { prisma } from './prisma';
-import { LOCAL_USER_ID } from './local-user';
+import { AccessError } from 'thesidedoor-core/access';
+import type { Prisma } from '@/generated/prisma/client';
+import { prismaUnfiltered } from './prisma';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
+import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 import { resolveProfileAvatar } from './avatars';
 import type { UserRole } from '@/generated/prisma/client';
 
@@ -19,11 +23,30 @@ export interface HouseholdProfile {
   primaryCourse: { targetLang: string; level: string } | null;
 }
 
-/** Every profile in the household, owner first, each with its course summary. */
-export async function getHouseholdProfiles(): Promise<HouseholdProfile[]> {
-  const users = await prisma.user.findMany({
+export async function getHouseholdProfiles(
+  request: Request
+): Promise<(HouseholdProfile & { isActive: boolean })[]> {
+  return sottoTransaction(prismaUnfiltered, (database) => listHouseholdProfiles(database, request));
+}
+
+/** Profile visibility follows shared admission, independently of content selection. */
+export async function listHouseholdProfiles(
+  database: Prisma.TransactionClient,
+  request: Request
+): Promise<(HouseholdProfile & { isActive: boolean })[]> {
+  const identity = await resolveSottoRequest(database, request);
+  if (!identity) throw new AccessError('unauthorized');
+  const state = await (await sottoAccessStore(database)).read();
+  const ids = identity.principalId
+    ? [identity.principalId]
+    : (state.householdProfiles ?? []).map((profile) => profile.id);
+  const users = await database.user.findMany({
+    where: { id: { in: ids } },
     orderBy: { createdAt: 'asc' },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      image: true,
       courses: {
         select: { targetLang: true, currentLevel: true },
         orderBy: { updatedAt: 'desc' },
@@ -38,8 +61,12 @@ export async function getHouseholdProfiles(): Promise<HouseholdProfile[]> {
         id: u.id,
         name: u.name ?? 'Learner',
         avatarUrl: resolveProfileAvatar(u.id, u.image).image,
-        isOwner: u.id === LOCAL_USER_ID,
-        role: u.role,
+        isOwner: identity.isOwner && u.id === identity.principalId,
+        role:
+          identity.isOwner && u.id === identity.principalId
+            ? ('ADMIN' as const)
+            : ('USER' as const),
+        isActive: u.id === identity.userId,
         courseCount: u.courses.length,
         primaryCourse: primary
           ? { targetLang: primary.targetLang, level: primary.currentLevel }

@@ -8,8 +8,7 @@ Sotto is open-source language-learning infrastructure released under the GNU Aff
 
 - Node.js 20+
 - Docker and Docker Compose
-- An API key for at least one LLM provider (e.g. `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`)
-- An API key for at least one TTS provider (e.g. `ELEVENLABS_API_KEY`)
+- Access to an AI provider and a speech provider, configured after startup in `/welcome` or Admin
 
 ### First-time setup
 
@@ -27,7 +26,7 @@ npm run setup
 4. Pushes the Prisma schema (`npx prisma db push`).
 5. Generates the Prisma client (`npx prisma generate`).
 
-Edit `.env.local` to add your API keys before starting the dev server.
+Start the development server, open `/welcome`, and save your provider credentials. Sidedoor encrypts them in the development database.
 
 ### Running locally
 

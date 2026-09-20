@@ -1,3 +1,4 @@
+import { knownTokenSum } from 'thesidedoor-core/ai/usage';
 /**
  * Research Agent — builds a verified knowledge dossier for episode generation.
  *
@@ -77,8 +78,8 @@ export interface DossierResult {
   gaps: string[];
   blockedClaims: string[];
   recommendedAngle: string | null;
-  totalInputTokens: number;
-  totalOutputTokens: number;
+  totalInputTokens: number | null;
+  totalOutputTokens: number | null;
   model: string;
 }
 
@@ -97,6 +98,8 @@ export interface BuildDossierParams {
   discoverySummary?: string;
   curatedArticles?: string; // pre-formatted briefing articles
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
   model?: string;
   provider: string;
 }
@@ -245,8 +248,8 @@ async function verifySources(sources: SourceRecord[]): Promise<SourceRecord[]> {
 
 export async function buildResearchDossier(params: BuildDossierParams): Promise<DossierResult> {
   const ai = createAIProvider(params.provider);
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
+  let totalInputTokens: number | null = 0;
+  let totalOutputTokens: number | null = 0;
   let modelUsed = params.model || 'unknown';
 
   const userBrief: UserBrief = {
@@ -281,13 +284,15 @@ export async function buildResearchDossier(params: BuildDossierParams): Promise<
     {
       maxTokens: 8192,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
       useWebSearch: params.mode === 'open-web',
     }
   );
 
-  totalInputTokens += sourceResponse.inputTokens;
-  totalOutputTokens += sourceResponse.outputTokens;
+  totalInputTokens = knownTokenSum(totalInputTokens, sourceResponse.inputTokens);
+  totalOutputTokens = knownTokenSum(totalOutputTokens, sourceResponse.outputTokens);
   modelUsed = sourceResponse.model;
 
   const sourceData = JSON.parse(extractFirstJson(sourceResponse.content));
@@ -346,12 +351,14 @@ export async function buildResearchDossier(params: BuildDossierParams): Promise<
     {
       maxTokens: 8192,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
     }
   );
 
-  totalInputTokens += factResponse.inputTokens;
-  totalOutputTokens += factResponse.outputTokens;
+  totalInputTokens = knownTokenSum(totalInputTokens, factResponse.inputTokens);
+  totalOutputTokens = knownTokenSum(totalOutputTokens, factResponse.outputTokens);
 
   const factData = JSON.parse(extractFirstJson(factResponse.content));
   const evidence: EvidenceCard[] = (factData.evidence || []).map(
@@ -396,12 +403,14 @@ export async function buildResearchDossier(params: BuildDossierParams): Promise<
     {
       maxTokens: 4096,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
     }
   );
 
-  totalInputTokens += angleResponse.inputTokens;
-  totalOutputTokens += angleResponse.outputTokens;
+  totalInputTokens = knownTokenSum(totalInputTokens, angleResponse.inputTokens);
+  totalOutputTokens = knownTokenSum(totalOutputTokens, angleResponse.outputTokens);
 
   const angleData = JSON.parse(extractFirstJson(angleResponse.content));
 

@@ -1,0 +1,12 @@
+import { build } from 'esbuild';
+
+await build({
+  entryPoints: ['scripts/access.ts'],
+  outfile: 'dist/access.cjs',
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'cjs',
+  external: ['fs-ext', 'pg-native'],
+  logLevel: 'info',
+});

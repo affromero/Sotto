@@ -14,7 +14,25 @@
  * selected. No secrets are embedded here.
  */
 
+import { providerCredentials } from 'thesidedoor-core/providers/catalog';
+
 export type AiMethod = 'cli' | 'key' | 'url' | null;
+
+export function welcomeVoiceCredentialFields(provider: string) {
+  return providerCredentials(resolveWelcomeTtsProviderId(provider) ?? provider, 'speech');
+}
+
+export function welcomeVoiceCredentialExtras(provider: string, keys: Record<string, string>) {
+  const metadata = welcomeVoiceCredentialFields(provider);
+  return Object.fromEntries(
+    [...metadata.fields, ...metadata.configurationFields]
+      .filter((field) => field.id !== 'apiKey')
+      .flatMap((field) => {
+        const value = keys[`${provider}:${field.id}`]?.trim();
+        return value ? [[field.id, value]] : [];
+      })
+  );
+}
 
 /** A provider key to POST. `endpoint` selects the validated settings route. */
 export interface KeyPost {
@@ -122,11 +140,11 @@ export function resolveAi(
   const v = clean(value);
   const m = clean(model);
 
-  if (method === 'key' && v) {
+  if (method === 'key') {
     // claude → anthropic, codex → openai, cloud LLM cards → their registry id.
     const byokProvider = aiModelProviderId(provider) ?? 'openai';
     return {
-      keyPost: { endpoint: 'ai-keys', provider: byokProvider, apiKey: v },
+      keyPost: v ? { endpoint: 'ai-keys', provider: byokProvider, apiKey: v } : null,
       preferredAiProvider: byokProvider,
       // Bare registry model id picked in the wizard (no "local:" prefix). Drives
       // generation via AutoModelConfig once persisted; null falls back to default.

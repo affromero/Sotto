@@ -24,7 +24,7 @@ extension SottoAppModel {
     }
 
     /// Pairs from a typed server address instead of a scanned QR: open the
-    /// instance gate with the household password, ask that server for a
+    /// Sidedoor household session with the household password, ask that server for a
     /// one-time token, then redeem it exactly as a scan would. Only the
     /// resulting API key is stored; the password is never persisted.
     func pairWithServer(urlText: String, password: String) async {
@@ -47,7 +47,7 @@ extension SottoAppModel {
 
         do {
             if !trimmedPassword.isEmpty {
-                try await client.openGate(password: trimmedPassword)
+                try await client.enterHousehold(password: trimmedPassword)
             }
             let pairing = try await client.requestPairingToken(deviceName: SottoAppModel.deviceName)
             await redeemPairingPayload(PairingPayload(serverURL: serverURL, token: pairing.token))
@@ -85,8 +85,8 @@ extension SottoAppModel {
         return base.url
     }
 
-    /// The gate answers 401 "Wrong password"; the proxy answers a bare 401
-    /// "Unauthorized" when no gate cookie reached it at all. Both would read as
+    /// Sidedoor answers 401 for an invalid password; the proxy answers a bare
+    /// 401 when no access cookie reached it. Both would read as
     /// nothing but a status code otherwise, so name the actual problem.
     nonisolated static func pairingFailureMessage(for error: Error, host: String, sentPassword: Bool) -> String {
         let text = error.localizedDescription

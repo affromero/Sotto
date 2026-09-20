@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
@@ -173,7 +174,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           return errorResponse('Class not found or already passed.', 400);
         }
         if (cls.status !== 'GENERATING') {
-          void regenerateCurrentClass(classId, authed.userId).catch((error: unknown) => {
+          void regenerateCurrentClass(
+            classId,
+            authed.userId,
+            sottoRequestExecution(request, authed)
+          ).catch((error: unknown) => {
             logBackgroundRegenerationFailure(error, classId);
           });
         }
@@ -183,12 +188,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const ok = await regenerateCurrentClass(classId, authed.userId);
+      const ok = await regenerateCurrentClass(
+        classId,
+        authed.userId,
+        sottoRequestExecution(request, authed)
+      );
       if (!ok) return errorResponse('Class not found or already passed.', 400);
       return NextResponse.json({ regenerated: true, scope: 'class' });
     }
 
-    const ok = await regenerateFailedSections(classId, authed.userId);
+    const ok = await regenerateFailedSections(
+      classId,
+      authed.userId,
+      sottoRequestExecution(request, authed)
+    );
     if (!ok) return errorResponse('No failed sections to regenerate (or class not found).', 400);
     return NextResponse.json({ regenerated: true });
   } catch (error: unknown) {

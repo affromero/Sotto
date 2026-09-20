@@ -11,6 +11,7 @@
     "!apps/desktop"
   ],
   "scripts": {
+    "access": "npm run access --workspace=@sotto/web --",
     "build": "scripts/run-with-env.sh npm run build --workspace=@sotto/web",
     "ci": "node scripts/ci/audit-gate.mjs && python3 -m unittest discover -s scripts/tests -p 'test*.py' && npm run ci:web && npm run ci:packages",
     "ci:packages": "npm test --workspace=@sotto/shared -- --run && npm run type-check --workspace=@sotto/mcp && npm run build --workspace=@sotto/mcp && npm test --workspace=groundcheck -- --run && npm run typecheck --workspace=groundcheck && npm run build --workspace=groundcheck && npm test --workspace=@sotto/learning-model -- --run && npm run typecheck --workspace=@sotto/learning-model && npm run build --workspace=@sotto/learning-model",
@@ -24,7 +25,6 @@
     "lint": "npm run lint --workspace=@sotto/web",
     "lint:fix": "npm run lint:fix --workspace=@sotto/web",
     "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",
-    "smoke:audio-providers": "npm run smoke:audio-providers --workspace=@sotto/web",
     "speech:config": "npm run speech:config --workspace=@sotto/web",
     "speech:config:check": "npm run speech:config:check --workspace=@sotto/web",
     "start": "npm run start --workspace=@sotto/web",
@@ -81,7 +81,8 @@
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
     "prisma": "7.10.0",
-    "sort-package-json": "^4.0.0"
+    "sort-package-json": "^4.0.0",
+    "tsup": "^8.5.1"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "^16.3.3"

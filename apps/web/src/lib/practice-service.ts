@@ -21,7 +21,10 @@ export type {
 } from './practice/types';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent } from './class-listening-generator';
-import { composeSpeakingPrompts } from './class-speaking-generator';
+import {
+  composeSpeakingPrompts,
+  publishSpeakingPromptReferences,
+} from './class-speaking-generator';
 import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { buildLearnerContext } from './pedagogy';
@@ -262,6 +265,7 @@ export async function startPractice(
   courseId: string,
   userId: string,
   kind: PracticeKind,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
   options: StartPracticeOptions = {}
 ): Promise<StartPracticeResult> {
   const course = await loadCourse(courseId, userId);
@@ -280,13 +284,15 @@ export async function startPractice(
   if (!baseSeed) return { status: 'unavailable', reason: 'no_content' };
   const seed = applyFocusToSeed(baseSeed, focusTargets);
 
-  if (kind === 'FULL') return startFull(course, seed, seedToken, note, focusTargets);
+  if (kind === 'FULL') return startFull(course, seed, seedToken, note, focusTargets, execution);
   if (kind === 'GRAMMAR' || kind === 'READING') {
-    return startMc(course, kind, seed, seedToken, note, focusTargets);
+    return startMc(course, kind, seed, seedToken, note, focusTargets, execution);
   }
-  if (kind === 'LISTENING') return startListening(course, seed, seedToken, note, focusTargets);
-  if (kind === 'SPEAKING') return startSpeaking(course, seed, seedToken, note, focusTargets);
-  return startWriting(course, seed, seedToken, note, focusTargets);
+  if (kind === 'LISTENING')
+    return startListening(course, seed, seedToken, note, focusTargets, execution);
+  if (kind === 'SPEAKING')
+    return startSpeaking(course, seed, seedToken, note, focusTargets, execution);
+  return startWriting(course, seed, seedToken, note, focusTargets, execution);
 }
 
 type VocabPracticeBuild =
@@ -401,9 +407,18 @@ async function startMc(
   seed: PracticeSeed,
   seedToken: string,
   note: string,
-  focusTargets: FocusPracticeTarget[]
+  focusTargets: FocusPracticeTarget[],
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
-  const generatedItems = await buildSectionMcItems(course, kind, seed, seedToken, note, 'q');
+  const generatedItems = await buildSectionMcItems(
+    course,
+    kind,
+    seed,
+    seedToken,
+    note,
+    'q',
+    execution
+  );
   const focusItems = buildFocusItems(
     focusTargets,
     'f',
@@ -430,10 +445,12 @@ async function buildSectionMcItems(
   seed: PracticeSeed,
   seedToken: string,
   note: string,
-  idPrefix: string
+  idPrefix: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<PracticeMcItem[]> {
   const questions = await generateSectionQuestions({
     userId: course.userId,
+    execution,
     skill: kind as SkillType,
     level: course.currentLevel,
     nativeLang: course.nativeLang,
@@ -460,17 +477,19 @@ async function startFull(
   seed: PracticeSeed,
   seedToken: string,
   note: string,
-  focusTargets: FocusPracticeTarget[]
+  focusTargets: FocusPracticeTarget[],
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
   // Listening (which includes reference verification and can fail the whole
   // build) runs BEFORE the speaking prompts: speaking is the only section that
   // spends TTS credits up front, so it must not start until verification has
   // passed. The LLM-only sections stay parallel with listening.
   const [grammarItems, readingItems, listening, writingComposed] = await Promise.all([
-    buildSectionMcItems(course, 'GRAMMAR', seed, `${seedToken}-grammar`, note, 'g'),
-    buildSectionMcItems(course, 'READING', seed, `${seedToken}-reading`, note, 'r'),
+    buildSectionMcItems(course, 'GRAMMAR', seed, `${seedToken}-grammar`, note, 'g', execution),
+    buildSectionMcItems(course, 'READING', seed, `${seedToken}-reading`, note, 'r', execution),
     composeListeningContent({
       userId: course.userId,
+      execution,
       courseId: course.id,
       level: course.currentLevel,
       nativeLang: course.nativeLang,
@@ -481,6 +500,7 @@ async function startFull(
     }),
     composeWritingPrompts({
       userId: course.userId,
+      execution,
       level: course.currentLevel,
       nativeLang: course.nativeLang,
       targetLang: course.targetLang,
@@ -491,6 +511,7 @@ async function startFull(
   ]);
 
   const speakingComposed = await composeSpeakingPrompts({
+    execution,
     userId: course.userId,
     level: course.currentLevel,
     nativeLang: course.nativeLang,
@@ -566,7 +587,7 @@ async function startFull(
         targetPhrase: c.targetPhrase,
         translation: c.translation,
         ipa: c.ipa,
-        referenceTtsUrl: c.referenceTtsUrl,
+        referenceTtsUrl: null,
       })),
     }),
     prisma.writingPrompt.createMany({
@@ -579,8 +600,7 @@ async function startFull(
       })),
     }),
   ]);
-
-  const [speakingPrompts, writingPrompts] = await Promise.all([
+  const [storedSpeakingPrompts, writingPrompts] = await Promise.all([
     prisma.speakingPrompt.findMany({
       where: { practiceSessionId: session.id },
       orderBy: { order: 'asc' },
@@ -592,6 +612,18 @@ async function startFull(
       select: { id: true, task: true, guidance: true, ideas: true },
     }),
   ]);
+  const references = await publishSpeakingPromptReferences({
+    prompts: storedSpeakingPrompts.map((prompt, index) => ({
+      id: prompt.id,
+      composed: speakingComposed[index]!,
+    })),
+    userId: course.userId,
+    execution,
+  });
+  const speakingPrompts = storedSpeakingPrompts.map((prompt) => ({
+    ...prompt,
+    referenceTtsUrl: references.get(prompt.id) ?? prompt.referenceTtsUrl,
+  }));
 
   logger.info('Full practice generated', {
     sessionId: session.id,
@@ -615,10 +647,12 @@ async function startListening(
   seed: PracticeSeed,
   seedToken: string,
   note: string,
-  focusTargets: FocusPracticeTarget[]
+  focusTargets: FocusPracticeTarget[],
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
   const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: course.userId,
+    execution,
     courseId: course.id,
     level: course.currentLevel,
     nativeLang: course.nativeLang,
@@ -668,7 +702,8 @@ async function startSpeaking(
   seed: PracticeSeed,
   seedToken: string,
   note: string,
-  focusTargets: FocusPracticeTarget[]
+  focusTargets: FocusPracticeTarget[],
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
   // Speaking prompts hang off the session, so create it first to namespace them.
   const session = await prisma.practiceSession.create({
@@ -684,6 +719,7 @@ async function startSpeaking(
   });
 
   const composed = await composeSpeakingPrompts({
+    execution,
     userId: course.userId,
     level: course.currentLevel,
     nativeLang: course.nativeLang,
@@ -701,15 +737,24 @@ async function startSpeaking(
       targetPhrase: c.targetPhrase,
       translation: c.translation,
       ipa: c.ipa,
-      referenceTtsUrl: c.referenceTtsUrl,
+      referenceTtsUrl: null,
     })),
   });
 
-  const prompts = await prisma.speakingPrompt.findMany({
+  const storedPrompts = await prisma.speakingPrompt.findMany({
     where: { practiceSessionId: session.id },
     orderBy: { order: 'asc' },
     select: { id: true, targetPhrase: true, translation: true, referenceTtsUrl: true },
   });
+  const references = await publishSpeakingPromptReferences({
+    prompts: storedPrompts.map((prompt, index) => ({ id: prompt.id, composed: composed[index]! })),
+    userId: course.userId,
+    execution,
+  });
+  const prompts = storedPrompts.map((prompt) => ({
+    ...prompt,
+    referenceTtsUrl: references.get(prompt.id) ?? prompt.referenceTtsUrl,
+  }));
 
   logger.info('Speaking practice generated', {
     sessionId: session.id,
@@ -723,7 +768,8 @@ async function startWriting(
   seed: PracticeSeed,
   seedToken: string,
   note: string,
-  focusTargets: FocusPracticeTarget[]
+  focusTargets: FocusPracticeTarget[],
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
   // Writing prompts hang off the session, so create it first.
   const session = await prisma.practiceSession.create({
@@ -740,6 +786,7 @@ async function startWriting(
 
   const composed = await composeWritingPrompts({
     userId: course.userId,
+    execution,
     level: course.currentLevel,
     nativeLang: course.nativeLang,
     targetLang: course.targetLang,

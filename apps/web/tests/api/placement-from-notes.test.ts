@@ -99,7 +99,13 @@ describe('POST /api/v1/placement/from-notes (deduce)', () => {
       rationale: 'Subordinate clauses.',
       confidence: 0.8,
     });
-    expect(mockRunNotesDeduction).toHaveBeenCalledWith('u1', 'en', 'es', 'mi cuaderno');
+    expect(mockRunNotesDeduction).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      'en',
+      'es',
+      'mi cuaderno'
+    );
   });
 });
 
@@ -143,7 +149,14 @@ describe('POST /api/v1/placement/from-notes/confirm', () => {
     const body = await res.json();
     expect(body).toEqual({ courseId: 'course-1', level: 'B1', addedVocabulary: 7 });
 
-    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith('u1', 'en', 'es', 'B1', 'NOTES');
+    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      'en',
+      'es',
+      'B1',
+      'NOTES'
+    );
     expect(mockSetCourseNote).toHaveBeenCalledWith('course-1', 'mis materiales');
     expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
       expect.objectContaining({

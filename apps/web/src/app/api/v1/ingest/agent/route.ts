@@ -11,6 +11,7 @@ import {
   type PrivateIngestionTransaction,
 } from '@/lib/private-ingestion';
 import { errorResponse } from '@/lib/api-response';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 
 function contentHash(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex');
@@ -168,6 +169,10 @@ export async function POST(request: NextRequest) {
       },
       jobPriority: getJobPriority(),
       jobIdPrefix: 'agent-ingest',
+      authorize: async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        return { userId: authResult.userId };
+      },
       writeIngestionRecord: async (tx: PrivateIngestionTransaction, episodeId: string) => {
         await tx.agentIngestion.create({
           data: {

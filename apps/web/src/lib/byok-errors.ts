@@ -7,11 +7,7 @@
  */
 
 export type ByokErrorKind =
-  | 'auth_invalid'
-  | 'insufficient_credits'
-  | 'rate_limited'
-  | 'provider_error'
-  | 'unknown';
+  'auth_invalid' | 'insufficient_credits' | 'rate_limited' | 'provider_error' | 'unknown';
 
 const FETCH_STATUS_RE = /API error \((\d{3})\)/;
 const OPENAI_STATUS_RE = /^(\d{3})\s/;
@@ -55,21 +51,15 @@ export function classifyError(errorMessage: string): ByokErrorKind {
   return 'unknown';
 }
 
-/**
- * Check if an error indicates the API key lacks access to the requested resource.
- * Any 404 from a BYOK key is worth retrying with the platform key — the most
- * common case is ElevenLabs model access (e.g. eleven_v3), but generic 404s
- * from other providers should also trigger the fallback.
- */
-export function isModelAccessError(errorMessage: string): boolean {
-  return /\b404\b/.test(errorMessage);
-}
-
 export function isKeyInvalidationError(kind: ByokErrorKind): boolean {
   return kind === 'auth_invalid' || kind === 'insufficient_credits';
 }
 
-export function userMessage(kind: ByokErrorKind, providerLabel: string, stageLabel?: string): string {
+export function userMessage(
+  kind: ByokErrorKind,
+  providerLabel: string,
+  stageLabel?: string
+): string {
   switch (kind) {
     case 'auth_invalid':
       return `Your ${providerLabel} API key is invalid or has been revoked. Update it in Settings.`;

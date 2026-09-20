@@ -82,8 +82,11 @@ const OPENAI_VOICES: CatalogVoice[] = [
 // Dynamic fetchers — API calls with Redis caching
 // ---------------------------------------------------------------------------
 
-async function fetchElevenLabsCatalog(apiKey: string): Promise<CatalogVoice[]> {
-  const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+async function fetchElevenLabsCatalog(
+  apiKey: string,
+  request: typeof fetch
+): Promise<CatalogVoice[]> {
+  const response = await request('https://api.elevenlabs.io/v1/voices', {
     headers: { 'xi-api-key': apiKey },
   });
 
@@ -109,7 +112,10 @@ async function fetchElevenLabsCatalog(apiKey: string): Promise<CatalogVoice[]> {
   return voices;
 }
 
-async function fetchCartesiaCatalog(apiKey: string): Promise<CatalogVoice[]> {
+async function fetchCartesiaCatalog(
+  apiKey: string,
+  request: typeof fetch
+): Promise<CatalogVoice[]> {
   const voices: CatalogVoice[] = [];
   let cursor: string | undefined;
 
@@ -118,7 +124,7 @@ async function fetchCartesiaCatalog(apiKey: string): Promise<CatalogVoice[]> {
     url.searchParams.set('limit', '100');
     if (cursor) url.searchParams.set('starting_after', cursor);
 
-    const response = await fetch(url.toString(), {
+    const response = await request(url.toString(), {
       headers: {
         'X-API-Key': apiKey,
         'Cartesia-Version': '2025-04-16',
@@ -143,10 +149,13 @@ async function fetchCartesiaCatalog(apiKey: string): Promise<CatalogVoice[]> {
   return voices;
 }
 
-async function fetchHumeCatalog(apiKey: string): Promise<CatalogVoice[]> {
-  const response = await fetch('https://api.hume.ai/v0/tts/voices?provider=HUME_AI&page_size=100', {
-    headers: { 'X-Hume-Api-Key': apiKey },
-  });
+async function fetchHumeCatalog(apiKey: string, request: typeof fetch): Promise<CatalogVoice[]> {
+  const response = await request(
+    'https://api.hume.ai/v0/tts/voices?provider=HUME_AI&page_size=100',
+    {
+      headers: { 'X-Hume-Api-Key': apiKey },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`Hume voices API error (${response.status})`);
@@ -167,14 +176,10 @@ async function fetchHumeCatalog(apiKey: string): Promise<CatalogVoice[]> {
 }
 
 async function fetchLocalCatalog(): Promise<CatalogVoice[]> {
-  const baseURL = infra('ttsBaseUrl', 'TTS_BASE_URL')?.replace(/\/+$/, '');
+  const baseURL = infra('ttsBaseUrl')?.replace(/\/+$/, '');
   if (!baseURL) return providerVoiceToCatalog(getLocalTtsVoicePool());
 
-  const headers: Record<string, string> = {};
-  const apiKey = process.env.TTS_API_KEY?.trim();
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
-  const response = await fetch(`${baseURL}/voices`, { headers });
+  const response = await fetch(`${baseURL}/voices`);
   if (!response.ok) {
     throw new Error(`Local TTS voices API error (${response.status})`);
   }
@@ -216,11 +221,12 @@ async function fetchLocalCatalog(): Promise<CatalogVoice[]> {
  */
 export async function getVoiceCatalog(
   providerId: TtsProviderId,
-  apiKey?: string
+  apiKey?: string,
+  request: typeof fetch = fetch
 ): Promise<CatalogVoice[]> {
   switch (providerId) {
     case 'elevenlabs': {
-      const key = apiKey || process.env.ELEVENLABS_API_KEY;
+      const key = apiKey;
       if (!key) return voicePoolToCatalog(VOICE_POOL, 'elevenlabs');
 
       const cacheKey = 'tts:voicecatalog:elevenlabs';
@@ -228,7 +234,7 @@ export async function getVoiceCatalog(
       if (cached) return cached;
 
       try {
-        const catalog = await fetchElevenLabsCatalog(key);
+        const catalog = await fetchElevenLabsCatalog(key, request);
         await cache.set(cacheKey, catalog, CATALOG_TTL);
         return catalog;
       } catch (err) {
@@ -240,7 +246,7 @@ export async function getVoiceCatalog(
     }
 
     case 'cartesia': {
-      const key = apiKey || process.env.CARTESIA_API_KEY;
+      const key = apiKey;
       if (!key) return providerVoiceToCatalog(CARTESIA_VOICE_POOL);
 
       const cacheKey = 'tts:voicecatalog:cartesia';
@@ -248,7 +254,7 @@ export async function getVoiceCatalog(
       if (cached) return cached;
 
       try {
-        const catalog = await fetchCartesiaCatalog(key);
+        const catalog = await fetchCartesiaCatalog(key, request);
         await cache.set(cacheKey, catalog, CATALOG_TTL);
         return catalog;
       } catch (err) {
@@ -260,7 +266,7 @@ export async function getVoiceCatalog(
     }
 
     case 'hume': {
-      const key = apiKey || process.env.HUME_API_KEY;
+      const key = apiKey;
       if (!key) return providerVoiceToCatalog(HUME_VOICE_POOL);
 
       const cacheKey = 'tts:voicecatalog:hume';
@@ -268,7 +274,7 @@ export async function getVoiceCatalog(
       if (cached) return cached;
 
       try {
-        const catalog = await fetchHumeCatalog(key);
+        const catalog = await fetchHumeCatalog(key, request);
         await cache.set(cacheKey, catalog, CATALOG_TTL);
         return catalog;
       } catch (err) {

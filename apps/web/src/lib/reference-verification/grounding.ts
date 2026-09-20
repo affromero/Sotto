@@ -10,6 +10,7 @@ import {
 } from '@/lib/reference-validator';
 import type { ContentDomain } from 'groundcheck';
 import type { ClaimContext } from './claim-extractor';
+import { capturedLearningAiOptions, type CapturedLearningAi } from '@/lib/learning-ai';
 
 export type GroundingReason = 'all_checks_failed' | 'unreliable_source' | 'low_quality_source';
 
@@ -19,16 +20,6 @@ export interface GroundingInput {
   claimContext: ClaimContext;
   allChecks: VerificationCheck[];
   reason?: GroundingReason;
-}
-
-function requireReferenceGroundingRouting(
-  model?: string,
-  provider?: string
-): { model: string; provider: string } {
-  if (!provider || !model) {
-    throw new Error('AI provider and model are required for reference grounding.');
-  }
-  return { model, provider };
 }
 
 /**
@@ -184,11 +175,9 @@ async function aiGroundBatch(
   batch: Array<{ ref: ReferenceInput; claimContext: ClaimContext }>,
   topic: string,
   systemPrompt: string,
-  apiKeyOverride?: string,
-  model?: string,
-  provider?: string
+  aiSelection: CapturedLearningAi
 ): Promise<Map<string, VerificationCheck>> {
-  const routing = requireReferenceGroundingRouting(model, provider);
+  const routing = aiSelection;
 
   const results = new Map<string, VerificationCheck>();
   // Grounding routes through CLI agents with web search (e.g. codex), which
@@ -225,8 +214,7 @@ Find one real, verifiable source per reference. Return JSON only.`;
     const response = await Promise.race([
       ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
         maxTokens: 4096,
-        apiKeyOverride,
-        model: routing.model,
+        ...(await capturedLearningAiOptions(aiSelection)),
         useWebSearch: true,
       }),
       new Promise<never>((_, reject) =>
@@ -306,9 +294,7 @@ Find one real, verifiable source per reference. Return JSON only.`;
 async function aiGroundingSearch(
   candidates: Array<{ ref: ReferenceInput; claimContext: ClaimContext }>,
   topic: string,
-  apiKeyOverride?: string,
-  model?: string,
-  provider?: string
+  aiSelection: CapturedLearningAi
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
   if (candidates.length === 0) return results;
@@ -319,14 +305,7 @@ async function aiGroundingSearch(
   // Split into batches and process sequentially to respect rate limits
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
     const batch = candidates.slice(i, i + BATCH_SIZE);
-    const batchResults = await aiGroundBatch(
-      batch,
-      topic,
-      systemPrompt,
-      apiKeyOverride,
-      model,
-      provider
-    );
+    const batchResults = await aiGroundBatch(batch, topic, systemPrompt, aiSelection);
 
     for (const [id, check] of batchResults) {
       results.set(id, check);
@@ -358,17 +337,13 @@ async function aiGroundingSearch(
 async function groundReferenceCandidates(
   inputs: GroundingInput[],
   topic: string,
-  apiKeyOverride?: string,
-  model?: string,
-  provider?: string
+  aiSelection: CapturedLearningAi
 ): Promise<Map<string, VerificationCheck>> {
   const candidates = inputs;
 
   if (candidates.length === 0) {
     return new Map();
   }
-  requireReferenceGroundingRouting(model, provider);
-
   logger.info('Starting reference grounding', {
     total: String(inputs.length),
     candidates: String(candidates.length),
@@ -386,9 +361,7 @@ async function groundReferenceCandidates(
   const aiResults = await aiGroundingSearch(
     remaining.map((c) => ({ ref: c.ref, claimContext: c.claimContext })),
     topic,
-    apiKeyOverride,
-    model,
-    provider
+    aiSelection
   );
 
   // Merge results (OpenAlex takes priority)
@@ -414,9 +387,7 @@ async function groundReferenceCandidates(
 export async function groundFailedReferences(
   inputs: GroundingInput[],
   topic: string,
-  apiKeyOverride?: string,
-  model?: string,
-  provider?: string
+  aiSelection: CapturedLearningAi
 ): Promise<Map<string, VerificationCheck>> {
   const needsWork = inputs.filter((i) => needsGrounding(i.allChecks));
   if (needsWork.length === 0) {
@@ -426,8 +397,6 @@ export async function groundFailedReferences(
   return groundReferenceCandidates(
     needsWork.map((i) => ({ ...i, reason: 'all_checks_failed' as const })),
     topic,
-    apiKeyOverride,
-    model,
-    provider
+    aiSelection
   );
 }

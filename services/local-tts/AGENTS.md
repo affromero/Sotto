@@ -2,11 +2,10 @@
 
 Keyless, self-hosted text-to-speech server wrapping the open-source
 [Kokoro-82M](https://github.com/hexgrad/kokoro) model in FastAPI. It is the TTS
-analog of the keyless local LLM (`AI_PROVIDER=local`) and local STT
-(`STT_PROVIDER=local`) backends: a self-hoster sets `TTS_PROVIDER=kokoro` and
-`TTS_BASE_URL`, and all lesson/speaking audio is generated with no cloud keys.
-For other local TTS models, keep the same sidecar HTTP shape and configure
-`TTS_PROVIDER=local`; do not pretend every local sidecar is Kokoro.
+analog of the keyless local LLM and local STT backends. A self-hoster selects
+Kokoro and saves its base URL, and all lesson/speaking audio is generated with
+no cloud keys. For other local TTS models, keep the same sidecar HTTP shape and
+select Local. Keep custom sidecars distinct from Kokoro.
 
 ## Purpose
 
@@ -32,9 +31,9 @@ language.
 ## Port & networking
 
 - Listens on **8000**.
-- Local dev (outside Docker): `TTS_BASE_URL=http://localhost:8000`.
+- Local dev (outside Docker): save `http://localhost:8000`.
 - Inside Docker Compose, the worker reaches it via the **service name**, not
-  localhost: `TTS_BASE_URL=http://local-tts:8000`.
+  localhost: save `http://local-tts:8000`.
 
 ## Build & run
 

@@ -85,6 +85,66 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   providerRequiresAiKey: (provider: string) =>
     provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
+vi.mock('@/lib/sidedoor/jobs/core/durable-queue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sidedoor/jobs/core/durable-queue')>()),
+  durableJobProviderExecution: (_job: unknown, userId: string, signal?: AbortSignal) => ({
+    userId,
+    signal,
+    authorize: vi.fn(),
+  }),
+  transitionDurableQueueJob: async ({
+    queue,
+    type,
+    payload,
+    jobId,
+    mutate,
+  }: {
+    queue: { name: string };
+    type: string;
+    payload: unknown;
+    jobId: string;
+    mutate: (database: { episode: { update: typeof mockPrismaEpisodeUpdate } }) => Promise<void>;
+  }) => {
+    await mutate({ episode: { update: mockPrismaEpisodeUpdate } });
+    return mockEnqueueDurableJob(queue, type, payload, { jobId });
+  },
+}));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedEpisodeAi: async ({
+    userId,
+    aiModel,
+    allowSharing,
+  }: {
+    userId: string;
+    aiModel?: string | null;
+    allowSharing?: boolean;
+  }) => {
+    if (!aiModel) {
+      if (allowSharing)
+        throw new Error('AI model is required for script writing when no AI key is configured.');
+      const aiKey = await mockGetAiKey(userId);
+      if (!aiKey)
+        throw new Error('AI model is required for script writing when no AI key is configured.');
+      return { ...(await mockResolveAiModelAndProvider({ episodeAiModel: null, aiKey })), aiKey };
+    }
+    const resolved = await mockResolveAiModelAndProvider({ episodeAiModel: aiModel, aiKey: null });
+    if (['claude-code', 'codex', 'local'].includes(resolved.provider) || allowSharing)
+      return { ...resolved, aiKey: null };
+    const aiKey = await mockGetAiKey(userId, resolved.provider);
+    if (!aiKey)
+      throw new Error(`AI key for provider "${resolved.provider}" is required for script writing.`);
+    return { ...resolved, aiKey };
+  },
+  capturedLearningAiOptions: async (ai: {
+    model: string;
+    provider: string;
+    aiKey?: { apiKey: string } | null;
+  }) => ({
+    model: ai.model,
+    provider: ai.provider,
+    apiKeyOverride: ai.aiKey?.apiKey,
+  }),
+}));
 
 const { mockWriteScript } = vi.hoisted(() => ({
   mockWriteScript: vi.fn().mockResolvedValue({
@@ -113,9 +173,9 @@ vi.mock('@/lib/script-writer', () => ({
   writeScript: mockWriteScript,
 }));
 
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  enqueueDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   JobType: { COMPILE_SCRIPT: 'compile_script' },
   compileScriptQueue: { name: 'compile-script' },
 }));
@@ -207,7 +267,7 @@ describe('processScriptWriting', () => {
     mockPrismaTagFindMany.mockResolvedValue([]);
     mockPrismaEpisodeTagUpsert.mockResolvedValue({});
     mockPrismaEpisodeUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue({ id: 'compile-job-1' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'compile-job-1' });
     mockLogUsage.mockResolvedValue(undefined);
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockResolveAiModelAndProvider.mockResolvedValue({
@@ -315,7 +375,7 @@ describe('processScriptWriting', () => {
       mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({ aiModel: 'gpt-5-mini' });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
 
-      await processScriptWriting(createMockJob({ ...defaultPayload, useAdminCredits: true }));
+      await processScriptWriting(createMockJob({ ...defaultPayload, allowSharedCredential: true }));
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
@@ -333,7 +393,7 @@ describe('processScriptWriting', () => {
 
     it('rejects admin-credit routes without an explicit model', async () => {
       await expect(
-        processScriptWriting(createMockJob({ ...defaultPayload, useAdminCredits: true }))
+        processScriptWriting(createMockJob({ ...defaultPayload, allowSharedCredential: true }))
       ).rejects.toThrow('AI model is required for script writing when no AI key is configured.');
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -368,7 +428,7 @@ describe('processScriptWriting', () => {
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockWriteScript).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledWith(
+      expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
         { name: 'compile-script' },
         'compile_script',
         { episodeId: 'episode-001', userId: 'user-001' },

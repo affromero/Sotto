@@ -1,4 +1,12 @@
-import { spawn } from 'child_process';
+import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
+import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
+import {
+  ClaudeOutputDecoder,
+  CliProtocolError,
+  type CliOutputEvent,
+} from 'thesidedoor-core/runtime/cli';
+import { GenerationUsageError } from 'thesidedoor-core/ai/usage';
+import type { TokenUsage } from 'thesidedoor-core/ai';
 import { randomUUID } from 'crypto';
 import {
   copyFileSync,
@@ -148,37 +156,48 @@ function createInvocationConfig(): InvocationConfig {
   delete env.ANTHROPIC_AUTH_TOKEN;
 
   const release = () => {
+    const failures: unknown[] = [];
+    let temporaryCredentials: string | undefined;
     try {
       const current = readFileSync(
         /* turbopackIgnore: true */ join(dir, '.credentials.json'),
         'utf8'
       );
       if (current !== seeded && supersedesCredentials('claude-code', shared, current)) {
-        const tmp = `${shared}.tmp-${randomUUID()}`;
-        writeFileSync(/* turbopackIgnore: true */ tmp, current, { mode: 0o660 });
-        renameSync(/* turbopackIgnore: true */ tmp, shared);
+        temporaryCredentials = `${shared}.tmp-${randomUUID()}`;
+        writeFileSync(/* turbopackIgnore: true */ temporaryCredentials, current, { mode: 0o660 });
+        renameSync(/* turbopackIgnore: true */ temporaryCredentials, shared);
         logger.info('claude-code: persisted refreshed OAuth credentials');
       }
-    } catch {
-      // Credentials unchanged or unreadable — nothing to persist.
+    } catch (error) {
+      failures.push(error);
+    }
+    if (temporaryCredentials) {
+      try {
+        rmSync(/* turbopackIgnore: true */ temporaryCredentials, { force: true });
+      } catch (error) {
+        failures.push(error);
+      }
     }
     try {
       rmSync(/* turbopackIgnore: true */ dir, { recursive: true, force: true });
-    } catch {
-      // Best-effort cleanup.
+    } catch (error) {
+      failures.push(error);
     }
+    if (failures.length)
+      throw new AggregateError(failures, 'Claude credentials could not be persisted or cleaned up');
   };
 
   return { env, release };
 }
 
-interface ClaudeCodeResponse {
+interface ClaudeCodeResponse extends TokenUsage {
   content: string;
-  inputTokens: number;
-  outputTokens: number;
 }
 
 interface ClaudeCodeOptions {
+  signal?: AbortSignal;
+  onUsage?: (usage: TokenUsage) => void;
   model?: string;
   timeoutMs?: number;
   useWebSearch?: boolean;
@@ -271,263 +290,177 @@ export async function executeClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): Promise<ClaudeCodeResponse> {
-  if (opts?.images?.length) {
-    let content = '';
-    for await (const chunk of streamClaudeCode(systemPrompt, prompt, opts)) content += chunk;
-    if (!content) throw new Error('claude-code: no output produced (empty response).');
-    return { content, inputTokens: 0, outputTokens: 0 };
-  }
-  const selection = resolveSelection(opts);
-  const model = selection.model;
-  const timeoutMs = opts?.timeoutMs || 600_000;
-
-  const args = buildArgs(model, systemPrompt, 'text', { ...opts, effort: selection.effort });
-
-  logger.info('claude-code: executing', {
-    model,
-    effort: selection.effort ?? '(configured default)',
-    promptLength: String(prompt.length),
-    webSearch: String(!!opts?.useWebSearch),
-  });
-
-  return new Promise((resolve, reject) => {
-    const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost(), {
-      remoteEnvKeys: CLAUDE_ENV_KEYS,
-    });
-    const invocation = createInvocationConfig();
-    const child = spawn(command, spawnArgs, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: invocation.env,
-    });
-
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`claude-code: timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      invocation.release();
-
-      if (code !== 0) {
-        // The CLI reports failures ("Not logged in", "OAuth session expired")
-        // on stdout in print mode, so stderr alone yields a blank message.
-        const detail = (stderr.trim() || stdout.trim() || '(no output)').slice(0, 500);
-        logger.error('claude-code: non-zero exit', { code: String(code), detail });
-        reject(new Error(`claude-code: exited with code ${code} — ${detail}`));
-        return;
-      }
-
-      const content = stdout.trim();
-      if (!content) {
-        const detail = stderr.trim().slice(0, 300) || '(empty)';
-        logger.error('claude-code: exited cleanly but produced no output', {
-          bufferRemainder: detail,
-        });
-        reject(new Error(`claude-code: no output produced (empty response). Buffer: ${detail}`));
-        return;
-      }
-
-      resolve({ content, inputTokens: 0, outputTokens: 0 });
-    });
-
-    child.on('error', (err) => {
-      clearTimeout(timer);
-      invocation.release();
-      reject(
-        new Error(`claude-code: failed to spawn — ${err.message}. Is the 'claude' CLI installed?`)
-      );
-    });
-
-    child.stdin.write(claudeStdin(prompt, opts?.images));
-    child.stdin.end();
-  });
+  let content = '';
+  let usage: TokenUsage = { inputTokens: null, outputTokens: null };
+  for await (const text of streamClaudeCode(systemPrompt, prompt, {
+    ...opts,
+    onUsage(value) {
+      usage = { ...value };
+      opts?.onUsage?.({ ...value });
+    },
+  }))
+    content += text;
+  return { content: opts?.images?.length ? content : content.trim(), ...usage };
 }
 
-/**
- * Spawn `claude -p` with stream-json output and yield text chunks.
- * Parses newline-delimited JSON from stdout, yielding text content as it arrives.
- */
-export async function* streamClaudeCode(
+/** The shared iterator aborts a pending read before waiting for owned cleanup. */
+export function streamClaudeCode(
   systemPrompt: string,
   prompt: string,
   opts?: ClaudeCodeOptions
 ): AsyncGenerator<string> {
-  const selection = resolveSelection(opts);
-  const model = selection.model;
-  const timeoutMs = opts?.timeoutMs || 600_000;
-  const stdin = claudeStdin(prompt, opts?.images);
+  return interruptibleStream(
+    (signal) => streamClaudeRaw(systemPrompt, prompt, { ...opts, signal }),
+    {
+      signal: opts?.signal,
+      isCleanupError: isClaudeCleanupError,
+    }
+  );
+}
 
-  const args = buildArgs(model, systemPrompt, 'stream-json', {
+class ClaudeCleanupError extends Error {}
+
+export function isClaudeCleanupError(error: unknown): boolean {
+  return (
+    error instanceof ClaudeCleanupError ||
+    (error instanceof ProcessExecutionError && error.code === 'cleanup_failed')
+  );
+}
+
+function releaseInvocation(
+  invocation: InvocationConfig,
+  primary?: { error: unknown },
+  usage?: TokenUsage
+) {
+  try {
+    invocation.release();
+  } catch (error) {
+    const cleanup = new ClaudeCleanupError('claude-code: credential cleanup failed', {
+      cause: error,
+    });
+    const failure = primary
+      ? new AggregateError([primary.error, cleanup], 'Claude execution and cleanup failed', {
+          cause: error,
+        })
+      : cleanup;
+    if (usage) throw new GenerationUsageError(failure.message, usage, { cause: failure });
+    throw failure;
+  }
+}
+
+async function* streamClaudeRaw(
+  systemPrompt: string,
+  prompt: string,
+  opts: ClaudeCodeOptions
+): AsyncGenerator<string> {
+  opts.signal?.throwIfAborted();
+  const selection = resolveSelection(opts);
+  const args = buildArgs(selection.model, systemPrompt, 'stream-json', {
     ...opts,
     effort: selection.effort,
   });
-
-  logger.info('claude-code: streaming', {
-    model,
-    effort: selection.effort ?? '(configured default)',
-    promptLength: String(prompt.length),
-    webSearch: String(!!opts?.useWebSearch),
-  });
-
+  const stdin = claudeStdin(prompt, opts.images);
   const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost(), {
     remoteEnvKeys: CLAUDE_ENV_KEYS,
   });
   const invocation = createInvocationConfig();
-  const child = spawn(command, spawnArgs, {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: invocation.env,
-  });
-
-  const timer = setTimeout(() => {
-    child.kill('SIGTERM');
-  }, timeoutMs);
-
-  // Capture stderr for error reporting
+  const decoder = new ClaudeOutputDecoder({ maximumLineChars: Number.MAX_SAFE_INTEGER });
+  let usage: TokenUsage | undefined;
   let stderr = '';
-  child.stderr.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString();
-  });
-
-  // Track process exit code (non-blocking — captured via listener)
-  let exitCode: number | null = null;
-  child.on('close', (code) => {
-    exitCode = code;
-    invocation.release();
-  });
-
-  child.stdin.write(stdin);
-  child.stdin.end();
-
-  let buffer = '';
+  let stdout = '';
+  let failure = '';
+  let terminalFailure = false;
   let produced = false;
-  const streamState = { sawDelta: false, sawAssistant: false };
-  let consecutiveParseFailures = 0;
-
-  function textFromEvent(raw: unknown): string[] {
-    if (!raw || typeof raw !== 'object') return [];
-    const outer = raw as {
-      type?: string;
-      event?: unknown;
-      delta?: { text?: unknown };
-      result?: unknown;
-      message?: { content?: unknown };
-      content?: unknown;
-    };
-    const event =
-      outer.type === 'stream_event' && outer.event && typeof outer.event === 'object'
-        ? (outer.event as typeof outer)
-        : outer;
-    if (event.type === 'content_block_delta' && typeof event.delta?.text === 'string') {
-      streamState.sawDelta = true;
-      return [event.delta.text];
-    }
-    if (event.type === 'assistant' && !streamState.sawDelta) {
-      const blocks = event.message?.content ?? event.content;
-      if (!Array.isArray(blocks)) return [];
-      const texts = blocks.flatMap((block) => {
-        if (!block || typeof block !== 'object') return [];
-        const typed = block as { type?: unknown; text?: unknown };
-        return typed.type === 'text' && typeof typed.text === 'string' ? [typed.text] : [];
-      });
-      if (texts.length > 0) streamState.sawAssistant = true;
-      return texts;
-    }
-    if (
-      event.type === 'result' &&
-      !streamState.sawDelta &&
-      !streamState.sawAssistant &&
-      typeof event.result === 'string'
-    ) {
-      return [event.result];
-    }
-    return [];
-  }
-
-  function parseLine(line: string): string[] {
-    const raw = JSON.parse(line) as unknown;
-    return textFromEvent(raw);
-  }
-
-  try {
-    for await (const chunk of child.stdout) {
-      buffer += chunk.toString();
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          for (const text of parseLine(line)) {
-            produced = true;
-            yield text;
-          }
-        } catch {
-          // Not valid JSON — skip partial lines
-          consecutiveParseFailures++;
-          if (consecutiveParseFailures >= 10) {
-            logger.warn('claude-code: repeated JSON parse failures in stream', {
-              consecutiveParseFailures: String(consecutiveParseFailures),
-              sample: line.slice(0, 200),
-            });
-          }
-          continue;
-        }
-        consecutiveParseFailures = 0;
+  let finished = false;
+  let primary: { error: unknown } | undefined;
+  function* observe(events: Iterable<CliOutputEvent>): Generator<string> {
+    for (const event of events) {
+      if (event.type === 'usage') {
+        usage = { ...event.usage };
+        opts.onUsage?.({ ...usage });
+      }
+      if (event.type === 'failure') {
+        terminalFailure = true;
+        failure = event.message;
+      }
+      if (event.type === 'text') {
+        produced = true;
+        yield event.text;
       }
     }
-
-    // Process remaining buffer
-    if (buffer.trim()) {
+  }
+  const diagnostic = () =>
+    failure ||
+    stderr.trim() ||
+    stdout
+      .split('\n')
+      .filter((line) =>
+        /^(?:error:\s*)?(?:not logged in|oauth|failed to authenticate|401|unauthorized|usage limit)/i.test(
+          line.trim()
+        )
+      )
+      .join('\n') ||
+    '(no output)';
+  try {
+    for await (const chunk of new ProcessRunner().stream({
+      command,
+      args: spawnArgs,
+      environment: invocation.env,
+      input: stdin,
+      signal: opts.signal,
+      timeoutMs: opts.timeoutMs || 600000,
+      maxOutputBytes: Number.MAX_SAFE_INTEGER,
+    })) {
+      if (chunk.channel === 'stderr') {
+        stderr = (stderr + chunk.text).slice(-4000);
+        continue;
+      }
+      stdout = (stdout + chunk.text).slice(0, 4000);
+      yield* observe(decoder.push(chunk.text));
+    }
+    finished = true;
+    // Supported older CLI versions may finish after assistant messages.
+    yield* observe(decoder.finish(false));
+    if (terminalFailure) throw new Error(`claude-code: ${diagnostic()}`);
+    if (!produced)
+      throw new Error(`claude-code: no output produced (empty response). ${diagnostic()}`);
+  } catch (error) {
+    if (!finished) {
       try {
-        for (const text of parseLine(buffer)) {
-          produced = true;
-          yield text;
+        for (const event of decoder.finish(false)) {
+          if (event.type === 'failure') {
+            terminalFailure = true;
+            failure = event.message;
+          }
+          if (event.type === 'usage') {
+            usage = { ...event.usage };
+            opts.onUsage?.({ ...usage });
+          }
         }
       } catch {
-        consecutiveParseFailures += 1;
+        /* Preserve the execution failure. */
       }
     }
-
-    // Surface errors when no text was produced
-    if (!produced) {
-      if (exitCode !== null && exitCode !== 0) {
-        // Auth failures print plain text on stdout, which lands unparsed in buffer.
-        const errorMsg =
-          stderr.trim() ||
-          buffer.trim().slice(0, 500) ||
-          `claude-code exited with code ${exitCode}`;
-        logger.error('claude-code: stream failed', {
-          exitCode: String(exitCode),
-          detail: errorMsg.slice(0, 500),
-        });
-        throw new Error(errorMsg);
-      } else if (stderr.trim()) {
-        logger.error('claude-code: stream produced no output', { stderr: stderr.slice(0, 500) });
-        throw new Error(stderr.trim());
-      } else {
-        // Exit 0, no stderr, no output — this is the empty-response failure mode
-        const detail = buffer.trim().slice(0, 300) || '(empty)';
-        logger.error('claude-code: exited cleanly but produced no output', {
-          bufferRemainder: detail,
-        });
-        throw new Error(`claude-code: no output produced (empty response). Buffer: ${detail}`);
-      }
-    }
+    let reported = error;
+    if (error instanceof CliProtocolError && diagnostic() !== '(no output)')
+      reported = new Error(`claude-code: ${diagnostic()}`, { cause: error });
+    if (error instanceof ProcessExecutionError && error.code === 'exit_failed')
+      reported = new Error(`claude-code: exited with code ${error.exitCode}: ${diagnostic()}`, {
+        cause: error,
+      });
+    if (error instanceof ProcessExecutionError && error.code === 'start_failed')
+      reported = new Error("claude-code: failed to spawn. Is the 'claude' CLI installed?", {
+        cause: error,
+      });
+    if (usage)
+      reported = new GenerationUsageError(
+        reported instanceof Error ? reported.message : 'Claude execution failed',
+        usage,
+        { cause: reported }
+      );
+    primary = { error: reported };
+    throw reported;
   } finally {
-    clearTimeout(timer);
-    child.kill('SIGTERM');
+    releaseInvocation(invocation, primary, usage);
   }
 }

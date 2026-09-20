@@ -1,8 +1,15 @@
 import { homedir } from 'os';
 import path from 'path';
+import { AccessError } from 'thesidedoor-core/access';
+import { captureLocalUsageAccount } from '../account';
 import { logger } from '../../logger';
 import { getCheapestModelForProvider } from '../../providers/ai-registry';
-import type { AgentUsageCacheEntry, AgentUsageProvider, AgentUsageWindow } from '../types';
+import type {
+  AgentUsageCacheEntry,
+  AgentUsageProvider,
+  AgentUsageWindow,
+  UsageProviderContext,
+} from '../types';
 import {
   buildProvider,
   capitalizePlan,
@@ -14,7 +21,6 @@ import {
   getNumber,
   getRecord,
   getString,
-  hashToken,
   percentFromFraction,
   readJson,
   resetInFromTimestamp,
@@ -41,7 +47,8 @@ function parseClaudeCredentials(value: unknown): ClaudeCredentials | null {
   };
 }
 
-async function getClaudeCredentials(): Promise<ClaudeCredentials | null> {
+async function getClaudeCredentials(signal?: AbortSignal): Promise<ClaudeCredentials | null> {
+  signal?.throwIfAborted();
   const envCredentials = getString(process.env.CLAUDE_CODE_CREDENTIALS_JSON);
   if (envCredentials) {
     try {
@@ -56,7 +63,8 @@ async function getClaudeCredentials(): Promise<ClaudeCredentials | null> {
     const keychainJson = await execFileText(
       'security',
       ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
-      3000
+      3000,
+      signal
     );
     if (keychainJson) {
       try {
@@ -69,7 +77,7 @@ async function getClaudeCredentials(): Promise<ClaudeCredentials | null> {
   }
 
   const claudeHome = process.env.CLAUDE_HOME || path.join(homedir(), '.claude');
-  const fileCredentials = await readJson(path.join(claudeHome, '.credentials.json'));
+  const fileCredentials = await readJson(path.join(claudeHome, '.credentials.json'), signal);
   return parseClaudeCredentials(fileCredentials);
 }
 
@@ -107,13 +115,25 @@ export function parseClaudeUsageHeaders(
   ];
 }
 
-export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
-  const credentials = await getClaudeCredentials();
-  const cacheKey = credentials ? hashToken(credentials.accessToken) : 'no-auth';
+export async function getClaudeUsageProvider(
+  context: UsageProviderContext
+): Promise<AgentUsageProvider> {
+  const { credentials, admission, signal, fingerprint } = await captureLocalUsageAccount(
+    context,
+    'claude-code',
+    getClaudeCredentials
+  );
+  const model = getCheapestModelForProvider('anthropic');
+  const cacheKey = fingerprint([model ?? null]);
   const now = Date.now();
   if (claudeCache && claudeCache.key === cacheKey && claudeCache.expiresAt > now) {
-    return claudeCache.value;
+    return structuredClone(claudeCache.value);
   }
+  const publish = async (provider: AgentUsageProvider, ttl: number) => {
+    await admission.validate(signal);
+    claudeCache = { key: cacheKey, expiresAt: Date.now() + ttl, value: structuredClone(provider) };
+    return provider;
+  };
 
   if (!credentials) {
     const provider = buildProvider({
@@ -128,11 +148,9 @@ export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
       credits: null,
       limitReached: false,
     });
-    claudeCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider, ERROR_CACHE_TTL_MS);
   }
 
-  const model = getCheapestModelForProvider('anthropic');
   if (!model) {
     const provider = buildProvider({
       id: 'claude-code',
@@ -146,14 +164,17 @@ export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
       credits: null,
       limitReached: false,
     });
-    claudeCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider, ERROR_CACHE_TTL_MS);
   }
 
   try {
+    const transport = admission.createTransport([
+      { method: 'POST', url: 'https://api.anthropic.com/v1/messages' },
+    ]);
     const response = await fetchWithTimeout(
       'https://api.anthropic.com/v1/messages',
       {
+        signal,
         method: 'POST',
         headers: {
           Authorization: `Bearer ${credentials.accessToken}`,
@@ -168,7 +189,8 @@ export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
           messages: [{ role: 'user', content: 'hi' }],
         }),
       },
-      CLAUDE_TIMEOUT_MS
+      CLAUDE_TIMEOUT_MS,
+      transport.authenticatedFetch
     );
 
     if (!response.ok) {
@@ -188,8 +210,7 @@ export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
         credits: null,
         limitReached: false,
       });
-      claudeCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider, ERROR_CACHE_TTL_MS);
     }
 
     const provider = buildProvider({
@@ -204,12 +225,12 @@ export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
       credits: null,
       limitReached: false,
     });
-    claudeCache = { key: cacheKey, expiresAt: now + CLAUDE_CACHE_TTL_MS, value: provider };
-    return provider;
+    return await publish(provider, CLAUDE_CACHE_TTL_MS);
   } catch (error) {
-    logger.warn('Failed to fetch Claude Code usage status', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof AggregateError) throw error;
+    signal.throwIfAborted();
+    if (error instanceof AccessError) throw error;
+    logger.warn('Failed to fetch Claude Code usage status');
     const provider = buildProvider({
       id: 'claude-code',
       category: 'agent',
@@ -222,8 +243,7 @@ export async function getClaudeUsageProvider(): Promise<AgentUsageProvider> {
       credits: null,
       limitReached: false,
     });
-    claudeCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider, ERROR_CACHE_TTL_MS);
   }
 }
 

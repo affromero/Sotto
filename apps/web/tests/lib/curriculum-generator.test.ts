@@ -36,6 +36,24 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: (...args: unknown[]) => mockGetAiProviderMeta(...args),
 }));
 
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedLearningAi: async () => {
+    const key = await mockGetAiKey();
+    if (key) {
+      const model = mockGetAiProviderMeta(key.provider)?.defaultModel;
+      if (!model) throw new Error(`No default AI model configured for provider "${key.provider}".`);
+      return { provider: key.provider, model, apiKey: key.apiKey };
+    }
+    if (process.env.AI_PROVIDER === 'claude-code')
+      return { provider: 'claude-code', model: 'claude-sonnet-4-6' };
+    throw new Error('No AI provider available');
+  },
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
+}));
+
 const mockGenerateResponse = vi.fn();
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
@@ -56,7 +74,17 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ── Import under test (after mocks) ──────────────────────────────────────────
-import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { getOrCreateCurriculum as getOrCreateCurriculumWithExecution } from '@/lib/curriculum-generator';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+
+function getOrCreateCurriculum(userId: string, native: string, target: string) {
+  return getOrCreateCurriculumWithExecution(
+    userId,
+    blockedProviderExecution(userId),
+    native,
+    target
+  );
+}
 
 // ── Sample LLM curriculum JSON ────────────────────────────────────────────────
 

@@ -67,14 +67,14 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 
 vi.mock('@/lib/queue', () => ({
   contentExtractionQueue: { name: 'content-extraction' },
   scriptGenerationQueue: { name: 'script-generation' },
   audioGenerationQueue: { name: 'audio-generation' },
   audioStitchingQueue: { name: 'audio-stitching' },
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   JobType: {
     EXTRACT_CONTENT: 'extract_content',
     GENERATE_SCRIPT: 'generate_script',
@@ -158,7 +158,7 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
     mockIsUserAdmin.mockResolvedValue(false); // non-admin by default
     mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPrismaEpisodeUpdateMany.mockResolvedValue({ count: 1 });
-    mockAddJob.mockResolvedValue({ id: 'job-1' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-1' });
   });
 
   afterEach(() => {
@@ -323,11 +323,12 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       expect(data.segments).toBe(2);
       expect(mockRestartExistingSegmentAudio).toHaveBeenCalledWith(
         'episode-f2',
-        expect.stringMatching(/^[a-f0-9-]{36}$/)
+        expect.stringMatching(/^[a-f0-9-]{36}$/),
+        expect.objectContaining({ authorize: expect.any(Function) })
       );
     });
 
-    it('uses determineResumePoint to resume from STITCH_AUDIO', async () => {
+    it('rejects stitching resume without its original generation identity', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
       mockPrismaEpisodeFindUnique.mockResolvedValue({
         id: 'episode-f3',
@@ -349,16 +350,10 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       const request = createMockRequest();
       const params = await createMockParams('episode-f3');
       const response = await POST(request, params);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.resumedAt).toBe('STITCH_AUDIO');
-      expect(mockAddJob).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'audio-stitching' }),
-        'stitch_audio',
-        expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3'] }),
-        { jobId: expect.stringMatching(/^stitch-episode-f3-[a-f0-9]{24}$/) }
-      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: 'The audio generation identity is missing',
+      });
     });
 
     it('uses determineResumePoint to resume from SCRIPT_READY', async () => {
@@ -380,7 +375,7 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       expect(response.status).toBe(200);
       expect(data.resumedAt).toBe('SCRIPT_READY');
       // No job queued — user must approve script
-      expect(mockAddJob).not.toHaveBeenCalled();
+      expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
     });
 
     it('nukes everything and restarts when forceRestart=true', async () => {

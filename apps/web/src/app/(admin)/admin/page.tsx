@@ -1,30 +1,23 @@
 import Link from 'next/link';
-import {
-  getUsageHeadline,
-  getSpendByService,
-  getSpendByDay,
-  getLearnerCounts,
-} from '@/lib/admin/usage-stats';
-import { fmtUSD, fmtCompact, fmtInt, pctChange } from '@/lib/admin/format';
+import { getUsageOverview } from '@/lib/admin/usage-stats';
+import { fmtCompact, fmtInt, pctChange, fmtMeasured } from '@/lib/admin/format';
 import { colorForService } from '@/components/admin/serviceColors';
 import { AreaChart } from '@/components/admin/charts/AreaChart';
 import { ShareBar } from '@/components/admin/charts/ShareBar';
 import { Glyph } from '@/components/Glyph';
 import { GlassOrb } from '@/components/landing/GlassOrb';
-import styles from '../adminTheme.styles';
+import styles from '@/app/(admin)/adminTheme.styles';
 
 const WINDOW_DAYS = 30;
 
 export default async function AdminOverviewPage() {
-  const [headline, byService, byDay, learners] = await Promise.all([
-    getUsageHeadline(WINDOW_DAYS),
-    getSpendByService(WINDOW_DAYS),
-    getSpendByDay(WINDOW_DAYS),
-    getLearnerCounts(),
-  ]);
+  const { headline, byService, byDay, learners } = await getUsageOverview(WINDOW_DAYS);
   const { total: totalUsers, signupsThisWeek } = learners;
 
-  const delta = pctChange(headline.spend, headline.spendPrev);
+  const delta =
+    headline.unknownCosts || headline.unknownCostsPrev
+      ? null
+      : pctChange(headline.spend, headline.spendPrev);
   const spendTotal = byDay.reduce((a, d) => a + d.usd, 0);
   const areaData = byDay.map((d, i) => ({
     v: d.usd,
@@ -49,12 +42,17 @@ export default async function AdminOverviewPage() {
         </div>
       </div>
 
+      {headline.unknownCosts > 0 && (
+        <p>{headline.unknownCosts} requests have unknown costs. Charts show known spend only.</p>
+      )}
       <div className={styles.statGrid}>
         <div className={styles.stat}>
           <div className={styles.stLabel}>
             <Glyph name="spark" size={13} /> Spend · {WINDOW_DAYS}d
           </div>
-          <div className={styles.stVal}>{fmtUSD(headline.spend)}</div>
+          <div className={styles.stVal}>
+            {fmtMeasured(headline.spend, headline.requests, headline.unknownCosts)}
+          </div>
           {delta !== null && (
             <div className={`${styles.stDelta} ${delta >= 0 ? styles.up : styles.down}`}>
               <Glyph name={delta >= 0 ? 'arrow' : 'check'} size={12} /> {Math.abs(delta)}% vs prior{' '}
@@ -77,7 +75,14 @@ export default async function AdminOverviewPage() {
           </div>
           <div className={styles.stVal}>{fmtCompact(headline.requests)}</div>
           <div className={`${styles.stDelta} ${styles.flat}`}>
-            <Glyph name="clock" size={11} /> {headline.avgLatencyMs}ms avg
+            <Glyph name="clock" size={11} />{' '}
+            {fmtMeasured(
+              headline.avgLatencyMs,
+              headline.requests,
+              headline.unknownLatency,
+              (value) => `${value}ms`
+            )}{' '}
+            avg
           </div>
         </div>
         <div className={styles.stat}>
@@ -97,13 +102,19 @@ export default async function AdminOverviewPage() {
             <div className={styles.phTitle}>
               <Glyph name="graph" size={15} /> Spend, last {WINDOW_DAYS} days
             </div>
-            <div className={styles.phNote}>{fmtUSD(spendTotal)}</div>
+            <div className={styles.phNote}>
+              {fmtMeasured(spendTotal, headline.requests, headline.unknownCosts)}
+            </div>
           </div>
           <div className={styles.panelBody}>
             {spendTotal > 0 ? (
               <AreaChart id="overviewSpend" data={areaData} height={150} />
             ) : (
-              <div className={styles.empty}>No usage logged yet in this window.</div>
+              <div className={styles.empty}>
+                {headline.requests > 0
+                  ? 'No measured spend in this window.'
+                  : 'No usage logged yet in this window.'}
+              </div>
             )}
           </div>
         </div>
@@ -123,7 +134,9 @@ export default async function AdminOverviewPage() {
                     <div className={styles.legendRow} key={p.service}>
                       <span className={styles.lgDot} style={{ background: p.color }} />
                       <span className={styles.lgName}>{p.service}</span>
-                      <span className={styles.lgVal}>{p.usd === 0 ? 'free' : fmtUSD(p.usd)}</span>
+                      <span className={styles.lgVal}>
+                        {fmtMeasured(p.usd, p.requests, p.unknownCosts)}
+                      </span>
                     </div>
                   ))}
                 </div>

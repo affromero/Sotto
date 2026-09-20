@@ -1,5 +1,10 @@
 import { createHash } from 'crypto';
 
+export function createInitialStitchKey(fingerprint: string): string {
+  if (!/^[a-f0-9]{64}$/.test(fingerprint)) throw new Error('Invalid initial stitching fingerprint');
+  return createHash('sha256').update(`sotto-initial-stitch-v2\n${fingerprint}`).digest('hex');
+}
+
 export interface StitchSegmentIdentity {
   id: string;
   version: number;
@@ -18,12 +23,4 @@ export function createStitchKey(
         .join('\n')}\n${String(skipSfx)}`
     )
     .digest('hex');
-}
-
-export function createStitchJobId(
-  episodeId: string,
-  segments: StitchSegmentIdentity[],
-  skipSfx = false
-): string {
-  return `stitch-${episodeId}-${createStitchKey(episodeId, segments, skipSfx).slice(0, 24)}`;
 }

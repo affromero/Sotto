@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createEpisodeSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
-import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
+import { admitDurableJob, contentExtractionQueue, JobType } from '@/lib/queue';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getGenerationFeatures, getJobPriority } from '@/lib/generation-features';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
@@ -12,6 +12,8 @@ import { generateEpisodeSlug } from '@/lib/slugify';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { randomUUID } from 'node:crypto';
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) {
@@ -65,7 +67,7 @@ export async function POST(request: NextRequest) {
 
   // Admin request context — resolve the role for the authenticated principal
   // (Bearer key or session), not the ambient session.
-  const isAdmin = await isUserAdmin(authResult.userId);
+  const isAdmin = await isUserAdmin(authResult);
 
   const genFeatures = getGenerationFeatures();
 
@@ -154,76 +156,71 @@ export async function POST(request: NextRequest) {
     ...(isApiKeyAuth && { source: 'API' as const }),
   };
 
-  const episode = await prisma.episode.create({
-    data: { ...episodeData, userId: authResult.userId },
-  });
-
-  // Generate slug for vanity URL
-  const slug = await generateEpisodeSlug(parsed.data.title, authResult.userId, prisma);
-  if (slug) {
-    await prisma.episode.update({ where: { id: episode.id }, data: { slug } });
-  }
-
-  // Create EpisodeVoice records from the voices array
-  if (voiceEntries.length > 0) {
-    await prisma.episodeVoice.createMany({
-      data: voiceEntries.map((v) => ({
-        episodeId: episode.id,
-        speaker: v.speaker,
-        voiceId: v.voiceId ?? null,
-        provider: parsed.data.ttsProvider ?? autoResolvedTtsProvider ?? null,
-      })),
-    });
-  }
-
-  // Create or update Discovery record from metadata
-  if (parsed.data.metadata) {
-    const meta = parsed.data.metadata;
-    const discoveryData = {
-      topic: meta.topic,
-      depth: meta.depth,
-      audienceLevel: meta.audienceLevel,
-      audience: meta.audience,
-      focusAreas: meta.focusAreas ?? [],
-      tone: meta.tone,
-      durationTarget: meta.durationTarget
-        ? Math.min(meta.durationTarget, effectiveMaxDuration)
-        : undefined,
-      sourceUrl: meta.sourceUrl,
-      sourceContent: meta.sourceContent,
-      speakers: meta.speakers ?? undefined,
-      verificationMode,
-    };
-
-    await prisma.discovery.create({
-      data: {
-        ...discoveryData,
-        episodeId: episode.id,
-        userId: authResult.userId,
-      },
-    });
-  } else {
-    // Create a minimal Discovery record so the pipeline can find it
-    await prisma.discovery.create({
-      data: {
-        episodeId: episode.id,
-        userId: authResult.userId,
-        topic: parsed.data.topic,
-      },
-    });
-  }
-
-  // Queue content extraction job to kick off the pipeline
+  const episodeId = randomUUID();
   const sourceUrl = parsed.data.metadata?.sourceUrl;
   const sourceText = parsed.data.metadata?.sourceContent;
   const payload: ExtractContentPayload = {
-    episodeId: episode.id,
+    episodeId,
     userId: authResult.userId,
     sourceUrl: sourceUrl ?? undefined,
     sourceText: sourceText ?? undefined,
   };
   const jobPriority = getJobPriority();
-  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { priority: jobPriority });
+  await admitDurableJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
+    jobId: `extract-${episodeId}`,
+    priority: jobPriority,
+    authorize: async (database) => {
+      await requireOriginalSottoAdmission(database, request, authResult);
+      return { userId: authResult.userId };
+    },
+    mutate: async (database, operationId) => {
+      await database.episode.create({
+        data: {
+          id: episodeId,
+          ...episodeData,
+          userId: authResult.userId,
+          pipelineGeneration: operationId,
+        },
+      });
+      const slug = await generateEpisodeSlug(parsed.data.title, authResult.userId, database);
+      if (slug) await database.episode.update({ where: { id: episodeId }, data: { slug } });
+      if (voiceEntries.length > 0)
+        await database.episodeVoice.createMany({
+          data: voiceEntries.map((voice) => ({
+            episodeId,
+            speaker: voice.speaker,
+            voiceId: voice.voiceId ?? null,
+            provider: parsed.data.ttsProvider ?? autoResolvedTtsProvider ?? null,
+          })),
+        });
+      const metadata = parsed.data.metadata;
+      await database.discovery.create({
+        data: metadata
+          ? {
+              topic: metadata.topic,
+              depth: metadata.depth,
+              audienceLevel: metadata.audienceLevel,
+              audience: metadata.audience,
+              focusAreas: metadata.focusAreas ?? [],
+              tone: metadata.tone,
+              durationTarget: metadata.durationTarget
+                ? Math.min(metadata.durationTarget, effectiveMaxDuration)
+                : undefined,
+              sourceUrl: metadata.sourceUrl,
+              sourceContent: metadata.sourceContent,
+              speakers: metadata.speakers ?? undefined,
+              verificationMode,
+              episodeId,
+              userId: authResult.userId,
+            }
+          : {
+              episodeId,
+              userId: authResult.userId,
+              topic: parsed.data.topic,
+            },
+      });
+    },
+  });
 
-  return NextResponse.json({ id: episode.id, status: episode.status }, { status: 201 });
+  return NextResponse.json({ id: episodeId, status: 'EXTRACTING' }, { status: 201 });
 }

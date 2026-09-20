@@ -142,31 +142,9 @@ REDIS_PASSWORD=<strong password>
 REDIS_URL=redis://:<strong password>@redis:6379
 ```
 
-Choose explicit providers. One simple starting point:
+Start the stack, open `/welcome`, and choose the AI, speech, and storage providers. Save hosted credentials or local service URLs there. Sidedoor encrypts credentials and applies the same configuration to web and worker processes. Provider usage and limits are configured in Admin alongside the corresponding saved credential.
 
-```bash
-AI_PROVIDER=openai
-OPENAI_API_KEY=<your key>
-TTS_PROVIDER=elevenlabs
-ELEVENLABS_API_KEY=<your key>
-```
-
-After setup, users add audio provider keys in the wizard or provider settings.
-ElevenLabs usage works with the normal ElevenLabs key. Cartesia usage needs the
-optional Cartesia admin key in the wizard, provider settings, or
-`CARTESIA_ADMIN_API_KEY`.
-Set a plan preset (`free`, `pro`, `startup`, `scale`, or `custom`) with
-`CARTESIA_USAGE_PLAN`, or set `CARTESIA_MONTHLY_CREDIT_LIMIT` directly. The
-optional reset-day setting (`CARTESIA_BILLING_RESET_DAY`) lets Sotto show
-remaining-credit estimates instead of only credits used in the current billing
-window.
-
-For local media storage:
-
-```bash
-STORAGE_PROVIDER=local
-LOCAL_STORAGE_DIR=./.sotto/storage
-```
+For local media storage, select **Local** in `/welcome` or Admin and save the mounted shared storage root.
 
 For optional Caddy www-redirect:
 

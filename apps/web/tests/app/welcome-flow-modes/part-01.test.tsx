@@ -14,6 +14,14 @@ import { StepContext } from '@/app/welcome/steps/StepContext';
 import { StepContextReview } from '@/app/welcome/steps/StepContextReview';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
 import { StepReady } from '@/app/welcome/steps/StepReady';
+import {
+  createWelcomeCredentialBoundary,
+  withWelcomeCredentialBoundary,
+} from '../../helpers/setup/welcome-credentials';
+let credentialBoundary = createWelcomeCredentialBoundary();
+beforeEach(() => {
+  credentialBoundary = createWelcomeCredentialBoundary();
+});
 import { StepVoice } from '@/app/welcome/steps/StepVoice';
 import { COMPOSE_LOG, MODULES } from '@/app/welcome/data';
 
@@ -38,10 +46,10 @@ vi.mock('next/image', () => ({
 function mockConfigFetch(selfHosted: boolean) {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({
+    withWelcomeCredentialBoundary(credentialBoundary, async () => ({
       ok: false,
       json: async () => ({ selfHosted, isOwner: false }),
-    })
+    }))
   );
 }
 
@@ -652,7 +660,7 @@ describe('welcome hosted-demo mode', () => {
         ],
       }),
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', withWelcomeCredentialBoundary(credentialBoundary, fetchMock));
 
     const renderStep = () => (
       <StepVoice
@@ -849,10 +857,12 @@ describe('welcome hosted-demo mode', () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn();
     const onJump = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', withWelcomeCredentialBoundary(credentialBoundary, fetchMock));
 
     render(
       <StepReady
+        saveCredentials={credentialBoundary.saveCredentials}
+        submitSetup={credentialBoundary.submitSetup}
         baseLang="en"
         language="it"
         level="A2"
@@ -898,10 +908,12 @@ describe('welcome hosted-demo mode', () => {
       ok: true,
       json: async () => ({ demo: false, courseId: 'course_1' }),
     });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('fetch', withWelcomeCredentialBoundary(credentialBoundary, fetchMock));
 
     render(
       <StepReady
+        saveCredentials={credentialBoundary.saveCredentials}
+        submitSetup={credentialBoundary.submitSetup}
         baseLang="en"
         language="it"
         level="A2"
@@ -930,7 +942,16 @@ describe('welcome hosted-demo mode', () => {
           ttsModel: {},
           sttModel: {},
         }}
-        storage={{ provider: 's3', s3Bucket: 'sotto-media', s3Region: 'us-east-1' }}
+        storage={{
+          provider: 's3',
+          localRoot: '.sotto/storage',
+          endpoint: 'https://s3.us-east-1.amazonaws.com',
+          bucket: 'sotto-media',
+          region: 'us-east-1',
+          publicUrl: '',
+          accessKeyId: 'test-access',
+          secretAccessKey: 'test-secret',
+        }}
         config={{ selfHosted: true, isOwner: true }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
@@ -951,7 +972,14 @@ describe('welcome hosted-demo mode', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
       course: { native: 'en', target: 'it', level: 'A2' },
       preferred: { language: 'it' },
-      infra: { storageProvider: 's3', s3Bucket: 'sotto-media', s3Region: 'us-east-1' },
+      infra: {
+        storageProvider: 's3',
+        localStorageRoot: null,
+        objectStorageEndpoint: 'https://s3.us-east-1.amazonaws.com',
+        objectStorageBucket: 'sotto-media',
+        objectStorageRegion: 'us-east-1',
+        objectStoragePublicUrl: null,
+      },
     });
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('https://example.com/paper');
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toContain('[book] Invisible Cities');

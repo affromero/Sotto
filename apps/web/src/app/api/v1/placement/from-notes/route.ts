@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { runNotesDeduction } from '@/lib/placement-notes';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,13 @@ export async function POST(request: NextRequest) {
       return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rate.resetAt });
     }
 
-    const deduction = await runNotesDeduction(userId, native, target, content);
+    const deduction = await runNotesDeduction(
+      userId,
+      sottoRequestExecution(request, authed),
+      native,
+      target,
+      content
+    );
     return NextResponse.json({
       native,
       target,

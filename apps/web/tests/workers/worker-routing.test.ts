@@ -21,6 +21,14 @@ function opts(overrides: Partial<Parameters<typeof shouldRun>[1]> = {}) {
 }
 
 describe('matchesProfile', () => {
+  it('routes episode invalidation to light workers and respects explicit exclusion', () => {
+    expect(shouldRun('episode-status', opts({ profile: 'light', preset: 'core' }))).toBe(true);
+    expect(shouldRun('episode-status', opts({ profile: 'heavy' }))).toBe(false);
+    expect(shouldRun('episode-status', opts({ profile: 'pipeline' }))).toBe(false);
+    expect(shouldRun('episode-status', opts({ excludeFilter: new Set(['episode-status']) }))).toBe(
+      false
+    );
+  });
   it('profile=all matches everything', () => {
     expect(matchesProfile('audio-generation', 'all')).toBe(true);
     expect(matchesProfile('content-extraction', 'all')).toBe(true);
@@ -36,7 +44,7 @@ describe('matchesProfile', () => {
 
   it('profile=pipeline matches only PIPELINE_WORKERS', () => {
     expect(matchesProfile('content-extraction', 'pipeline')).toBe(true);
-    expect(matchesProfile('script-generation', 'pipeline')).toBe(true);
+    expect(matchesProfile('script-writing', 'pipeline')).toBe(true);
     expect(matchesProfile('audio-generation', 'pipeline')).toBe(false);
     expect(matchesProfile('notifications', 'pipeline')).toBe(false);
   });
@@ -149,9 +157,7 @@ describe('shouldRun — profile filtering with preset=core', () => {
     expect(shouldRun('content-extraction', opts({ profile: 'pipeline', preset: 'core' }))).toBe(
       true
     );
-    expect(shouldRun('script-generation', opts({ profile: 'pipeline', preset: 'core' }))).toBe(
-      true
-    );
+    expect(shouldRun('script-writing', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
     expect(shouldRun('speaking-grading', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
   });
 });

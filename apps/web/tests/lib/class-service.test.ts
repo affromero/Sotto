@@ -1,3 +1,4 @@
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Hoisted mock handles ----
@@ -237,7 +238,9 @@ describe('createNextClass', () => {
   it('throws CourseNotFoundError when the course does not belong to the user', async () => {
     mockCourseFindFirst.mockResolvedValue(null);
 
-    await expect(createNextClass('course-1', 'u1')).rejects.toBeInstanceOf(CourseNotFoundError);
+    await expect(
+      createNextClass('course-1', 'u1', blockedProviderExecution('u1'))
+    ).rejects.toBeInstanceOf(CourseNotFoundError);
   });
 
   it('returns {kind:"gated"} when a non-PASSED class already exists', async () => {
@@ -248,7 +251,7 @@ describe('createNextClass', () => {
       lesson: { level: 'A1' },
     });
 
-    const result = await createNextClass('course-1', 'u1');
+    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
 
     expect(result).toEqual({ kind: 'gated', activeClassId: 'class-active', status: 'IN_PROGRESS' });
   });
@@ -267,7 +270,7 @@ describe('createNextClass', () => {
     mockCourseClassFindMany.mockResolvedValue([]);
     mockCourseClassDelete.mockResolvedValue({});
 
-    const result = await createNextClass('course-1', 'u1');
+    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
 
     expect(result.kind).toBe('created');
     expect(mockCourseClassDelete).toHaveBeenCalledWith({ where: { id: 'class-stale-a1' } });
@@ -289,7 +292,7 @@ describe('createNextClass', () => {
     // All lessons already passed
     mockCourseClassFindMany.mockResolvedValue([{ lessonId: 'lesson-1' }]);
 
-    const result = await createNextClass('course-1', 'u1');
+    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
 
     expect(result).toEqual({ kind: 'done' });
   });
@@ -300,7 +303,7 @@ describe('createNextClass', () => {
     // No lessons passed yet
     mockCourseClassFindMany.mockResolvedValue([]);
 
-    const result = await createNextClass('course-1', 'u1');
+    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
 
     expect(result.kind).toBe('created');
     expect((result as { kind: 'created'; classId: string }).classId).toBe('class-new');
@@ -324,7 +327,9 @@ describe('createNextClass', () => {
     mockGenerateSectionQuestions.mockRejectedValue(new Error('AI failure'));
     mockCourseClassDelete.mockResolvedValue({});
 
-    await expect(createNextClass('course-1', 'u1')).rejects.toThrow('AI failure');
+    await expect(createNextClass('course-1', 'u1', blockedProviderExecution('u1'))).rejects.toThrow(
+      'AI failure'
+    );
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'class-new' } })
     );
@@ -337,7 +342,9 @@ describe('createNextClass', () => {
     mockGenerateClassListening.mockRejectedValue(new Error('TTS unavailable'));
     mockCourseClassDelete.mockResolvedValue({});
 
-    await expect(createNextClass('course-1', 'u1')).rejects.toThrow('TTS unavailable');
+    await expect(createNextClass('course-1', 'u1', blockedProviderExecution('u1'))).rejects.toThrow(
+      'TTS unavailable'
+    );
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'class-new' } })
     );
@@ -351,9 +358,9 @@ describe('createNextClass', () => {
     mockCourseClassFindMany.mockResolvedValue([]);
     mockCourseClassFindUnique.mockResolvedValue(null);
 
-    await expect(createNextClass('course-1', 'u1')).rejects.toBeInstanceOf(
-      ClassGenerationCancelledError
-    );
+    await expect(
+      createNextClass('course-1', 'u1', blockedProviderExecution('u1'))
+    ).rejects.toBeInstanceOf(ClassGenerationCancelledError);
     expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
   });
 
@@ -378,7 +385,7 @@ describe('createNextClass', () => {
         sourceUrl: 'https://example.com/a',
       });
 
-      const result = await createNextClass('course-1', 'u1', {
+      const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'), {
         sourceUrl: 'https://example.com/a',
       });
 
@@ -406,7 +413,9 @@ describe('createNextClass', () => {
     });
 
     it('topic mode builds about the topic at currentLevel without extracting a URL', async () => {
-      const result = await createNextClass('course-1', 'u1', { topic: 'Mars rovers' });
+      const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'), {
+        topic: 'Mars rovers',
+      });
 
       expect(result.kind).toBe('created');
       expect(mockPrepareClassSource).not.toHaveBeenCalled();
@@ -421,7 +430,7 @@ describe('createNextClass', () => {
     });
 
     it('starts normal classes at the course currentLevel instead of the first unpassed A1 lesson', async () => {
-      const result = await createNextClass('course-1', 'u1');
+      const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
 
       expect(result.kind).toBe('created');
       expect(mockCourseClassCreate).toHaveBeenCalledWith(
@@ -446,7 +455,9 @@ describe('createNextClass', () => {
       mockPrepareClassSource.mockRejectedValue(new ClassSourceError('Could not read that link.'));
 
       await expect(
-        createNextClass('course-1', 'u1', { sourceUrl: 'https://paywalled.com/x' })
+        createNextClass('course-1', 'u1', blockedProviderExecution('u1'), {
+          sourceUrl: 'https://paywalled.com/x',
+        })
       ).rejects.toBeInstanceOf(ClassSourceError);
       // Source prep happens BEFORE class creation, so nothing was persisted.
       expect(mockCourseClassCreate).not.toHaveBeenCalled();
@@ -737,7 +748,7 @@ describe('regenerateCurrentClass', () => {
       course: SAMPLE_COURSE,
     });
 
-    const result = await regenerateCurrentClass('class-1', 'u1');
+    const result = await regenerateCurrentClass('class-1', 'u1', blockedProviderExecution('u1'));
 
     expect(result).toBe(true);
     expect(mockCourseClassUpdate).toHaveBeenCalledWith(
@@ -770,7 +781,7 @@ describe('regenerateCurrentClass', () => {
       course: SAMPLE_COURSE,
     });
 
-    const result = await regenerateCurrentClass('class-1', 'u1');
+    const result = await regenerateCurrentClass('class-1', 'u1', blockedProviderExecution('u1'));
 
     expect(result).toBe(false);
     expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
@@ -817,6 +828,7 @@ describe('deleteClassForUser', () => {
 // ---- regenerateFailedSections ----
 
 describe('regenerateFailedSections', () => {
+  const execution = blockedProviderExecution('u1');
   const FAILED_SECTION = {
     id: 'sec-grammar',
     skill: 'GRAMMAR',
@@ -849,7 +861,7 @@ describe('regenerateFailedSections', () => {
   it('returns false when the class is not found or not owned by the user', async () => {
     mockCourseClassFindFirst.mockResolvedValue(null);
 
-    const result = await regenerateFailedSections('class-1', 'u1');
+    const result = await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(result).toBe(false);
   });
@@ -860,7 +872,7 @@ describe('regenerateFailedSections', () => {
       sections: [], // no failed sections (Prisma filtered them out)
     });
 
-    const result = await regenerateFailedSections('class-1', 'u1');
+    const result = await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(result).toBe(false);
   });
@@ -868,7 +880,7 @@ describe('regenerateFailedSections', () => {
   it('returns true and bumps the attempt for each failed section', async () => {
     mockCourseClassFindFirst.mockResolvedValue(SAMPLE_CLASS_WITH_FAILED);
 
-    const result = await regenerateFailedSections('class-1', 'u1');
+    const result = await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(result).toBe(true);
     // attempt should be bumped to 2
@@ -883,7 +895,7 @@ describe('regenerateFailedSections', () => {
   it('deletes old questions and creates new ones for each failed section', async () => {
     mockCourseClassFindFirst.mockResolvedValue(SAMPLE_CLASS_WITH_FAILED);
 
-    await regenerateFailedSections('class-1', 'u1');
+    await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(mockLessonQuestionDeleteMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { sectionId: 'sec-grammar' } })
@@ -896,7 +908,7 @@ describe('regenerateFailedSections', () => {
   it('sets the class status back to IN_PROGRESS after regeneration', async () => {
     mockCourseClassFindFirst.mockResolvedValue(SAMPLE_CLASS_WITH_FAILED);
 
-    await regenerateFailedSections('class-1', 'u1');
+    await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(mockCourseClassUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -916,7 +928,7 @@ describe('regenerateFailedSections', () => {
     };
     mockCourseClassFindFirst.mockResolvedValue(twoFailed);
 
-    const result = await regenerateFailedSections('class-1', 'u1');
+    const result = await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(result).toBe(true);
     expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(2);
@@ -938,7 +950,7 @@ describe('regenerateFailedSections', () => {
       sections: [{ id: 'sec-speaking', skill: 'SPEAKING', attempt: 1, passed: false }],
     });
 
-    const result = await regenerateFailedSections('class-1', 'u1');
+    const result = await regenerateFailedSections('class-1', 'u1', execution);
 
     expect(result).toBe(true);
     expect(mockSpeakingRecordingDeleteMany).toHaveBeenCalledWith(

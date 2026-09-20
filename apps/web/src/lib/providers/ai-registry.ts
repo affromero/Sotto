@@ -1,13 +1,14 @@
+import { aiCredentialForm } from '@/lib/providers/shared/credential-fields';
+import { modelPresets, type ModelPreset } from 'thesidedoor-core/ai/catalog';
 /**
- * Declarative AI (LLM) provider registry — capabilities, auth config, and
- * validation functions for every supported BYOK AI provider.
+ * Declarative AI (LLM) provider registry: capabilities, auth config, and
+ * credential fields for every supported BYOK AI provider.
  * Parallel to tts-registry.ts for TTS providers.
  *
  * Model pricing is sourced from the `pricetoken` package (static offline data)
  * rather than hardcoded — see hydratePricingFromPricetoken() below.
  */
 import { STATIC_PRICING, type ModelPricing as PricetokenModelPricing } from 'pricetoken';
-import { logger } from '../logger';
 import { getAgentModelDisplayName, getAgentProviderForModelId } from '../agent-models/id';
 
 // ---------------------------------------------------------------------------
@@ -68,34 +69,13 @@ export interface AiProviderAuthField {
   placeholder: string;
 }
 
-export interface AiModelOption {
-  id: string;
-  displayName: string;
-  /** Short name without provider prefix, e.g. 'Haiku 4.5', '5 Mini'. */
-  shortDisplayName: string;
-  tier: 'fast' | 'balanced' | 'best' | 'max';
-  /** Maximum input context window in tokens. */
-  contextWindow: number;
-  /** Maximum output tokens the model can generate. */
-  maxOutputTokens: number;
-  /** Per-million-token pricing. Omit for zero-cost or non-metered models. */
-  pricing?: { inputPerMTok: number; outputPerMTok: number };
-  /**
-   * Whether this model uses internal reasoning/thinking tokens that consume
-   * part of max_completion_tokens before producing visible output.
-   * When true, providers auto-boost the token budget so reasoning doesn't
-   * starve the visible output.
-   */
-  isReasoning?: boolean;
-}
+export type AiModelOption = ModelPreset;
 
 export interface AiProviderMeta {
   id: AiProviderId;
   displayName: string;
   /** Short label for badges, e.g. 'Claude', 'GPT'. */
   shortLabel: string;
-  /** Env var name for the platform API key, e.g. 'ANTHROPIC_API_KEY'. Omit for STT-only or local-CLI providers. */
-  platformEnvKey?: string;
   defaultModel: string;
   getApiKeyUrl: string;
   models: AiModelOption[];
@@ -103,7 +83,6 @@ export interface AiProviderMeta {
   capabilities?: { web: boolean; vision: boolean };
   auth: {
     fields: AiProviderAuthField[];
-    validate: (credentials: Record<string, string>) => Promise<boolean>;
   };
 }
 
@@ -112,57 +91,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'anthropic',
     displayName: 'Anthropic (Claude)',
     shortLabel: 'Claude',
-    platformEnvKey: 'ANTHROPIC_API_KEY',
     defaultModel: 'claude-haiku-4-5-20251001',
-    getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
-    models: [
-      {
-        id: 'claude-haiku-4-5-20251001',
-        displayName: 'Claude Haiku 4.5',
-        shortDisplayName: 'Haiku 4.5',
-        tier: 'fast',
-        contextWindow: 200_000,
-        maxOutputTokens: 64_000,
-      },
-      {
-        id: 'claude-sonnet-4-6',
-        displayName: 'Claude Sonnet 4.6',
-        shortDisplayName: 'Sonnet 4.6',
-        tier: 'balanced',
-        contextWindow: 200_000,
-        maxOutputTokens: 64_000,
-      },
-      {
-        id: 'claude-opus-4-6',
-        displayName: 'Claude Opus 4.6',
-        shortDisplayName: 'Opus 4.6',
-        tier: 'best',
-        contextWindow: 200_000,
-        maxOutputTokens: 128_000,
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('anthropic').getApiKeyUrl,
+    models: modelPresets('anthropic'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'x-api-key': creds.apiKey,
-              'anthropic-version': '2023-06-01',
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 1,
-              messages: [{ role: 'user', content: 'hi' }],
-            }),
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('anthropic').fields,
     },
   },
 
@@ -170,95 +103,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'openai',
     displayName: 'OpenAI',
     shortLabel: 'GPT',
-    platformEnvKey: 'OPENAI_API_KEY',
     defaultModel: 'gpt-5.4',
-    getApiKeyUrl: 'https://platform.openai.com/api-keys',
-    models: [
-      {
-        id: 'gpt-5-nano',
-        displayName: 'GPT-5 Nano',
-        shortDisplayName: '5 Nano',
-        tier: 'fast',
-        contextWindow: 400_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5-mini',
-        displayName: 'GPT-5 Mini',
-        shortDisplayName: '5 Mini',
-        tier: 'fast',
-        contextWindow: 400_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5',
-        displayName: 'GPT-5',
-        shortDisplayName: '5',
-        tier: 'balanced',
-        contextWindow: 400_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5.2',
-        displayName: 'GPT-5.2',
-        shortDisplayName: '5.2',
-        tier: 'best',
-        contextWindow: 400_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5.4-nano',
-        displayName: 'GPT-5.4 Nano',
-        shortDisplayName: '5.4 Nano',
-        tier: 'fast',
-        contextWindow: 400_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5.4-mini',
-        displayName: 'GPT-5.4 Mini',
-        shortDisplayName: '5.4 Mini',
-        tier: 'fast',
-        contextWindow: 400_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5.4',
-        displayName: 'GPT-5.4',
-        shortDisplayName: '5.4',
-        tier: 'balanced',
-        contextWindow: 1_050_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-      {
-        id: 'gpt-5.4-pro',
-        displayName: 'GPT-5.4 Pro',
-        shortDisplayName: '5.4 Pro',
-        tier: 'best',
-        contextWindow: 1_050_000,
-        maxOutputTokens: 128_000,
-        isReasoning: true,
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('openai').getApiKeyUrl,
+    models: modelPresets('openai'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.openai.com/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('openai').fields,
     },
   },
 
@@ -267,37 +116,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Claude Code (CLI)',
     shortLabel: 'Claude',
     defaultModel: 'opus',
-    getApiKeyUrl: '',
-    models: [
-      {
-        id: 'haiku',
-        displayName: 'Haiku',
-        shortDisplayName: 'Haiku 4.5',
-        tier: 'fast',
-        contextWindow: 200_000,
-        maxOutputTokens: 64_000,
-      },
-      {
-        id: 'sonnet',
-        displayName: 'Sonnet',
-        shortDisplayName: 'Sonnet 4.6',
-        tier: 'balanced',
-        contextWindow: 200_000,
-        maxOutputTokens: 64_000,
-      },
-      {
-        id: 'opus',
-        displayName: 'Opus',
-        shortDisplayName: 'Opus 4.6',
-        tier: 'best',
-        contextWindow: 200_000,
-        maxOutputTokens: 128_000,
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('claude-code').getApiKeyUrl,
+    models: modelPresets('claude-code'),
     capabilities: { web: true, vision: true },
     auth: {
-      fields: [],
-      validate: async () => true,
+      fields: aiCredentialForm('claude-code').fields,
     },
   },
 
@@ -309,12 +132,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Codex (CLI)',
     shortLabel: 'Codex',
     defaultModel: 'codex',
-    getApiKeyUrl: '',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('codex').getApiKeyUrl,
+    models: modelPresets('codex'),
     capabilities: { web: true, vision: false },
     auth: {
-      fields: [],
-      validate: async () => true,
+      fields: aiCredentialForm('codex').fields,
     },
   },
 
@@ -328,11 +150,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Local model (Ollama / vLLM / LM Studio)',
     shortLabel: 'Local',
     defaultModel: '',
-    getApiKeyUrl: '',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('local').getApiKeyUrl,
+    models: modelPresets('local'),
     auth: {
-      fields: [],
-      validate: async () => true,
+      fields: aiCredentialForm('local').fields,
     },
   },
 
@@ -341,20 +162,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Together AI',
     shortLabel: 'Together',
     defaultModel: '',
-    getApiKeyUrl: 'https://api.together.xyz/settings/api-keys',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('together').getApiKeyUrl,
+    models: modelPresets('together'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.together.xyz/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('together').fields,
     },
   },
 
@@ -363,20 +174,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Deepgram (STT)',
     shortLabel: 'Deepgram',
     defaultModel: '',
-    getApiKeyUrl: 'https://console.deepgram.com/',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('deepgram').getApiKeyUrl,
+    models: modelPresets('deepgram'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.deepgram.com/v1/projects', {
-            headers: { Authorization: `Token ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('deepgram').fields,
     },
   },
 
@@ -385,20 +186,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'AssemblyAI (STT)',
     shortLabel: 'AssemblyAI',
     defaultModel: '',
-    getApiKeyUrl: 'https://www.assemblyai.com/app',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('assemblyai').getApiKeyUrl,
+    models: modelPresets('assemblyai'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.assemblyai.com/v2/transcript?limit=1', {
-            headers: { authorization: creds.apiKey },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('assemblyai').fields,
     },
   },
 
@@ -408,51 +199,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'groq',
     displayName: 'Groq',
     shortLabel: 'Groq',
-    platformEnvKey: 'GROQ_API_KEY',
     defaultModel: 'llama-3.1-8b-instant',
-    getApiKeyUrl: 'https://console.groq.com/keys',
-    models: [
-      {
-        id: 'llama-3.1-8b-instant',
-        displayName: 'Llama 3.1 8B Instant',
-        shortDisplayName: 'Llama 8B',
-        tier: 'fast',
-        contextWindow: 131_072,
-        maxOutputTokens: 131_072,
-        pricing: { inputPerMTok: 0.05, outputPerMTok: 0.08 },
-      },
-      {
-        id: 'llama-3.3-70b-versatile',
-        displayName: 'Llama 3.3 70B Versatile',
-        shortDisplayName: 'Llama 70B',
-        tier: 'balanced',
-        contextWindow: 131_072,
-        maxOutputTokens: 32_768,
-        pricing: { inputPerMTok: 0.59, outputPerMTok: 0.79 },
-      },
-      {
-        id: 'openai/gpt-oss-120b',
-        displayName: 'GPT-OSS 120B',
-        shortDisplayName: 'GPT-OSS 120B',
-        tier: 'best',
-        contextWindow: 131_072,
-        maxOutputTokens: 65_536,
-        isReasoning: true,
-        pricing: { inputPerMTok: 0.15, outputPerMTok: 0.6 },
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('groq').getApiKeyUrl,
+    models: modelPresets('groq'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.groq.com/openai/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('groq').fields,
     },
   },
 
@@ -461,42 +212,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'xai',
     displayName: 'xAI (Grok)',
     shortLabel: 'Grok',
-    platformEnvKey: 'XAI_API_KEY',
     defaultModel: 'grok-4-fast',
-    getApiKeyUrl: 'https://console.x.ai/',
-    models: [
-      {
-        id: 'grok-4-fast',
-        displayName: 'Grok 4 Fast',
-        shortDisplayName: 'Grok 4 Fast',
-        tier: 'balanced',
-        contextWindow: 1_000_000,
-        maxOutputTokens: 32_768,
-        pricing: { inputPerMTok: 1.25, outputPerMTok: 2.5 },
-      },
-      {
-        id: 'grok-4',
-        displayName: 'Grok 4',
-        shortDisplayName: 'Grok 4',
-        tier: 'best',
-        contextWindow: 1_000_000,
-        maxOutputTokens: 32_768,
-        isReasoning: true,
-        pricing: { inputPerMTok: 1.25, outputPerMTok: 2.5 },
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('xai').getApiKeyUrl,
+    models: modelPresets('xai'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xai-...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.x.ai/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('xai').fields,
     },
   },
 
@@ -505,42 +225,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'deepseek',
     displayName: 'DeepSeek',
     shortLabel: 'DeepSeek',
-    platformEnvKey: 'DEEPSEEK_API_KEY',
     defaultModel: 'deepseek-v4-flash',
-    getApiKeyUrl: 'https://platform.deepseek.com/api_keys',
-    models: [
-      {
-        id: 'deepseek-v4-flash',
-        displayName: 'DeepSeek V4 Flash',
-        shortDisplayName: 'V4 Flash',
-        tier: 'balanced',
-        contextWindow: 1_000_000,
-        maxOutputTokens: 65_536,
-        pricing: { inputPerMTok: 0.14, outputPerMTok: 0.28 },
-      },
-      {
-        id: 'deepseek-v4-pro',
-        displayName: 'DeepSeek V4 Pro',
-        shortDisplayName: 'V4 Pro',
-        tier: 'best',
-        contextWindow: 1_000_000,
-        maxOutputTokens: 65_536,
-        isReasoning: true,
-        pricing: { inputPerMTok: 0.435, outputPerMTok: 0.87 },
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('deepseek').getApiKeyUrl,
+    models: modelPresets('deepseek'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.deepseek.com/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('deepseek').fields,
     },
   },
 
@@ -549,50 +238,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'mistral',
     displayName: 'Mistral',
     shortLabel: 'Mistral',
-    platformEnvKey: 'MISTRAL_API_KEY',
     defaultModel: 'mistral-small-latest',
-    getApiKeyUrl: 'https://console.mistral.ai/api-keys',
-    models: [
-      {
-        id: 'mistral-small-latest',
-        displayName: 'Mistral Small',
-        shortDisplayName: 'Small',
-        tier: 'fast',
-        contextWindow: 128_000,
-        maxOutputTokens: 16_384,
-        pricing: { inputPerMTok: 0.15, outputPerMTok: 0.6 },
-      },
-      {
-        id: 'mistral-medium-latest',
-        displayName: 'Mistral Medium',
-        shortDisplayName: 'Medium',
-        tier: 'balanced',
-        contextWindow: 131_072,
-        maxOutputTokens: 16_384,
-        pricing: { inputPerMTok: 0.4, outputPerMTok: 2.0 },
-      },
-      {
-        id: 'mistral-large-latest',
-        displayName: 'Mistral Large',
-        shortDisplayName: 'Large',
-        tier: 'best',
-        contextWindow: 256_000,
-        maxOutputTokens: 32_768,
-        pricing: { inputPerMTok: 0.5, outputPerMTok: 1.5 },
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('mistral').getApiKeyUrl,
+    models: modelPresets('mistral'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Mistral API key' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.mistral.ai/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('mistral').fields,
     },
   },
 
@@ -601,41 +251,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'nvidia',
     displayName: 'NVIDIA NIM',
     shortLabel: 'NVIDIA',
-    platformEnvKey: 'NVIDIA_API_KEY',
     defaultModel: 'nvidia/llama-3.3-nemotron-super-49b-v1',
-    getApiKeyUrl: 'https://build.nvidia.com/',
-    models: [
-      {
-        id: 'nvidia/llama-3.3-nemotron-super-49b-v1',
-        displayName: 'Nemotron Super 49B',
-        shortDisplayName: 'Nemotron 49B',
-        tier: 'balanced',
-        contextWindow: 131_072,
-        maxOutputTokens: 65_536,
-        isReasoning: true,
-      },
-      {
-        id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-        displayName: 'Nemotron Ultra 253B',
-        shortDisplayName: 'Nemotron 253B',
-        tier: 'best',
-        contextWindow: 131_072,
-        maxOutputTokens: 32_768,
-        isReasoning: true,
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('nvidia').getApiKeyUrl,
+    models: modelPresets('nvidia'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'nvapi-...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://integrate.api.nvidia.com/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('nvidia').fields,
     },
   },
 
@@ -644,20 +264,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Gladia (STT)',
     shortLabel: 'Gladia',
     defaultModel: '',
-    getApiKeyUrl: 'https://app.gladia.io/',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('gladia').getApiKeyUrl,
+    models: modelPresets('gladia'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.gladia.io/v2/pre-recorded', {
-            headers: { 'x-gladia-key': creds.apiKey },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('gladia').fields,
     },
   },
 
@@ -666,20 +276,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Speechmatics (STT)',
     shortLabel: 'Speechmatics',
     defaultModel: '',
-    getApiKeyUrl: 'https://portal.speechmatics.com/',
-    models: [],
+    getApiKeyUrl: aiCredentialForm('speechmatics').getApiKeyUrl,
+    models: modelPresets('speechmatics'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://eu1.asr.api.speechmatics.com/v2/jobs', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('speechmatics').fields,
     },
   },
 
@@ -687,42 +287,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     id: 'google',
     displayName: 'Google (Gemini)',
     shortLabel: 'Gemini',
-    platformEnvKey: 'GOOGLE_AI_API_KEY',
     defaultModel: 'gemini-3.1-flash-lite-preview',
-    getApiKeyUrl: 'https://aistudio.google.com/apikey',
-    models: [
-      {
-        id: 'gemini-3.1-flash-lite-preview',
-        displayName: 'Gemini 3.1 Flash Lite',
-        shortDisplayName: 'Flash Lite 3.1',
-        tier: 'fast',
-        contextWindow: 1_000_000,
-        maxOutputTokens: 64_000,
-      },
-      {
-        id: 'gemini-3.1-pro-preview',
-        displayName: 'Gemini 3.1 Pro',
-        shortDisplayName: 'Pro 3.1',
-        tier: 'balanced',
-        contextWindow: 1_000_000,
-        maxOutputTokens: 64_000,
-      },
-    ],
+    getApiKeyUrl: aiCredentialForm('google').getApiKeyUrl,
+    models: modelPresets('google'),
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'AIza...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/openai/models',
-            {
-              headers: { Authorization: `Bearer ${creds.apiKey}` },
-            }
-          );
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: aiCredentialForm('google').fields,
     },
   },
 };
@@ -758,6 +327,7 @@ export function getCheapestModelForProvider(providerId: AiProviderId): string | 
 }
 
 export function getAiProviderMeta(id: AiProviderId): AiProviderMeta {
+  if (!isValidAiProviderId(id)) throw new Error(`Unknown AI provider: ${id}`);
   const meta = AI_PROVIDERS[id];
   if (!meta) throw new Error(`Unknown AI provider: ${id}`);
   return meta;
@@ -776,7 +346,7 @@ export function getAiProviderIdsWithPricing(): AiProviderId[] {
 }
 
 export function isValidAiProviderId(id: string): id is AiProviderId {
-  return id in AI_PROVIDERS;
+  return Object.hasOwn(AI_PROVIDERS, id);
 }
 
 /**
@@ -794,7 +364,7 @@ export function getAiModelDisplayName(modelId: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Client-safe DTO — serializable subset of AiProviderMeta (no validate())
+// Client-safe DTO — serializable subset of AiProviderMeta
 // ---------------------------------------------------------------------------
 
 export interface AiProviderClientMeta {
@@ -840,7 +410,7 @@ const AI_CLIENT_DESCRIPTIONS: Record<
 
 /**
  * Returns serializable provider metadata for client components.
- * Strips `validate()`, filters out `claude-code` (not user-facing).
+ * Filters out `claude-code` (not user-facing).
  * Called server-side only — client components receive this as props.
  */
 export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
@@ -970,20 +540,4 @@ export function getModelMaxOutputTokens(modelId: string): number | null {
     if (model) return model.maxOutputTokens;
   }
   return null;
-}
-
-export async function validateAiProviderCredentials(
-  providerId: AiProviderId,
-  credentials: Record<string, string>
-): Promise<boolean> {
-  const meta = getAiProviderMeta(providerId);
-  try {
-    return await meta.auth.validate(credentials);
-  } catch (error) {
-    logger.warn('AI provider credential validation failed', {
-      provider: providerId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
 }

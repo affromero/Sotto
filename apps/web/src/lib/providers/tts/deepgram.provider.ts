@@ -9,23 +9,28 @@
  * @tts-research-date 2026-06-15 — POST /v1/speak, `Authorization: Token`, aura-2 voices
  */
 import { logger } from '../../logger';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { DEEPGRAM_AURA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { applyPronunciationAliases } from '../../pronunciation-dictionary';
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 
 export class DeepgramAuraProvider implements TtsProvider {
+  static readonly speechEndpoint = 'https://api.deepgram.com/v1/speak';
   readonly providerId: TtsProviderId = 'deepgram';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey?: string, model?: string) {
-    const key = apiKey || process.env.DEEPGRAM_API_KEY;
-    if (!key) throw new Error('Deepgram requires an API key (BYOK or DEEPGRAM_API_KEY env var)');
-    this.apiKey = key;
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    model?: string
+  ) {
+    if (!apiKey.trim()) throw new Error('Deepgram requires an API key');
+    this.apiKey = apiKey;
     this.model = model ?? 'aura-2';
   }
 
@@ -37,17 +42,26 @@ export class DeepgramAuraProvider implements TtsProvider {
       bit_rate: '48000',
     });
 
-    const response = await fetch(`https://api.deepgram.com/v1/speak?${query.toString()}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${this.apiKey}`,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      `${DeepgramAuraProvider.speechEndpoint}?${query.toString()}`,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: applyPronunciationAliases(params.text) }),
       },
-      body: JSON.stringify({ text: applyPronunciationAliases(params.text) }),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
+      const errorText = await response.text();
+      params.signal?.throwIfAborted();
       throw new Error(`Deepgram TTS error (${response.status}): ${errorText}`);
     }
 
@@ -59,7 +73,12 @@ export class DeepgramAuraProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? DEEPGRAM_AURA_VOICE_POOL[0].id : DEEPGRAM_AURA_VOICE_POOL[1].id;

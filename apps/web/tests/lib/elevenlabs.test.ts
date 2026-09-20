@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createProviderTransport } from 'thesidedoor-core/providers/transport';
+import { VOICE_POOL } from '@/lib/voice-pool';
 
 // ---- Set env BEFORE any imports ----
 vi.stubEnv('ELEVENLABS_API_KEY', 'test-api-key');
@@ -21,18 +23,14 @@ vi.mock('@/lib/logger', () => ({
 const originalEnv = process.env;
 
 // ---- Import under test ----
-import {
-  selectVoicePair,
-  getVoiceId,
-  getVoiceProfile,
-  generateSpeech,
-  generateSoundEffect,
-  designVoice,
-  getVoices,
-  getElevenLabsPerKCharRate,
-  getOpenAiPerKCharRate,
-  VOICE_POOL,
-} from '@/lib/elevenlabs';
+import { generateSpeech, generateSoundEffect, getOpenAiPerKCharRate } from '@/lib/elevenlabs';
+
+function speechExecution() {
+  return {
+    apiKey: process.env.ELEVENLABS_API_KEY ?? '',
+    transport: { authenticatedFetch: mockFetch },
+  };
+}
 
 // ---- Tests ----
 
@@ -42,118 +40,6 @@ describe('elevenlabs', () => {
     // Reset env to original state
     process.env = { ...originalEnv };
     process.env.ELEVENLABS_API_KEY = 'test-api-key';
-  });
-
-  describe('voice selection', () => {
-    it('selects a voice pair with different voices for host and expert', () => {
-      const result = selectVoicePair('episode-123');
-
-      expect(result.host).toBeDefined();
-      expect(result.expert).toBeDefined();
-      expect(result.host.id).not.toBe(result.expert.id);
-    });
-
-    it('returns consistent voice pair for the same episode ID', () => {
-      const result1 = selectVoicePair('episode-abc');
-      const result2 = selectVoicePair('episode-abc');
-
-      expect(result1.host.id).toBe(result2.host.id);
-      expect(result1.expert.id).toBe(result2.expert.id);
-    });
-
-    it('returns different voice pairs for different episode IDs', () => {
-      const result1 = selectVoicePair('episode-001');
-      const result2 = selectVoicePair('episode-002');
-
-      // At least one voice should be different between the two pairs
-      const isDifferent =
-        result1.host.id !== result2.host.id || result1.expert.id !== result2.expert.id;
-
-      expect(isDifferent).toBe(true);
-    });
-
-    it('prefers different genders for host and expert when possible', () => {
-      // Test multiple episode IDs to check gender diversity preference
-      const pairs = Array.from({ length: 10 }, (_, i) => selectVoicePair(`episode-${i}`));
-
-      const differentGenderCount = pairs.filter(
-        (pair) => pair.host.gender !== pair.expert.gender
-      ).length;
-
-      // Most pairs should have different genders (at least 70%)
-      expect(differentGenderCount).toBeGreaterThanOrEqual(7);
-    });
-  });
-
-  describe('getVoiceId', () => {
-    it('returns host voice ID from voice pool when episode ID is provided', () => {
-      const voiceId = getVoiceId('HOST', 'episode-123');
-      const profile = getVoiceProfile(voiceId);
-
-      expect(voiceId).toBeDefined();
-      expect(profile).toBeDefined();
-    });
-
-    it('returns expert voice ID from voice pool when episode ID is provided', () => {
-      const voiceId = getVoiceId('EXPERT', 'episode-123');
-      const profile = getVoiceProfile(voiceId);
-
-      expect(voiceId).toBeDefined();
-      expect(profile).toBeDefined();
-    });
-
-    it('returns different voice IDs for HOST and EXPERT with same episode ID', () => {
-      const hostVoiceId = getVoiceId('HOST', 'episode-abc');
-      const expertVoiceId = getVoiceId('EXPERT', 'episode-abc');
-
-      expect(hostVoiceId).not.toBe(expertVoiceId);
-    });
-
-    it('uses env overrides when both HOST and EXPERT voice IDs are set', () => {
-      process.env.ELEVENLABS_HOST_VOICE_ID = 'custom-host-id';
-      process.env.ELEVENLABS_EXPERT_VOICE_ID = 'custom-expert-id';
-
-      const hostVoiceId = getVoiceId('HOST', 'episode-123');
-      const expertVoiceId = getVoiceId('EXPERT', 'episode-123');
-
-      expect(hostVoiceId).toBe('custom-host-id');
-      expect(expertVoiceId).toBe('custom-expert-id');
-    });
-
-    it('returns fallback voices when no episode ID is provided', () => {
-      const hostVoiceId = getVoiceId('HOST');
-      const expertVoiceId = getVoiceId('EXPERT');
-
-      expect(hostVoiceId).toBeDefined();
-      expect(expertVoiceId).toBeDefined();
-      expect(hostVoiceId).not.toBe(expertVoiceId);
-    });
-  });
-
-  describe('getVoiceProfile', () => {
-    it('returns voice profile for valid voice ID', () => {
-      const firstVoice = VOICE_POOL[0];
-      const profile = getVoiceProfile(firstVoice.id);
-
-      expect(profile).toEqual(firstVoice);
-    });
-
-    it('returns undefined for unknown voice ID', () => {
-      const profile = getVoiceProfile('unknown-voice-id');
-
-      expect(profile).toBeUndefined();
-    });
-
-    it('returns profile with all expected properties', () => {
-      const profile = getVoiceProfile(VOICE_POOL[0].id);
-
-      expect(profile).toHaveProperty('id');
-      expect(profile).toHaveProperty('name');
-      expect(profile).toHaveProperty('gender');
-      expect(profile).toHaveProperty('accent');
-      expect(profile).toHaveProperty('ageRange');
-      expect(profile).toHaveProperty('character');
-    });
   });
 
   describe('generateSpeech', () => {
@@ -167,6 +53,7 @@ describe('elevenlabs', () => {
       });
 
       const result = await generateSpeech({
+        ...speechExecution(),
         text: 'Hello world',
         voiceId: 'voice-123',
       });
@@ -178,7 +65,8 @@ describe('elevenlabs', () => {
           headers: expect.objectContaining({
             'xi-api-key': 'test-api-key',
           }),
-        })
+        }),
+        expect.objectContaining({ onDispatch: expect.any(Function) })
       );
 
       const callArgs = mockFetch.mock.calls[0];
@@ -201,6 +89,7 @@ describe('elevenlabs', () => {
       });
 
       await generateSpeech({
+        ...speechExecution(),
         text: 'Custom settings test',
         voiceId: 'voice-456',
         modelId: 'eleven_turbo_v2',
@@ -229,7 +118,7 @@ describe('elevenlabs', () => {
         headers: { get: () => null },
       });
 
-      await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
+      await generateSpeech({ ...speechExecution(), text: 'Test', voiceId: 'voice-123' });
 
       const url = mockFetch.mock.calls[0][0];
       expect(url).toContain('output_format=mp3_44100_192');
@@ -242,7 +131,7 @@ describe('elevenlabs', () => {
         headers: { get: () => null },
       });
 
-      await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
+      await generateSpeech({ ...speechExecution(), text: 'Test', voiceId: 'voice-123' });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.voice_settings.use_speaker_boost).toBe(true);
@@ -256,6 +145,7 @@ describe('elevenlabs', () => {
       });
 
       await generateSpeech({
+        ...speechExecution(),
         text: 'Current segment',
         voiceId: 'voice-123',
         modelId: 'eleven_turbo_v2',
@@ -277,6 +167,7 @@ describe('elevenlabs', () => {
       });
 
       await generateSpeech({
+        ...speechExecution(),
         text: 'Current segment',
         voiceId: 'voice-123',
         modelId: 'eleven_v3',
@@ -299,6 +190,7 @@ describe('elevenlabs', () => {
       });
 
       await generateSpeech({
+        ...speechExecution(),
         text: 'Current segment',
         voiceId: 'voice-123',
         modelId: 'eleven_v3_flash',
@@ -318,7 +210,7 @@ describe('elevenlabs', () => {
         headers: { get: () => null },
       });
 
-      await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
+      await generateSpeech({ ...speechExecution(), text: 'Test', voiceId: 'voice-123' });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body).not.toHaveProperty('previous_text');
@@ -329,11 +221,8 @@ describe('elevenlabs', () => {
       delete process.env.ELEVENLABS_API_KEY;
 
       await expect(
-        generateSpeech({
-          text: 'Test',
-          voiceId: 'voice-123',
-        })
-      ).rejects.toThrow('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
+        generateSpeech({ ...speechExecution(), text: 'Test', voiceId: 'voice-123' })
+      ).rejects.toThrow('No ElevenLabs credential is saved');
     });
 
     it('throws error with API error message on failure', async () => {
@@ -344,24 +233,73 @@ describe('elevenlabs', () => {
       });
 
       await expect(
-        generateSpeech({
-          text: 'Test',
-          voiceId: 'voice-123',
-        })
+        generateSpeech({ ...speechExecution(), text: 'Test', voiceId: 'voice-123' })
       ).rejects.toThrow(/ElevenLabs.*429/);
     });
   });
 
   describe('generateSoundEffect', () => {
-    it('calls ElevenLabs sound effects API with correct parameters', async () => {
-      const mockAudioBuffer = Buffer.from('sound effect data');
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        arrayBuffer: async () => mockAudioBuffer.buffer,
+    it.each([200, 400, 401, 402, 403, 404, 422, 429, 202, 408, 409, 500, 503])(
+      'records only a proven terminal response for HTTP %s',
+      async (status) => {
+        const audio = Buffer.from('ID3sound effect data');
+        const response = new Response(status === 200 ? audio : 'Request did not produce audio', {
+          status,
+        });
+        let settled = false;
+        const transport = createProviderTransport({
+          rules: [{ method: 'POST', url: 'https://api.elevenlabs.io/v1/sound-generation' }],
+          admit: async () => {},
+          implementation: async () => response,
+        });
+        const result = generateSoundEffect({
+          prompt: 'rain',
+          apiKey: 'captured-key',
+          transport,
+          onSettled: () => {
+            settled = true;
+          },
+        });
+        if (status === 200) await expect(result).resolves.toEqual(audio);
+        else await expect(result).rejects.toThrow();
+        expect(settled).toBe([200, 400, 401, 402, 403, 404, 422, 429].includes(status));
+        expect(response.body?.locked).toBe(false);
+      }
+    );
+    it('does not record a rejection as settled when its response body is truncated', async () => {
+      const response = new Response(
+        new ReadableStream({
+          start(stream) {
+            stream.error(new Error('Truncated rejection'));
+          },
+        }),
+        { status: 401 }
+      );
+      let settled = false;
+      const transport = createProviderTransport({
+        rules: [{ method: 'POST', url: 'https://api.elevenlabs.io/v1/sound-generation' }],
+        admit: async () => {},
+        implementation: async () => response,
       });
+      await expect(
+        generateSoundEffect({
+          prompt: 'rain',
+          apiKey: 'captured-key',
+          transport,
+          onSettled: () => {
+            settled = true;
+          },
+        })
+      ).rejects.toThrow();
+      expect(settled).toBe(false);
+    });
+    it('calls ElevenLabs sound effects API with correct parameters', async () => {
+      const mockAudioBuffer = Buffer.from('ID3sound effect data');
+
+      mockFetch.mockResolvedValue(new Response(mockAudioBuffer));
 
       const result = await generateSoundEffect({
+        ...speechExecution(),
         prompt: 'gentle rain falling',
       });
 
@@ -372,7 +310,8 @@ describe('elevenlabs', () => {
           headers: expect.objectContaining({
             'xi-api-key': 'test-api-key',
           }),
-        })
+        }),
+        undefined
       );
 
       const callArgs = mockFetch.mock.calls[0];
@@ -381,18 +320,16 @@ describe('elevenlabs', () => {
         text: 'gentle rain falling',
       });
 
-      expect(result).toBeInstanceOf(Buffer);
+      expect(result).toEqual(mockAudioBuffer);
     });
 
     it('includes duration when provided (max 30 seconds)', async () => {
-      const mockAudioBuffer = Buffer.from('sound effect data');
+      const mockAudioBuffer = Buffer.from('ID3sound effect data');
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        arrayBuffer: async () => mockAudioBuffer.buffer,
-      });
+      mockFetch.mockResolvedValue(new Response(mockAudioBuffer));
 
       await generateSoundEffect({
+        ...speechExecution(),
         prompt: 'ocean waves',
         durationSeconds: 15,
       });
@@ -403,14 +340,12 @@ describe('elevenlabs', () => {
     });
 
     it('caps duration at 30 seconds', async () => {
-      const mockAudioBuffer = Buffer.from('sound effect data');
+      const mockAudioBuffer = Buffer.from('ID3sound effect data');
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        arrayBuffer: async () => mockAudioBuffer.buffer,
-      });
+      mockFetch.mockResolvedValue(new Response(mockAudioBuffer));
 
       await generateSoundEffect({
+        ...speechExecution(),
         prompt: 'long ambient sound',
         durationSeconds: 60,
       });
@@ -421,135 +356,81 @@ describe('elevenlabs', () => {
     });
 
     it('throws error when API returns error status', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: async () => 'Invalid prompt',
-      });
+      mockFetch.mockResolvedValue(new Response('Invalid prompt', { status: 400 }));
 
       await expect(
         generateSoundEffect({
+          ...speechExecution(),
           prompt: 'invalid',
         })
       ).rejects.toThrow(/ElevenLabs.*400/);
     });
-  });
-
-  describe('designVoice', () => {
-    it('creates a new voice from description', async () => {
-      const mockAudioBuffer = Buffer.from('preview audio');
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        headers: {
-          get: (name: string) => (name === 'generated_voice_id' ? 'new-voice-id-123' : null),
+    it('rejects revoked authority before reporting transport invocation', async () => {
+      const rejected = new Error('Authority revoked');
+      let dispatched = false;
+      const transport = createProviderTransport({
+        rules: [{ method: 'POST', url: 'https://api.elevenlabs.io/v1/sound-generation' }],
+        admit: async () => {
+          throw rejected;
         },
-        arrayBuffer: async () => mockAudioBuffer.buffer,
+        implementation: async () => {
+          throw new Error('Unauthorized HTTP request');
+        },
       });
-
-      const result = await designVoice({
-        description: 'A warm, friendly female voice with a slight British accent',
-        sampleText: 'Hello, welcome to the episode',
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/voice-generation/generate-voice'),
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'xi-api-key': 'test-api-key',
-          }),
-        })
-      );
-      expect(result.voiceId).toBe('new-voice-id-123');
-      expect(result.audioPreview).toBeInstanceOf(Buffer);
-    });
-
-    it('throws error on API failure', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 403,
-        text: async () => 'Insufficient credits',
-      });
-
       await expect(
-        designVoice({
-          description: 'Test voice',
-          sampleText: 'Test',
+        generateSoundEffect({
+          prompt: 'rain',
+          apiKey: 'captured-key',
+          transport,
+          onDispatch: () => {
+            dispatched = true;
+          },
         })
-      ).rejects.toThrow(/ElevenLabs.*403/);
+      ).rejects.toBe(rejected);
+      expect(dispatched).toBe(false);
     });
-  });
-
-  describe('getVoices', () => {
-    it('fetches voice library from API', async () => {
-      const mockVoices = [
-        { voice_id: 'v1', name: 'Voice One', category: 'premade' },
-        { voice_id: 'v2', name: 'Voice Two', category: 'cloned' },
-      ];
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ voices: mockVoices }),
-      });
-
-      const result = await getVoices();
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/voices'),
-        expect.objectContaining({
-          headers: expect.objectContaining({ 'xi-api-key': 'test-api-key' }),
+    it('awaits response-body cancellation after a dispatched sound request', async () => {
+      const controller = new AbortController();
+      const reason = new Error('Generation stopped');
+      let dispatched = false;
+      let canceled = false;
+      const response = new Response(
+        new ReadableStream({
+          start(stream) {
+            stream.enqueue(new Uint8Array([1]));
+          },
+          pull() {
+            controller.abort(reason);
+          },
+          async cancel() {
+            await Promise.resolve();
+            canceled = true;
+          },
         })
       );
-      expect(result).toEqual(mockVoices);
-    });
-
-    it('throws error when API key is missing', async () => {
-      delete process.env.ELEVENLABS_API_KEY;
-
-      await expect(getVoices()).rejects.toThrow('ElevenLabs API key not configured');
-    });
-
-    it('throws error on API failure', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 401,
+      const transport = createProviderTransport({
+        rules: [{ method: 'POST', url: 'https://api.elevenlabs.io/v1/sound-generation' }],
+        admit: async () => {},
+        implementation: async () => response,
       });
-
-      await expect(getVoices()).rejects.toThrow('ElevenLabs API error (401)');
+      await expect(
+        generateSoundEffect({
+          prompt: 'rain',
+          apiKey: 'captured-key',
+          transport,
+          signal: controller.signal,
+          onDispatch: () => {
+            dispatched = true;
+          },
+        })
+      ).rejects.toBe(reason);
+      expect(dispatched).toBe(true);
+      expect(canceled).toBe(true);
+      expect(response.body?.locked).toBe(false);
     });
   });
 
   describe('cost tracking', () => {
-    it('returns correct ElevenLabs rate for scale tier (default)', () => {
-      const rate = getElevenLabsPerKCharRate();
-      expect(rate).toBe(0.17);
-    });
-
-    it('returns correct ElevenLabs rate for free tier', () => {
-      process.env.ELEVENLABS_TIER = 'free';
-      const rate = getElevenLabsPerKCharRate();
-      expect(rate).toBe(0.0);
-    });
-
-    it('returns correct ElevenLabs rate for starter tier', () => {
-      process.env.ELEVENLABS_TIER = 'starter';
-      const rate = getElevenLabsPerKCharRate();
-      expect(rate).toBe(0.3);
-    });
-
-    it('returns correct ElevenLabs rate for creator tier', () => {
-      process.env.ELEVENLABS_TIER = 'creator';
-      const rate = getElevenLabsPerKCharRate();
-      expect(rate).toBe(0.24);
-    });
-
-    it('returns default rate for unknown tier', () => {
-      process.env.ELEVENLABS_TIER = 'unknown-tier';
-      const rate = getElevenLabsPerKCharRate();
-      expect(rate).toBe(0.17);
-    });
-
     it('returns correct OpenAI TTS rate', () => {
       const rate = getOpenAiPerKCharRate();
       expect(rate).toBe(0.015);
@@ -579,7 +460,7 @@ describe('elevenlabs', () => {
 
     it('ensures every voice has required metadata', () => {
       VOICE_POOL.forEach((voice) => {
-        expect(voice.id).toBeDefined();
+        expect(voice.ids.elevenlabs).toBeDefined();
         expect(voice.name).toBeDefined();
         expect(voice.gender).toBeDefined();
         expect(voice.accent).toBeDefined();

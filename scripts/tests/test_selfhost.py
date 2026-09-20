@@ -61,6 +61,12 @@ if name == "docker":
             sys.exit(1)
         if command[0] == "run" and os.environ.get("TEST_MIGRATION_FAIL"):
             sys.exit(1)
+        if command[0] == "run" and "dist/access.cjs" in command:
+            if "list" in command:
+                print('{"mode":"household","principals":[]}')
+            elif "claim" in command:
+                print('{"operation":"claim","code":"fixture-owner-claim","expiresInMinutes":15}')
+            sys.exit(0)
         if command[:3] == ["exec", "-T", "postgres"]:
             if os.environ.get("TEST_DB_FAIL"):
                 sys.exit(1)
@@ -97,7 +103,6 @@ class SelfHostTests(unittest.TestCase):
             "SOTTO_DIR": str(self.install),
             "SOTTO_BIN_DIR": str(self.bin),
             "SOTTO_YES": "1",
-            "SOTTO_AGENT_CHOICE": "5",
             "TEST_REPO": str(ROOT),
             "TEST_LOG": str(self.log),
             "TEST_REVISION": REVISION,
@@ -189,7 +194,8 @@ class SelfHostTests(unittest.TestCase):
         self.assertIn("SOTTO_IMAGE_TAG=12345678\n", configuration)
         self.assertIn("BYOK_ENCRYPTION_KEY=", configuration)
         self.assertTrue((self.install / "images.sh").is_file())
-        self.assertIn("Configure generation and audio providers", result.stdout)
+        self.assertIn("fixture-owner-claim", result.stdout)
+        self.assertIn("Continue in your browser", result.stdout)
 
     def test_install_database_timeout_exits_with_actionable_failure(self):
         result = self.run_script("install.sh", TEST_DB_FAIL="1")
@@ -209,19 +215,15 @@ class SelfHostTests(unittest.TestCase):
         self.assert_unchanged()
         self.assertTrue((self.install / ".operation-lock").is_dir())
 
-    def test_reinstall_preserves_the_existing_port_and_literal_key(self):
+    def test_reinstall_preserves_runtime_settings(self):
         with (self.install / ".env").open("a") as configuration:
             configuration.write('WEB_PORT="4321"\n')
             configuration.write('NEXT_PUBLIC_APP_URL=https://learning.example.com\n')
-        result = self.run_script(
-            "install.sh", TEST_HEALTH="12345678", SOTTO_AGENT_CHOICE="1",
-            SOTTO_AI_KEY="sk-$literal-key",
-        )
+        result = self.run_script("install.sh", TEST_HEALTH="12345678")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         configuration = (self.install / ".env").read_text()
         self.assertIn("WEB_PORT=4321\n", configuration)
         self.assertIn("NEXT_PUBLIC_APP_URL=https://learning.example.com\n", configuration)
-        self.assertIn("OPENAI_API_KEY='sk-$literal-key'\n", configuration)
 
     def test_rollback_restores_saved_configuration_and_absence_of_an_override(self):
         previous = self.install / "previous"

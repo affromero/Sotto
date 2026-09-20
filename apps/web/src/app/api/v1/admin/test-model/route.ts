@@ -2,47 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { z } from 'zod';
 import { createAIProvider } from '@/lib/providers/ai';
-import { createTtsProviderAsync } from '@/lib/providers/tts';
-import { createSttProvider } from '@/lib/providers/stt';
+import { createSttProvider, sttProviderRules } from '@/lib/providers/stt';
 import { getProviderIds, type TtsProviderId } from '@/lib/providers/tts-registry';
 import type { SttProviderId } from '@/lib/providers/stt-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
-import { getAiKey, getByokKey } from '@/lib/byok';
+import { authenticateRequest } from '@/lib/api-keys';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import {
+  captureSottoExecutionCredential,
+  sottoExecutionCredentialFields,
+} from '@/lib/sidedoor/credentials/runtime/credential-execution';
+import {
+  createSottoProviderTransport,
+  type SottoProviderExecution,
+} from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { prismaUnfiltered } from '@/lib/prisma';
 import { logUsage } from '@/lib/usage-logger';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { BRAND } from '@sotto/shared';
 import { getTestVoiceId } from '@/lib/providers/tts-voices';
-import { getPlatformTtsKey } from '@/lib/tts-generation';
+import { getServerInfra, infra } from '@/lib/server-config';
+import { capturedLearningAiOptions, resolveCapturedLearningAiForProvider } from '@/lib/learning-ai';
+import { resolveTtsProvider } from '@/lib/providers/tts';
 
 const requestSchema = z.object({
   type: z.enum(['ai', 'tts', 'stt']),
   provider: z.string().min(1),
   model: z.string().min(1),
-  keySource: z.enum(['platform', 'byok']).default('platform'),
 });
-
-// Voice IDs and platform keys are derived from the registry — no manual updates needed.
-// See: getTestVoiceId() in tts-voices.ts, getPlatformTtsKey() in tts-generation.ts
-
-function getSttPlatformKey(provider: string): string | undefined {
-  switch (provider) {
-    case 'openai':
-      return process.env.OPENAI_API_KEY;
-    case 'elevenlabs':
-      return process.env.ELEVENLABS_API_KEY;
-    case 'together':
-      return process.env.TOGETHER_API_KEY;
-    case 'deepgram':
-      return process.env.DEEPGRAM_API_KEY;
-    case 'assemblyai':
-      return process.env.ASSEMBLYAI_API_KEY;
-    case 'local':
-      return process.env.STT_API_KEY?.trim() || 'local';
-    default:
-      return undefined;
-  }
-}
 
 /**
  * Generate real "Hello" audio from the first available TTS provider.
@@ -52,16 +41,28 @@ function getSttPlatformKey(provider: string): string | undefined {
 /** All TTS providers. Auto-populated from registry. */
 const TTS_PROBE_ORDER: TtsProviderId[] = getProviderIds();
 
-async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {
+async function generateTestAudio(
+  execution: SottoProviderExecution
+): Promise<{ audio: Buffer; provider: string } | null> {
   for (const id of TTS_PROBE_ORDER) {
-    const apiKey = getPlatformTtsKey(id);
-    if (!apiKey) continue;
-
     try {
-      const tts = await createTtsProviderAsync(id, apiKey);
+      const resolved = await resolveTtsProvider({
+        userId: execution.userId,
+        execution,
+        episodeId: 'admin-provider-test',
+        requestedProvider: id,
+      });
+      const tts = resolved.provider;
       const voiceId = getTestVoiceId(id);
       const audio = await withTimeout(
-        tts.generateSpeech({ text: `${BRAND.name} — ${BRAND.tagline}`, voiceId }),
+        tts.generateSpeech({
+          text: `${BRAND.name}, ${BRAND.tagline}`,
+          voiceId,
+          signal: AbortSignal.any([
+            ...(execution.signal ? [execution.signal] : []),
+            AbortSignal.timeout(5_000),
+          ]),
+        }),
         5_000
       );
       return { audio, provider: id };
@@ -94,7 +95,12 @@ function classifyError(error: Error): string {
   const msg = error.message;
   const lower = msg.toLowerCase();
 
-  if (msg === 'timeout' || lower.includes('timed out') || error.name === 'AbortError') {
+  if (
+    msg === 'timeout' ||
+    lower.includes('timed out') ||
+    error.name === 'AbortError' ||
+    ('status' in error && error.status === 408)
+  ) {
     return 'Timed out';
   }
   if (
@@ -106,7 +112,7 @@ function classifyError(error: Error): string {
     lower.includes('not initialized') ||
     lower.includes('no elevenlabs api key')
   ) {
-    return 'Platform API key not configured (check .env)';
+    return 'Saved provider credential is not configured';
   }
   if (
     lower.includes('401') ||
@@ -135,10 +141,13 @@ function classifyError(error: Error): string {
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
+  const deadline = Promise.withResolvers<never>();
+  const timer = setTimeout(() => deadline.reject(new Error('timeout')), ms);
+  try {
+    return await Promise.race([promise, deadline.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -146,6 +155,17 @@ export async function POST(request: NextRequest) {
   if (!adminId) {
     return errorResponse('Forbidden', 403);
   }
+  const original = await authenticateRequest(request);
+  if (!original || !original.isOwner || original.userId !== adminId)
+    return errorResponse('Forbidden', 403);
+  const execution: SottoProviderExecution = {
+    userId: adminId,
+    signal: request.signal,
+    authorize: async (database) => {
+      await requireOriginalSottoAdmission(database, request, original);
+      return { userId: adminId };
+    },
+  };
 
   const body = await request.json();
   const parsed = requestSchema.safeParse(body);
@@ -154,37 +174,30 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { type, provider, model, keySource } = parsed.data;
+  const { type, provider, model } = parsed.data;
+  await getServerInfra();
   const start = Date.now();
 
   try {
     if (type === 'ai') {
-      let apiKeyOverride: string | undefined;
-
-      if (keySource === 'byok') {
-        const keyData = await getAiKey(adminId, provider as AiProviderId);
-        if (!keyData) {
-          return NextResponse.json({
-            success: false,
-            latencyMs: Date.now() - start,
-            error: 'BYOK key not found for this provider',
-          });
-        }
-        apiKeyOverride = keyData.apiKey;
-      }
-
+      const captured = await resolveCapturedLearningAiForProvider(
+        adminId,
+        provider as AiProviderId,
+        model,
+        execution,
+        true
+      );
       const aiProvider = createAIProvider(provider);
       const timeoutMs = provider === 'claude-code' || provider === 'codex' ? 60_000 : 15_000;
       const result = await withTimeout(
         aiProvider.generateResponse('', [{ role: 'user', content: 'Say hello in one word.' }], {
-          model,
+          ...(await capturedLearningAiOptions(captured)),
           maxTokens: 20,
           skipModeration: true,
-          apiKeyOverride,
         }),
         timeoutMs
       );
-      logUsage({
+      await logUsage({
         service: provider,
         model: result.model,
         category: 'admin_test',
@@ -200,40 +213,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'tts') {
-      let apiKey: string | undefined;
-
-      if (keySource === 'byok') {
-        const key = await getByokKey(adminId, provider as TtsProviderId);
-        if (!key) {
-          return NextResponse.json({
-            success: false,
-            latencyMs: Date.now() - start,
-            error: 'BYOK key not found for this provider',
-          });
-        }
-        apiKey = key;
-      } else {
-        apiKey = getPlatformTtsKey(provider as TtsProviderId);
-
-        if (!apiKey) {
-          return NextResponse.json({
-            success: false,
-            latencyMs: Date.now() - start,
-            error: 'Platform API key not configured (check .env)',
-          });
-        }
-      }
-
       const voiceId = getTestVoiceId(provider as TtsProviderId);
-      const ttsProvider = await createTtsProviderAsync(
-        provider as TtsProviderId,
-        apiKey,
-        undefined,
-        model
-      );
+      const resolved = await resolveTtsProvider({
+        userId: adminId,
+        execution,
+        episodeId: 'admin-provider-test',
+        requestedProvider: provider as TtsProviderId,
+        requestedModel: model,
+      });
+      const ttsProvider = resolved.provider;
 
       const audioBuffer = await withTimeout(
-        ttsProvider.generateSpeech({ text: `${BRAND.name} — ${BRAND.tagline}`, voiceId }),
+        ttsProvider.generateSpeech({
+          text: `${BRAND.name}, ${BRAND.tagline}`,
+          voiceId,
+          signal: AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]),
+        }),
         30_000
       );
 
@@ -247,52 +242,36 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'stt') {
-      let sttKey: string | undefined;
-
-      if (keySource === 'byok') {
-        if (provider === 'local') {
-          sttKey = process.env.STT_API_KEY?.trim() || 'local';
-        } else if (
-          provider === 'openai' ||
-          provider === 'together' ||
-          provider === 'deepgram' ||
-          provider === 'assemblyai'
-        ) {
-          const keyData = await getAiKey(adminId, provider as AiProviderId);
-          if (!keyData) {
-            return NextResponse.json({
-              success: false,
-              latencyMs: Date.now() - start,
-              error: 'BYOK key not found for this provider',
-            });
-          }
-          sttKey = keyData.apiKey;
-        } else if (provider === 'elevenlabs') {
-          const key = await getByokKey(adminId, 'elevenlabs');
-          if (!key) {
-            return NextResponse.json({
-              success: false,
-              latencyMs: Date.now() - start,
-              error: 'BYOK key not found for this provider',
-            });
-          }
-          sttKey = key;
-        }
-      } else {
-        sttKey = getSttPlatformKey(provider);
-        if (!sttKey) {
-          return NextResponse.json({
-            success: false,
-            latencyMs: Date.now() - start,
-            error: 'Platform API key not configured (check .env)',
-          });
-        }
-      }
-
-      const sttProvider = createSttProvider(provider as SttProviderId, sttKey!, model);
+      const sttProviderId = provider as SttProviderId;
+      const saved =
+        provider === 'local'
+          ? null
+          : await sottoTransaction(prismaUnfiltered, (database) =>
+              captureSottoExecutionCredential(
+                database,
+                execution.authorize,
+                'stt',
+                provider,
+                true,
+                request.signal
+              )
+            );
+      execution.credential = saved;
+      const sttKey =
+        provider === 'local'
+          ? 'local'
+          : saved
+            ? sottoExecutionCredentialFields(saved).apiKey
+            : undefined;
+      if (!sttKey) throw new Error(`No saved credential is available for ${provider}`);
+      const sttTransport = await createSottoProviderTransport(
+        execution,
+        sttProviderRules(sttProviderId, infra('sttBaseUrl'))
+      );
+      const sttProvider = createSttProvider(sttProviderId, sttKey!, model, sttTransport);
 
       // Generate real "Hello" audio from the first available TTS provider
-      const testAudio = await generateTestAudio();
+      const testAudio = await generateTestAudio(execution);
       const audioBuffer = testAudio?.audio;
       const ttsSource = testAudio?.provider;
 
@@ -304,7 +283,10 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const result = await withTimeout(sttProvider.transcribe(audioBuffer), 15_000);
+      const result = await withTimeout(
+        sttProvider.transcribe(audioBuffer, { signal: request.signal }),
+        15_000
+      );
       return NextResponse.json({
         success: true,
         latencyMs: Date.now() - start,

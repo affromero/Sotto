@@ -41,6 +41,11 @@ export function isAnimalSlug(value: string): boolean {
   return BY_SLUG.has(value);
 }
 
+/** Only exact shipped paths are exempt from uploaded-file retirement. */
+export function isBundledAvatarImage(value: string): boolean {
+  return ANIMAL_AVATARS.some((avatar) => avatarImagePath(avatar.slug) === value);
+}
+
 export function getAnimalAvatar(slug: string): AnimalAvatar | undefined {
   return BY_SLUG.get(slug);
 }

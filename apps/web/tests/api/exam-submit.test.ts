@@ -57,7 +57,12 @@ describe('POST /api/v1/exams/[examId]/submit', () => {
     const res = await POST(req(VALID), PARAMS);
     expect(res.status).toBe(200);
     expect((await res.json()).band).toBe('B1 pass (mock)');
-    expect(mockScoreExam).toHaveBeenCalledWith('exam1', 'u1', VALID.answers);
+    expect(mockScoreExam).toHaveBeenCalledWith(
+      'exam1',
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      VALID.answers
+    );
   });
 
   it('returns 404 for a missing or non-owner exam', async () => {

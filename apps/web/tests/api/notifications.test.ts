@@ -1,361 +1,150 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @vitest-environment node
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-
-// Define mock fns at module scope so they're properly typed as Mock
-const mockNotificationFindMany = vi.fn();
-const mockNotificationCount = vi.fn();
-const mockNotificationFindUnique = vi.fn();
-const mockNotificationUpdate = vi.fn();
-const mockNotificationUpdateMany = vi.fn();
-const mockAuth = vi.fn();
-
-vi.mock('@/lib/prisma', () => {
-  const _mockPrisma = {
-    notification: {
-      findMany: (...args: unknown[]) => mockNotificationFindMany(...args),
-      count: (...args: unknown[]) => mockNotificationCount(...args),
-      findUnique: (...args: unknown[]) => mockNotificationFindUnique(...args),
-      update: (...args: unknown[]) => mockNotificationUpdate(...args),
-      updateMany: (...args: unknown[]) => mockNotificationUpdateMany(...args),
-    },
-  };
-  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
-});
-
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
-
+import type { PrismaClient } from '@/generated/prisma/client';
+import { createSharedTestInstance } from '../helpers/setup/shared-instance';
 import { GET } from '@/app/api/v1/notifications/route';
 import { PATCH } from '@/app/api/v1/notifications/[notificationId]/route';
 import { POST } from '@/app/api/v1/notifications/mark-all-read/route';
 
-const mockPrisma = {
-  notification: {
-    findMany: mockNotificationFindMany,
-    count: mockNotificationCount,
-    findUnique: mockNotificationFindUnique,
-    update: mockNotificationUpdate,
-    updateMany: mockNotificationUpdateMany,
-  },
-};
-
-function createRequest(params: Record<string, string> = {}): NextRequest {
-  const url = new URL('http://localhost:3000/api/v1/notifications');
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
+const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(binding);
+  return { prisma: database, prismaUnfiltered: database };
+});
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('notification routes with shared sessions', () => {
+  let instance: Awaited<ReturnType<typeof createSharedTestInstance>>;
+  let identity: Awaited<ReturnType<Awaited<ReturnType<typeof createSharedTestInstance>>['reset']>>;
+  let other: { id: string; token: string };
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('notifications');
+    binding.database = instance.database;
+  });
+  beforeEach(async () => {
+    identity = await instance.reset();
+    other = await identity.household('Other learner');
+    await instance.database.notification.createMany({
+      data: [
+        {
+          id: 'owned-new',
+          userId: identity.ownerId,
+          type: 'EPISODE_READY',
+          title: 'Lesson ready',
+          message: 'Listen now',
+          data: { episodeId: 'lesson' },
+          createdAt: new Date('2026-09-12T02:00:00Z'),
+        },
+        {
+          id: 'owned-old',
+          userId: identity.ownerId,
+          type: 'SCRIPT_READY',
+          title: 'Script ready',
+          message: 'Review it',
+          read: true,
+          createdAt: new Date('2026-09-12T01:00:00Z'),
+        },
+        {
+          id: 'other-private',
+          userId: other.id,
+          type: 'KEY_INVALID',
+          title: 'Private key warning',
+          message: 'Other learner only',
+        },
+      ],
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+  afterAll(async () => {
+    binding.database = null;
+    if (instance) await instance.close();
+  });
+  function request(
+    path = '/api/v1/notifications',
+    token: string | null = identity.ownerToken,
+    method = 'GET'
+  ) {
+    return new NextRequest(new URL(path, 'http://localhost:3000'), {
+      method,
+      headers: token ? { cookie: `sotto_session=${token}` } : {},
+    });
   }
-  return new NextRequest(url);
-}
-
-const mockSession = {
-  user: {
-    id: 'user-1',
-    email: 'alice@example.com',
-    name: 'Alice',
-  },
-  expires: '2025-12-31T00:00:00Z',
-};
-
-const mockNotification1 = {
-  id: 'notif-1',
-  userId: 'user-1',
-  type: 'EPISODE_READY',
-  title: 'Episode ready',
-  message: 'Your episode "Quantum Physics 101" is ready to listen',
-  data: { episodeId: 'pod-1' },
-  read: false,
-  createdAt: new Date('2025-01-15T10:00:00Z'),
-};
-
-const mockNotification2 = {
-  id: 'notif-2',
-  userId: 'user-1',
-  type: 'BRIEFING_READY',
-  title: 'Briefing ready',
-  message: 'Your daily briefing is ready',
-  data: { episodeId: 'pod-briefing' },
-  read: true,
-  createdAt: new Date('2025-01-14T10:00:00Z'),
-};
-
-const mockNotification3 = {
-  id: 'notif-3',
-  userId: 'user-1',
-  type: 'SCRIPT_READY',
-  title: 'Script ready',
-  message: 'Your script is ready for review',
-  data: { episodeId: 'pod-2' },
-  read: false,
-  createdAt: new Date('2025-01-13T10:00:00Z'),
-};
-
-describe('GET /api/v1/notifications', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('rejects anonymous and revoked sessions before exposing notifications', async () => {
+    expect((await GET(request(undefined, null))).status).toBe(401);
+    await identity.access.logout(identity.ownerToken);
+    expect((await GET(request())).status).toBe(401);
   });
-
-  it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request);
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns notifications with correct response shape', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([mockNotification1]);
-    mockPrisma.notification.count
-      .mockResolvedValueOnce(1) // total count
-      .mockResolvedValueOnce(1); // unread count
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toHaveProperty('notifications');
-    expect(body).toHaveProperty('total');
-    expect(body).toHaveProperty('unreadCount');
-    expect(body).toHaveProperty('page');
-    expect(body).toHaveProperty('limit');
-    expect(body).toHaveProperty('hasMore');
-    expect(Array.isArray(body.notifications)).toBe(true);
-  });
-
-  it('returns notification data with proper structure', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([mockNotification1]);
-    mockPrisma.notification.count.mockResolvedValue(1);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    const notif = body.notifications[0];
-    expect(notif.id).toBe('notif-1');
-    expect(notif.type).toBe('EPISODE_READY');
-    expect(notif.title).toBe('Episode ready');
-    expect(notif.message).toBe('Your episode "Quantum Physics 101" is ready to listen');
-    expect(notif.data).toEqual({ episodeId: 'pod-1' });
-    expect(notif.read).toBe(false);
-  });
-
-  it('applies default parameters (page=1, limit=20)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.notification.count.mockResolvedValue(0);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.page).toBe(1);
-    expect(body.limit).toBe(20);
-  });
-
-  it('respects pagination with page and limit parameters', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([mockNotification2]);
-    mockPrisma.notification.count.mockResolvedValue(25);
-
-    const request = createRequest({ page: '2', limit: '10' });
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.page).toBe(2);
-    expect(body.limit).toBe(10);
-  });
-
-  it('calculates hasMore correctly when more results exist', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([mockNotification1]);
-    mockPrisma.notification.count.mockResolvedValue(25);
-
-    const request = createRequest({ page: '1', limit: '10' });
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.hasMore).toBe(true);
-    expect(body.total).toBe(25);
-  });
-
-  it('calculates hasMore correctly when no more results', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([mockNotification1]);
-    mockPrisma.notification.count.mockResolvedValue(1);
-
-    const request = createRequest({ page: '1', limit: '20' });
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.hasMore).toBe(false);
-  });
-
-  it('returns empty list when user has no notifications', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.notification.count.mockResolvedValue(0);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.notifications).toEqual([]);
-    expect(body.total).toBe(0);
-    expect(body.unreadCount).toBe(0);
-    expect(body.hasMore).toBe(false);
-  });
-
-  it('returns correct unreadCount when some notifications are unread', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([
-      mockNotification1,
-      mockNotification2,
-      mockNotification3,
-    ]);
-    mockPrisma.notification.count
-      .mockResolvedValueOnce(3) // total count
-      .mockResolvedValueOnce(2); // unread count (notif-1 and notif-3)
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.total).toBe(3);
-    expect(body.unreadCount).toBe(2);
-  });
-
-  it('returns 400 for invalid page parameter (0)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-
-    const request = createRequest({ page: '0' });
-    const response = await GET(request);
-
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body).toHaveProperty('error');
-  });
-
-  it('returns 400 for invalid limit parameter (exceeds 50)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-
-    const request = createRequest({ limit: '51' });
-    const response = await GET(request);
-
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body).toHaveProperty('error');
-  });
-});
-
-describe('PATCH /api/v1/notifications/[notificationId]', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const params = Promise.resolve({ notificationId: 'notif-1' });
-    const response = await PATCH(request, { params });
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('marks notification as read and returns updated notification', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findUnique.mockResolvedValue(mockNotification1);
-    mockPrisma.notification.update.mockResolvedValue({
-      ...mockNotification1,
-      read: true,
+  it('returns only the selected learner notifications with counts and pagination', async () => {
+    const first = await GET(request('/api/v1/notifications?page=1&limit=1'));
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({
+      notifications: [{ id: 'owned-new', title: 'Lesson ready', data: { episodeId: 'lesson' } }],
+      total: 2,
+      unreadCount: 1,
+      page: 1,
+      limit: 1,
+      hasMore: true,
     });
-
-    const request = createRequest();
-    const params = Promise.resolve({ notificationId: 'notif-1' });
-    const response = await PATCH(request, { params });
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.id).toBe('notif-1');
-    expect(body.read).toBe(true);
+    const second = await GET(request('/api/v1/notifications?page=2&limit=1'));
+    expect(await second.json()).toMatchObject({
+      notifications: [{ id: 'owned-old' }],
+      total: 2,
+      hasMore: false,
+    });
+    const household = await GET(request(undefined, other.token));
+    expect(await household.json()).toMatchObject({
+      notifications: [{ id: 'other-private' }],
+      total: 1,
+      unreadCount: 1,
+    });
   });
-
-  it('returns 404 when notification does not exist', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findUnique.mockResolvedValue(null);
-
-    const request = createRequest();
-    const params = Promise.resolve({ notificationId: 'nonexistent' });
-    const response = await PATCH(request, { params });
-
+  it.each(['page=0', 'limit=51'])('rejects invalid pagination %s', async (query) => {
+    expect((await GET(request(`/api/v1/notifications?${query}`))).status).toBe(400);
+  });
+  it('marks one owned notification read and preserves another learner notification', async () => {
+    const response = await PATCH(
+      request('/api/v1/notifications/owned-new', identity.ownerToken, 'PATCH'),
+      { params: Promise.resolve({ notificationId: 'owned-new' }) }
+    );
+    expect(response.status).toBe(200);
+    expect(
+      (await instance.database.notification.findUniqueOrThrow({ where: { id: 'owned-new' } })).read
+    ).toBe(true);
+    const forbidden = await PATCH(
+      request('/api/v1/notifications/other-private', identity.ownerToken, 'PATCH'),
+      { params: Promise.resolve({ notificationId: 'other-private' }) }
+    );
+    expect(forbidden.status).toBe(403);
+    expect(
+      (await instance.database.notification.findUniqueOrThrow({ where: { id: 'other-private' } }))
+        .read
+    ).toBe(false);
+  });
+  it('reports a missing notification without modifying existing records', async () => {
+    const response = await PATCH(
+      request('/api/v1/notifications/missing', identity.ownerToken, 'PATCH'),
+      { params: Promise.resolve({ notificationId: 'missing' }) }
+    );
     expect(response.status).toBe(404);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Notification not found' });
+    expect(await instance.database.notification.count({ where: { read: false } })).toBe(2);
   });
-
-  it('returns 403 when user does not own the notification', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findUnique.mockResolvedValue({
-      ...mockNotification1,
-      userId: 'user-2', // different user
-    });
-
-    const request = createRequest();
-    const params = Promise.resolve({ notificationId: 'notif-1' });
-    const response = await PATCH(request, { params });
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Forbidden' });
-  });
-});
-
-describe('POST /api/v1/notifications/mark-all-read', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await POST(request);
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('marks all unread notifications as read and returns count', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.updateMany.mockResolvedValue({ count: 5 });
-
-    const request = createRequest();
-    const response = await POST(request);
-    const body = await response.json();
-
+  it('marks all notifications for the selected learner and leaves other learners unread', async () => {
+    const response = await POST(
+      request('/api/v1/notifications/mark-all-read', identity.ownerToken, 'POST')
+    );
     expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true, count: 5 });
-  });
-
-  it('returns count 0 when no unread notifications exist', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.updateMany.mockResolvedValue({ count: 0 });
-
-    const request = createRequest();
-    const response = await POST(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true, count: 0 });
+    expect(
+      await instance.database.notification.count({
+        where: { userId: identity.ownerId, read: false },
+      })
+    ).toBe(0);
+    expect(
+      await instance.database.notification.count({ where: { userId: other.id, read: false } })
+    ).toBe(1);
+    const repeated = await POST(
+      request('/api/v1/notifications/mark-all-read', identity.ownerToken, 'POST')
+    );
+    expect(await repeated.json()).toMatchObject({ count: 0 });
   });
 });

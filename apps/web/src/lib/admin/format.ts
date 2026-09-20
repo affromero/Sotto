@@ -9,11 +9,24 @@ export function fmtUSD(n: number): string {
 }
 
 export function fmtCompact(n: number): string {
-  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(
+    n
+  );
 }
 
 export function fmtInt(n: number): string {
   return n.toLocaleString('en-US');
+}
+
+/** A known subtotal is not a complete measurement when some requests have no value. */
+export function fmtMeasured(
+  value: number,
+  requests: number,
+  unknown: number,
+  format = fmtUSD
+): string {
+  if (requests > 0 && requests === unknown) return 'Unknown';
+  return `${format(value)}${unknown > 0 ? ' (partial)' : ''}`;
 }
 
 /** Whole-percent change from `prev` to `cur`; null when there's no prior baseline. */

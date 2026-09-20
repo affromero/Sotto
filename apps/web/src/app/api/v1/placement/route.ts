@@ -15,6 +15,7 @@ import { createOrRaiseCourse } from '@/lib/placement-course';
 import { getCourseNote, mergeCourseNote, setCourseNote } from '@/lib/course-notes';
 import { getCachedNotesDeduction, clearNotesDeduction } from '@/lib/placement-notes';
 import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 const langCode = z.string().trim().toLowerCase().length(2);
 const cefrLevel = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
 
     const { questions } = await generatePlacement(
       userId,
+      sottoRequestExecution(request, authed),
       native,
       target,
       note,
@@ -119,6 +121,7 @@ export async function POST(request: NextRequest) {
     // currentLevel, so re-testing never discards progress made through classes.
     const course = await createOrRaiseCourse(
       userId,
+      sottoRequestExecution(request, authed),
       native,
       target,
       outcome.level,
@@ -148,6 +151,7 @@ export async function POST(request: NextRequest) {
       await setCourseNote(course.id, merged);
       await extractAndStoreNoteVocab({
         userId,
+        execution: sottoRequestExecution(request, authed),
         courseId: course.id,
         nativeLang: native,
         targetLang: target,

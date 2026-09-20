@@ -280,7 +280,7 @@ cmd_update() {
     rm -f "$SOTTO_DIR/previous/$file"
     [ ! -f "$SOTTO_DIR/$file" ] || cp "$SOTTO_DIR/$file" "$SOTTO_DIR/previous/$file"
   done
-  # Keep rollback immutable even when upgrading a legacy latest installation.
+  # Keep rollback immutable when an installation currently tracks latest.
   SOTTO_DIR="$install_dir/previous"
   set_env_value SOTTO_IMAGE_TAG "$from"
   SOTTO_DIR="$install_dir"

@@ -22,6 +22,14 @@ enum UserRole {
 
 // ============ USERS & AUTH ============
 
+model SidedoorState {
+  id       String @id
+  revision String
+  state    Json
+
+  @@index([id(ops: raw("text_pattern_ops"))], map: "SidedoorState_id_pattern_idx")
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -71,15 +79,6 @@ model User {
   // API Keys
   apiKeys       ApiKey[]
   pairingTokens PairingToken[]
-
-  // BYOK TTS keys (multi-provider)
-  userTtsKeys UserTtsKey[]
-
-  // BYOK AI keys (LLM providers)
-  userAiKeys UserAiKey[]
-
-  // Visual cue provider keys (for learner-marked target imagery)
-  userVisualCueKeys UserVisualCueKey[]
 
   // Interests (onboarding + settings)
   interests              UserInterest[]
@@ -150,9 +149,11 @@ model Episode {
   activeStitchKey        String?
   activeStitchOwner      String?
   audioGenerationKey     String?
+  pipelineGeneration     String?
 
   // PDF export
   pdfUrl String?
+  transcriptPublication Json?
 
   // Waveform visualization
   waveformUrl    String?
@@ -225,8 +226,8 @@ model ResearchDossier {
   blockedClaims    Json? // string[] — claims that couldn't be verified
   recommendedAngle String? @db.Text
 
-  totalInputTokens  Int     @default(0)
-  totalOutputTokens Int     @default(0)
+  totalInputTokens  Int?
+  totalOutputTokens Int?
   model             String?
 
   episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
@@ -249,8 +250,8 @@ model CreativeOutline {
   unresolvedQuestions Json? // string[]
   speakerRoles        Json? // { speaker, role }[]
 
-  inputTokens  Int     @default(0)
-  outputTokens Int     @default(0)
+  inputTokens  Int?
+  outputTokens Int?
   model        String?
 
   episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
@@ -671,7 +672,7 @@ model ApiUsageLog {
   // Cost tracking
   inputTokens  Int?
   outputTokens Int?
-  totalCost    Float
+  totalCost    Float?
 
   // Performance
   durationMs Int?
@@ -736,6 +737,7 @@ model ApiKey {
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
   revokedAt  DateTime?
+  expiresAt  DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -823,107 +825,6 @@ enum VerificationStatus {
   FAILED
   REPLACED
   REMOVED
-}
-
-// ============ USER TTS KEYS (Multi-Provider BYOK) ============
-
-model UserTtsKey {
-  id           String    @id @default(cuid())
-  userId       String
-  provider     String // 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate'
-  encryptedKey String    @db.Text
-  extraData    String?   @db.Text // encrypted JSON for multi-field auth
-  isValid      Boolean   @default(true)
-  label        String?
-  lastUsedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider])
-  @@index([userId])
-}
-
-// ============ USER AI KEYS (LLM BYOK) ============
-
-model UserAiKey {
-  id           String    @id @default(cuid())
-  userId       String
-  provider     String // 'anthropic' | 'openai'
-  encryptedKey String    @db.Text
-  isValid      Boolean   @default(true)
-  label        String?
-  lastUsedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider])
-  @@index([userId])
-}
-
-// ============ USER VISUAL CUE KEYS ============
-
-model UserVisualCueKey {
-  id           String    @id @default(cuid())
-  userId       String
-  provider     String // 'pexels'
-  encryptedKey String    @db.Text
-  isValid      Boolean   @default(true)
-  label        String?
-  lastUsedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider])
-  @@index([userId])
-}
-
-// ============ AUTO MODEL CONFIG ============
-
-model AutoModelConfig {
-  id                 String   @id @default("singleton")
-  aiProvider         String   @default("anthropic")
-  aiModel            String   @default("claude-haiku-4-5-20251001")
-  ttsProvider        String   @default("openai")
-  ttsModel           String   @default("tts-1-hd")
-  sttProvider        String   @default("openai")
-  sttModel           String   @default("whisper-large-v3-turbo")
-  platformAiProvider String   @default("anthropic")
-  platformAiModel    String   @default("claude-haiku-4-5-20251001")
-  includedModels     Json?
-  includedTtsModels  Json?
-  includedSttModels  Json?
-  updatedAt          DateTime @updatedAt
-  updatedBy          String?
-}
-
-// ============ SITE CONFIG ============
-
-model SiteConfig {
-  id String @id @default("singleton")
-
-  // Owner-set server infrastructure (non-secret selection only; null = fall back to env).
-  // Secrets (provider keys, R2/S3 credentials) never live here — they stay in env or the
-  // encrypted BYOK store. Set by the owner through the onboarding wizard.
-  aiProvider      String?
-  aiModel         String?
-  aiBaseUrl       String?
-  sttProvider     String?
-  sttBaseUrl      String?
-  sttModel        String?
-  ttsProvider     String?
-  ttsBaseUrl      String?
-  storageProvider String?
-  s3Bucket        String?
-  s3Region        String?
-
-  updatedAt DateTime @updatedAt
-  updatedBy String?
 }
 
 // ============ AUDIO FINGERPRINTING & DUPLICATE DETECTION ============

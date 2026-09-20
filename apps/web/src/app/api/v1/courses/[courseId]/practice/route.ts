@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
@@ -23,9 +24,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parsed = startSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse('Invalid practice kind', 400);
 
-    const result = await startPractice(courseId, authed.userId, parsed.data.kind, {
-      focusTargetId: parsed.data.focusTargetId ?? null,
-    });
+    const result = await startPractice(
+      courseId,
+      authed.userId,
+      parsed.data.kind,
+      sottoRequestExecution(request, authed),
+      {
+        focusTargetId: parsed.data.focusTargetId ?? null,
+      }
+    );
     if (result.status === 'unavailable') {
       return NextResponse.json(result, { status: 200 });
     }

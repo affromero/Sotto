@@ -3,7 +3,8 @@
 // (reused by practice); generateClassWriting adds the ClassSection + WritingPrompt
 // persistence.
 import { prisma } from './prisma';
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
@@ -15,6 +16,7 @@ const WRITING_PROMPT_COUNT = 3;
 
 export interface WritingPromptsParams {
   userId: string;
+  execution: SottoProviderExecution;
   level: string;
   nativeLang: string;
   targetLang: string;
@@ -56,7 +58,7 @@ function isValidRawPrompt(item: unknown): item is RawWritingPrompt {
 export async function composeWritingPrompts(
   p: WritingPromptsParams
 ): Promise<ComposedWritingPrompt[]> {
-  const ai = await resolveLearningAi(p.userId);
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   const vocabList = p.targetVocab.map((v) => `${v.lemma} — ${v.gloss}`).join('\n');
   const systemPrompt = loadAndRender('writing/generate-writing-prompts.md', {
@@ -78,7 +80,7 @@ export async function composeWritingPrompts(
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${WRITING_PROMPT_COUNT} writing tasks.` }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.7 }
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 2048, temperature: 0.7 }
   );
 
   logUsage({
@@ -119,6 +121,7 @@ export async function composeWritingPrompts(
 
 export interface ClassWritingParams {
   userId: string;
+  execution: SottoProviderExecution;
   classId: string;
   attempt?: number;
   level: string;
@@ -137,6 +140,7 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
   const attempt = p.attempt ?? 1;
   const prompts = await composeWritingPrompts({
     userId: p.userId,
+    execution: p.execution,
     level: p.level,
     nativeLang: p.nativeLang,
     targetLang: p.targetLang,

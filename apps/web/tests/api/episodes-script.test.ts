@@ -165,10 +165,10 @@ describe('GET /api/v1/episodes/[episodeId]/script', () => {
 
     expect(response.status).toBe(200);
     expect(body.lowReferences).toBe(true);
-    expect(body.requiredRefCount).toBe(10);
+    expect(body.requiredRefCount).toBe(15);
   });
 
-  it('defaults requiredRefCount to 5 when discovery not found', async () => {
+  it('uses the standard reference threshold when discovery is not found', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', lowReferences: true });
     const turns = [{ speaker: 'HOST', text: 'Hello' }];
@@ -181,7 +181,7 @@ describe('GET /api/v1/episodes/[episodeId]/script', () => {
 
     expect(response.status).toBe(200);
     expect(body.lowReferences).toBe(true);
-    expect(body.requiredRefCount).toBe(5);
+    expect(body.requiredRefCount).toBe(10);
   });
 });
 

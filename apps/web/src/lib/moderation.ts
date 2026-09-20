@@ -1,20 +1,13 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
+import { abortable } from 'thesidedoor-core/runtime/stream';
 import { cache } from './redis';
 import { logUsage } from './usage-logger';
-import { logger } from './logger';
 
-const OPENAI_MODERATION_KEY = process.env.OPENAI_MODERATION_KEY;
 const MODERATION_API_URL = 'https://api.openai.com/v1/moderations';
-const MODERATION_MODEL = process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest';
-const MODERATION_TIMEOUT_MS = 3000;
-const CACHE_TTL_SECONDS = 600; // 10 minutes
-const MAX_INPUT_LENGTH = 32000; // API limit ~32K chars
+const MODERATION_MODEL = 'omni-moderation-latest';
+const CACHE_TTL_SECONDS = 600;
+const MAX_INPUT_LENGTH = 32_000;
 
-/**
- * Per-category score thresholds. Lower = stricter.
- * sexual/minors is extremely strict (0.1); violence is permissive (0.7)
- * since documentary/educational content legitimately discusses it.
- */
 const CATEGORY_THRESHOLDS: Record<string, number> = {
   'sexual/minors': 0.1,
   sexual: 0.5,
@@ -38,6 +31,11 @@ export interface ModerationResult {
   blockedCategories: string[];
 }
 
+export interface ModerationPort {
+  fetch: typeof fetch;
+  model?: string;
+}
+
 export class ContentModerationError extends Error {
   readonly categories: string[];
 
@@ -48,111 +46,70 @@ export class ContentModerationError extends Error {
   }
 }
 
-function cacheKey(text: string): string {
-  return `mod:${createHash('sha256').update(text).digest('hex').slice(0, 16)}`;
+function cacheKey(model: string, text: string): string {
+  return `mod:${createHash('sha256').update(`${model}\0${text}`).digest('hex')}`;
 }
 
-/**
- * Run content through the OpenAI Moderation API.
- * Returns detailed results with per-category flags and scores.
- *
- * Fail-open: if the API is unavailable or times out, logs a warning and
- * returns an unflagged result so the platform doesn't go down.
- */
-export async function moderateContent(text: string): Promise<ModerationResult> {
-  if (!OPENAI_MODERATION_KEY) {
-    logger.warn('OPENAI_MODERATION_KEY not set — skipping moderation');
-    return { flagged: false, categories: {}, scores: {}, blockedCategories: [] };
-  }
-
+/** Run moderation only through a captured, authorized provider transport. */
+export async function moderateContent(
+  text: string,
+  port?: ModerationPort,
+  signal?: AbortSignal
+): Promise<ModerationResult> {
+  signal?.throwIfAborted();
+  if (!port) return { flagged: false, categories: {}, scores: {}, blockedCategories: [] };
   const truncated = text.slice(0, MAX_INPUT_LENGTH);
-  const key = cacheKey(truncated);
-
-  // Check cache
-  const cached = await cache.get<ModerationResult>(key).catch(() => null);
+  const model = port.model ?? MODERATION_MODEL;
+  const key = cacheKey(model, truncated);
+  const lookup = cache.get<ModerationResult>(key).catch(() => null);
+  const cached = await (signal ? abortable(lookup, signal) : lookup);
   if (cached) return cached;
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), MODERATION_TIMEOUT_MS);
-
-    const response = await fetch(MODERATION_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_MODERATION_KEY}`,
-      },
-      body: JSON.stringify({ model: MODERATION_MODEL, input: truncated }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      logger.warn('Moderation API returned non-OK', { status: String(response.status) });
-      return { flagged: false, categories: {}, scores: {}, blockedCategories: [] };
-    }
-
-    const data = (await response.json()) as {
-      results: Array<{
-        flagged: boolean;
-        categories: Record<string, boolean>;
-        category_scores: Record<string, number>;
-      }>;
-    };
-
-    const result = data.results[0];
-    if (!result) {
-      return { flagged: false, categories: {}, scores: {}, blockedCategories: [] };
-    }
-
-    // Apply custom thresholds instead of trusting the API's binary flags
-    const blockedCategories: string[] = [];
-    for (const [category, score] of Object.entries(result.category_scores)) {
-      const threshold = CATEGORY_THRESHOLDS[category] ?? 0.5;
-      if (score >= threshold) {
-        blockedCategories.push(category);
-      }
-    }
-
-    const moderationResult: ModerationResult = {
-      flagged: blockedCategories.length > 0,
-      categories: result.categories,
-      scores: result.category_scores,
-      blockedCategories,
-    };
-
-    logUsage({
-      service: 'openai',
-      model: MODERATION_MODEL,
-      category: 'moderation',
-      totalCost: 0,
-      metadata: { inputChars: truncated.length },
-    });
-
-    // Cache result
-    await cache.set(key, moderationResult, CACHE_TTL_SECONDS).catch(() => {});
-
-    return moderationResult;
-  } catch (err) {
-    // Fail-open: log and allow through
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('abort')) {
-      logger.warn('Moderation API timed out — allowing through');
-    } else {
-      logger.warn('Moderation API error — allowing through', { error: msg });
-    }
-    return { flagged: false, categories: {}, scores: {}, blockedCategories: [] };
+  const response = await port.fetch(MODERATION_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, input: truncated }),
+    signal,
+  });
+  if (!response.ok) {
+    const status = response.status;
+    await response.body?.cancel();
+    throw new Error(`Moderation provider returned HTTP ${status}`);
   }
+  const data = (await response.json()) as {
+    results?: Array<{
+      categories: Record<string, boolean>;
+      category_scores: Record<string, number>;
+    }>;
+  };
+  const result = data.results?.[0];
+  if (!result) throw new Error('Moderation provider returned no result');
+  const blockedCategories = Object.entries(result.category_scores)
+    .filter(([category, score]) => score >= (CATEGORY_THRESHOLDS[category] ?? 0.5))
+    .map(([category]) => category);
+  const moderation = {
+    flagged: blockedCategories.length > 0,
+    categories: result.categories,
+    scores: result.category_scores,
+    blockedCategories,
+  };
+  await logUsage({
+    service: 'openai',
+    model,
+    category: 'moderation',
+    totalCost: 0,
+    metadata: { inputChars: truncated.length },
+  });
+  signal?.throwIfAborted();
+  await cache.set(key, moderation, CACHE_TTL_SECONDS);
+  return moderation;
 }
 
-/**
- * Screen content and throw ContentModerationError if flagged.
- * Use this as a hard gate on user input before LLM calls.
- */
-export async function moderateOrThrow(text: string): Promise<void> {
-  const result = await moderateContent(text);
-  if (result.flagged) {
-    throw new ContentModerationError(result.blockedCategories);
-  }
+export async function moderateOrThrow(
+  text: string,
+  port?: ModerationPort,
+  signal?: AbortSignal
+): Promise<void> {
+  const result = await moderateContent(text, port, signal);
+  if (result.flagged) throw new ContentModerationError(result.blockedCategories);
 }

@@ -1,0 +1,125 @@
+.root {
+  min-height: 100dvh;
+  padding: 96px 24px 64px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(
+      70% 60% at 50% 30%,
+      color-mix(in oklab, var(--color-primary) 16%, transparent),
+      transparent 70%
+    ),
+    #121310;
+  color: #e9e3d3;
+}
+
+.brand {
+  position: absolute;
+  top: 26px;
+  left: 28px;
+  margin: 0;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-size: 24px;
+}
+
+.content {
+  width: min(420px, 100%);
+}
+.heading {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+  text-align: center;
+}
+.sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #9d9684;
+  text-align: center;
+  margin: 0 0 40px;
+}
+.access {
+  width: 100%;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9d9684;
+}
+.input {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #3a3b36;
+  background: #1c1d19;
+  color: #e9e3d3;
+  font-size: 16px;
+  width: 100%;
+}
+.input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.button {
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 16px;
+}
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: #ff8fb1;
+}
+.hint {
+  margin: 12px 0 0;
+  max-width: 400px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #9d9684;
+}
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.secondary {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: inherit;
+  background: #1c1d19;
+  border: 1px solid #3a3b36;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.secondary[aria-pressed='true'] {
+  border-color: var(--color-primary);
+}
+.secondary:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}

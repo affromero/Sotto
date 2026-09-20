@@ -227,7 +227,9 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSource).toContain('cp "$ENV_TEMPLATE" "$ENV_FILE"');
     expect(setupSource).toContain('compose up -d postgres redis');
     expect(setupSource).toContain('bash "$SCRIPT_DIR/install-deps.sh" --node --docker --ffmpeg');
-    expect(setupSource).toContain('Fastest path: set OPENAI_API_KEY');
+    expect(setupSource).toContain(
+      'Complete /welcome to save AI, speech, and local/R2/S3 storage settings.'
+    );
     expect(setupSource).not.toContain('uv sync --group pitch');
     expect(setupSource).not.toContain('AI_PROVIDER="anthropic"');
     expect(setupSource).not.toContain('docker-compose up -d');
@@ -235,7 +237,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSource).not.toContain('set_env_value NEXTAUTH_SECRET');
 
     expect(installDepsSource).toContain('install_ffmpeg');
-    expect(localSetupDocs).toContain('LOCAL_STORAGE_DIR="./.sotto/storage"');
+    expect(localSetupDocs).toContain('SIDEDOOR_EXECUTION_DIR="./.sotto/executions"');
     expect(localSetupDocs).not.toContain(
       'Compatibility scripts are still available for the old hosted setup'
     );
@@ -264,7 +266,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(agentDocs).not.toContain('Compatibility scripts for the old hosted setup');
     expect(agentDocs).not.toContain('Hosted deployments may still use Doppler');
     expect(agentDocs).toContain(
-      'Critical local variables: `DATABASE_URL`, `REDIS_URL`, `BYOK_ENCRYPTION_KEY`'
+      'Critical local variables are `DATABASE_URL`, `REDIS_URL`, `BYOK_ENCRYPTION_KEY`, and `SIDEDOOR_EXECUTION_DIR`'
     );
   });
 
@@ -273,8 +275,8 @@ describe('open-source language-learning OSS surfaces', () => {
     const envOssExample = readFileSync(resolve(repoRoot, '.env.oss.example'), 'utf8');
     const envTemplateSources = [envExample, envOssExample].join('\n');
 
-    expect(envExample).toContain('Use your own secret manager');
-    expect(envExample).toContain('copy .env.oss.example to .env.local');
+    expect(envExample).toContain('Configure providers, models, credentials');
+    expect(envOssExample).toContain('Configure AI, speech, and storage in /welcome or Admin');
     expect(envTemplateSources).not.toContain('NEXTAUTH_SECRET');
     expect(envTemplateSources).not.toContain('dashboard.doppler.com/workplace/projects/sotto');
     expect(envTemplateSources).not.toContain('doppler secrets download');
@@ -522,7 +524,7 @@ describe('open-source language-learning OSS surfaces', () => {
     );
     expect(caddyTemplate).toContain('__SOTTO_APP_DOMAIN__');
     expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_WWW');
-    expect(caddyTemplate).toContain('health_uri /api/health');
+    expect(caddyTemplate).toContain('health_uri /api/v1/health');
     expect(deploymentSources).not.toContain('doppler');
     expect(deploymentSources).not.toContain('Doppler');
     expect(deploymentSources).not.toContain('dashboard.doppler.com');

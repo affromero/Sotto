@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LANGUAGES,
@@ -28,19 +28,16 @@ import {
   resolveStt,
   sttModelProviderId,
   resolveVisualCue,
+  welcomeVoiceCredentialExtras,
   type KeyPost,
 } from '../providerMap';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.styles';
+import c from '@/app/welcome/components.styles';
 
 const MAX_ONBOARDING_NOTE_CHARS = 4000;
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
-const CARTESIA_ADMIN_KEY_ID = 'cartesia:adminApiKey';
-const CARTESIA_USAGE_PLAN_ID = 'cartesia:usagePlan';
-const CARTESIA_MONTHLY_LIMIT_ID = 'cartesia:monthlyCreditLimit';
-const CARTESIA_RESET_DAY_ID = 'cartesia:billingResetDay';
 
 function contextKindLabel(item: ContextItem) {
   if (item.kind === 'article') return 'article/news';
@@ -84,6 +81,8 @@ interface Props {
   voice: VoiceState;
   storage?: StorageState;
   config: OnboardingConfig;
+  saveCredentials: (posts: readonly KeyPost[]) => Promise<boolean>;
+  submitSetup: (payload: Record<string, unknown>) => Promise<Response | null>;
   onRestart: () => void;
   onJump: (step: number) => void;
 }
@@ -96,16 +95,33 @@ export function StepReady({
   contextItems,
   agent,
   voice,
-  storage = { provider: 'local', s3Bucket: '', s3Region: '' },
+  storage = {
+    provider: 'local',
+    localRoot: '.sotto/storage',
+    endpoint: '',
+    bucket: '',
+    region: '',
+    publicUrl: '',
+    accessKeyId: '',
+    secretAccessKey: '',
+  },
   config,
+  saveCredentials,
+  submitSetup,
   onRestart,
   onJump,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const [demoComplete, setDemoComplete] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const lang = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
   const base = BASE_LANGS.find((b) => b.code === baseLang) ?? BASE_LANGS[0];
@@ -127,28 +143,10 @@ export function StepReady({
     router.push('/');
   }
 
-  async function postKey(post: KeyPost): Promise<boolean> {
-    try {
-      const res = await fetch(`/api/v1/settings/${post.endpoint}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: post.provider,
-          apiKey: post.apiKey,
-          ...(post.extra ?? {}),
-        }),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
   async function finishOnboarding() {
+    if (loading) return;
     setLoading(true);
     setError(null);
-    setWarnings([]);
     setDemoComplete(false);
 
     // Managed showcase (SELF_HOSTED=false): a non-persisting demo. Stop before
@@ -167,22 +165,7 @@ export function StepReady({
       voice.keys[voice.tts] ?? '',
       voice.baseUrls[voice.tts] ?? '',
       voice.ttsModel[voice.tts] ?? '',
-      voice.tts === 'cartesia'
-        ? {
-            ...(voice.keys[CARTESIA_ADMIN_KEY_ID]?.trim()
-              ? { adminApiKey: voice.keys[CARTESIA_ADMIN_KEY_ID].trim() }
-              : {}),
-            ...(voice.keys[CARTESIA_USAGE_PLAN_ID]?.trim()
-              ? { usagePlan: voice.keys[CARTESIA_USAGE_PLAN_ID].trim() }
-              : {}),
-            ...(voice.keys[CARTESIA_MONTHLY_LIMIT_ID]?.trim()
-              ? { monthlyCreditLimit: voice.keys[CARTESIA_MONTHLY_LIMIT_ID].trim() }
-              : {}),
-            ...(voice.keys[CARTESIA_RESET_DAY_ID]?.trim()
-              ? { billingResetDay: voice.keys[CARTESIA_RESET_DAY_ID].trim() }
-              : {}),
-          }
-        : undefined
+      welcomeVoiceCredentialExtras(voice.tts, voice.keys)
     );
     const stt = resolveStt(
       voice.stt,
@@ -195,35 +178,30 @@ export function StepReady({
       voice.keys[VISUAL_CUE_KEY_ID] ?? ''
     );
 
-    // BYOK keys → the validated key routes. Surface failures (don't swallow)
-    // but don't block onboarding. Keys are editable later in Admin Providers.
-    const failures: string[] = [];
-    const postedKeys = new Set<string>();
-    for (const post of [
+    const credentialPosts = [
       ai.keyPost,
       liveTranslateKey,
       tts.keyPost,
       stt.keyPost,
       visualCue.keyPost,
-    ]) {
-      if (!post) continue;
-      const postId = `${post.endpoint}:${post.provider}`;
-      if (postedKeys.has(postId)) continue;
-      postedKeys.add(postId);
-      const ok = await postKey(post);
-      if (!ok) failures.push(post.provider);
-    }
-    if (failures.length) {
-      setWarnings([
-        `Couldn't verify your ${failures.join(', ')} key${failures.length > 1 ? 's' : ''}. Add ${failures.length > 1 ? 'them' : 'it'} later in Admin Providers.`,
-      ]);
+    ].filter((post): post is KeyPost => post !== null);
+    const credentialsSaved = await saveCredentials(credentialPosts);
+    if (!mounted.current) return;
+    if (!credentialsSaved) {
+      setLoading(false);
+      setError('Review the credential result above before finishing setup.');
+      return;
     }
 
     // Everything else (course, preferences, owner infra) in one call.
     const storageInfra = {
       storageProvider: storage.provider,
-      s3Bucket: storage.provider === 's3' ? storage.s3Bucket : null,
-      s3Region: storage.provider === 's3' ? storage.s3Region : null,
+      localStorageRoot: storage.provider === 'local' ? storage.localRoot : null,
+      objectStorageEndpoint: storage.provider === 'local' ? null : storage.endpoint,
+      objectStorageBucket: storage.provider === 'local' ? null : storage.bucket,
+      objectStorageRegion: storage.provider === 'local' ? null : storage.region,
+      objectStoragePublicUrl:
+        storage.provider === 'local' || !storage.publicUrl ? null : storage.publicUrl,
     };
     const infra = config.isOwner
       ? { ...ai.infra, ...tts.infra, ...stt.infra, ...storageInfra }
@@ -231,32 +209,44 @@ export function StepReady({
     const note = buildContextNote(sources, contextItems);
 
     try {
-      const res = await fetch('/api/v1/onboarding/save', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          course: { native: baseLang, target: language, ...(level && { level }) },
-          ...(note && { note }),
-          preferred: {
-            language,
-            ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),
-            ...(ai.preferredAiModel && { aiModel: ai.preferredAiModel }),
-            ...(tts.preferredTtsProvider && { ttsProvider: tts.preferredTtsProvider }),
-            ...(tts.preferredTtsModel && { ttsModel: tts.preferredTtsModel }),
-            ...(stt.preferredSttProvider && { sttProvider: stt.preferredSttProvider }),
-            ...(stt.preferredSttModel && { sttModel: stt.preferredSttModel }),
-          },
-          ...(infra && Object.keys(infra).length > 0 && { infra }),
-        }),
+      const res = await submitSetup({
+        course: { native: baseLang, target: language, ...(level && { level }) },
+        ...(note && { note }),
+        preferred: {
+          language,
+          ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),
+          ...(ai.preferredAiModel && { aiModel: ai.preferredAiModel }),
+          ...(tts.preferredTtsProvider && { ttsProvider: tts.preferredTtsProvider }),
+          ...(tts.preferredTtsModel && { ttsModel: tts.preferredTtsModel }),
+          ...(stt.preferredSttProvider && { sttProvider: stt.preferredSttProvider }),
+          ...(stt.preferredSttModel && { sttModel: stt.preferredSttModel }),
+        },
+        ...(infra && Object.keys(infra).length > 0 && { infra }),
+        ...(config.isOwner && storage.provider !== 'local'
+          ? {
+              storageCredential: {
+                provider: storage.provider,
+                accessKeyId: storage.accessKeyId,
+                secretAccessKey: storage.secretAccessKey,
+              },
+            }
+          : {}),
       });
+      if (!mounted.current) return;
+      if (!res) {
+        setLoading(false);
+        setError('Setup is not ready to save. Review the credential status and try again.');
+        return;
+      }
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!mounted.current) return;
         setError(body?.error ?? 'Could not finish setup. Please try again.');
         setLoading(false);
         return;
       }
     } catch {
+      if (!mounted.current) return;
       setError('Could not reach the server. Check your connection and try again.');
       setLoading(false);
       return;
@@ -367,12 +357,6 @@ export function StepReady({
         </div>
       </div>
 
-      {warnings.map((w) => (
-        <div key={w} className={c.locknote} role="status">
-          <Glyph name="shield" size={15} />
-          {w}
-        </div>
-      ))}
       {error && (
         <div className={c.locknote} role="alert">
           <Glyph name="lock" size={15} />

@@ -1,4 +1,5 @@
-import { getSharedByokKey } from '../../byok';
+import { AccessError } from 'thesidedoor-core/access';
+import { captureUsageAccount } from '../account';
 import { logger } from '../../logger';
 import type {
   AgentUsageCacheEntry,
@@ -17,11 +18,9 @@ import {
   formatResetAt,
   friendlyReset,
   getBoolean,
-  getEnvString,
   getNumber,
   getRecord,
   getString,
-  hashToken,
   isRecord,
   percentFromUsage,
   usageWindow,
@@ -30,11 +29,6 @@ import {
 const ELEVENLABS_TIMEOUT_MS = 7_000;
 
 let elevenLabsCache: AgentUsageCacheEntry | null = null;
-
-async function getElevenLabsUsageKey(userId: string): Promise<string | null> {
-  const byokKey = await getSharedByokKey(userId, 'elevenlabs');
-  return byokKey?.apiKey ?? getEnvString('ELEVENLABS_API_KEY');
-}
 
 function billingPeriodLabel(period: string | null): string {
   switch (period) {
@@ -136,25 +130,42 @@ export function parseElevenLabsSubscriptionPayload(payload: unknown): {
 export async function getElevenLabsUsageProvider(
   context: UsageProviderContext
 ): Promise<AgentUsageProvider | null> {
-  const apiKey = await getElevenLabsUsageKey(context.userId);
+  const account = await captureUsageAccount(context, 'elevenlabs');
+  const { admission, signal } = account;
+  const apiKey = account.fields?.apiKey;
   if (!apiKey) return null;
 
-  const cacheKey = hashToken(apiKey);
+  const cacheKey = account.fingerprint();
   const now = Date.now();
   if (elevenLabsCache && elevenLabsCache.key === cacheKey && elevenLabsCache.expiresAt > now) {
-    return elevenLabsCache.value;
+    return structuredClone(elevenLabsCache.value);
   }
 
+  const publish = async (provider: AgentUsageProvider, ttl: number) => {
+    await admission.validate(signal);
+    elevenLabsCache = {
+      key: cacheKey,
+      expiresAt: Date.now() + ttl,
+      value: structuredClone(provider),
+    };
+    return provider;
+  };
+
   try {
+    const transport = admission.createTransport([
+      { method: 'GET', url: 'https://api.elevenlabs.io/v1/user/subscription' },
+    ]);
     const { response, payload } = await fetchJsonWithTimeout(
       'https://api.elevenlabs.io/v1/user/subscription',
       {
+        signal,
         headers: {
           'xi-api-key': apiKey,
           'User-Agent': 'sotto-provider-usage/0.1',
         },
       },
-      ELEVENLABS_TIMEOUT_MS
+      ELEVENLABS_TIMEOUT_MS,
+      transport.authenticatedFetch
     );
 
     if (!response.ok) {
@@ -174,8 +185,7 @@ export async function getElevenLabsUsageProvider(
         credits: null,
         limitReached: false,
       });
-      elevenLabsCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider, ERROR_CACHE_TTL_MS);
     }
 
     const parsed = parseElevenLabsSubscriptionPayload(payload);
@@ -192,8 +202,7 @@ export async function getElevenLabsUsageProvider(
         credits: null,
         limitReached: false,
       });
-      elevenLabsCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider, ERROR_CACHE_TTL_MS);
     }
 
     const provider = buildProvider({
@@ -208,16 +217,12 @@ export async function getElevenLabsUsageProvider(
       credits: parsed.credits,
       limitReached: parsed.limitReached,
     });
-    elevenLabsCache = {
-      key: cacheKey,
-      expiresAt: now + AUDIO_PROVIDER_CACHE_TTL_MS,
-      value: provider,
-    };
-    return provider;
+    return await publish(provider, AUDIO_PROVIDER_CACHE_TTL_MS);
   } catch (error) {
-    logger.warn('Failed to fetch ElevenLabs subscription usage status', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof AggregateError) throw error;
+    signal.throwIfAborted();
+    if (error instanceof AccessError) throw error;
+    logger.warn('Failed to fetch ElevenLabs subscription usage status');
     const provider = buildProvider({
       id: 'elevenlabs',
       category: 'audio',
@@ -230,8 +235,7 @@ export async function getElevenLabsUsageProvider(
       credits: null,
       limitReached: false,
     });
-    elevenLabsCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider, ERROR_CACHE_TTL_MS);
   }
 }
 

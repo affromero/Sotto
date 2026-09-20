@@ -50,7 +50,7 @@ async function getClient() {
   if (!clientInstance) {
     const { createLinkPreviewClient } = await import('@steipete/summarize-core');
     clientInstance = createLinkPreviewClient({
-      openaiApiKey: process.env.OPENAI_API_KEY ?? null,
+      openaiApiKey: null,
       ytDlpPath: process.env.YT_DLP_PATH || 'yt-dlp',
       onProgress: (event: { kind: string }) => {
         logger.debug('YouTube extraction progress', { kind: event.kind });

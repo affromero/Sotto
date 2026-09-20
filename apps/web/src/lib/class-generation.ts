@@ -1,6 +1,7 @@
 // Generates multiple-choice questions for a class's MC sections (GRAMMAR /
 // READING) via the user's AI provider. Mirrors the canonical worker LLM flow.
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
@@ -59,6 +60,7 @@ export interface GeneratedQuestion {
 
 export interface SectionGenParams {
   userId: string;
+  execution: SottoProviderExecution;
   skill: SkillType; // GRAMMAR | READING
   level: string;
   nativeLang: string;
@@ -234,7 +236,7 @@ function normalizeQuestions(
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
-  const ai = await resolveLearningAi(p.userId);
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   // Sourced READING classes: base the MCQs on the leveled passage. The
   // {{SOURCE}} block is rendered only for a READING section that has source
@@ -277,8 +279,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         },
       ],
       {
-        model: ai.model,
-        apiKeyOverride: ai.apiKey,
+        ...(await capturedLearningAiOptions(ai)),
         maxTokens: 4096,
         temperature: 0.8,
         jsonSchema: CLASS_SECTION_QUIZ_JSON_SCHEMA,
@@ -343,8 +344,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         ].join('\n'),
         [{ role: 'user', content: buildRepairPrompt(lastMalformedContent, lastError) }],
         {
-          model: ai.model,
-          apiKeyOverride: ai.apiKey,
+          ...(await capturedLearningAiOptions(ai)),
           maxTokens: 4096,
           temperature: 0,
           jsonSchema: CLASS_SECTION_QUIZ_JSON_SCHEMA,

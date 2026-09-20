@@ -1,119 +1,33 @@
-import { Job } from 'bullmq';
+import type { Job } from 'bullmq';
+import { setTimeout } from 'node:timers/promises';
 import type { ValidateKeysPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { decryptApiKey } from '@/lib/byok';
-import { validateProviderCredentials, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { validateAiProviderCredentials, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  processCredentialValidation,
+  scheduleCredentialValidationPage,
+} from '@/lib/sidedoor/credentials/runtime/credential-validation-work';
 import { logger } from '@/lib/logger';
 
 const THROTTLE_MS = 500;
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export async function processKeyValidation(
+  job: Job<ValidateKeysPayload>,
+  signal?: AbortSignal
+): Promise<void> {
+  signal?.throwIfAborted();
+  await processCredentialValidation(prisma, job, signal);
+  await setTimeout(THROTTLE_MS, undefined, { signal });
 }
 
-export async function processKeyValidation(job: Job<ValidateKeysPayload>): Promise<void> {
-  let ttsChecked = 0;
-  let ttsInvalidated = 0;
-  let aiChecked = 0;
-  let aiInvalidated = 0;
-
-  // Re-validate all TTS BYOK keys
-  const ttsKeys = await prisma.userTtsKey.findMany({
-    where: { isValid: true },
-    select: { id: true, userId: true, provider: true, encryptedKey: true, extraData: true },
-  });
-
-  const notifQueue = (await import('@/lib/queue')).notificationQueue;
-
-  for (const key of ttsKeys) {
-    ttsChecked++;
-    try {
-      const apiKey = decryptApiKey(key.encryptedKey);
-      const creds: Record<string, string> = { apiKey };
-      if (key.extraData) {
-        try {
-          const extra = JSON.parse(decryptApiKey(key.extraData));
-          if (extra.userId) creds.userId = extra.userId;
-        } catch (err) {
-          logger.warn('Failed to decrypt TTS key extraData, proceeding without it', {
-            keyId: key.id,
-            provider: key.provider,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-
-      const valid = await validateProviderCredentials(key.provider as TtsProviderId, creds);
-      if (!valid) {
-        await prisma.userTtsKey.update({
-          where: { id: key.id },
-          data: { isValid: false },
-        });
-        ttsInvalidated++;
-
-        await notifQueue.add('send_notification', {
-          userId: key.userId,
-          type: 'KEY_INVALID',
-          title: 'TTS Key Invalid',
-          message: `Your ${key.provider} API key is no longer valid. Update it in Settings.`,
-          data: {},
-        });
-      }
-    } catch (err) {
-      logger.warn('Key validation check failed for TTS key', {
-        keyId: key.id,
-        provider: key.provider,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    await delay(THROTTLE_MS);
-    await job.updateProgress(Math.round((ttsChecked / (ttsKeys.length + 1)) * 50));
-  }
-
-  // Re-validate all AI BYOK keys
-  const aiKeys = await prisma.userAiKey.findMany({
-    where: { isValid: true },
-    select: { id: true, userId: true, provider: true, encryptedKey: true },
-  });
-
-  for (const key of aiKeys) {
-    aiChecked++;
-    try {
-      const apiKey = decryptApiKey(key.encryptedKey);
-      const valid = await validateAiProviderCredentials(key.provider as AiProviderId, { apiKey });
-      if (!valid) {
-        await prisma.userAiKey.update({
-          where: { id: key.id },
-          data: { isValid: false },
-        });
-        aiInvalidated++;
-
-        await notifQueue.add('send_notification', {
-          userId: key.userId,
-          type: 'KEY_INVALID',
-          title: 'AI Key Invalid',
-          message: `Your ${key.provider} API key is no longer valid. Update it in Settings.`,
-          data: {},
-        });
-      }
-    } catch (err) {
-      logger.warn('Key validation check failed for AI key', {
-        keyId: key.id,
-        provider: key.provider,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    await delay(THROTTLE_MS);
-    await job.updateProgress(50 + Math.round((aiChecked / (aiKeys.length + 1)) * 50));
-  }
-
-  logger.info('BYOK key validation completed', {
-    ttsChecked,
-    ttsInvalidated,
-    aiChecked,
-    aiInvalidated,
-  });
+/** Admit one immutable validation job per current credential. */
+export async function scheduleAllCredentialValidations(signal?: AbortSignal): Promise<number> {
+  let cursor: string | null = null;
+  let scheduled = 0;
+  do {
+    const page = await scheduleCredentialValidationPage(prisma, cursor, signal);
+    scheduled += page.scheduled;
+    cursor = page.cursor;
+  } while (cursor !== null);
+  logger.info('Provider credential validation scheduled', { scheduled });
+  return scheduled;
 }

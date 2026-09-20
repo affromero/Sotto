@@ -8,38 +8,32 @@ vi.mock('@/lib/logger', () => ({
 describe('getAiPricing', () => {
   it('returns pricing for known Anthropic model', () => {
     const pricing = getAiPricing('claude-haiku-4-5-20251001');
-    expect(pricing.inputPerMTok).toBe(1.0);
-    expect(pricing.outputPerMTok).toBe(5.0);
+    expect(pricing).toEqual({ inputPerMTok: 1.0, outputPerMTok: 5.0 });
   });
 
   it('returns pricing for known OpenAI model', () => {
     const pricing = getAiPricing('gpt-5-nano');
-    expect(pricing.inputPerMTok).toBe(0.05);
-    expect(pricing.outputPerMTok).toBe(0.4);
+    expect(pricing).toEqual({ inputPerMTok: 0.05, outputPerMTok: 0.4 });
   });
 
   it('returns pricing for known Google model', () => {
     const pricing = getAiPricing('gemini-3.1-flash-lite-preview');
-    expect(pricing.inputPerMTok).toBe(0.25);
-    expect(pricing.outputPerMTok).toBe(1.5);
+    expect(pricing).toEqual({ inputPerMTok: 0.25, outputPerMTok: 1.5 });
   });
 
-  it('returns zero pricing for claude-code models', () => {
+  it('leaves subscription pricing unknown for claude-code models', () => {
     const pricing = getAiPricing('claude-code:haiku');
-    expect(pricing.inputPerMTok).toBe(0);
-    expect(pricing.outputPerMTok).toBe(0);
+    expect(pricing).toBeNull();
   });
 
-  it('returns zero pricing for Codex configured-default effort selectors', () => {
+  it('leaves subscription pricing unknown for Codex effort selectors', () => {
     const pricing = getAiPricing('codex#effort=xhigh');
-    expect(pricing.inputPerMTok).toBe(0);
-    expect(pricing.outputPerMTok).toBe(0);
+    expect(pricing).toBeNull();
   });
 
-  it('returns Sonnet 4.6 fallback for unknown model', () => {
+  it('leaves unrecognized model pricing unknown', () => {
     const pricing = getAiPricing('unknown-model-xyz');
-    expect(pricing.inputPerMTok).toBe(3.0);
-    expect(pricing.outputPerMTok).toBe(15.0);
+    expect(pricing).toBeNull();
   });
 });
 
@@ -56,10 +50,18 @@ describe('getAiCost', () => {
     expect(cost).toBeCloseTo(0.105, 4);
   });
 
-  it('returns 0 cost for claude-code models', () => {
+  it('does not invent a token cost for a CLI subscription', () => {
     const cost = getAiCost('claude-code:opus', 1_000_000, 1_000_000);
-    expect(cost).toBe(0);
+    expect(cost).toBeNull();
   });
+
+  it.each([null, undefined, -1, NaN, 0.5])(
+    'keeps cost unknown for missing or invalid token counts (%s)',
+    (count) => {
+      expect(getAiCost('gpt-5-nano', count, 10)).toBeNull();
+      expect(getAiCost('gpt-5-nano', 10, count)).toBeNull();
+    }
+  );
 });
 
 describe('getCheapestModel', () => {

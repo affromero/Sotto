@@ -1,366 +1,221 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Job } from 'bullmq';
+import type { SpeakingGradingPayload } from '@/lib/queue';
 
-// ---- Prisma mock ----
-
-const mockSpeakingRecordingFindUnique = vi.fn();
-const mockSpeakingRecordingUpdate = vi.fn().mockResolvedValue({});
-const mockClassSectionFindUnique = vi.fn();
-
-vi.mock('@/lib/prisma', () => {
-  const _mock = {
-    speakingRecording: {
-      findUnique: (...args: unknown[]) => mockSpeakingRecordingFindUnique(...args),
-      update: (...args: unknown[]) => mockSpeakingRecordingUpdate(...args),
-    },
-    classSection: {
-      findUnique: (...args: unknown[]) => mockClassSectionFindUnique(...args),
+const mocks = vi.hoisted(() => {
+  const ownership = {
+    instanceId: 'instance-1',
+    scopes: [{ subjectId: 'profile:user-1', generation: 1 }],
+    reference: 'https://storage.example/recording.webm',
+    associations: {
+      recordingId: 'recording-1',
+      createdAt: new Date('2026-01-01T00:00:00Z').getTime(),
+      userId: 'user-1',
+      prompt: {
+        promptId: 'prompt-1',
+        createdAt: new Date('2026-01-01T00:00:00Z').getTime(),
+        parents: [{ kind: 'class', id: 'section-1', courseId: 'course-1', parentId: 'class-1' }],
+      },
+      parents: [{ kind: 'class', id: 'section-1', courseId: 'course-1', parentId: 'class-1' }],
     },
   };
-  return { prisma: _mock, prismaUnfiltered: _mock };
+  const update = vi.fn().mockResolvedValue({});
+  const recording = {
+    id: 'recording-1',
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    sectionId: 'section-1',
+    practiceSessionId: null,
+    examSectionId: null,
+    promptId: 'prompt-1',
+    userId: 'user-1',
+    audioUrl: '/api/storage/recording.webm',
+    status: 'PENDING',
+    prompt: { targetPhrase: 'Guten Morgen' },
+    user: { id: 'user-1', preferredSttModel: null },
+  };
+  const database = {
+    speakingRecording: { findUnique: vi.fn(), update },
+    classSection: { findUnique: vi.fn() },
+    practiceSession: { findUnique: vi.fn() },
+    examSection: { findUnique: vi.fn() },
+  };
+  const storageInput = {
+    consumer: 'recording:recording-1:audio',
+    reference: recording.audioUrl,
+    assetId: 'a'.repeat(64),
+    backendId: 'b'.repeat(64),
+    binding: 'c'.repeat(64),
+    key: 'speaking/recording.webm',
+  };
+  const backend = { descriptor: { kind: 'local', identity: { binding: 'binding' } } };
+  return {
+    update,
+    recording,
+    database,
+    storageInput,
+    backend,
+    ownership,
+    resolveStorageInput: vi.fn().mockResolvedValue({ input: storageInput, backend }),
+    validateStorageInputs: vi.fn().mockResolvedValue([backend]),
+    markCleanupUnconfirmed: vi.fn(),
+    transcribe: vi.fn(),
+    authenticatedFetch: vi.fn(async (_request, _init, observation) => {
+      observation?.onDispatch();
+      observation?.onConsumed?.({ status: 200 });
+      return new Response('{}');
+    }),
+    score: vi.fn(async (input: { fetch?: typeof fetch }) => {
+      const response = await input.fetch?.('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+      });
+      await response?.text();
+      return {
+        transcript: 'Guten Morgen',
+        overallScore: 0.9,
+        rubricScores: { accuracy: 0.9, fluency: 0.9, completeness: 0.9 },
+        phonemeScores: [],
+        feedback: 'Good work',
+      };
+    }),
+  };
 });
 
-// ---- BYOK mock ----
-
-const mockGetAiKey = vi.fn().mockResolvedValue({ apiKey: 'test-ai-key', provider: 'anthropic' });
-
-vi.mock('@/lib/byok', () => ({
-  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mocks.database }));
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: (_database: unknown, operation: (value: typeof mocks.database) => unknown) =>
+    operation(mocks.database),
 }));
-
-// ---- AI registry mock ----
-
-vi.mock('@/lib/providers/ai-registry', () => ({
-  getAiProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'claude-haiku-4-5-20251001' }),
-  getProviderForModel: (id: string) => (id?.startsWith('claude') ? 'anthropic' : null),
+vi.mock('@/lib/sidedoor/storage/core/storage-inputs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sidedoor/storage/core/storage-inputs')>()),
+  resolveStorageInput: (...args: unknown[]) => mocks.resolveStorageInput(...args),
+  validateStorageInputs: (...args: unknown[]) => mocks.validateStorageInputs(...args),
 }));
-
-// ---- Auto model config mock (resolveLearningAi reads the configured AI model) ----
-
-vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: vi.fn().mockResolvedValue({
-    model: {
-      aiProvider: 'anthropic',
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai',
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
-    },
+vi.mock('@/lib/r2', () => ({
+  restoreStorageBackend: vi.fn().mockResolvedValue({
+    downloadToFile: vi.fn(async (_reference: string, destination: string) => {
+      const files = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      await files.mkdir('/tmp/speaking-test', { recursive: true });
+      await files.writeFile(destination, Buffer.from('audio'));
+      return {};
+    }),
   }),
 }));
-
-// ---- STT mock ----
-
-const mockTranscribe = vi.fn().mockResolvedValue({
-  text: 'Guten Morgen',
-  segments: [],
-  words: [
-    { word: 'Guten', start: 0.0, end: 0.5 },
-    { word: 'Morgen', start: 0.6, end: 1.1 },
-  ],
-});
-
-const mockResolveSttProvider = vi.fn().mockResolvedValue({
-  providerId: 'openai',
-  apiKey: 'stt-key',
-  model: 'whisper-1',
-  source: 'platform',
-});
-
-const mockCreateSttProvider = vi.fn().mockReturnValue({
-  transcribe: (...args: unknown[]) => mockTranscribe(...args),
-});
-
+vi.mock('@/lib/sidedoor/jobs/core/job-execution-lifetime', () => ({
+  withSottoJobExecution: async (options: {
+    validate: (database: typeof mocks.database) => Promise<boolean>;
+    run: (context: { directory: string; markCleanupUnconfirmed: () => void }) => Promise<unknown>;
+  }) => {
+    if (!(await options.validate(mocks.database))) return undefined;
+    return options.run({
+      directory: '/tmp/speaking-test',
+      markCleanupUnconfirmed: mocks.markCleanupUnconfirmed,
+    });
+  },
+}));
+vi.mock('@/lib/sidedoor/jobs/core/job-delivery', () => ({
+  readSottoWorkerJob: vi.fn().mockResolvedValue({
+    complete: false,
+    operationId: '10000000-0000-4000-8000-000000000001',
+    fingerprint: 'd'.repeat(64),
+    scopes: [],
+    payload: {
+      recordingId: 'recording-1',
+      recordingCreatedAt: new Date('2026-01-01T00:00:00Z').getTime(),
+      storage: mocks.storageInput,
+      ownership: mocks.ownership,
+    },
+  }),
+  sottoJobOutbox: vi.fn(() => ({ complete: vi.fn().mockResolvedValue(true) })),
+}));
 vi.mock('@/lib/providers/stt', () => ({
-  resolveSttProvider: (...args: unknown[]) => mockResolveSttProvider(...args),
-  createSttProvider: (...args: unknown[]) => mockCreateSttProvider(...args),
-  getConfiguredSttProviderId: () => 'openai',
+  resolveCapturedSttProvider: vi.fn().mockResolvedValue({
+    providerId: 'openai',
+    apiKey: 'key',
+    model: 'whisper-1',
+    provider: { transcribe: mocks.transcribe },
+  }),
+  getConfiguredSttProviderId: vi.fn(() => 'openai'),
 }));
-
-// ---- Scorer mock ----
-
-const mockScore = vi.fn().mockResolvedValue({
-  overallScore: 0.82,
-  rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.9 },
-  feedback: 'Good attempt! Focus on the final consonant.',
-  phonemeScores: [{ op: 'match', expected: 'guten', actual: 'guten' }],
-  transcript: 'Guten Morgen',
-});
-
-const mockResolvePronunciationScorer = vi.fn().mockReturnValue({
-  score: (...args: unknown[]) => mockScore(...args),
-});
-
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
+  createSottoProviderTransport: vi
+    .fn()
+    .mockResolvedValue({ authenticatedFetch: mocks.authenticatedFetch }),
+}));
+vi.mock('@/lib/providers/ai', () => ({
+  aiProviderRules: vi.fn(() => [
+    { method: 'POST', url: 'https://api.anthropic.com/', descendants: true },
+  ]),
+}));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedLearningAi: vi.fn().mockResolvedValue({
+    provider: 'anthropic',
+    model: 'claude-haiku-4-5-20251001',
+    apiKey: 'ai-key',
+    execution: { userId: 'user-1', authorize: vi.fn() },
+  }),
+}));
+vi.mock('@/lib/sidedoor/storage/core/speaking-storage', () => ({
+  captureSpeakingRecordingStorage: vi.fn().mockResolvedValue(mocks.ownership),
+}));
 vi.mock('@/lib/pronunciation/scorer', () => ({
-  resolvePronunciationScorer: (...args: unknown[]) => mockResolvePronunciationScorer(...args),
+  resolvePronunciationScorer: vi.fn(() => ({ score: mocks.score })),
 }));
-
-// ---- Logger mock ----
-
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-// ---- Global fetch mock ----
-
-const mockFetch = vi.fn().mockResolvedValue({
-  ok: true,
-  arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
-});
-vi.stubGlobal('fetch', mockFetch);
-
-// ---- Import under test ----
+vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/server-config', () => ({ infra: vi.fn(() => undefined) }));
+vi.mock('@/lib/audio/media-process', () => ({ isMediaCleanupFailure: vi.fn(() => false) }));
 
 import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
-import type { SpeakingGradingPayload } from '@/lib/queue';
-import type { Job } from 'bullmq';
 
-// ---- Helpers ----
-
-function makeJob(data: SpeakingGradingPayload): Job<SpeakingGradingPayload> {
+function job(): Job<SpeakingGradingPayload> {
   return {
-    data,
+    id: '10000000-0000-4000-8000-000000000001',
+    name: 'speaking-grading.v1',
+    data: {
+      operationId: '10000000-0000-4000-8000-000000000001',
+      fingerprint: 'd'.repeat(64),
+    },
     updateProgress: vi.fn().mockResolvedValue(undefined),
   } as unknown as Job<SpeakingGradingPayload>;
 }
 
-const SAMPLE_RECORDING = {
-  id: 'rec-001',
-  sectionId: 'sec-001',
-  promptId: 'prompt-001',
-  userId: 'user-001',
-  audioUrl: 'https://r2.example.com/speaking/user-001/prompt-001/abc.webm',
-  status: 'PENDING',
-  prompt: { targetPhrase: 'Guten Morgen' },
-  user: { id: 'user-001', preferredSttModel: null },
-};
-
-const SAMPLE_SECTION = {
-  classId: 'class-001',
-  class: {
-    course: { targetLang: 'de' },
-  },
-};
-
-// ---- Tests ----
-
-describe('processSpeakingGrading', () => {
+describe('durable speaking grading', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSpeakingRecordingFindUnique.mockResolvedValue(SAMPLE_RECORDING);
-    mockClassSectionFindUnique.mockResolvedValue(SAMPLE_SECTION);
-    mockSpeakingRecordingUpdate.mockResolvedValue({});
-    mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key', provider: 'anthropic' });
-    mockScore.mockResolvedValue({
-      overallScore: 0.82,
-      rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.9 },
-      feedback: 'Good attempt!',
-      phonemeScores: [{ op: 'match', expected: 'guten', actual: 'guten' }],
-      transcript: 'Guten Morgen',
+    mocks.database.speakingRecording.findUnique.mockResolvedValue(mocks.recording);
+    mocks.database.classSection.findUnique.mockResolvedValue({
+      class: { course: { targetLang: 'de' } },
     });
-    mockFetch.mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
-    });
-    mockTranscribe.mockResolvedValue({
-      text: 'Guten Morgen',
-      segments: [],
-      words: [
-        { word: 'Guten', start: 0.0, end: 0.5 },
-        { word: 'Morgen', start: 0.6, end: 1.1 },
-      ],
+    mocks.transcribe.mockImplementation(async (_audio, options) => {
+      options.onDispatch();
+      options.onSettled();
+      return { text: 'Guten Morgen', segments: [], words: [] };
     });
   });
 
-  describe('happy path — SCORED update', () => {
-    it('updates recording to SCORED with all scored fields', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
+  it('reads attributed storage and publishes only after terminal provider responses', async () => {
+    await processSpeakingGrading(job());
 
-      // Should have set GRADING first
-      expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'rec-001' }, data: { status: 'GRADING' } })
-      );
-
-      // Final SCORED update
-      expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'rec-001' },
-          data: expect.objectContaining({
-            status: 'SCORED',
-            transcript: 'Guten Morgen',
-            overallScore: 0.82,
-            feedback: 'Good attempt!',
-          }),
-        })
-      );
-    });
-
-    it('persists rubricScores and phonemeScores', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      type UpdateArg = {
-        data?: { status?: string; rubricScores?: unknown; phonemeScores?: unknown };
-      };
-      const scoredCall = (mockSpeakingRecordingUpdate.mock.calls as Array<[UpdateArg]>).find(
-        ([arg]) => arg.data?.status === 'SCORED'
-      );
-      expect(scoredCall).toBeDefined();
-      const scoredData = scoredCall![0].data!;
-      expect(scoredData.rubricScores).toEqual({
-        accuracy: 0.85,
-        fluency: 0.78,
-        completeness: 0.9,
-      });
-      expect(scoredData.phonemeScores).toEqual([
-        { op: 'match', expected: 'guten', actual: 'guten' },
-      ]);
-    });
-
-    it('calls scorer with targetPhrase, transcript, wordTimings and targetLang', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      expect(mockScore).toHaveBeenCalledWith(
-        expect.objectContaining({
-          targetPhrase: 'Guten Morgen',
-          transcript: 'Guten Morgen',
-          targetLang: 'de',
-          wordTimings: [
-            { word: 'Guten', start: 0.0, end: 0.5 },
-            { word: 'Morgen', start: 0.6, end: 1.1 },
-          ],
-        })
-      );
-    });
-
-    it('passes AI provider + model from BYOK key', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      expect(mockScore).toHaveBeenCalledWith(
-        expect.objectContaining({
-          aiProvider: 'anthropic',
-          aiModel: 'claude-haiku-4-5-20251001',
-          aiApiKey: 'test-ai-key',
-          userId: 'user-001',
-        })
-      );
-    });
-
-    it('reports monotonically increasing progress ending at 100', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
-        ([p]) => p as number
-      );
-      for (let i = 1; i < calls.length; i++) {
-        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
-      }
-      expect(calls[calls.length - 1]).toBe(100);
-    });
+    expect(mocks.resolveStorageInput).toHaveBeenCalledWith(
+      mocks.database,
+      expect.objectContaining({ consumer: 'recording:recording-1:audio' })
+    );
+    expect(mocks.validateStorageInputs).toHaveBeenCalledWith(mocks.database, [mocks.storageInput]);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'SCORED' }) })
+    );
+    expect(mocks.markCleanupUnconfirmed).not.toHaveBeenCalled();
   });
 
-  describe('error handling — FAILED status', () => {
-    it('sets status FAILED and rethrows when recording not found', async () => {
-      mockSpeakingRecordingFindUnique.mockResolvedValue(null);
-      const job = makeJob({ recordingId: 'rec-missing' });
-
-      await expect(processSpeakingGrading(job)).rejects.toThrow('SpeakingRecording not found');
-      // No update to FAILED since we throw before marking GRADING
-      expect(mockSpeakingRecordingUpdate).not.toHaveBeenCalled();
+  it('retains the execution after a dispatch with no terminal proof', async () => {
+    mocks.transcribe.mockImplementation(async (_audio, options) => {
+      options.onDispatch();
+      throw new Error('connection lost');
     });
 
-    it('sets status FAILED and rethrows when audio download fails', async () => {
-      mockFetch.mockResolvedValue({ ok: false, status: 404 });
-      const job = makeJob({ recordingId: 'rec-001' });
-
-      await expect(processSpeakingGrading(job)).rejects.toThrow();
-      expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: 'FAILED' } })
-      );
-    });
-
-    it('sets status FAILED and rethrows when STT transcription throws', async () => {
-      mockTranscribe.mockRejectedValue(new Error('STT rate limit'));
-      const job = makeJob({ recordingId: 'rec-001' });
-
-      await expect(processSpeakingGrading(job)).rejects.toThrow('STT rate limit');
-      expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: 'FAILED' } })
-      );
-    });
-
-    it('sets status FAILED and rethrows when no AI provider is available', async () => {
-      mockGetAiKey.mockResolvedValue(null);
-      const prev = process.env.AI_PROVIDER;
-      process.env.AI_PROVIDER = '';
-      const job = makeJob({ recordingId: 'rec-001' });
-
-      try {
-        await expect(processSpeakingGrading(job)).rejects.toThrow(/AI provider/i);
-      } finally {
-        process.env.AI_PROVIDER = prev;
-      }
-      expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: 'FAILED' } })
-      );
-    });
-
-    it('sets status FAILED and rethrows when scorer throws', async () => {
-      mockScore.mockRejectedValue(new Error('LLM timeout'));
-      const job = makeJob({ recordingId: 'rec-001' });
-
-      await expect(processSpeakingGrading(job)).rejects.toThrow('LLM timeout');
-      expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: 'FAILED' } })
-      );
-    });
-  });
-
-  describe('STT integration', () => {
-    it('downloads audio from the recording audioUrl', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      expect(mockFetch).toHaveBeenCalledWith(SAMPLE_RECORDING.audioUrl);
-    });
-
-    it('passes targetLang to STT transcribe', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      expect(mockTranscribe).toHaveBeenCalledWith(expect.any(Buffer), { language: 'de' });
-    });
-
-    it('resolves STT for the recording userId', async () => {
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      expect(mockResolveSttProvider).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'user-001' })
-      );
-    });
-
-    it('passes the learner preferred STT model to provider resolution', async () => {
-      mockSpeakingRecordingFindUnique.mockResolvedValue({
-        ...SAMPLE_RECORDING,
-        user: { id: 'user-001', preferredSttModel: 'gpt-4o-transcribe' },
-      });
-
-      const job = makeJob({ recordingId: 'rec-001' });
-      await processSpeakingGrading(job);
-
-      expect(mockResolveSttProvider).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'user-001',
-          requestedProvider: 'openai',
-          requestedModel: 'gpt-4o-transcribe',
-          language: 'de',
-        })
-      );
-    });
+    await expect(processSpeakingGrading(job())).rejects.toThrow('connection lost');
+    expect(mocks.markCleanupUnconfirmed).toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'FAILED' } })
+    );
   });
 });

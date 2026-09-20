@@ -11,7 +11,8 @@ const mockGet = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({ authenticateRequest: (...a: unknown[]) => mockAuth(...a) }));
 vi.mock('@/lib/mock-exam-service', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/mock-exam-service')>('@/lib/mock-exam-service');
+  const actual =
+    await vi.importActual<typeof import('@/lib/mock-exam-service')>('@/lib/mock-exam-service');
   return {
     ...actual,
     createMockExam: (...a: unknown[]) => mockCreate(...a),
@@ -55,7 +56,12 @@ describe('POST /api/v1/exams', () => {
     const res = await POST(postReq({ courseId: 'c1', level: 'B2' }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ examId: 'exam1' });
-    expect(mockCreate).toHaveBeenCalledWith('c1', 'u1', 'B2');
+    expect(mockCreate).toHaveBeenCalledWith(
+      'c1',
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      'B2'
+    );
   });
 
   it('returns 404 for a course the caller does not own', async () => {

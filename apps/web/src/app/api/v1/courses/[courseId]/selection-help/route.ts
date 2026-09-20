@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { classLanguagePolicy } from '@/lib/classes/class-language-policy';
-import { resolveLearningAi } from '@/lib/learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -111,7 +112,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
     if (!course) return errorResponse('Course not found', 404);
 
-    const ai = await resolveLearningAi(authed.userId);
+    const ai = await resolveCapturedLearningAi(
+      authed.userId,
+      sottoRequestExecution(request, authed)
+    );
     const provider = createAIProvider(ai.provider);
     const languagePolicy = classLanguagePolicy({
       level: course.currentLevel,
@@ -154,8 +158,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       ],
       {
-        model: ai.model,
-        apiKeyOverride: ai.apiKey,
+        ...(await capturedLearningAiOptions(ai)),
         maxTokens: 1200,
         temperature: 0.4,
       }

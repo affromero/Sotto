@@ -262,7 +262,12 @@ describe('POST /api/v1/courses', () => {
   it('calls getOrCreateCurriculum with userId, native, and target', async () => {
     await POST(makePostRequest({ native: 'en', target: 'de' }));
 
-    expect(mockGetOrCreateCurriculum).toHaveBeenCalledWith('u1', 'en', 'de');
+    expect(mockGetOrCreateCurriculum).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      'en',
+      'de'
+    );
   });
 
   it('blocks creating a duplicate course for the same language pair', async () => {

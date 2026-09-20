@@ -43,11 +43,12 @@ export function FactoryResetPanel() {
         </div>
         <div>
           <h2 id="factory-reset-title" className={styles.title}>
-            Factory reset
+            Reset learning data
           </h2>
           <p className={styles.copy}>
-            Permanently erase profiles, generated lessons, courses, generated media, provider keys,
-            queues, and admin settings. Sotto will restart at the initial setup wizard.
+            Permanently erase generated lessons, courses, media, queues, and learner preferences.
+            Access, passkeys, profiles, provider credentials, and server settings remain available
+            so the instance cannot lock its owner out.
           </p>
         </div>
       </div>
@@ -60,11 +61,11 @@ export function FactoryResetPanel() {
         >
           <div>
             <h3 id="factory-reset-confirm-title" className={styles.confirmTitle}>
-              Confirm factory reset
+              Confirm learning-data reset
             </h3>
             <p id="factory-reset-confirm-copy" className={styles.confirmCopy}>
-              This cannot be undone. All household data and generated files are deleted, the owner
-              profile is recreated, and onboarding starts over.
+              This cannot be undone. Generated learning data and files are deleted. Every profile
+              returns to onboarding with its existing sign-in and provider access intact.
             </p>
           </div>
           <div className={styles.actions}>
@@ -74,7 +75,7 @@ export function FactoryResetPanel() {
               onClick={runFactoryReset}
               disabled={isBusy}
             >
-              {isBusy ? 'Resetting...' : 'Delete everything and reset'}
+              {isBusy ? 'Resetting...' : 'Delete learning data'}
             </button>
             <button
               type="button"
@@ -93,18 +94,18 @@ export function FactoryResetPanel() {
           onClick={() => setStatus('confirming')}
           disabled={isBusy}
         >
-          Factory reset
+          Reset learning data
         </button>
       )}
 
       {status === 'reset' && (
         <div className={`${styles.result} ${styles.success}`} role="status">
-          Factory reset complete. Redirecting to setup...
+          Learning data reset complete. Redirecting to setup...
         </div>
       )}
       {status === 'error' && (
         <div className={`${styles.result} ${styles.error}`} role="status">
-          Failed to factory reset.
+          Failed to reset learning data.
         </div>
       )}
     </section>

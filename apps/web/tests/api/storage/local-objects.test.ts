@@ -9,17 +9,13 @@ import { NextRequest } from 'next/server';
 // behaviour under test and both depend on genuine paths and file sizes.
 const storeDir = await mkdtemp(path.join(tmpdir(), 'sotto-storage-test-'));
 
-vi.hoisted(() => {
-  process.env.STORAGE_PROVIDER = 'local';
-});
-process.env.LOCAL_STORAGE_DIR = storeDir;
-
 const mockAuthenticateRequest = vi.fn();
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
 }));
 vi.mock('@/lib/server-config', () => ({
-  infra: (_key: string, envName: string) => process.env[envName],
+  infra: (key: string) =>
+    key === 'storageProvider' ? 'local' : key === 'localStorageRoot' ? storeDir : undefined,
 }));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

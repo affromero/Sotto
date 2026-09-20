@@ -16,11 +16,7 @@ function createPrismaClient(): PrismaClient {
   }
 
   if (!url.startsWith('postgresql://') && !url.startsWith('postgres://')) {
-    throw new Error(
-      `DATABASE_URL has invalid format: ${url.substring(0, 20)}...\n\n` +
-        `Must start with 'postgresql://' or 'postgres://'\n` +
-        `Example: DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sotto?schema=public"\n`
-    );
+    throw new Error('DATABASE_URL must start with postgresql:// or postgres://.');
   }
 
   // Prisma 7 connects through a driver adapter. Pool tuning that used to be

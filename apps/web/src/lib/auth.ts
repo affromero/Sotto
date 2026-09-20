@@ -1,9 +1,13 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
+import { isAccessError } from 'thesidedoor-core/access';
 import type { UserRole } from '@/generated/prisma/client';
-import { prisma } from './prisma';
-import { LOCAL_USER_ID, ACTIVE_PROFILE_COOKIE, ensureLocalUser } from './local-user';
-import { accessPasswordConfigured, GATE_COOKIE, verifyGateToken } from './access/gate';
+import { prismaUnfiltered } from './prisma';
+import {
+  resolveSottoSession,
+  SHARED_SESSION_COOKIE,
+} from '@/lib/sidedoor/access/core/session-identity';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 export interface AuthUser {
   id: string;
@@ -15,51 +19,35 @@ export interface AuthUser {
 
 export interface AuthSession {
   user: AuthUser;
+  principalId: string | null;
+  sessionId: string;
+  isOwner: boolean;
 }
 
-/**
- * Resolve the current request's profile. Sotto is self-hosted for a household
- * with no login: the active profile is whichever one the `sotto_profile` cookie
- * points at, set by the passwordless picker. With no (or a stale) cookie we fall
- * back to the owner, so a fresh install and a single-profile household behave
- * exactly as before. The resolved role is the profile's real DB role — the owner
- * is ADMIN, learners added later are USER — which is what gates the admin area.
- *
- * Exported (un-memoized) for unit tests; request code should use `auth()`, which
- * memoizes this per request via React `cache()`. Cookies are only ever READ
- * here; switching profiles sets the cookie from the switch route handler.
- *
- * The signature stays `Promise<AuthSession | null>` so existing route guards
- * (`if (!session?.user?.id) return 401`) keep compiling and tests that mock this
- * to `null` keep passing; at runtime a profile is always present.
- */
+/** Request-local content identity. Household profile selection never grants owner authority. */
 export async function resolveSession(): Promise<AuthSession | null> {
-  const cookieStore = await cookies();
-
-  // A household profile is not an authentication boundary. When the instance
-  // access gate is enabled, never resolve the ambient owner/profile until the
-  // shared gate cookie has been verified. This keeps route handlers that use
-  // auth() directly from bypassing SOTTO_ACCESS_PASSWORD.
-  if (accessPasswordConfigured()) {
-    const gateToken = cookieStore.get(GATE_COOKIE)?.value;
-    if (!(await verifyGateToken(gateToken))) return null;
+  const token = (await cookies()).get(SHARED_SESSION_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    return await sottoTransaction(prismaUnfiltered, async (database) => {
+      const identity = await resolveSottoSession(database, token);
+      if (identity.kind !== 'content') return null;
+      const user = await database.user.findUniqueOrThrow({
+        where: { id: identity.userId },
+        select: { id: true, name: true, email: true, image: true },
+      });
+      return {
+        user: { ...user, role: identity.isOwner ? 'ADMIN' : 'USER' },
+        principalId: identity.principalId,
+        sessionId: identity.sessionId,
+        isOwner: identity.isOwner,
+      };
+    });
+  } catch (error) {
+    if (isAccessError(error) && (error.code === 'unauthorized' || error.code === 'forbidden'))
+      return null;
+    throw error;
   }
-
-  const activeId = cookieStore.get(ACTIVE_PROFILE_COOKIE)?.value;
-
-  let user = activeId ? await prisma.user.findUnique({ where: { id: activeId } }) : null;
-  if (!user) user = await prisma.user.findUnique({ where: { id: LOCAL_USER_ID } });
-  if (!user) user = await ensureLocalUser();
-
-  return {
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      image: user.image,
-      role: user.role,
-    },
-  };
 }
 
 export const auth = cache(resolveSession);

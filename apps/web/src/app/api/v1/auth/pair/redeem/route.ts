@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { redeemPairingToken } from '@/lib/pairing';
-import { generateApiKey } from '@/lib/api-keys';
 import { redeemPairingSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
 import { checkRateLimit } from '@/lib/redis';
+import { readAccessJson } from 'thesidedoor-core/access/http';
+import { accessOperation } from '@/lib/sidedoor/access/core/http';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,30 +14,19 @@ export const dynamic = 'force-dynamic';
  * the token is single-use and short-lived. Mirrors /api/auth/mobile's key mint.
  */
 export async function POST(request: NextRequest) {
-  const ip =
-    request.headers.get('cf-connecting-ip')?.trim() ||
-    request.headers.get('x-real-ip')?.trim() ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown';
-  const rate = await checkRateLimit(`pair-redeem:${ip}`, 10, 60);
+  return accessOperation(request, false, () => redeem(request));
+}
+
+async function redeem(request: NextRequest) {
+  const rate = await checkRateLimit('pair-redeem:instance', 10, 60);
   if (!rate.allowed) return errorResponse('Too many attempts. Try again later.', 429);
 
-  const body = await request.json().catch(() => ({}));
+  const body = await readAccessJson(request);
   const parsed = redeemPairingSchema.safeParse(body);
   if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
 
   const redeemed = await redeemPairingToken(parsed.data.token);
   if (!redeemed) return errorResponse('Invalid or expired pairing token', 401);
 
-  const { key, hash, prefix } = generateApiKey();
-  await prisma.apiKey.create({
-    data: { userId: redeemed.userId, name: redeemed.name, keyHash: hash, keyPrefix: prefix },
-  });
-
-  const user = await prisma.user.findUnique({
-    where: { id: redeemed.userId },
-    select: { id: true, name: true, email: true, image: true, role: true },
-  });
-
-  return NextResponse.json({ token: key, user });
+  return NextResponse.json(redeemed, { headers: { 'Cache-Control': 'private, no-store' } });
 }

@@ -1,17 +1,11 @@
-import {
-  getUsageHeadline,
-  getSpendByService,
-  getSpendByDay,
-  getSpendByCategory,
-  getCostByUser,
-} from '@/lib/admin/usage-stats';
-import { fmtUSD, fmtCompact, pctChange } from '@/lib/admin/format';
+import { getUsageReport } from '@/lib/admin/usage-stats';
+import { fmtUSD, fmtCompact, pctChange, fmtMeasured, fmtInt } from '@/lib/admin/format';
 import { colorForService } from '@/components/admin/serviceColors';
 import { AreaChart } from '@/components/admin/charts/AreaChart';
 import { ShareBar } from '@/components/admin/charts/ShareBar';
 import { Bars } from '@/components/admin/charts/Bars';
 import { Glyph } from '@/components/Glyph';
-import styles from '../../adminTheme.styles';
+import styles from '@/app/(admin)/adminTheme.styles';
 
 export const metadata = { title: 'Usage & cost · Sotto admin' };
 
@@ -22,15 +16,12 @@ function prettyCategory(c: string): string {
 }
 
 export default async function AdminUsagePage() {
-  const [headline, byService, byDay, byCategory, byUser] = await Promise.all([
-    getUsageHeadline(WINDOW_DAYS),
-    getSpendByService(WINDOW_DAYS),
-    getSpendByDay(WINDOW_DAYS),
-    getSpendByCategory(WINDOW_DAYS),
-    getCostByUser(WINDOW_DAYS, 8),
-  ]);
+  const { headline, byService, byDay, byCategory, byUser } = await getUsageReport(WINDOW_DAYS);
 
-  const delta = pctChange(headline.spend, headline.spendPrev);
+  const delta =
+    headline.unknownCosts || headline.unknownCostsPrev
+      ? null
+      : pctChange(headline.spend, headline.spendPrev);
   const services = byService.map((s, i) => ({ ...s, color: colorForService(s.service, i) }));
   const areaData = byDay.map((d, i) => ({
     v: d.usd,
@@ -61,12 +52,17 @@ export default async function AdminUsagePage() {
         </div>
       </div>
 
+      {headline.unknownCosts > 0 && (
+        <p>{headline.unknownCosts} requests have unknown costs. Charts show known spend only.</p>
+      )}
       <div className={styles.statGrid}>
         <div className={styles.stat}>
           <div className={styles.stLabel}>
             <Glyph name="spark" size={13} /> Spend · {WINDOW_DAYS}d
           </div>
-          <div className={styles.stVal}>{fmtUSD(headline.spend)}</div>
+          <div className={styles.stVal}>
+            {fmtMeasured(headline.spend, headline.requests, headline.unknownCosts)}
+          </div>
           {delta !== null && (
             <div className={`${styles.stDelta} ${delta >= 0 ? styles.up : styles.down}`}>
               <Glyph name={delta >= 0 ? 'arrow' : 'check'} size={12} /> {Math.abs(delta)}% vs prior{' '}
@@ -79,11 +75,23 @@ export default async function AdminUsagePage() {
             <Glyph name="dot" size={13} /> Tokens
           </div>
           <div className={styles.stVal}>
-            {fmtCompact(headline.tokensIn)}
+            {fmtMeasured(
+              headline.tokensIn,
+              headline.tokenRequests,
+              headline.unknownInputTokens,
+              fmtCompact
+            )}
             <small> in</small>
           </div>
           <div className={`${styles.stDelta} ${styles.flat}`}>
-            <Glyph name="dot" size={10} /> {fmtCompact(headline.tokensOut)} out
+            <Glyph name="dot" size={10} />{' '}
+            {fmtMeasured(
+              headline.tokensOut,
+              headline.tokenRequests,
+              headline.unknownOutputTokens,
+              fmtCompact
+            )}{' '}
+            out
           </div>
         </div>
         <div className={styles.stat}>
@@ -100,7 +108,7 @@ export default async function AdminUsagePage() {
             <Glyph name="clock" size={13} /> Avg latency
           </div>
           <div className={styles.stVal}>
-            {headline.avgLatencyMs}
+            {fmtMeasured(headline.avgLatencyMs, headline.requests, headline.unknownLatency, fmtInt)}
             <small> ms</small>
           </div>
           <div className={`${styles.stDelta} ${styles.flat}`}>
@@ -120,7 +128,11 @@ export default async function AdminUsagePage() {
           {headline.spend > 0 ? (
             <AreaChart id="usageTrend" data={areaData} height={170} />
           ) : (
-            <div className={styles.empty}>No usage logged yet in this window.</div>
+            <div className={styles.empty}>
+              {headline.requests > 0
+                ? 'No measured spend in this window.'
+                : 'No usage logged yet in this window.'}
+            </div>
           )}
         </div>
       </div>
@@ -145,8 +157,8 @@ export default async function AdminUsagePage() {
                         <small>{fmtCompact(p.requests)} requests</small>
                       </span>
                       <span className={styles.lgVal}>
-                        {p.usd === 0 ? 'free' : fmtUSD(p.usd)}
-                        <small>{Math.round(p.share * 100)}%</small>
+                        {fmtMeasured(p.usd, p.requests, p.unknownCosts)}
+                        <small>{Math.round(p.share * 100)}% of known spend</small>
                       </span>
                     </div>
                   ))}
@@ -165,6 +177,14 @@ export default async function AdminUsagePage() {
             </div>
           </div>
           <div className={styles.panelBody}>
+            {byCategory
+              .filter((c) => c.unknownCosts > 0)
+              .map((c) => (
+                <p key={c.category}>
+                  {prettyCategory(c.category)}: {fmtMeasured(c.usd, c.requests, c.unknownCosts)}.{' '}
+                  {c.unknownCosts} requests have unknown costs.
+                </p>
+              ))}
             {categoryRows.length > 0 ? (
               <Bars rows={categoryRows} fmt={fmtUSD} />
             ) : (
@@ -179,9 +199,19 @@ export default async function AdminUsagePage() {
           <div className={styles.phTitle}>
             <Glyph name="today" size={15} /> Cost by learner
           </div>
-          <div className={styles.phNote}>observability — no caps</div>
+          <div className={styles.phNote}>
+            Top 8 learners by known spend. Unknown costs may occur outside this list.
+          </div>
         </div>
         <div className={styles.panelBody}>
+          {byUser
+            .filter((u) => u.unknownCosts > 0)
+            .map((u) => (
+              <p key={u.userId}>
+                {u.name}: {fmtMeasured(u.usd, u.requests, u.unknownCosts)}. {u.unknownCosts}{' '}
+                requests have unknown costs.
+              </p>
+            ))}
           {learnerRows.length > 0 ? (
             <Bars rows={learnerRows} fmt={fmtUSD} />
           ) : (

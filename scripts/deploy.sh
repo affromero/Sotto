@@ -176,12 +176,6 @@ set -a
 source "$COMPOSE_ENV_FILE"
 set +a
 require_env NEXT_PUBLIC_APP_URL
-# The managed showcase (SELF_HOSTED=false) runs ungated on purpose; the access
-# gate activates whenever SOTTO_ACCESS_PASSWORD is set, so requiring it there
-# would password-wall the public demo.
-if [ "${SELF_HOSTED:-true}" != "false" ]; then
-  require_env_min_length SOTTO_ACCESS_PASSWORD 16
-fi
 require_env_min_length BYOK_ENCRYPTION_KEY 32
 
 # --- Stack identity (may come from the env file or the caller's environment) ---
@@ -585,7 +579,7 @@ docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" run -
 
 # --- Start new slot ---
 
-# Pin legacy dual-slot routing to the current service before starting a candidate.
+# Pin dual-slot routing to the current service before starting a candidate.
 if [ "$OLD_SLOT" != none ]; then
   if [ "$OLD_SLOT" = blue ]; then old_web_port=$WEB_PORT_BLUE; else old_web_port=$WEB_PORT_GREEN; fi
   ( NEW_WEB_PORT=$old_web_port; render_caddy_config "$APP_DOMAIN" "$WWW_DOMAIN" ) > "$IMAGE_OVERRIDES/caddy.current"
@@ -642,7 +636,12 @@ fi
 
 echo ""
 echo "=== Post-deploy smoke check ==="
-BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
+if [ "${SELF_HOSTED:-true}" = "false" ]; then
+  EXPECTED_ANONYMOUS_STATUS=200
+else
+  EXPECTED_ANONYMOUS_STATUS=401
+fi
+BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" EXPECTED_ANONYMOUS_STATUS="$EXPECTED_ANONYMOUS_STATUS" bash scripts/smoke-prod.sh
 
 # --- Restart workers ---
 # Workers are stateless BullMQ consumers; jobs are durable in Redis.

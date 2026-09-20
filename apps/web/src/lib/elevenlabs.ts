@@ -1,82 +1,11 @@
 import { logger } from './logger';
-import {
-  VOICE_POOL as POOL,
-  selectVoicePair as selectPair,
-  findByVoiceId,
-  type VoicePoolEntry,
-  type VoiceMatchMetadata,
-} from './voice-pool';
+import { detectAudioFormat, isRecognizedAudio } from './audio-format';
+import { constants as bufferConstants } from 'node:buffer';
 import { getProviderMeta } from './providers/tts-registry';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
+import { abortable, readResponseBytes, readResponseText } from 'thesidedoor-core/runtime/stream';
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
-
-// Helper to get API key dynamically for better testability
-function getApiKey(): string | undefined {
-  return process.env.ELEVENLABS_API_KEY;
-}
-
-// ---------------------------------------------------------------------------
-// Voice Pool — re-exported from voice-pool.ts for backward compatibility
-// ---------------------------------------------------------------------------
-
-/** @deprecated Use VoicePoolEntry from voice-pool.ts directly */
-export interface VoiceProfile {
-  id: string;
-  name: string;
-  gender: 'male' | 'female';
-  accent: 'american' | 'british' | 'australian' | 'indian' | 'african';
-  ageRange: 'young' | 'middle' | 'mature';
-  character: string;
-}
-
-/** Map VoicePoolEntry to legacy VoiceProfile shape */
-function toLegacy(entry: VoicePoolEntry): VoiceProfile {
-  return {
-    id: entry.ids.elevenlabs,
-    name: entry.name,
-    gender: entry.gender,
-    accent: entry.accent,
-    ageRange: entry.ageRange,
-    character: entry.character,
-  };
-}
-
-const VOICE_POOL: VoiceProfile[] = POOL.map(toLegacy);
-
-export function selectVoicePair(
-  episodeId: string,
-  metadata?: VoiceMatchMetadata
-): { host: VoiceProfile; expert: VoiceProfile } {
-  const pair = selectPair(episodeId, metadata);
-  return { host: toLegacy(pair.host), expert: toLegacy(pair.expert) };
-}
-
-/**
- * Get voice ID for a speaker role on a specific episode.
- * Falls back to env overrides if set, otherwise uses the voice pool.
- */
-export function getVoiceId(speaker: string, episodeId?: string): string {
-  const envHost = process.env.ELEVENLABS_HOST_VOICE_ID;
-  const envExpert = process.env.ELEVENLABS_EXPERT_VOICE_ID;
-  if (envHost && envExpert) {
-    return speaker === 'HOST' ? envHost : envExpert;
-  }
-
-  if (!episodeId) {
-    return speaker === 'HOST' ? VOICE_POOL[0].id : VOICE_POOL[8].id;
-  }
-
-  const pair = selectVoicePair(episodeId);
-  return speaker === 'HOST' ? pair.host.id : pair.expert.id;
-}
-
-/**
- * Get the full voice profile for logging and metadata
- */
-export function getVoiceProfile(voiceId: string): VoiceProfile | undefined {
-  const entry = findByVoiceId(voiceId);
-  return entry ? toLegacy(entry) : undefined;
-}
 
 // ---------------------------------------------------------------------------
 // Text-to-Speech
@@ -91,16 +20,20 @@ export async function generateSpeech(params: {
   style?: number;
   speed?: number;
   seed?: number;
-  apiKeyOverride?: string;
+  apiKey: string;
+  transport: ProviderTransport;
+  signal?: AbortSignal;
   previousText?: string;
   nextText?: string;
   previousRequestIds?: string[];
   /** ISO 639-1 language hint (e.g. 'es', 'ja'). Passed as language_code to ElevenLabs API. */
   language?: string;
+  onDispatch?: () => void;
+  onSettled?: () => void;
 }): Promise<{ audio: Buffer; requestId: string | null }> {
-  const apiKey = params.apiKeyOverride || getApiKey();
+  const apiKey = params.apiKey;
   if (!apiKey) {
-    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
+    throw new Error('No ElevenLabs credential is saved');
   }
 
   const meta = getProviderMeta('elevenlabs');
@@ -138,16 +71,23 @@ export async function generateSpeech(params: {
     if (params.nextText) body.next_text = params.nextText;
   }
 
-  const response = await fetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}?output_format=mp3_44100_192`,
+  const response = await params.transport.authenticatedFetch(
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${encodeURIComponent(params.voiceId)}?output_format=mp3_44100_192`,
     {
       method: 'POST',
+      signal: params.signal,
       headers: {
         'xi-api-key': apiKey,
         'Content-Type': 'application/json',
         Accept: 'audio/mpeg',
       },
       body: JSON.stringify(body),
+    },
+    {
+      onDispatch: params.onDispatch ?? (() => {}),
+      onConsumed: ({ status }) => {
+        if (status < 500) params.onSettled?.();
+      },
     }
   );
 
@@ -157,6 +97,7 @@ export async function generateSpeech(params: {
   }
 
   const arrayBuffer = await response.arrayBuffer();
+  params.signal?.throwIfAborted();
   return {
     audio: Buffer.from(arrayBuffer),
     requestId: response.headers.get('request-id'),
@@ -232,15 +173,19 @@ export async function generateSpeechWithTimestamps(params: {
   style?: number;
   speed?: number;
   seed?: number;
-  apiKeyOverride?: string;
+  apiKey: string;
+  transport: ProviderTransport;
+  signal?: AbortSignal;
   previousText?: string;
   nextText?: string;
   previousRequestIds?: string[];
   language?: string;
+  onDispatch?: () => void;
+  onSettled?: () => void;
 }): Promise<{ audio: Buffer; wordTimings: WordTimingResult[]; requestId: string | null }> {
-  const apiKey = params.apiKeyOverride || getApiKey();
+  const apiKey = params.apiKey;
   if (!apiKey) {
-    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
+    throw new Error('No ElevenLabs credential is saved');
   }
 
   const meta = getProviderMeta('elevenlabs');
@@ -274,16 +219,23 @@ export async function generateSpeechWithTimestamps(params: {
     if (params.nextText) body.next_text = params.nextText;
   }
 
-  const response = await fetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}/with-timestamps?output_format=mp3_44100_192`,
+  const response = await params.transport.authenticatedFetch(
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${encodeURIComponent(params.voiceId)}/with-timestamps?output_format=mp3_44100_192`,
     {
       method: 'POST',
+      signal: params.signal,
       headers: {
         'xi-api-key': apiKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
       body: JSON.stringify(body),
+    },
+    {
+      onDispatch: params.onDispatch ?? (() => {}),
+      onConsumed: ({ status }) => {
+        if (status < 500) params.onSettled?.();
+      },
     }
   );
 
@@ -298,6 +250,7 @@ export async function generateSpeechWithTimestamps(params: {
   };
 
   const audio = Buffer.from(data.audio_base64, 'base64');
+  params.signal?.throwIfAborted();
   const wordTimings = characterTimingsToWordTimings(data.alignment);
 
   return {
@@ -314,96 +267,63 @@ export async function generateSpeechWithTimestamps(params: {
 export async function generateSoundEffect(params: {
   prompt: string;
   durationSeconds?: number;
+  apiKey: string;
+  transport: ProviderTransport;
+  signal?: AbortSignal;
+  onDispatch?: () => void;
+  onSettled?: () => void;
 }): Promise<Buffer> {
-  if (!getApiKey()) {
-    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
-  }
+  const onSettled = params.onSettled;
+  params.signal?.throwIfAborted();
+  const apiKey = params.apiKey;
+  if (!apiKey?.trim()) throw new Error('ElevenLabs API key is not set');
 
   const body: Record<string, unknown> = { text: params.prompt };
   if (params.durationSeconds) {
     body.duration_seconds = Math.min(params.durationSeconds, 30);
   }
 
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/sound-generation`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': getApiKey()!,
-      'Content-Type': 'application/json',
-      Accept: 'audio/mpeg',
+  const signal = params.signal ?? new AbortController().signal;
+  const response = await params.transport.authenticatedFetch(
+    `${ELEVENLABS_BASE_URL}/sound-generation`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify(body),
+      signal,
     },
-    body: JSON.stringify(body),
-  });
+    params.onDispatch ? { onDispatch: params.onDispatch } : undefined
+  );
 
   if (!response.ok) {
-    const errorText = await response.text();
+    const errorText = await readResponseText(response, {
+      signal,
+      maxBytes: bufferConstants.MAX_LENGTH,
+    });
+    // Documented synchronous request rejections, not a general rule for provider HTTP failures.
+    // https://elevenlabs.io/docs/eleven-api/resources/errors
+    if ([400, 401, 402, 403, 404, 422, 429].includes(response.status)) onSettled?.();
     throw new Error(`ElevenLabs Sound Effects API error (${response.status}): ${errorText}`);
   }
 
-  const arrayBuffer = await response.arrayBuffer();
+  const bytes = await readResponseBytes(response, { signal, maxBytes: bufferConstants.MAX_LENGTH });
+  const audio = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (
+    response.status !== 200 ||
+    !isRecognizedAudio(audio) ||
+    detectAudioFormat(audio).ext !== 'mp3'
+  )
+    throw new Error('ElevenLabs sound effects returned an unexpected synchronous audio response');
+  onSettled?.();
   logger.info('Sound effect generated', {
     prompt: params.prompt,
     durationSeconds: String(params.durationSeconds ?? 'auto'),
   });
-  return Buffer.from(arrayBuffer);
-}
-
-// ---------------------------------------------------------------------------
-// Voice Design — create entirely new voices from text descriptions
-// ---------------------------------------------------------------------------
-
-export async function designVoice(params: {
-  description: string;
-  sampleText: string;
-}): Promise<{ voiceId: string; audioPreview: Buffer }> {
-  if (!getApiKey()) {
-    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
-  }
-
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/voice-generation/generate-voice`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': getApiKey()!,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      voice_description: params.description,
-      text: params.sampleText,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`ElevenLabs Voice Design API error (${response.status}): ${errorText}`);
-  }
-
-  const voiceId = response.headers.get('generated_voice_id') || '';
-  const arrayBuffer = await response.arrayBuffer();
-
-  logger.info('Custom voice designed', { description: params.description, voiceId });
-  return { voiceId, audioPreview: Buffer.from(arrayBuffer) };
-}
-
-// ---------------------------------------------------------------------------
-// Voice Library
-// ---------------------------------------------------------------------------
-
-export async function getVoices(): Promise<
-  Array<{ voice_id: string; name: string; category: string }>
-> {
-  if (!getApiKey()) {
-    throw new Error('ElevenLabs API key not configured');
-  }
-
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices`, {
-    headers: { 'xi-api-key': getApiKey()! },
-  });
-
-  if (!response.ok) {
-    throw new Error(`ElevenLabs API error (${response.status})`);
-  }
-
-  const data = await response.json();
-  return data.voices;
+  return audio;
 }
 
 // ---------------------------------------------------------------------------
@@ -417,63 +337,53 @@ const DEFAULT_CONCURRENCY = 2;
  * header to determine the concurrency limit for the given API key.
  * Caches the result in Redis for 5 minutes so plan upgrades are picked up quickly.
  */
-export async function getElevenLabsConcurrencyLimit(apiKey: string): Promise<number> {
+export async function getElevenLabsConcurrencyLimit(
+  apiKey: string,
+  transport: ProviderTransport,
+  signal?: AbortSignal
+): Promise<number> {
+  signal?.throwIfAborted();
   const { cache } = await import('./redis');
   const crypto = await import('crypto');
   const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
   const cacheKey = `elevenlabs:concurrency:${keyHash}`;
 
   const cached = await cache.get<number>(cacheKey);
+  signal?.throwIfAborted();
   if (cached !== null) return cached;
 
+  const response = await transport.authenticatedFetch(`${ELEVENLABS_BASE_URL}/user/subscription`, {
+    headers: { 'xi-api-key': apiKey },
+    signal,
+  });
+  const failure = response.ok
+    ? null
+    : new Error(`ElevenLabs subscription error (${response.status})`);
   try {
-    const response = await fetch(`${ELEVENLABS_BASE_URL}/user/subscription`, {
-      headers: { 'xi-api-key': apiKey },
-    });
-
-    if (!response.ok) {
-      logger.warn('Failed to fetch ElevenLabs subscription', { status: response.status });
-      return DEFAULT_CONCURRENCY;
-    }
-
-    const maxConcurrent = response.headers.get('maximum-concurrent-requests');
-    const limit = maxConcurrent ? parseInt(maxConcurrent, 10) : DEFAULT_CONCURRENCY;
-
-    if (isNaN(limit) || limit <= 0) {
-      logger.warn('Invalid maximum-concurrent-requests header', { maxConcurrent });
-      return DEFAULT_CONCURRENCY;
-    }
-
-    await cache.set(cacheKey, limit, 300);
-    logger.info('ElevenLabs concurrency resolved from API header', { limit });
-    return limit;
-  } catch (error) {
-    logger.warn('ElevenLabs subscription lookup failed, using default', {
-      error: error instanceof Error ? error.message : 'Unknown',
-    });
-    return DEFAULT_CONCURRENCY;
+    if (response.body) await abortable(response.body.cancel(), AbortSignal.timeout(1_000));
+  } catch (cleanup) {
+    if (failure) throw new AggregateError([failure, cleanup], failure.message, { cause: cleanup });
+    throw cleanup;
   }
+  if (failure) throw failure;
+  signal?.throwIfAborted();
+  const maxConcurrent = response.headers.get('maximum-concurrent-requests');
+  const limit = maxConcurrent === null ? DEFAULT_CONCURRENCY : Number(maxConcurrent);
+  if (
+    (maxConcurrent !== null && !/^[1-9]\d*$/.test(maxConcurrent)) ||
+    !Number.isSafeInteger(limit) ||
+    limit <= 0
+  )
+    throw new Error('Invalid ElevenLabs concurrency limit');
+  await cache.set(cacheKey, limit, 300);
+  signal?.throwIfAborted();
+  logger.info('ElevenLabs concurrency resolved from API header', { limit });
+  return limit;
 }
 
 // ---------------------------------------------------------------------------
 // Cost Tracking
 // ---------------------------------------------------------------------------
-
-const ELEVENLABS_RATE_PER_K_CHARS: Record<string, number> = {
-  free: 0.0,
-  starter: 0.3,
-  creator: 0.24,
-  scale: 0.17,
-};
-
-/**
- * Get the ElevenLabs cost per 1,000 characters based on the account tier.
- * Configured via ELEVENLABS_TIER env var (default: 'scale').
- */
-export function getElevenLabsPerKCharRate(): number {
-  const tier = process.env.ELEVENLABS_TIER || 'scale';
-  return ELEVENLABS_RATE_PER_K_CHARS[tier] ?? 0.17;
-}
 
 /**
  * Get the OpenAI TTS cost per 1,000 characters.
@@ -482,31 +392,3 @@ export function getElevenLabsPerKCharRate(): number {
 export function getOpenAiPerKCharRate(): number {
   return 0.015;
 }
-
-/**
- * Fetch a single voice by ID to validate it exists and get its metadata.
- * Returns null if the voice is not found (404).
- */
-export async function getVoiceById(
-  voiceId: string,
-  apiKeyOverride?: string
-): Promise<{ name: string; labels: Record<string, string> } | null> {
-  const apiKey = apiKeyOverride || getApiKey();
-  if (!apiKey) throw new Error('ElevenLabs API key not configured');
-
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/${voiceId}`, {
-    headers: { 'xi-api-key': apiKey },
-  });
-
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`ElevenLabs API error (${response.status}): ${text}`);
-  }
-
-  const data = await response.json();
-  return { name: data.name as string, labels: (data.labels ?? {}) as Record<string, string> };
-}
-
-// Export the pool for external access (e.g. voice selection UI)
-export { VOICE_POOL };

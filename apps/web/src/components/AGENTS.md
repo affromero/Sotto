@@ -55,6 +55,11 @@ export function ComponentName({ variant = 'primary', children }: ComponentNamePr
 
 ## Adding a New Component
 
+Settings credential cards use `settings/useCredentialEditor.ts` for captured revisions,
+explicit unverified consent, cancellation, and uncertain-outcome reconciliation.
+Form edits invalidate pending confirmation. A pending uncertain write blocks edits
+until the user checks its status.
+
 1. Create `src/components/domain/ComponentName.tsx`
 2. Create `src/components/domain/ComponentName.module.css`
 3. Export from component (no barrel files needed — import directly)

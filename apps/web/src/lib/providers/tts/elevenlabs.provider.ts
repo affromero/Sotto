@@ -22,6 +22,7 @@ import {
 } from '../../voice-pool';
 import { mapDirectionToExpression } from '../../tts-expression-mapper';
 import { applyPronunciationAliases } from '../../pronunciation-dictionary';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 // Speakers that use the "host" voice slot; all others use "expert" slot.
 // HOST/GUEST are at even indices (0, 2); EXPERT/SKEPTIC at odd (1, 3).
@@ -38,14 +39,22 @@ function injectTagAtSentenceBoundaries(text: string, tag: string): string {
 }
 
 export class ElevenLabsProvider implements TtsProvider {
+  static readonly speechEndpoint = 'https://api.elevenlabs.io/v1/text-to-speech/';
+  static readonly subscriptionEndpoint = 'https://api.elevenlabs.io/v1/user/subscription';
+  static readonly soundEffectEndpoint = 'https://api.elevenlabs.io/v1/sound-generation';
   readonly providerId: TtsProviderId = 'elevenlabs';
   private clientPromise: Promise<typeof import('../../elevenlabs')> | null = null;
-  private byokApiKey: string | undefined;
+  private readonly apiKey: string;
   private model: string;
   private lastRequestId: string | null = null;
 
-  constructor(byokApiKey?: string, model?: string) {
-    this.byokApiKey = byokApiKey;
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    model?: string
+  ) {
+    if (!apiKey.trim()) throw new Error('ElevenLabs API key is not set');
+    this.apiKey = apiKey;
     this.model = model ?? getProviderMeta('elevenlabs').defaultModel;
   }
 
@@ -56,9 +65,13 @@ export class ElevenLabsProvider implements TtsProvider {
     return this.clientPromise;
   }
 
+  async getConcurrencyLimit(signal?: AbortSignal): Promise<number> {
+    const client = await this.getClient();
+    return client.getElevenLabsConcurrencyLimit(this.apiKey, this.transport, signal);
+  }
+
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const el = await this.getClient();
-    const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
     const modelId = params.modelId ?? this.model;
     const meta = getProviderMeta('elevenlabs');
     const skipTextContext = meta.modelsWithoutTextContext.includes(modelId);
@@ -83,7 +96,9 @@ export class ElevenLabsProvider implements TtsProvider {
       text,
       voiceId: params.voiceId,
       modelId,
-      apiKeyOverride,
+      apiKey: this.apiKey,
+      transport: this.transport,
+      signal: params.signal,
       previousText: skipTextContext ? undefined : params.previousText,
       nextText: skipTextContext ? undefined : params.nextText,
       previousRequestIds: params.continuityIds?.slice(-3),
@@ -94,6 +109,8 @@ export class ElevenLabsProvider implements TtsProvider {
       speed: elExpr?.speed,
       seed: params.seed,
       language: params.language,
+      onDispatch: params.onDispatch,
+      onSettled: params.onSettled,
     });
 
     this.lastRequestId = requestId;
@@ -104,7 +121,6 @@ export class ElevenLabsProvider implements TtsProvider {
     params: SpeechParams
   ): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
     const el = await this.getClient();
-    const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
     const modelId = params.modelId ?? this.model;
     const meta = getProviderMeta('elevenlabs');
     const skipTextContext = meta.modelsWithoutTextContext.includes(modelId);
@@ -128,7 +144,9 @@ export class ElevenLabsProvider implements TtsProvider {
       text,
       voiceId: params.voiceId,
       modelId,
-      apiKeyOverride,
+      apiKey: this.apiKey,
+      transport: this.transport,
+      signal: params.signal,
       previousText: skipTextContext ? undefined : params.previousText,
       nextText: skipTextContext ? undefined : params.nextText,
       previousRequestIds: params.continuityIds?.slice(-3),
@@ -138,6 +156,8 @@ export class ElevenLabsProvider implements TtsProvider {
       speed: elExpr?.speed,
       seed: params.seed,
       language: params.language,
+      onDispatch: params.onDispatch,
+      onSettled: params.onSettled,
     });
 
     this.lastRequestId = requestId;
@@ -150,7 +170,7 @@ export class ElevenLabsProvider implements TtsProvider {
 
   async generateSoundEffect(params: SfxParams): Promise<Buffer> {
     const el = await this.getClient();
-    return el.generateSoundEffect(params);
+    return el.generateSoundEffect({ ...params, apiKey: this.apiKey, transport: this.transport });
   }
 
   getVoiceId(

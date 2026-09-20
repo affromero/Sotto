@@ -1,8 +1,8 @@
+import { providerCredentialForm } from '@/lib/providers/shared/credential-fields';
 /**
- * Declarative TTS provider registry — capabilities, auth config, language
- * support, and validation functions for every supported BYOK provider.
+ * Declarative TTS provider registry: capabilities, auth config, language
+ * support and credential fields for every supported BYOK provider.
  */
-import { logger } from '../logger';
 import {
   CARTESIA_USAGE_ALLOWANCE,
   type ProviderUsageAllowance,
@@ -69,7 +69,6 @@ export interface TtsProviderMeta {
   usageAllowance?: TtsProviderUsageAllowance;
   auth: {
     fields: TtsProviderAuthField[];
-    validate: (credentials: Record<string, string>) => Promise<boolean>;
   };
 }
 
@@ -101,7 +100,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
     id: 'elevenlabs',
     displayName: 'ElevenLabs',
-    getApiKeyUrl: 'https://elevenlabs.io/app/settings/api-keys',
+    getApiKeyUrl: providerCredentialForm('elevenlabs', 'speech').getApiKeyUrl,
     supportsSfx: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
@@ -136,24 +135,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'language_code',
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xi-xxxxxxxxxxxxxxxxxxxx' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.elevenlabs.io/v1/user', {
-            headers: { 'xi-api-key': creds.apiKey },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('elevenlabs', 'speech').fields,
     },
   },
 
   openai: {
     id: 'openai',
     displayName: 'OpenAI',
-    getApiKeyUrl: 'https://platform.openai.com/api-keys',
+    getApiKeyUrl: providerCredentialForm('openai', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 4096,
@@ -177,24 +166,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: null,
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.openai.com/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('openai', 'speech').fields,
     },
   },
 
   cartesia: {
     id: 'cartesia',
     displayName: 'Cartesia',
-    getApiKeyUrl: 'https://play.cartesia.ai/keys',
+    getApiKeyUrl: providerCredentialForm('cartesia', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 5000,
@@ -230,49 +209,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     voicesAreCrossLingual: true,
     usageAllowance: CARTESIA_USAGE_ALLOWANCE,
     auth: {
-      fields: [
-        { key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' },
-        {
-          key: 'adminApiKey',
-          label: 'Admin API Key',
-          placeholder: 'sk_car_admin_... (optional, for usage)',
-          optional: true,
-        },
-        {
-          key: 'monthlyCreditLimit',
-          label: 'Monthly Credit Limit',
-          placeholder: 'Optional, e.g. 1000000',
-          type: 'number',
-          optional: true,
-        },
-        {
-          key: 'billingResetDay',
-          label: 'Billing Reset Day',
-          placeholder: 'Optional, 1-31',
-          type: 'number',
-          optional: true,
-        },
-      ],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.cartesia.ai/voices?limit=1', {
-            headers: {
-              'X-API-Key': creds.apiKey,
-              'Cartesia-Version': '2025-04-16',
-            },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('cartesia', 'speech').fields,
     },
   },
 
   hume: {
     id: 'hume',
     displayName: 'Hume AI',
-    getApiKeyUrl: 'https://platform.hume.ai/settings/keys',
+    getApiKeyUrl: providerCredentialForm('hume', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
@@ -300,33 +244,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: null,
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.hume.ai/v0/tts', {
-            method: 'POST',
-            headers: {
-              'X-Hume-Api-Key': creds.apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              utterances: [{ text: 'test', description: 'A neutral voice' }],
-              format: { type: 'mp3' },
-            }),
-          });
-          // Hume returns 200 on success or 400 for bad params but not 401/403
-          return res.status !== 401 && res.status !== 403;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('hume', 'speech').fields,
     },
   },
 
   fal: {
     id: 'fal',
     displayName: 'Fal',
-    getApiKeyUrl: 'https://fal.ai/dashboard/keys',
+    getApiKeyUrl: providerCredentialForm('fal', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
@@ -354,24 +279,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'language',
     voicesAreCrossLingual: false,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://rest.fal.ai/keys/', {
-            headers: { Authorization: `Key ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('fal', 'speech').fields,
     },
   },
 
   minimax: {
     id: 'minimax',
     displayName: 'MiniMax',
-    getApiKeyUrl: 'https://fal.ai/dashboard/keys',
+    getApiKeyUrl: providerCredentialForm('minimax', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
@@ -399,24 +314,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: null,
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your FAL API key' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://rest.fal.ai/keys/', {
-            headers: { Authorization: `Key ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('minimax', 'speech').fields,
     },
   },
 
   mistral: {
     id: 'mistral',
     displayName: 'Mistral (Voxtral)',
-    getApiKeyUrl: 'https://console.mistral.ai/api-keys',
+    getApiKeyUrl: providerCredentialForm('mistral', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 4096,
@@ -438,24 +343,14 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: null,
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Mistral API key' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.mistral.ai/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('mistral', 'speech').fields,
     },
   },
 
   replicate: {
     id: 'replicate',
     displayName: 'Replicate',
-    getApiKeyUrl: 'https://replicate.com/account/api-tokens',
+    getApiKeyUrl: providerCredentialForm('replicate', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
@@ -489,29 +384,16 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: null,
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.replicate.com/v1/account', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('replicate', 'speech').fields,
     },
   },
 
-  // Keyless, server-configured local provider — talks to the Kokoro FastAPI
-  // sidecar at TTS_BASE_URL (no cloud key). Selected explicitly via
-  // TTS_PROVIDER=kokoro; never auto-selected by key availability. Like the
-  // keyless local AI/STT backends, it carries no auth fields and is filtered out
-  // of the BYOK client DTO (see getAllTtsProviderClientMeta).
+  // Keyless local provider for the Kokoro FastAPI sidecar. The saved selection
+  // and base URL are explicit. It carries no auth fields.
   kokoro: {
     id: 'kokoro',
     displayName: 'Kokoro (Local)',
-    getApiKeyUrl: '',
+    getApiKeyUrl: providerCredentialForm('kokoro', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: false,
     maxSegmentChars: 4096,
@@ -533,11 +415,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'language',
     voicesAreCrossLingual: true,
     auth: {
-      fields: [],
-      // Keyless — no credentials to validate. Reachability is checked at
-      // generation time by the provider (clear error if TTS_BASE_URL is unset
-      // or the sidecar is unreachable).
-      validate: async () => true,
+      fields: providerCredentialForm('kokoro', 'speech').fields,
     },
   },
 
@@ -546,7 +424,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   deepgram: {
     id: 'deepgram',
     displayName: 'Deepgram Aura',
-    getApiKeyUrl: 'https://console.deepgram.com/',
+    getApiKeyUrl: providerCredentialForm('deepgram', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 2000,
@@ -568,17 +446,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: null,
     voicesAreCrossLingual: false,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.deepgram.com/v1/projects', {
-            headers: { Authorization: `Token ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('deepgram', 'speech').fields,
     },
   },
 
@@ -586,7 +454,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   rime: {
     id: 'rime',
     displayName: 'Rime',
-    getApiKeyUrl: 'https://app.rime.ai/tokens',
+    getApiKeyUrl: providerCredentialForm('rime', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 3000,
@@ -609,17 +477,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'lang',
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://users.rime.ai/data/voices', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('rime', 'speech').fields,
     },
   },
 
@@ -627,7 +485,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   playht: {
     id: 'playht',
     displayName: 'PlayHT',
-    getApiKeyUrl: 'https://play.ht/studio/api-access',
+    getApiKeyUrl: providerCredentialForm('playht', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: true,
     maxSegmentChars: 20000,
@@ -655,32 +513,20 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'language',
     voicesAreCrossLingual: true,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
-      validate: async (creds) => {
-        try {
-          const userId = process.env.PLAYHT_USER_ID;
-          if (!userId) return false;
-          const res = await fetch('https://api.play.ht/api/v2/voices', {
-            headers: { 'X-USER-ID': userId, AUTHORIZATION: creds.apiKey },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
+      fields: providerCredentialForm('playht', 'speech').fields,
     },
   },
 
   // Generic local sidecar provider. This is the flexible no-code extension
   // point for self-hosters who want to run any local TTS model. It uses the same
   // small HTTP contract as services/local-tts, selected explicitly with
-  // TTS_PROVIDER=local and TTS_BASE_URL. Voice IDs come from TTS_VOICES or the
+  // Shared configuration selects local TTS and its endpoint. Voice IDs come from shared settings or the
   // sidecar's /voices endpoint; the sidecar may ignore unsupported optional
   // fields such as model and language.
   local: {
     id: 'local',
     displayName: 'Local TTS sidecar',
-    getApiKeyUrl: '',
+    getApiKeyUrl: providerCredentialForm('local', 'speech').getApiKeyUrl,
     supportsSfx: false,
     supportsStreaming: false,
     maxSegmentChars: 4096,
@@ -702,13 +548,13 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     languageParam: 'language',
     voicesAreCrossLingual: true,
     auth: {
-      fields: [],
-      validate: async () => true,
+      fields: providerCredentialForm('local', 'speech').fields,
     },
   },
 };
 
 export function getProviderMeta(id: TtsProviderId): TtsProviderMeta {
+  if (!isValidProviderId(id)) throw new Error(`Unknown TTS provider: ${id}`);
   const meta = TTS_PROVIDERS[id];
   if (!meta) throw new Error(`Unknown TTS provider: ${id}`);
   return meta;
@@ -723,31 +569,11 @@ export function getProviderIds(): TtsProviderId[] {
 }
 
 export function isValidProviderId(id: string): id is TtsProviderId {
-  return id in TTS_PROVIDERS;
-}
-
-/**
- * Validate credentials for a specific provider.
- * Delegates to the provider's registered validation function.
- */
-export async function validateProviderCredentials(
-  providerId: TtsProviderId,
-  credentials: Record<string, string>
-): Promise<boolean> {
-  const meta = getProviderMeta(providerId);
-  try {
-    return await meta.auth.validate(credentials);
-  } catch (error) {
-    logger.warn('Provider credential validation failed', {
-      provider: providerId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
+  return Object.hasOwn(TTS_PROVIDERS, id);
 }
 
 // ---------------------------------------------------------------------------
-// Client-safe DTO — serializable subset of TtsProviderMeta (no validate())
+// Client-safe DTO — serializable subset of TtsProviderMeta
 // ---------------------------------------------------------------------------
 
 /** Serializable model option for client components (Set → string[]). */
@@ -775,7 +601,7 @@ export interface TtsProviderClientMeta {
 
 /**
  * Returns serializable provider metadata for client components.
- * Strips `validate()`. Called server-side only — client components receive this as props.
+ * Called server-side only — client components receive this as props.
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
   return (

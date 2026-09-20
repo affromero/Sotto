@@ -7,6 +7,7 @@ import { DOMAIN_CONFIGS } from 'groundcheck';
 import type { ReferenceInput, VerificationCheck } from '@/lib/reference-validator';
 import type { ClaimContext } from './claim-extractor';
 import { z } from 'zod';
+import { capturedLearningAiOptions, type CapturedLearningAi } from '@/lib/learning-ai';
 
 const aiEvaluationResponseSchema = z.object({
   evaluations: z.array(
@@ -73,13 +74,9 @@ export interface RefWithDomain {
 export async function aiEvaluateWithDomainContext(
   refsWithDomain: RefWithDomain[],
   topic: string,
-  apiKeyOverride?: string,
-  model?: string,
-  provider?: string
+  aiSelection: CapturedLearningAi
 ): Promise<Map<string, VerificationCheck>> {
-  if (!provider || !model) {
-    throw new Error('AI provider and model are required for reference verification.');
-  }
+  const { provider } = aiSelection;
 
   const results = new Map<string, VerificationCheck>();
 
@@ -126,8 +123,7 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
     const response = await Promise.race([
       ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
         maxTokens: 4096,
-        apiKeyOverride,
-        model,
+        ...(await capturedLearningAiOptions(aiSelection)),
         useWebSearch: true,
       }),
       new Promise<never>((_, reject) =>

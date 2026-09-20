@@ -52,6 +52,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
   const sseConnectedRef = useRef(false);
 
   const fetchNotifications = useCallback(async () => {
+    const seenAtStart = new Set(seenIdsRef.current);
     try {
       const response = await fetch('/api/v1/notifications');
       if (!response.ok) return;
@@ -68,9 +69,14 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
       initialLoadRef.current = false;
 
       // Update seen IDs
-      seenIdsRef.current = new Set(data.map((n) => n.id));
-
-      setNotifications(data);
+      for (const notification of data) seenIdsRef.current.add(notification.id);
+      const fetchedIds = new Set(data.map((notification) => notification.id));
+      setNotifications((previous) => [
+        ...previous.filter(
+          (notification) => !seenAtStart.has(notification.id) && !fetchedIds.has(notification.id)
+        ),
+        ...data,
+      ]);
     } catch {
       // Silently fail on poll errors
     } finally {
@@ -112,9 +118,10 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
       es.onmessage = (event) => {
         try {
           const notification: NotificationData = JSON.parse(event.data);
+          const alreadySeen = seenIdsRef.current.has(notification.id);
           prepend(notification);
           // Fire toast callback for SSE-delivered notifications
-          if (onNewRef.current) {
+          if (!alreadySeen && onNewRef.current) {
             onNewRef.current([notification]);
           }
         } catch {

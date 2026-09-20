@@ -9,6 +9,9 @@ import { PriceTokenClient, STATIC_PRICING } from 'pricetoken';
 import { prisma } from './prisma';
 import { logger } from './logger';
 import { getPricetokenModelInfo } from './providers/ai-registry';
+import { prismaUnfiltered } from './prisma';
+import { resolveSottoInstanceCredential } from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,7 +32,11 @@ export interface ExtractedModelPricing {
 
 /** Fetch all model pricing from pricetoken.ai API. */
 export async function fetchPricingFromPricetoken(): Promise<ExtractedModelPricing[]> {
-  const apiKey = process.env.PRICETOKEN_API_KEY;
+  const credential = await sottoTransaction(prismaUnfiltered, (database) =>
+    resolveSottoInstanceCredential(database, 'pricing', 'pricetoken')
+  );
+  const apiKey =
+    typeof credential?.values.apiKey === 'string' ? credential.values.apiKey : undefined;
   const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
 
   const models = await client.getPricing();

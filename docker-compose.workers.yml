@@ -16,8 +16,9 @@ x-worker-image: &worker-image
     - '1000'
   volumes:
     # Workers generate the TTS and episode audio that web serves back over
-    # /api/v1/storage, so with STORAGE_PROVIDER=local both must see one store.
+    # /api/v1/storage, so web and workers must mount the same local store.
     - storage:/app/apps/web/.sotto/storage
+    - executions:/app/apps/web/.sotto/runtime
     - cli-credentials:/run/cli-credentials
     - agent-home:/home/sotto/.claude
     - agent-codex-home:/home/sotto/.codex
@@ -38,6 +39,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
+      SIDEDOOR_EXECUTION_DIR: /app/apps/web/.sotto/runtime/executions
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: heavy
@@ -68,6 +70,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
+      SIDEDOOR_EXECUTION_DIR: /app/apps/web/.sotto/runtime/executions
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: pipeline
@@ -98,6 +101,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials
       LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/apps/web/.sotto/storage}
+      SIDEDOOR_EXECUTION_DIR: /app/apps/web/.sotto/runtime/executions
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
       WORKER_PROFILE: light
@@ -160,3 +164,5 @@ volumes:
   # own empty store and every local asset would vanish on the next swap.
   storage:
     name: ${SOTTO_STACK:?Set SOTTO_STACK}-storage
+  executions:
+    name: ${SOTTO_STACK:?Set SOTTO_STACK}-executions

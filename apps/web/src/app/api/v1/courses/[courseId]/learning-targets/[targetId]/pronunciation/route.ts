@@ -8,6 +8,7 @@ import {
   LearningTargetUnavailableError,
 } from '@/lib/learning-targets';
 import { logger } from '@/lib/logger';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 
 type RouteParams = { params: Promise<{ courseId: string; targetId: string }> };
 
@@ -16,7 +17,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const { courseId, targetId } = await params;
-    const target = await generateTargetPronunciation(courseId, authed.userId, targetId);
+    const target = await generateTargetPronunciation(courseId, authed.userId, targetId, {
+      userId: authed.userId,
+      signal: request.signal,
+      authorize: async (database) => {
+        await requireOriginalSottoAdmission(database, request, authed);
+        return { userId: authed.userId };
+      },
+    });
     return NextResponse.json(target);
   } catch (error: unknown) {
     if (

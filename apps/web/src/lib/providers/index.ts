@@ -1,41 +1,13 @@
-import { createStorageProvider, type StorageProvider } from './storage';
-
-export interface Providers {
-  storage: StorageProvider;
-}
-
-let _providers: Providers | null = null;
-
-/**
- * Get singleton provider instances that are safe to construct without user runtime choices:
- * - STORAGE_PROVIDER: local (default) | r2 | s3
- */
-export function getProviders(): Providers {
-  if (!_providers) {
-    _providers = {
-      storage: createStorageProvider(),
-    };
-  }
-  return _providers;
-}
-
 // Re-export types for convenience
 export type { AIProvider, ChatMessage, AIOptions, AIResponse } from './ai';
 export type { TtsProvider, SpeechParams, SfxParams } from './tts';
-export type { StorageProvider } from './storage';
 
 // Re-export factory functions for direct use
 export { createAIProvider } from './ai';
-export {
-  createTtsProvider,
-  createPremiumTtsProvider,
-  createTtsProviderAsync,
-  resolveTtsProvider,
-} from './tts';
+export { createTtsProviderAsync, resolveTtsProvider } from './tts';
 export type { ResolvedProvider } from './tts';
 export { createSttProvider } from './stt';
 export type { TranscriptionResult, SttProvider, SttProviderId } from './stt';
-export { createStorageProvider } from './storage';
 
 // TTS registry
 export type { TtsProviderId, TtsProviderMeta, TtsModelOption } from './tts-registry';

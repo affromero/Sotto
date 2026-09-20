@@ -34,22 +34,30 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- R2 mock ----
 
-const mockUploadFile = vi
-  .fn()
-  .mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
+const mockCreateSpeakingRecording = vi.fn().mockResolvedValue({
+  id: 'rec-001',
+  audioUrl: 'https://storage.example.com/speaking/recording.webm',
+  status: 'PENDING',
+  operationId: '10000000-0000-4000-8000-000000000001',
+  fingerprint: 'a'.repeat(64),
+});
 
-vi.mock('@/lib/r2', () => ({
-  uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+vi.mock('@/lib/sidedoor/storage/publication/speaking-recording-upload', () => ({
+  createSpeakingRecording: (...args: unknown[]) => mockCreateSpeakingRecording(...args),
 }));
 
 // ---- Queue mock ----
 
-const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-001' });
+const mockEnqueueDurableJob = vi.fn().mockResolvedValue({ id: 'job-001' });
+const mockDeliverSottoJob = vi.fn().mockResolvedValue('delivered');
 
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   speakingGradingQueue: {},
   JobType: { SPEAKING_GRADING: 'speaking_grading' },
+}));
+vi.mock('@/lib/sidedoor/jobs/core/job-delivery', () => ({
+  deliverSottoJob: (...args: unknown[]) => mockDeliverSottoJob(...args),
 }));
 
 // ---- Logger mock ----
@@ -125,10 +133,13 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     mockCourseClassFindFirst.mockResolvedValue({ id: 'class-001' });
     mockSpeakingPromptFindFirst.mockResolvedValue({ id: 'prompt-001', sectionId: 'sec-001' });
     mockSpeakingRecordingCreate.mockResolvedValue({ id: 'rec-001', status: 'PENDING' });
-    mockUploadFile.mockResolvedValue(
-      'https://r2.example.com/speaking/user-001/prompt-001/uuid.webm'
-    );
-    mockAddJob.mockResolvedValue({ id: 'job-001' });
+    mockCreateSpeakingRecording.mockResolvedValue({
+      id: 'rec-001',
+      status: 'PENDING',
+      operationId: '10000000-0000-4000-8000-000000000001',
+      fingerprint: 'a'.repeat(64),
+    });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-001' });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -163,9 +174,9 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     const res = await POST(req, routeParams('class-001', 'prompt-001'));
 
     expect(res.status).toBe(400);
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
   it('returns 400 for random non-audio bytes without storing or queuing', async () => {
@@ -173,9 +184,9 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     const res = await POST(req, routeParams('class-001', 'prompt-001'));
 
     expect(res.status).toBe(400);
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
   it('creates a PENDING SpeakingRecording and returns 201', async () => {
@@ -187,40 +198,39 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     expect(body).toEqual({ recordingId: 'rec-001', status: 'PENDING' });
   });
 
-  it('uploads audio to R2 with a key containing userId and promptId', async () => {
+  it('publishes audio with captured ownership and the class parent', async () => {
     const req = makePostRequest('class-001', 'prompt-001', makeAudioFile());
     await POST(req, routeParams('class-001', 'prompt-001'));
 
-    expect(mockUploadFile).toHaveBeenCalledOnce();
-    const [key, , contentType] = mockUploadFile.mock.calls[0];
-    expect(key).toMatch(/^speaking\/user-001\/prompt-001\//);
-    expect(key).toMatch(/\.webm$/);
-    expect(contentType).toBe('audio/webm');
+    expect(mockCreateSpeakingRecording).toHaveBeenCalledWith(
+      expect.objectContaining({
+        admission: { userId: 'user-001' },
+        promptId: 'prompt-001',
+        parent: { sectionId: 'sec-001' },
+        extension: 'webm',
+        contentType: 'audio/webm',
+      })
+    );
   });
 
   it('creates SpeakingRecording with correct sectionId and status PENDING', async () => {
     const req = makePostRequest('class-001', 'prompt-001', makeAudioFile());
     await POST(req, routeParams('class-001', 'prompt-001'));
 
-    expect(mockSpeakingRecordingCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          sectionId: 'sec-001',
-          promptId: 'prompt-001',
-          userId: 'user-001',
-          status: 'PENDING',
-        }),
-      })
-    );
+    expect(mockCreateSpeakingRecording).toHaveBeenCalledOnce();
   });
 
   it('enqueues a SPEAKING_GRADING job with the new recordingId', async () => {
     const req = makePostRequest('class-001', 'prompt-001', makeAudioFile());
     await POST(req, routeParams('class-001', 'prompt-001'));
 
-    expect(mockAddJob).toHaveBeenCalledWith(expect.anything(), 'speaking_grading', {
-      recordingId: 'rec-001',
-    });
+    expect(mockDeliverSottoJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationId: '10000000-0000-4000-8000-000000000001',
+        fingerprint: 'a'.repeat(64),
+        version: 1,
+      })
+    );
   });
 });
 

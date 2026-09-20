@@ -173,8 +173,8 @@ fi
 
 if command_exists curl; then
   run_cmd health/version-localhost-3000 curl -fsS --max-time 10 http://localhost:3000/api/version
-  run_cmd health/health-localhost-3000 curl -fsS --max-time 10 http://localhost:3000/api/health
-  run_cmd health/health-localhost-3010 curl -fsS --max-time 10 http://localhost:3010/api/health
+  run_cmd health/health-localhost-3000 curl -fsS --max-time 10 http://localhost:3000/api/v1/health
+  run_cmd health/health-localhost-3010 curl -fsS --max-time 10 http://localhost:3010/api/v1/health
 fi
 
 for env_file in "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.local" "$PROJECT_DIR/.env.production"; do

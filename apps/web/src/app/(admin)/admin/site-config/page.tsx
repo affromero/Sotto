@@ -8,14 +8,19 @@ interface Config {
   aiProvider: string | null;
   aiModel: string | null;
   aiBaseUrl: string | null;
+  liveModel: string | null;
   sttProvider: string | null;
   sttModel: string | null;
   sttBaseUrl: string | null;
   ttsProvider: string | null;
   ttsBaseUrl: string | null;
+  ttsVoices: string | null;
   storageProvider: string | null;
-  s3Bucket: string | null;
-  s3Region: string | null;
+  localStorageRoot: string | null;
+  objectStorageEndpoint: string | null;
+  objectStorageBucket: string | null;
+  objectStorageRegion: string | null;
+  objectStoragePublicUrl: string | null;
 }
 
 type InfraKey = keyof Config;
@@ -51,6 +56,7 @@ const GROUPS: Array<{
         placeholder: 'anthropic · openai · google · claude-code · local',
       },
       { key: 'aiModel', label: 'Model', placeholder: 'blank for the provider default' },
+      { key: 'liveModel', label: 'Live model', placeholder: 'Gemini Live model (optional)' },
       {
         key: 'aiBaseUrl',
         label: 'Base URL',
@@ -67,6 +73,7 @@ const GROUPS: Array<{
         placeholder: 'elevenlabs · openai · cartesia · kokoro',
       },
       { key: 'ttsBaseUrl', label: 'Base URL', placeholder: 'local TTS endpoint (optional)' },
+      { key: 'ttsVoices', label: 'Voice IDs', placeholder: 'comma-separated local voice IDs' },
     ],
   },
   {
@@ -84,8 +91,11 @@ const GROUPS: Array<{
     title: 'Storage',
     fields: [
       { key: 'storageProvider', label: 'Provider', placeholder: 'local · s3 · r2' },
-      { key: 's3Bucket', label: 'Bucket', placeholder: 'bucket name' },
-      { key: 's3Region', label: 'Region', placeholder: 'auto · us-east-1' },
+      { key: 'localStorageRoot', label: 'Local directory', placeholder: '.sotto/storage' },
+      { key: 'objectStorageEndpoint', label: 'Object endpoint', placeholder: 'https://…' },
+      { key: 'objectStorageBucket', label: 'Bucket', placeholder: 'bucket name' },
+      { key: 'objectStorageRegion', label: 'Signing region', placeholder: 'auto · us-east-1' },
+      { key: 'objectStoragePublicUrl', label: 'Public URL', placeholder: 'optional CDN URL' },
     ],
   },
 ];
@@ -94,10 +104,10 @@ export default function SiteConfigPage() {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [clearStatus, setClearStatus] = useState<'idle' | 'clearing' | 'cleared' | 'error'>('idle');
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>('idle');
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
-  const [clearBannerOpen, setClearBannerOpen] = useState(false);
+  const [storageAccessKeyId, setStorageAccessKeyId] = useState('');
+  const [storageSecretAccessKey, setStorageSecretAccessKey] = useState('');
 
   useEffect(() => {
     fetch('/api/v1/admin/site-config')
@@ -112,23 +122,20 @@ export default function SiteConfigPage() {
   function setField(key: keyof Config, value: string | boolean | null) {
     setCfg((c) => (c ? { ...c, [key]: value } : c));
     setSaveStatus('idle');
-    setClearStatus('idle');
     setMigrationStatus('idle');
     setMigrationResult(null);
-    setClearBannerOpen(false);
   }
 
   async function save() {
     if (!cfg) return;
     setSaveStatus('saving');
-    const infra = GROUPS.flatMap((g) => g.fields).reduce<Record<string, string | null>>(
-      (acc, f) => {
+    const infra = GROUPS.filter((group) => group.title !== 'Storage')
+      .flatMap((g) => g.fields)
+      .reduce<Record<string, string | null>>((acc, f) => {
         const v = (cfg[f.key] ?? '').toString().trim();
         acc[f.key] = v === '' ? null : v;
         return acc;
-      },
-      {}
-    );
+      }, {});
     try {
       const res = await fetch('/api/v1/admin/site-config', {
         method: 'PATCH',
@@ -139,25 +146,8 @@ export default function SiteConfigPage() {
       const data = (await res.json()) as Config;
       setCfg(data);
       setSaveStatus('saved');
-      setClearStatus('idle');
-      setClearBannerOpen(false);
     } catch {
       setSaveStatus('error');
-    }
-  }
-
-  async function clearAdminOverrides() {
-    setClearStatus('clearing');
-    setSaveStatus('idle');
-    try {
-      const res = await fetch('/api/v1/admin/site-config', { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to clear overrides');
-      const data = (await res.json()) as Config;
-      setCfg(data);
-      setClearStatus('cleared');
-      setClearBannerOpen(false);
-    } catch {
-      setClearStatus('error');
     }
   }
 
@@ -172,30 +162,30 @@ export default function SiteConfigPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targetProvider: cfg.storageProvider || 'local',
-          s3Bucket: cfg.s3Bucket,
-          s3Region: cfg.s3Region,
-          switchAfter: true,
+          localStorageRoot: cfg.localStorageRoot,
+          objectStorageEndpoint: cfg.objectStorageEndpoint,
+          objectStorageBucket: cfg.objectStorageBucket,
+          objectStorageRegion: cfg.objectStorageRegion,
+          objectStoragePublicUrl: cfg.objectStoragePublicUrl,
+          accessKeyId: storageAccessKeyId || undefined,
+          secretAccessKey: storageSecretAccessKey || undefined,
         }),
       });
       const body = (await res.json().catch(() => null)) as
-        | MigrationResult
-        | { error?: string }
-        | null;
+        MigrationResult | { error?: string } | null;
       if (!res.ok || !isMigrationResult(body)) {
         throw new Error(body && 'error' in body ? body.error : 'Storage migration failed');
       }
       setMigrationResult(body);
       setMigrationStatus(body.failed > 0 ? 'error' : 'done');
       setSaveStatus(body.switched ? 'saved' : 'idle');
+      if (body.switched) {
+        setStorageAccessKeyId('');
+        setStorageSecretAccessKey('');
+      }
     } catch {
       setMigrationStatus('error');
     }
-  }
-
-  function showClearBanner() {
-    setClearBannerOpen(true);
-    setClearStatus('idle');
-    setSaveStatus('idle');
   }
 
   if (loading || !cfg) return <div className={styles.container}>Loading...</div>;
@@ -205,137 +195,97 @@ export default function SiteConfigPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Admin Settings</h1>
         <p className={styles.subtitle}>
-          The same server settings the onboarding wizard sets, editable here. Changes take effect
-          immediately. Leave a field blank to fall back to the environment variable.
+          These are the shared settings used by web and worker processes. Provider credentials stay
+          encrypted in Sidedoor. Storage changes run a verified copy before activation.
         </p>
       </div>
-
-      <section className={styles.dangerZone} aria-labelledby="clear-overrides-title">
-        <div>
-          <h2 id="clear-overrides-title" className={styles.dangerTitle}>
-            Clear admin overrides
-          </h2>
-          <p className={styles.dangerText}>
-            Remove owner-set AI, speech, and storage selections so Sotto falls back to environment
-            variables. This does not delete profiles, courses, keys, lessons, or media.
-          </p>
-        </div>
-        <button
-          type="button"
-          className={styles.resetBtn}
-          onClick={showClearBanner}
-          disabled={clearStatus === 'clearing' || saveStatus === 'saving'}
-          aria-expanded={clearBannerOpen}
-        >
-          Clear overrides
-        </button>
-      </section>
-
-      {clearBannerOpen && (
-        <section
-          className={styles.confirmBanner}
-          aria-labelledby="clear-overrides-confirm-title"
-          aria-describedby="clear-overrides-confirm-copy"
-        >
-          <div>
-            <h2 id="clear-overrides-confirm-title" className={styles.confirmTitle}>
-              Confirm clearing overrides
-            </h2>
-            <p id="clear-overrides-confirm-copy" className={styles.confirmText}>
-              This only clears admin infrastructure fields. The destructive factory reset is on the
-              System page.
-            </p>
-          </div>
-          <div className={styles.confirmActions}>
-            <button
-              type="button"
-              className={styles.confirmResetBtn}
-              onClick={clearAdminOverrides}
-              disabled={clearStatus === 'clearing'}
-            >
-              {clearStatus === 'clearing' ? 'Clearing...' : 'Clear admin overrides'}
-            </button>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              onClick={() => setClearBannerOpen(false)}
-              disabled={clearStatus === 'clearing'}
-            >
-              Cancel
-            </button>
-          </div>
-        </section>
-      )}
-
-      {clearStatus === 'cleared' && (
-        <div className={`${styles.resultBanner} ${styles.resultSuccess}`} role="status">
-          Admin overrides cleared. Sotto is now using environment-backed settings where available.
-        </div>
-      )}
-      {clearStatus === 'error' && (
-        <div className={`${styles.resultBanner} ${styles.resultError}`} role="status">
-          Failed to clear admin overrides.
-        </div>
-      )}
 
       {GROUPS.map((group) => (
         <section key={group.title} className={styles.group}>
           <h2 className={styles.sectionTitle}>{group.title}</h2>
-          {group.title === 'Storage' && cfg.storageProvider !== 's3' && (
+          {group.title === 'Storage' && (
             <p className={styles.groupHelp}>
-              {cfg.storageProvider === 'r2'
-                ? 'Cloudflare R2 credentials stay in R2_* environment variables. Restart web and workers after changing secrets.'
-                : 'Local storage writes to LOCAL_STORAGE_DIR on this machine. Back up that directory with the database.'}
+              Local storage uses the configured persistent directory. R2 and S3 credentials are
+              encrypted and never returned to the browser.
             </p>
           )}
-          {group.fields.map((f) => (
-            <div key={f.key} className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor={f.key}>
-                {f.label}
-              </label>
-              {f.key === 'storageProvider' ? (
-                <select
-                  id={f.key}
-                  className={styles.select}
-                  value={cfg.storageProvider ?? 'local'}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                >
-                  <option value="local">local - local disk</option>
-                  <option value="r2">r2 - Cloudflare R2</option>
-                  <option value="s3">s3 - AWS S3</option>
-                </select>
-              ) : group.title === 'Storage' && cfg.storageProvider !== 's3' ? (
-                <input
-                  id={f.key}
-                  className={styles.input}
-                  type="text"
-                  value={cfg[f.key] ?? ''}
-                  placeholder={f.placeholder}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                  disabled
-                />
-              ) : (
-                <input
-                  id={f.key}
-                  className={styles.input}
-                  type="text"
-                  value={cfg[f.key] ?? ''}
-                  placeholder={f.placeholder}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                />
-              )}
-            </div>
-          ))}
+          {group.fields
+            .filter(
+              (field) =>
+                group.title !== 'Storage' ||
+                field.key === 'storageProvider' ||
+                (cfg.storageProvider === 'local'
+                  ? field.key === 'localStorageRoot'
+                  : field.key !== 'localStorageRoot')
+            )
+            .map((f) => (
+              <div key={f.key} className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor={f.key}>
+                  {f.label}
+                </label>
+                {f.key === 'storageProvider' ? (
+                  <select
+                    id={f.key}
+                    className={styles.select}
+                    value={cfg.storageProvider ?? 'local'}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                  >
+                    <option value="local">local - local disk</option>
+                    <option value="r2">r2 - Cloudflare R2</option>
+                    <option value="s3">s3 - AWS S3</option>
+                  </select>
+                ) : (
+                  <input
+                    id={f.key}
+                    className={styles.input}
+                    type="text"
+                    value={cfg[f.key] ?? ''}
+                    placeholder={f.placeholder}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                  />
+                )}
+              </div>
+            ))}
           {group.title === 'Storage' && (
             <section className={styles.migrationBox} aria-labelledby="storage-migration-title">
+              {cfg.storageProvider !== 'local' && (
+                <>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="storageAccessKeyId">
+                      Access key ID
+                    </label>
+                    <input
+                      id="storageAccessKeyId"
+                      className={styles.input}
+                      type="password"
+                      autoComplete="off"
+                      value={storageAccessKeyId}
+                      onChange={(event) => setStorageAccessKeyId(event.target.value)}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel} htmlFor="storageSecretAccessKey">
+                      Secret access key
+                    </label>
+                    <input
+                      id="storageSecretAccessKey"
+                      className={styles.input}
+                      type="password"
+                      autoComplete="new-password"
+                      value={storageSecretAccessKey}
+                      onChange={(event) => setStorageSecretAccessKey(event.target.value)}
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <h3 id="storage-migration-title" className={styles.migrationTitle}>
                   Migrate existing media
                 </h3>
                 <p className={styles.migrationText}>
-                  Copies known media references to the selected provider, updates database URLs, and
-                  leaves the old files in place. Use this when switching from local disk to a bucket
-                  or back.
+                  Copies every attributed asset, verifies its bytes, updates references, and
+                  activates the destination only when the complete inventory has no blockers. Source
+                  files remain available for recovery.
                 </p>
               </div>
               <button
@@ -374,7 +324,7 @@ export default function SiteConfigPage() {
           type="button"
           className={styles.saveBtn}
           onClick={save}
-          disabled={saveStatus === 'saving' || clearStatus === 'clearing'}
+          disabled={saveStatus === 'saving'}
         >
           {saveStatus === 'saving' ? 'Saving...' : 'Save changes'}
         </button>

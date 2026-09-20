@@ -7,31 +7,37 @@ Sentry.init({
 
 import {
   createWorker,
-  keyValidationQueue,
   pricingFetchQueue,
-  ttsProviderMonitorQueue,
   JobType,
+  withDispatchQueue,
+  ALL_QUEUE_NAMES,
+  createQueue,
+  admitDurableJob,
 } from '@/lib/queue';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
+import { startSottoJobReconciliation } from '@/lib/sidedoor/jobs/core/job-reconciliation';
+import { sottoJobFailureCode } from '@/lib/sidedoor/jobs/core/job-contracts';
 import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
-import { processContentExtraction } from './content-extraction.worker';
-import { processDeepResearch } from './deep-research.worker';
-import { processCreativePlanning } from './creative-planning.worker';
-import { processScriptWriting } from './script-writing.worker';
-import { processCompileScript } from './compile-script.worker';
-import { processScriptGeneration } from './script-generation.worker';
-import { processAudioGeneration } from './audio-generation.worker';
-import { processAudioStitching } from './audio-stitching.worker';
-import { processInteraction } from './interaction.worker';
-import { processSegmentRegeneration } from './segment-regeneration.worker';
-import { processNotification } from './notification.worker';
-import { processPdfGeneration } from './pdf-generation.worker';
-import { processKeyValidation } from './key-validation.worker';
-import { processPricingFetch } from './pricing-fetch.worker';
-import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
-import { processWaveformGeneration } from './waveform-generation.worker';
-import { processSpeakingGrading } from './speaking-grading.worker';
-import { processWorksheetPdf } from './worksheet-pdf.worker';
+import { processContentExtraction } from '@/workers/content-extraction.worker';
+import { processDeepResearch } from '@/workers/deep-research.worker';
+import { processCreativePlanning } from '@/workers/creative-planning.worker';
+import { processScriptWriting } from '@/workers/script-writing.worker';
+import { processCompileScript } from '@/workers/compile-script.worker';
+import { processAudioGeneration } from '@/workers/audio-generation.worker';
+import { processAudioStitching } from '@/workers/audio-stitching.worker';
+import { processInteraction } from '@/workers/interaction.worker';
+import { processSegmentRegeneration } from '@/workers/segment-regeneration.worker';
+import { processNotification } from '@/workers/notification.worker';
+import { processPdfGeneration } from '@/workers/pdf-generation.worker';
+import { processKeyValidation } from '@/workers/key-validation.worker';
+import { scheduleAllCredentialValidations } from '@/workers/key-validation.worker';
+import { processPricingFetch } from '@/workers/pricing-fetch.worker';
+import { processWaveformGeneration } from '@/workers/waveform-generation.worker';
+import { processEpisodeStatus } from '@/workers/durable/status/episode-status.worker';
+import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
+import { processWorksheetPdf } from '@/workers/worksheet-pdf.worker';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
@@ -91,11 +97,6 @@ const workers = [
     createWorker('script-writing', processScriptWriting, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('compile-script') &&
     createWorker('compile-script', processCompileScript, { concurrency: 2 }),
-  shouldRun('script-generation') &&
-    createWorker('script-generation', processScriptGeneration, {
-      concurrency: 2,
-      lockDuration: 300000,
-    }),
   shouldRun('audio-generation') &&
     createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
   shouldRun('audio-stitching') &&
@@ -114,46 +115,71 @@ const workers = [
     createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('pricing-fetch') &&
     createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
-  shouldRun('tts-provider-monitor') &&
-    createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
   shouldRun('waveform-generation') &&
     createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
+  shouldRun('episode-status') &&
+    createWorker('episode-status', processEpisodeStatus, { concurrency: 5 }),
   shouldRun('speaking-grading') &&
     createWorker('speaking-grading', processSpeakingGrading, { concurrency: 5 }),
   shouldRun('worksheet-pdf') &&
     createWorker('worksheet-pdf', processWorksheetPdf, { concurrency: 2 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
-// Cron jobs and webhooks run only on light (or all) profile to prevent duplicate
-// repeat registrations. BullMQ 6 dropped `repeat` from `add()`; recurring work is
-// registered through `upsertJobScheduler`, which is keyed by scheduler id and so
-// is idempotent across worker restarts on its own.
+// The outbox job identity is the UTC day. Every restart immediately reconciles
+// today's work, so an in-memory timer cannot create a missed day.
+const recurringTimers = new Set<ReturnType<typeof setTimeout>>();
+
+function scheduleRecurring(label: string, delay: () => number, operation: () => Promise<void>) {
+  const run = async () => {
+    await operation().catch((error) =>
+      logger.error(`${label} failed`, {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    const timer = setTimeout(() => {
+      recurringTimers.delete(timer);
+      void run();
+    }, delay());
+    recurringTimers.add(timer);
+  };
+  void run();
+}
+
+async function admitScheduled(queue: typeof pricingFetchQueue, type: JobType, jobId: string) {
+  await admitDurableJob(
+    queue,
+    type,
+    {},
+    {
+      jobId,
+      authorize: async (database) => {
+        await sottoStorageInstance(database).read();
+      },
+      mutate: async () => {},
+    }
+  );
+}
+
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
-  // Schedule BYOK key re-validation every 24 hours
-  if (shouldRun('key-validation')) {
-    keyValidationQueue
-      .upsertJobScheduler(JobType.VALIDATE_KEYS, { every: 24 * 60 * 60 * 1000 })
-      .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
-      .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
-  }
+  const day = 24 * 60 * 60 * 1000;
+  if (shouldRun('key-validation'))
+    scheduleRecurring(
+      'Credential validation scheduling',
+      () => day,
+      async () => {
+        await scheduleAllCredentialValidations();
+      }
+    );
 
-  // Schedule daily TTS provider monitor (6am UTC)
-  if (shouldRun('tts-provider-monitor')) {
-    ttsProviderMonitorQueue
-      .upsertJobScheduler(JobType.MONITOR_TTS_PROVIDERS, { pattern: '0 6 * * *' })
-      .then(() => logger.info('TTS provider monitor scheduled', { schedule: '6:00 UTC daily' }))
-      .catch((err) =>
-        logger.error('Failed to schedule TTS provider monitor', { error: err.message })
-      );
-  }
-
-  // Schedule daily pricing fetch (every 24 hours)
-  if (shouldRun('pricing-fetch')) {
-    pricingFetchQueue
-      .upsertJobScheduler(JobType.FETCH_PRICING, { every: 86400000 })
-      .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
-      .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
-  }
+  if (shouldRun('pricing-fetch'))
+    scheduleRecurring(
+      'Pricing fetch scheduling',
+      () => day,
+      async () => {
+        const bucket = new Date().toISOString().slice(0, 10);
+        await admitScheduled(pricingFetchQueue, JobType.FETCH_PRICING, `pricing-fetch:${bucket}`);
+      }
+    );
 
   // Start in-memory pricing refresh interval (picks up DB changes every 5 min)
   startPricingRefreshInterval();
@@ -161,13 +187,54 @@ if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 
 logger.info(`${workers.length} workers started`, { profile: WORKER_PROFILE });
 
+// Every eligible host can restore queue delivery. Execution still follows its worker profile.
+const durableQueues = new Map(ALL_QUEUE_NAMES.map((name) => [name, createQueue(name)]));
+const reconciliation = [...durableQueues.keys()].some(shouldRun)
+  ? startSottoJobReconciliation({
+      database: prisma,
+      queues: durableQueues,
+      withQueue: withDispatchQueue,
+      onResults: (results) => {
+        for (const result of results) {
+          if (result.status === 'failed')
+            logger.error('Durable job delivery failed; work remains pending', {
+              operationId: result.id,
+              reason: sottoJobFailureCode(result.error),
+            });
+        }
+      },
+      onError: (error) => {
+        logger.error(
+          'Durable job reconciliation failed. Check migration, database and Redis availability.',
+          {
+            reason: sottoJobFailureCode(error),
+          }
+        );
+      },
+    })
+  : null;
+reconciliation?.done.catch(() => {
+  logger.error('Durable job reconciliation stopped unexpectedly');
+  process.exitCode = 1;
+  void shutdown();
+});
+
 // Graceful shutdown
+let shuttingDown = false;
 async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  for (const timer of recurringTimers) clearTimeout(timer);
   logger.info('Shutting down workers...');
+  await Promise.all(workers.map((worker) => worker.pause(true)));
+  for (const worker of workers) worker.cancelAllJobs();
+  await reconciliation?.stop().catch(() => {
+    logger.error('Durable job reconciliation stopped with an error');
+  });
   await Promise.all(workers.map((w) => w.close()));
   await closeRedis();
   logger.info('All workers stopped');
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 
 process.on('SIGTERM', shutdown);

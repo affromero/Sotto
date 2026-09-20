@@ -20,7 +20,29 @@ import { StepContextReview } from './steps/StepContextReview';
 import { StepCompose } from './steps/StepCompose';
 import { StepReady } from './steps/StepReady';
 import { OnboardingThemeSwitch } from './OnboardingThemeSwitch';
-import { resolveAi } from './providerMap';
+import { resolveAi, type KeyPost } from './providerMap';
+import { resumeEndpoint, resumeEndpoints } from '@/app/welcome/session/resume-security';
+import {
+  DEFAULT_AGENT,
+  DEFAULT_VOICE,
+  DEFAULT_STORAGE,
+  clampStep,
+  storageFromConfig,
+  parseStoredSnapshot,
+  toSingleUnderstoodSet,
+  type WelcomeSnapshot,
+} from '@/app/welcome/session/welcome-snapshot';
+import {
+  welcomeCredentialDiscovery,
+  welcomeCredentialSelections,
+} from '@/app/welcome/session/credential-discovery';
+import {
+  WelcomeCredentialSession,
+  WelcomeCredentialContextError,
+  type WelcomeCredentialResult,
+} from '@/app/welcome/session/credential-session';
+import { CredentialReconciliationError } from '@/lib/sidedoor/credentials/config/credential-browser';
+import { Button } from '@/components/ui/Button';
 import t from './theme.module.css';
 import type { AgentStatus } from '@/lib/agent-availability';
 
@@ -50,8 +72,13 @@ export interface VoiceState {
 
 export interface StorageState {
   provider: 'local' | 'r2' | 's3';
-  s3Bucket: string;
-  s3Region: string;
+  localRoot: string;
+  endpoint: string;
+  bucket: string;
+  region: string;
+  publicUrl: string;
+  accessKeyId: string;
+  secretAccessKey: string;
 }
 
 /** One selectable model option surfaced in the wizard. */
@@ -96,20 +123,11 @@ export interface OnboardingConfig {
   onboardingResumeKey?: string;
   infra?: {
     storageProvider: string | null;
-    s3Bucket: string | null;
-    s3Region: string | null;
-  } | null;
-  /**
-   * Owner-only: provider keys / storage env vars already present in the server
-   * env (presence booleans only, never values). Wizard display ids. Absent for
-   * the demo and non-owner learners, where the wizard behaves as before.
-   */
-  env?: {
-    tts: string[];
-    stt: string[];
-    ai: string[];
-    visual: string[];
-    storage: Record<string, boolean>;
+    localStorageRoot: string | null;
+    objectStorageEndpoint: string | null;
+    objectStorageBucket: string | null;
+    objectStorageRegion: string | null;
+    objectStoragePublicUrl: string | null;
   } | null;
   agentStatuses?: Record<'claude-code' | 'codex', AgentStatus> | null;
 }
@@ -120,214 +138,6 @@ interface WelcomeFlowProps {
 }
 
 const SAVE_KEY = 'sotto.onboarding.v1';
-
-const DEFAULT_AGENT: AgentState = {
-  provider: '',
-  method: null,
-  value: '',
-  model: '',
-  liveTranslationKey: '',
-  status: 'idle',
-};
-
-const DEFAULT_VOICE: VoiceState = {
-  tts: 'elevenlabs',
-  stt: 'whisper',
-  visualCueProvider: 'pexels',
-  keys: {},
-  baseUrls: {},
-  ttsModel: {},
-  sttModel: {},
-};
-
-const DEFAULT_STORAGE: StorageState = {
-  provider: 'local',
-  s3Bucket: '',
-  s3Region: '',
-};
-
-interface WelcomeSnapshot {
-  onboardingResumeKey?: string;
-  step: number;
-  profileName: string;
-  avatarSlug: string;
-  timezone: string;
-  baseLang: string;
-  language: string;
-  agent: AgentState;
-  voice: VoiceState;
-  storage: StorageState;
-  sources: Set<string>;
-  contextItems: ContextItem[];
-  understood: Set<CefrLevel>;
-}
-
-function clampStep(n: number) {
-  return Math.max(0, Math.min(STEPS.length - 1, n));
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
-}
-
-function isCefrLevel(value: unknown): value is CefrLevel {
-  return typeof value === 'string' && LEVELS.includes(value as CefrLevel);
-}
-
-function toSingleUnderstoodSet(levels: Iterable<CefrLevel>): Set<CefrLevel> {
-  const selected = new Set(levels);
-  let best: CefrLevel | null = null;
-  for (const level of LEVELS) {
-    if (selected.has(level)) best = level;
-  }
-  return best ? new Set([best]) : new Set();
-}
-
-function isContextItemKind(value: unknown): value is ContextItemKind {
-  return (
-    value === 'link' ||
-    value === 'book' ||
-    value === 'article' ||
-    value === 'music' ||
-    value === 'topic' ||
-    value === 'file' ||
-    value === 'text'
-  );
-}
-
-function isKnownAvatarSlug(value: unknown): value is string {
-  return typeof value === 'string' && ANIMAL_AVATARS.some((avatar) => avatar.slug === value);
-}
-
-function parseAgent(value: unknown): AgentState {
-  const record = asRecord(value);
-  if (!record) return { ...DEFAULT_AGENT };
-
-  return {
-    provider: typeof record.provider === 'string' ? record.provider : '',
-    method:
-      record.method === 'cli' || record.method === 'key' || record.method === 'url'
-        ? record.method
-        : null,
-    value: typeof record.value === 'string' ? record.value : '',
-    model: typeof record.model === 'string' ? record.model : '',
-    liveTranslationKey:
-      typeof record.liveTranslationKey === 'string' ? record.liveTranslationKey : '',
-    status:
-      record.status === 'idle' || record.status === 'verifying' || record.status === 'connected'
-        ? record.status
-        : 'idle',
-  };
-}
-
-function stringRecord(value: unknown): Record<string, string> {
-  const record = asRecord(value) ?? {};
-  return Object.fromEntries(
-    Object.entries(record).filter(
-      (entry): entry is [string, string] => typeof entry[1] === 'string'
-    )
-  );
-}
-
-function parseVoice(value: unknown): VoiceState {
-  const record = asRecord(value);
-
-  return {
-    tts: typeof record?.tts === 'string' ? record.tts : DEFAULT_VOICE.tts,
-    stt: typeof record?.stt === 'string' ? record.stt : DEFAULT_VOICE.stt,
-    visualCueProvider:
-      record?.visualCueProvider === 'off' || record?.visualCueProvider === 'pexels'
-        ? record.visualCueProvider
-        : DEFAULT_VOICE.visualCueProvider,
-    keys: stringRecord(record?.keys),
-    baseUrls: stringRecord(record?.baseUrls),
-    ttsModel: stringRecord(record?.ttsModel),
-    sttModel: stringRecord(record?.sttModel),
-  };
-}
-
-function parseStorage(value: unknown): StorageState {
-  const record = asRecord(value);
-  const provider =
-    record?.provider === 'r2' || record?.provider === 's3' || record?.provider === 'local'
-      ? record.provider
-      : DEFAULT_STORAGE.provider;
-  return {
-    provider,
-    s3Bucket: typeof record?.s3Bucket === 'string' ? record.s3Bucket : '',
-    s3Region: typeof record?.s3Region === 'string' ? record.s3Region : '',
-  };
-}
-
-function storageFromConfig(config: OnboardingConfig): StorageState {
-  const provider = config.infra?.storageProvider;
-  return {
-    provider: provider === 'r2' || provider === 's3' || provider === 'local' ? provider : 'local',
-    s3Bucket: config.infra?.s3Bucket ?? '',
-    s3Region: config.infra?.s3Region ?? '',
-  };
-}
-
-function parseContextItems(value: unknown): ContextItem[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.flatMap((item, index) => {
-    const record = asRecord(item);
-    if (!record || !isContextItemKind(record.kind) || typeof record.value !== 'string') {
-      return [];
-    }
-
-    const trimmed = record.value.trim();
-    if (!trimmed) return [];
-
-    return [
-      {
-        id: typeof record.id === 'string' && record.id ? record.id : `ctx-${record.kind}-${index}`,
-        kind: record.kind,
-        label:
-          typeof record.label === 'string' && record.label.trim()
-            ? record.label.trim()
-            : record.kind,
-        value: trimmed,
-      },
-    ];
-  });
-}
-
-function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
-  try {
-    const record = asRecord(JSON.parse(raw));
-    if (!record) return null;
-
-    const storedStep = typeof record.step === 'number' ? record.step : 0;
-    const sources = Array.isArray(record.sources) ? record.sources.filter(Boolean).map(String) : [];
-    const understood = Array.isArray(record.understood)
-      ? record.understood.filter(isCefrLevel)
-      : [];
-
-    return {
-      onboardingResumeKey:
-        typeof record.onboardingResumeKey === 'string' ? record.onboardingResumeKey : undefined,
-      step: clampStep(storedStep),
-      profileName:
-        typeof record.profileName === 'string' && record.profileName.trim()
-          ? record.profileName
-          : 'Learner',
-      avatarSlug: isKnownAvatarSlug(record.avatarSlug) ? record.avatarSlug : ANIMAL_AVATARS[0].slug,
-      timezone: typeof record.timezone === 'string' ? record.timezone : '',
-      baseLang: typeof record.baseLang === 'string' ? record.baseLang : 'en',
-      language: typeof record.language === 'string' ? record.language : '',
-      agent: parseAgent(record.agent),
-      voice: parseVoice(record.voice),
-      storage: parseStorage(record.storage),
-      sources: new Set(sources),
-      contextItems: parseContextItems(record.contextItems),
-      understood: toSingleUnderstoodSet(understood),
-    };
-  } catch {
-    return null;
-  }
-}
 
 function designSnapshotForStep(step: number, languageParam: string | null): WelcomeSnapshot {
   const clamped = clampStep(step);
@@ -394,6 +204,127 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [config, setConfig] = useState<OnboardingConfig>(
     initialConfig ?? { selfHosted: false, isOwner: false }
   );
+  const [credentialSession] = useState(() => new WelcomeCredentialSession());
+  const credentialLifetime = useRef<AbortController | null>(null);
+  const credentialLock = useRef(false);
+  const [credentialBusy, setCredentialBusy] = useState(false);
+  const [credentialReady, setCredentialReady] = useState(false);
+  const [credentialFeedback, setCredentialFeedback] = useState<WelcomeCredentialResult | null>(
+    null
+  );
+  const pendingCredentialPosts = useRef<readonly KeyPost[]>([]);
+  const clearCredentialSecrets = useCallback(() => {
+    setAgent((previous) => ({ ...previous, value: '', liveTranslationKey: '', status: 'idle' }));
+    setVoice((previous) => ({ ...previous, keys: {} }));
+    setStorage((previous) => ({ ...previous, accessKeyId: '', secretAccessKey: '' }));
+    pendingCredentialPosts.current = [];
+    setCredentialReady(false);
+  }, []);
+
+  const loadCredentials = useCallback(
+    async (signal: AbortSignal) => {
+      credentialLock.current = true;
+      setCredentialBusy(true);
+      try {
+        await credentialSession.load(signal);
+        signal.throwIfAborted();
+        setCredentialReady(true);
+        setCredentialFeedback(null);
+      } catch (error) {
+        if (!signal.aborted && error instanceof WelcomeCredentialContextError)
+          clearCredentialSecrets();
+        if (!signal.aborted)
+          setCredentialFeedback({
+            status: 'review',
+            message: error instanceof Error ? error.message : 'Could not load credential settings.',
+          });
+      } finally {
+        if (!signal.aborted) {
+          credentialLock.current = false;
+          setCredentialBusy(false);
+        }
+      }
+    },
+    [credentialSession, clearCredentialSecrets]
+  );
+
+  useEffect(() => {
+    if (!config.selfHosted) return;
+    const lifetime = new AbortController();
+    credentialLifetime.current = lifetime;
+    void loadCredentials(lifetime.signal);
+    return () => lifetime.abort();
+  }, [config.selfHosted, loadCredentials]);
+
+  async function saveCredentials(posts: readonly KeyPost[], consentOperationId?: string) {
+    if (!config.selfHosted) return true;
+    const signal = credentialLifetime.current?.signal;
+    if (!signal || signal.aborted || credentialLock.current || !credentialReady) return false;
+    credentialLock.current = true;
+    setCredentialBusy(true);
+    pendingCredentialPosts.current = structuredClone(posts);
+    try {
+      const result = await credentialSession.save(posts, signal, consentOperationId);
+      if (result.status === 'ready')
+        await credentialSession.verifySelections(welcomeCredentialSelections(agent, voice), signal);
+      signal.throwIfAborted();
+      if (result.status !== 'ready' && result.clearSecrets) clearCredentialSecrets();
+      setCredentialFeedback(result.status === 'ready' ? null : result);
+      return result.status === 'ready';
+    } catch (error) {
+      if (!signal.aborted && error instanceof WelcomeCredentialContextError)
+        clearCredentialSecrets();
+      if (!signal.aborted)
+        setCredentialFeedback({
+          status: error instanceof CredentialReconciliationError ? 'uncertain' : 'review',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Could not save credentials. Review them before continuing.',
+        });
+      return false;
+    } finally {
+      if (!signal.aborted) {
+        credentialLock.current = false;
+        setCredentialBusy(false);
+      }
+    }
+  }
+
+  async function submitSetup(payload: Record<string, unknown>): Promise<Response | null> {
+    const signal = credentialLifetime.current?.signal;
+    if (!signal || signal.aborted || credentialLock.current || !credentialReady) return null;
+    credentialLock.current = true;
+    setCredentialBusy(true);
+    try {
+      const credentials = credentialSession.captureSelections(
+        welcomeCredentialSelections(agent, voice)
+      );
+      const response = await fetch('/api/v1/onboarding/save', {
+        method: 'POST',
+        credentials: 'include',
+        signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, credentials }),
+      });
+      const body = await response.text();
+      signal.throwIfAborted();
+      return new Response(body, { status: response.status, headers: response.headers });
+    } catch (error) {
+      if (signal.aborted) return null;
+      throw error;
+    } finally {
+      if (!signal.aborted) {
+        credentialLock.current = false;
+        setCredentialBusy(false);
+      }
+    }
+  }
+
+  function credentialFieldsChanged() {
+    credentialSession.invalidateConfirmations();
+    if (credentialFeedback?.status === 'confirmation') setCredentialFeedback(null);
+  }
 
   useEffect(() => {
     let active = true;
@@ -406,7 +337,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
             isOwner: !!data.isOwner,
             onboardingResumeKey: data.onboardingResumeKey ?? initialConfig?.onboardingResumeKey,
             infra: data.infra ?? null,
-            env: data.env ?? null,
             agentStatuses: data.agentStatuses ?? null,
           };
           setConfig(nextConfig);
@@ -430,6 +360,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   }, [understood]);
 
   const go = useCallback((n: number) => {
+    if (credentialLock.current) return;
     setStep(clampStep(n));
   }, []);
 
@@ -518,9 +449,13 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         timezone,
         baseLang,
         language,
-        agent,
-        voice,
-        storage,
+        agent: {
+          ...agent,
+          value: agent.method === 'url' ? resumeEndpoint(agent.value) : '',
+          liveTranslationKey: '',
+        },
+        voice: { ...voice, keys: {}, baseUrls: resumeEndpoints(voice.baseUrls) },
+        storage: { ...storage, accessKeyId: '', secretAccessKey: '' },
         sources: [...sources],
         contextItems,
         understood: [...understood],
@@ -594,6 +529,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   }
 
   function reset() {
+    if (credentialLock.current) return;
     setStep(0);
     setProfileName('Learner');
     setAvatarSlug(ANIMAL_AVATARS[0].slug);
@@ -622,29 +558,48 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setUnderstood(new Set([lvl]));
   }
 
-  // Persist the AI slice the moment the agent step is completed, not only at the
-  // final StepReady save: placement's "estimate from material" (step 8) resolves
-  // the provider server-side, so an unsaved selection means "No AI provider
-  // available" mid-wizard. Best-effort and idempotent — StepReady saves it again.
-  function persistAgentSelection() {
-    if (!config.selfHosted) return;
-    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
-    if (ai.keyPost) {
-      const { endpoint, provider, apiKey, extra } = ai.keyPost;
-      void fetch(`/api/v1/settings/${endpoint}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey, ...(extra ?? {}) }),
-      }).catch(() => {});
+  async function persistAgentSelection() {
+    if (!config.selfHosted) return true;
+    if (agent.method === 'url' && !config.isOwner) {
+      setCredentialFeedback({
+        status: 'review',
+        message: 'Only the owner can save a server endpoint. Ask the owner to configure it.',
+      });
+      return false;
     }
-    if (config.isOwner && Object.keys(ai.infra).length > 0) {
-      void fetch('/api/v1/admin/site-config', {
+    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
+    if (!(await saveCredentials(ai.keyPost ? [ai.keyPost] : []))) return false;
+    if (!config.isOwner || Object.keys(ai.infra).length === 0) return true;
+    const signal = credentialLifetime.current?.signal;
+    if (!signal || signal.aborted || credentialLock.current) return false;
+    credentialLock.current = true;
+    setCredentialBusy(true);
+    try {
+      const response = await fetch('/api/v1/admin/site-config', {
         method: 'PATCH',
         credentials: 'include',
+        signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ai.infra),
-      }).catch(() => {});
+      });
+      signal.throwIfAborted();
+      if (!response.ok)
+        throw new Error(
+          'Could not save the selected AI configuration. Review it and continue again.'
+        );
+      return true;
+    } catch (error) {
+      if (!signal.aborted)
+        setCredentialFeedback({
+          status: 'review',
+          message: error instanceof Error ? error.message : 'Could not save AI configuration.',
+        });
+      return false;
+    } finally {
+      if (!signal.aborted) {
+        credentialLock.current = false;
+        setCredentialBusy(false);
+      }
     }
   }
 
@@ -703,13 +658,28 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         <StepAgent
           agent={agent}
           demoMode={demoMode}
-          envDetected={config.env?.ai ?? []}
+          savedDetected={welcomeCredentialDiscovery(credentialSession, 'saved').ai}
+          savedOutcome={(() => {
+            const post = resolveAi(agent.provider, agent.method, agent.value, agent.model).keyPost;
+            return post ? credentialSession.receiptStatus(post) : null;
+          })()}
           agentStatuses={config.agentStatuses ?? undefined}
           aiModels={modelMeta.ai}
-          setAgent={(updater) => setAgent((prev) => updater(prev))}
-          onNext={() => {
-            persistAgentSelection();
-            go(5);
+          setAgent={setAgent}
+          onCredentialEdit={credentialFieldsChanged}
+          onSave={async () => {
+            if (!(await persistAgentSelection())) return null;
+            if (agent.method === 'url') return 'configured';
+            const provider = resolveAi(
+              agent.provider,
+              agent.method,
+              agent.value,
+              agent.model
+            ).preferredAiProvider;
+            return provider ? credentialSession.savedStatus('ai-keys', provider) : null;
+          }}
+          onNext={async () => {
+            if (await persistAgentSelection()) go(5);
           }}
           onBack={() => go(3)}
         />
@@ -720,13 +690,16 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         <StepVoice
           voice={voice}
           demoMode={demoMode}
-          envDetectedTts={config.env?.tts ?? []}
-          envDetectedStt={config.env?.stt ?? []}
-          envDetectedVisual={config.env?.visual ?? []}
+          savedDetectedTts={welcomeCredentialDiscovery(credentialSession, 'saved').tts}
+          savedDetectedStt={welcomeCredentialDiscovery(credentialSession, 'saved').stt}
+          savedDetectedVisual={welcomeCredentialDiscovery(credentialSession, 'saved').visual}
           ttsModels={modelMeta.tts}
           sttModels={modelMeta.stt}
           language={language}
-          setVoice={(updater) => setVoice((prev) => updater(prev))}
+          setVoice={(updater) => {
+            credentialFieldsChanged();
+            setVoice((prev) => updater(prev));
+          }}
           onNext={() => go(6)}
           onBack={() => go(4)}
         />
@@ -806,6 +779,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           voice={voice}
           storage={storage}
           config={config}
+          saveCredentials={saveCredentials}
+          submitSetup={submitSetup}
           onRestart={reset}
           onJump={go}
         />
@@ -882,7 +857,43 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       {/* Stage */}
       <main className={t.stage}>
         <div className={t.stageInner} key={step}>
-          {stepView}
+          {config.selfHosted && credentialFeedback && credentialFeedback.status !== 'ready' && (
+            <div role="status">
+              <p>{credentialFeedback.message}</p>
+              <Button
+                disabled={credentialBusy}
+                onClick={() => {
+                  if (credentialFeedback.status === 'review') {
+                    const signal = credentialLifetime.current?.signal;
+                    if (signal) void loadCredentials(signal);
+                  } else {
+                    void saveCredentials(
+                      pendingCredentialPosts.current,
+                      credentialFeedback.status === 'confirmation'
+                        ? credentialFeedback.operationId
+                        : undefined
+                    );
+                  }
+                }}
+              >
+                {credentialFeedback.status === 'confirmation'
+                  ? 'Save without verification'
+                  : credentialFeedback.status === 'uncertain'
+                    ? 'Check status'
+                    : 'Reload credentials'}
+              </Button>
+            </div>
+          )}
+          <fieldset
+            className={t.credentialBoundary}
+            disabled={
+              config.selfHosted &&
+              step >= 4 &&
+              (credentialBusy || !credentialReady || credentialFeedback?.status === 'uncertain')
+            }
+          >
+            {stepView}
+          </fieldset>
         </div>
       </main>
     </div>

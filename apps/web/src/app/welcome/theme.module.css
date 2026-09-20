@@ -544,3 +544,9 @@
   background: var(--accent);
   color: var(--accent-fg);
 }
+.credentialBoundary {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}

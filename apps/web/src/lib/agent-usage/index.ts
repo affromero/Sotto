@@ -27,6 +27,7 @@ import {
   resolveCartesiaUsageAllowance,
 } from './providers/cartesia';
 import { ERROR_CACHE_TTL_MS, formatUsageDuration, nowIso } from './utils';
+import { captureSottoProviderAdmission } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 const PROVIDER_ADAPTERS: UsageProviderAdapter[] = [
   getClaudeUsageProvider,
@@ -56,11 +57,35 @@ export {
   resolveCartesiaUsageAllowance,
 };
 
-export async function getAgentUsageStatus(userId: string): Promise<AgentUsageStatus> {
-  const context: UsageProviderContext = { userId };
-  const providers = (
-    await Promise.all(PROVIDER_ADAPTERS.map((adapter) => adapter(context)))
-  ).filter((provider): provider is AgentUsageProvider => provider !== null);
+export async function getAgentUsageStatus(
+  execution: UsageProviderContext
+): Promise<AgentUsageStatus> {
+  const siblings = new AbortController();
+  const signal = execution.signal
+    ? AbortSignal.any([execution.signal, siblings.signal])
+    : siblings.signal;
+  const context: UsageProviderContext = { ...execution, signal };
+  const admit = await captureSottoProviderAdmission(context);
+  const results = await Promise.allSettled(
+    PROVIDER_ADAPTERS.map(async (adapter) => {
+      try {
+        await admit.validate(signal);
+        const provider = await adapter(context);
+        await admit.validate(signal);
+        return provider;
+      } catch (error) {
+        if (!siblings.signal.aborted) siblings.abort(error);
+        throw error;
+      }
+    })
+  );
+  signal.throwIfAborted();
+  const providers: AgentUsageProvider[] = [];
+  for (const result of results) {
+    if (result.status === 'rejected') throw result.reason;
+    if (result.value) providers.push(result.value);
+  }
+  await admit.validate(signal);
 
   return {
     providers,

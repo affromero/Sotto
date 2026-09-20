@@ -7,16 +7,19 @@
  * @tts-research-date 2026-03-11 — Inworld TTS 1.5 Max/Mini added
  */
 import { logger } from '../../logger';
-import { replicateFetch } from '../../replicate-fetch';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { TtsProvider, SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, INWORLD_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { mapDirectionToExpression } from '../../tts-expression-mapper';
 import type { VoiceMatchMetadata } from '../../voice-pool';
 import { VOICE_LANGUAGE_AFFINITIES } from '../../tts-language-support';
+import type { MediaTransport, ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
+const MAX_RATE_LIMIT_RETRIES = 4;
+const DEFAULT_RETRY_DELAY_MS = 8000;
 
 /** Replicate model path lookup — model ID → owner/model-name on Replicate */
 const MODEL_PATHS: Record<string, string> = {
@@ -51,12 +54,36 @@ interface ReplicatePrediction {
   error: string | null;
 }
 
+function retryDelay(bodyText: string): number {
+  try {
+    const parsed = JSON.parse(bodyText) as { retry_after?: unknown; detail?: unknown };
+    if (typeof parsed.retry_after === 'number' && parsed.retry_after > 0)
+      return Math.ceil(parsed.retry_after * 1000);
+    if (typeof parsed.detail === 'string') {
+      const seconds = parsed.detail.match(/resets in ~(\d+)s/)?.[1];
+      if (seconds) return Number.parseInt(seconds, 10) * 1000;
+    }
+  } catch {}
+  return DEFAULT_RETRY_DELAY_MS;
+}
+
 export class ReplicateProvider implements TtsProvider {
+  static readonly predictionRoot = 'https://api.replicate.com/v1/predictions/';
+  static readonly speechEndpoints = Object.freeze(
+    Object.values(MODEL_PATHS).map(
+      (path) => `https://api.replicate.com/v1/models/${path}/predictions`
+    )
+  );
   readonly providerId: TtsProviderId = 'replicate';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    private readonly media: MediaTransport,
+    model?: string
+  ) {
     this.apiKey = apiKey;
     this.model = model ?? getProviderMeta('replicate').defaultModel;
   }
@@ -90,76 +117,71 @@ export class ReplicateProvider implements TtsProvider {
       input.language = langName ?? 'auto';
     }
 
-    let response: Response;
-    try {
-      response = await replicateFetch(
-        `https://api.replicate.com/v1/models/${modelPath}/predictions`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-            Prefer: 'wait',
-          },
-          body: JSON.stringify({ input }),
-        }
-      );
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === 'ReplicateFetchError' &&
-        'status' in error &&
-        'bodyText' in error
-      ) {
-        throw new Error(`Replicate API error (${String(error.status)}): ${String(error.bodyText)}`);
-      }
-      throw error;
-    }
+    const response = await this.fetchWithRateLimitRetry(
+      `https://api.replicate.com/v1/models/${modelPath}/predictions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'wait',
+        },
+        body: JSON.stringify({ input }),
+        signal: params.signal,
+      },
+      params,
+      true
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status >= 400 && response.status < 500) params.onSettled?.();
       throw new Error(`Replicate API error (${response.status}): ${errorText}`);
     }
 
     let prediction: ReplicatePrediction = await response.json();
 
     if (prediction.status !== 'succeeded') {
-      prediction = await this.pollPrediction(prediction.id);
+      prediction = await this.pollPrediction(prediction.id, params);
     }
+    params.onSettled?.();
 
     if (prediction.status === 'failed') {
       throw new Error(`Replicate prediction failed: ${prediction.error}`);
     }
+    if (prediction.status === 'canceled') throw new Error('Replicate prediction was canceled');
 
     if (!prediction.output) {
       throw new Error('Replicate returned no audio output');
     }
 
-    const audioResponse = await fetch(prediction.output);
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download Replicate audio: ${audioResponse.status}`);
-    }
+    const audio = await this.media.downloadMedia(prediction.output, { signal: params.signal });
 
     logger.info('Replicate speech generated', {
       model: this.model,
       voiceId: params.voiceId,
       chars: params.text.length,
     });
-    const arrayBuffer = await audioResponse.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return Buffer.from(audio);
   }
 
-  private async pollPrediction(id: string): Promise<ReplicatePrediction> {
-    let delay = 1000;
+  private async pollPrediction(id: string, params: SpeechParams): Promise<ReplicatePrediction> {
+    let delayMs = 1000;
     for (let attempt = 0; attempt < 60; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay = Math.min(delay * 1.3, 5000);
+      await delay(delayMs, undefined, { signal: params.signal });
+      delayMs = Math.round(Math.min(delayMs * 1.3, 5000));
 
-      const response = await fetch(`https://api.replicate.com/v1/predictions/${id}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      });
+      const response = await this.fetchWithRateLimitRetry(
+        `${ReplicateProvider.predictionRoot}${encodeURIComponent(id)}`,
+        { headers: { Authorization: `Bearer ${this.apiKey}` }, signal: params.signal },
+        params,
+        false
+      );
 
-      if (!response.ok) continue;
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Replicate API error (${response.status}): ${body}`);
+      }
 
       const prediction: ReplicatePrediction = await response.json();
       if (
@@ -171,6 +193,33 @@ export class ReplicateProvider implements TtsProvider {
       }
     }
     throw new Error('Replicate prediction timed out after 60 poll attempts');
+  }
+
+  private async fetchWithRateLimitRetry(
+    url: string,
+    init: RequestInit,
+    params: Pick<SpeechParams, 'onDispatch' | 'onSettled' | 'signal'>,
+    effectful: boolean
+  ): Promise<Response> {
+    for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+      const response = await this.transport.authenticatedFetch(url, init, {
+        onDispatch: effectful ? (params.onDispatch ?? (() => {})) : () => {},
+      });
+      if (response.status !== 429) return response;
+      const body = await response.text();
+      if (effectful) params.onSettled?.();
+      if (attempt === MAX_RATE_LIMIT_RETRIES)
+        throw new Error(`Replicate API error (${response.status}): ${body}`);
+      const delayMs = retryDelay(body);
+      logger.warn('Replicate API rate limited, retrying', {
+        attempt: attempt + 1,
+        delayMs,
+        status: response.status,
+        url,
+      });
+      await delay(delayMs, undefined, { signal: params.signal });
+    }
+    throw new Error('Replicate rate-limit retry exhausted');
   }
 
   getVoiceId(

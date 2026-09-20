@@ -45,14 +45,16 @@ describe('InlineModelTest', () => {
 
   it('shows why a model failed instead of a bare cross', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ success: false, error: 'Platform API key not configured (check .env)' })
+      jsonResponse({ success: false, error: 'Saved provider credential is not configured' })
     );
     render(<InlineModelTest type="tts" provider="elevenlabs" model="eleven_v3" />);
 
     await userEvent.click(screen.getByRole('button', { name: /test this model/i }));
 
     // The reason is the whole point: "it failed" sends you to the logs.
-    expect(await screen.findByText(/Platform API key not configured/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Saved provider credential is not configured/)
+    ).toBeInTheDocument();
   });
 
   it('survives a network failure without wedging the button', async () => {

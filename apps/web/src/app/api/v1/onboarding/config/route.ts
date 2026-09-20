@@ -5,7 +5,6 @@ import { getSiteConfig } from '@/lib/site-config';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { buildEnvPresence } from './env-presence';
 import { getAgentStatus } from '@/lib/agent-availability';
 
 /**
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
   try {
     const selfHosted = isSelfHosted();
     if (!selfHosted) {
-      return NextResponse.json({ selfHosted: false, isOwner: false, infra: null, env: null });
+      return NextResponse.json({ selfHosted: false, isOwner: false, infra: null });
     }
 
     const authed = await authenticateRequest(request);
@@ -27,7 +26,7 @@ export async function GET(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
 
-    const isOwner = await isUserAdmin(authed.userId);
+    const isOwner = await isUserAdmin(authed);
 
     const config = await getSiteConfig();
     const infra = isOwner
@@ -41,14 +40,14 @@ export async function GET(request: NextRequest) {
           ttsProvider: config.ttsProvider,
           ttsBaseUrl: config.ttsBaseUrl,
           storageProvider: config.storageProvider,
-          s3Bucket: config.s3Bucket,
-          s3Region: config.s3Region,
+          localStorageRoot: config.localStorageRoot,
+          objectStorageEndpoint: config.objectStorageEndpoint,
+          objectStorageBucket: config.objectStorageBucket,
+          objectStorageRegion: config.objectStorageRegion,
+          objectStoragePublicUrl: config.objectStoragePublicUrl,
         }
       : null;
 
-    // Owner-only: which provider keys / storage env vars the server already has
-    // (presence booleans, never values), so the wizard can pre-check them.
-    const env = isOwner ? buildEnvPresence() : null;
     const agentStatuses = isOwner
       ? await Promise.all([getAgentStatus('claude-code'), getAgentStatus('codex')]).then(
           ([claude, codex]) => ({ 'claude-code': claude, codex })
@@ -59,7 +58,6 @@ export async function GET(request: NextRequest) {
       selfHosted,
       isOwner,
       infra,
-      env,
       ...(agentStatuses ? { agentStatuses } : {}),
     });
   } catch (error: unknown) {

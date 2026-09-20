@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from '../../adminTheme.styles';
+import styles from '@/app/(admin)/adminTheme.styles';
 
 interface UserActionsProps {
   userId: string;

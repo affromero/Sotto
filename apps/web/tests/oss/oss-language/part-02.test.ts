@@ -28,24 +28,6 @@ describe('open-source language-learning OSS surfaces', () => {
   ];
   void primarySurfaceFiles;
 
-  it('requires explicit provider selection for BYOK key deletion', () => {
-    const byokSources = [
-      'src/app/api/v1/settings/byok/route.ts',
-      'src/lib/validations.ts',
-      'src/lib/AGENTS.md',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(byokSources).toContain('byokProviderSchema');
-    expect(byokSources).toContain("errorResponse('Provider is required', 400)");
-    expect(byokSources).not.toContain('legacy behavior removes elevenlabs');
-    expect(byokSources).not.toContain('validProviders');
-    expect(byokSources).not.toContain('targetProvider');
-    expect(byokSources).not.toContain("?'elevenlabs'");
-    expect(byokSources).not.toContain("|| 'elevenlabs'");
-  });
-
   it('rejects invalid voice provider selection instead of switching providers', () => {
     const voiceProviderSources = ['src/app/api/v1/voices/route.ts', 'tests/api/voices.test.ts']
       .map(readSource)

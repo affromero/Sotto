@@ -1,10 +1,12 @@
-import { prisma } from './prisma';
-import { assertStorageWritable, uploadFile } from './r2';
+import { isDeepStrictEqual } from 'node:util';
+import { prisma, prismaUnfiltered } from './prisma';
 import { getAutoModelConfig } from './auto-model-config';
 import { getConfiguredTtsProviderId, resolveTtsProvider } from './providers/tts';
 import { isValidProviderId, type TtsProviderId } from './providers/tts-registry';
 import { getVisualCueKey } from './visual-cue-keys';
 import { logger } from './logger';
+import { captureFocusTargetStorage } from '@/lib/sidedoor/storage/core/focus-target-storage';
+import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import type { CefrLevel, FocusTargetKind, FocusTargetSource } from '@sotto/shared';
 
 const MAX_TARGET_TEXT = 500;
@@ -293,7 +295,7 @@ async function findTargetForUser(courseId: string, userId: string, targetId: str
 }
 
 async function fetchPexelsCue(userId: string, query: string): Promise<VisualCueResult | null> {
-  const apiKey = (await getVisualCueKey(userId, 'pexels')) ?? process.env.PEXELS_API_KEY?.trim();
+  const apiKey = await getVisualCueKey(userId, 'pexels');
   if (!apiKey) return null;
 
   const url = new URL('https://api.pexels.com/v1/search');
@@ -386,7 +388,8 @@ async function resolvePronunciationRouting(target: Awaited<ReturnType<typeof fin
 export async function generateTargetPronunciation(
   courseId: string,
   userId: string,
-  targetId: string
+  targetId: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<LearningTargetDto> {
   const target = await findTargetForUser(courseId, userId, targetId);
   const routing = await resolvePronunciationRouting(target);
@@ -395,6 +398,7 @@ export async function generateTargetPronunciation(
   try {
     const resolved = await resolveTtsProvider({
       userId,
+      execution,
       episodeId,
       requestedProvider: routing.providerId,
       requestedModel: routing.model,
@@ -414,8 +418,6 @@ export async function generateTargetPronunciation(
     );
   }
 
-  await assertStorageWritable();
-
   const voiceId = provider.getVoiceId('HOST', episodeId, undefined, target.course.targetLang);
   const audioBuffer = await provider.generateSpeech({
     text: target.text,
@@ -423,15 +425,47 @@ export async function generateTargetPronunciation(
     modelId: provider.getModelId(),
     language: target.course.targetLang,
   });
-  const url = await uploadFile(
-    `learning-targets/${courseId}/${target.id}.mp3`,
-    audioBuffer,
-    'audio/mpeg'
-  );
-  const updated = await prisma.learnerFocusTarget.update({
-    where: { id: target.id },
-    data: { pronunciationAudioUrl: url },
+  const url = await writeStorageReference({
+    database: prismaUnfiltered,
+    signal: execution.signal ?? new AbortController().signal,
+    prefix: `learning-targets/${target.id}`,
+    extension: 'mp3',
+    body: audioBuffer,
+    contentType: 'audio/mpeg',
+    captureAdmission: async (database) => {
+      const recipient = await execution.authorize(database);
+      if (recipient.userId !== userId) throw new Error('Learning target recipient changed');
+      const snapshot = await captureFocusTargetStorage(database, target.id);
+      if (snapshot.userId !== userId || snapshot.target.courseId !== courseId)
+        throw new LearningTargetNotFoundError('Learning target not found');
+      return {
+        instanceId: snapshot.instanceId,
+        scopes: snapshot.scopes,
+        consumer: `focus-target:${target.id}:pronunciation`,
+        snapshot,
+      };
+    },
+    validateAdmission: async (database, captured, committedReference) => {
+      const recipient = await execution.authorize(database);
+      if (recipient.userId !== userId) throw new Error('Learning target recipient changed');
+      const current = await captureFocusTargetStorage(database, target.id);
+      if (committedReference) {
+        if (current.target.pronunciationAudioUrl !== committedReference)
+          throw new Error('Learning target pronunciation publication changed');
+        return;
+      }
+      if (!isDeepStrictEqual(current, captured.snapshot))
+        throw new Error('Learning target pronunciation ownership changed');
+    },
+    previousReference: (snapshot) => snapshot.target.pronunciationAudioUrl,
+    commit: async (database, reference) => {
+      await database.learnerFocusTarget.update({
+        where: { id: target.id },
+        data: { pronunciationAudioUrl: reference },
+      });
+    },
   });
+  const updated = { ...target, pronunciationAudioUrl: url };
   logger.info('Generated learning-target pronunciation', {
     targetId: target.id,
     providerId: routing.providerId,

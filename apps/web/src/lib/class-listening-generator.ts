@@ -1,13 +1,14 @@
 // Generates the LISTENING section of a class:
 // 1. Creates a CLASS episode seeded with due vocabulary.
 // 2. Generates a short conversational script via generateScript().
-// 3. Persists Script + VocabularyEntry rows (mirrors script-generation worker).
+// 3. Persists Script and VocabularyEntry rows for the class episode.
 // 4. Queues audio generation via createSegmentsAndQueueAudio().
 // 5. Upserts each generated vocab word into the learner's knowledge graph.
 // 6. Generates comprehension MC questions over the transcript.
 // 7. Creates the ClassSection + LessonQuestion rows (status: READY).
 import { prisma } from './prisma';
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
@@ -24,6 +25,7 @@ const LISTENING_QUIZ_COUNT = 4;
 
 export interface ClassListeningParams {
   userId: string;
+  execution: SottoProviderExecution;
   classId: string;
   courseId: string;
   attempt?: number;
@@ -57,6 +59,7 @@ export interface ListeningComprehensionQuestion {
 // section, or a practice session). No ClassSection/LessonQuestion rows here.
 export interface ListeningContentParams {
   userId: string;
+  execution: SottoProviderExecution;
   courseId: string;
   level: string;
   nativeLang: string;
@@ -101,15 +104,15 @@ export async function composeListeningContent(
   p: ListeningContentParams
 ): Promise<ListeningContent> {
   // Step 1: resolve the learning AI provider (BYOK or local agent)
-  const ai = await resolveLearningAi(p.userId);
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const userSpeechPrefs = await prisma.user.findUnique({
     where: { id: p.userId },
     select: { preferredTtsModel: true },
   });
   const configuredTtsProvider = getConfiguredTtsProviderId();
 
-  // Step 2: create a CLASS episode. When the instance pins an explicit TTS
-  // provider (TTS_PROVIDER, e.g. the keyless local kokoro sidecar), seed it on
+  // Step 2: create a CLASS episode. When the instance pins a TTS provider,
+  // such as the keyless local Kokoro sidecar, seed it on
   // the episode so the audio-generation worker renders listening audio with it.
   const episode = await prisma.episode.create({
     data: {
@@ -146,12 +149,12 @@ export async function composeListeningContent(
       mustIncludeVocabulary: p.mustIncludeVocab,
       sourceContent: p.sourceContent,
       sourceMetadata: p.sourceMetadata,
-      // NOT key-availability fallback: web-search only enriches a topic that has
-      // no extracted text; provider selection stays explicit (resolveLearningAi).
+      // Web search enriches a topic that has no extracted text. Provider
+      // selection stays explicit in resolveCapturedLearningAi.
       webSearchEnabled: !p.sourceContent,
     });
 
-    // Step 4: persist Script + VocabularyEntry (mirrors script-generation worker)
+    // Step 4: persist Script and VocabularyEntry
     await prisma.$transaction(async (tx) => {
       await tx.script.create({
         data: {
@@ -194,7 +197,8 @@ export async function composeListeningContent(
         episodeId,
         p.userId,
         p.objective,
-        result.turns
+        result.turns,
+        p.execution
       );
       if (referenceCheck.verified < minimumVerifiedReferences(referenceCheck.total)) {
         throw new Error(
@@ -211,7 +215,9 @@ export async function composeListeningContent(
       where: { id: episodeId },
       data: { status: 'GENERATING_AUDIO' },
     });
-    await createSegmentsAndQueueAudio(episodeId, result.turns);
+    await createSegmentsAndQueueAudio(episodeId, result.turns, {
+      authorize: p.execution.authorize,
+    });
 
     // Step 6: log usage
     logUsage({
@@ -268,7 +274,7 @@ export async function composeListeningContent(
           content: `Generate ${LISTENING_QUIZ_COUNT} listening comprehension questions.`,
         },
       ],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.7 }
+      { ...(await capturedLearningAiOptions(ai)), maxTokens: 4096, temperature: 0.7 }
     );
 
     logUsage({
@@ -339,6 +345,7 @@ export async function generateClassListening(
   const attempt = p.attempt ?? 1;
   const { episodeId, comprehensionQuestions } = await composeListeningContent({
     userId: p.userId,
+    execution: p.execution,
     courseId: p.courseId,
     level: p.level,
     nativeLang: p.nativeLang,

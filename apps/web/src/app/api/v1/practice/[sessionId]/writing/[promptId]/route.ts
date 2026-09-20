@@ -6,6 +6,7 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { gradeWriting } from '@/lib/writing-grader';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 type RouteParams = { params: Promise<{ sessionId: string; promptId: string }> };
 
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const course = prompt.practiceSession.course;
     const grade = await gradeWriting({
       userId,
+      execution: sottoRequestExecution(request, authed),
       nativeLang: course.nativeLang,
       targetLang: course.targetLang,
       level: course.currentLevel,

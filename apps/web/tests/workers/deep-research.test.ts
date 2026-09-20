@@ -49,6 +49,66 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   providerRequiresAiKey: (provider: string) =>
     provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
+vi.mock('@/lib/sidedoor/jobs/core/durable-queue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sidedoor/jobs/core/durable-queue')>()),
+  durableJobProviderExecution: (_job: unknown, userId: string, signal?: AbortSignal) => ({
+    userId,
+    signal,
+    authorize: vi.fn(),
+  }),
+  transitionDurableQueueJob: async ({
+    queue,
+    type,
+    payload,
+    jobId,
+    mutate,
+  }: {
+    queue: { name: string };
+    type: string;
+    payload: unknown;
+    jobId: string;
+    mutate: (database: { episode: { update: typeof mockPrismaEpisodeUpdate } }) => Promise<void>;
+  }) => {
+    await mutate({ episode: { update: mockPrismaEpisodeUpdate } });
+    return mockEnqueueDurableJob(queue, type, payload, { jobId });
+  },
+}));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedEpisodeAi: async ({
+    userId,
+    aiModel,
+    allowSharing,
+  }: {
+    userId: string;
+    aiModel?: string | null;
+    allowSharing?: boolean;
+  }) => {
+    if (!aiModel) {
+      if (allowSharing)
+        throw new Error('AI model is required for deep research when no AI key is configured.');
+      const aiKey = await mockGetAiKey(userId);
+      if (!aiKey)
+        throw new Error('AI model is required for deep research when no AI key is configured.');
+      return { ...(await mockResolveAiModelAndProvider({ episodeAiModel: null, aiKey })), aiKey };
+    }
+    const resolved = await mockResolveAiModelAndProvider({ episodeAiModel: aiModel, aiKey: null });
+    if (['claude-code', 'codex', 'local'].includes(resolved.provider) || allowSharing)
+      return { ...resolved, aiKey: null };
+    const aiKey = await mockGetAiKey(userId, resolved.provider);
+    if (!aiKey)
+      throw new Error(`AI key for provider "${resolved.provider}" is required for deep research.`);
+    return { ...resolved, aiKey };
+  },
+  capturedLearningAiOptions: async (ai: {
+    model: string;
+    provider: string;
+    aiKey?: { apiKey: string } | null;
+  }) => ({
+    model: ai.model,
+    provider: ai.provider,
+    apiKeyOverride: ai.aiKey?.apiKey,
+  }),
+}));
 
 const { mockBuildResearchDossier } = vi.hoisted(() => ({
   mockBuildResearchDossier: vi.fn().mockResolvedValue({
@@ -69,9 +129,9 @@ vi.mock('@/lib/research-agent', () => ({
   buildResearchDossier: mockBuildResearchDossier,
 }));
 
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  enqueueDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   JobType: { CREATIVE_PLANNING: 'creative_planning' },
   creativePlanningQueue: { name: 'creative-planning' },
 }));
@@ -134,7 +194,7 @@ describe('processDeepResearch', () => {
     });
     mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
-    mockAddJob.mockResolvedValue({ id: 'planning-job-1' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'planning-job-1' });
     mockLogUsage.mockResolvedValue(undefined);
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockResolveAiModelAndProvider.mockResolvedValue({
@@ -236,7 +296,7 @@ describe('processDeepResearch', () => {
       });
       mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
 
-      await processDeepResearch(createMockJob({ ...defaultPayload, useAdminCredits: true }));
+      await processDeepResearch(createMockJob({ ...defaultPayload, allowSharedCredential: true }));
 
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
@@ -254,7 +314,7 @@ describe('processDeepResearch', () => {
 
     it('rejects admin-credit routes without an explicit model', async () => {
       await expect(
-        processDeepResearch(createMockJob({ ...defaultPayload, useAdminCredits: true }))
+        processDeepResearch(createMockJob({ ...defaultPayload, allowSharedCredential: true }))
       ).rejects.toThrow('AI model is required for deep research when no AI key is configured.');
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
@@ -293,7 +353,7 @@ describe('processDeepResearch', () => {
       expect(mockGetAiKey).not.toHaveBeenCalled();
       expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockBuildResearchDossier).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledWith(
+      expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
         { name: 'creative-planning' },
         'creative_planning',
         {
@@ -301,7 +361,7 @@ describe('processDeepResearch', () => {
           userId: 'user-001',
           discoveryId: 'discovery-001',
           dossierId: 'dossier-001',
-          useAdminCredits: undefined,
+          allowSharedCredential: undefined,
         },
         { jobId: expect.stringMatching(/^plan-episode-001-/) }
       );

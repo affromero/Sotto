@@ -8,7 +8,7 @@ import {
   cleanAndRenumberMarkdown,
   buildRenumberMap,
 } from '@/lib/script-updater';
-import { getMinReferenceCount } from '@/lib/script-verifier';
+import { getMinReferenceCount } from '@/lib/reference-thresholds';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 type RouteParams = { params: Promise<{ episodeId: string }> };

@@ -2,18 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { buildSetupReadiness, buildSttProviderStatuses } from '@/lib/setup-readiness';
 
 describe('buildSetupReadiness', () => {
-  it('marks the one-key OpenAI path ready when OpenAI is explicitly selected for generation, TTS, and STT', () => {
+  it('marks one saved OpenAI credential ready for generation, TTS, and STT', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
       storageProvider: 'local',
-      aiProviders: [],
-      ttsProviders: [],
-      sttProviders: [],
+      aiProviders: [{ provider: 'openai', isValid: true }],
+      ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [{ provider: 'openai', isValid: true }],
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
-      env: { OPENAI_API_KEY: 'sk-test' },
     });
 
     expect(readiness.ready).toBe(true);
@@ -30,7 +29,6 @@ describe('buildSetupReadiness', () => {
       sttProviders: [],
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
-      env: {},
     });
 
     expect(readiness.ready).toBe(true);
@@ -61,7 +59,6 @@ describe('buildSetupReadiness', () => {
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
-      env: {},
     });
     const generation = readiness.capabilities.find((capability) => capability.id === 'generation');
 
@@ -82,7 +79,6 @@ describe('buildSetupReadiness', () => {
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
       claudeCodeAvailable: true,
-      env: {},
     });
     const generation = readiness.capabilities.find((capability) => capability.id === 'generation');
 
@@ -90,7 +86,7 @@ describe('buildSetupReadiness', () => {
     expect(readiness.ready).toBe(true);
   });
 
-  it('marks local LLM, TTS, and STT ready from base URLs', () => {
+  it('marks local LLM, TTS, and STT ready from saved base URLs', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
@@ -98,14 +94,12 @@ describe('buildSetupReadiness', () => {
       aiProviders: [],
       ttsProviders: [],
       sttProviders: [],
-      env: {
-        AI_PROVIDER: 'local',
-        AI_BASE_URL: 'http://localhost:11434/v1',
-        TTS_PROVIDER: 'local',
-        TTS_BASE_URL: 'http://localhost:8000',
-        STT_PROVIDER: 'local',
-        STT_BASE_URL: 'http://localhost:8001/v1',
-      },
+      selectedAiProvider: 'local',
+      selectedTtsProvider: 'local',
+      selectedSttProvider: 'local',
+      aiBaseUrl: 'http://localhost:11434/v1',
+      ttsBaseUrl: 'http://localhost:8000',
+      sttBaseUrl: 'http://localhost:8001/v1',
     });
 
     expect(readiness.ready).toBe(true);
@@ -131,7 +125,6 @@ describe('buildSetupReadiness', () => {
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'openai',
       claudeCodeAvailable: false,
-      env: {},
     });
     const generation = readiness.capabilities.find((capability) => capability.id === 'generation');
 
@@ -151,7 +144,6 @@ describe('buildSetupReadiness', () => {
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'elevenlabs',
       selectedSttProvider: 'elevenlabs',
-      env: {},
     });
     const storage = readiness.capabilities.find((capability) => capability.id === 'storage');
 
@@ -170,7 +162,6 @@ describe('buildSetupReadiness', () => {
       sttProviders: [{ provider: 'openai', isValid: true }],
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
-      env: {},
     });
     const stt = readiness.capabilities.find((capability) => capability.id === 'stt');
 
@@ -194,7 +185,6 @@ describe('buildSetupReadiness', () => {
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
       selectedSttProvider: 'deepgram',
-      env: {},
     });
     const stt = readiness.capabilities.find((capability) => capability.id === 'stt');
 
@@ -216,7 +206,6 @@ describe('buildSetupReadiness', () => {
       selectedAiProvider: 'local',
       selectedTtsProvider: 'local',
       selectedSttProvider: 'local',
-      env: {},
     });
 
     expect(readiness.capabilities).toEqual(
@@ -224,17 +213,17 @@ describe('buildSetupReadiness', () => {
         expect.objectContaining({
           id: 'generation',
           status: 'action_required',
-          detail: 'Set AI_BASE_URL for the local OpenAI-compatible server.',
+          detail: 'Save the base URL for the local OpenAI-compatible server.',
         }),
         expect.objectContaining({
           id: 'tts',
           status: 'action_required',
-          detail: 'Set TTS_BASE_URL for the local TTS sidecar.',
+          detail: 'Save the base URL for the local TTS sidecar.',
         }),
         expect.objectContaining({
           id: 'stt',
           status: 'action_required',
-          detail: 'Set STT_BASE_URL for the local Whisper-compatible server.',
+          detail: 'Save the base URL for the local Whisper-compatible server.',
         }),
       ])
     );

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { customTagSchema, deleteAccountSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
-import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
@@ -16,6 +15,9 @@ import { supportsSttLanguage } from '@/lib/providers/stt-registry';
 import { errorResponse } from '@/lib/api-response';
 import { THEME_PREFS_COOKIE, serializeThemePrefs, themePrefsFromUser } from '@/lib/theme-prefs';
 import { z } from 'zod';
+import { deleteSottoProfile } from '@/lib/sidedoor/access/deletion/profile-deletion';
+import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
+import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
@@ -343,58 +345,16 @@ export async function DELETE(request: NextRequest) {
       return errorResponse('You must send { "confirm": "DELETE" } to delete your account', 400);
     }
 
-    const userId = authResult.userId;
-
-    // Collect episode IDs and storage keys before deleting
-    const episodes = await prisma.episode.findMany({
-      where: { userId },
-      select: { id: true, audioUrl: true, pdfUrl: true },
-    });
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { image: true },
-    });
-
-    // Delete orphaned models (no User FK, won't cascade)
-    await Promise.all([prisma.feedback.deleteMany({ where: { userId } })]);
-
-    // Delete user — cascades handle all FK-linked records
-    await prisma.user.delete({ where: { id: userId } });
-
-    // R2 storage cleanup — best-effort, doesn't fail the request
-    try {
-      const deletePromises: Promise<void>[] = [];
-
-      // Delete all files under each episode prefix (segments, audio, PDFs, versions)
-      // force: true — account deletion is the one legitimate bulk-delete scenario
-      for (const p of episodes) {
-        const keys = await listFiles(`episodes/${p.id}/`);
-        for (const key of keys) {
-          deletePromises.push(deleteFile(key, { force: true }));
-        }
-      }
-
-      // Delete user avatar
-      if (user?.image) {
-        deletePromises.push(deleteFile(user.image));
-      }
-
-      if (deletePromises.length > 0) {
-        await Promise.allSettled(deletePromises);
-        logger.info('Account deletion R2 cleanup completed', {
-          userId,
-          filesAttempted: String(deletePromises.length),
-        });
-      }
-    } catch (storageError) {
-      logger.error('Account deletion R2 cleanup failed', {
-        userId,
-        error: storageError instanceof Error ? storageError.message : 'Unknown error',
-      });
-    }
-
-    return NextResponse.json({ success: true });
+    const cleanup = await deleteSottoProfile(prismaUnfiltered, request, authResult.userId);
+    if (!cleanup) return errorResponse('User not found', 404);
+    const response = NextResponse.json(
+      { success: true, cleanup: { id: cleanup.id, phase: cleanup.phase } },
+      { status: cleanup.phase === 'complete' ? 200 : 202 }
+    );
+    response.cookies.delete(ACTIVE_PROFILE_COOKIE);
+    response.cookies.delete(THEME_PREFS_COOKIE);
+    response.cookies.delete(SHARED_SESSION_COOKIE);
+    return response;
   } catch (error: unknown) {
     logger.error('Failed to delete account', {
       error: error instanceof Error ? error.message : String(error),

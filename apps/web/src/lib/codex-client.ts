@@ -1,23 +1,24 @@
-import { spawn } from 'child_process';
-import { readFileSync, unlinkSync } from 'fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
+import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
+import {
+  CodexOutputDecoder,
+  CliProtocolError,
+  type CliOutputEvent,
+} from 'thesidedoor-core/runtime/cli';
+import { GenerationUsageError } from 'thesidedoor-core/ai/usage';
+import type { TokenUsage } from 'thesidedoor-core/ai';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { getCodexSshHost, isCodexAvailable } from './agent-availability';
-import { logger } from './logger';
 import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
-import { parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
+import { formatAgentModelId, parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
 
 /**
- * Codex CLI provider client — routes AI calls through `codex exec` in a
- * read-only sandbox (no file writes, no command execution), so Codex behaves as
- * a pure text generator. Modeled on claude-code-client. The prompt is piped via
- * stdin; the final assistant message is captured from a temp output file (with a
- * stdout fallback). A model is passed only when explicitly selected, so by
- * default Codex uses the model configured in the user's Codex setup.
- *
- * NOTE: the exact `codex exec` flags depend on the installed Codex CLI version;
- * this matches the documented invocation but is validated at runtime, not here.
+ * Run the selected Codex CLI with the existing read-only execution policy.
+ * Local execution prefers its final-answer file. Remote execution collects
+ * decoded assistant messages, which can include intermediate messages.
  */
 
 const SANDBOX = ['-s', 'read-only'];
@@ -26,13 +27,14 @@ const CODEX_ENV_KEYS = ['CODEX_HOME', 'CODEX_API_KEY'];
 
 export { getCodexSshHost, isCodexAvailable };
 
-interface CodexResponse {
+interface CodexResponse extends TokenUsage {
   content: string;
-  inputTokens: number;
-  outputTokens: number;
+  model: string;
 }
 
 interface CodexOptions {
+  signal?: AbortSignal;
+  onUsage?: (usage: TokenUsage & { model: string }) => void;
   model?: string;
   timeoutMs?: number;
   effort?: AgentEffortLevel;
@@ -65,15 +67,17 @@ function resolveSelection(opts?: CodexOptions): { model: string; effort?: AgentE
 
 function codexArgs(
   opts?: CodexOptions,
-  outFile?: string
+  outFile?: string,
+  selection = resolveSelection(opts)
 ): {
   args: string[];
   model: string;
   effort?: AgentEffortLevel;
 } {
-  const { model, effort } = resolveSelection(opts);
+  const { model, effort } = selection;
   const args = [
     'exec',
+    '--json',
     '--ephemeral',
     '--ignore-user-config',
     '--ignore-rules',
@@ -114,156 +118,225 @@ function classifyCodexFailure(code: number | null, stderr: string): string {
     return 'The Codex AI provider is not authenticated. Re-connect Codex or switch to another AI model in Settings.';
   }
   // Real errors come last in stderr — the head is a version/session banner.
-  return `codex: exited with code ${code} — ${stderr.slice(-500)}`;
+  return `codex: exited with code ${code}: ${stderr.slice(-500)}`;
 }
 
-/**
- * Spawn `codex exec` and return the full response. Codex has no system-prompt
- * flag, so the system prompt is prepended to the user prompt.
- */
+type Selection = ReturnType<typeof resolveSelection>;
+
+function modelIdentity(selection: Selection): string {
+  return formatAgentModelId('codex', selection.model || null, selection.effort);
+}
+
+class CodexCleanupError extends Error {}
+
+export function isCodexCleanupError(error: unknown): boolean {
+  return (
+    error instanceof CodexCleanupError ||
+    (error instanceof ProcessExecutionError && error.code === 'cleanup_failed')
+  );
+}
+
+async function releaseOutput(
+  directory: string | undefined,
+  primary: { error: unknown } | undefined,
+  usage: TokenUsage
+) {
+  if (!directory) return;
+  try {
+    await rm(directory, { recursive: true, force: true });
+  } catch (error) {
+    const cleanup = new CodexCleanupError('Codex temporary output cleanup failed', {
+      cause: error,
+    });
+    const failure = primary
+      ? new AggregateError([primary.error, cleanup], 'Codex execution and cleanup failed', {
+          cause: error,
+        })
+      : cleanup;
+    throw new GenerationUsageError(failure.message, usage, { cause: failure });
+  }
+}
+
+/** Return the final local answer, or decoded assistant messages over SSH. */
 export async function executeCodex(
   systemPrompt: string,
   prompt: string,
   opts?: CodexOptions
 ): Promise<CodexResponse> {
-  const timeoutMs = opts?.timeoutMs || 600_000;
-  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const outFile = join(
-    /* turbopackIgnore: true */ tmpdir(),
-    `codex-${process.pid}-${Date.now()}.txt`
-  );
-
-  const { args, model, effort } = codexArgs(opts, outFile);
-
-  logger.info('codex: executing', {
-    model: model || '(configured default)',
-    effort: effort ?? '(configured default)',
-    promptLength: String(fullPrompt.length),
-  });
-
-  return new Promise((resolve, reject) => {
-    const { command, args: spawnArgs } = buildAgentInvocation('codex', args, getCodexSshHost(), {
-      remoteEnvKeys: CODEX_ENV_KEYS,
-    });
-    const child = spawn(command, spawnArgs, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: codexEnvironment(),
-    });
-
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`codex: timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      if (code !== 0) {
-        logger.error('codex: non-zero exit', { code: String(code), stderr });
-        reject(new Error(classifyCodexFailure(code, stderr)));
-        return;
-      }
-
-      let content = '';
+  opts?.signal?.throwIfAborted();
+  const selection = resolveSelection(opts);
+  const host = getCodexSshHost();
+  let directory: string | undefined;
+  let usage: TokenUsage = { inputTokens: null, outputTokens: null };
+  let primary: { error: unknown } | undefined;
+  try {
+    if (!host) directory = await mkdtemp(join(tmpdir(), 'sotto-codex-'));
+    const output = directory ? join(directory, 'answer.txt') : undefined;
+    let content = '';
+    for await (const text of runCodex(
+      systemPrompt,
+      prompt,
+      {
+        ...opts,
+        onUsage(value) {
+          usage = { ...value };
+          opts?.onUsage?.({ ...value });
+        },
+      },
+      selection,
+      host,
+      output
+    ))
+      content += text;
+    if (output) {
       try {
-        content = readFileSync(/* turbopackIgnore: true */ outFile, 'utf8').trim();
-      } catch {
-        // fall back to stdout below
+        const final = (await readFile(output, 'utf8')).trim();
+        if (final) content = final;
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
       }
-      try {
-        unlinkSync(/* turbopackIgnore: true */ outFile);
-      } catch {
-        // best-effort cleanup
-      }
-      if (!content) content = stdout.trim();
-
-      if (!content) {
-        const detail = stderr.trim().slice(0, 300) || '(empty)';
-        reject(new Error(`codex: no output produced (empty response). Buffer: ${detail}`));
-        return;
-      }
-      resolve({ content, inputTokens: 0, outputTokens: 0 });
-    });
-
-    child.on('error', (err) => {
-      clearTimeout(timer);
-      reject(new Error(`codex: failed to spawn — ${err.message}. Is the 'codex' CLI installed?`));
-    });
-
-    child.stdin.write(fullPrompt);
-    child.stdin.end();
-  });
+    }
+    opts?.signal?.throwIfAborted();
+    if (!content.trim()) throw new Error('codex: no output produced (empty response)');
+    return { ...usage, content: content.trim(), model: modelIdentity(selection) };
+  } catch (error) {
+    const failure =
+      error instanceof GenerationUsageError
+        ? error
+        : new GenerationUsageError(
+            error instanceof Error ? error.message : 'Codex execution failed',
+            usage,
+            { cause: error }
+          );
+    primary = { error: failure };
+    throw failure;
+  } finally {
+    await releaseOutput(directory, primary, usage);
+  }
 }
 
-/** Forward the progressive stdout emitted by current `codex exec` releases. */
-export async function* streamCodex(
+/** Stream decoded assistant messages with measured usage and settled cancellation. */
+export function streamCodex(
   systemPrompt: string,
   prompt: string,
   opts?: CodexOptions
 ): AsyncGenerator<string> {
-  const timeoutMs = opts?.timeoutMs || 600_000;
-  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const { args } = codexArgs(opts);
-  const { command, args: spawnArgs } = buildAgentInvocation('codex', args, getCodexSshHost(), {
-    remoteEnvKeys: CODEX_ENV_KEYS,
-  });
-  const child = spawn(command, spawnArgs, {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: codexEnvironment(),
-  });
-  const chunks: string[] = [];
-  let notify: (() => void) | null = null;
-  let done = false;
-  let failure: Error | null = null;
-  let stderr = '';
-  let produced = false;
-  const timer = setTimeout(() => {
-    child.kill('SIGTERM');
-    failure = new Error(`codex: timed out after ${timeoutMs}ms`);
-  }, timeoutMs);
-  child.stdout.on('data', (chunk: Buffer) => {
-    produced = true;
-    chunks.push(chunk.toString());
-    notify?.();
-  });
-  child.stderr.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString();
-  });
-  child.on('error', (error) => {
-    failure = new Error(`codex: failed to spawn — ${error.message}. Is the 'codex' CLI installed?`);
-  });
-  child.on('close', (code) => {
-    clearTimeout(timer);
-    if (code !== 0 && !failure) {
-      failure = new Error(`codex: exited with code ${code} — ${stderr.slice(0, 500)}`);
-    } else if (!produced && !failure) {
-      failure = new Error(
-        `codex: no output produced (empty response). Buffer: ${stderr.trim().slice(0, 300) || '(empty)'}`
-      );
+  return interruptibleStream(
+    (signal) =>
+      runCodex(
+        systemPrompt,
+        prompt,
+        { ...opts, signal },
+        resolveSelection(opts),
+        getCodexSshHost()
+      ),
+    {
+      signal: opts?.signal,
+      isCleanupError: isCodexCleanupError,
     }
-    done = true;
-    notify?.();
-  });
-  child.stdin.write(fullPrompt);
-  child.stdin.end();
+  );
+}
 
-  while (!done || chunks.length > 0) {
-    if (chunks.length === 0) {
-      await new Promise<void>((resolve) => {
-        notify = resolve;
-      });
-      notify = null;
-      continue;
+async function* runCodex(
+  systemPrompt: string,
+  prompt: string,
+  opts: CodexOptions,
+  selection: Selection,
+  host?: string,
+  output?: string
+): AsyncGenerator<string> {
+  opts.signal?.throwIfAborted();
+  const { args } = codexArgs(opts, output, selection);
+  const invocation = buildAgentInvocation('codex', args, host, { remoteEnvKeys: CODEX_ENV_KEYS });
+  const environment = codexEnvironment();
+  const decoder = new CodexOutputDecoder(Number.MAX_SAFE_INTEGER);
+  let usage: TokenUsage | undefined;
+  let stderr = '';
+  let stdout = '';
+  let failure = '';
+  let terminalFailure = false;
+  let finished = false;
+  let produced = false;
+  function* observe(events: Iterable<CliOutputEvent>): Generator<string> {
+    for (const event of events) {
+      if (event.type === 'usage') {
+        usage = { ...event.usage };
+        opts.onUsage?.({ ...usage, model: modelIdentity(selection) });
+      }
+      if (event.type === 'failure') {
+        terminalFailure = true;
+        failure = event.message;
+      }
+      if (event.type === 'text') {
+        produced = true;
+        yield event.text;
+      }
     }
-    yield chunks.shift() as string;
   }
-  if (failure) throw failure;
+  const diagnostic = () =>
+    failure ||
+    stderr.trim() ||
+    stdout
+      .split('\n')
+      .filter((line) =>
+        /^(?:error:\s*)?(?:not logged in|oauth|failed to authenticate|401|unauthorized|usage limit)/i.test(
+          line.trim()
+        )
+      )
+      .join('\n') ||
+    '(no output)';
+  try {
+    for await (const chunk of new ProcessRunner().stream({
+      ...invocation,
+      environment,
+      signal: opts.signal,
+      timeoutMs: opts.timeoutMs || 600000,
+      input: systemPrompt ? systemPrompt + '\n\n' + prompt : prompt,
+      maxOutputBytes: Number.MAX_SAFE_INTEGER,
+    })) {
+      if (chunk.channel === 'stderr') {
+        stderr = (stderr + chunk.text).slice(-4000);
+        continue;
+      }
+      stdout = (stdout + chunk.text).slice(0, 4000);
+      yield* observe(decoder.push(chunk.text));
+    }
+    finished = true;
+    yield* observe(decoder.finish());
+    if (terminalFailure) throw new Error(classifyCodexFailure(1, diagnostic()));
+    if (!produced && !output) throw new Error('codex: no output produced (empty response)');
+  } catch (error) {
+    if (!finished) {
+      try {
+        for (const event of decoder.finish(false)) {
+          if (event.type === 'failure') {
+            terminalFailure = true;
+            failure = event.message;
+          }
+          if (event.type === 'usage') {
+            usage = { ...event.usage };
+            opts.onUsage?.({ ...usage, model: modelIdentity(selection) });
+          }
+        }
+      } catch {
+        /* Preserve the execution failure. */
+      }
+    }
+    let reported = error;
+    if (error instanceof ProcessExecutionError && error.code === 'exit_failed')
+      reported = new Error(classifyCodexFailure(error.exitCode, diagnostic()), { cause: error });
+    if (error instanceof ProcessExecutionError && error.code === 'start_failed')
+      reported = new Error("codex: failed to spawn. Is the 'codex' CLI installed?", {
+        cause: error,
+      });
+    if (error instanceof CliProtocolError && diagnostic() !== '(no output)')
+      reported = new Error(classifyCodexFailure(1, diagnostic()), { cause: error });
+    if (usage)
+      throw new GenerationUsageError(
+        reported instanceof Error ? reported.message : 'Codex execution failed',
+        usage,
+        { cause: reported }
+      );
+    throw reported;
+  }
 }

@@ -34,22 +34,29 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- R2 mock ----
 
-const mockUploadFile = vi
-  .fn()
-  .mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
+const mockCreateSpeakingRecording = vi.fn().mockResolvedValue({
+  id: 'rec-001',
+  status: 'PENDING',
+  operationId: '10000000-0000-4000-8000-000000000001',
+  fingerprint: 'a'.repeat(64),
+});
 
-vi.mock('@/lib/r2', () => ({
-  uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+vi.mock('@/lib/sidedoor/storage/publication/speaking-recording-upload', () => ({
+  createSpeakingRecording: (...args: unknown[]) => mockCreateSpeakingRecording(...args),
 }));
 
 // ---- Queue mock ----
 
-const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-001' });
+const mockEnqueueDurableJob = vi.fn().mockResolvedValue({ id: 'job-001' });
+const mockDeliverSottoJob = vi.fn().mockResolvedValue('delivered');
 
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   speakingGradingQueue: {},
   JobType: { SPEAKING_GRADING: 'speaking_grading' },
+}));
+vi.mock('@/lib/sidedoor/jobs/core/job-delivery', () => ({
+  deliverSottoJob: (...args: unknown[]) => mockDeliverSottoJob(...args),
 }));
 
 // ---- Logger mock ----
@@ -77,7 +84,7 @@ function makeGetRequest(url: string): NextRequest {
  * issues in the test environment (same pattern as classes-speaking.test.ts).
  */
 function makePostRequest(
-  audioFile?: { arrayBuffer: () => Promise<ArrayBuffer>; type: string } | null,
+  audioFile?: { arrayBuffer: () => Promise<ArrayBuffer>; type: string } | null
 ): NextRequest {
   const fileEntry = audioFile ?? null;
   return {
@@ -112,8 +119,13 @@ describe('POST /api/v1/exams/[examId]/speaking/[promptId]', () => {
     mockMockExamFindFirst.mockResolvedValue({ id: 'exam-001' });
     mockSpeakingPromptFindFirst.mockResolvedValue({ id: 'prompt-001', examSectionId: 'esec-001' });
     mockSpeakingRecordingCreate.mockResolvedValue({ id: 'rec-001', status: 'PENDING' });
-    mockUploadFile.mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
-    mockAddJob.mockResolvedValue({ id: 'job-001' });
+    mockCreateSpeakingRecording.mockResolvedValue({
+      id: 'rec-001',
+      status: 'PENDING',
+      operationId: '10000000-0000-4000-8000-000000000001',
+      fingerprint: 'a'.repeat(64),
+    });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-001' });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -140,21 +152,27 @@ describe('POST /api/v1/exams/[examId]/speaking/[promptId]', () => {
   });
 
   it('returns 400 for a zero-byte audio upload without storing or queuing', async () => {
-    const res = await POST(makePostRequest(makeEmptyAudioFile()), routeParams('exam-001', 'prompt-001'));
+    const res = await POST(
+      makePostRequest(makeEmptyAudioFile()),
+      routeParams('exam-001', 'prompt-001')
+    );
 
     expect(res.status).toBe(400);
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
   it('returns 400 for random non-audio bytes without storing or queuing', async () => {
-    const res = await POST(makePostRequest(makeGarbageAudioFile()), routeParams('exam-001', 'prompt-001'));
+    const res = await POST(
+      makePostRequest(makeGarbageAudioFile()),
+      routeParams('exam-001', 'prompt-001')
+    );
 
     expect(res.status).toBe(400);
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
   it('creates a PENDING SpeakingRecording keyed by examSectionId and returns 201', async () => {
@@ -163,34 +181,25 @@ describe('POST /api/v1/exams/[examId]/speaking/[promptId]', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toEqual({ recordingId: 'rec-001', status: 'PENDING' });
-    expect(mockSpeakingRecordingCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          examSectionId: 'esec-001',
-          promptId: 'prompt-001',
-          userId: 'user-001',
-          status: 'PENDING',
-        }),
-      })
+    expect(mockCreateSpeakingRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ parent: { examSectionId: 'esec-001' } })
     );
   });
 
-  it('uploads audio to R2 with a key containing userId and promptId', async () => {
+  it('publishes recognized audio through the owned storage helper', async () => {
     await POST(makePostRequest(makeAudioFile()), routeParams('exam-001', 'prompt-001'));
 
-    expect(mockUploadFile).toHaveBeenCalledOnce();
-    const [key, , contentType] = mockUploadFile.mock.calls[0];
-    expect(key).toMatch(/^speaking\/user-001\/prompt-001\//);
-    expect(key).toMatch(/\.webm$/);
-    expect(contentType).toBe('audio/webm');
+    expect(mockCreateSpeakingRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ extension: 'webm', contentType: 'audio/webm' })
+    );
   });
 
   it('enqueues a SPEAKING_GRADING job with the new recordingId', async () => {
     await POST(makePostRequest(makeAudioFile()), routeParams('exam-001', 'prompt-001'));
 
-    expect(mockAddJob).toHaveBeenCalledWith(expect.anything(), 'speaking_grading', {
-      recordingId: 'rec-001',
-    });
+    expect(mockDeliverSottoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ operationId: '10000000-0000-4000-8000-000000000001', version: 1 })
+    );
   });
 });
 
@@ -213,7 +222,9 @@ describe('GET /api/v1/exams/[examId]/speaking/[promptId]', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
-    const req = makeGetRequest('http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest(
+      'http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-001'
+    );
     const res = await GET(req, routeParams('exam-001', 'prompt-001'));
     expect(res.status).toBe(401);
   });
@@ -226,20 +237,26 @@ describe('GET /api/v1/exams/[examId]/speaking/[promptId]', () => {
 
   it('returns 404 when exam does not belong to user', async () => {
     mockMockExamFindFirst.mockResolvedValue(null);
-    const req = makeGetRequest('http://localhost/api/v1/exams/exam-999/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest(
+      'http://localhost/api/v1/exams/exam-999/speaking/prompt-001?recordingId=rec-001'
+    );
     const res = await GET(req, routeParams('exam-999', 'prompt-001'));
     expect(res.status).toBe(404);
   });
 
   it('returns 404 when recording not found or not owned by user', async () => {
     mockSpeakingRecordingFindFirst.mockResolvedValue(null);
-    const req = makeGetRequest('http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-999');
+    const req = makeGetRequest(
+      'http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-999'
+    );
     const res = await GET(req, routeParams('exam-001', 'prompt-001'));
     expect(res.status).toBe(404);
   });
 
   it('returns scored fields when grading is complete', async () => {
-    const req = makeGetRequest('http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest(
+      'http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-001'
+    );
     const res = await GET(req, routeParams('exam-001', 'prompt-001'));
 
     expect(res.status).toBe(200);
@@ -248,7 +265,9 @@ describe('GET /api/v1/exams/[examId]/speaking/[promptId]', () => {
   });
 
   it('scopes the recording lookup to the authenticated user', async () => {
-    const req = makeGetRequest('http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest(
+      'http://localhost/api/v1/exams/exam-001/speaking/prompt-001?recordingId=rec-001'
+    );
     await GET(req, routeParams('exam-001', 'prompt-001'));
 
     expect(mockSpeakingRecordingFindFirst).toHaveBeenCalledWith(

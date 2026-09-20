@@ -67,7 +67,7 @@
 | `/api/v1/tts-options`                                                  | GET              | Yes   | TTS provider:model list                                                                                                                                                                                                                   |
 | `/api/v1/ai-models`                                                    | GET              | Yes   | AI model list                                                                                                                                                                                                                             |
 | `/api/v1/tts-models`                                                   | GET              | Yes   | TTS models by provider                                                                                                                                                                                                                    |
-| `/api/v1/storage/[...key]`                                             | GET              | Yes   | Serve an object from local storage (`STORAGE_PROVIDER=local`); the read side of the URLs `lib/r2.ts` mints. Supports Range requests for audio seeking. 404s when object storage is configured                                             |
+| `/api/v1/storage/[...key]`                                             | GET              | Yes   | Serve an object from the saved local storage root. Supports Range requests for audio seeking. Returns 404 when object storage is selected.                                                                                                |
 | `/api/v1/stt-providers`                                                | GET              | Yes   | STT providers                                                                                                                                                                                                                             |
 | `/api/v1/settings/ai-keys`                                             | GET/POST/DELETE  | Yes   | AI BYOK keys                                                                                                                                                                                                                              |
 | `/api/v1/settings/byok`                                                | GET/POST/DELETE  | Yes   | TTS BYOK keys                                                                                                                                                                                                                             |
@@ -92,7 +92,7 @@
 | `/api/v1/courses/[courseId]/notes`                                     | GET/PUT/POST     | Yes   | Course-scoped learner note (free-text context); POST imports uploaded official/enrolled-course notes, merges them into the note, and best-effort extracts vocabulary for the learner graph                                                |
 | `/api/v1/courses/[courseId]/practice`                                  | GET/POST         | Yes   | GET: due counts per skill + recent sessions. POST: start an ungated practice session (kind ∈ PracticeKind, including FULL catch-up)                                                                                                       |
 | `/api/v1/courses/[courseId]/learning-targets`                          | GET/POST         | Yes   | List/add learner-marked difficult words, phrases, and sentences for focused practice. POST stores context and schedules the target for adaptive review without translating it                                                             |
-| `/api/v1/courses/[courseId]/learning-targets/[targetId]/visual-cue`    | POST             | Yes   | Attach an optional Pexels visual cue to a learner-marked target using the learner's encrypted visual-cue key, with `PEXELS_API_KEY` as platform fallback                                                                                  |
+| `/api/v1/courses/[courseId]/learning-targets/[targetId]/visual-cue`    | POST             | Yes   | Attach an optional Pexels visual cue to a learner-marked target using the learner's encrypted visual-cue credential                                                                                                                       |
 | `/api/v1/courses/[courseId]/learning-targets/[targetId]/pronunciation` | POST             | Yes   | Generate pronunciation audio for a learner-marked target through the configured TTS provider                                                                                                                                              |
 | `/api/v1/practice/[sessionId]`                                         | GET              | Yes   | Re-enter a practice session that is still ACTIVE, in the shape the runner expects. Restores the material, not in-flight multiple-choice answers                                                                                           |
 | `/api/v1/practice/[sessionId]/submit`                                  | POST             | Yes   | Grade a practice session, drive SRS (per-item for VOCAB, aggregate otherwise); ungated                                                                                                                                                    |
@@ -118,6 +118,18 @@
 `(dashboard)/` — dashboard layout. `(admin)/` — admin layout. (Single-user self-hosted: no login, so route groups are layout-only, not auth gates.)
 
 ## Adding Routes
+
+`welcome/welcome-snapshot.ts` and `welcome/resume-security.ts` discard browser-stored
+secrets and retain safe endpoint URLs. `welcome/credential-discovery.ts` projects
+personal credential metadata into wizard cards. The final onboarding request
+requires displayed owner context and personal credential heads, checked in both
+database transactions. Agent setup reports real saves and verification outcomes.
+
+Welcome uses `welcome/credential-session.ts` to share captured credential revisions
+between early AI setup and final completion. It retains receipts across retries,
+merges compatible physical-slot aliases before writes, and blocks unresolved writes.
+`StepReady` receives its save callback from `WelcomeFlow`; it must not POST keys directly.
+Provider-specific auxiliary fields come from the shared credential catalog.
 
 **Page**: `src/app/route-name/page.tsx` + optional `.module.css`.
 **API**: `src/app/api/v1/resource/route.ts` + Zod schema in `lib/validations.ts`.

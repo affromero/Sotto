@@ -7,17 +7,16 @@ import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { ContentModerationError } from '@/lib/moderation';
-import { getAiKey } from '@/lib/byok';
-import {
-  providerRequiresAiKey,
-  resolveAiModelAndProvider,
-  type AiProviderId,
-} from '@/lib/providers/ai-registry';
+import { capturedLearningAiOptions, resolveCapturedEpisodeAi } from '@/lib/learning-ai';
+import { durableJobProviderExecution } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
 
-export async function processInteraction(job: Job<ProcessInteractionPayload>): Promise<void> {
+export async function processInteraction(
+  job: Job<ProcessInteractionPayload>,
+  signal?: AbortSignal
+): Promise<void> {
   const { episodeId, interactionId, userId, question, timestamp } = job.data;
 
   logger.info('Processing interaction', { episodeId, interactionId });
@@ -26,29 +25,26 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   const [episode, user] = await Promise.all([
     prisma.episode.findUnique({
       where: { id: episodeId },
-      select: { language: true, aiModel: true },
+      select: { language: true, aiModel: true, aiProvider: true },
     }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
   ]);
 
-  const aiKey = episode?.aiModel ? null : await getAiKey(userId);
-  if (!episode?.aiModel && !aiKey) {
-    throw new Error('AI model is required for interactions when no AI key is configured.');
-  }
-
-  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
-  const { model, provider } = await resolveAiModelAndProvider({
-    episodeAiModel: episode?.aiModel,
-    aiKey,
+  if (!episode) throw new Error(`Episode not found: ${episodeId}`);
+  const ai = await resolveCapturedEpisodeAi({
+    userId,
+    aiModel: episode.aiModel,
+    aiProvider: episode.aiProvider,
+    allowSharing: false,
+    execution: durableJobProviderExecution(job, userId, signal),
   });
-
-  const providerAiKey =
-    episode?.aiModel && providerRequiresAiKey(provider)
-      ? await getAiKey(userId, provider as AiProviderId)
-      : aiKey;
-  if (episode?.aiModel && providerRequiresAiKey(provider) && !providerAiKey) {
-    throw new Error(`AI key for provider "${provider}" is required for interactions.`);
-  }
+  const {
+    model,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
+  } = await capturedLearningAiOptions(ai);
+  const provider = ai.provider;
 
   // Get episode script context
   const script = await prisma.script.findUnique({ where: { episodeId } });
@@ -114,7 +110,12 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
           content: `Recent episode context:\n${recentContext}\n\nUser's question: ${question}`,
         },
       ],
-      { apiKeyOverride: providerAiKey?.apiKey, model }
+      {
+        apiKeyOverride,
+        model,
+        fetch: providerFetch,
+        signal: providerSignal,
+      }
     );
   } catch (err) {
     if (err instanceof ContentModerationError) {

@@ -6,6 +6,10 @@ const mockAuthenticateRequest = vi.fn();
 const mockListByokProviders = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
+const siteConfiguration = vi.hoisted(() => ({
+  ttsProvider: null as string | null,
+  ttsBaseUrl: null as string | null,
+}));
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -21,6 +25,10 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
   },
+}));
+
+vi.mock('@/lib/site-config', () => ({
+  getSiteConfig: async () => siteConfiguration,
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
@@ -63,7 +71,8 @@ describe('GET /api/v1/tts-options', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockUserFindUnique.mockResolvedValue({ role: 'USER' });
     mockGetAutoModelConfig.mockResolvedValue({ includedTtsModels: ['openai:tts-1'] });
-    vi.stubEnv('TTS_BASE_URL', '');
+    siteConfiguration.ttsProvider = null;
+    siteConfiguration.ttsBaseUrl = null;
   });
 
   afterEach(() => {
@@ -78,7 +87,7 @@ describe('GET /api/v1/tts-options', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.isByok).toBe(true);
+    expect(body.hasCredential).toBe(true);
     expect(body.options).toEqual([
       expect.objectContaining({
         id: 'openai:tts-1',
@@ -90,8 +99,9 @@ describe('GET /api/v1/tts-options', () => {
     );
   });
 
-  it('includes local TTS sidecar options when TTS_BASE_URL is configured', async () => {
-    vi.stubEnv('TTS_BASE_URL', 'http://localhost:8000');
+  it('includes local TTS sidecar options when shared configuration selects it', async () => {
+    siteConfiguration.ttsProvider = 'local';
+    siteConfiguration.ttsBaseUrl = 'http://localhost:8000';
     mockListByokProviders.mockResolvedValue([]);
 
     const request = new NextRequest('https://sotto.test/api/v1/tts-options');

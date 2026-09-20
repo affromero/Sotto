@@ -1,7 +1,8 @@
 // Grades a learner's writing response synchronously via the LLM: returns an
 // overall score, inline corrections (old/new/why), and encouraging feedback.
 // Unlike speaking (STT + async worker), writing grading is a single LLM call.
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -20,6 +21,7 @@ export interface WritingGrade {
 
 export interface GradeWritingParams {
   userId: string;
+  execution: SottoProviderExecution;
   nativeLang: string;
   targetLang: string;
   level: string;
@@ -38,7 +40,7 @@ function isCorrection(item: unknown): item is WritingCorrection {
 }
 
 export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade> {
-  const ai = await resolveLearningAi(p.userId);
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   const systemPrompt = loadAndRender('writing/grade-writing.md', {
     LEVEL: p.level,
@@ -52,7 +54,7 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: 'Grade the response.' }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 2048, temperature: 0.3 }
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 2048, temperature: 0.3 }
   );
 
   logUsage({

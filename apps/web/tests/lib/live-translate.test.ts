@@ -7,16 +7,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockGetAiKey = vi.fn();
+const mockListAiProviders = vi.fn();
+const sharedConfiguration = vi.hoisted(() => ({ liveModel: null as string | null }));
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...a: unknown[]) => mockGetAiKey(...a),
+  listAiProviders: (...a: unknown[]) => mockListAiProviders(...a),
+}));
+
+vi.mock('@/lib/site-config', () => ({
+  getSiteConfig: async () => ({ liveModel: sharedConfiguration.liveModel }),
 }));
 
 const mockCourseFindFirst = vi.fn();
-const mockUserAiKeyFindUnique = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
-    userAiKey: { findUnique: (...a: unknown[]) => mockUserAiKeyFindUnique(...a) },
   },
 }));
 
@@ -46,15 +51,17 @@ import {
 const COURSE = { nativeLang: 'en', targetLang: 'de' };
 
 describe('getLiveTranslateModel', () => {
-  afterEach(() => vi.unstubAllEnvs());
-
-  it('defaults to a documented Gemini Live model when unset', () => {
-    expect(getLiveTranslateModel()).toBe('gemini-live-2.5-flash-preview');
+  afterEach(() => {
+    sharedConfiguration.liveModel = null;
   });
 
-  it('honors the GEMINI_LIVE_MODEL override', () => {
-    vi.stubEnv('GEMINI_LIVE_MODEL', 'gemini-3.5-live-translate-preview');
-    expect(getLiveTranslateModel()).toBe('gemini-3.5-live-translate-preview');
+  it('defaults to a documented Gemini Live model when unset', async () => {
+    await expect(getLiveTranslateModel()).resolves.toBe('gemini-live-2.5-flash-preview');
+  });
+
+  it('uses the configured Gemini Live model', async () => {
+    sharedConfiguration.liveModel = 'gemini-3.5-live-translate-preview';
+    await expect(getLiveTranslateModel()).resolves.toBe('gemini-3.5-live-translate-preview');
   });
 });
 
@@ -79,13 +86,17 @@ describe('resolveLiveTranslate', () => {
 describe('canLiveTranslate', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('is true when a google key row exists', async () => {
-    mockUserAiKeyFindUnique.mockResolvedValue({ id: 'k1' });
+  it('is available when the personal Google credential is enabled', async () => {
+    mockListAiProviders.mockResolvedValue([{ provider: 'google', isValid: true }]);
     await expect(canLiveTranslate('u1')).resolves.toBe(true);
   });
 
-  it('is false when there is no google key row', async () => {
-    mockUserAiKeyFindUnique.mockResolvedValue(null);
+  it.each([
+    { keys: [] },
+    { keys: [{ provider: 'google', isValid: false }] },
+    { keys: [{ provider: 'openai', isValid: true }] },
+  ])('is unavailable without an enabled personal Google credential: $keys', async ({ keys }) => {
+    mockListAiProviders.mockResolvedValue(keys);
     await expect(canLiveTranslate('u1')).resolves.toBe(false);
   });
 });
@@ -101,7 +112,7 @@ describe('mintLiveToken', () => {
   it('rejects a course the caller does not own, before touching Google', async () => {
     mockCourseFindFirst.mockResolvedValue(null);
     await expect(mintLiveToken('u1', 'c-other', 'native_to_target')).rejects.toBeInstanceOf(
-      LiveTranslateCourseError,
+      LiveTranslateCourseError
     );
     expect(mockAuthTokensCreate).not.toHaveBeenCalled();
   });
@@ -134,14 +145,14 @@ describe('mintLiveToken', () => {
   it('surfaces a Google rejection as an access error (no silent degrade)', async () => {
     mockAuthTokensCreate.mockRejectedValue(new Error('model not found for this key'));
     await expect(mintLiveToken('u1', 'c1', 'native_to_target')).rejects.toBeInstanceOf(
-      LiveTranslateAccessError,
+      LiveTranslateAccessError
     );
   });
 
   it('treats a missing token name as an access error', async () => {
     mockAuthTokensCreate.mockResolvedValue({});
     await expect(mintLiveToken('u1', 'c1', 'native_to_target')).rejects.toBeInstanceOf(
-      LiveTranslateAccessError,
+      LiveTranslateAccessError
     );
   });
 });

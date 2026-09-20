@@ -3,6 +3,12 @@ import { assignVoicesForEpisode } from '@/lib/voice-assigner';
 
 const mockEpisodeVoiceFindMany = vi.fn();
 const mockEpisodeVoiceCreateMany = vi.fn();
+const serverConfiguration = vi.hoisted(() => ({ ttsVoices: null as string | null }));
+
+vi.mock('@/lib/server-config', () => ({
+  infra: (key: string) =>
+    key === 'ttsVoices' ? (serverConfiguration.ttsVoices ?? undefined) : undefined,
+}));
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -26,6 +32,7 @@ vi.mock('@/lib/logger', () => ({
 describe('assignVoicesForEpisode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverConfiguration.ttsVoices = null;
     mockEpisodeVoiceFindMany.mockResolvedValue([]);
     mockEpisodeVoiceCreateMany.mockResolvedValue({ count: 0 });
   });
@@ -137,7 +144,7 @@ describe('assignVoicesForEpisode', () => {
   });
 
   it('uses configured local sidecar voice IDs', async () => {
-    vi.stubEnv('TTS_VOICES', 'voice_a,voice_b,voice_c');
+    serverConfiguration.ttsVoices = 'voice_a,voice_b,voice_c';
 
     await assignVoicesForEpisode(
       'pod-1',

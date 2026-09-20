@@ -1,22 +1,24 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@/generated/prisma/client';
-import { CreativePlanningPayload, addJob, JobType, scriptWritingQueue } from '@/lib/queue';
+import { CreativePlanningPayload, JobType, scriptWritingQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { createCreativeOutline } from '@/lib/creative-director';
 import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey } from '@/lib/byok';
+import { capturedLearningAiOptions, resolveCapturedEpisodeAi } from '@/lib/learning-ai';
 import {
-  providerRequiresAiKey,
-  resolveAiModelAndProvider,
-  type AiProviderId,
-} from '@/lib/providers/ai-registry';
+  durableJobProviderExecution,
+  transitionDurableQueueJob,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
-export async function processCreativePlanning(job: Job<CreativePlanningPayload>): Promise<void> {
-  const { episodeId, userId, discoveryId, dossierId, useAdminCredits } = job.data;
+export async function processCreativePlanning(
+  job: Job<CreativePlanningPayload>,
+  signal?: AbortSignal
+): Promise<void> {
+  const { episodeId, userId, discoveryId, dossierId, allowSharedCredential } = job.data;
 
   logger.info('Creative planning starting', { episodeId });
   await job.updateProgress(5);
@@ -30,26 +32,28 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   if (existingOutline) {
     logger.info('Creative outline already exists, skipping to script writing', { episodeId });
 
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'SCRIPTING' },
-    });
-    await invalidateEpisodeCache(episodeId);
-    await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
-
-    await addJob(
-      scriptWritingQueue,
-      JobType.WRITE_SCRIPT,
-      {
+    await transitionDurableQueueJob({
+      job,
+      queue: scriptWritingQueue,
+      type: JobType.WRITE_SCRIPT,
+      payload: {
         episodeId,
         userId,
         discoveryId,
         dossierId,
         outlineId: existingOutline.id,
-        useAdminCredits,
+        allowSharedCredential,
       },
-      { jobId: `write-${episodeId}-${String(job.id)}` }
-    );
+      jobId: `write-${episodeId}-${String(job.id)}`,
+      mutate: async (database) => {
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { status: 'SCRIPTING' },
+        });
+      },
+    });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
 
     await job.updateProgress(100);
     return;
@@ -75,29 +79,26 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
     }),
     prisma.episode.findUniqueOrThrow({
       where: { id: episodeId },
-      select: { aiModel: true },
+      select: { aiModel: true, aiProvider: true },
     }),
   ]);
 
   await job.updateProgress(15);
 
-  const aiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
-  if (!episode.aiModel && !aiKey) {
-    throw new Error('AI model is required for creative planning when no AI key is configured.');
-  }
-
-  const { model, provider } = await resolveAiModelAndProvider({
-    episodeAiModel: episode.aiModel,
-    aiKey,
+  const ai = await resolveCapturedEpisodeAi({
+    userId,
+    aiModel: episode.aiModel,
+    aiProvider: episode.aiProvider,
+    allowSharing: Boolean(allowSharedCredential),
+    execution: durableJobProviderExecution(job, userId, signal),
   });
-
-  const providerAiKey =
-    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
-      ? await getAiKey(userId, provider as AiProviderId)
-      : aiKey;
-  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
-    throw new Error(`AI key for provider "${provider}" is required for creative planning.`);
-  }
+  const {
+    model,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
+  } = await capturedLearningAiOptions(ai);
+  const provider = ai.provider;
 
   const sources = dossier.sources as unknown as SourceRecord[];
   const evidence = dossier.evidence as unknown as EvidenceCard[];
@@ -119,7 +120,9 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
     sources,
     evidence,
     recommendedAngle: dossier.recommendedAngle,
-    apiKeyOverride: providerAiKey?.apiKey,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
     model,
     provider,
   });
@@ -165,26 +168,28 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   );
 
   // Chain to script writing
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: { status: 'SCRIPTING' },
-  });
-  await invalidateEpisodeCache(episodeId);
-  await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
-
-  await addJob(
-    scriptWritingQueue,
-    JobType.WRITE_SCRIPT,
-    {
+  await transitionDurableQueueJob({
+    job,
+    queue: scriptWritingQueue,
+    type: JobType.WRITE_SCRIPT,
+    payload: {
       episodeId,
       userId,
       discoveryId,
       dossierId,
       outlineId: savedOutline.id,
-      useAdminCredits,
+      allowSharedCredential,
     },
-    { jobId: `write-${episodeId}-${String(job.id)}` }
-  );
+    jobId: `write-${episodeId}-${String(job.id)}`,
+    mutate: async (database) => {
+      await database.episode.update({
+        where: { id: episodeId },
+        data: { status: 'SCRIPTING' },
+      });
+    },
+  });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
 
   logger.info('Creative planning complete, queued script writing', {
     episodeId,

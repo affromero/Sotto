@@ -17,7 +17,21 @@ import {
   resolveTts,
   resolveStt,
   resolveVisualCue,
+  welcomeVoiceCredentialExtras,
 } from '@/app/welcome/providerMap';
+
+it('keeps the selected PlayHT account identifier with its own key', () => {
+  const extra = welcomeVoiceCredentialExtras('playht', {
+    'playht:userId': ' personal-account ',
+    'cartesia:adminApiKey': 'different-account-secret',
+  });
+  expect(resolveTts('playht', 'personal-key', '', '', extra).keyPost).toEqual({
+    endpoint: 'byok',
+    provider: 'playht',
+    apiKey: 'personal-key',
+    extra: { userId: 'personal-account' },
+  });
+});
 
 describe('resolveAi', () => {
   it('maps claude + key to a BYOK anthropic key (AI-key store)', () => {
@@ -115,6 +129,14 @@ describe('resolveAi', () => {
     expect(r.keyPost).toBeNull();
     expect(r.infra).toEqual({});
     expect(r.preferredAiProvider).toBeNull();
+  });
+
+  it('keeps the selected AI provider and model when reusing a saved key', () => {
+    expect(resolveAi('claude', 'key', '', 'selected-model')).toMatchObject({
+      keyPost: null,
+      preferredAiProvider: 'anthropic',
+      preferredAiModel: 'selected-model',
+    });
   });
 });
 
