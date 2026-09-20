@@ -191,29 +191,3 @@ export async function visitStorageDeletionReferences(
     ({ visualCueUrl, pronunciationAudioUrl }) => ({ visualCueUrl, pronunciationAudioUrl })
   );
 }
-
-/** Existing synchronous cleanup callers retain their reference classification until migration. */
-export async function collectStorageDeletionTargets(
-  database: Prisma.TransactionClient,
-  scope: StorageDeletionScope,
-  publicUrl?: string
-) {
-  const episodePrefixes: string[] = [];
-  const episodeRefs = new Set<string>();
-  const explicitRefs = new Set<string>();
-  await visitStorageDeletionReferences(database, scope, async (page) => {
-    const refs = ['episode', 'segment', 'version'].includes(page.source)
-      ? episodeRefs
-      : explicitRefs;
-    for (const row of page.rows) {
-      if (row.episodePrefix) episodePrefixes.push(row.episodePrefix);
-      for (const reference of ownedStorageReferences(Object.values(row.references), publicUrl))
-        refs.add(reference);
-    }
-  });
-  return {
-    episodePrefixes,
-    episodeRefs: [...episodeRefs],
-    explicitRefs: [...explicitRefs],
-  };
-}

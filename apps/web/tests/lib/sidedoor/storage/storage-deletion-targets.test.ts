@@ -5,7 +5,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@/generated/prisma/client';
 import {
-  collectStorageDeletionTargets,
   ownedStorageReferences,
   visitStorageDeletionReferences,
   type StorageDeletionReferencePage,
@@ -166,45 +165,6 @@ suite('storage ownership collection with PostgreSQL', () => {
       ...Object.values(values)
     );
   }
-  it('collects every owned speaking path and recording without collecting another profile’s files', async () => {
-    const targets = await database.$transaction(
-      (tx) => collectStorageDeletionTargets(tx, { kind: 'profile', id: 'first' }),
-      { isolationLevel: 'Serializable' }
-    );
-    expect(targets.episodePrefixes).toEqual(['episodes/first/']);
-    expect(new Set(targets.episodeRefs)).toEqual(
-      new Set(['first/episode.mp3', 'first/segment.mp3', 'first/version.mp3'])
-    );
-    expect(new Set(targets.explicitRefs)).toEqual(
-      new Set([
-        'first/avatar.png',
-        'first/worksheet.pdf',
-        'first/sectionId.mp3',
-        'first/practiceSessionId.mp3',
-        'first/examSectionId.mp3',
-        'first/recording.mp3',
-        'first/cross-recording.mp3',
-        'first/focus.png',
-        'first/focus.mp3',
-      ])
-    );
-    expect(await database.user.count()).toBe(2);
-    expect(await database.episode.count()).toBe(2);
-  });
-  it('keeps course cleanup scoped while instance cleanup includes both profiles', async () => {
-    const course = await collectStorageDeletionTargets(database, {
-      kind: 'course',
-      id: 'first',
-      episodeIds: ['first'],
-    });
-    expect(course.explicitRefs).not.toContain('first/avatar.png');
-    expect(course.explicitRefs).not.toContain('first/cross-recording.mp3');
-    expect(
-      [...course.episodeRefs, ...course.explicitRefs].every((ref) => ref.startsWith('first/'))
-    ).toBe(true);
-    const all = await collectStorageDeletionTargets(database, { kind: 'instance' });
-    expect(new Set(all.episodePrefixes)).toEqual(new Set(['episodes/first/', 'episodes/second/']));
-  });
   it('captures independent exam-user and recording-practice cascades without collecting surviving prompts', async () => {
     await insert('MockExam', {
       id: 'cross-exam',

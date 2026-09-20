@@ -372,7 +372,7 @@ projection with the canonical `generateEpisodeTranscript` renderer.
 
 `sidedoor/keys.ts` revokes canonical device authority and retained API key metadata in one transaction using the original browser or native credential.
 
-`storage-deletion-targets.ts` visits raw storage references in pages of 100 rows, retaining source model, row ID, field names and episode prefixes. Unknown URLs and bundled paths remain available for explicit classification. Durable deletion must await every page in the same Serializable transaction as its snapshot and cascade. Course episode IDs must come from the canonical ownership query. The compatibility collector applies the existing storage-reference filter for current course/reset callers. Collection never deletes files and includes all speaking ownership paths.
+`storage-deletion-targets.ts` visits raw storage references in pages of 100 rows, retaining source model, row ID, field names and episode prefixes. Unknown URLs and bundled paths remain available for explicit classification. Durable deletion must await every page in the same Serializable transaction as its snapshot and cascade. Course episode IDs must come from the canonical ownership query. The visitor never deletes files and includes all speaking ownership paths.
 
 `sidedoor/profiles.ts` creates household principals, learner records and avatars atomically through prepared shared operations. Profile edits keep display labels separate from login identifiers. It validates household selection and reads appearance in the same transaction. Browser selection persists in shared session state; native clients carry the validated profile in their request header.
 
