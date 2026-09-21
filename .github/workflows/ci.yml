@@ -68,7 +68,7 @@ jobs:
         run: npm ci
 
       - name: Install media tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools
 
       - name: Validate GitHub Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
