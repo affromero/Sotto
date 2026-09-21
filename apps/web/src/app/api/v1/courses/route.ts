@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { cefrRank } from '@/lib/cefr-levels';
 
 const langCode = z.string().trim().toLowerCase().length(2);
@@ -106,7 +107,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const curriculum = await getOrCreateCurriculum(userId, native, target);
+    const curriculum = await getOrCreateCurriculum(
+      userId,
+      sottoRequestExecution(request, authed),
+      native,
+      target
+    );
 
     const course = await prisma.course.create({
       // Skip-placement start: the learner chose A1 without a test -> MANUAL.

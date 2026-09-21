@@ -12,6 +12,7 @@ const nextConfig = {
     'pg',
     'markit-ai',
     '@shiftlabs/markit',
+    'thesidedoor-flock',
   ],
   // Per-instance build dir, so two dev servers (e.g. the self-hosted instance and
   // the SELF_HOSTED=false mock) can run side by side without fighting over .next.
@@ -154,6 +155,7 @@ const nextConfig = {
 };
 
 module.exports = withSentryConfig(nextConfig, {
+  telemetry: false,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,

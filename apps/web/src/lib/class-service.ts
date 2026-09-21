@@ -107,6 +107,7 @@ interface SectionOverride {
 async function buildSection(
   classId: string,
   userId: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
   skill: SkillType,
   lesson: LessonLike,
   nativeLang: string,
@@ -130,6 +131,7 @@ async function buildSection(
   await assertClassStillGenerating(classId);
   const questions = await generateSectionQuestions({
     userId,
+    execution,
     skill,
     level: over?.level ?? lesson.level,
     nativeLang,
@@ -192,6 +194,7 @@ interface ClassBuildCourse {
 }
 
 interface ClassContentBuildParams {
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution;
   classId: string;
   courseId: string;
   userId: string;
@@ -223,6 +226,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
 
   const intro = await generateClassIntro({
     userId: p.userId,
+    execution: p.execution,
     level: lessonLevel,
     nativeLang: p.course.nativeLang,
     targetLang: p.course.targetLang,
@@ -239,6 +243,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     await buildSection(
       p.classId,
       p.userId,
+      p.execution,
       skill,
       p.lesson,
       p.course.nativeLang,
@@ -262,6 +267,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     await assertClassStillGenerating(p.classId);
     await generateClassListening({
       userId: p.userId,
+      execution: p.execution,
       classId: p.classId,
       courseId: p.courseId,
       attempt: p.attempt,
@@ -288,6 +294,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
   try {
     await assertClassStillGenerating(p.classId);
     await generateClassSpeaking({
+      execution: p.execution,
       userId: p.userId,
       classId: p.classId,
       attempt: p.attempt,
@@ -312,6 +319,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     await assertClassStillGenerating(p.classId);
     await generateClassWriting({
       userId: p.userId,
+      execution: p.execution,
       classId: p.classId,
       attempt: p.attempt,
       level: lessonLevel,
@@ -343,6 +351,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
 export async function createNextClass(
   courseId: string,
   userId: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
   opts?: SourcedClassOpts
 ): Promise<NextClassResult> {
   const initialCourse = await prisma.course.findFirst({
@@ -374,6 +383,7 @@ export async function createNextClass(
   if (!course.curriculum.lessons.some((lesson) => lesson.level === course.currentLevel)) {
     await ensureCurriculumHasLevelLessons({
       userId,
+      execution,
       curriculumId: course.curriculumId,
       nativeLang: course.nativeLang,
       targetLang: course.targetLang,
@@ -411,6 +421,7 @@ export async function createNextClass(
       targetLang: course.targetLang,
       nativeLang: course.nativeLang,
       userId,
+      execution,
     });
     sourceTitle = prepared.title;
     sourceUrl = prepared.sourceUrl;
@@ -445,6 +456,7 @@ export async function createNextClass(
   let adaptiveSeed: Prisma.InputJsonObject;
   try {
     adaptiveSeed = await buildClassContent({
+      execution,
       classId: cls.id,
       courseId,
       userId,
@@ -472,7 +484,11 @@ export async function createNextClass(
   return { kind: 'created', classId: cls.id };
 }
 
-export async function regenerateCurrentClass(classId: string, userId: string): Promise<boolean> {
+export async function regenerateCurrentClass(
+  classId: string,
+  userId: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
+): Promise<boolean> {
   const cls = await prisma.courseClass.findFirst({
     where: { id: classId, course: { userId } },
     include: { lesson: true, course: true },
@@ -500,6 +516,7 @@ export async function regenerateCurrentClass(classId: string, userId: string): P
       targetLang: cls.course.targetLang,
       nativeLang: cls.course.nativeLang,
       userId,
+      execution,
     });
     sourceTitle = prepared.title;
     sourceUrl = prepared.sourceUrl;
@@ -537,6 +554,7 @@ export async function regenerateCurrentClass(classId: string, userId: string): P
 
   try {
     const adaptiveSeed = await buildClassContent({
+      execution,
       classId,
       courseId: cls.courseId,
       userId,
@@ -809,7 +827,11 @@ export async function submitClass(
 // Regenerate the FAILED sections of a class in a different form. In-place:
 // bumps attempt + seed and replaces the questions, so a learner can't pass by
 // memorizing answers.
-export async function regenerateFailedSections(classId: string, userId: string): Promise<boolean> {
+export async function regenerateFailedSections(
+  classId: string,
+  userId: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
+): Promise<boolean> {
   const cls = await prisma.courseClass.findFirst({
     where: { id: classId, course: { userId } },
     include: { sections: { where: { passed: false } }, lesson: true, course: true },
@@ -844,6 +866,7 @@ export async function regenerateFailedSections(classId: string, userId: string):
     await prisma.lessonQuestion.deleteMany({ where: { sectionId: s.id } });
     const questions = await generateSectionQuestions({
       userId,
+      execution,
       skill: s.skill,
       level: cls.lesson.level,
       nativeLang: cls.course.nativeLang,

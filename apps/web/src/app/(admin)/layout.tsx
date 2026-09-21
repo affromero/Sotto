@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Newsreader, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import { auth } from '@/lib/auth';
-import { hasCompletedInitialOnboarding } from '@/lib/local-user';
+import { getLearnerOnboarding } from '@/lib/sidedoor/access/core/onboarding';
 import { isSelfHosted } from '@/lib/self-hosted';
 import { AdminShell } from './AdminShell';
 
@@ -36,10 +36,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await auth();
 
   if (!session?.user) {
-    redirect('/auth/login');
+    redirect('/access');
   }
 
-  if (isSelfHosted() && !(await hasCompletedInitialOnboarding())) {
+  if (isSelfHosted() && !(await getLearnerOnboarding(session.user.id)).completed) {
     redirect('/welcome');
   }
 

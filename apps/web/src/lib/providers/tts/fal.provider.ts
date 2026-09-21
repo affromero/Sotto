@@ -6,7 +6,7 @@
  *   - qwen3-tts-1.7b / qwen3-tts-0.6b: Named preset voices
  */
 import { logger } from '../../logger';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { VOICE_LANGUAGE_AFFINITIES } from '../../tts-language-support';
@@ -14,6 +14,7 @@ import { VOICE_LANGUAGE_AFFINITIES } from '../../tts-language-support';
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { MediaTransport, ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 interface FalTtsResponse {
   audio: { url: string; duration: number; sample_rate: number };
@@ -40,11 +41,17 @@ const QWEN3_LANGUAGE_MAP: Record<string, string> = {
 };
 
 export class FalProvider implements TtsProvider {
+  static readonly speechEndpoints = Object.freeze(Object.values(MODEL_ENDPOINTS));
   readonly providerId: TtsProviderId = 'fal';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    private readonly media: MediaTransport,
+    model?: string
+  ) {
     this.apiKey = apiKey;
     this.model = model ?? getProviderMeta('fal').defaultModel;
   }
@@ -60,14 +67,22 @@ export class FalProvider implements TtsProvider {
       if (langName) body.language = langName;
     }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Key ${this.apiKey}`,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      url,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          Authorization: `Key ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -79,18 +94,14 @@ export class FalProvider implements TtsProvider {
       throw new Error('Fal returned no audio URL');
     }
 
-    const audioResponse = await fetch(data.audio.url);
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download Fal audio: ${audioResponse.status}`);
-    }
+    const audio = await this.media.downloadMedia(data.audio.url, { signal: params.signal });
 
     logger.info('Fal speech generated', {
       model: this.model,
       voiceId: params.voiceId,
       chars: params.text.length,
     });
-    const arrayBuffer = await audioResponse.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return Buffer.from(audio);
   }
 
   getVoiceId(

@@ -14,7 +14,10 @@ import {
 import { resolveExamSpec, type ExamSpec } from './exam-spec';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent } from './class-listening-generator';
-import { composeSpeakingPrompts } from './class-speaking-generator';
+import {
+  composeSpeakingPrompts,
+  publishSpeakingPromptReferences,
+} from './class-speaking-generator';
 import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { buildLearnerContext } from './pedagogy';
@@ -39,7 +42,8 @@ interface ExamCourseCtx {
 export async function createMockExam(
   courseId: string,
   userId: string,
-  levelOverride?: CefrLevel,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
+  levelOverride?: CefrLevel
 ): Promise<string> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
@@ -68,7 +72,16 @@ export async function createMockExam(
 
   let anyReady = false;
   for (let i = 0; i < blueprint.sections.length; i++) {
-    const ok = await buildExamSection(exam.id, course, blueprint.sections[i], i + 1, level, spec, note);
+    const ok = await buildExamSection(
+      exam.id,
+      course,
+      blueprint.sections[i],
+      i + 1,
+      level,
+      spec,
+      note,
+      execution
+    );
     anyReady = anyReady || ok;
   }
 
@@ -87,6 +100,7 @@ async function buildExamSection(
   level: CefrLevel,
   spec: ExamSpec,
   note: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<boolean> {
   const examSection = await prisma.examSection.create({
     data: {
@@ -104,6 +118,7 @@ async function buildExamSection(
     if (section.format === 'mc') {
       const questions = await generateSectionQuestions({
         userId: course.userId,
+        execution,
         skill: section.skill,
         level,
         nativeLang: course.nativeLang,
@@ -130,6 +145,7 @@ async function buildExamSection(
     } else if (section.format === 'listening') {
       const { episodeId, comprehensionQuestions } = await composeListeningContent({
         userId: course.userId,
+        execution,
         courseId: course.id,
         level,
         nativeLang: course.nativeLang,
@@ -152,6 +168,7 @@ async function buildExamSection(
       });
     } else if (section.format === 'speaking') {
       const composed = await composeSpeakingPrompts({
+        execution,
         userId: course.userId,
         level,
         nativeLang: course.nativeLang,
@@ -161,19 +178,31 @@ async function buildExamSection(
         refId: examSection.id,
         note,
       });
+      const selected = composed.slice(0, section.itemCount);
       await prisma.speakingPrompt.createMany({
-        data: composed.slice(0, section.itemCount).map((c, i) => ({
+        data: selected.map((c, i) => ({
           examSectionId: examSection.id,
           order: i + 1,
           targetPhrase: c.targetPhrase,
           translation: c.translation,
           ipa: c.ipa,
-          referenceTtsUrl: c.referenceTtsUrl,
+          referenceTtsUrl: null,
         })),
+      });
+      const saved = await prisma.speakingPrompt.findMany({
+        where: { examSectionId: examSection.id },
+        orderBy: { order: 'asc' },
+        select: { id: true },
+      });
+      await publishSpeakingPromptReferences({
+        prompts: saved.map((prompt, index) => ({ id: prompt.id, composed: selected[index]! })),
+        userId: course.userId,
+        execution,
       });
     } else {
       const composed = await composeWritingPrompts({
         userId: course.userId,
+        execution,
         level,
         nativeLang: course.nativeLang,
         targetLang: course.targetLang,
@@ -231,7 +260,13 @@ export interface ExamSectionPublic {
   score: number | null;
   episode: { id: string; audioUrl: string | null; status: string } | null;
   questions: ExamQuestionPublic[];
-  speakingPrompts: Array<{ id: string; order: number; targetPhrase: string; translation: string; referenceTtsUrl: string | null }>;
+  speakingPrompts: Array<{
+    id: string;
+    order: number;
+    targetPhrase: string;
+    translation: string;
+    referenceTtsUrl: string | null;
+  }>;
   writingPrompts: Array<{ id: string; order: number; task: string; guidance: string | null }>;
 }
 
@@ -247,7 +282,12 @@ export interface ExamPublic {
     overallScore: number | null;
     band: string | null;
     feedback: string | null;
-    sectionResults: Array<{ sectionId: string; skill: string; score: number; feedback: string | null }>;
+    sectionResults: Array<{
+      sectionId: string;
+      skill: string;
+      score: number;
+      feedback: string | null;
+    }>;
   } | null;
 }
 
@@ -271,7 +311,10 @@ export interface CourseExamsView {
 }
 
 /** The flagship exam available for a course + the learner's past exams. */
-export async function listCourseExams(courseId: string, userId: string): Promise<CourseExamsView | null> {
+export async function listCourseExams(
+  courseId: string,
+  userId: string
+): Promise<CourseExamsView | null> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
     select: { targetLang: true, currentLevel: true },

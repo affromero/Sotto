@@ -35,8 +35,8 @@ export interface OutlineResult {
   tensionCurve: Array<{ beatOrder: number; tension: number }>;
   bannedAngles: string[];
   unresolvedQuestions: string[];
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 }
 
@@ -52,6 +52,8 @@ export interface CreateOutlineParams {
   evidence: EvidenceCard[];
   recommendedAngle: string | null;
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
   model?: string;
   provider: string;
 }
@@ -184,6 +186,8 @@ export async function createCreativeOutline(params: CreateOutlineParams): Promis
     {
       maxTokens: 6144,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
     }
   );

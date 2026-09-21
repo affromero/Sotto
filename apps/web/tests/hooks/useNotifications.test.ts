@@ -44,6 +44,58 @@ afterEach(() => {
 });
 
 describe('useNotifications', () => {
+  it('keeps live notifications during an older history fetch and does not toast repeated SSE deliveries', async () => {
+    let stream: { onmessage: ((event: { data: string }) => void) | null } | undefined;
+    class NotificationStream {
+      onmessage: ((event: { data: string }) => void) | null = null;
+      constructor() {
+        stream = this;
+      }
+      close() {}
+    }
+    vi.stubGlobal('EventSource', NotificationStream);
+    let resolveHistory!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveHistory = resolve;
+      })
+    );
+    const toasts: string[] = [];
+    const { result, unmount } = renderHook(() =>
+      useNotifications({
+        onNewNotifications: (items) => {
+          toasts.push(...items.map((item) => item.id));
+        },
+      })
+    );
+    try {
+      const live = { ...mockNotifications[0]!, id: 'live-notification' };
+      act(() => {
+        stream!.onmessage!({ data: JSON.stringify(live) });
+        stream!.onmessage!({ data: JSON.stringify(live) });
+      });
+      await act(async () => {
+        resolveHistory({
+          ok: true,
+          json: async () => ({ notifications: mockNotifications }),
+        } as Response);
+      });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.notifications.map((item) => item.id)).toEqual([
+        'live-notification',
+        ...mockNotifications.map((item) => item.id),
+      ]);
+      act(() => {
+        stream!.onmessage!({ data: JSON.stringify(live) });
+        stream!.onmessage!({ data: JSON.stringify(mockNotifications[0]) });
+      });
+      expect(toasts).toEqual(['live-notification']);
+      expect(result.current.notifications).toHaveLength(4);
+    } finally {
+      unmount();
+      vi.unstubAllGlobals();
+    }
+  });
   describe('initial fetch', () => {
     it('starts with loading state', () => {
       vi.mocked(fetch).mockImplementation(() => new Promise(() => {}));

@@ -7,7 +7,7 @@ import { Glyph, type GlyphName } from '@/components/Glyph';
 import { GlassBead } from '@/components/landing/GlassBead';
 import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
 import { useTheme } from '@/components/providers/ThemeProvider';
-import styles from './adminTheme.styles';
+import styles from '@/app/(admin)/adminTheme.styles';
 
 interface AdminShellProps {
   children: React.ReactNode;

@@ -1,125 +1,19 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
-import { logger } from './logger';
-import { prisma } from './prisma';
+import { prismaUnfiltered } from './prisma';
 import {
-  type TtsProviderId,
-  validateProviderCredentials,
-  getProviderMeta,
-} from './providers/tts-registry';
-import {
-  type AiProviderId,
-  validateAiProviderCredentials,
-  getAiProviderMeta,
-} from './providers/ai-registry';
-
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
-const SALT_LENGTH = 16;
-const KEY_LENGTH = 32;
-
-function getEncryptionKey(salt: Buffer): Buffer {
-  const secret = process.env.BYOK_ENCRYPTION_KEY;
-  if (!secret) {
-    throw new Error('BYOK_ENCRYPTION_KEY environment variable is not set');
-  }
-  return scryptSync(secret, salt, KEY_LENGTH);
-}
-
-/**
- * Encrypt an API key for storage.
- * Format: base64(salt + iv + authTag + ciphertext)
- */
-export function encryptApiKey(plaintext: string): string {
-  const salt = randomBytes(SALT_LENGTH);
-  const key = getEncryptionKey(salt);
-  const iv = randomBytes(IV_LENGTH);
-
-  const cipher = createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  const combined = Buffer.concat([salt, iv, authTag, encrypted]);
-  return combined.toString('base64');
-}
-
-/**
- * Decrypt a stored API key.
- */
-export function decryptApiKey(encoded: string): string {
-  const combined = Buffer.from(encoded, 'base64');
-
-  const salt = combined.subarray(0, SALT_LENGTH);
-  const iv = combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-  const authTag = combined.subarray(
-    SALT_LENGTH + IV_LENGTH,
-    SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH
-  );
-  const ciphertext = combined.subarray(SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
-
-  const key = getEncryptionKey(salt);
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(authTag);
-
-  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return decrypted.toString('utf8');
-}
-
-// ---------------------------------------------------------------------------
-// Multi-provider BYOK operations (UserTtsKey model)
-// ---------------------------------------------------------------------------
-
-export interface ByokCredentials {
-  apiKey: string;
-  userId?: string;
-  extra?: Record<string, string>;
-}
+  listSottoProfileCredentials,
+  resolveSottoProfileCredential,
+  sottoCredentialStorage,
+} from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import type { CredentialScope } from '@/lib/sidedoor/access/state/state';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import type { TtsProviderId } from './providers/tts-registry';
+import type { AiProviderId } from './providers/ai-registry';
 
 export interface ByokKeyInfo {
   provider: TtsProviderId;
   isValid: boolean;
   lastUsedAt: Date | null;
   label: string | null;
-}
-
-/**
- * Store (upsert) a BYOK key for a specific provider.
- * Accepts TTS providers and music providers (e.g. 'suno').
- */
-export async function storeByokKey(
-  userId: string,
-  provider: TtsProviderId | 'suno',
-  credentials: ByokCredentials
-): Promise<void> {
-  const encryptedKey = encryptApiKey(credentials.apiKey);
-  const extraData: Record<string, string> = {
-    ...(credentials.extra ?? {}),
-    ...(credentials.userId ? { userId: credentials.userId } : {}),
-  };
-  const encryptedExtra =
-    Object.keys(extraData).length > 0 ? encryptApiKey(JSON.stringify(extraData)) : null;
-
-  const label = provider === 'suno' ? 'Suno' : getProviderMeta(provider).displayName;
-
-  await prisma.userTtsKey.upsert({
-    where: { userId_provider: { userId, provider } },
-    update: {
-      encryptedKey,
-      extraData: encryptedExtra,
-      isValid: true,
-      updatedAt: new Date(),
-    },
-    create: {
-      userId,
-      provider,
-      encryptedKey,
-      extraData: encryptedExtra,
-      isValid: true,
-      label,
-    },
-  });
-
-  logger.info('Stored BYOK key', { userId, provider });
 }
 
 /**
@@ -130,183 +24,122 @@ export async function getByokKey(
   userId: string,
   provider?: TtsProviderId | string
 ): Promise<string | null> {
-  // Legacy: no provider arg → query elevenlabs (backward compat)
+  return (await getByokCredential(userId, provider))?.apiKey ?? null;
+}
+
+export async function getByokCredential(userId: string, provider?: TtsProviderId | string) {
   const targetProvider = provider ?? 'elevenlabs';
+  return selectCredential(
+    userId,
+    targetProvider === 'suno' ? 'music' : 'tts',
+    targetProvider,
+    false
+  );
+}
 
-  const record = await prisma.userTtsKey.findUnique({
-    where: { userId_provider: { userId, provider: targetProvider } },
-  });
-
-  if (!record) {
-    return null;
-  }
-
-  try {
-    // Update lastUsedAt
-    await prisma.userTtsKey.update({
-      where: { id: record.id },
-      data: { lastUsedAt: new Date() },
-    });
-    return decryptApiKey(record.encryptedKey);
-  } catch (error) {
-    logger.error('Failed to decrypt BYOK key', {
+/** Caller has already authorized this learner. Keep all fields and provenance in one snapshot. */
+async function selectCredential(
+  userId: string,
+  scope: Exclude<CredentialScope, 'stt'>,
+  provider: string | undefined,
+  allowSharing: boolean
+) {
+  return sottoTransaction(prismaUnfiltered, async (tx) => {
+    let selectedProvider = provider;
+    if (selectedProvider === undefined) {
+      const keys = (await listSottoProfileCredentials(tx, userId, [scope], allowSharing)).filter(
+        (key) => key.credential.availability === 'enabled'
+      );
+      const personal = keys.filter((key) => !key.shared);
+      const candidates = personal.length ? personal : keys;
+      candidates.sort(
+        (left, right) => left.credential.metadata.createdAt - right.credential.metadata.createdAt
+      );
+      selectedProvider = (
+        candidates.find((key) => key.credential.provider === 'anthropic') ?? candidates[0]
+      )?.credential.provider;
+      if (!selectedProvider) return null;
+    }
+    const selected = await resolveSottoProfileCredential(
+      tx,
       userId,
-      provider: targetProvider,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
-}
-
-async function findSharedAdminId(userId: string): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
+      scope,
+      selectedProvider,
+      allowSharing
+    );
+    if (!selected) return null;
+    const { credential } = selected;
+    const apiKey = credential.values.apiKey;
+    if (typeof apiKey !== 'string' || !apiKey.trim())
+      throw new Error('The selected provider credential has no API key');
+    const storage = await sottoCredentialStorage(tx, scope, selectedProvider);
+    await storage.owned.recordUse(
+      { ...storage.slot, owner: credential.owner },
+      credential.credentialRevision,
+      Date.now()
+    );
+    return {
+      apiKey,
+      provider: selectedProvider,
+      ownerUserId: selected.ownerUserId,
+      shared: selected.shared,
+      extraData: Object.fromEntries(
+        Object.entries(credential.values)
+          .filter(([field]) => field !== 'apiKey')
+          .map(([field, value]) => [field, String(value)])
+      ),
+      provenance: {
+        instanceId: selected.instanceId,
+        owner: credential.owner,
+        modality: credential.modality,
+        provider: credential.provider,
+        revision: credential.credentialRevision,
+        binding: credential.binding,
+        sharingRevision: selected.sharingRevision,
+      },
+    };
   });
-  if (user?.role === 'ADMIN') return null;
-
-  const admin = await prisma.user.findFirst({
-    where: { role: 'ADMIN', id: { not: userId } },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true },
-  });
-  return admin?.id ?? null;
 }
 
-export async function getSharedByokKey(
-  userId: string,
-  provider?: TtsProviderId | string
-): Promise<{ apiKey: string; ownerUserId: string; shared: boolean } | null> {
-  const ownKey = await getByokKey(userId, provider);
-  if (ownKey) return { apiKey: ownKey, ownerUserId: userId, shared: false };
-
-  const adminId = await findSharedAdminId(userId);
-  if (!adminId) return null;
-  const adminKey = await getByokKey(adminId, provider);
-  return adminKey ? { apiKey: adminKey, ownerUserId: adminId, shared: true } : null;
-}
-
-/**
- * Retrieve the extra credentials for a provider.
- */
-export async function getByokExtraData(
-  userId: string,
-  provider: TtsProviderId
-): Promise<Record<string, string> | null> {
-  const record = await prisma.userTtsKey.findUnique({
-    where: { userId_provider: { userId, provider } },
-    select: { extraData: true },
-  });
-
-  if (!record?.extraData) return null;
-
-  try {
-    return JSON.parse(decryptApiKey(record.extraData));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Retrieve the household owner's extra BYOK credentials for a non-admin user.
- * Returns null for admins or when no separate admin profile exists.
- */
-export async function getSharedAdminByokExtraData(
-  userId: string,
-  provider: TtsProviderId
-): Promise<Record<string, string> | null> {
-  const adminId = await findSharedAdminId(userId);
-  return adminId ? getByokExtraData(adminId, provider) : null;
-}
-
-/**
- * Update encrypted extra credential data without replacing the primary provider API key.
- */
-export async function updateByokExtraData(
-  userId: string,
-  provider: TtsProviderId | 'suno',
-  extra: Record<string, string | null>
-): Promise<boolean> {
-  const record = await prisma.userTtsKey.findUnique({
-    where: { userId_provider: { userId, provider } },
-    select: { extraData: true },
-  });
-
-  if (!record) return false;
-
-  let currentExtra: Record<string, string> = {};
-  if (record.extraData) {
-    try {
-      currentExtra = JSON.parse(decryptApiKey(record.extraData));
-    } catch (error) {
-      logger.warn('Failed to decrypt existing BYOK extraData before update', {
-        userId,
-        provider,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  const nextExtra = { ...currentExtra };
-  for (const [key, value] of Object.entries(extra)) {
-    if (value === null) {
-      delete nextExtra[key];
-    } else {
-      nextExtra[key] = value;
-    }
-  }
-  const encryptedExtra =
-    Object.keys(nextExtra).length > 0 ? encryptApiKey(JSON.stringify(nextExtra)) : null;
-
-  await prisma.userTtsKey.update({
-    where: { userId_provider: { userId, provider } },
-    data: { extraData: encryptedExtra },
-  });
-
-  logger.info('Updated BYOK extra data', { userId, provider });
-  return true;
-}
-
-/**
- * Remove a user's BYOK key for a specific provider.
- */
-export async function removeByokKey(
-  userId: string,
-  provider?: TtsProviderId | 'suno'
-): Promise<void> {
-  const targetProvider = provider ?? 'elevenlabs';
-
-  await prisma.userTtsKey
-    .delete({
-      where: { userId_provider: { userId, provider: targetProvider } },
-    })
-    .catch(() => {
-      // Ignore if doesn't exist
-    });
-
-  logger.info('Removed BYOK key', { userId, provider: targetProvider });
+export async function getSharedByokKey(userId: string, provider?: TtsProviderId | string) {
+  const selectedProvider = provider ?? 'elevenlabs';
+  return selectCredential(
+    userId,
+    selectedProvider === 'suno' ? 'music' : 'tts',
+    selectedProvider,
+    true
+  );
 }
 
 /**
  * List all configured BYOK providers for a user.
  */
-export async function listByokProviders(userId: string): Promise<ByokKeyInfo[]> {
-  const keys = await prisma.userTtsKey.findMany({
-    where: { userId },
-    select: {
-      provider: true,
-      isValid: true,
-      lastUsedAt: true,
-      label: true,
-    },
-  });
+export async function listByokProviders(
+  userId: string,
+  allowSharing = false
+): Promise<ByokKeyInfo[]> {
+  const keys = await listProviderKeys(userId, ['tts', 'music'], allowSharing);
+  return keys.map((key) => ({ ...key, provider: key.provider as TtsProviderId }));
+}
 
-  return keys.map((k) => ({
-    provider: k.provider as TtsProviderId,
-    isValid: k.isValid,
-    lastUsedAt: k.lastUsedAt,
-    label: k.label,
-  }));
+async function listProviderKeys(
+  userId: string,
+  scopes: readonly Exclude<CredentialScope, 'stt'>[],
+  allowSharing: boolean
+) {
+  return sottoTransaction(prismaUnfiltered, async (tx) => {
+    const keys = await listSottoProfileCredentials(tx, userId, scopes, allowSharing);
+    return keys.map(({ credential, shared }) => ({
+      provider: credential.provider,
+      isValid: credential.availability === 'enabled',
+      lastUsedAt:
+        credential.metadata.lastUsedAt === null ? null : new Date(credential.metadata.lastUsedAt),
+      label: credential.label,
+      revision: credential.credentialRevision,
+      verification: credential.verification,
+      shared,
+    }));
+  });
 }
 
 /**
@@ -316,61 +149,21 @@ export async function hasByokKey(
   userId: string,
   provider?: TtsProviderId | string
 ): Promise<boolean> {
-  if (provider) {
-    const count = await prisma.userTtsKey.count({
-      where: { userId, provider, isValid: true },
-    });
-    return count > 0;
-  }
-
-  // Any provider
-  const count = await prisma.userTtsKey.count({ where: { userId, isValid: true } });
-  return count > 0;
+  return (await listByokProviders(userId)).some(
+    (key) => key.isValid && (!provider || key.provider === provider)
+  );
 }
 
 export async function hasSharedByokKey(
   userId: string,
   provider?: TtsProviderId | string
 ): Promise<boolean> {
-  if (await hasByokKey(userId, provider)) return true;
-
-  const adminId = await findSharedAdminId(userId);
-  return adminId ? hasByokKey(adminId, provider) : false;
+  return (await listProviderKeys(userId, ['tts', 'music'], true)).some(
+    (key) => key.isValid && (!provider || key.provider === provider)
+  );
 }
 
-/**
- * Validate a BYOK key against the provider's API.
- */
-export async function validateByokKey(
-  provider: TtsProviderId | 'suno',
-  credentials: ByokCredentials
-): Promise<boolean> {
-  // Suno is a music provider — validate via sunoapi.org credits endpoint
-  if (provider === 'suno') {
-    return validateSunoKey(credentials.apiKey);
-  }
-  const creds: Record<string, string> = { apiKey: credentials.apiKey };
-  if (credentials.userId) creds.userId = credentials.userId;
-  return validateProviderCredentials(provider, creds);
-}
-
-async function validateSunoKey(apiKey: string): Promise<boolean> {
-  try {
-    const res = await fetch('https://api.sunoapi.org/api/v1/generate/get-credits', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-// Legacy exports for backward compat
-export { validateProviderCredentials as validateElevenLabsKey };
-
-// ---------------------------------------------------------------------------
-// AI (LLM) BYOK operations (UserAiKey model)
-// ---------------------------------------------------------------------------
+// AI (LLM) credential operations backed by Sidedoor.
 
 export interface AiKeyInfo {
   provider: AiProviderId;
@@ -380,187 +173,31 @@ export interface AiKeyInfo {
 }
 
 /**
- * Store (upsert) an AI BYOK key for a specific provider.
- */
-export async function storeAiKey(
-  userId: string,
-  provider: AiProviderId,
-  apiKey: string
-): Promise<void> {
-  const encryptedKey = encryptApiKey(apiKey);
-
-  await prisma.userAiKey.upsert({
-    where: { userId_provider: { userId, provider } },
-    update: {
-      encryptedKey,
-      isValid: true,
-      updatedAt: new Date(),
-    },
-    create: {
-      userId,
-      provider,
-      encryptedKey,
-      isValid: true,
-      label: getAiProviderMeta(provider).displayName,
-    },
-  });
-
-  logger.info('Stored AI BYOK key', { userId, provider });
-}
-
-/**
  * Retrieve and decrypt a user's AI BYOK key.
  * If provider is specified, returns that provider's key.
  * If not, returns the first available key (anthropic preferred).
  */
-export async function getAiKey(
-  userId: string,
-  provider?: AiProviderId
-): Promise<{ apiKey: string; provider: AiProviderId } | null> {
-  if (provider) {
-    const record = await prisma.userAiKey.findUnique({
-      where: { userId_provider: { userId, provider } },
-    });
-    if (!record) return null;
-
-    try {
-      await prisma.userAiKey.update({
-        where: { id: record.id },
-        data: { lastUsedAt: new Date() },
-      });
-      return { apiKey: decryptApiKey(record.encryptedKey), provider };
-    } catch (error) {
-      logger.error('Failed to decrypt AI BYOK key', {
-        userId,
-        provider,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }
-  }
-
-  // No provider specified — try anthropic first, then openai
-  const records = await prisma.userAiKey.findMany({
-    where: { userId, isValid: true },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  // Prefer anthropic
-  const preferred = records.find((r) => r.provider === 'anthropic') || records[0];
-  if (!preferred) return null;
-
-  try {
-    await prisma.userAiKey.update({
-      where: { id: preferred.id },
-      data: { lastUsedAt: new Date() },
-    });
-    return {
-      apiKey: decryptApiKey(preferred.encryptedKey),
-      provider: preferred.provider as AiProviderId,
-    };
-  } catch (error) {
-    logger.error('Failed to decrypt AI BYOK key', {
-      userId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
+export async function getAiKey(userId: string, provider?: AiProviderId) {
+  const selected = await selectCredential(userId, 'ai', provider, false);
+  return selected ? { ...selected, provider: selected.provider as AiProviderId } : null;
 }
 
-export async function getSharedAiKey(
-  userId: string,
-  provider?: AiProviderId
-): Promise<{
-  apiKey: string;
-  provider: AiProviderId;
-  ownerUserId: string;
-  shared: boolean;
-} | null> {
-  const ownKey = await getAiKey(userId, provider);
-  if (ownKey) return { ...ownKey, ownerUserId: userId, shared: false };
-
-  const adminId = await findSharedAdminId(userId);
-  if (!adminId) return null;
-  const adminKey = await getAiKey(adminId, provider);
-  return adminKey ? { ...adminKey, ownerUserId: adminId, shared: true } : null;
+export async function getSharedAiKey(userId: string, provider?: AiProviderId) {
+  const selected = await selectCredential(userId, 'ai', provider, true);
+  return selected ? { ...selected, provider: selected.provider as AiProviderId } : null;
 }
 
 /**
  * Check if a user has any AI BYOK key configured.
  */
 export async function hasAiKey(userId: string): Promise<boolean> {
-  const count = await prisma.userAiKey.count({ where: { userId, isValid: true } });
-  return count > 0;
-}
-
-/**
- * Remove a user's AI BYOK key for a specific provider.
- */
-export async function removeAiKey(userId: string, provider: AiProviderId): Promise<void> {
-  await prisma.userAiKey
-    .delete({
-      where: { userId_provider: { userId, provider } },
-    })
-    .catch(() => {
-      // Ignore if doesn't exist
-    });
-
-  logger.info('Removed AI BYOK key', { userId, provider });
+  return (await listAiProviders(userId)).some((key) => key.isValid);
 }
 
 /**
  * List all configured AI providers for a user.
  */
-export async function listAiProviders(userId: string): Promise<AiKeyInfo[]> {
-  const keys = await prisma.userAiKey.findMany({
-    where: { userId },
-    select: {
-      provider: true,
-      isValid: true,
-      lastUsedAt: true,
-      label: true,
-    },
-  });
-
-  return keys.map((k) => ({
-    provider: k.provider as AiProviderId,
-    isValid: k.isValid,
-    lastUsedAt: k.lastUsedAt,
-    label: k.label,
-  }));
-}
-
-/**
- * Validate an AI BYOK key against the provider's API.
- */
-export async function validateAiKey(provider: AiProviderId, apiKey: string): Promise<boolean> {
-  return validateAiProviderCredentials(provider, { apiKey });
-}
-
-/**
- * Mark a TTS BYOK key as invalid after a runtime failure.
- */
-export async function markTtsKeyInvalid(userId: string, provider: TtsProviderId): Promise<boolean> {
-  const result = await prisma.userTtsKey.updateMany({
-    where: { userId, provider, isValid: true },
-    data: { isValid: false },
-  });
-  if (result.count > 0) {
-    logger.info('Marked TTS BYOK key as invalid', { userId, provider });
-  }
-  return result.count > 0;
-}
-
-/**
- * Mark an AI BYOK key as invalid after a runtime failure.
- */
-export async function markAiKeyInvalid(userId: string, provider: AiProviderId): Promise<boolean> {
-  const result = await prisma.userAiKey.updateMany({
-    where: { userId, provider, isValid: true },
-    data: { isValid: false },
-  });
-  if (result.count > 0) {
-    logger.info('Marked AI BYOK key as invalid', { userId, provider });
-  }
-  return result.count > 0;
+export async function listAiProviders(userId: string, allowSharing = false): Promise<AiKeyInfo[]> {
+  const keys = await listProviderKeys(userId, ['ai'], allowSharing);
+  return keys.map((key) => ({ ...key, provider: key.provider as AiProviderId }));
 }

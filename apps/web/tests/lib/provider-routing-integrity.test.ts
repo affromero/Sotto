@@ -13,6 +13,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, relative } from 'path';
 import * as globModule from 'glob';
+import ts from 'typescript';
 
 type GlobSync = (
   pattern: string,
@@ -43,6 +44,35 @@ function readSrc(absPath: string): { rel: string; content: string } {
   };
 }
 
+/** The dedicated Anthropic adapter names its selectedApi transport explicitly. */
+function canonicalAnthropicSelectionLines(file: string, content: string): Set<number> {
+  const allowed = new Set<number>();
+  if (file !== 'lib/llm.ts') return allowed;
+  const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true);
+  function visit(node: ts.Node) {
+    ts.forEachChild(node, visit);
+    if (
+      !ts.isCallExpression(node) ||
+      !ts.isIdentifier(node.expression) ||
+      node.expression.text !== 'selectedApi'
+    )
+      return;
+    const argument = node.arguments[0];
+    if (!argument || !ts.isObjectLiteralExpression(argument)) return;
+    for (const property of argument.properties) {
+      if (
+        ts.isPropertyAssignment(property) &&
+        property.name.getText(source) === 'provider' &&
+        ts.isStringLiteral(property.initializer) &&
+        property.initializer.text === 'anthropic'
+      )
+        allowed.add(source.getLineAndCharacterOfPosition(property.getStart(source)).line);
+    }
+  }
+  visit(source);
+  return allowed;
+}
+
 // ── Test 1: No llm.ts imports outside allowlist ───────────────
 
 describe('no direct llm.ts imports outside allowlist', () => {
@@ -51,7 +81,7 @@ describe('no direct llm.ts imports outside allowlist', () => {
     // discovery-agent uses Anthropic streaming (streamResponse + generateResponse
     // with onComplete callback for token tracking)
     'lib/discovery-agent.ts',
-    // AnthropicProvider wraps llm.ts via dynamic import('../llm') — this IS the provider system
+    // AnthropicProvider wraps llm.ts via dynamic import('@/lib/llm') — this IS the provider system
     'lib/providers/ai.ts',
   ]);
 
@@ -75,7 +105,7 @@ describe('no direct llm.ts imports outside allowlist', () => {
       violations,
       [
         'These files import from llm.ts (hardcoded Anthropic SDK) instead of using the provider system.',
-        "Fix: replace `import { generateResponse } from './llm'` with `import { createAIProvider } from './providers/ai'`",
+        "Fix: replace `import { generateResponse } from '@/lib/llm'` with `import { createAIProvider } from '@/lib/providers/ai'`",
         'Violations:',
         ...violations.map((f) => `  - ${f}`),
       ].join('\n')
@@ -133,7 +163,7 @@ describe('no hardcoded provider anthropic in AI resolution calls', () => {
 
   const PROVIDER_ANTHROPIC_RE = /provider:\s*['"]anthropic['"]/;
 
-  it("no hardcoded provider: 'anthropic' in source files outside providers/", () => {
+  it('rejects hardcoded Anthropic selection outside the provider registry and canonical adapter', () => {
     const allTs = globSync('**/*.ts', {
       cwd: SRC_DIR,
       ignore: ['**/*.d.ts', '**/*.test.ts'],
@@ -144,9 +174,10 @@ describe('no hardcoded provider anthropic in AI resolution calls', () => {
       if (PROVIDER_ALLOWLIST.has(file)) continue;
 
       const { content } = readSrc(join(SRC_DIR, file));
+      const canonicalLines = canonicalAnthropicSelectionLines(file, content);
       const lines = content.split('\n');
       for (let i = 0; i < lines.length; i++) {
-        if (PROVIDER_ANTHROPIC_RE.test(lines[i])) {
+        if (PROVIDER_ANTHROPIC_RE.test(lines[i]) && !canonicalLines.has(i)) {
           violations.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }
@@ -271,10 +302,10 @@ describe('pricing coverage', () => {
       for (const model of provider.models) {
         if (model.pricing) {
           const pricing = getAiPricing(model.id);
-          expect(pricing.inputPerMTok, `${model.id} inputPerMTok mismatch`).toBe(
+          expect(pricing?.inputPerMTok, `${model.id} inputPerMTok mismatch`).toBe(
             model.pricing.inputPerMTok
           );
-          expect(pricing.outputPerMTok, `${model.id} outputPerMTok mismatch`).toBe(
+          expect(pricing?.outputPerMTok, `${model.id} outputPerMTok mismatch`).toBe(
             model.pricing.outputPerMTok
           );
         }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isAnimalSlug } from './avatars';
+import { credentialSelectionEnvelopeSchema } from '@/lib/sidedoor/credentials/config/credential-selection-contract';
 
 /**
  * Discovery chat message validation
@@ -519,8 +520,7 @@ export const redeemPairingSchema = z.object({
   token: z.string().min(10).max(256),
 });
 
-// Owner-set server infrastructure (non-secret selection). Each field accepts a
-// trimmed string to set, or null to clear (fall back to env). No secrets here.
+// Owner-set shared infrastructure location. Secrets use owned credential records.
 // Empty strings are normalized to null in setSiteConfig.
 const infraField = z.string().trim().max(512).nullable().optional();
 
@@ -528,14 +528,18 @@ export const serverInfraSchema = z.object({
   aiProvider: infraField,
   aiModel: infraField,
   aiBaseUrl: infraField,
+  liveModel: infraField,
   sttProvider: infraField,
   sttBaseUrl: infraField,
   sttModel: infraField,
   ttsProvider: infraField,
   ttsBaseUrl: infraField,
   storageProvider: infraField,
-  s3Bucket: infraField,
-  s3Region: infraField,
+  localStorageRoot: infraField,
+  objectStorageEndpoint: infraField,
+  objectStorageBucket: infraField,
+  objectStorageRegion: infraField,
+  objectStoragePublicUrl: infraField,
 });
 
 export const siteConfigUpdateSchema = serverInfraSchema;
@@ -547,6 +551,7 @@ const langCode2 = z.string().trim().toLowerCase().length(2);
 const cefrLevel = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 
 export const onboardingSaveSchema = z.object({
+  credentials: credentialSelectionEnvelopeSchema,
   course: z.object({
     native: langCode2,
     target: langCode2,
@@ -565,6 +570,14 @@ export const onboardingSaveSchema = z.object({
     })
     .optional(),
   infra: serverInfraSchema.optional(),
+  storageCredential: z
+    .object({
+      provider: z.enum(['r2', 's3']),
+      accessKeyId: z.string().trim().min(1).max(512),
+      secretAccessKey: z.string().trim().min(1).max(2048),
+    })
+    .strict()
+    .optional(),
 });
 
 // POST /api/v1/live-translate/token — mint an ephemeral Gemini Live token for a course.

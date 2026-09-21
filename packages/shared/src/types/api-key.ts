@@ -5,6 +5,8 @@ export interface ApiKeyData {
   lastUsedAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  expiresAt: string | null;
+  status: 'active' | 'revoked' | 'expired' | 'unavailable';
 }
 
 export interface ApiKeyCreated {
@@ -13,4 +15,5 @@ export interface ApiKeyCreated {
   key: string; // Full key, shown only once
   keyPrefix: string;
   createdAt: string;
+  expiresAt: string | null;
 }

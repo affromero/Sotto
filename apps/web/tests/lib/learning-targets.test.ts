@@ -1,3 +1,4 @@
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockCourseFindFirst = vi.fn();
@@ -7,13 +8,14 @@ const mockLearnerFocusTargetFindFirst = vi.fn();
 const mockLearnerFocusTargetUpdate = vi.fn();
 const mockAssertStorageWritable = vi.fn();
 const mockUploadFile = vi.fn();
+const mockWriteStorageReference = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
 const mockGetConfiguredTtsProviderId = vi.fn();
 const mockResolveTtsProvider = vi.fn();
 const mockGetVisualCueKey = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
     course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
     learnerVocab: { upsert: (...a: unknown[]) => mockLearnerVocabUpsert(...a) },
     learnerFocusTarget: {
@@ -23,11 +25,18 @@ vi.mock('@/lib/prisma', () => ({
       findFirst: (...a: unknown[]) => mockLearnerFocusTargetFindFirst(...a),
       update: (...a: unknown[]) => mockLearnerFocusTargetUpdate(...a),
     },
-  },
-}));
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
 vi.mock('@/lib/r2', () => ({
   assertStorageWritable: (...a: unknown[]) => mockAssertStorageWritable(...a),
   uploadFile: (...a: unknown[]) => mockUploadFile(...a),
+}));
+vi.mock('@/lib/sidedoor/storage/core/storage-write', () => ({
+  writeStorageReference: (...a: unknown[]) => mockWriteStorageReference(...a),
+}));
+vi.mock('@/lib/sidedoor/storage/core/focus-target-storage', () => ({
+  captureFocusTargetStorage: vi.fn(),
 }));
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...a: unknown[]) => mockGetAutoModelConfig(...a),
@@ -101,6 +110,7 @@ beforeEach(() => {
   });
   mockLearnerFocusTargetUpdate.mockResolvedValue(TARGET_ROW);
   mockAssertStorageWritable.mockResolvedValue(undefined);
+  mockWriteStorageReference.mockResolvedValue('https://cdn.example/focus.mp3');
 });
 
 describe('learning target text handling', () => {
@@ -177,7 +187,12 @@ describe('generateTargetPronunciation', () => {
       pronunciationAudioUrl: 'https://cdn.example/focus.mp3',
     });
 
-    const target = await generateTargetPronunciation('c1', 'u1', 'ft1');
+    const target = await generateTargetPronunciation(
+      'c1',
+      'u1',
+      'ft1',
+      blockedProviderExecution('u1')
+    );
 
     expect(target.pronunciationAudioUrl).toBe('https://cdn.example/focus.mp3');
     expect(mockResolveTtsProvider).toHaveBeenCalledWith(
@@ -221,7 +236,12 @@ describe('generateTargetPronunciation', () => {
       pronunciationAudioUrl: 'https://cdn.example/focus.mp3',
     });
 
-    const target = await generateTargetPronunciation('c1', 'u1', 'ft1');
+    const target = await generateTargetPronunciation(
+      'c1',
+      'u1',
+      'ft1',
+      blockedProviderExecution('u1')
+    );
 
     expect(target.pronunciationAudioUrl).toBe('https://cdn.example/focus.mp3');
     expect(mockResolveTtsProvider).toHaveBeenCalledWith(

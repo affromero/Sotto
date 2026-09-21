@@ -3,38 +3,57 @@
  * for the welcome wizard's local TTS/STT selections. Tests the same local
  * contracts generation will use, so the UI can block on a real green light.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @vitest-environment node
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-
-const mockAuth = vi.fn();
-
-vi.mock('@/lib/auth', () => ({ auth: (...a: unknown[]) => mockAuth(...a) }));
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
+import type { PrismaClient } from '@/generated/prisma/client';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+  type SharedTestIdentity,
+} from '../helpers/setup/shared-instance';
+const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(binding);
+  return { prisma: database, prismaUnfiltered: database };
+});
 
 import { POST } from '@/app/api/v1/onboarding/check-local-speech/route';
 
-function req(body: unknown): NextRequest {
+function req(body: unknown, token?: string): NextRequest {
   return new NextRequest('http://localhost:3000/api/v1/onboarding/check-local-speech', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { cookie: `sotto_session=${token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
 }
 
-describe('POST /api/v1/onboarding/check-local-speech', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAuth.mockResolvedValue({ user: { id: 'u1' } });
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('POST /api/v1/onboarding/check-local-speech', () => {
+  let instance: SharedTestInstance;
+  let identity: SharedTestIdentity;
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('speech_checks');
+    binding.database = instance.database;
+  });
+  beforeEach(async () => {
+    identity = await instance.reset();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+  afterAll(async () => {
+    binding.database = null;
+    if (instance) await instance.close();
   });
 
   it('rejects unauthenticated checks', async () => {
-    mockAuth.mockResolvedValue(null);
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -66,7 +85,9 @@ describe('POST /api/v1/onboarding/check-local-speech', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const res = await POST(req({ tts: { provider: 'local' }, stt: { provider: 'local' } }));
+    const res = await POST(
+      req({ tts: { provider: 'local' }, stt: { provider: 'local' } }, identity.ownerToken)
+    );
 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
@@ -80,10 +101,13 @@ describe('POST /api/v1/onboarding/check-local-speech', () => {
 
   it('fails STT endpoints that omit the OpenAI-compatible /v1 base path', async () => {
     const res = await POST(
-      req({
-        tts: { provider: 'openai' },
-        stt: { provider: 'local', baseUrl: 'http://localhost:8001' },
-      })
+      req(
+        {
+          tts: { provider: 'openai' },
+          stt: { provider: 'local', baseUrl: 'http://localhost:8001' },
+        },
+        identity.ownerToken
+      )
     );
 
     expect(res.status).toBe(200);

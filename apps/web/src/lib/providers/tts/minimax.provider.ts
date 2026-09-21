@@ -1,12 +1,12 @@
 /**
  * MiniMax Speech-02 HD TTS provider — #1 ranked on Speech Arena.
- * Accessed via Fal.ai infrastructure (shares FAL_KEY).
+ * Accessed through the saved Fal.ai credential.
  * Supports 17 preset voices, 7 emotions, speed and pitch control.
  *
  * @tts-research-date 2026-03-01 — MiniMax Speech-02 HD via Fal API
  */
 import { logger } from '../../logger';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { MINIMAX_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
@@ -14,6 +14,7 @@ import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expr
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { MediaTransport, ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 interface MinimaxTtsResponse {
   audio: { url: string; content_type: string; file_name: string; file_size: number };
@@ -25,11 +26,19 @@ const MODEL_ENDPOINTS: Record<string, string> = {
 };
 
 export class MinimaxProvider implements TtsProvider {
+  static readonly speechEndpoints = Object.freeze(
+    Object.values(MODEL_ENDPOINTS).map((path) => `https://fal.run/${path}`)
+  );
   readonly providerId: TtsProviderId = 'minimax';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    private readonly media: MediaTransport,
+    model?: string
+  ) {
     this.apiKey = apiKey;
     this.model = model ?? 'speech-02-hd';
   }
@@ -52,14 +61,22 @@ export class MinimaxProvider implements TtsProvider {
       }
     }
 
-    const response = await fetch(`https://fal.run/${endpoint}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Key ${this.apiKey}`,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      `https://fal.run/${endpoint}`,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          Authorization: `Key ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -71,17 +88,18 @@ export class MinimaxProvider implements TtsProvider {
       throw new Error('MiniMax returned no audio URL');
     }
 
-    const audioResponse = await fetch(data.audio.url);
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download MiniMax audio: ${audioResponse.status}`);
-    }
+    const audio = await this.media.downloadMedia(data.audio.url, { signal: params.signal });
 
     logger.info('MiniMax speech generated', { voiceId: params.voiceId, chars: params.text.length });
-    const arrayBuffer = await audioResponse.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    return Buffer.from(audio);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? MINIMAX_VOICE_POOL[0].id : MINIMAX_VOICE_POOL[1].id;

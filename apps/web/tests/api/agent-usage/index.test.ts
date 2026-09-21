@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { AccessError } from 'thesidedoor-core/access';
 
 const mockAuthenticateRequest = vi.fn();
 const mockGetAgentUsageStatus = vi.fn();
@@ -50,6 +51,7 @@ describe('GET /api/v1/agent-usage', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body).toMatchObject({ error: 'Unauthorized' });
     expect(mockGetAgentUsageStatus).not.toHaveBeenCalled();
   });
@@ -59,8 +61,15 @@ describe('GET /api/v1/agent-usage', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(mockAuthenticateRequest).toHaveBeenCalledOnce();
-    expect(mockGetAgentUsageStatus).toHaveBeenCalledWith('user-1');
+    expect(mockGetAgentUsageStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        signal: expect.any(AbortSignal),
+        authorize: expect.any(Function),
+      })
+    );
     expect(body.providers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -70,5 +79,30 @@ describe('GET /api/v1/agent-usage', () => {
         }),
       ])
     );
+  });
+
+  it('returns sanitized access failures without making the response cacheable', async () => {
+    mockGetAgentUsageStatus.mockRejectedValue(
+      new AccessError('forbidden', 'private account details')
+    );
+    const response = await GET(createRequest());
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.text()).not.toContain('private account details');
+  });
+
+  it('does not publish a usage result after the caller cancels', async () => {
+    const controller = new AbortController();
+    const request = new NextRequest('http://localhost:3000/api/v1/agent-usage', {
+      signal: controller.signal,
+    });
+    mockGetAgentUsageStatus.mockImplementation(async () => {
+      controller.abort();
+      return { providers: [{ detail: 'private usage result' }] };
+    });
+    const response = await GET(request);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.text()).not.toContain('private usage result');
   });
 });

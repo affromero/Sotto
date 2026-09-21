@@ -1,9 +1,11 @@
 import { z } from 'zod';
-import { prisma } from './prisma';
+import type { Prisma } from '@/generated/prisma/client';
 import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './providers/ai-registry';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
 import { getSttProviderMeta, type SttProviderId } from './providers/stt-registry';
-import { logger } from './logger';
+import { prismaUnfiltered } from './prisma';
+import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 export interface ModelConfig {
   aiProvider: AiProviderId;
@@ -41,6 +43,22 @@ export type SystemAiProviderId = (typeof SYSTEM_AI_PROVIDER_IDS)[number];
 const DISABLED_SYSTEM_AI_PROVIDER_PREFIX = '__disabled-system-ai-provider:';
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
+const autoModelConfigSchema = z
+  .object({
+    model: z.object({
+      aiProvider: z.string(),
+      aiModel: z.string(),
+      ttsProvider: z.string(),
+      ttsModel: z.string(),
+      sttProvider: z.string(),
+      sttModel: z.string(),
+    }),
+    platform: z.object({ aiProvider: z.string(), aiModel: z.string() }),
+    includedModels: includedModelsSchema,
+    includedTtsModels: includedModelsSchema,
+    includedSttModels: includedModelsSchema,
+  })
+  .strict();
 
 // Seed values for fresh installs — derived from registry, not hardcoded.
 // Computed lazily (not at module load) so simply importing this module — now a
@@ -62,76 +80,46 @@ function seeds() {
   };
 }
 
-/**
- * Get the current auto model configuration.
- * Creates the singleton row with registry-derived defaults if it doesn't exist.
- * Self-heals orphaned model/provider pairs in existing rows.
- */
-export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
-  let row = await prisma.autoModelConfig.findUnique({
-    where: { id: 'singleton' },
-  });
-  if (!row) {
-    try {
-      row = await prisma.autoModelConfig.create({
-        data: { id: 'singleton', ...seeds() },
-      });
-    } catch {
-      row = await prisma.autoModelConfig.findUnique({ where: { id: 'singleton' } });
-      if (!row) throw new Error('AutoModelConfig singleton missing after create race');
-    }
-  }
-
-  const repairs: Record<string, string> = {};
-  for (const [providerField, modelField, label] of [
-    ['aiProvider', 'aiModel', 'default'] as const,
-    ['platformAiProvider', 'platformAiModel', 'platform'] as const,
-  ]) {
-    const provider = row[providerField];
-    const model = row[modelField];
-    const owner = getProviderForModel(model);
-    if (owner && owner !== provider) {
-      const corrected = getAiProviderMeta(provider as AiProviderId).defaultModel;
-      repairs[modelField] = corrected;
-      logger.warn(`AutoModelConfig: repaired orphaned ${label} model`, {
-        was: `${provider}/${model}`,
-        corrected: `${provider}/${corrected}`,
-      });
-    } else if (!owner) {
-      const corrected = getAiProviderMeta(provider as AiProviderId).defaultModel;
-      repairs[modelField] = corrected;
-      logger.warn(`AutoModelConfig: repaired unknown ${label} model`, {
-        was: `${provider}/${model}`,
-        corrected: `${provider}/${corrected}`,
-      });
-    }
-  }
-
-  if (Object.keys(repairs).length > 0) {
-    await prisma.autoModelConfig.update({
-      where: { id: 'singleton' },
-      data: repairs,
-    });
-    Object.assign(row, repairs);
-  }
-
+export function defaultAutoModelConfig(): AutoModelConfigData {
+  const seed = seeds();
   return {
     model: {
-      aiProvider: row.aiProvider as AiProviderId,
-      aiModel: row.aiModel,
-      ttsProvider: row.ttsProvider as TtsProviderId,
-      ttsModel: row.ttsModel,
-      sttProvider: row.sttProvider as SttProviderId,
-      sttModel: row.sttModel,
+      aiProvider: seed.aiProvider,
+      aiModel: seed.aiModel,
+      ttsProvider: seed.ttsProvider,
+      ttsModel: seed.ttsModel,
+      sttProvider: seed.sttProvider,
+      sttModel: seed.sttModel,
     },
     platform: {
-      aiProvider: row.platformAiProvider as AiProviderId,
-      aiModel: row.platformAiModel,
+      aiProvider: seed.platformAiProvider,
+      aiModel: seed.platformAiModel,
     },
-    includedModels: includedModelsSchema.parse(row.includedModels),
-    includedTtsModels: includedModelsSchema.parse(row.includedTtsModels),
-    includedSttModels: includedModelsSchema.parse(row.includedSttModels),
+    includedModels: null,
+    includedTtsModels: null,
+    includedSttModels: null,
   };
+}
+
+type SharedDatabase = Pick<Prisma.TransactionClient, '$queryRawUnsafe'>;
+
+/** Read the single shared model configuration source. */
+export async function getAutoModelConfig(
+  transaction?: SharedDatabase
+): Promise<AutoModelConfigData> {
+  const read = async (database: SharedDatabase) => {
+    const state = await sidedoorStateStore(database).read();
+    if (state.configuration.automaticModels === null)
+      throw new Error(
+        'Initialize Sotto with `npm run access -- initialize` before starting the application'
+      );
+    const config = autoModelConfigSchema.parse(
+      state.configuration.automaticModels
+    ) as AutoModelConfigData;
+    assertModelProviderPairs({ model: config.model, platform: config.platform });
+    return config;
+  };
+  return transaction ? read(transaction) : sottoTransaction(prismaUnfiltered, read);
 }
 
 /**
@@ -143,7 +131,7 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
  * provider matches). Only checks pairs where both provider and a non-empty
  * model are supplied — partial updates and keyless/STT-only providers are skipped.
  */
-function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
+export function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
   const m = data.model;
   if (m?.aiProvider && m.aiModel && getProviderForModel(m.aiModel) !== m.aiProvider) {
     throw new Error(`AI model "${m.aiModel}" does not belong to provider "${m.aiProvider}".`);
@@ -175,35 +163,35 @@ function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
  */
 export async function setAutoModelConfig(
   data: AutoModelConfigUpdate,
-  adminId: string
+  _adminId: string,
+  transaction?: SharedDatabase
 ): Promise<void> {
   assertModelProviderPairs(data);
-
-  const update: Record<string, string | string[] | null> = { updatedBy: adminId };
-
-  if (data.model) {
-    if (data.model.aiProvider) update.aiProvider = data.model.aiProvider;
-    if (data.model.aiModel) update.aiModel = data.model.aiModel;
-    if (data.model.ttsProvider) update.ttsProvider = data.model.ttsProvider;
-    if (data.model.ttsModel) update.ttsModel = data.model.ttsModel;
-    if (data.model.sttProvider) update.sttProvider = data.model.sttProvider;
-    if (data.model.sttModel) update.sttModel = data.model.sttModel;
-  }
-
-  if (data.platform) {
-    if (data.platform.aiProvider) update.platformAiProvider = data.platform.aiProvider;
-    if (data.platform.aiModel) update.platformAiModel = data.platform.aiModel;
-  }
-
-  if (data.includedModels !== undefined) update.includedModels = data.includedModels;
-  if (data.includedTtsModels !== undefined) update.includedTtsModels = data.includedTtsModels;
-  if (data.includedSttModels !== undefined) update.includedSttModels = data.includedSttModels;
-
-  await prisma.autoModelConfig.upsert({
-    where: { id: 'singleton' },
-    create: { id: 'singleton', ...update },
-    update,
-  });
+  const write = async (database: SharedDatabase) => {
+    const store = sidedoorStateStore(database);
+    await store.transact((state) => {
+      if (state.configuration.automaticModels === null)
+        throw new Error(
+          'Initialize Sotto with `npm run access -- initialize` before changing configuration'
+        );
+      const current = autoModelConfigSchema.parse(state.configuration.automaticModels);
+      const updated: AutoModelConfigData = {
+        model: { ...current.model, ...data.model } as ModelConfig,
+        platform: { ...current.platform, ...data.platform } as PlatformAiConfig,
+        includedModels:
+          data.includedModels === undefined ? current.includedModels : data.includedModels,
+        includedTtsModels:
+          data.includedTtsModels === undefined ? current.includedTtsModels : data.includedTtsModels,
+        includedSttModels:
+          data.includedSttModels === undefined ? current.includedSttModels : data.includedSttModels,
+      };
+      assertModelProviderPairs({ model: updated.model, platform: updated.platform });
+      state.configuration.automaticModels = autoModelConfigSchema.parse(updated);
+      state.revision++;
+    });
+  };
+  if (transaction) return write(transaction);
+  await sottoTransaction(prismaUnfiltered, write);
 }
 
 /**

@@ -6,7 +6,7 @@ import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { Glyph } from '../Glyph';
 import { TimezoneGlobe } from '../timezone/TimezoneGlobe';
 import t from '../theme.module.css';
-import c from '../components.styles';
+import c from '@/app/welcome/components.styles';
 
 interface Props {
   name: string;

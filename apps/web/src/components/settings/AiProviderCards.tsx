@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useCredentialEditor } from './useCredentialEditor';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -39,9 +40,17 @@ export function AiProviderCards({
   systemProviders,
   onReadyChange,
 }: AiProviderCardsProps) {
-  const [configured, setConfigured] = useState<Map<string, boolean>>(
-    new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
+  const credentials = useCredentialEditor('ai-keys');
+  const configured = useMemo(
+    () =>
+      new Map(
+        (credentials.snapshot?.keys ?? initialConfigured).map((key) => [key.provider, key.isValid])
+      ),
+    [credentials.snapshot, initialConfigured]
   );
+  useEffect(() => {
+    if (credentials.snapshot) onReadyChange?.(credentials.snapshot.keys.some((key) => key.isValid));
+  }, [credentials.snapshot, onReadyChange]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -80,71 +89,27 @@ export function AiProviderCards({
     });
   }, [configured, providerMeta]);
 
+  const finishCredentialEdit = (providerId: string) => {
+    setFieldValues((previous) => {
+      const next = { ...previous };
+      delete next[providerId];
+      return next;
+    });
+    setExpandedId(null);
+  };
   const handleSaveKey = async (providerId: string) => {
     const apiKey = fieldValues[providerId]?.trim();
     if (!apiKey) return;
-
-    setSavingId(providerId);
-    setStatus((prev) => ({ ...prev, [providerId]: 'validating' }));
-    setErrors((prev) => ({ ...prev, [providerId]: '' }));
-
-    try {
-      const res = await fetch('/api/v1/settings/ai-keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: providerId, apiKey }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setErrors((prev) => ({ ...prev, [providerId]: data.error || 'Failed to save key' }));
-        setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
-        return;
-      }
-
-      setConfigured((prev) => {
-        const next = new Map(prev).set(providerId, true);
-        onReadyChange?.(Array.from(next.values()).some(Boolean));
-        return next;
-      });
-      setFieldValues((prev) => {
-        const next = { ...prev };
-        delete next[providerId];
-        return next;
-      });
-      setExpandedId(null);
-      setStatus((prev) => ({ ...prev, [providerId]: 'saved' }));
-      setTimeout(() => setStatus((prev) => ({ ...prev, [providerId]: 'idle' })), 3000);
-    } catch {
-      setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
-      setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
-    } finally {
-      setSavingId(null);
-    }
+    const result = await credentials.save(providerId, { values: { apiKey } });
+    if (result?.status === 'confirmed') finishCredentialEdit(providerId);
   };
-
   const handleRemoveKey = async (providerId: string) => {
-    setSavingId(providerId);
-    try {
-      await fetch('/api/v1/settings/ai-keys', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: providerId }),
-      });
-      setConfigured((prev) => {
-        const next = new Map(prev);
-        next.delete(providerId);
-        onReadyChange?.(Array.from(next.values()).some(Boolean));
-        return next;
-      });
-      setStatus((prev) => ({ ...prev, [providerId]: 'removed' }));
-      setTimeout(() => setStatus((prev) => ({ ...prev, [providerId]: 'idle' })), 3000);
-    } catch {
-      setErrors((prev) => ({ ...prev, [providerId]: 'Failed to remove key.' }));
-      setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
-    } finally {
-      setSavingId(null);
-    }
+    await credentials.remove(providerId);
+  };
+  const handleCredentialAction = async () => {
+    const provider = credentials.feedback?.provider;
+    const result = await credentials.act();
+    if (provider && result?.status === 'confirmed') finishCredentialEdit(provider);
   };
 
   const handleToggleSystemProvider = async (providerId: string, enabled: boolean) => {
@@ -206,6 +171,20 @@ export function AiProviderCards({
 
   return (
     <div className={styles.grid}>
+      {credentials.feedback && (
+        <div role="status" className={styles.card}>
+          <p>{credentials.feedback.message}</p>
+          {credentials.feedback.action && (
+            <Button onClick={handleCredentialAction} disabled={credentials.busy}>
+              {credentials.feedback.action === 'confirm'
+                ? 'Save without verification'
+                : credentials.feedback.action === 'reconcile'
+                  ? 'Check status'
+                  : 'Reload settings'}
+            </Button>
+          )}
+        </div>
+      )}
       {connectedSystemProviders.map((sp) => (
         <div key={sp.id} className={`${styles.card} ${styles.cardConnected}`}>
           <div className={styles.cardHeader}>
@@ -226,7 +205,7 @@ export function AiProviderCards({
               variant="ghost"
               onClick={() => handleToggleSystemProvider(sp.id, false)}
               loading={savingId === sp.id}
-              disabled={savingId !== null}
+              disabled={savingId !== null || credentials.editingBlocked}
             >
               Disable
             </Button>
@@ -260,7 +239,7 @@ export function AiProviderCards({
               type="button"
               className={styles.addKeyBtn}
               onClick={() => handleToggleSystemProvider(sp.id, true)}
-              disabled={savingId !== null}
+              disabled={savingId !== null || credentials.editingBlocked}
             >
               Enable
             </button>
@@ -277,8 +256,11 @@ export function AiProviderCards({
       {sortedProviderMeta.map((provider) => {
         const isConfigured = configured.has(provider.id);
         const isValid = configured.get(provider.id) ?? true;
+        const verified =
+          credentials.snapshot?.keys.find((key) => key.provider === provider.id)?.verification
+            .lastConfirmed?.status === 'verified';
         const isExpanded = expandedId === provider.id;
-        const isSaving = savingId === provider.id;
+        const isSaving = credentials.busy;
         const modelNames = provider.models.map((m) => m.displayName).join(' · ');
         const cardClassName = isConfigured
           ? `${styles.card} ${isValid ? styles.cardConnected : styles.cardInvalid}`
@@ -302,9 +284,11 @@ export function AiProviderCards({
                 <span className={styles.statusValidating}>Validating key...</span>
               ) : isConfigured ? (
                 isValid ? (
-                  <span className={styles.statusConnected}>Connected</span>
+                  <span className={styles.statusConnected}>
+                    {verified ? 'Verified' : 'Saved, unverified'}
+                  </span>
                 ) : (
-                  <span className={styles.statusInvalid}>Key Invalid</span>
+                  <span className={styles.statusInvalid}>Key disabled</span>
                 )
               ) : (
                 <span className={styles.statusNone}>Not configured</span>
@@ -316,7 +300,10 @@ export function AiProviderCards({
                 <button
                   type="button"
                   className={styles.addKeyBtn}
-                  onClick={() => setExpandedId(provider.id)}
+                  onClick={() => {
+                    if (credentials.begin(provider.id)) setExpandedId(provider.id);
+                  }}
+                  disabled={credentials.editingBlocked}
                 >
                   Update Key
                 </button>
@@ -324,7 +311,7 @@ export function AiProviderCards({
                   variant="ghost"
                   onClick={() => handleRemoveKey(provider.id)}
                   loading={isSaving}
-                  disabled={savingId !== null}
+                  disabled={savingId !== null || credentials.editingBlocked}
                 >
                   Remove Key
                 </Button>
@@ -339,7 +326,10 @@ export function AiProviderCards({
                 <button
                   type="button"
                   className={styles.addKeyBtn}
-                  onClick={() => setExpandedId(provider.id)}
+                  onClick={() => {
+                    if (credentials.begin(provider.id)) setExpandedId(provider.id);
+                  }}
+                  disabled={credentials.editingBlocked}
                 >
                   Add Key
                 </button>
@@ -364,12 +354,11 @@ export function AiProviderCards({
                     label={field.label}
                     type="password"
                     value={fieldValues[provider.id] || ''}
-                    onChange={(e) =>
-                      setFieldValues((prev) => ({
-                        ...prev,
-                        [provider.id]: e.target.value,
-                      }))
-                    }
+                    disabled={credentials.editingBlocked}
+                    onChange={(e) => {
+                      credentials.edited();
+                      setFieldValues((prev) => ({ ...prev, [provider.id]: e.target.value }));
+                    }}
                     placeholder={field.placeholder}
                   />
                 ))}
@@ -377,11 +366,23 @@ export function AiProviderCards({
                   <Button
                     onClick={() => handleSaveKey(provider.id)}
                     loading={isSaving}
-                    disabled={savingId !== null || !fieldValues[provider.id]?.trim()}
+                    disabled={
+                      savingId !== null ||
+                      credentials.editingBlocked ||
+                      credentials.feedback?.action === 'confirm' ||
+                      !fieldValues[provider.id]?.trim()
+                    }
                   >
                     Save Key
                   </Button>
-                  <Button variant="ghost" onClick={() => setExpandedId(null)}>
+                  <Button
+                    variant="ghost"
+                    disabled={credentials.editingBlocked}
+                    onClick={() => {
+                      credentials.edited();
+                      setExpandedId(null);
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -428,7 +429,7 @@ export function AiProviderCards({
                 variant="ghost"
                 onClick={() => handleReloadCredentials(sp.id)}
                 loading={savingId === sp.id}
-                disabled={savingId !== null}
+                disabled={savingId !== null || credentials.editingBlocked}
               >
                 Reload host login
               </Button>

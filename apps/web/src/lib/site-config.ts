@@ -1,89 +1,72 @@
-import { prisma } from './prisma';
-import { logger } from './logger';
+import { z } from 'zod';
+import type { Prisma } from '@/generated/prisma/client';
+import { prismaUnfiltered } from './prisma';
+import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
-/**
- * Non-secret server infrastructure selection the owner sets in the onboarding
- * wizard. `null` on any field means "fall back to the matching env var". Secrets
- * (provider keys, R2/S3 credentials) are NEVER stored here — they live in env or
- * the encrypted BYOK store.
- */
-export interface ServerInfraConfig {
-  aiProvider: string | null;
-  aiModel: string | null;
-  aiBaseUrl: string | null;
-  sttProvider: string | null;
-  sttBaseUrl: string | null;
-  sttModel: string | null;
-  ttsProvider: string | null;
-  ttsBaseUrl: string | null;
-  storageProvider: string | null;
-  s3Bucket: string | null;
-  s3Region: string | null;
-}
+export const serverInfraConfigSchema = z
+  .object({
+    aiProvider: z.string().nullable(),
+    aiModel: z.string().nullable(),
+    aiBaseUrl: z.string().nullable(),
+    liveModel: z.string().nullable(),
+    sttProvider: z.string().nullable(),
+    sttBaseUrl: z.string().nullable(),
+    sttModel: z.string().nullable(),
+    ttsProvider: z.string().nullable(),
+    ttsBaseUrl: z.string().nullable(),
+    ttsVoices: z.string().nullable().default(null),
+    storageProvider: z.string().nullable(),
+    localStorageRoot: z.string().nullable(),
+    objectStorageEndpoint: z.string().nullable(),
+    objectStorageBucket: z.string().nullable(),
+    objectStorageRegion: z.string().nullable(),
+    objectStoragePublicUrl: z.string().nullable(),
+  })
+  .strict();
 
+export type ServerInfraConfig = z.infer<typeof serverInfraConfigSchema>;
 export type SiteConfigData = ServerInfraConfig;
 
-const EMPTY_INFRA: ServerInfraConfig = {
+export const EMPTY_INFRA: ServerInfraConfig = {
   aiProvider: null,
   aiModel: null,
   aiBaseUrl: null,
+  liveModel: null,
   sttProvider: null,
   sttBaseUrl: null,
   sttModel: null,
   ttsProvider: null,
   ttsBaseUrl: null,
+  ttsVoices: null,
   storageProvider: null,
-  s3Bucket: null,
-  s3Region: null,
+  localStorageRoot: null,
+  objectStorageEndpoint: null,
+  objectStorageBucket: null,
+  objectStorageRegion: null,
+  objectStoragePublicUrl: null,
 };
 
-const DEFAULTS: SiteConfigData = { ...EMPTY_INFRA };
+export const INFRA_KEYS = Object.keys(EMPTY_INFRA) as (keyof ServerInfraConfig)[];
+type SharedDatabase = Pick<Prisma.TransactionClient, '$queryRawUnsafe'>;
 
-export const INFRA_KEYS: (keyof ServerInfraConfig)[] = [
-  'aiProvider',
-  'aiModel',
-  'aiBaseUrl',
-  'sttProvider',
-  'sttBaseUrl',
-  'sttModel',
-  'ttsProvider',
-  'ttsBaseUrl',
-  'storageProvider',
-  's3Bucket',
-  's3Region',
-];
-
-export async function getSiteConfig(): Promise<SiteConfigData> {
-  try {
-    const row = await prisma.siteConfig.findUnique({
-      where: { id: 'singleton' },
-    });
-    if (!row) return DEFAULTS;
-    return {
-      aiProvider: row.aiProvider,
-      aiModel: row.aiModel,
-      aiBaseUrl: row.aiBaseUrl,
-      sttProvider: row.sttProvider,
-      sttBaseUrl: row.sttBaseUrl,
-      sttModel: row.sttModel,
-      ttsProvider: row.ttsProvider,
-      ttsBaseUrl: row.ttsBaseUrl,
-      storageProvider: row.storageProvider,
-      s3Bucket: row.s3Bucket,
-      s3Region: row.s3Region,
-    };
-  } catch (err) {
-    logger.warn('Failed to read site config', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return DEFAULTS;
-  }
+async function read(database: SharedDatabase): Promise<SiteConfigData> {
+  const state = await sidedoorStateStore(database).read();
+  if (state.configuration.site === null)
+    throw new Error(
+      'Initialize Sotto with `npm run access -- initialize` before starting the application'
+    );
+  return serverInfraConfigSchema.parse(state.configuration.site);
 }
 
-/**
- * Normalize an infra field: trim, and treat empty string as "unset" (null) so the
- * resolver falls back to env rather than to a blank explicit selection.
- */
+/** Read the single shared configuration source. Runtime never reads imported tables or env. */
+export async function getSiteConfig(
+  options: { database?: SharedDatabase; strict?: true } = {}
+): Promise<SiteConfigData> {
+  if (options.database) return read(options.database);
+  return sottoTransaction(prismaUnfiltered, read);
+}
+
 function normalizeInfra(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -91,27 +74,36 @@ function normalizeInfra(value: string | null | undefined): string | null | undef
   return trimmed.length === 0 ? null : trimmed;
 }
 
-export async function setSiteConfig(data: Partial<SiteConfigData>, adminId: string): Promise<void> {
-  const infra: Record<string, string | null> = {};
-  for (const key of INFRA_KEYS) {
-    const normalized = normalizeInfra(data[key]);
-    if (normalized !== undefined) infra[key] = normalized;
-  }
-
-  await prisma.siteConfig.upsert({
-    where: { id: 'singleton' },
-    update: {
-      ...infra,
-      updatedBy: adminId,
-    },
-    create: {
-      id: 'singleton',
-      ...infra,
-      updatedBy: adminId,
-    },
+async function write(
+  database: SharedDatabase,
+  data: Partial<SiteConfigData>,
+  _adminId: string
+): Promise<void> {
+  const store = sidedoorStateStore(database);
+  await store.transact((state) => {
+    if (state.configuration.site === null)
+      throw new Error(
+        'Initialize Sotto with `npm run access -- initialize` before changing configuration'
+      );
+    const current = serverInfraConfigSchema.parse(state.configuration.site);
+    for (const key of INFRA_KEYS) {
+      const normalized = normalizeInfra(data[key]);
+      if (normalized !== undefined) current[key] = normalized;
+    }
+    state.configuration.site = current;
+    state.revision++;
   });
 }
 
+export async function setSiteConfig(
+  data: Partial<SiteConfigData>,
+  adminId: string,
+  transaction?: SharedDatabase
+): Promise<void> {
+  if (transaction) return write(transaction, data, adminId);
+  await sottoTransaction(prismaUnfiltered, (database) => write(database, data, adminId));
+}
+
 export async function resetSiteConfig(adminId: string): Promise<void> {
-  await setSiteConfig(DEFAULTS, adminId);
+  await setSiteConfig(EMPTY_INFRA, adminId);
 }

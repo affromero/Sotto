@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Glyph, type GlyphName } from '@/components/Glyph';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import { InlineModelTest } from './InlineModelTest';
-import shell from '../../adminTheme.styles';
+import shell from '@/app/(admin)/adminTheme.styles';
 import {
   formatAgentModelId,
   parseAgentModelId,

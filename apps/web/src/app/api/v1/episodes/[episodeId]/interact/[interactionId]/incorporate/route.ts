@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/api-keys';
-import { prisma } from '@/lib/prisma';
-import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
-import { createAIProvider } from '@/lib/providers/ai';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { accessOperation } from '@/lib/sidedoor/access/core/http';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import {
+  captureIncorporation,
+  commitIncorporation,
+  prepareIncorporation,
+  IncorporationAdmissionError,
+  incorporationPosition,
+} from '@/lib/sidedoor/jobs/stitch/incorporation';
+import { EpisodeStorageChangedError } from '@/lib/sidedoor/storage/core/episode-storage';
+import { createAIProvider, type AIResponse } from '@/lib/providers/ai';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
@@ -15,63 +23,32 @@ import {
 } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 
-import type { RegenerateSegmentPayload } from '@/lib/queue';
-
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ episodeId: string; interactionId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
-  const { episodeId, interactionId } = await params;
-  const authed = await authenticateRequest(request);
-
-  if (!authed) {
-    return errorResponse('Unauthorized', 401);
-  }
-
-  const userId = authed.userId;
-
-  // Fetch the interaction with episode ownership check
-  const interaction = await prisma.interaction.findUnique({
-    where: { id: interactionId },
-    include: {
-      episode: {
-        select: {
-          id: true,
-          userId: true,
-          status: true,
-          source: true,
-          language: true,
-          aiModel: true,
-        },
-      },
-    },
+  return accessOperation(request, !request.headers.has('authorization'), async () => {
+    try {
+      return await incorporate(request, await params);
+    } catch (error) {
+      if (error instanceof IncorporationAdmissionError)
+        return errorResponse(error.message, error.status);
+      if (error instanceof EpisodeStorageChangedError)
+        return errorResponse('Episode ownership changed during generation', 409);
+      throw error;
+    }
   });
+}
 
-  if (!interaction || interaction.episodeId !== episodeId) {
-    return errorResponse('Interaction not found', 404);
-  }
-
-  // Only the episode owner can incorporate
-  if (interaction.episode.userId !== userId) {
-    return errorResponse('Forbidden', 403);
-  }
-
-  if (interaction.episode.source === 'IMPORT') {
-    return errorResponse('Incorporation not yet supported for imported episodes', 400);
-  }
-
-  // Interaction must be answered or resolved
-  if (!['ANSWERED', 'RESOLVED'].includes(interaction.status)) {
-    return errorResponse(`Cannot incorporate interaction with status "${interaction.status}"`, 409);
-  }
-
-  // Episode must be in READY state
-  if (interaction.episode.status !== 'READY') {
-    return errorResponse(
-      `Episode is currently "${interaction.episode.status}", must be READY`,
-      409
-    );
-  }
+async function incorporate(
+  request: NextRequest,
+  { episodeId, interactionId }: { episodeId: string; interactionId: string }
+) {
+  const admission = await sottoTransaction(prisma, (tx) =>
+    captureIncorporation(tx, request, episodeId, interactionId)
+  );
+  const interaction = admission.inputs;
+  const userId = admission.identity.userId;
 
   const aiKey = interaction.episode.aiModel ? null : await getAiKey(userId);
   if (!interaction.episode.aiModel && !aiKey) {
@@ -100,37 +77,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   }
 
-  // Set interaction to INCORPORATING
-  await prisma.interaction.update({
-    where: { id: interactionId },
-    data: { status: 'INCORPORATING' },
-  });
+  const segments = interaction.episode.segments;
 
-  // Set episode to UPDATING
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: { status: 'UPDATING' },
-  });
-
-  // Find the segment closest to the interaction timestamp
-  const segments = await prisma.segment.findMany({
-    where: { episodeId },
-    orderBy: { order: 'asc' },
-    select: { order: true, startTime: true, duration: true, speaker: true, text: true },
-  });
-
-  let insertAfterOrder = 0;
-  let activeSpeaker = segments[0]?.speaker ?? 'HOST';
-  for (const seg of segments) {
-    const segEnd = (seg.startTime ?? 0) + (seg.duration ?? 0);
-    if (interaction.timestamp <= segEnd) {
-      insertAfterOrder = seg.order;
-      activeSpeaker = seg.speaker;
-      break;
-    }
-    insertAfterOrder = seg.order;
-    activeSpeaker = seg.speaker;
-  }
+  const { insertAfterOrder, speaker: activeSpeaker } = incorporationPosition(interaction);
 
   // Get surrounding context for generating the incorporation text
   const contextSegments = segments
@@ -152,16 +101,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     CONTENT_SAFETY_INSTRUCTIONS;
 
   const ai = createAIProvider(provider);
-  const response = await ai.generateResponse(
-    systemPrompt,
-    [
-      {
-        role: 'user',
-        content: `Episode context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural episode segment that addresses this question and answer.`,
-      },
-    ],
-    { apiKeyOverride: providerAiKey?.apiKey, model: resolvedModel }
-  );
+  let response: AIResponse;
+  try {
+    response = await ai.generateResponse(
+      systemPrompt,
+      [
+        {
+          role: 'user',
+          content: `Episode context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural episode segment that addresses this question and answer.`,
+        },
+      ],
+      { apiKeyOverride: providerAiKey?.apiKey, model: resolvedModel }
+    );
+  } catch {
+    return errorResponse('AI generation failed. Check the selected provider and retry.', 502);
+  }
 
   await logUsage({
     service: provider,
@@ -173,18 +127,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     userId,
   });
 
-  // Queue segment regeneration
-  const payload: RegenerateSegmentPayload = {
-    episodeId,
-    interactionId,
-    insertAfterOrder,
-    newText: response.content,
-    speaker: activeSpeaker,
-  };
-
-  await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload, {
-    jobId: `segment-regeneration-${interactionId}`,
-  });
+  const job = prepareIncorporation(admission, response.content);
+  await sottoTransaction(prisma, (tx) => commitIncorporation(tx, request, admission, job));
 
   return NextResponse.json(
     {
@@ -192,6 +136,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       interactionId,
       insertAfterOrder,
       generatedText: response.content,
+      operationId: job.id,
     },
     { status: 202 }
   );

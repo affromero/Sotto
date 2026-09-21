@@ -5,6 +5,10 @@
  * Each provider skips gracefully when env vars are missing.
  */
 import { describe, it, expect } from 'vitest';
+import {
+  captureSottoCredentialProbe,
+  validateSottoCredentialProbe,
+} from '@/lib/providers/shared/credential-validation';
 
 // ---------------------------------------------------------------------------
 // PostgreSQL
@@ -55,73 +59,79 @@ describe('R2 Storage', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AI Providers (via ai-registry validate)
+// AI Providers (shared credential verification)
 // ---------------------------------------------------------------------------
 describe('AI Providers', () => {
   describe('Anthropic', () => {
     it.skipIf(!process.env.ANTHROPIC_API_KEY)('validates credentials', async () => {
-      const { validateAiProviderCredentials } = await import('@/lib/providers/ai-registry');
-      const valid = await validateAiProviderCredentials('anthropic', {
-        apiKey: process.env.ANTHROPIC_API_KEY!,
-      });
-      expect(valid).toBe(true);
+      const result = await validateSottoCredentialProbe(
+        captureSottoCredentialProbe('ai', 'anthropic', {
+          apiKey: process.env.ANTHROPIC_API_KEY!,
+        })
+      );
+      expect(result).toMatchObject({ status: 'valid', readiness: { authentication: 'verified' } });
     });
   });
 
   describe('OpenAI', () => {
     it.skipIf(!process.env.OPENAI_API_KEY)('validates credentials', async () => {
-      const { validateAiProviderCredentials } = await import('@/lib/providers/ai-registry');
-      const valid = await validateAiProviderCredentials('openai', {
-        apiKey: process.env.OPENAI_API_KEY!,
-      });
-      expect(valid).toBe(true);
+      const result = await validateSottoCredentialProbe(
+        captureSottoCredentialProbe('ai', 'openai', {
+          apiKey: process.env.OPENAI_API_KEY!,
+        })
+      );
+      expect(result).toMatchObject({ status: 'valid', readiness: { authentication: 'verified' } });
     });
   });
 });
 
 // ---------------------------------------------------------------------------
-// TTS Providers (via tts-registry validate)
+// TTS Providers (shared credential verification)
 // ---------------------------------------------------------------------------
 describe('TTS Providers', () => {
   describe('ElevenLabs', () => {
     it.skipIf(!process.env.ELEVENLABS_API_KEY)('validates credentials', async () => {
-      const { validateProviderCredentials } = await import('@/lib/providers/tts-registry');
-      const valid = await validateProviderCredentials('elevenlabs', {
-        apiKey: process.env.ELEVENLABS_API_KEY!,
-      });
-      expect(valid).toBe(true);
+      const result = await validateSottoCredentialProbe(
+        captureSottoCredentialProbe('tts', 'elevenlabs', {
+          apiKey: process.env.ELEVENLABS_API_KEY!,
+        })
+      );
+      expect(result).toMatchObject({ status: 'valid', readiness: { authentication: 'verified' } });
     });
   });
 
   describe('OpenAI TTS', () => {
     it.skipIf(!process.env.OPENAI_API_KEY)('validates credentials', async () => {
-      const { validateProviderCredentials } = await import('@/lib/providers/tts-registry');
-      const valid = await validateProviderCredentials('openai', {
-        apiKey: process.env.OPENAI_API_KEY!,
-      });
-      expect(valid).toBe(true);
+      const result = await validateSottoCredentialProbe(
+        captureSottoCredentialProbe('tts', 'openai', {
+          apiKey: process.env.OPENAI_API_KEY!,
+        })
+      );
+      expect(result).toMatchObject({ status: 'valid', readiness: { authentication: 'verified' } });
     });
   });
 
   describe('Cartesia', () => {
     // BYOK-only — smoke test env vars
     it.skipIf(!process.env.CARTESIA_API_KEY)('validates credentials', async () => {
-      const { validateProviderCredentials } = await import('@/lib/providers/tts-registry');
-      const valid = await validateProviderCredentials('cartesia', {
-        apiKey: process.env.CARTESIA_API_KEY!,
-      });
-      expect(valid).toBe(true);
+      const result = await validateSottoCredentialProbe(
+        captureSottoCredentialProbe('tts', 'cartesia', {
+          apiKey: process.env.CARTESIA_API_KEY!,
+        })
+      );
+      expect(result).toMatchObject({ status: 'valid', readiness: { authentication: 'verified' } });
     });
   });
 
   describe('Hume', () => {
     // BYOK-only — smoke test env vars
     it.skipIf(!process.env.HUME_API_KEY)('validates credentials', async () => {
-      const { validateProviderCredentials } = await import('@/lib/providers/tts-registry');
-      const valid = await validateProviderCredentials('hume', {
-        apiKey: process.env.HUME_API_KEY!,
-      });
-      expect(valid).toBe(true);
+      const result = await validateSottoCredentialProbe(
+        captureSottoCredentialProbe('tts', 'hume', {
+          apiKey: process.env.HUME_API_KEY!,
+        })
+      );
+      expect(result).toMatchObject({ status: 'valid', readiness: { authentication: 'verified' } });
     });
   });
 

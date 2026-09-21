@@ -7,8 +7,9 @@
 // Google key the feature is hidden (canLiveTranslate) and the route 422s with an
 // actionable message. The Live model id is configurable via GEMINI_LIVE_MODEL.
 import { GoogleGenAI, Modality } from '@google/genai';
-import { getAiKey } from './byok';
+import { getAiKey, listAiProviders } from './byok';
 import { prisma } from './prisma';
+import { getSiteConfig } from './site-config';
 
 /** Default Gemini Live model. Override with GEMINI_LIVE_MODEL for a
  *  translation-tuned preview (half-cascade) model when your key has access. */
@@ -47,8 +48,8 @@ export class LiveTranslateCourseError extends Error {}
 /** The key exists but Google rejected the Live/ephemeral-token request. */
 export class LiveTranslateAccessError extends Error {}
 
-export function getLiveTranslateModel(): string {
-  const override = (process.env.GEMINI_LIVE_MODEL ?? '').trim();
+export async function getLiveTranslateModel(): Promise<string> {
+  const override = (await getSiteConfig()).liveModel?.trim() ?? '';
   return override || DEFAULT_LIVE_MODEL;
 }
 
@@ -60,10 +61,10 @@ export async function resolveLiveTranslate(userId: string): Promise<LiveTranslat
   const key = await getAiKey(userId, 'google');
   if (!key) {
     throw new LiveTranslateKeyError(
-      'Live conversation needs a Google (Gemini) API key. Add one in Settings to unlock it.',
+      'Live conversation needs a Google (Gemini) API key. Add one in Settings to unlock it.'
     );
   }
-  return { apiKey: key.apiKey, model: getLiveTranslateModel() };
+  return { apiKey: key.apiKey, model: await getLiveTranslateModel() };
 }
 
 /**
@@ -72,11 +73,7 @@ export async function resolveLiveTranslate(userId: string): Promise<LiveTranslat
  * every /learn hub render.
  */
 export async function canLiveTranslate(userId: string): Promise<boolean> {
-  const row = await prisma.userAiKey.findUnique({
-    where: { userId_provider: { userId, provider: 'google' } },
-    select: { id: true },
-  });
-  return Boolean(row);
+  return (await listAiProviders(userId)).some((key) => key.provider === 'google' && key.isValid);
 }
 
 /**
@@ -87,7 +84,7 @@ export async function canLiveTranslate(userId: string): Promise<boolean> {
 export async function mintLiveToken(
   userId: string,
   courseId: string,
-  direction: LiveDirection,
+  direction: LiveDirection
 ): Promise<LiveTokenResult> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
@@ -126,7 +123,7 @@ export async function mintLiveToken(
   } catch (error: unknown) {
     throw new LiveTranslateAccessError(
       'Could not start a live session. Your Google key may not have access to the Gemini Live model. ' +
-        (error instanceof Error ? error.message : String(error)),
+        (error instanceof Error ? error.message : String(error))
     );
   }
 

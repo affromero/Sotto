@@ -4,6 +4,7 @@
 // writes happen here — the course does not exist until confirmation.
 import { cache } from '@/lib/redis';
 import { deduceLevelFromNotes, type NotesDeduction } from '@/lib/placement-test';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 const NOTES_TTL_SECONDS = 3600;
 
@@ -24,11 +25,12 @@ export interface CachedNotesDeduction extends NotesDeduction {
  */
 export async function runNotesDeduction(
   userId: string,
+  execution: SottoProviderExecution,
   native: string,
   target: string,
-  content: string,
+  content: string
 ): Promise<NotesDeduction> {
-  const { deduction } = await deduceLevelFromNotes(userId, native, target, content);
+  const { deduction } = await deduceLevelFromNotes(userId, execution, native, target, content);
   const cached: CachedNotesDeduction = { ...deduction, content };
   await cache.set(notesCacheKey(userId, native, target), cached, NOTES_TTL_SECONDS);
   return deduction;
@@ -38,7 +40,7 @@ export async function runNotesDeduction(
 export async function getCachedNotesDeduction(
   userId: string,
   native: string,
-  target: string,
+  target: string
 ): Promise<CachedNotesDeduction | null> {
   return cache.get<CachedNotesDeduction>(notesCacheKey(userId, native, target));
 }
@@ -47,7 +49,7 @@ export async function getCachedNotesDeduction(
 export async function clearNotesDeduction(
   userId: string,
   native: string,
-  target: string,
+  target: string
 ): Promise<void> {
   await cache.delete(notesCacheKey(userId, native, target)).catch(() => {});
 }

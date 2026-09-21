@@ -1,14 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma, type EpisodeSource } from '@/generated/prisma/client';
-import { prisma } from './prisma';
-import { addJob, contentExtractionQueue, JobType } from './queue';
+import { admitDurableJob, contentExtractionQueue, JobType } from './queue';
 import type { ExtractContentPayload } from './queue';
 import { getProviderForModel } from './providers/ai-registry';
 import { generateEpisodeSlug } from './slugify';
 
-export type PrivateIngestionTransaction = Omit<
-  typeof prisma,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
+export type PrivateIngestionTransaction = Prisma.TransactionClient;
 
 interface PrivateIngestionDiscovery {
   sourceContent: string;
@@ -33,74 +30,62 @@ interface CreatePrivateIngestionEpisodeParams {
   discovery: PrivateIngestionDiscovery;
   jobPriority: number;
   jobIdPrefix: string;
+  authorize: (database: Prisma.TransactionClient) => Promise<{ userId?: string } | void>;
   writeIngestionRecord: (tx: PrivateIngestionTransaction, episodeId: string) => Promise<void>;
-}
-
-function resolveAiProvider(aiModel?: string): string | null {
-  if (!aiModel) return null;
-  return getProviderForModel(aiModel);
 }
 
 export async function createPrivateIngestionEpisode(
   params: CreatePrivateIngestionEpisodeParams
 ): Promise<{ id: string; status: string; source: EpisodeSource; discoveryId: string }> {
-  const created = await prisma.$transaction(async (tx) => {
-    const episode = await tx.episode.create({
-      data: {
-        userId: params.userId,
-        title: params.title,
-        topic: params.topic,
-        status: 'EXTRACTING',
-        source: params.source,
-        sourcePlatform: params.sourcePlatform,
-        visibility: 'PRIVATE',
-        aiProvider: resolveAiProvider(params.aiModel),
-        aiModel: params.aiModel ?? null,
-        ttsProvider: params.ttsProvider,
-        ttsModel: params.ttsModel ?? null,
-      },
-    });
-
-    const discovery = await tx.discovery.create({
-      data: {
-        episodeId: episode.id,
-        userId: params.userId,
-        topic: params.topic,
-        depth: params.discovery.depth ?? 'standard',
-        audienceLevel: params.discovery.audienceLevel ?? 'general',
-        focusAreas: params.discovery.focusAreas ?? [],
-        tone: params.discovery.tone ?? 'casual',
-        durationTarget: params.discovery.durationTarget ?? 10,
-        sourceUrl: params.discovery.sourceUrl,
-        sourceContent: params.discovery.sourceContent,
-        sourceMetadata: params.discovery.sourceMetadata,
-      },
-    });
-
-    await params.writeIngestionRecord(tx, episode.id);
-
-    return { episode, discovery };
-  });
-
-  const slug = await generateEpisodeSlug(params.title, params.userId, prisma);
-  if (slug) {
-    await prisma.episode.update({ where: { id: created.episode.id }, data: { slug } });
-  }
-
+  const episodeId = randomUUID();
+  const discoveryId = randomUUID();
   const payload: ExtractContentPayload = {
-    episodeId: created.episode.id,
+    episodeId,
     userId: params.userId,
     sourceText: params.discovery.sourceContent,
   };
-  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
+  await admitDurableJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
     priority: params.jobPriority,
-    jobId: `${params.jobIdPrefix}-${created.episode.id}`,
+    jobId: `${params.jobIdPrefix}-${episodeId}`,
+    authorize: params.authorize,
+    mutate: async (database, operationId) => {
+      await database.episode.create({
+        data: {
+          id: episodeId,
+          userId: params.userId,
+          title: params.title,
+          topic: params.topic,
+          status: 'EXTRACTING',
+          pipelineGeneration: operationId,
+          source: params.source,
+          sourcePlatform: params.sourcePlatform,
+          visibility: 'PRIVATE',
+          aiProvider: params.aiModel ? getProviderForModel(params.aiModel) : null,
+          aiModel: params.aiModel ?? null,
+          ttsProvider: params.ttsProvider,
+          ttsModel: params.ttsModel ?? null,
+        },
+      });
+      await database.discovery.create({
+        data: {
+          id: discoveryId,
+          episodeId,
+          userId: params.userId,
+          topic: params.topic,
+          depth: params.discovery.depth ?? 'standard',
+          audienceLevel: params.discovery.audienceLevel ?? 'general',
+          focusAreas: params.discovery.focusAreas ?? [],
+          tone: params.discovery.tone ?? 'casual',
+          durationTarget: params.discovery.durationTarget ?? 10,
+          sourceUrl: params.discovery.sourceUrl,
+          sourceContent: params.discovery.sourceContent,
+          sourceMetadata: params.discovery.sourceMetadata,
+        },
+      });
+      await params.writeIngestionRecord(database, episodeId);
+      const slug = await generateEpisodeSlug(params.title, params.userId, database);
+      if (slug) await database.episode.update({ where: { id: episodeId }, data: { slug } });
+    },
   });
-
-  return {
-    id: created.episode.id,
-    status: created.episode.status,
-    source: params.source,
-    discoveryId: created.discovery.id,
-  };
+  return { id: episodeId, status: 'EXTRACTING', source: params.source, discoveryId };
 }

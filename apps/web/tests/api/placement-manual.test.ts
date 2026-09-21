@@ -66,6 +66,13 @@ describe('POST /api/v1/placement/manual', () => {
     const res = await POST(post({ native: 'en', target: 'de', level: 'C1' }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ courseId: 'course-1', level: 'B1' });
-    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith('u1', 'en', 'de', 'C1', 'MANUAL');
+    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      'en',
+      'de',
+      'C1',
+      'MANUAL'
+    );
   });
 });

@@ -18,13 +18,14 @@ import { alignPhrase, type AlignedToken } from './align';
 import { loadAndRender } from '../prompt-loader';
 import { createAIProvider } from '../providers/ai';
 import { logUsage } from '../usage-logger';
-import { logger } from '../logger';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
 // ---------------------------------------------------------------------------
 
 export interface PronunciationInput {
+  signal?: AbortSignal;
+  fetch?: typeof fetch;
   /** The phrase the learner was asked to say. */
   targetPhrase: string;
   /** What the STT engine transcribed. */
@@ -213,48 +214,39 @@ export class SelfContainedScorer implements PronunciationScorer {
       deletionWords
     );
 
-    let llmRubric: LlmRubric | null = null;
-    try {
-      const systemPrompt = loadAndRender('speaking/pronunciation-rubric.md', {
-        TARGET: input.targetLang,
-        TARGET_PHRASE: input.targetPhrase,
-        TRANSCRIPT: input.transcript,
-        ALIGNMENT_SUMMARY: alignmentSummary,
-      });
+    const systemPrompt = loadAndRender('speaking/pronunciation-rubric.md', {
+      TARGET: input.targetLang,
+      TARGET_PHRASE: input.targetPhrase,
+      TRANSCRIPT: input.transcript,
+      ALIGNMENT_SUMMARY: alignmentSummary,
+    });
 
-      const ai = createAIProvider(input.aiProvider);
-      const res = await ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: 'Score this pronunciation attempt.' }],
-        {
-          model: input.aiModel,
-          apiKeyOverride: input.aiApiKey,
-          maxTokens: 256,
-          temperature: 0.2,
-          skipModeration: true,
-        }
-      );
-
-      await logUsage({
-        service: input.aiProvider,
-        model: res.model,
-        category: 'pronunciation-scoring',
-        inputTokens: res.inputTokens,
-        outputTokens: res.outputTokens,
-        userId: input.userId,
-      });
-
-      llmRubric = parseLlmRubric(res.content);
-      if (!llmRubric) {
-        logger.warn('[SelfContainedScorer] Failed to parse LLM rubric JSON, falling back', {
-          raw: res.content.slice(0, 200),
-        });
+    const ai = createAIProvider(input.aiProvider);
+    const res = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: 'Score this pronunciation attempt.' }],
+      {
+        signal: input.signal,
+        fetch: input.fetch,
+        model: input.aiModel,
+        apiKeyOverride: input.aiApiKey,
+        maxTokens: 256,
+        temperature: 0.2,
+        skipModeration: true,
       }
-    } catch (err) {
-      logger.warn('[SelfContainedScorer] LLM rubric call failed, falling back to deterministic', {
-        error: String(err),
-      });
-    }
+    );
+
+    await logUsage({
+      service: input.aiProvider,
+      model: res.model,
+      category: 'pronunciation-scoring',
+      inputTokens: res.inputTokens,
+      outputTokens: res.outputTokens,
+      userId: input.userId,
+    });
+
+    const llmRubric = parseLlmRubric(res.content);
+    if (!llmRubric) throw new Error('Pronunciation rubric provider returned invalid JSON');
 
     // Step 4 — blend deterministic + LLM signals
     let finalAccuracy: number;
@@ -262,20 +254,10 @@ export class SelfContainedScorer implements PronunciationScorer {
     let finalCompleteness: number;
     let feedback: string;
 
-    if (llmRubric) {
-      finalAccuracy = (deterministicAccuracy + llmRubric.accuracy) / 2;
-      finalFluency = (deterministicFluency + llmRubric.fluency) / 2;
-      finalCompleteness = (deterministicCompleteness + llmRubric.completeness) / 2;
-      feedback = llmRubric.feedback;
-    } else {
-      finalAccuracy = deterministicAccuracy;
-      finalFluency = deterministicFluency;
-      finalCompleteness = deterministicCompleteness;
-      feedback =
-        deterministicAccuracy >= 0.9
-          ? 'Great job! Keep practising to build fluency.'
-          : 'Keep practising — focus on the words that were substituted or missing.';
-    }
+    finalAccuracy = (deterministicAccuracy + llmRubric.accuracy) / 2;
+    finalFluency = (deterministicFluency + llmRubric.fluency) / 2;
+    finalCompleteness = (deterministicCompleteness + llmRubric.completeness) / 2;
+    feedback = llmRubric.feedback;
 
     // Step 5 — weighted overall score
     const overallScore = clamp01(

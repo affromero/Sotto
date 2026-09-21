@@ -1,12 +1,22 @@
 import { ConnectionOptions, Queue, Worker, Job } from 'bullmq';
+import { validateSottoQueueContract } from '@/lib/sidedoor/jobs/core/job-contracts';
+import { executeSottoJob } from '@/lib/sidedoor/jobs/core/job-execution';
+import {
+  admitDurableQueueJob,
+  bindDurableQueueJob,
+  bindDurableQueueCleanup,
+  completeDurableQueueJob,
+  loadDurableQueueJob,
+  isDurableQueueCleanupFailure,
+  reconcileDurableQueueFailure,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
+import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
-import { markEpisodeFailed } from './pipeline-resume';
-import { classifyError, isKeyInvalidationError, userMessage } from './byok-errors';
-import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
-import type { AiProviderId } from './providers/ai-registry';
-import type { TtsProviderId } from './providers/tts-registry';
+import type { Prisma } from '@/generated/prisma/client';
 
 /**
  * Job types for the Sotto queue system
@@ -17,17 +27,11 @@ export enum JobType {
   CREATIVE_PLANNING = 'creative_planning',
   WRITE_SCRIPT = 'write_script',
   COMPILE_SCRIPT = 'compile_script',
-  GENERATE_SCRIPT = 'generate_script',
   GENERATE_AUDIO = 'generate_audio',
-  STITCH_AUDIO = 'stitch_audio',
   PROCESS_INTERACTION = 'process_interaction',
-  REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
-  GENERATE_PDF = 'generate_pdf',
   VALIDATE_KEYS = 'validate_keys',
   FETCH_PRICING = 'fetch_pricing',
-  GENERATE_WAVEFORM = 'generate_waveform',
-  MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
   SPEAKING_GRADING = 'speaking_grading',
   WORKSHEET_PDF = 'worksheet_pdf',
 }
@@ -40,7 +44,7 @@ export interface ExtractContentPayload {
   userId: string;
   sourceUrl?: string;
   sourceText?: string;
-  useAdminCredits?: boolean;
+  allowSharedCredential?: boolean;
 }
 
 export interface GenerateScriptPayload {
@@ -48,7 +52,7 @@ export interface GenerateScriptPayload {
   userId: string;
   discoveryId: string;
   sourceContent?: string;
-  useAdminCredits?: boolean;
+  allowSharedCredential?: boolean;
   userFeedback?: string;
   previousTurns?: Array<{ speaker: string; text: string; direction?: string }>;
   previousReferences?: Array<{
@@ -76,14 +80,6 @@ export interface GenerateAudioPayload {
   direction?: string;
 }
 
-export interface StitchAudioPayload {
-  episodeId: string;
-  segmentIds: string[];
-  segmentVersions: number[];
-  segmentAudioUrls: string[];
-  skipSfx?: boolean;
-}
-
 export interface ProcessInteractionPayload {
   episodeId: string;
   interactionId: string;
@@ -92,15 +88,8 @@ export interface ProcessInteractionPayload {
   timestamp: number;
 }
 
-export interface RegenerateSegmentPayload {
-  episodeId: string;
-  interactionId: string;
-  insertAfterOrder: number;
-  newText: string;
-  speaker: string;
-}
-
 export interface SendNotificationPayload {
+  notificationId?: string;
   userId: string;
   type: string;
   title: string;
@@ -111,7 +100,7 @@ export interface SendNotificationPayload {
 export interface ValidateReferencesPayload {
   episodeId: string;
   userId: string;
-  useAdminCredits?: boolean;
+  allowSharedCredential?: boolean;
   referenceRetryAttempt?: number; // 0-based, undefined = first pass
   previousVerifiedCount?: number; // for early termination (going backward = stop)
   previouslyVerifiedRefIds?: string[]; // skip re-verification on retry
@@ -121,7 +110,7 @@ export interface DeepResearchPayload {
   episodeId: string;
   userId: string;
   discoveryId: string;
-  useAdminCredits?: boolean;
+  allowSharedCredential?: boolean;
 }
 
 export interface CreativePlanningPayload {
@@ -129,7 +118,7 @@ export interface CreativePlanningPayload {
   userId: string;
   discoveryId: string;
   dossierId: string;
-  useAdminCredits?: boolean;
+  allowSharedCredential?: boolean;
 }
 
 export interface WriteScriptPayload {
@@ -138,19 +127,14 @@ export interface WriteScriptPayload {
   discoveryId: string;
   dossierId: string;
   outlineId: string;
-  useAdminCredits?: boolean;
+  allowSharedCredential?: boolean;
   sourceUrls?: string[];
 }
 
 export interface CompileScriptPayload {
   episodeId: string;
   userId: string;
-  useAdminCredits?: boolean;
-}
-
-export interface GeneratePdfPayload {
-  episodeId: string;
-  userId: string;
+  allowSharedCredential?: boolean;
 }
 
 export interface ValidateKeysPayload {}
@@ -160,11 +144,6 @@ export interface CollectR2UsagePayload {}
 export interface FetchPricingPayload {}
 
 export interface MonitorTtsProvidersPayload {}
-
-export interface GenerateWaveformPayload {
-  episodeId: string;
-  userId: string;
-}
 
 /**
  * Queue configuration
@@ -189,7 +168,10 @@ const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
 
 const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'content-extraction': { attempts: 3 },
-  'script-generation': { attempts: 3 },
+  'deep-research': { attempts: 3 },
+  'creative-planning': { attempts: 3 },
+  'script-writing': { attempts: 3 },
+  'compile-script': { attempts: 3 },
   'audio-generation': { attempts: 3 },
   'audio-stitching': { attempts: 2 },
   interactions: { attempts: 3 },
@@ -199,7 +181,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'key-validation': { attempts: 1, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
   'waveform-generation': { attempts: 2, skipEvents: true },
-  'tts-provider-monitor': { attempts: 2, skipEvents: true },
+  'episode-status': { attempts: 3, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
 };
@@ -241,6 +223,48 @@ export function createQueue(name: string, config?: QueueDefinition): Queue {
   return queue;
 }
 
+/** A dispatcher owns its connection so cancellation can reject in-flight Redis commands. */
+export async function withDispatchQueue<Result>(
+  name: string,
+  signal: AbortSignal,
+  operation: (queue: Queue) => Promise<Result>
+): Promise<Result> {
+  signal.throwIfAborted();
+  if (!name || name.includes(':')) throw new Error('Invalid dispatcher queue name');
+  const config = getQueueDefinition(name);
+  const client = createRedisConnection(`dispatch:${name}`, {
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+    commandTimeout: 10_000,
+    retryStrategy: () => null,
+  });
+  let queue: Queue | undefined;
+  const abort = () => client.disconnect();
+  // Cut off this Redis transport; an already proven database acknowledgement may still finish.
+  const timer = setTimeout(abort, 15_000);
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    queue = new Queue(name, {
+      connection: client as unknown as ConnectionOptions,
+      defaultJobOptions: {
+        attempts: config.attempts,
+        backoff: config.backoff,
+        removeOnComplete: config.removeOnComplete,
+        removeOnFail: config.removeOnFail,
+      },
+    });
+    if (signal.aborted) abort();
+    await queue.waitUntilReady();
+    signal.throwIfAborted();
+    return await operation(queue);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', abort);
+    client.disconnect();
+    await queue?.close();
+  }
+}
+
 function logJobCompleted(queueName: string, job: Job<unknown>): void {
   const jobId = String(job.id);
   if (!jobId.startsWith('repeat:')) {
@@ -259,212 +283,20 @@ function logWorkerJobFailure(queueName: string, job: Job<unknown> | undefined, e
   });
 }
 
-async function handleWorkerFailure(
-  queueName: string,
-  job: Job<unknown> | undefined,
-  failedReason: string
-): Promise<void> {
-  const jobId = job?.id != null ? String(job.id) : undefined;
-
-  try {
-    const episodeId = (job?.data as Record<string, unknown> | undefined)?.episodeId as
-      string | undefined;
-    if (!episodeId) {
-      return;
-    }
-
-    await prisma.pipelineEvent
-      .create({
-        data: {
-          episodeId,
-          stage: queueName,
-          type:
-            job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3)
-              ? 'retry'
-              : 'error',
-          message: failedReason || 'Unknown failure',
-          metadata: {
-            jobId,
-            attemptNumber: job?.attemptsMade,
-            maxAttempts: job?.opts?.attempts,
-            segmentId: (job?.data as Record<string, unknown> | undefined)?.segmentId as
-              string | undefined,
-            errorKind: classifyError(failedReason || ''),
-          },
-        },
-      })
-      .catch((err) =>
-        logger.error('Failed to write PipelineEvent', {
-          jobId,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      );
-
-    const episode = await prisma.episode.findUnique({
-      where: { id: episodeId },
-      select: {
-        status: true,
-        userId: true,
-        title: true,
-        ttsProvider: true,
-        source: true,
-        user: { select: { name: true, email: true } },
-      },
-    });
-    if (!episode) {
-      return;
-    }
-
-    const errorKind = classifyError(failedReason || '');
-    const notifQueue = createQueue('notifications');
-    const ownerLabel = episode.user?.name || episode.user?.email || episode.userId;
-
-    const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
-    const AI_QUEUES = ['script-generation'];
-
-    if (queueName === 'interactions') {
-      if (isKeyInvalidationError(errorKind)) {
-        const aiKey = await prisma.userAiKey.findFirst({
-          where: { userId: episode.userId, isValid: true },
-        });
-        if (aiKey) {
-          await markAiKeyInvalid(episode.userId, aiKey.provider as AiProviderId);
-          if (notifQueue) {
-            await notifQueue.add('send_notification', {
-              userId: episode.userId,
-              type: 'KEY_INVALID',
-              title: 'API Key Invalid',
-              message: userMessage(errorKind, aiKey.provider),
-              data: { episodeId },
-            });
-          }
-        }
-      }
-      return;
-    }
-
-    if (
-      episode.status === 'READY' ||
-      episode.status === 'FAILED' ||
-      episode.status === 'SCRIPT_READY'
-    ) {
-      return;
-    }
-
-    const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
-    const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
-    if (!isTerminal) {
-      return;
-    }
-
-    const STAGE_LABELS: Record<string, string> = {
-      'content-extraction': 'Content extraction',
-      'script-generation': 'Script generation',
-      'audio-generation': 'Audio generation',
-      'audio-stitching': 'Audio stitching',
-      'segment-regeneration': 'Segment regeneration',
-    };
-    const stageLabel = STAGE_LABELS[queueName] || 'Generation';
-    let failureReason = userMessage(errorKind, 'the provider', stageLabel);
-
-    if (isKeyInvalidationError(errorKind)) {
-      // Dedupe: markTts/AiKeyInvalid returns true only on the first flip
-      // (updateMany WHERE isValid=true), so only the first worker sends the notification.
-      let didInvalidateKey = false;
-
-      if (TTS_QUEUES.includes(queueName) && episode.ttsProvider) {
-        didInvalidateKey = await markTtsKeyInvalid(
-          episode.userId,
-          episode.ttsProvider as TtsProviderId
-        );
-        failureReason = userMessage(errorKind, episode.ttsProvider);
-        await prisma.episode.update({
-          where: { id: episodeId },
-          data: { ttsProvider: null, ttsModel: null },
-        });
-      } else if (AI_QUEUES.includes(queueName)) {
-        const aiKey = await prisma.userAiKey.findFirst({
-          where: { userId: episode.userId, isValid: true },
-        });
-        if (aiKey) {
-          didInvalidateKey = await markAiKeyInvalid(episode.userId, aiKey.provider as AiProviderId);
-          failureReason = userMessage(errorKind, aiKey.provider);
-        }
-      }
-
-      if (didInvalidateKey && notifQueue) {
-        await notifQueue.add('send_notification', {
-          userId: episode.userId,
-          type: 'KEY_INVALID',
-          title: 'API Key Invalid',
-          message: failureReason,
-          data: { episodeId },
-        });
-      }
-    }
-
-    const errorId = `err_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')}`;
-
-    const didTransition = await markEpisodeFailed(episodeId, {
-      failureReason,
-      technicalError: failedReason || undefined,
-      errorId,
-    });
-
-    if (!didTransition) {
-      logger.info('Episode already failed, skipping duplicate notifications', { episodeId });
-      return;
-    }
-
-    if (notifQueue) {
-      await notifQueue.add('send_notification', {
-        userId: episode.userId,
-        type: 'EPISODE_FAILED',
-        title: 'Generation Failed',
-        message: `${failureReason} (ref: ${errorId})`,
-        data: { episodeId },
-      });
-    }
-
-    const episodeLabel = episode.title || episodeId;
-    const adminUsers = await prisma.user.findMany({
-      where: { role: 'ADMIN', id: { not: episode.userId } },
-      select: { id: true },
-    });
-    const adminMessage = `[${queueName}] ${episodeLabel} (by ${ownerLabel}) — ${errorKind}`;
-    for (const admin of adminUsers) {
-      if (notifQueue) {
-        notifQueue
-          .add('send_notification', {
-            userId: admin.id,
-            type: 'PIPELINE_FAILURE',
-            title: 'Pipeline Failure',
-            message: adminMessage,
-            data: { episodeId },
-          })
-          .catch((err: unknown) => {
-            logger.warn('Failed to queue admin pipeline-failure notification', {
-              adminId: admin.id,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          });
-      }
-    }
-
-    logger.info('Marked episode as FAILED after generation failure', {
-      userId: episode.userId,
-      episodeId,
-      errorKind,
-      failureReason,
-    });
-  } catch (err) {
-    logger.error('Failed to process failure handler', {
-      jobId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+function genericContractVersion(queueName: string, jobName: string): number | null {
+  if (queueName === 'notifications') return jobName === 'notifications.v4' ? 4 : null;
+  return new Set([
+    'content-extraction',
+    'deep-research',
+    'creative-planning',
+    'script-writing',
+    'compile-script',
+    'audio-generation',
+    'interactions',
+    'pricing-fetch',
+  ]).has(queueName)
+    ? 1
+    : null;
 }
 
 function createQueueReference(name: string): Queue {
@@ -498,48 +330,29 @@ function createQueueReference(name: string): Queue {
   return reference;
 }
 
-/**
- * Add job to queue
- */
-export async function addJob<T>(
+export async function admitDurableJob<T>(
   queue: Queue,
   jobType: JobType,
   payload: T,
-  options?: { priority?: number; delay?: number; attempts?: number; jobId?: string }
-): Promise<Job<T>> {
-  if (options?.jobId != null) {
-    const existing = (await queue.getJob(options.jobId)) as Job<T> | undefined;
-    if (existing) {
-      const state = await existing.getState();
-      if (state === 'failed') {
-        await existing.updateData(payload);
-        await existing.retry();
-        logger.info(`Failed job retried on queue: ${queue.name}`, {
-          jobId: existing.id,
-          jobType,
-        });
-      } else {
-        logger.info(`Existing job reused on queue: ${queue.name}`, {
-          jobId: existing.id,
-          jobType,
-          state,
-        });
-      }
-      return existing;
-    }
+  options: {
+    jobId: string;
+    authorize: (database: Prisma.TransactionClient) => Promise<{ userId?: string } | void>;
+    mutate: (database: Prisma.TransactionClient, operationId: string) => Promise<void>;
+    priority?: number;
+    attempts?: number;
   }
-
-  // Only pass defined values — undefined overrides BullMQ's defaultJobOptions via Object.assign
-  const opts: Record<string, unknown> = {};
-  if (options?.priority != null) opts.priority = options.priority;
-  if (options?.delay != null) opts.delay = options.delay;
-  if (options?.attempts != null) opts.attempts = options.attempts;
-  if (options?.jobId != null) opts.jobId = options.jobId;
-
-  const job = await queue.add(jobType, payload, opts);
-
-  logger.info(`Job added to queue: ${queue.name}`, { jobId: job.id, jobType });
-  return job;
+): Promise<Job<T>> {
+  const definition = getQueueDefinition(queue.name);
+  return admitDurableQueueJob({
+    queue,
+    type: jobType,
+    payload,
+    jobId: options.jobId,
+    authorize: options.authorize,
+    mutate: options.mutate,
+    priority: options.priority,
+    attempts: options.attempts ?? definition.attempts,
+  });
 }
 
 /**
@@ -547,17 +360,61 @@ export async function addJob<T>(
  */
 export function createWorker<T>(
   queueName: string,
-  processor: (job: Job<T>) => Promise<unknown>,
+  processor: (job: Job<T>, signal?: AbortSignal, token?: string) => Promise<unknown>,
   config?: { concurrency?: number; lockDuration?: number }
 ): Worker<T> {
   const queueDefinition = getQueueDefinition(queueName);
   const connection = createRedisConnection(`worker:${queueName}`) as unknown as ConnectionOptions;
 
-  const worker = new Worker<T>(queueName, processor, {
-    connection,
-    concurrency: config?.concurrency || 3,
-    lockDuration: config?.lockDuration || 30000,
-  });
+  const worker = new Worker<T>(
+    queueName,
+    async (job, token, signal) => {
+      validateSottoQueueContract(queueName, job);
+      const genericVersion = genericContractVersion(queueName, job.name);
+      if (genericVersion === null) return executeSottoJob(job, processor, token, signal);
+      const work = await sottoTransaction(prisma, (database) =>
+        loadDurableQueueJob<T>(database, job as Job<unknown>, queueName, genericVersion)
+      );
+      if (work.complete) return;
+      const bound = bindDurableQueueJob(job as Job<unknown>, work.payload.payload, work);
+      const executionSignal = signal ?? new AbortController().signal;
+      return executeSottoJob(
+        bound,
+        () =>
+          withSottoJobExecution({
+            database: prisma,
+            parentId: work.operationId,
+            fingerprint: work.fingerprint,
+            signal: executionSignal,
+            isCleanupFailure: isDurableQueueCleanupFailure,
+            validate: async (database) => {
+              const current = await loadDurableQueueJob<T>(
+                database,
+                job as Job<unknown>,
+                queueName,
+                genericVersion
+              );
+              return !current.complete;
+            },
+            run: async ({ markCleanupUnconfirmed }) => {
+              bindDurableQueueCleanup(bound, markCleanupUnconfirmed);
+              const result = await processor(bound, executionSignal, token);
+              await sottoTransaction(prisma, (database) =>
+                completeDurableQueueJob(database, bound)
+              );
+              return result;
+            },
+          }),
+        token,
+        executionSignal
+      );
+    },
+    {
+      connection,
+      concurrency: config?.concurrency || 3,
+      lockDuration: config?.lockDuration || 30000,
+    }
+  );
 
   worker.on('ready', () => logger.info(`Worker ready for ${queueName}`));
   worker.on('error', (err) => logWorkerError(queueName, err));
@@ -568,9 +425,31 @@ export function createWorker<T>(
   });
   worker.on('failed', (job, err) => {
     logWorkerJobFailure(queueName, job as Job<unknown> | undefined, err);
-    if (!queueDefinition.skipEvents) {
-      void handleWorkerFailure(queueName, job as Job<unknown> | undefined, err.message);
-    }
+    if (!job || job.attemptsMade < (job.opts.attempts ?? queueDefinition.attempts ?? 1)) return;
+    const version = genericContractVersion(queueName, job.name);
+    if (version === null) return;
+    void reconcileDurableQueueFailure({
+      database: prisma,
+      job: job as Job<unknown>,
+      handler: queueName,
+      version,
+      failedReason: err.message,
+    })
+      .then(async (notification) => {
+        if (!notification) return;
+        await deliverSottoJob({
+          database: prisma,
+          queue: createQueue('notifications'),
+          ...notification,
+        });
+      })
+      .catch((failureError) =>
+        logger.error('Durable terminal failure reconciliation failed', {
+          queueName,
+          jobId: job.id,
+          error: failureError instanceof Error ? failureError.message : String(failureError),
+        })
+      );
   });
 
   return worker;
@@ -584,7 +463,6 @@ export const deepResearchQueue = createQueueReference('deep-research');
 export const creativePlanningQueue = createQueueReference('creative-planning');
 export const scriptWritingQueue = createQueueReference('script-writing');
 export const compileScriptQueue = createQueueReference('compile-script');
-export const scriptGenerationQueue = createQueueReference('script-generation');
 export const audioGenerationQueue = createQueueReference('audio-generation');
 export const audioStitchingQueue = createQueueReference('audio-stitching');
 export const interactionQueue = createQueueReference('interactions');
@@ -604,7 +482,7 @@ export interface WorksheetPdfPayload {
 }
 
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
-export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
+export const episodeStatusQueue = createQueueReference('episode-status');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
 

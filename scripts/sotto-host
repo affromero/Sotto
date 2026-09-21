@@ -272,6 +272,8 @@ cmd_update() {
   candidate_compose run --rm --no-deps workers sh -c \
     "cd /app && npx --no-install prisma migrate deploy --config=/app/prisma.config.ts && npx --no-install tsx apps/web/prisma/seed-curriculum.ts" ||
     fail "Database initialization failed. Existing configuration and rollback history have not changed. Inspect the migration or curriculum error before retrying."
+  candidate_compose run --rm --no-deps web node dist/access.cjs initialize ||
+    fail "Sidedoor conversion failed. Existing services remain active. Inspect the conversion error before retrying."
 
   SOTTO_DIR="$install_dir"
   cd "$SOTTO_DIR"
@@ -280,7 +282,7 @@ cmd_update() {
     rm -f "$SOTTO_DIR/previous/$file"
     [ ! -f "$SOTTO_DIR/$file" ] || cp "$SOTTO_DIR/$file" "$SOTTO_DIR/previous/$file"
   done
-  # Keep rollback immutable even when upgrading a legacy latest installation.
+  # Keep rollback immutable when an installation currently tracks latest.
   SOTTO_DIR="$install_dir/previous"
   set_env_value SOTTO_IMAGE_TAG "$from"
   SOTTO_DIR="$install_dir"
@@ -302,6 +304,8 @@ cmd_update() {
   printf '\n'
 
   if [ -n "$response" ]; then
+    compose run --rm --no-deps web node dist/access.cjs finalize ||
+      fail "Sidedoor finalization failed. Source state remains available for rollback. Inspect the error before retrying."
     ok "Sotto is up on ${target}: ${response}"
   else
     fail "Sotto did not report healthy at http://localhost:$(web_port)\n  Logs:     ${BOLD}cd ${SOTTO_DIR} && docker compose logs --tail 50 web${RESET}\n  Roll back: ${BOLD}sotto-host rollback${RESET}"

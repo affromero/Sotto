@@ -1,9 +1,20 @@
-import { moderateOrThrow } from '../moderation';
+import { abortable, interruptibleStream } from 'thesidedoor-core/runtime/stream';
+import { providerCompatibleConnection } from 'thesidedoor-core/providers/catalog';
+import { captureApiEndpoint, selectedApi } from '@/lib/providers/shared/api-selection';
+import { moderateOrThrow, type ModerationPort } from '../moderation';
+import type { TokenUsage } from 'thesidedoor-core/ai';
+import { ProviderCleanupError } from 'thesidedoor-core/ai';
+import { GenerationUsageError } from 'thesidedoor-core/ai/usage';
+import {
+  generateSharedApi,
+  streamSharedApiWithRetry,
+  type SharedApiSelection,
+} from '@/lib/providers/shared/shared-api';
 import { isReasoningModel, getAiProviderMeta } from './ai-registry';
-import type { AiProviderId } from './ai-registry';
 import { logger } from '../logger';
 import { withRetry } from '../retry';
 import { getServerInfra, infra } from '../server-config';
+import type { ProviderRequestRule } from 'thesidedoor-core/providers/transport';
 
 /**
  * Minimum max_completion_tokens for reasoning models.
@@ -38,49 +49,19 @@ function textOf(content: string | ContentPart[]): string {
     .join('\n');
 }
 
-/** Convert ChatMessage[] to OpenAI Chat Completions format (images → image_url). */
-
-function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
-  return [
-    { role: 'system', content: system },
-    ...messages.map((m) => {
-      if (typeof m.content === 'string') return { role: m.role, content: m.content };
-      return {
-        role: m.role,
-
-        content: m.content.map((p): any =>
-          p.type === 'text'
-            ? { type: 'text', text: p.text }
-            : { type: 'image_url', image_url: { url: p.url } }
-        ),
-      };
-    }),
-  ];
-}
-
-/** Convert ChatMessage[] to OpenAI Responses API format (input_text / input_image). */
-
-function toResponsesInput(messages: ChatMessage[]): any[] {
-  return messages.map((m) => {
-    if (typeof m.content === 'string') return { role: m.role, content: m.content };
-    return {
-      role: m.role,
-
-      content: m.content.map((p): any =>
-        p.type === 'text'
-          ? { type: 'input_text', text: p.text }
-          : { type: 'input_image', image_url: p.url }
-      ),
-    };
-  });
-}
-
 export interface AIOptions {
+  /** Captured request boundary for authorization and terminal-effect observation. */
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
+  onUsage?: (usage: TokenUsage) => void;
   maxTokens?: number;
   temperature?: number;
   model?: string;
   skipModeration?: boolean;
+  moderation?: ModerationPort;
   apiKeyOverride?: string;
+  /** Exact endpoint captured with the selected credential or keyless configuration. */
+  endpoint?: string;
   /** Enable web search for this call. Each provider handles it natively. */
   useWebSearch?: boolean;
   /** Request structured JSON output conforming to a JSON Schema. Provider-mapped:
@@ -88,16 +69,28 @@ export interface AIOptions {
   jsonSchema?: { name: string; schema: Record<string, unknown> };
 }
 
-export interface AIResponse {
+export interface AIResponse extends TokenUsage {
   content: string;
-  inputTokens: number;
-  outputTokens: number;
   model: string;
 }
 
 export interface AIProvider {
   generateResponse(system: string, messages: ChatMessage[], opts?: AIOptions): Promise<AIResponse>;
   streamResponse(system: string, messages: ChatMessage[], opts?: AIOptions): AsyncGenerator<string>;
+}
+
+/** Bound every SDK request to the selected provider endpoint captured for this execution. */
+export function aiProviderRules(
+  provider: string,
+  capturedEndpoint?: string
+): readonly ProviderRequestRule[] {
+  if (provider === 'claude-code' || provider === 'codex') return [];
+  const endpoint = capturedEndpoint ?? captureApiEndpoint(provider);
+  const base = new URL(endpoint);
+  base.search = '';
+  base.hash = '';
+  if (!base.pathname.endsWith('/')) base.pathname += '/';
+  return [{ method: 'POST', url: base.href, descendants: true, allowQuery: true }];
 }
 
 /**
@@ -116,28 +109,46 @@ class AnthropicProvider implements AIProvider {
     const claude = await this.getClient();
     const tools = opts?.useWebSearch ? [claude.WEB_SEARCH_TOOL] : undefined;
     return claude.generateResponse(system, messages, {
+      fetch: opts?.fetch,
+      signal: opts?.signal,
+      onUsage: opts?.onUsage,
+      temperature: opts?.temperature,
       maxTokens: opts?.maxTokens,
       model: opts?.model,
       apiKeyOverride: opts?.apiKeyOverride,
+      endpoint: opts?.endpoint,
       skipModeration: opts?.skipModeration,
+      moderation: opts?.moderation,
       ...(tools ? { tools } : {}),
       ...(opts?.jsonSchema ? { jsonSchema: opts.jsonSchema } : {}),
     });
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    const claude = await this.getClient();
-    const tools = opts?.useWebSearch ? [claude.WEB_SEARCH_TOOL] : undefined;
-    yield* claude.streamResponse(system, messages, {
-      maxTokens: opts?.maxTokens,
-      model: opts?.model,
-      apiKeyOverride: opts?.apiKeyOverride,
-      ...(tools ? { tools } : {}),
-    });
+    const getClient = this.getClient.bind(this);
+    return interruptibleStream(
+      async function* (signal) {
+        const claude = await getClient();
+        const tools = opts?.useWebSearch ? [claude.WEB_SEARCH_TOOL] : undefined;
+        yield* claude.streamResponse(system, messages, {
+          signal,
+          temperature: opts?.temperature,
+          jsonSchema: opts?.jsonSchema,
+          skipModeration: opts?.skipModeration,
+          moderation: opts?.moderation,
+          onComplete: (usage) => opts?.onUsage?.(usage),
+          maxTokens: opts?.maxTokens,
+          model: opts?.model,
+          apiKeyOverride: opts?.apiKeyOverride,
+          ...(tools ? { tools } : {}),
+        });
+      },
+      { signal: opts?.signal, isCleanupError: (error) => error instanceof ProviderCleanupError }
+    );
   }
 }
 
@@ -146,12 +157,29 @@ class AnthropicProvider implements AIProvider {
  * Supports web search via the web_search_preview hosted tool.
  */
 class OpenAIProvider implements AIProvider {
-  private async getClient(apiKeyOverride?: string) {
-    const apiKey = apiKeyOverride || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
-    const { default: OpenAI } = await import('openai');
-    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
-    return new OpenAI({ apiKey, maxRetries: 0 });
+  private capture(opts?: AIOptions): { selection: SharedApiSelection; maxTokens: number } {
+    const apiKey = opts?.apiKeyOverride;
+    if (!apiKey) throw new Error('A captured OpenAI credential is required');
+    const model = opts?.model;
+    if (!model) throw new Error('A captured OpenAI model is required');
+    const transport = opts?.useWebSearch ? 'responses' : 'compatible';
+    const requested = opts?.maxTokens || 4096;
+    return {
+      selection: {
+        ...selectedApi({
+          provider: 'openai',
+          label: 'OpenAI',
+          transport,
+          apiKey,
+          endpoint: opts?.endpoint ?? captureApiEndpoint('openai'),
+        }),
+        model,
+      },
+      maxTokens:
+        transport === 'compatible' && isReasoningModel(model)
+          ? Math.max(requested, REASONING_MODEL_MIN_TOKENS)
+          : requested,
+    };
   }
 
   async generateResponse(
@@ -159,488 +187,277 @@ class OpenAIProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
+    opts?.signal?.throwIfAborted();
     if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+      const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+      if (lastUser) await moderateOrThrow(textOf(lastUser.content), opts?.moderation, opts?.signal);
     }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.OPENAI_MODEL;
-    if (!model) throw new Error('No OpenAI model configured. Set OPENAI_MODEL or pass opts.model.');
-
-    // web_search_preview requires the Responses API (not Chat Completions)
-    if (opts?.useWebSearch) {
-      return withRetry('[OpenAI:Responses]', async () => {
-        // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
-
-        const response = await (client as any).responses.create({
-          model,
-          instructions: system,
-          input: toResponsesInput(messages),
-          tools: [{ type: 'web_search_preview' }],
-          max_output_tokens: opts?.maxTokens || 4096,
-          temperature: opts?.temperature,
-        });
-        return {
-          content: response.output_text || '',
-          inputTokens: response.usage?.input_tokens || 0,
-          outputTokens: response.usage?.output_tokens || 0,
-          model,
-        };
-      });
-    }
-
-    // For reasoning models, ensure the token budget is high enough for
-    // internal thinking + visible output. Callers set maxTokens for visible
-    // output; reasoning overhead is handled transparently here.
-    const requestedTokens = opts?.maxTokens || 4096;
-    const effectiveTokens = isReasoningModel(model)
-      ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
-      : requestedTokens;
-
-    return withRetry('[OpenAI:ChatCompletions]', async () => {
-      const response = await client.chat.completions.create({
-        model,
-        max_completion_tokens: effectiveTokens,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema
-          ? {
-              response_format: {
-                type: 'json_schema' as const,
-                json_schema: {
-                  name: opts.jsonSchema.name,
-                  schema: opts.jsonSchema.schema,
-                  strict: true,
-                },
-              },
-            }
-          : {}),
-      });
-
-      const choice = response.choices[0];
-      const content = choice?.message?.content || '';
-
-      if (!content && (choice as any)?.finish_reason === 'length') {
-        const details = (response.usage as any)?.completion_tokens_details;
-        logger.warn(
-          '[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget',
-          {
-            model,
-            max_completion_tokens: String(effectiveTokens),
-            completion_tokens: String(response.usage?.completion_tokens || 0),
-            reasoning_tokens: String(details?.reasoning_tokens ?? 'n/a'),
-          }
-        );
-        throw new Error(
-          `OpenAI model "${model}" produced no visible output (finish_reason=length). ` +
-            `Reasoning used all ${effectiveTokens} tokens. Increase max_completion_tokens or use a non-reasoning model.`
-        );
-      }
-      return {
-        content,
-        inputTokens: response.usage?.prompt_tokens || 0,
-        outputTokens: response.usage?.completion_tokens || 0,
-        model,
-      };
-    });
+    const { selection, maxTokens } = this.capture(opts);
+    const result = await withRetry(
+      '[OpenAI]',
+      () =>
+        generateSharedApi(selection, system, messages, {
+          ...opts,
+          maxTokens,
+          onUsage: undefined,
+        }),
+      { signal: opts?.signal }
+    );
+    opts?.signal?.throwIfAborted();
+    if (selection.transport === 'compatible' && !result.content && result.finishReason === 'length')
+      throw emptyOpenAiResponse(selection.model, maxTokens, result);
+    notifyApiUsage(result, opts);
+    return result;
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.OPENAI_MODEL;
-    if (!model) throw new Error('No OpenAI model configured. Set OPENAI_MODEL or pass opts.model.');
-
-    // web_search_preview requires the Responses API (not Chat Completions)
-    if (opts?.useWebSearch) {
-      const stream: any = await withRetry('[OpenAI:Responses:stream]', () =>
-        (client as any).responses.create({
-          model,
-          instructions: system,
-          input: toResponsesInput(messages),
-          tools: [{ type: 'web_search_preview' }],
-          max_output_tokens: opts?.maxTokens || 4096,
-          temperature: opts?.temperature,
-          stream: true,
-        })
-      );
-      for await (const event of stream) {
-        if ((event as any).type === 'response.output_text.delta') {
-          yield (event as any).delta;
+    const capture = () => this.capture(opts);
+    return interruptibleStream(
+      async function* (signal) {
+        if (!opts?.skipModeration) {
+          const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+          if (lastUser) await moderateOrThrow(textOf(lastUser.content), opts?.moderation, signal);
         }
-      }
-      return;
-    }
-
-    const requestedTokens = opts?.maxTokens || 4096;
-    const effectiveTokens = isReasoningModel(model)
-      ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
-      : requestedTokens;
-
-    const stream = await withRetry('[OpenAI:ChatCompletions:stream]', () =>
-      client.chat.completions.create({
-        model,
-        max_completion_tokens: effectiveTokens,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        stream: true,
-      })
-    );
-
-    let yieldedAny = false;
-    let lastFinishReason: string | null = null;
-    for await (const chunk of stream) {
-      const choice = chunk.choices[0];
-
-      const finishReason = (choice as any)?.finish_reason as string | null;
-      if (finishReason) lastFinishReason = finishReason;
-      const delta = choice?.delta?.content;
-      if (delta) {
-        yieldedAny = true;
-        yield delta;
-      }
-    }
-
-    if (!yieldedAny) {
-      if (lastFinishReason === 'length') {
-        logger.warn('[OpenAI] Stream produced 0 visible bytes with finish_reason=length', {
-          model,
-          max_completion_tokens: String(effectiveTokens),
+        const { selection, maxTokens } = capture();
+        let yieldedAny = false;
+        let finish: { reason: string; usage?: TokenUsage } | undefined;
+        for await (const chunk of streamSharedApiWithRetry(
+          '[OpenAI:stream]',
+          selection,
+          system,
+          messages,
+          {
+            ...opts,
+            signal,
+            maxTokens,
+            onFinish: (event) => {
+              finish = event;
+            },
+          }
+        )) {
+          if (chunk) yieldedAny = true;
+          yield chunk;
+        }
+        signal.throwIfAborted();
+        if (selection.transport !== 'compatible' || yieldedAny) return;
+        if (finish?.reason === 'length')
+          throw emptyOpenAiResponse(
+            selection.model,
+            maxTokens,
+            finish.usage ?? { inputTokens: null, outputTokens: null }
+          );
+        logger.warn('[OpenAI] Stream produced 0 visible bytes', {
+          model: selection.model,
+          finish_reason: finish?.reason ?? 'unknown',
+          max_completion_tokens: String(maxTokens),
         });
-        throw new Error(
-          `OpenAI model "${model}" streamed no visible output (finish_reason=length). ` +
-            `Reasoning likely consumed all ${effectiveTokens} tokens.`
-        );
-      }
-      logger.warn('[OpenAI] Stream produced 0 visible bytes', {
-        model,
-        finish_reason: lastFinishReason ?? 'unknown',
-        max_completion_tokens: String(effectiveTokens),
-      });
-    }
-  }
-}
-
-/**
- * Google Gemini provider — uses OpenAI SDK with Google's OpenAI-compatible endpoint.
- * No new dependency required.
- */
-class GoogleProvider implements AIProvider {
-  private async getClient(apiKeyOverride?: string) {
-    const apiKey = apiKeyOverride || process.env.GOOGLE_AI_API_KEY;
-    if (!apiKey) throw new Error('GOOGLE_AI_API_KEY is not set');
-    const { default: OpenAI } = await import('openai');
-    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
-    return new OpenAI({
-      apiKey,
-      maxRetries: 0,
-      baseURL:
-        process.env.GOOGLE_AI_BASE_URL ||
-        'https://generativelanguage.googleapis.com/v1beta/openai/',
-    });
-  }
-
-  async generateResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): Promise<AIResponse> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.GOOGLE_AI_MODEL || 'gemini-3.1-flash-lite-preview';
-
-    return withRetry('[Google:ChatCompletions]', async () => {
-      const response = await client.chat.completions.create({
-        model,
-        max_completion_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema
-          ? {
-              response_format: {
-                type: 'json_schema' as const,
-                json_schema: {
-                  name: opts.jsonSchema.name,
-                  schema: opts.jsonSchema.schema,
-                  strict: true,
-                },
-              },
-            }
-          : {}),
-      });
-
-      const content = response.choices[0]?.message?.content || '';
-      return {
-        content,
-        inputTokens: response.usage?.prompt_tokens || 0,
-        outputTokens: response.usage?.completion_tokens || 0,
-        model,
-      };
-    });
-  }
-
-  async *streamResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): AsyncGenerator<string> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.GOOGLE_AI_MODEL || 'gemini-3.1-flash-lite-preview';
-
-    const stream = await withRetry('[Google:ChatCompletions:stream]', () =>
-      client.chat.completions.create({
-        model,
-        max_completion_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        stream: true,
-      })
+      },
+      { signal: opts?.signal, isCleanupError: (error) => error instanceof ProviderCleanupError }
     );
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) yield delta;
-    }
   }
 }
 
-/**
- * Generic OpenAI-compatible LLM provider — drives any chat-completions API that
- * speaks the OpenAI wire format (xAI, DeepSeek, Mistral, Groq, NVIDIA NIM) via
- * the OpenAI SDK with a per-provider baseURL + API key. BYOK keys arrive through
- * opts.apiKeyOverride; otherwise the provider's env key is used.
- */
-class OpenAiCompatibleProvider implements AIProvider {
+function notifyApiUsage(usage: TokenUsage, opts?: AIOptions): void {
+  opts?.onUsage?.({
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cachedInputTokens: usage.cachedInputTokens,
+    cacheWriteTokens: usage.cacheWriteTokens,
+    reasoningTokens: usage.reasoningTokens,
+  });
+}
+
+function emptyOpenAiResponse(
+  model: string,
+  maxTokens: number,
+  usage: TokenUsage
+): GenerationUsageError {
+  logger.warn('[OpenAI] No visible output within the token budget', {
+    model,
+    max_completion_tokens: String(maxTokens),
+    completion_tokens: String(usage.outputTokens ?? 'unknown'),
+    reasoning_tokens: String(usage.reasoningTokens ?? 'unknown'),
+  });
+  return new GenerationUsageError(
+    `OpenAI model "${model}" produced no visible output (finish_reason=length). Increase max_completion_tokens above ${maxTokens} or use a non-reasoning model.`,
+    usage
+  );
+}
+
+/** Product defaults and moderation for compatible API providers. */
+class SharedCompatibleProvider implements AIProvider {
   constructor(
-    private cfg: { label: string; envKey: string; baseURL: string; defaultModel: string }
+    private readonly label: string,
+    private readonly capture: (opts?: AIOptions) => SharedApiSelection | Promise<SharedApiSelection>
   ) {}
 
-  private async getClient(apiKeyOverride?: string) {
-    const apiKey = apiKeyOverride || process.env[this.cfg.envKey];
-    if (!apiKey) throw new Error(`${this.cfg.envKey} is not set`);
-    const { default: OpenAI } = await import('openai');
-    return new OpenAI({ apiKey, maxRetries: 0, baseURL: this.cfg.baseURL });
-  }
-
   async generateResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
+    opts?.signal?.throwIfAborted();
     if (!opts?.skipModeration) {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+      if (lastUserMsg)
+        await moderateOrThrow(textOf(lastUserMsg.content), opts?.moderation, opts?.signal);
     }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || this.cfg.defaultModel;
-
-    return withRetry(`[${this.cfg.label}:ChatCompletions]`, async () => {
-      const response = await client.chat.completions.create({
-        model,
-        max_completion_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema
-          ? {
-              response_format: {
-                type: 'json_schema' as const,
-                json_schema: {
-                  name: opts.jsonSchema.name,
-                  schema: opts.jsonSchema.schema,
-                  strict: true,
-                },
-              },
-            }
-          : {}),
-      });
-
-      const content = response.choices[0]?.message?.content || '';
-      return {
-        content,
-        inputTokens: response.usage?.prompt_tokens || 0,
-        outputTokens: response.usage?.completion_tokens || 0,
-        model,
-      };
-    });
+    const selection = await abortable(
+      Promise.resolve(this.capture(opts)),
+      opts?.signal ?? new AbortController().signal
+    );
+    reportCompatibleSearch(selection, opts);
+    const result = await withRetry(
+      `[${this.label}:ChatCompletions]`,
+      () =>
+        generateSharedApi(selection, system, messages, {
+          ...opts,
+          onUsage: undefined,
+          useWebSearch: false,
+          maxTokens: opts?.maxTokens || 4096,
+        }),
+      { signal: opts?.signal }
+    );
+    opts?.signal?.throwIfAborted();
+    notifyApiUsage(result, opts);
+    return result;
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || this.cfg.defaultModel;
-
-    const stream = await withRetry(`[${this.cfg.label}:ChatCompletions:stream]`, () =>
-      client.chat.completions.create({
-        model,
-        max_completion_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        stream: true,
-      })
+    const capture = this.capture;
+    const label = this.label;
+    return interruptibleStream(
+      async function* (signal) {
+        if (!opts?.skipModeration) {
+          const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+          if (lastUserMsg)
+            await moderateOrThrow(textOf(lastUserMsg.content), opts?.moderation, signal);
+        }
+        const selection = await abortable(Promise.resolve(capture(opts)), signal);
+        signal.throwIfAborted();
+        reportCompatibleSearch(selection, opts);
+        yield* streamSharedApiWithRetry(
+          `[${label}:ChatCompletions:stream]`,
+          selection,
+          system,
+          messages,
+          {
+            ...opts,
+            signal,
+            useWebSearch: false,
+            maxTokens: opts?.maxTokens || 4096,
+          }
+        );
+      },
+      { signal: opts?.signal, isCleanupError: (error) => error instanceof ProviderCleanupError }
     );
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) yield delta;
-    }
   }
 }
 
-// baseURL + env key per OpenAI-compatible LLM provider; default model from registry.
-const OPENAI_COMPATIBLE_LLMS: Record<string, { label: string; envKey: string; baseURL: string }> = {
-  xai: { label: 'xAI', envKey: 'XAI_API_KEY', baseURL: 'https://api.x.ai/v1' },
-  deepseek: {
-    label: 'DeepSeek',
-    envKey: 'DEEPSEEK_API_KEY',
-    baseURL: 'https://api.deepseek.com/v1',
-  },
-  mistral: { label: 'Mistral', envKey: 'MISTRAL_API_KEY', baseURL: 'https://api.mistral.ai/v1' },
-  groq: { label: 'Groq', envKey: 'GROQ_API_KEY', baseURL: 'https://api.groq.com/openai/v1' },
-  nvidia: {
-    label: 'NVIDIA',
-    envKey: 'NVIDIA_API_KEY',
-    baseURL: 'https://integrate.api.nvidia.com/v1',
-  },
+function reportCompatibleSearch(selection: SharedApiSelection, opts?: AIOptions): void {
+  if (opts?.useWebSearch)
+    logger.warn('Hosted web search is unavailable for the selected compatible provider', {
+      provider: selection.descriptor.id,
+      model: selection.model,
+    });
+}
+
+function compatibleSelection(
+  id: string,
+  label: string,
+  apiKey: string,
+  model: string,
+  baseUrl: string
+): SharedApiSelection {
+  return {
+    ...selectedApi({ provider: id, label, transport: 'compatible', apiKey, endpoint: baseUrl }),
+    model,
+  };
+}
+
+class GoogleProvider extends SharedCompatibleProvider {
+  constructor() {
+    super('Google', (opts) => {
+      const apiKey = opts?.apiKeyOverride;
+      if (!apiKey) throw new Error('A captured Google credential is required');
+      return compatibleSelection(
+        'google',
+        'Google',
+        apiKey,
+        opts?.model || getAiProviderMeta('google').defaultModel,
+        opts?.endpoint ?? captureApiEndpoint('google')
+      );
+    });
+  }
+}
+
+class OpenAiCompatibleProvider extends SharedCompatibleProvider {
+  constructor(cfg: { id: string; label: string; baseURL: string; defaultModel: string }) {
+    super(cfg.label, (opts) => {
+      const apiKey = opts?.apiKeyOverride;
+      if (!apiKey) throw new Error(`A captured ${cfg.label} credential is required`);
+      return compatibleSelection(
+        cfg.id,
+        cfg.label,
+        apiKey,
+        opts?.model || cfg.defaultModel,
+        opts?.endpoint ?? cfg.baseURL
+      );
+    });
+  }
+}
+
+// Endpoint and label per OpenAI-compatible LLM provider.
+const OPENAI_COMPATIBLE_LABELS = {
+  xai: 'xAI',
+  deepseek: 'DeepSeek',
+  mistral: 'Mistral',
+  groq: 'Groq',
+  nvidia: 'NVIDIA',
 };
 
 /**
  * Local provider — talks to any OpenAI-compatible local inference server
  * (Ollama, vLLM, LM Studio, llama.cpp server) via the OpenAI SDK with a
  * configurable baseURL. Keyless by design: local servers usually ignore the
- * API key, but the SDK requires a non-empty string, so we send 'local' unless
- * AI_API_KEY is set (for remote OpenAI-compatible servers behind auth).
+ * API key, but the SDK requires a non-empty string, so we send the selected
+ * credential or a non-secret local placeholder.
  *
- * The model is host-defined (AI_MODEL) and may arrive prefixed as "local:<model>"
+ * The model is configured in Sotto and may arrive prefixed as "local:<model>"
  * from the llm.ts router or resolveAiModelAndProvider — strip it before sending.
  */
-class LocalProvider implements AIProvider {
-  private async getClient() {
-    // Read-through the owner's DB infra config (warms the sync snapshot) then env.
-    await getServerInfra();
-    const baseURL = infra('aiBaseUrl', 'AI_BASE_URL');
-    if (!baseURL) {
-      throw new Error(
-        'AI_BASE_URL is not set. Point it at your local OpenAI-compatible server (e.g. http://localhost:11434/v1 for Ollama).'
+class LocalProvider extends SharedCompatibleProvider {
+  constructor() {
+    super('Local', async (opts) => {
+      await getServerInfra();
+      const baseUrl = infra('aiBaseUrl');
+      if (!baseUrl)
+        throw new Error(
+          'No local AI base URL is saved. Point it at your OpenAI-compatible server, such as http://localhost:11434/v1 for Ollama.'
+        );
+      const raw = (opts?.model || infra('aiModel') || '').trim();
+      const model = raw.startsWith('local:') ? raw.slice('local:'.length) : raw;
+      if (!model)
+        throw new Error(
+          'No local AI model is saved. Choose a model served by your local server, such as "qwen3", "gemma3", or "llama3.3".'
+        );
+      const selection = compatibleSelection(
+        'local',
+        'Local',
+        opts?.apiKeyOverride?.trim() || 'local',
+        model,
+        baseUrl
       );
-    }
-    const { default: OpenAI } = await import('openai');
-    // AI_API_KEY is a secret — never sourced from DB config; env-only (or 'local').
-    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
-    return new OpenAI({
-      apiKey: process.env.AI_API_KEY?.trim() || 'local',
-      maxRetries: 0,
-      baseURL,
+      return { ...selection, descriptor: { ...selection.descriptor, transport: 'local' } };
     });
-  }
-
-  private resolveModel(optsModel?: string): string {
-    const raw = (optsModel || infra('aiModel', 'AI_MODEL') || '').trim();
-    const model = raw.startsWith('local:') ? raw.slice('local:'.length) : raw;
-    if (!model) {
-      throw new Error(
-        'No local model configured. Set AI_MODEL to the model your local server serves (e.g. "qwen3", "gemma3", "llama3.3").'
-      );
-    }
-    return model;
-  }
-
-  async generateResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): Promise<AIResponse> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient();
-    const model = this.resolveModel(opts?.model);
-
-    return withRetry('[Local:ChatCompletions]', async () => {
-      const response = await client.chat.completions.create({
-        model,
-        max_completion_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        ...(opts?.jsonSchema
-          ? {
-              response_format: {
-                type: 'json_schema' as const,
-                json_schema: {
-                  name: opts.jsonSchema.name,
-                  schema: opts.jsonSchema.schema,
-                  strict: true,
-                },
-              },
-            }
-          : {}),
-      });
-
-      const content = response.choices[0]?.message?.content || '';
-      return {
-        content,
-        inputTokens: response.usage?.prompt_tokens || 0,
-        outputTokens: response.usage?.completion_tokens || 0,
-        model,
-      };
-    });
-  }
-
-  async *streamResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): AsyncGenerator<string> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient();
-    const model = this.resolveModel(opts?.model);
-
-    const stream = await withRetry('[Local:ChatCompletions:stream]', () =>
-      client.chat.completions.create({
-        model,
-        max_completion_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
-        messages: toOpenAiMessages(system, messages),
-        stream: true,
-      })
-    );
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) yield delta;
-    }
   }
 }
 
@@ -659,13 +476,21 @@ class ClaudeCodeLazyProvider implements AIProvider {
     return provider.generateResponse(system, messages, opts);
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    const provider = await this.createProvider();
-    yield* provider.streamResponse(system, messages, opts);
+    const createProvider = this.createProvider.bind(this);
+    let cleanupError: (error: unknown) => boolean = () => false;
+    return interruptibleStream(
+      async function* (signal) {
+        const provider = await createProvider();
+        cleanupError = (await import('../claude-code-client')).isClaudeCleanupError;
+        yield* provider.streamResponse(system, messages, { ...opts, signal });
+      },
+      { signal: opts?.signal, isCleanupError: (error) => cleanupError(error) }
+    );
   }
 }
 
@@ -684,13 +509,21 @@ class CodexLazyProvider implements AIProvider {
     return provider.generateResponse(system, messages, opts);
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    const provider = await this.createProvider();
-    yield* provider.streamResponse(system, messages, opts);
+    const createProvider = this.createProvider.bind(this);
+    let cleanupError: (error: unknown) => boolean = () => false;
+    return interruptibleStream(
+      async function* (signal) {
+        const provider = await createProvider();
+        cleanupError = (await import('../codex-client')).isCodexCleanupError;
+        yield* provider.streamResponse(system, messages, { ...opts, signal });
+      },
+      { signal: opts?.signal, isCleanupError: (error) => cleanupError(error) }
+    );
   }
 }
 
@@ -719,9 +552,12 @@ export function createAIProvider(type: string): AIProvider {
     case 'mistral':
     case 'groq':
     case 'nvidia': {
-      const cfg = OPENAI_COMPATIBLE_LLMS[type];
+      const cfg = providerCompatibleConnection(type);
+      if (!cfg) throw new Error(`Missing compatible connection metadata for ${type}`);
       return new OpenAiCompatibleProvider({
-        ...cfg,
+        id: type,
+        label: OPENAI_COMPATIBLE_LABELS[type],
+        baseURL: cfg.baseURL,
         defaultModel: getAiProviderMeta(type).defaultModel,
       });
     }
@@ -730,11 +566,4 @@ export function createAIProvider(type: string): AIProvider {
         `Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`
       );
   }
-}
-
-export interface ResolvedAiProvider {
-  provider: AiProviderId;
-  source: 'byok' | 'platform';
-  apiKey?: string;
-  model?: string;
 }

@@ -7,7 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 
 const mockGenerateResponse = vi.fn();
@@ -36,6 +40,7 @@ import {
   extractAndStoreNoteLearningTargets,
   extractAndStoreNoteVocab,
 } from '@/lib/live-vocab';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 const SAMPLE = JSON.stringify([
   { lemma: 'bestellen', gloss: 'to order', pos: 'verb' },
@@ -54,6 +59,7 @@ const NOTE_SAMPLE = JSON.stringify({
 
 const PARAMS = {
   userId: 'u1',
+  execution: blockedProviderExecution('u1'),
   courseId: 'c1',
   targetLang: 'de',
   nativeLang: 'en',
@@ -165,6 +171,7 @@ describe('extractAndStoreLiveVocab', () => {
     });
     const n = await extractAndStoreNoteVocab({
       userId: 'u1',
+      execution: blockedProviderExecution('u1'),
       courseId: 'c1',
       targetLang: 'it',
       nativeLang: 'en',
@@ -207,6 +214,7 @@ describe('extractAndStoreLiveVocab', () => {
 
     const result = await extractAndStoreNoteLearningTargets({
       userId: 'u1',
+      execution: blockedProviderExecution('u1'),
       courseId: 'c1',
       targetLang: 'it',
       nativeLang: 'en',

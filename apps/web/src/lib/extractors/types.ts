@@ -40,7 +40,8 @@ export interface ExtractedContent {
   /** Source type: html, pdf, youtube, video, document */
   sourceType: 'html' | 'pdf' | 'youtube' | 'video' | 'document';
   /** Which extraction method succeeded */
-  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'summarize-core' | 'pinchtab' | 'markit';
+  extractionMethod:
+    'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'pinchtab' | 'markit';
   /** Structured tables extracted from the source */
   tables?: ExtractedTable[];
   /** Figures/images extracted from the source */

@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
-import { interactionQueue, addJob, JobType } from '@/lib/queue';
+import { interactionQueue, admitDurableJob, JobType } from '@/lib/queue';
 import { checkRateLimit } from '@/lib/redis';
 import type { ProcessInteractionPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { randomUUID } from 'node:crypto';
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -51,29 +53,45 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { question, timestamp } = parsed.data;
 
   // Create interaction record
-  const interaction = await prisma.interaction.create({
-    data: {
-      episodeId,
-      userId: authResult.userId,
-      question,
-      timestamp,
-      status: 'PENDING',
-    },
-    include: {
-      user: { select: { id: true, name: true, image: true } },
-    },
-  });
-
-  // Queue interaction processing job
+  const interactionId = randomUUID();
   const payload: ProcessInteractionPayload = {
     episodeId,
-    interactionId: interaction.id,
+    interactionId,
     userId: authResult.userId,
     question,
     timestamp,
   };
 
-  await addJob(interactionQueue, JobType.PROCESS_INTERACTION, payload);
+  let interaction: Awaited<ReturnType<typeof prisma.interaction.create>> | null = null;
+  await admitDurableJob(interactionQueue, JobType.PROCESS_INTERACTION, payload, {
+    jobId: `interaction-${interactionId}`,
+    authorize: async (database) => {
+      await requireOriginalSottoAdmission(database, request, authResult);
+      const current = await database.episode.findUnique({
+        where: { id: episodeId },
+        select: { userId: true, visibility: true },
+      });
+      if (!current || (current.userId !== authResult.userId && current.visibility !== 'UNLISTED'))
+        throw new Error('Episode interaction authority changed');
+      return { userId: authResult.userId };
+    },
+    mutate: async (database) => {
+      interaction = await database.interaction.create({
+        data: {
+          id: interactionId,
+          episodeId,
+          userId: authResult.userId,
+          question,
+          timestamp,
+          status: 'PENDING',
+        },
+        include: {
+          user: { select: { id: true, name: true, image: true } },
+        },
+      });
+    },
+  });
+  if (!interaction) throw new Error('Interaction admission did not commit');
 
   return NextResponse.json(interaction, { status: 201 });
 }

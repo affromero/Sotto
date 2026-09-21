@@ -16,6 +16,13 @@ export type SttProviderId =
   | 'speechmatics'
   | 'local';
 
+/** Existing personal-key storage, retained for explicit credential migration. */
+export function sttUsesTtsCredentials(
+  provider: SttProviderId
+): provider is 'elevenlabs' | 'cartesia' {
+  return provider === 'elevenlabs' || provider === 'cartesia';
+}
+
 export interface SttModelOption {
   id: string;
   displayName: string;
@@ -124,7 +131,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
   // Cartesia Ink — batch /stt. ink-whisper stays the multilingual default
   // (word timestamps, 99+ languages); ink-2 (May 2026) is faster and more
   // accurate but English-only, so language fit routes non-English courses back
-  // to ink-whisper. The Cartesia API key lives in the TTS/BYOK store (UserTtsKey).
+  // to ink-whisper. The Cartesia API key uses the shared Sidedoor TTS credential.
   cartesia: {
     id: 'cartesia',
     displayName: 'Cartesia (Ink)',
@@ -188,9 +195,8 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
   },
 
   // Local OpenAI-compatible Whisper server (faster-whisper-server / Speaches /
-  // whisper.cpp server). Keyless and free; the served model is host-defined via
-  // STT_MODEL (default whisper-1; recommend Whisper large-v3-turbo for broad
-  // multilingual coverage). Endpoint via STT_BASE_URL.
+  // whisper.cpp server). Keyless and free. The saved model and endpoint define
+  // the connection. Whisper large-v3-turbo has broad language coverage.
   local: {
     id: 'local',
     displayName: 'Local Whisper',

@@ -99,6 +99,50 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   providerRequiresAiKey: (provider: string) =>
     provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
 }));
+vi.mock('@/lib/sidedoor/jobs/core/durable-queue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sidedoor/jobs/core/durable-queue')>()),
+  durableJobProviderExecution: (_job: unknown, userId: string, signal?: AbortSignal) => ({
+    userId,
+    signal,
+    authorize: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedEpisodeAi: async ({
+    userId,
+    aiModel,
+    allowSharing,
+  }: {
+    userId: string;
+    aiModel?: string | null;
+    allowSharing?: boolean;
+  }) => {
+    if (!aiModel) {
+      if (allowSharing)
+        throw new Error('AI model is required for interactions when no AI key is configured.');
+      const aiKey = await mockGetAiKey(userId);
+      if (!aiKey)
+        throw new Error('AI model is required for interactions when no AI key is configured.');
+      return { ...(await mockResolveAiModelAndProvider({ episodeAiModel: null, aiKey })), aiKey };
+    }
+    const resolved = await mockResolveAiModelAndProvider({ episodeAiModel: aiModel, aiKey: null });
+    if (['claude-code', 'codex', 'local'].includes(resolved.provider) || allowSharing)
+      return { ...resolved, aiKey: null };
+    const aiKey = await mockGetAiKey(userId, resolved.provider);
+    if (!aiKey)
+      throw new Error(`AI key for provider "${resolved.provider}" is required for interactions.`);
+    return { ...resolved, aiKey };
+  },
+  capturedLearningAiOptions: async (ai: {
+    model: string;
+    provider: string;
+    aiKey?: { apiKey: string } | null;
+  }) => ({
+    model: ai.model,
+    provider: ai.provider,
+    apiKeyOverride: ai.aiKey?.apiKey,
+  }),
+}));
 
 vi.mock('@/lib/logger', () => ({
   logger: {

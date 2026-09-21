@@ -1,229 +1,160 @@
-import { ensureLocalUser } from '@/lib/local-user';
+import { StorageCleanupJournal } from 'thesidedoor-core/storage';
+import type { Prisma } from '@/generated/prisma/client';
 import { logger } from '@/lib/logger';
 import { prismaUnfiltered } from '@/lib/prisma';
-import { deleteFile, extractR2Key, listFiles, LOCAL_STORAGE_URL_PREFIX } from '@/lib/r2';
-
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+import { captureStorageBackend } from '@/lib/r2';
+import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/learning-deletion';
+import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 export interface FactoryResetResult {
-  usersDeleted: number;
+  profilesPreserved: number;
   episodesDeleted: number;
   filesAttempted: number;
   filesDeleted: number;
   filesFailed: number;
+  cleanupPendingJobs: number;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function cleanup(database: Prisma.TransactionClient) {
+  return new StorageCleanupJournal(
+    {
+      query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+    },
+    'postgres',
+    SIDEDOOR_STATE_ID
+  );
 }
 
-function uniqueDefined(values: Array<string | null | undefined>): string[] {
-  return [...new Set(values.filter((value): value is string => Boolean(value?.trim())))];
-}
-
-function isAppStorageRef(value: string): boolean {
-  if (value.startsWith('/avatars/') || value.startsWith('data:')) {
-    return false;
-  }
-  // Local storage: both the route form written today and the `file://` rows
-  // written before that route existed are ours, and `extractR2Key` resolves
-  // either back to a key.
-  if (value.startsWith(`${LOCAL_STORAGE_URL_PREFIX}/`) || value.startsWith('file://')) {
-    return true;
-  }
-  if (R2_PUBLIC_URL && value.startsWith(`${R2_PUBLIC_URL}/`)) {
-    return true;
-  }
-  if (/^https?:\/\//i.test(value)) {
-    return false;
-  }
-  return !value.startsWith('/');
-}
-
-async function collectStorageTargets() {
-  const [episodes, segments, versions, users, classes, prompts, recordings, focusTargets] =
-    await Promise.all([
-      prismaUnfiltered.episode.findMany({
-        select: {
-          id: true,
-          audioUrl: true,
-          pdfUrl: true,
-          waveformUrl: true,
-          spectrogramUrl: true,
-        },
-      }),
-      prismaUnfiltered.segment.findMany({ select: { audioUrl: true } }),
-      prismaUnfiltered.episodeVersion.findMany({ select: { audioUrl: true } }),
-      prismaUnfiltered.user.findMany({ select: { image: true } }),
-      prismaUnfiltered.courseClass.findMany({ select: { worksheetPdfUrl: true } }),
-      prismaUnfiltered.speakingPrompt.findMany({ select: { referenceTtsUrl: true } }),
-      prismaUnfiltered.speakingRecording.findMany({ select: { audioUrl: true } }),
-      prismaUnfiltered.learnerFocusTarget.findMany({
-        select: { visualCueUrl: true, pronunciationAudioUrl: true },
-      }),
-    ]);
-
-  return {
-    episodePrefixes: episodes.map((episode) => `episodes/${episode.id}/`),
-    episodeRefs: uniqueDefined([
-      ...episodes.flatMap((episode) => [
-        episode.audioUrl,
-        episode.pdfUrl,
-        episode.waveformUrl,
-        episode.spectrogramUrl,
-      ]),
-      ...segments.map((segment) => segment.audioUrl),
-      ...versions.map((version) => version.audioUrl),
-    ]).filter(isAppStorageRef),
-    explicitRefs: uniqueDefined([
-      ...users.map((user) => user.image),
-      ...classes.map((cls) => cls.worksheetPdfUrl),
-      ...prompts.map((prompt) => prompt.referenceTtsUrl),
-      ...recordings.map((recording) => recording.audioUrl),
-      ...focusTargets.flatMap((target) => [target.visualCueUrl, target.pronunciationAudioUrl]),
-    ]).filter(isAppStorageRef),
-  };
-}
-
-async function deleteStorageTargets(): Promise<
-  Pick<FactoryResetResult, 'filesAttempted' | 'filesDeleted' | 'filesFailed'>
-> {
-  const { episodePrefixes, episodeRefs, explicitRefs } = await collectStorageTargets();
-  const forcedKeys = new Set<string>(episodeRefs.map((ref) => extractR2Key(ref)));
-  const normalKeys = new Set<string>(explicitRefs.map((ref) => extractR2Key(ref)));
-  let filesAttempted = 0;
-  let filesDeleted = 0;
-  let filesFailed = 0;
-
-  for (const prefix of episodePrefixes) {
-    try {
-      const prefixKeys = await listFiles(prefix);
-      prefixKeys.forEach((key) => forcedKeys.add(key));
-    } catch (error) {
-      logger.warn('Factory reset could not list episode storage prefix', {
-        prefix,
-        error: errorMessage(error),
-      });
-    }
-  }
-
-  for (const key of forcedKeys) {
-    filesAttempted += 1;
-    try {
-      await deleteFile(key, { force: true });
-      filesDeleted += 1;
-    } catch (error) {
-      filesFailed += 1;
-      logger.warn('Factory reset could not delete episode storage file', {
-        key,
-        error: errorMessage(error),
-      });
-    }
-  }
-
-  for (const key of normalKeys) {
-    if (forcedKeys.has(key)) continue;
-    filesAttempted += 1;
-    try {
-      await deleteFile(key);
-      filesDeleted += 1;
-    } catch (error) {
-      filesFailed += 1;
-      logger.warn('Factory reset could not delete storage file', {
-        key,
-        error: errorMessage(error),
-      });
-    }
-  }
-
-  return { filesAttempted, filesDeleted, filesFailed };
-}
-
-async function deleteDatabaseState(): Promise<
-  Pick<FactoryResetResult, 'usersDeleted' | 'episodesDeleted'>
-> {
-  const [usersDeleted, episodesDeleted] = await Promise.all([
-    prismaUnfiltered.user.count(),
-    prismaUnfiltered.episode.count(),
-  ]);
-
-  await prismaUnfiltered.$transaction([
-    prismaUnfiltered.episodeVersionSegment.deleteMany({}),
-    prismaUnfiltered.episodeVersion.deleteMany({}),
-    prismaUnfiltered.discoveryMessage.deleteMany({}),
-    prismaUnfiltered.discovery.deleteMany({}),
-    prismaUnfiltered.agentIngestion.deleteMany({}),
-    prismaUnfiltered.researchDossier.deleteMany({}),
-    prismaUnfiltered.creativeOutline.deleteMany({}),
-    prismaUnfiltered.script.deleteMany({}),
-    prismaUnfiltered.segment.deleteMany({}),
-    prismaUnfiltered.episodeVoice.deleteMany({}),
-    prismaUnfiltered.audioFingerprint.deleteMany({}),
-    prismaUnfiltered.reference.deleteMany({}),
-    prismaUnfiltered.vocabularyEntry.deleteMany({}),
-    prismaUnfiltered.episodeTag.deleteMany({}),
-    prismaUnfiltered.pipelineEvent.deleteMany({}),
-    prismaUnfiltered.job.deleteMany({}),
-    prismaUnfiltered.save.deleteMany({}),
-    prismaUnfiltered.interaction.deleteMany({}),
-    prismaUnfiltered.examSectionResult.deleteMany({}),
-    prismaUnfiltered.examSubmission.deleteMany({}),
-    prismaUnfiltered.examQuestion.deleteMany({}),
-    prismaUnfiltered.sectionAnswer.deleteMany({}),
-    prismaUnfiltered.speakingRecording.deleteMany({}),
-    prismaUnfiltered.writingResponse.deleteMany({}),
-    prismaUnfiltered.speakingPrompt.deleteMany({}),
-    prismaUnfiltered.writingPrompt.deleteMany({}),
-    prismaUnfiltered.examSection.deleteMany({}),
-    prismaUnfiltered.mockExam.deleteMany({}),
-    prismaUnfiltered.classSubmission.deleteMany({}),
-    prismaUnfiltered.lessonQuestion.deleteMany({}),
-    prismaUnfiltered.classSection.deleteMany({}),
-    prismaUnfiltered.courseClass.deleteMany({}),
-    prismaUnfiltered.vocabEdge.deleteMany({}),
-    prismaUnfiltered.learnerFocusTarget.deleteMany({}),
-    prismaUnfiltered.practiceSession.deleteMany({}),
-    prismaUnfiltered.courseNote.deleteMany({}),
-    prismaUnfiltered.placementResult.deleteMany({}),
-    prismaUnfiltered.learnerVocab.deleteMany({}),
-    prismaUnfiltered.learnerGrammar.deleteMany({}),
-    prismaUnfiltered.course.deleteMany({}),
-    prismaUnfiltered.userInterest.deleteMany({}),
-    prismaUnfiltered.userVoicePreference.deleteMany({}),
-    prismaUnfiltered.userTtsKey.deleteMany({}),
-    prismaUnfiltered.userAiKey.deleteMany({}),
-    prismaUnfiltered.userVisualCueKey.deleteMany({}),
-    prismaUnfiltered.apiKey.deleteMany({}),
-    prismaUnfiltered.pairingToken.deleteMany({}),
-    prismaUnfiltered.notification.deleteMany({}),
-    prismaUnfiltered.pushSubscription.deleteMany({}),
-    prismaUnfiltered.discoveryChatError.deleteMany({}),
-    prismaUnfiltered.apiUsageLog.deleteMany({}),
-    prismaUnfiltered.feedback.deleteMany({}),
-    prismaUnfiltered.episode.deleteMany({}),
-    prismaUnfiltered.user.deleteMany({}),
-    prismaUnfiltered.siteConfig.deleteMany({}),
-    prismaUnfiltered.autoModelConfig.deleteMany({}),
-    prismaUnfiltered.modelPricingSnapshot.deleteMany({}),
-    prismaUnfiltered.curriculum.deleteMany({ where: { source: 'generated' } }),
-  ]);
-
-  return { usersDeleted, episodesDeleted };
+async function deleteDatabaseState(database: Prisma.TransactionClient): Promise<void> {
+  await database.episodeVersionSegment.deleteMany({});
+  await database.episodeVersion.deleteMany({});
+  await database.discoveryMessage.deleteMany({});
+  await database.discovery.deleteMany({});
+  await database.agentIngestion.deleteMany({});
+  await database.researchDossier.deleteMany({});
+  await database.creativeOutline.deleteMany({});
+  await database.script.deleteMany({});
+  await database.segment.deleteMany({});
+  await database.episodeVoice.deleteMany({});
+  await database.audioFingerprint.deleteMany({});
+  await database.reference.deleteMany({});
+  await database.vocabularyEntry.deleteMany({});
+  await database.episodeTag.deleteMany({});
+  await database.pipelineEvent.deleteMany({});
+  await database.job.deleteMany({});
+  await database.save.deleteMany({});
+  await database.interaction.deleteMany({});
+  await database.examSectionResult.deleteMany({});
+  await database.examSubmission.deleteMany({});
+  await database.examQuestion.deleteMany({});
+  await database.sectionAnswer.deleteMany({});
+  await database.speakingRecording.deleteMany({});
+  await database.writingResponse.deleteMany({});
+  await database.speakingPrompt.deleteMany({});
+  await database.writingPrompt.deleteMany({});
+  await database.examSection.deleteMany({});
+  await database.mockExam.deleteMany({});
+  await database.classSubmission.deleteMany({});
+  await database.lessonQuestion.deleteMany({});
+  await database.classSection.deleteMany({});
+  await database.courseClass.deleteMany({});
+  await database.vocabEdge.deleteMany({});
+  await database.learnerFocusTarget.deleteMany({});
+  await database.practiceSession.deleteMany({});
+  await database.courseNote.deleteMany({});
+  await database.placementResult.deleteMany({});
+  await database.learnerVocab.deleteMany({});
+  await database.learnerGrammar.deleteMany({});
+  await database.course.deleteMany({});
+  await database.userInterest.deleteMany({});
+  await database.userVoicePreference.deleteMany({});
+  await database.pairingToken.deleteMany({});
+  await database.notification.deleteMany({});
+  await database.pushSubscription.deleteMany({});
+  await database.discoveryChatError.deleteMany({});
+  await database.apiUsageLog.deleteMany({});
+  await database.feedback.deleteMany({});
+  await database.episode.deleteMany({});
+  await database.user.updateMany({
+    data: {
+      hasCompletedOnboarding: false,
+      preferredLanguage: null,
+      preferredAiProvider: null,
+      preferredAiModel: null,
+      preferredTtsProvider: null,
+      preferredTtsModel: null,
+    },
+  });
+  await database.modelPricingSnapshot.deleteMany({});
+  await database.curriculum.deleteMany({ where: { source: 'generated' } });
 }
 
 export async function factoryReset(): Promise<FactoryResetResult> {
-  const storage = await deleteStorageTargets();
-  const database = await deleteDatabaseState();
+  const backend = await captureStorageBackend();
+  const admitted = await sottoTransaction(
+    prismaUnfiltered,
+    async (database) => {
+      const [profilesPreserved, episodes, courses] = await Promise.all([
+        database.user.count(),
+        database.episode.findMany({ select: { id: true, createdAt: true } }),
+        database.course.findMany({ select: { id: true, createdAt: true } }),
+      ]);
+      const subjects = [
+        ...episodes.map((episode) => ({
+          subjectId: 'episode:' + episode.id,
+          generation: episode.createdAt.getTime(),
+        })),
+        ...courses.map((course) => ({
+          subjectId: 'course:' + course.id,
+          generation: course.createdAt.getTime(),
+        })),
+      ];
+      const jobs = subjects.length
+        ? await admitLearningStorageDeletion({
+            database,
+            scope: { kind: 'instance' },
+            subjects,
+            currentBackend: backend,
+          })
+        : [];
+      await deleteDatabaseState(database);
+      return {
+        profilesPreserved,
+        episodesDeleted: episodes.length,
+        jobs: jobs.map((job) => ({ id: job.id, files: job.pending })),
+      };
+    },
+    { timeoutMs: 60_000 }
+  );
 
-  await ensureLocalUser();
-
+  for (const job of admitted.jobs) {
+    try {
+      await runSottoStorageCleanup(prismaUnfiltered, job.id);
+    } catch (error) {
+      logger.error('Factory reset storage cleanup remains pending', {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  const statuses = await sottoTransaction(prismaUnfiltered, async (database) =>
+    Promise.all(admitted.jobs.map((job) => cleanup(database).get(job.id)))
+  );
+  const filesAttempted = admitted.jobs.reduce((total, job) => total + job.files, 0);
+  const filesDeleted = statuses.reduce((total, job) => total + job.deleted, 0);
+  const cleanupPendingJobs = statuses.filter((job) => job.phase !== 'complete').length;
+  const result = {
+    profilesPreserved: admitted.profilesPreserved,
+    episodesDeleted: admitted.episodesDeleted,
+    filesAttempted,
+    filesDeleted,
+    filesFailed: filesAttempted - filesDeleted,
+    cleanupPendingJobs,
+  };
   logger.warn('Factory reset completed', {
-    usersDeleted: String(database.usersDeleted),
-    episodesDeleted: String(database.episodesDeleted),
-    filesAttempted: String(storage.filesAttempted),
-    filesDeleted: String(storage.filesDeleted),
-    filesFailed: String(storage.filesFailed),
+    ...Object.fromEntries(Object.entries(result).map(([key, value]) => [key, String(value)])),
   });
-
-  return { ...database, ...storage };
+  return result;
 }

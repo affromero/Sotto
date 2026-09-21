@@ -5,7 +5,9 @@ import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getAgentModelOffering } from '@/lib/agent-models';
-import { ensureLocalUser } from '@/lib/local-user';
+import { getLearnerOnboarding } from '@/lib/sidedoor/access/core/onboarding';
+import { auth } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const metadata = {
   title: 'Welcome to Sotto',
@@ -21,12 +23,14 @@ export const dynamic = 'force-dynamic';
  * backend provider ids the wizard maps to (AI key → anthropic/openai; cloud TTS;
  * cloud STT). Built server-side from the provider registries — never hardcoded.
  */
-async function buildModelMeta(): Promise<ModelMeta> {
-  const autoConfig = await getAutoModelConfig().catch(() => undefined);
-  const [claudeOffering, codexOffering] = await Promise.all([
-    getAgentModelOffering('claude-code', { autoConfig }),
-    getAgentModelOffering('codex', { autoConfig }),
-  ]);
+async function buildModelMeta(selfHosted: boolean): Promise<ModelMeta> {
+  const autoConfig = selfHosted ? await getAutoModelConfig() : undefined;
+  const [claudeOffering, codexOffering] = selfHosted
+    ? await Promise.all([
+        getAgentModelOffering('claude-code', { autoConfig }),
+        getAgentModelOffering('codex', { autoConfig }),
+      ])
+    : [getAiProviderMeta('claude-code'), getAiProviderMeta('codex')];
   const opt = <T extends { id: string; displayName: string }>(models: T[]) =>
     models.map((m) => ({ id: m.id, label: m.displayName }));
   return {
@@ -67,17 +71,16 @@ async function buildModelMeta(): Promise<ModelMeta> {
 
 export default async function WelcomePage() {
   const selfHosted = isSelfHosted();
-  // Browser wizard progress is scoped to the owner row that created it. A
-  // factory reset recreates that row, so stale progress from the previous
-  // installation cannot skip the fresh welcome flow.
-  const onboardingResumeKey = selfHosted
-    ? (await ensureLocalUser()).createdAt.toISOString()
+  const session = selfHosted ? await auth() : null;
+  if (selfHosted && !session?.user) redirect('/access');
+  const onboardingResumeKey = session?.user
+    ? (await getLearnerOnboarding(session.user.id)).resumeKey
     : undefined;
 
   return (
     <WelcomeFlow
-      initialConfig={{ selfHosted, isOwner: false, onboardingResumeKey }}
-      modelMeta={await buildModelMeta()}
+      initialConfig={{ selfHosted, isOwner: session?.isOwner ?? false, onboardingResumeKey }}
+      modelMeta={await buildModelMeta(selfHosted)}
     />
   );
 }

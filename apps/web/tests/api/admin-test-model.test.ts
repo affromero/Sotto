@@ -1,568 +1,219 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @vitest-environment node
 import { NextRequest } from 'next/server';
+import { beforeAll, beforeEach, afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import type { PrismaClient } from '@/generated/prisma/client';
+import { getAiProviderMeta } from '@/lib/providers/ai-registry';
+import { getProviderMeta } from '@/lib/providers/tts-registry';
+import { getSttProviderMeta } from '@/lib/providers/stt-registry';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+  type SharedTestIdentity,
+} from '../helpers/setup/shared-instance';
 
-// ── Hoisted mock factories (run before vi.mock() calls) ───────────────────────
-
-const mockRequireAdmin = vi.hoisted(() => vi.fn());
-const mockGenerateResponse = vi.hoisted(() => vi.fn());
-const mockCreateAIProvider = vi.hoisted(() =>
-  vi.fn(() => ({ generateResponse: mockGenerateResponse, streamResponse: vi.fn() }))
-);
-const mockGenerateSpeech = vi.hoisted(() => vi.fn());
-const mockCreateTtsProviderAsync = vi.hoisted(() =>
-  vi.fn(async () => ({
-    generateSpeech: mockGenerateSpeech,
-    getVoiceId: vi.fn(() => 'test-voice'),
-    getModelId: vi.fn(() => 'test-model'),
-    providerId: 'elevenlabs',
-  }))
-);
-const mockTranscribe = vi.hoisted(() => vi.fn());
-const mockCreateSttProvider = vi.hoisted(() => vi.fn(() => ({ transcribe: mockTranscribe })));
-const mockGetAiKey = vi.hoisted(() => vi.fn());
-const mockGetByokKey = vi.hoisted(() => vi.fn());
-const mockGetByokExtraData = vi.hoisted(() => vi.fn());
-
-// ── Module mocks ──────────────────────────────────────────────────────────────
-
-vi.mock('@/lib/auth-guards', () => ({ requireAdmin: mockRequireAdmin }));
-vi.mock('@/lib/providers/ai', () => ({ createAIProvider: mockCreateAIProvider }));
-vi.mock('@/lib/providers/tts', () => ({ createTtsProviderAsync: mockCreateTtsProviderAsync }));
-vi.mock('@/lib/providers/stt', () => ({ createSttProvider: mockCreateSttProvider }));
-vi.mock('@/lib/byok', () => ({
-  getAiKey: mockGetAiKey,
-  getByokKey: mockGetByokKey,
-  getByokExtraData: mockGetByokExtraData,
+const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null, token: '' }));
+vi.mock('openai', async () => {
+  const { createRequire } = await import('node:module');
+  return { default: createRequire(import.meta.url)('openai') };
+});
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(boundary);
+  return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => (boundary.token ? { value: boundary.token } : undefined) }),
 }));
 
-vi.mock('@/lib/providers/tts-voices', () => ({
-  CARTESIA_VOICE_POOL: [
-    { id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' },
-  ],
-  HUME_VOICE_POOL: [{ id: 'ITO', name: 'Ito', gender: 'female', character: 'warm' }],
-  FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
-  MINIMAX_VOICE_POOL: [
-    {
-      id: 'Deep_Voice_Man',
-      name: 'Deep Voice Man',
-      gender: 'male',
-      character: 'authoritative expert',
-    },
-  ],
-  MISTRAL_VOICE_POOL: [
-    {
-      id: 'casual_male',
-      name: 'Casual Male',
-      gender: 'male',
-      character: 'friendly conversationalist',
-    },
-  ],
-  KOKORO_VOICE_POOL: [
-    { id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' },
-  ],
-  LOCAL_TTS_VOICE_POOL: [
-    { id: 'default', name: 'Default', gender: 'female', character: 'warm narrator' },
-  ],
-  getTestVoiceId: vi.fn((provider: string) => {
-    const map: Record<string, string> = {
-      elevenlabs: '21m00Tcm4TlvDq8ikWAM',
-      openai: 'alloy',
-      cartesia: 'cartesia-test-voice',
-      hume: 'ITO',
-      fal: 'Vivian',
-      replicate: 'Vivian',
-      minimax: 'Deep_Voice_Man',
-      mistral: 'casual_male',
-      kokoro: 'af_heart',
-      local: 'default',
-    };
-    return map[provider] ?? 'alloy';
-  }),
-}));
-
-// getPlatformTtsKey reads process.env directly — no mock needed.
-// Tests control keys via vi.stubEnv() in beforeEach.
-
-vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderIds: vi.fn(() => [
-    'elevenlabs',
-    'openai',
-    'cartesia',
-    'hume',
-    'fal',
-    'replicate',
-    'minimax',
-    'mistral',
-    'kokoro',
-    'local',
-  ]),
-  getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
-}));
-
-import { POST } from '@/app/api/v1/admin/test-model/route';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function createRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest('http://localhost:3000/api/v1/admin/test-model', {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('owner model testing with canonical credentials and actual provider transports', () => {
+  let instance: SharedTestInstance;
+  let identity: SharedTestIdentity;
+  let route: typeof import('@/app/api/v1/admin/test-model/route');
+  let completion: string;
+  let transcript: string;
+  let requests: Request[];
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('admin_model');
+    boundary.database = instance.database;
+    route = await import('@/app/api/v1/admin/test-model/route');
   });
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-describe('POST /api/v1/admin/test-model', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRequireAdmin.mockResolvedValue('admin-1');
-    mockGetAiKey.mockResolvedValue(null);
-    mockGetByokKey.mockResolvedValue(null);
-    mockGetByokExtraData.mockResolvedValue(null);
-    // Clear provider env vars so tests start from a known state
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
-    vi.stubEnv('OPENAI_API_KEY', '');
-    vi.stubEnv('CARTESIA_API_KEY', '');
-    vi.stubEnv('HUME_API_KEY', '');
-    vi.stubEnv('FAL_KEY', '');
-    vi.stubEnv('REPLICATE_API_TOKEN', '');
-    vi.stubEnv('ANTHROPIC_API_KEY', '');
-    vi.stubEnv('MINIMAX_API_KEY', '');
+  beforeEach(async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', '1'.repeat(64));
+    identity = await instance.reset();
+    await instance.configureInfrastructure({
+      aiProvider: 'openai',
+      aiModel: getAiProviderMeta('openai').defaultModel,
+      ttsProvider: 'openai',
+      ttsBaseUrl: 'http://local-tts.example',
+      sttProvider: 'openai',
+      sttModel: getSttProviderMeta('openai').defaultModel,
+    });
+    await instance.seedAiCredential(identity.ownerId, 'openai', 'owner-key');
+    await instance.seedProfileCredential(identity.ownerId, 'tts', 'openai', {
+      apiKey: 'owner-key',
+    });
+    boundary.token = identity.ownerToken;
+    completion = 'Hello';
+    transcript = 'Hello world';
+    requests = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push(request.clone());
+      const url = new URL(request.url);
+      if (url.pathname === '/v1/chat/completions')
+        return Response.json({
+          id: 'chat-test',
+          object: 'chat.completion',
+          model: getAiProviderMeta('openai').defaultModel,
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: completion },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
+        });
+      if (url.pathname === '/v1/audio/speech' || url.pathname === '/tts')
+        return new Response(new Uint8Array([0x49, 0x44, 0x33, 1, 2]), {
+          headers: { 'content-type': 'audio/mpeg' },
+        });
+      if (url.pathname === '/v1/audio/transcriptions')
+        return Response.json({ text: transcript, language: 'en', duration: 1, words: [] });
+      throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
+    });
   });
-
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
-
-  // ── Auth ────────────────────────────────────────────────────────────────────
-
-  it('returns 403 when not admin', async () => {
-    mockRequireAdmin.mockResolvedValue(null);
-    const res = await POST(
-      createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
-    );
-    const body = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(body.error).toBe('Forbidden');
+  afterAll(async () => {
+    await instance?.close();
+    boundary.database = null;
   });
 
-  // ── Input validation ────────────────────────────────────────────────────────
+  function payload(type: 'ai' | 'tts' | 'stt') {
+    return {
+      type,
+      provider: 'openai',
+      model:
+        type === 'ai'
+          ? getAiProviderMeta('openai').defaultModel
+          : type === 'tts'
+            ? getProviderMeta('openai').models[0]!.id
+            : getSttProviderMeta('openai').defaultModel,
+    };
+  }
+  function request(body: unknown) {
+    return new NextRequest('http://localhost/api/v1/admin/test-model', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `sotto_session=${boundary.token}` },
+      body: JSON.stringify(body),
+    });
+  }
 
-  it('returns 400 for an invalid type', async () => {
-    const res = await POST(
-      createRequest({ type: 'invalid', provider: 'anthropic', model: 'claude' })
-    );
-    expect(res.status).toBe(400);
+  it('rejects anonymous and household access before contacting a provider', async () => {
+    boundary.token = '';
+    expect((await route.POST(request(payload('ai')))).status).toBe(403);
+    boundary.token = (await identity.household('Learner')).token;
+    expect((await route.POST(request(payload('ai')))).status).toBe(403);
+    expect(requests).toEqual([]);
   });
-
-  it('returns 400 when provider is missing', async () => {
-    const res = await POST(createRequest({ type: 'ai', model: 'claude' }));
-    expect(res.status).toBe(400);
+  it.each([
+    { type: 'invalid', provider: 'openai', model: 'invalid' },
+    { type: 'ai', model: 'model' },
+    { type: 'ai', provider: 'openai' },
+  ])('rejects malformed model input %j', async (body) => {
+    expect((await route.POST(request(body))).status).toBe(400);
+    expect(requests).toEqual([]);
   });
-
-  it('returns 400 when model is missing', async () => {
-    const res = await POST(createRequest({ type: 'ai', provider: 'anthropic' }));
-    expect(res.status).toBe(400);
+  it('uses the selected owner AI credential and model, and records usage', async () => {
+    const response = await route.POST(request(payload('ai')));
+    const result = await response.json();
+    expect(result, JSON.stringify(result)).toMatchObject({ success: true, response: 'Hello' });
+    const sent = requests.find((item) => new URL(item.url).pathname === '/v1/chat/completions')!;
+    expect(sent.headers.get('authorization')).toBe('Bearer owner-key');
+    expect(await sent.json()).toMatchObject({ model: getAiProviderMeta('openai').defaultModel });
+    expect(
+      await instance.database.apiUsageLog.findFirst({
+        where: { userId: identity.ownerId, category: 'admin_test' },
+      })
+    ).toMatchObject({ service: 'openai' });
   });
-
-  // ── AI testing ──────────────────────────────────────────────────────────────
-
-  describe('AI', () => {
-    it('returns success with the completion text', async () => {
-      mockGenerateResponse.mockResolvedValue({
-        content: 'Hello',
-        inputTokens: 5,
-        outputTokens: 1,
-        model: 'claude-haiku-4-5-20251001',
-      });
-
-      const res = await POST(
-        createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
-      );
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.success).toBe(true);
-      expect(body.response).toBe('Hello');
-      expect(typeof body.latencyMs).toBe('number');
-    });
-
-    it('truncates AI response to 60 characters', async () => {
-      mockGenerateResponse.mockResolvedValue({
-        content: 'A'.repeat(100),
-        inputTokens: 5,
-        outputTokens: 20,
-        model: 'claude',
-      });
-
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(true);
-      expect(body.response).toHaveLength(60);
-    });
-
-    it('passes the requested model to the AI provider', async () => {
-      mockGenerateResponse.mockResolvedValue({
-        content: 'Hi',
-        inputTokens: 1,
-        outputTokens: 1,
-        model: 'claude-opus-4-6',
-      });
-
-      await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-opus-4-6' }));
-
-      expect(mockGenerateResponse).toHaveBeenCalledWith(
-        '',
-        [{ role: 'user', content: 'Say hello in one word.' }],
-        expect.objectContaining({ model: 'claude-opus-4-6', maxTokens: 20 })
-      );
-    });
-
-    it('classifies a missing-key error', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('ANTHROPIC_API_KEY is not set'));
-
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
-    it('classifies a 401 authentication error', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('401 unauthorized'));
-
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Authentication failed — check API key');
-    });
-
-    it('classifies a 429 rate-limit error', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('429 rate limit exceeded'));
-
-      const res = await POST(
-        createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Rate limited by provider');
-    });
-
-    it('classifies a timeout', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('timeout'));
-
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Timed out');
-    });
-
-    it('passes through unknown errors verbatim', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('something unexpected happened'));
-
-      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('something unexpected happened');
+  it('limits the displayed AI completion to 60 characters', async () => {
+    completion = 'A'.repeat(100);
+    expect(await (await route.POST(request(payload('ai')))).json()).toMatchObject({
+      success: true,
+      response: 'A'.repeat(60),
     });
   });
-
-  // ── TTS testing ─────────────────────────────────────────────────────────────
-
-  describe('TTS', () => {
-    it('returns success with a base64 audio data URL', async () => {
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-key');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-mp3-bytes'));
-
-      const res = await POST(
-        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
-      );
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.success).toBe(true);
-      expect(body.audioData).toMatch(/^data:audio\/mpeg;base64,/);
-      expect(typeof body.latencyMs).toBe('number');
+  it('reports a missing selected credential without borrowing another provider account', async () => {
+    const missing = {
+      type: 'ai',
+      provider: 'anthropic',
+      model: getAiProviderMeta('anthropic').defaultModel,
+    };
+    expect(await (await route.POST(request(missing))).json()).toMatchObject({
+      success: false,
+      error: expect.stringContaining('required'),
     });
-
-    it('returns failure when the platform key is missing', async () => {
-      // ELEVENLABS_API_KEY stubbed to '' in beforeEach
-      const res = await POST(
-        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
+    expect(requests).toEqual([]);
+  });
+  it.each([
+    { status: 401, message: 'Invalid API key', expected: /Authentication failed/ },
+    { status: 429, message: 'Rate limit exceeded', expected: /Rate limited/ },
+    { status: 408, message: 'Request timeout', expected: /Timed out/ },
+    {
+      status: 400,
+      message: 'Unsupported request parameter',
+      expected: /Unsupported request parameter/,
+    },
+  ])(
+    'reports provider failure $status',
+    async ({ status, message, expected }) => {
+      vi.stubGlobal('fetch', async () =>
+        Response.json({ error: { message } }, { status, headers: { 'retry-after': '0' } })
       );
-      const body = await res.json();
-
-      expect(res.status).toBe(200); // HTTP 200 — business-level failure in body
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
-    it('classifies an auth error from the TTS provider', async () => {
-      vi.stubEnv('CARTESIA_API_KEY', 'bad-key');
-      mockGenerateSpeech.mockRejectedValue(new Error('403 forbidden'));
-
-      const res = await POST(
-        createRequest({ type: 'tts', provider: 'cartesia', model: 'sonic-2' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Authentication failed — check API key');
-    });
-
-    it('treats local TTS as a keyless platform provider', async () => {
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-mp3-bytes'));
-
-      const res = await POST(createRequest({ type: 'tts', provider: 'local', model: 'local' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(true);
-      expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('local', 'local', undefined, 'local');
+      expect(await (await route.POST(request(payload('ai')))).json()).toMatchObject({
+        success: false,
+        error: expect.stringMatching(expected),
+      });
+    },
+    20_000
+  );
+  it('returns the generated speech as an audio data URL', async () => {
+    expect(await (await route.POST(request(payload('tts')))).json()).toMatchObject({
+      success: true,
+      audioData: 'data:audio/mpeg;base64,SUQzAQI=',
     });
   });
-
-  // ── STT testing ─────────────────────────────────────────────────────────────
-
-  describe('STT', () => {
-    it('returns success with the transcription text', async () => {
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
-      mockTranscribe.mockResolvedValue({ text: 'Hello world', segments: [], language: 'en' });
-
-      const res = await POST(
-        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
-      );
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.success).toBe(true);
-      expect(body.transcript).toBe('Hello world');
-      expect(typeof body.latencyMs).toBe('number');
-    });
-
-    it('returns silence note when transcription is empty', async () => {
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
-      mockTranscribe.mockResolvedValue({ text: '', segments: [], language: 'en' });
-
-      const res = await POST(
-        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(true);
-      expect(body.transcript).toBe('(empty transcript)');
-    });
-
-    it('returns failure when the STT key is missing', async () => {
-      // OPENAI_API_KEY is '' from beforeEach
-      const res = await POST(
-        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
-    it('routes ElevenLabs STT to ELEVENLABS_API_KEY', async () => {
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-stt-key');
-      mockTranscribe.mockResolvedValue({ text: 'transcribed', segments: [], language: 'en' });
-
-      await POST(createRequest({ type: 'stt', provider: 'elevenlabs', model: 'scribe_v1' }));
-
-      expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'xi-stt-key', 'scribe_v1');
-    });
-
-    it('classifies a network error from the STT provider', async () => {
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
-      mockTranscribe.mockRejectedValue(new Error('fetch failed: ECONNREFUSED'));
-
-      const res = await POST(
-        createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toMatch(/^Network error:/);
-    });
-
-    it('routes local STT to the local placeholder key', async () => {
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      mockTranscribe.mockResolvedValue({ text: 'local transcript', segments: [], language: 'en' });
-
-      const res = await POST(
-        createRequest({ type: 'stt', provider: 'local', model: 'whisper-local' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(true);
-      expect(mockCreateSttProvider).toHaveBeenCalledWith('local', 'local', 'whisper-local');
-    });
+  it('uses an explicitly selected local TTS service without a hosted key', async () => {
+    expect(
+      await (
+        await route.POST(request({ type: 'tts', provider: 'local', model: 'local-model' }))
+      ).json()
+    ).toMatchObject({ success: true, audioData: expect.stringContaining('base64,') });
+    expect(requests.map((item) => item.url)).toEqual(['http://local-tts.example/tts']);
   });
-
-  // ── BYOK key source ──────────────────────────────────────────────────────────
-
-  describe('BYOK key source', () => {
-    describe('AI BYOK', () => {
-      it('calls generateResponse with apiKeyOverride from BYOK key', async () => {
-        mockGetAiKey.mockResolvedValue({ apiKey: 'byok-anthropic-key', provider: 'anthropic' });
-        mockGenerateResponse.mockResolvedValue({
-          content: 'Hello',
-          inputTokens: 5,
-          outputTokens: 1,
-          model: 'claude',
-        });
-
-        const res = await POST(
-          createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' })
-        );
-        const body = await res.json();
-
-        expect(body.success).toBe(true);
-        expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'anthropic');
-        expect(mockGenerateResponse).toHaveBeenCalledWith(
-          '',
-          [{ role: 'user', content: 'Say hello in one word.' }],
-          expect.objectContaining({ apiKeyOverride: 'byok-anthropic-key' })
-        );
-      });
-
-      it('returns failure when BYOK AI key is not found', async () => {
-        mockGetAiKey.mockResolvedValue(null);
-
-        const res = await POST(
-          createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' })
-        );
-        const body = await res.json();
-
-        expect(body.success).toBe(false);
-        expect(body.error).toMatch(/BYOK key not found/);
-      });
+  it('transcribes the generated sample using the selected owner STT account', async () => {
+    expect(await (await route.POST(request(payload('stt')))).json()).toMatchObject({
+      success: true,
+      transcript: 'Hello world',
     });
-
-    describe('TTS BYOK', () => {
-      it('uses BYOK key for TTS provider', async () => {
-        mockGetByokKey.mockResolvedValue('byok-xi-key');
-        mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
-
-        const res = await POST(
-          createRequest({
-            type: 'tts',
-            provider: 'elevenlabs',
-            model: 'eleven_v3',
-            keySource: 'byok',
-          })
-        );
-        const body = await res.json();
-
-        expect(body.success).toBe(true);
-        expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'elevenlabs');
-        expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith(
-          'elevenlabs',
-          'byok-xi-key',
-          undefined,
-          'eleven_v3'
-        );
-      });
-
-      it('returns failure when BYOK TTS key is not found', async () => {
-        mockGetByokKey.mockResolvedValue(null);
-
-        const res = await POST(
-          createRequest({
-            type: 'tts',
-            provider: 'elevenlabs',
-            model: 'eleven_v3',
-            keySource: 'byok',
-          })
-        );
-        const body = await res.json();
-
-        expect(body.success).toBe(false);
-        expect(body.error).toMatch(/BYOK key not found/);
-      });
-    });
-
-    describe('STT BYOK', () => {
-      it('uses AI BYOK key for openai STT', async () => {
-        vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
-        mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-        mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
-        mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
-
-        await POST(
-          createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' })
-        );
-
-        expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'openai');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith(
-          'openai',
-          'byok-openai-key',
-          'whisper-1'
-        );
-      });
-
-      it('uses TTS BYOK key for elevenlabs STT', async () => {
-        vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
-        mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-        mockGetByokKey.mockResolvedValue('byok-xi-stt-key');
-        mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
-
-        await POST(
-          createRequest({
-            type: 'stt',
-            provider: 'elevenlabs',
-            model: 'scribe_v1',
-            keySource: 'byok',
-          })
-        );
-
-        expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'elevenlabs');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith(
-          'elevenlabs',
-          'byok-xi-stt-key',
-          'scribe_v1'
-        );
-      });
-
-      it('returns failure when BYOK STT key is not found', async () => {
-        mockGetAiKey.mockResolvedValue(null);
-
-        const res = await POST(
-          createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' })
-        );
-        const body = await res.json();
-
-        expect(body.success).toBe(false);
-        expect(body.error).toMatch(/BYOK key not found/);
-      });
-    });
-
-    it('defaults to platform path when keySource is omitted', async () => {
-      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-platform-key');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
-
-      const res = await POST(
-        createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' })
-      );
-      const body = await res.json();
-
-      expect(body.success).toBe(true);
-      expect(mockGetByokKey).not.toHaveBeenCalled();
+    const sent = requests.find(
+      (item) => new URL(item.url).pathname === '/v1/audio/transcriptions'
+    )!;
+    expect(sent.headers.get('authorization')).toBe('Bearer owner-key');
+    const form = await sent.formData();
+    expect(form.get('model')).toBe(getSttProviderMeta('openai').defaultModel);
+    expect(form.get('file')).toBeInstanceOf(File);
+  });
+  it('reports an empty transcript explicitly', async () => {
+    transcript = '';
+    expect(await (await route.POST(request(payload('stt')))).json()).toMatchObject({
+      success: true,
+      transcript: '(empty transcript)',
     });
   });
 });

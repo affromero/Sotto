@@ -20,47 +20,115 @@ export async function GET(request: NextRequest) {
   }
 
   const { userId } = authed;
+  if (request.signal.aborted)
+    throw request.signal.reason ?? new DOMException('Request aborted', 'AbortError');
   const subscriber = createNotificationSubscriber(userId);
+
+  const pendingMessages: string[] = [];
+  let pendingSubscriberLoss: Error | undefined;
+  let terminateForSubscriberLoss = (error: Error) => {
+    pendingSubscriberLoss = error;
+  };
+  let deliverMessage: (data: string) => void = (data) => {
+    pendingMessages.push(data);
+  };
+  try {
+    await subscriber.subscribe((data) => deliverMessage(data), {
+      signal: request.signal,
+      onLoss: (error) => terminateForSubscriberLoss(error),
+    });
+    if (request.signal.aborted)
+      throw request.signal.reason ?? new DOMException('Request aborted', 'AbortError');
+  } catch (error) {
+    try {
+      await subscriber.cleanup();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        'Notification stream admission cleanup failed',
+        {
+          cause: error,
+        }
+      );
+    }
+    throw error;
+  }
+
+  let cleanupPromise: Promise<void> | undefined;
+  let keepalive: ReturnType<typeof setInterval> | undefined;
+  let removeAbort = () => {};
+  let terminated = false;
+  const cleanup = () => {
+    cleanupPromise ??= (async () => {
+      clearInterval(keepalive);
+      removeAbort();
+      await subscriber.cleanup();
+    })();
+    return cleanupPromise;
+  };
 
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
 
-      // Send initial keepalive so the client knows the connection is established
+      const terminate = (error?: unknown) => {
+        if (terminated) return;
+        terminated = true;
+        void cleanup().then(
+          () => {
+            try {
+              if (error === undefined) controller.close();
+              else controller.error(error);
+            } catch {
+              // The consumer may already have closed the stream.
+            }
+          },
+          (cleanupError) => {
+            logger.warn('Notification stream cleanup failed', {
+              userId,
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+            try {
+              controller.error(cleanupError);
+            } catch {
+              // The consumer may already have closed the stream.
+            }
+          }
+        );
+      };
+      terminateForSubscriberLoss = terminate;
+      if (pendingSubscriberLoss) {
+        terminate(pendingSubscriberLoss);
+        return;
+      }
+
       controller.enqueue(encoder.encode(': connected\n\n'));
 
-      subscriber.subscribe((data) => {
+      deliverMessage = (data) => {
         try {
           controller.enqueue(encoder.encode(`data: ${data}\n\n`));
         } catch {
-          // Controller closed — cleanup will handle it
+          terminate();
         }
-      });
+      };
+      for (const message of pendingMessages.splice(0)) deliverMessage(message);
 
-      // Keepalive every 30s to prevent proxy/load balancer timeouts
-      const keepalive = setInterval(() => {
+      keepalive = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(': keepalive\n\n'));
         } catch {
-          clearInterval(keepalive);
+          terminate();
         }
       }, 30_000);
 
-      // Cleanup when client disconnects
-      request.signal.addEventListener('abort', () => {
-        clearInterval(keepalive);
-        subscriber.cleanup().catch((err) => {
-          logger.warn('SSE subscriber cleanup failed', {
-            userId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-        try {
-          controller.close();
-        } catch {
-          // Already closed
-        }
-      });
+      const aborted = () => terminate(request.signal.reason);
+      request.signal.addEventListener('abort', aborted, { once: true });
+      removeAbort = () => request.signal.removeEventListener('abort', aborted);
+      if (request.signal.aborted) aborted();
+    },
+    cancel() {
+      terminated = true;
+      return cleanup();
     },
   });
 

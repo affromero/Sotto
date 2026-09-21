@@ -3,17 +3,15 @@
 A keyless, self-hosted text-to-speech server that wraps the open-source
 [Kokoro-82M](https://github.com/hexgrad/kokoro) model in a small FastAPI service.
 It lets a Sotto self-hoster generate all lesson and speaking audio with **zero
-cloud keys** by setting `TTS_PROVIDER=kokoro` and pointing `TTS_BASE_URL` at this
-service.
+cloud keys** by selecting Kokoro and saving this service's base URL in Sotto.
 
 Kokoro-82M is multilingual: English (US + UK), Spanish, French, Italian,
 Portuguese, Hindi, Japanese, and Chinese. It runs comfortably on CPU.
 
 This service is also the reference implementation of Sotto's generic local TTS
-sidecar shape. If you are wrapping a different local model, use
-`TTS_PROVIDER=local`, keep the same `/health`, `/voices`, and `/tts` endpoints,
-and configure your voice IDs with `TTS_VOICES` or `TTS_HOST_VOICE` /
-`TTS_EXPERT_VOICE`. See `docs/05-provider-extension-guide.md`.
+sidecar shape. If you are wrapping a different local model, select Local, keep
+the same `/health`, `/voices`, and `/tts` endpoints, and save the voice IDs in
+Sotto. See `docs/05-provider-extension-guide.md`.
 
 ## HTTP contract
 
@@ -95,18 +93,8 @@ uvicorn app:app --host 0.0.0.0 --port 8000  # from services/local-tts/
 
 ## Wiring into Sotto
 
-```bash
-TTS_PROVIDER=kokoro
-TTS_BASE_URL=http://localhost:8000      # local dev outside Docker
-# TTS_BASE_URL=http://local-tts:8000    # inside Docker Compose (service name)
-# TTS_API_KEY=                          # optional — only if you front it with auth
-```
+Choose **Kokoro** in `/welcome` or Admin. Save `http://localhost:8000` for local development or `http://local-tts:8000` inside Docker Compose. Save a credential only when a reverse proxy protects the sidecar.
 
 For a custom local model, point Sotto at your own sidecar instead:
 
-```bash
-TTS_PROVIDER=local
-TTS_BASE_URL=http://localhost:8000
-TTS_MODEL=my-local-model                # optional
-TTS_VOICES=voice_a,voice_b              # optional, must match your sidecar
-```
+Choose **Local**, save the sidecar URL and optional model, and enter voice IDs accepted by the sidecar.

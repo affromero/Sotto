@@ -8,7 +8,7 @@
  * Docs: https://docs.mistral.ai/capabilities/audio/text_to_speech/speech
  */
 import { logger } from '../../logger';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { convertInlineAudioTags } from '../../tts-expression-mapper';
 import { MISTRAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
@@ -16,17 +16,24 @@ import { MISTRAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { MediaTransport, ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 interface MistralTtsResponse {
   audio_data: string; // base64-encoded audio
 }
 
 export class MistralProvider implements TtsProvider {
+  static readonly speechEndpoint = 'https://api.mistral.ai/v1/audio/speech';
   readonly providerId: TtsProviderId = 'mistral';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    private readonly media: MediaTransport,
+    model?: string
+  ) {
     this.apiKey = apiKey;
     this.model = model ?? getProviderMeta('mistral').defaultModel;
   }
@@ -44,12 +51,8 @@ export class MistralProvider implements TtsProvider {
 
     if (isClonedVoice && params.voiceId.startsWith('http')) {
       // Fetch remote audio and convert to base64 for ref_audio
-      const audioRes = await fetch(params.voiceId);
-      if (!audioRes.ok) {
-        throw new Error(`Failed to fetch reference audio: ${audioRes.status}`);
-      }
-      const audioBuffer = await audioRes.arrayBuffer();
-      body.ref_audio = Buffer.from(audioBuffer).toString('base64');
+      const audio = await this.media.downloadMedia(params.voiceId, { signal: params.signal });
+      body.ref_audio = Buffer.from(audio).toString('base64');
     } else if (isClonedVoice) {
       // Already base64 data URI — strip prefix
       body.ref_audio = params.voiceId.replace(/^data:[^;]+;base64,/, '');
@@ -57,14 +60,22 @@ export class MistralProvider implements TtsProvider {
       body.voice_id = params.voiceId;
     }
 
-    const response = await fetch('https://api.mistral.ai/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      MistralProvider.speechEndpoint,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -80,7 +91,12 @@ export class MistralProvider implements TtsProvider {
     return Buffer.from(data.audio_data, 'base64');
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const pair = selectVoicePairFromPool(MISTRAL_VOICE_POOL, episodeId ?? 'default', metadata);
     const isHost = SPEAKER_VOICE_HOST_SET.has(speaker);
     return isHost ? pair.host.id : pair.expert.id;

@@ -18,7 +18,8 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...args: unknown[]) => mockResolveLearningAi(...args),
+  resolveCapturedLearningAi: (...args: unknown[]) => mockResolveLearningAi(...args),
+  resolveCapturedLearningAiForProvider: (...args: unknown[]) => mockResolveLearningAi(...args),
 }));
 
 vi.mock('@/lib/reference-verification/pipeline', () => ({
@@ -26,6 +27,9 @@ vi.mock('@/lib/reference-verification/pipeline', () => ({
 }));
 
 import { verifyEpisodeReferences } from '@/lib/reference-verification/verify-episode';
+import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
+
+const execution = blockedProviderExecution('user-1');
 
 const reference = {
   id: 'ref-1',
@@ -68,9 +72,13 @@ describe('verifyEpisodeReferences', () => {
     });
 
     await expect(
-      verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [
-        { speaker: 'HOST', text: 'Supported claim [1].' },
-      ])
+      verifyEpisodeReferences(
+        'episode-1',
+        'user-1',
+        'Topic',
+        [{ speaker: 'HOST', text: 'Supported claim [1].' }],
+        execution
+      )
     ).resolves.toMatchObject({ total: 1, verified: 1, allVerified: true });
 
     expect(mockReferenceUpdate).toHaveBeenCalledWith({
@@ -100,9 +108,13 @@ describe('verifyEpisodeReferences', () => {
     });
 
     await expect(
-      verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [
-        { speaker: 'HOST', text: 'Unsupported claim [1].' },
-      ])
+      verifyEpisodeReferences(
+        'episode-1',
+        'user-1',
+        'Topic',
+        [{ speaker: 'HOST', text: 'Unsupported claim [1].' }],
+        execution
+      )
     ).resolves.toMatchObject({ verified: 0, allVerified: false });
 
     expect(mockReferenceUpdate).toHaveBeenCalledWith({
@@ -114,7 +126,9 @@ describe('verifyEpisodeReferences', () => {
   it('does not call an AI provider when the episode has no references', async () => {
     mockReferenceFindMany.mockResolvedValue([]);
 
-    await expect(verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [])).resolves.toEqual({
+    await expect(
+      verifyEpisodeReferences('episode-1', 'user-1', 'Topic', [], execution)
+    ).resolves.toEqual({
       total: 0,
       verified: 0,
       allVerified: false,

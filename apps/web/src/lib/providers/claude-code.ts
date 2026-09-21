@@ -1,3 +1,4 @@
+import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
 import type {
   AIProvider,
   AIOptions,
@@ -58,25 +59,36 @@ export class ClaudeCodeProvider implements AIProvider {
     const { executeClaudeCode } = await import('../claude-code-client');
     const result = await executeClaudeCode(system, serializeMessages(textMessages), {
       model: invocationModel,
+      signal: opts?.signal,
+      onUsage: opts?.onUsage,
       useWebSearch: opts?.useWebSearch,
       ...(images.length ? { images } : {}),
     });
     return { ...result, model: reportedModel };
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    const { invocationModel } = resolveClaudeCodeModel(opts?.model);
-    const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
-    const images = imagesOf(messages);
-    const { streamClaudeCode } = await import('../claude-code-client');
-    yield* streamClaudeCode(system, serializeMessages(textMessages), {
-      model: invocationModel,
-      useWebSearch: opts?.useWebSearch,
-      ...(images.length ? { images } : {}),
-    });
+    let cleanupError: (error: unknown) => boolean = () => false;
+    return interruptibleStream(
+      async function* (signal) {
+        const { invocationModel } = resolveClaudeCodeModel(opts?.model);
+        const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+        const images = imagesOf(messages);
+        const { streamClaudeCode, isClaudeCleanupError } = await import('../claude-code-client');
+        cleanupError = isClaudeCleanupError;
+        yield* streamClaudeCode(system, serializeMessages(textMessages), {
+          model: invocationModel,
+          signal,
+          onUsage: opts?.onUsage,
+          useWebSearch: opts?.useWebSearch,
+          ...(images.length ? { images } : {}),
+        });
+      },
+      { signal: opts?.signal, isCleanupError: (error) => cleanupError(error) }
+    );
   }
 }

@@ -1,484 +1,211 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @vitest-environment node
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-
-// Define mock fns at module scope so they're properly typed as Mock
-const mockApiKeyFindMany = vi.fn();
-const mockApiKeyFindUnique = vi.fn();
-const mockApiKeyCreate = vi.fn();
-const mockApiKeyUpdate = vi.fn();
-const mockApiKeyCount = vi.fn();
-
-vi.mock('@/lib/prisma', () => {
-  const _mockPrisma = {
-    apiKey: {
-      findMany: (...args: unknown[]) => mockApiKeyFindMany(...args),
-      findUnique: (...args: unknown[]) => mockApiKeyFindUnique(...args),
-      create: (...args: unknown[]) => mockApiKeyCreate(...args),
-      update: (...args: unknown[]) => mockApiKeyUpdate(...args),
-      count: (...args: unknown[]) => mockApiKeyCount(...args),
-    },
-  };
-  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
-});
-
-const mockAuth = vi.fn();
-vi.mock('@/lib/auth', () => ({
-  auth: () => mockAuth(),
-}));
-
-const mockGenerateApiKey = vi.fn();
-const mockAuthenticateRequest = vi.fn();
-vi.mock('@/lib/api-keys', () => ({
-  generateApiKey: () => mockGenerateApiKey(),
-  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
-}));
-
-const mockIsUserAdmin = vi.fn();
-vi.mock('@/lib/auth-guards', () => ({
-  isUserAdmin: (...args: unknown[]) => mockIsUserAdmin(...args),
-}));
-
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
-}));
-
+import { tokenHash } from 'thesidedoor-core/access';
+import type { PrismaClient } from '@/generated/prisma/client';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+  type SharedTestIdentity,
+} from '../helpers/setup/shared-instance';
 import { GET, POST } from '@/app/api/v1/keys/route';
 import { DELETE } from '@/app/api/v1/keys/[keyId]/route';
+import { authenticateRequest } from '@/lib/api-keys';
+import { issueSottoPairing, redeemSottoPairing } from '@/lib/sidedoor/access/core/pairing';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
-const mockPrisma = {
-  apiKey: {
-    findMany: mockApiKeyFindMany,
-    findUnique: mockApiKeyFindUnique,
-    create: mockApiKeyCreate,
-    update: mockApiKeyUpdate,
-    count: mockApiKeyCount,
-  },
-};
-
-function createRequest(
-  url = 'http://localhost:3000/api/v1/keys',
-  options: RequestInit = {}
-): NextRequest {
-  return new NextRequest(url, options as any);
-}
-
-const mockApiKey = {
-  id: 'key-1',
-  userId: 'user-1',
-  name: 'Production Key',
-  keyPrefix: 'sk_sotto_abc123...',
-  lastUsedAt: new Date('2025-01-15T10:00:00Z'),
-  createdAt: new Date('2025-01-10T10:00:00Z'),
-  revokedAt: null,
-};
-
-const mockApiKey2 = {
-  id: 'key-2',
-  userId: 'user-1',
-  name: 'Staging Key',
-  keyPrefix: 'sk_sotto_def456...',
-  lastUsedAt: null,
-  createdAt: new Date('2025-01-12T10:00:00Z'),
-  revokedAt: null,
-};
-
-const mockRevokedApiKey = {
-  id: 'key-revoked',
-  userId: 'user-1',
-  name: 'Old Key',
-  keyPrefix: 'sk_sotto_old123...',
-  lastUsedAt: new Date('2025-01-05T10:00:00Z'),
-  createdAt: new Date('2025-01-01T10:00:00Z'),
-  revokedAt: new Date('2025-01-08T10:00:00Z'),
-};
-
-describe('GET /api/v1/keys', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when not authenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-
-    const response = await GET(createRequest());
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body.error).toBe('Unauthorized');
-  });
-
-  it('returns 401 when the Bearer credential is not recognised', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-
-    const response = await GET(createRequest());
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body.error).toBe('Unauthorized');
-  });
-
-  it('returns 403 when the authenticated user is not an admin', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(false);
-
-    const response = await GET(createRequest());
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe('Forbidden');
-  });
-
-  it('returns empty array when user has no API keys', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findMany.mockResolvedValue([]);
-
-    const response = await GET(createRequest());
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toEqual([]);
-  });
-
-  it('returns list of API keys for authenticated user', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey, mockApiKey2]);
-
-    const response = await GET(createRequest());
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toHaveLength(2);
-    expect(body[0].id).toBe('key-1');
-    expect(body[1].id).toBe('key-2');
-  });
-
-  it('returns only selected fields (no keyHash exposed)', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey]);
-
-    const response = await GET(createRequest());
-    const body = await response.json();
-
-    expect(body[0]).toHaveProperty('id');
-    expect(body[0]).toHaveProperty('name');
-    expect(body[0]).toHaveProperty('keyPrefix');
-    expect(body[0]).toHaveProperty('lastUsedAt');
-    expect(body[0]).toHaveProperty('createdAt');
-    expect(body[0]).toHaveProperty('revokedAt');
-    expect(body[0]).not.toHaveProperty('keyHash');
-  });
-
-  it('includes revoked keys in the list', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findMany.mockResolvedValue([mockApiKey, mockRevokedApiKey]);
-
-    const response = await GET(createRequest());
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toHaveLength(2);
-    expect(body[1].revokedAt).toBeTruthy();
-  });
+const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(binding);
+  return { prisma: database, prismaUnfiltered: database };
 });
-
-describe('POST /api/v1/keys', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('API key routes with shared authority', () => {
+  let instance: SharedTestInstance;
+  let identity: SharedTestIdentity;
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('keys');
+    binding.database = instance.database;
   });
-
-  it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body.error).toBe('Unauthorized');
+  beforeEach(async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
+    vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
+    vi.stubEnv('SIDEDOOR_TRUSTED_PROXY', 'false');
+    identity = await instance.reset();
   });
-
-  it('returns 403 when the authenticated user is not an admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe('Forbidden');
+  afterEach(() => vi.unstubAllEnvs());
+  afterAll(async () => {
+    binding.database = null;
+    if (instance) await instance.close();
   });
-
-  it('returns 400 for invalid input (missing name)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({}),
+  function request(
+    method = 'GET',
+    body?: unknown,
+    token: string | null = identity.ownerToken,
+    authorization?: string
+  ) {
+    const headers = new Headers({
+      origin: 'http://localhost:3000',
+      'content-type': 'application/json',
     });
-    const response = await POST(request);
-
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body).toHaveProperty('error');
-  });
-
-  it('returns 400 for invalid input (name too long)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'a'.repeat(101) }),
+    if (token) headers.set('cookie', `sotto_session=${token}`);
+    if (authorization !== undefined) headers.set('authorization', authorization);
+    return new NextRequest('http://localhost:3000/api/v1/keys', {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    const response = await POST(request);
-
-    expect(response.status).toBe(400);
-  });
-
-  it('returns 400 when user has reached MAX_ACTIVE_KEYS limit (10)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
-    mockPrisma.apiKey.count.mockResolvedValue(10);
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body.error).toBe('Maximum of 10 active API keys allowed');
-  });
-
-  it('creates API key successfully for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
-    mockPrisma.apiKey.count.mockResolvedValue(3);
-
-    mockGenerateApiKey.mockReturnValue({
-      key: 'sk_sotto_abc123def456',
-      hash: 'hash123',
-      prefix: 'sk_sotto_abc123...',
-    });
-
-    mockPrisma.apiKey.create.mockResolvedValue({
-      id: 'key-new',
-      userId: 'user-1',
-      name: 'Production Key',
-      keyHash: 'hash123',
-      keyPrefix: 'sk_sotto_abc123...',
-      createdAt: new Date('2025-01-20T10:00:00Z'),
-      lastUsedAt: null,
-      revokedAt: null,
-    });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Production Key' }),
-    });
-    const response = await POST(request);
-
+  }
+  async function create(name = 'My device') {
+    const response = await POST(request('POST', { name }));
     expect(response.status).toBe(201);
-    const body = await response.json();
-    expect(body.id).toBe('key-new');
-    expect(body.name).toBe('Production Key');
-    expect(body.keyPrefix).toBe('sk_sotto_abc123...');
+    return response.json() as Promise<{ id: string; name: string; key: string; expiresAt: string }>;
+  }
+  it('requires authentication and never falls back from an invalid bearer to a valid cookie', async () => {
+    expect((await GET(request('GET', undefined, null))).status).toBe(401);
+    expect(
+      (await GET(request('GET', undefined, identity.ownerToken, 'Bearer sk_sotto_forged'))).status
+    ).toBe(401);
+    expect((await POST(request('POST', { name: 'Tablet' }, null))).status).toBe(401);
   });
-
-  it('returns full API key only on creation (shown once)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
-    mockPrisma.apiKey.count.mockResolvedValue(0);
-
-    mockGenerateApiKey.mockReturnValue({
-      key: 'sk_sotto_fullkeyhere123456',
-      hash: 'hash123',
-      prefix: 'sk_sotto_fullkey...',
-    });
-
-    mockPrisma.apiKey.create.mockResolvedValue({
-      id: 'key-new',
-      userId: 'user-1',
-      name: 'Test Key',
-      keyHash: 'hash123',
-      keyPrefix: 'sk_sotto_fullkey...',
-      createdAt: new Date('2025-01-20T10:00:00Z'),
-      lastUsedAt: null,
-      revokedAt: null,
-    });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(201);
-    const body = await response.json();
-    expect(body.key).toBe('sk_sotto_fullkeyhere123456');
+  it('requires a browser owner and prevents household sessions or device credentials from minting keys', async () => {
+    const household = await identity.household('Learner');
+    expect((await POST(request('POST', { name: 'Tablet' }, household.token))).status).toBe(403);
+    const key = await create();
+    expect(
+      (await POST(request('POST', { name: 'Escalation' }, null, `Bearer ${key.key}`))).status
+    ).toBe(403);
+    expect(await instance.database.apiKey.count()).toBe(1);
   });
-
-  it('generates API key with sk_sotto_ prefix', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'ADMIN' } });
-
-    mockPrisma.apiKey.count.mockResolvedValue(0);
-
-    mockGenerateApiKey.mockReturnValue({
-      key: 'sk_sotto_test123',
-      hash: 'hash123',
-      prefix: 'sk_sotto_test123...',
-    });
-
-    mockPrisma.apiKey.create.mockResolvedValue({
-      id: 'key-new',
-      userId: 'user-1',
-      name: 'Test Key',
-      keyHash: 'hash123',
-      keyPrefix: 'sk_sotto_test123...',
-      createdAt: new Date('2025-01-20T10:00:00Z'),
-      lastUsedAt: null,
-      revokedAt: null,
-    });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(201);
-    const body = await response.json();
-    expect(body.key).toMatch(/^sk_sotto_/);
-  });
-});
-
-describe('DELETE /api/v1/keys/[keyId]', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when not authenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-
-    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body.error).toBe('Unauthorized');
-  });
-
-  it('returns 403 when the authenticated user is not an admin', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(false);
-
-    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe('Forbidden');
-  });
-
-  it('returns 404 when API key does not exist', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findUnique.mockResolvedValue(null);
-
-    const request = createRequest('http://localhost:3000/api/v1/keys/nonexistent', {
-      method: 'DELETE',
-    });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'nonexistent' }) });
-
-    expect(response.status).toBe(404);
-    const body = await response.json();
-    expect(body.error).toBe('API key not found');
-  });
-
-  it("returns 403 when trying to delete another user's API key", async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findUnique.mockResolvedValue({
-      userId: 'user-1',
-      revokedAt: null,
-    });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe('Forbidden');
-  });
-
-  it('returns 400 when trying to revoke already revoked key', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findUnique.mockResolvedValue({
-      userId: 'user-1',
-      revokedAt: new Date('2025-01-08T10:00:00Z'),
-    });
-
-    const request = createRequest('http://localhost:3000/api/v1/keys/key-revoked', {
-      method: 'DELETE',
-    });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-revoked' }) });
-
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body.error).toBe('API key already revoked');
-  });
-
-  it('revokes API key successfully', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-    mockPrisma.apiKey.findUnique.mockResolvedValue({
-      userId: 'user-1',
-      revokedAt: null,
-    });
-    mockPrisma.apiKey.update.mockResolvedValue(mockApiKey);
-
-    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
-
-    expect(response.status).toBe(204);
-  });
-});
-
-/**
- * ApiKey has no scopes and no expiry, so a paired device that could mint keys
- * would be able to outlive its own revocation: revoke the device, and the keys
- * it minted keep working. Listing and revoking are Bearer-capable; minting is
- * deliberately not, and new devices go through pairing instead.
- */
-describe('API key minting is not reachable with a device credential', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('rejects a Bearer-only caller even when that caller is an admin', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockIsUserAdmin.mockResolvedValue(true);
-
-    const response = await POST(
-      createRequest('http://localhost:3000/api/v1/keys', {
-        method: 'POST',
-        body: JSON.stringify({ name: 'minted from a phone' }),
-      })
+  it.each([{}, { name: '' }, { name: 'x'.repeat(101) }])(
+    'validates key names without minting a credential',
+    async (body) => {
+      expect((await POST(request('POST', body))).status).toBe(400);
+      expect(await instance.database.apiKey.count()).toBe(0);
+    }
+  );
+  it('returns a usable secret once, retains only its hash, and lists safe expiry metadata', async () => {
+    const created = await create('Phone');
+    expect(created.key).toMatch(/^sk_sotto_/);
+    const row = await instance.database.apiKey.findUniqueOrThrow({ where: { id: created.id } });
+    expect(row.keyHash).toBe(tokenHash(created.key));
+    expect(JSON.stringify(row)).not.toContain(created.key);
+    expect(row.expiresAt?.toISOString()).toBe(created.expiresAt);
+    const authenticated = await authenticateRequest(
+      request('GET', undefined, null, `Bearer ${created.key}`)
     );
-
-    expect(response.status).toBe(401);
-    expect(mockApiKeyCreate).not.toHaveBeenCalled();
+    expect(authenticated).toMatchObject({
+      userId: identity.ownerId,
+      isOwner: true,
+      authentication: 'device',
+    });
+    const response = await GET(request());
+    const list = (await response.json()) as Array<Record<string, unknown>>;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: created.id, name: 'Phone', status: 'active' });
+    expect(list[0]).not.toHaveProperty('key');
+    expect(list[0]).not.toHaveProperty('keyHash');
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+  it('enforces the shared active-device quota without leaking failed minting records', async () => {
+    for (let index = 0; index < 10; index++) await create(`Device ${index}`);
+    const response = await POST(request('POST', { name: 'Over quota' }));
+    expect(response.status).toBe(429);
+    expect(await instance.database.apiKey.count()).toBe(10);
+  });
+  it('revokes authority and keeps history while making repeated owner revocation safe', async () => {
+    const created = await create();
+    const params = { params: Promise.resolve({ keyId: created.id }) };
+    expect((await DELETE(request('DELETE'), params)).status).toBe(204);
+    expect(
+      await authenticateRequest(request('GET', undefined, null, `Bearer ${created.key}`))
+    ).toBeNull();
+    expect(
+      (await instance.database.apiKey.findUniqueOrThrow({ where: { id: created.id } })).revokedAt
+    ).not.toBeNull();
+    expect((await DELETE(request('DELETE'), params)).status).toBe(204);
+    const list = await (await GET(request())).json();
+    expect(list).toEqual([expect.objectContaining({ id: created.id, status: 'revoked' })]);
+  });
+  it('denies another household access to private key history and revocation', async () => {
+    const created = await create();
+    const household = await identity.household('Other learner');
+    expect(await (await GET(request('GET', undefined, household.token))).json()).toEqual([]);
+    expect(
+      (
+        await DELETE(request('DELETE', undefined, household.token), {
+          params: Promise.resolve({ keyId: created.id }),
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      await authenticateRequest(request('GET', undefined, null, `Bearer ${created.key}`))
+    ).not.toBeNull();
+  });
+  it('rejects cross-origin mutations and returns 404 for an absent key', async () => {
+    const forged = request('POST', { name: 'Forged' });
+    forged.headers.set('origin', 'https://untrusted.example');
+    expect((await POST(forged)).status).toBe(403);
+    expect(
+      (await DELETE(request('DELETE'), { params: Promise.resolve({ keyId: 'missing' }) })).status
+    ).toBe(404);
+    expect(await instance.database.apiKey.count()).toBe(0);
+  });
+  it('keeps a private member outside owner key management', async () => {
+    const created = await create();
+    await identity.access.addMember(identity.ownerToken, 'Member', 'private member password');
+    const memberToken = await identity.access.login('Member', 'private member password');
+    expect((await POST(request('POST', { name: 'Member key' }, memberToken))).status).toBe(403);
+    expect(await (await GET(request('GET', undefined, memberToken))).json()).toEqual([]);
+    expect(
+      (
+        await DELETE(request('DELETE', undefined, memberToken), {
+          params: Promise.resolve({ keyId: created.id }),
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      await authenticateRequest(request('GET', undefined, null, `Bearer ${created.key}`))
+    ).not.toBeNull();
+  });
+  it('limits an owner device to its delegated scope while allowing self-revocation', async () => {
+    const other = await create('Owner management');
+    const limited = await sottoTransaction(instance.database, async (tx) => {
+      const pair = await issueSottoPairing(tx, identity.ownerToken, 'Limited device', {
+        scopes: ['app'],
+      });
+      return redeemSottoPairing(tx, pair.token);
+    });
+    const row = await instance.database.apiKey.findUniqueOrThrow({
+      where: { keyHash: tokenHash(limited.token) },
+    });
+    const bearer = `Bearer ${limited.token}`;
+    expect(await authenticateRequest(request('GET', undefined, null, bearer))).toMatchObject({
+      userId: identity.ownerId,
+      isOwner: false,
+      authentication: 'device',
+    });
+    expect(await (await GET(request('GET', undefined, null, bearer))).json()).toEqual([
+      expect.objectContaining({ id: row.id }),
+    ]);
+    expect(
+      (
+        await DELETE(request('DELETE', undefined, null, bearer), {
+          params: Promise.resolve({ keyId: other.id }),
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await DELETE(request('DELETE', undefined, null, bearer), {
+          params: Promise.resolve({ keyId: row.id }),
+        })
+      ).status
+    ).toBe(204);
+    expect(await authenticateRequest(request('GET', undefined, null, bearer))).toBeNull();
+    expect(
+      await authenticateRequest(request('GET', undefined, null, `Bearer ${other.key}`))
+    ).not.toBeNull();
   });
 });

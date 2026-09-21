@@ -1,4 +1,5 @@
-import { getByokExtraData, getSharedAdminByokExtraData, getSharedByokKey } from '../../byok';
+import { AccessError } from 'thesidedoor-core/access';
+import { captureUsageAccount } from '../account';
 import { logger } from '../../logger';
 import { CARTESIA_USAGE_ALLOWANCE } from '../../provider-usage/allowances';
 import type {
@@ -16,10 +17,8 @@ import {
   formatCreditLabel,
   formatWholeNumber,
   getNumber,
-  hashToken,
   isRecord,
   percentFromUsage,
-  providerCacheKey,
   resetInFromDate,
   usageWindow,
 } from '../utils';
@@ -28,59 +27,6 @@ const CARTESIA_TIMEOUT_MS = 7_000;
 const CARTESIA_USAGE_API_VERSION = '2026-03-01';
 
 let cartesiaCache: AgentUsageCacheEntry | null = null;
-
-function hasAdminUsageKey(extraData: Record<string, string> | null): boolean {
-  return Boolean(extraData?.adminApiKey?.trim());
-}
-
-function cartesiaEnvExtraData(): Record<string, string> | null {
-  const extra = {
-    ...(process.env.CARTESIA_ADMIN_API_KEY?.trim()
-      ? { adminApiKey: process.env.CARTESIA_ADMIN_API_KEY.trim() }
-      : {}),
-    ...(process.env.CARTESIA_USAGE_PLAN?.trim()
-      ? { usagePlan: process.env.CARTESIA_USAGE_PLAN.trim() }
-      : {}),
-    ...(process.env.CARTESIA_MONTHLY_CREDIT_LIMIT?.trim()
-      ? { monthlyCreditLimit: process.env.CARTESIA_MONTHLY_CREDIT_LIMIT.trim() }
-      : {}),
-    ...(process.env.CARTESIA_BILLING_RESET_DAY?.trim()
-      ? { billingResetDay: process.env.CARTESIA_BILLING_RESET_DAY.trim() }
-      : {}),
-  };
-  return Object.keys(extra).length > 0 ? extra : null;
-}
-
-function mergeExtraData(
-  ...items: Array<Record<string, string> | null>
-): Record<string, string> | null {
-  const merged = Object.assign(
-    {},
-    ...items.filter((item): item is Record<string, string> => Boolean(item))
-  );
-  return Object.keys(merged).length > 0 ? merged : null;
-}
-
-async function getCartesiaRuntimeCredentials(
-  userId: string
-): Promise<{ apiKey: string; extraData: Record<string, string> | null } | null> {
-  const byokKey = await getSharedByokKey(userId, 'cartesia');
-  if (byokKey) {
-    const ownerExtraData = await getByokExtraData(byokKey.ownerUserId, 'cartesia');
-    const sharedAdminExtraData = hasAdminUsageKey(ownerExtraData)
-      ? null
-      : await getSharedAdminByokExtraData(userId, 'cartesia');
-    const extraData = mergeExtraData(cartesiaEnvExtraData(), ownerExtraData, sharedAdminExtraData);
-
-    return {
-      apiKey: byokKey.apiKey,
-      extraData,
-    };
-  }
-
-  const apiKey = process.env.CARTESIA_API_KEY?.trim();
-  return apiKey ? { apiKey, extraData: cartesiaEnvExtraData() } : null;
-}
 
 function optionalPositiveInteger(value: string | null | undefined): number | null {
   if (!value?.trim()) return null;
@@ -225,7 +171,8 @@ export function parseCartesiaCreditUsagePayload(
 export async function getCartesiaUsageProvider(
   context: UsageProviderContext
 ): Promise<AgentUsageProvider | null> {
-  const credentials = await getCartesiaRuntimeCredentials(context.userId);
+  const account = await captureUsageAccount(context, 'cartesia');
+  const { admission, signal, fields: credentials } = account;
   if (!credentials) return null;
 
   const adminKey = credentials.extraData?.adminApiKey?.trim() || null;
@@ -235,17 +182,24 @@ export async function getCartesiaUsageProvider(
 
   const nowDate = new Date();
   const billingWindow = resolveCartesiaBillingWindow(nowDate, resetDay);
-  const cacheKey = providerCacheKey([
-    adminKey ? hashToken(adminKey) : 'no-admin',
-    allowance.planId,
-    monthlyLimit,
+  const cacheKey = account.fingerprint([
     billingWindow.start.toISOString(),
     billingWindow.end.toISOString(),
   ]);
   const now = Date.now();
   if (cartesiaCache && cartesiaCache.key === cacheKey && cartesiaCache.expiresAt > now) {
-    return cartesiaCache.value;
+    return structuredClone(cartesiaCache.value);
   }
+
+  const publish = async (provider: AgentUsageProvider, ttl: number) => {
+    await admission.validate(signal);
+    cartesiaCache = {
+      key: cacheKey,
+      expiresAt: Date.now() + ttl,
+      value: structuredClone(provider),
+    };
+    return provider;
+  };
 
   if (!adminKey) {
     const provider = buildProvider({
@@ -260,8 +214,7 @@ export async function getCartesiaUsageProvider(
       credits: null,
       limitReached: false,
     });
-    cartesiaCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider, ERROR_CACHE_TTL_MS);
   }
 
   const params = new URLSearchParams({
@@ -270,16 +223,20 @@ export async function getCartesiaUsageProvider(
   });
 
   try {
+    const url = `https://api.cartesia.ai/usage/credits?${params.toString()}`;
+    const transport = admission.createTransport([{ method: 'GET', url }]);
     const { response, payload } = await fetchJsonWithTimeout(
-      `https://api.cartesia.ai/usage/credits?${params.toString()}`,
+      url,
       {
+        signal,
         headers: {
           Authorization: `Bearer ${adminKey}`,
           'Cartesia-Version': CARTESIA_USAGE_API_VERSION,
           'User-Agent': 'sotto-provider-usage/0.1',
         },
       },
-      CARTESIA_TIMEOUT_MS
+      CARTESIA_TIMEOUT_MS,
+      transport.authenticatedFetch
     );
 
     if (!response.ok) {
@@ -299,8 +256,7 @@ export async function getCartesiaUsageProvider(
         credits: null,
         limitReached: false,
       });
-      cartesiaCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider, ERROR_CACHE_TTL_MS);
     }
 
     const parsed = parseCartesiaCreditUsagePayload(payload, {
@@ -323,8 +279,7 @@ export async function getCartesiaUsageProvider(
         credits: null,
         limitReached: false,
       });
-      cartesiaCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider, ERROR_CACHE_TTL_MS);
     }
 
     const provider = buildProvider({
@@ -339,16 +294,12 @@ export async function getCartesiaUsageProvider(
       credits: parsed.credits,
       limitReached: parsed.limitReached,
     });
-    cartesiaCache = {
-      key: cacheKey,
-      expiresAt: now + AUDIO_PROVIDER_CACHE_TTL_MS,
-      value: provider,
-    };
-    return provider;
+    return await publish(provider, AUDIO_PROVIDER_CACHE_TTL_MS);
   } catch (error) {
-    logger.warn('Failed to fetch Cartesia credit usage status', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof AggregateError) throw error;
+    signal.throwIfAborted();
+    if (error instanceof AccessError) throw error;
+    logger.warn('Failed to fetch Cartesia credit usage status');
     const provider = buildProvider({
       id: 'cartesia',
       category: 'audio',
@@ -361,8 +312,7 @@ export async function getCartesiaUsageProvider(
       credits: null,
       limitReached: false,
     });
-    cartesiaCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider, ERROR_CACHE_TTL_MS);
   }
 }
 

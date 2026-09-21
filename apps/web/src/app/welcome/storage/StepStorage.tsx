@@ -4,46 +4,40 @@ import { useMemo, useState } from 'react';
 import type { OnboardingConfig, StorageState } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.styles';
+import c from '@/app/welcome/components.styles';
 
 interface Props {
   storage: StorageState;
   config: OnboardingConfig;
   demoMode: boolean;
-  setStorage: (updater: (prev: StorageState) => StorageState) => void;
+  setStorage: (updater: (previous: StorageState) => StorageState) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-const PROVIDERS: Array<{
-  id: StorageState['provider'];
-  name: string;
-  note: string;
-  detail: string;
-  icon: 'shield' | 'globe' | 'repo';
-}> = [
+const PROVIDERS = [
   {
     id: 'local',
     name: 'Local disk',
     note: 'single machine, simplest setup',
-    detail: 'Stores generated audio under LOCAL_STORAGE_DIR on this server.',
+    detail: 'Uses a persistent directory selected here.',
     icon: 'shield',
   },
   {
     id: 'r2',
     name: 'Cloudflare R2',
-    note: 'self-hosted, internet-facing',
-    detail: 'Uses R2 env secrets; Sotto only stores the provider choice.',
+    note: 'internet-facing object storage',
+    detail: 'Sidedoor encrypts the instance credential and captures each use.',
     icon: 'globe',
   },
   {
     id: 's3',
     name: 'AWS S3',
-    note: 'hosted bucket or S3-compatible ops',
-    detail: 'Stores bucket and region here; credentials stay in env.',
+    note: 'managed object storage',
+    detail: 'Sidedoor encrypts the instance credential and captures each use.',
     icon: 'repo',
   },
-];
+] as const;
 
 interface CheckState {
   status: 'idle' | 'checking' | 'ok' | 'error';
@@ -51,38 +45,25 @@ interface CheckState {
   message: string;
 }
 
-const R2_ENV_VARS = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME'];
-const S3_ENV_VARS = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
-
-/**
- * Owner-only: per-var presence of the selected provider's env secrets, from the
- * server (booleans only). Turns the passive "set these in env" copy into a
- * live checklist; the write check below stays the active confirmation.
- */
-function EnvVarChecklist({ vars, env }: { vars: string[]; env: Record<string, boolean> }) {
-  const allSet = vars.every((name) => env[name]);
+function StorageInput(props: {
+  label: string;
+  value: string;
+  placeholder: string;
+  secret?: boolean;
+  onChange: (value: string) => void;
+}) {
   return (
-    <div aria-label="Server env variables">
-      <ul className={c.localCheckList}>
-        {vars.map((name) => (
-          <li
-            key={name}
-            className={`${c.localCheckItem} ${env[name] ? c.localCheckItemOk : c.localCheckItemError}`}
-          >
-            <span className={c.localCheckItemHead}>
-              <Glyph name={env[name] ? 'check' : 'x'} size={13} />
-              <code>{name}</code>
-              <span>{env[name] ? 'set on the server' : 'missing'}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className={c.vkNote}>
-        {allSet
-          ? 'All required env vars detected on the server — run the write check to confirm.'
-          : 'Secrets are not saved in the wizard. Restart web and workers after changing them.'}
-      </div>
-    </div>
+    <label className={c.vkRow}>
+      <span className={c.vkLabel}>{props.label}</span>
+      <input
+        className={c.vkInput}
+        type={props.secret ? 'password' : 'text'}
+        autoComplete="off"
+        value={props.value}
+        placeholder={props.placeholder}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </label>
   );
 }
 
@@ -93,45 +74,38 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
     message: '',
   });
   const selected = PROVIDERS.find((provider) => provider.id === storage.provider) ?? PROVIDERS[0];
-  const signature = useMemo(
-    () =>
-      JSON.stringify({
-        provider: storage.provider,
-        s3Bucket: storage.s3Bucket.trim(),
-        s3Region: storage.s3Region.trim(),
-      }),
-    [storage.provider, storage.s3Bucket, storage.s3Region]
-  );
+  const signature = useMemo(() => JSON.stringify(storage), [storage]);
   const stale = check.status !== 'idle' && check.signature !== signature;
   const canCheck = config.isOwner && !demoMode;
-  // Present only for the owner on a real install; demo/learners keep today's copy.
-  const envStorage = canCheck ? (config.env?.storage ?? null) : null;
   const canContinue = demoMode || !config.isOwner || (check.status === 'ok' && !stale);
+  const update = (field: keyof StorageState, value: string) =>
+    setStorage((previous) => ({ ...previous, [field]: value }));
 
   async function runCheck() {
-    setCheck({
-      status: 'checking',
-      signature,
-      message: `Checking ${selected.name}.`,
-    });
+    setCheck({ status: 'checking', signature, message: `Checking ${selected.name}.` });
     try {
-      const res = await fetch('/api/v1/onboarding/check-storage', {
+      const response = await fetch('/api/v1/onboarding/check-storage', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: storage.provider,
-          s3Bucket: storage.s3Bucket,
-          s3Region: storage.s3Region,
+          localStorageRoot: storage.localRoot,
+          endpoint: storage.endpoint,
+          bucket: storage.bucket,
+          region: storage.region,
+          publicUrl: storage.publicUrl || null,
+          accessKeyId: storage.accessKeyId,
+          secretAccessKey: storage.secretAccessKey,
         }),
       });
-      const body = (await res.json().catch(() => null)) as { detail?: string } | null;
+      const body = (await response.json().catch(() => null)) as { detail?: string } | null;
       setCheck({
-        status: res.ok ? 'ok' : 'error',
+        status: response.ok ? 'ok' : 'error',
         signature,
         message:
           body?.detail ??
-          (res.ok ? `${selected.name} can write media.` : `${selected.name} is not ready.`),
+          (response.ok ? `${selected.name} can write media.` : `${selected.name} is not ready.`),
       });
     } catch {
       setCheck({
@@ -151,14 +125,14 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
         Decide where generated audio <em>lands</em>.
       </h1>
       <p className={t.lede}>
-        Listening classes are only ready after TTS audio is written to storage. Pick the storage
-        path now so Sotto can fail before a paid voice call if the destination is unavailable.
+        Sotto verifies the destination before a paid voice call. Object-store secrets are encrypted
+        with the same Sidedoor credential system as model providers.
       </p>
 
       <div className={c.voiceBlock}>
         <div className={c.voiceHead}>
           <span className={t.mlabel}>Media storage</span>
-          <span className={c.voiceSub}>episode audio, segment audio, worksheets, recordings</span>
+          <span className={c.voiceSub}>episode audio, worksheets, recordings</span>
         </div>
         <div className={c.voicePills}>
           {PROVIDERS.map((provider) => (
@@ -169,12 +143,7 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
                 storage.provider === provider.id ? c.voiceChoiceSel : ''
               }`}
               aria-pressed={storage.provider === provider.id}
-              onClick={() =>
-                setStorage((prev) => ({
-                  ...prev,
-                  provider: provider.id,
-                }))
-              }
+              onClick={() => setStorage((previous) => ({ ...previous, provider: provider.id }))}
             >
               <span className={c.voiceChipText}>
                 <span className={c.voiceChipName}>
@@ -191,73 +160,64 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
         <div className={c.voiceKey}>
           {storage.provider === 'local' ? (
             <>
-              <div className={c.voiceNote}>
-                <Glyph name="shield" size={13} />
-                Uses <code>LOCAL_STORAGE_DIR</code>
-                {envStorage?.LOCAL_STORAGE_DIR ? (
-                  <> · set on the server.</>
-                ) : (
-                  <>
-                    . Default: <code>/tmp/sotto-storage</code>.
-                  </>
-                )}
-              </div>
+              <StorageInput
+                label="Storage directory"
+                value={storage.localRoot}
+                placeholder=".sotto/storage"
+                onChange={(value) => update('localRoot', value)}
+              />
               <div className={c.vkNote}>
-                Best for a single Mac, laptop, or private server. Back up this directory with the
-                database.
+                Use a persistent, backed-up directory shared by web and worker containers.
               </div>
-            </>
-          ) : storage.provider === 'r2' ? (
-            <>
-              <div className={c.voiceNote}>
-                <Glyph name="lock" size={13} />
-                Set <code>R2_ACCOUNT_ID</code>, <code>R2_ACCESS_KEY_ID</code>,{' '}
-                <code>R2_SECRET_ACCESS_KEY</code>, and <code>R2_BUCKET_NAME</code> in env.
-              </div>
-              {envStorage ? (
-                <EnvVarChecklist vars={R2_ENV_VARS} env={envStorage} />
-              ) : (
-                <div className={c.vkNote}>
-                  Secrets are not saved in the wizard. Restart web and workers after changing them.
-                </div>
-              )}
             </>
           ) : (
             <>
-              <div className={c.vkRow}>
-                <span className={c.vkLabel}>
-                  <Glyph name="repo" size={13} /> S3 bucket
-                </span>
-                <input
-                  className={c.vkInput}
-                  value={storage.s3Bucket}
-                  placeholder="sotto-storage"
-                  onChange={(event) =>
-                    setStorage((prev) => ({ ...prev, s3Bucket: event.target.value }))
-                  }
-                />
+              <StorageInput
+                label="S3 endpoint"
+                value={storage.endpoint}
+                placeholder={
+                  storage.provider === 'r2'
+                    ? 'https://ACCOUNT.r2.cloudflarestorage.com'
+                    : 'https://s3.us-east-1.amazonaws.com'
+                }
+                onChange={(value) => update('endpoint', value)}
+              />
+              <StorageInput
+                label="Bucket"
+                value={storage.bucket}
+                placeholder="sotto-storage"
+                onChange={(value) => update('bucket', value)}
+              />
+              <StorageInput
+                label="Region"
+                value={storage.region}
+                placeholder={storage.provider === 'r2' ? 'auto' : 'us-east-1'}
+                onChange={(value) => update('region', value)}
+              />
+              <StorageInput
+                label="Public URL (optional)"
+                value={storage.publicUrl}
+                placeholder="https://media.example.com"
+                onChange={(value) => update('publicUrl', value)}
+              />
+              <StorageInput
+                label="Access key ID"
+                value={storage.accessKeyId}
+                placeholder="Access key ID"
+                secret
+                onChange={(value) => update('accessKeyId', value)}
+              />
+              <StorageInput
+                label="Secret access key"
+                value={storage.secretAccessKey}
+                placeholder="Secret access key"
+                secret
+                onChange={(value) => update('secretAccessKey', value)}
+              />
+              <div className={c.vkNote}>
+                The browser sends these once over your authenticated connection. Sidedoor stores
+                encrypted values and never returns them to the page.
               </div>
-              <div className={c.vkRow}>
-                <span className={c.vkLabel}>
-                  <Glyph name="globe" size={13} /> Region
-                </span>
-                <input
-                  className={c.vkInput}
-                  value={storage.s3Region}
-                  placeholder="us-east-1"
-                  onChange={(event) =>
-                    setStorage((prev) => ({ ...prev, s3Region: event.target.value }))
-                  }
-                />
-              </div>
-              {envStorage ? (
-                <EnvVarChecklist vars={S3_ENV_VARS} env={envStorage} />
-              ) : (
-                <div className={c.vkNote}>
-                  Credentials stay in <code>AWS_ACCESS_KEY_ID</code> and{' '}
-                  <code>AWS_SECRET_ACCESS_KEY</code>.
-                </div>
-              )}
             </>
           )}
         </div>
@@ -271,9 +231,7 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
                 <Glyph name={check.status === 'ok' && !stale ? 'check' : 'link'} size={14} />
                 Storage write check
               </span>
-              <span className={c.localCheckHint}>
-                Writes and deletes a tiny file using the selected provider.
-              </span>
+              <span className={c.localCheckHint}>Writes, reads, and deletes a tiny probe.</span>
             </div>
             <button
               type="button"

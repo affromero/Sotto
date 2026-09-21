@@ -1,21 +1,26 @@
-import { Job } from 'bullmq';
-import { WorksheetPdfPayload } from '@/lib/queue';
+import { isDeepStrictEqual } from 'node:util';
+import type { Job } from 'bullmq';
+import type { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { buildClassDocument } from '@/lib/class-document';
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
 import { renderWorksheetHtml } from '@/lib/worksheet-html';
-import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import { readSottoWorkerJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { worksheetPdfPayloadSchema } from '@/lib/sidedoor/jobs/stitch/worksheet-pdf-work';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 
-export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promise<void> {
-  const { classId, appBaseUrl } = job.data;
-
-  logger.info('Processing worksheet PDF', { classId });
-  await job.updateProgress(5);
-
-  // Load the class (owner-agnostic — worker runs server-side with full access)
-  const cls = await prisma.courseClass.findFirst({
-    where: { id: classId },
+async function readWork(database: Prisma.TransactionClient, job: Job<unknown>) {
+  const durable = await readSottoWorkerJob(database, job, {
+    handler: 'worksheet-pdf',
+    version: 1,
+    payload: worksheetPdfPayloadSchema,
+  });
+  if (durable.complete) return durable;
+  const cls = await database.courseClass.findFirst({
+    where: { id: durable.payload.classId },
     include: {
       course: { select: { nativeLang: true, targetLang: true } },
       lesson: {
@@ -36,10 +41,30 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
       },
     },
   });
+  if (!cls) throw new Error(`CourseClass not found: ${durable.payload.classId}`);
+  if (cls.updatedAt.getTime() !== durable.payload.classUpdatedAt)
+    throw new Error('Worksheet class changed before generation');
+  const ownership = await captureCourseStorage(database, cls.courseId);
+  if (!isDeepStrictEqual(ownership.scopes, durable.scopes))
+    throw new Error('Worksheet ownership changed before generation');
+  return { ...durable, cls, ownership };
+}
 
-  if (!cls) {
-    throw new Error(`CourseClass not found: ${classId}`);
+export async function processWorksheetPdf(
+  job: Job<unknown>,
+  signal: AbortSignal = AbortSignal.timeout(600_000)
+): Promise<void> {
+  signal.throwIfAborted();
+  const work = await sottoTransaction(prisma, (database) => readWork(database, job), { signal });
+  if (work.complete) {
+    await job.updateProgress(100);
+    return;
   }
+  const { cls, ownership } = work;
+  const { classId, appBaseUrl } = work.payload;
+
+  logger.info('Processing worksheet PDF', { classId });
+  await job.updateProgress(5);
 
   await job.updateProgress(15);
 
@@ -99,7 +124,10 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
     })),
   };
 
-  const doc = await buildClassDocument(input, { isAnswerKey: false, appBaseUrl });
+  const doc = await buildClassDocument(input, {
+    isAnswerKey: false,
+    appBaseUrl: appBaseUrl ?? undefined,
+  });
 
   await job.updateProgress(30);
 
@@ -107,9 +135,7 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
 
   await job.updateProgress(40);
 
-  // Graceful degradation: if Chromium is unavailable on a self-host, log and
-  // return without failing the job — the browser-print page is the fallback.
-  let pdfBuffer: Buffer | null = null;
+  let pdfBuffer: Buffer;
   let browser = null;
   try {
     const { chromium } = await import('playwright');
@@ -119,28 +145,67 @@ export async function processWorksheetPdf(job: Job<WorksheetPdfPayload>): Promis
     const pdfBytes = await page.pdf({ format: 'A4', printBackground: true });
     pdfBuffer = Buffer.from(pdfBytes);
   } catch (err) {
-    logger.warn('Chromium unavailable — skipping PDF generation for worksheet', {
+    logger.error('Worksheet PDF rendering failed', {
       classId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return;
+    throw new Error('Worksheet PDF rendering requires a working Chromium installation', {
+      cause: err,
+    });
   } finally {
     if (browser) {
-      await browser.close().catch((err: unknown) => {
-        logger.warn('Failed to close browser', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
+      await browser.close();
     }
   }
 
   await job.updateProgress(80);
 
-  const pdfUrl = await uploadFile(`worksheets/${classId}.pdf`, pdfBuffer, 'application/pdf');
-
-  await prisma.courseClass.update({
-    where: { id: classId },
-    data: { worksheetPdfUrl: pdfUrl },
+  const pdfUrl = await writeStorageReference({
+    database: prisma,
+    signal,
+    prefix: `worksheets/${classId}`,
+    extension: 'pdf',
+    body: pdfBuffer,
+    contentType: 'application/pdf',
+    captureAdmission: async (database) => {
+      const current = await readWork(database, job);
+      if (current.complete || !isDeepStrictEqual(current, work))
+        throw new Error('Worksheet changed during publication');
+      return {
+        instanceId: ownership.instanceId,
+        scopes: ownership.scopes,
+        consumer: `class:${classId}:worksheet`,
+        snapshot: cls,
+      };
+    },
+    validateAdmission: async (database, admission, committedReference) => {
+      if (committedReference) {
+        const receipt = await sottoJobOutbox(database).receipt(work.operationId);
+        const current = await database.courseClass.findUnique({
+          where: { id: classId },
+          select: { worksheetPdfUrl: true },
+        });
+        if (
+          receipt?.status !== 'complete' ||
+          receipt.fingerprint !== work.fingerprint ||
+          current?.worksheetPdfUrl !== committedReference
+        )
+          throw new Error('Worksheet publication cannot be verified');
+        return;
+      }
+      const current = await readWork(database, job);
+      if (current.complete || !isDeepStrictEqual(current.cls, admission.snapshot))
+        throw new Error('Worksheet changed during publication');
+    },
+    previousReference: (snapshot) => snapshot.worksheetPdfUrl,
+    commit: async (database, reference) => {
+      if (!(await sottoJobOutbox(database).complete(work.operationId, work.fingerprint)))
+        throw new Error('Worksheet work was already completed');
+      await database.courseClass.update({
+        where: { id: classId },
+        data: { worksheetPdfUrl: reference },
+      });
+    },
   });
 
   await job.updateProgress(100);

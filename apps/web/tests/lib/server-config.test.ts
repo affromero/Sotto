@@ -1,10 +1,5 @@
-/**
- * server-config: owner-set infra read DB-first then env, threaded into the
- * provider resolvers. The DB value is an EXPLICIT selection (config ?? env) —
- * never an availability-based fallback. When neither is set, `infra()` returns
- * undefined and the caller throws exactly as before.
- */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+/** Shared server configuration is the only runtime source after migration. */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SiteConfigData } from '@/lib/site-config';
 
 const mockGetSiteConfig = vi.fn();
@@ -18,57 +13,48 @@ const EMPTY: SiteConfigData = {
   aiProvider: null,
   aiModel: null,
   aiBaseUrl: null,
+  liveModel: null,
   sttProvider: null,
   sttBaseUrl: null,
   sttModel: null,
   ttsProvider: null,
   ttsBaseUrl: null,
+  ttsVoices: null,
   storageProvider: null,
-  s3Bucket: null,
-  s3Region: null,
+  localStorageRoot: null,
+  objectStorageEndpoint: null,
+  objectStorageBucket: null,
+  objectStorageRegion: null,
+  objectStoragePublicUrl: null,
 };
 
 function config(over: Partial<SiteConfigData>): SiteConfigData {
   return { ...EMPTY, ...over };
 }
 
-const ENV_KEYS = ['AI_PROVIDER', 'AI_MODEL', 'STT_PROVIDER', 'TTS_PROVIDER', 'TTS_BASE_URL'];
-const savedEnv: Record<string, string | undefined> = {};
-
 describe('server-config infra accessor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    for (const k of ENV_KEYS) {
-      savedEnv[k] = process.env[k];
-      delete process.env[k];
-    }
     mockGetSiteConfig.mockResolvedValue(EMPTY);
     invalidateServerInfra();
   });
 
-  afterEach(() => {
-    for (const k of ENV_KEYS) {
-      if (savedEnv[k] === undefined) delete process.env[k];
-      else process.env[k] = savedEnv[k];
-    }
-  });
-
-  it('returns the DB config value over the env var (config wins)', async () => {
+  it('returns the shared configuration value', async () => {
     process.env.STT_PROVIDER = 'openai';
     mockGetSiteConfig.mockResolvedValue(config({ sttProvider: 'local' }));
 
-    await getServerInfra(); // warm the snapshot
+    await getServerInfra();
 
-    expect(infra('sttProvider', 'STT_PROVIDER')).toBe('local');
+    expect(infra('sttProvider')).toBe('local');
   });
 
-  it('falls back to the env var when the DB config field is null', async () => {
+  it('does not read environment configuration after migration', async () => {
     process.env.STT_PROVIDER = 'deepgram';
     mockGetSiteConfig.mockResolvedValue(config({ sttProvider: null }));
 
     await getServerInfra();
 
-    expect(infra('sttProvider', 'STT_PROVIDER')).toBe('deepgram');
+    expect(infra('sttProvider')).toBeUndefined();
   });
 
   it('returns undefined when neither DB config nor env is set (no fallback)', async () => {
@@ -76,16 +62,16 @@ describe('server-config infra accessor', () => {
 
     await getServerInfra();
 
-    expect(infra('aiProvider', 'AI_PROVIDER')).toBeUndefined();
+    expect(infra('aiProvider')).toBeUndefined();
   });
 
-  it('treats a blank DB value as unset and falls back to env', async () => {
+  it('treats a blank shared value as unset', async () => {
     process.env.AI_MODEL = 'qwen3';
     mockGetSiteConfig.mockResolvedValue(config({ aiModel: '   ' }));
 
     await getServerInfra();
 
-    expect(infra('aiModel', 'AI_MODEL')).toBe('qwen3');
+    expect(infra('aiModel')).toBeUndefined();
   });
 
   it('getServerInfra returns the full DB snapshot', async () => {
@@ -103,13 +89,19 @@ describe('server-config infra accessor', () => {
   it('invalidate forces a re-read of changed DB config', async () => {
     mockGetSiteConfig.mockResolvedValue(config({ ttsProvider: 'kokoro' }));
     await getServerInfra();
-    expect(infra('ttsProvider', 'TTS_PROVIDER')).toBe('kokoro');
+    expect(infra('ttsProvider')).toBe('kokoro');
 
     // Owner clears the DB value; without invalidation the snapshot is still warm.
     mockGetSiteConfig.mockResolvedValue(EMPTY);
     invalidateServerInfra();
     await getServerInfra();
 
-    expect(infra('ttsProvider', 'TTS_PROVIDER')).toBeUndefined();
+    expect(infra('ttsProvider')).toBeUndefined();
+  });
+
+  it('requires the async boundary to load configuration', () => {
+    expect(() => infra('aiProvider')).toThrow(
+      'Shared server configuration was not loaded before provider construction'
+    );
   });
 });

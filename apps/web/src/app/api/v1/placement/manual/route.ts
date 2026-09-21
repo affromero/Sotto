@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { createOrRaiseCourse } from '@/lib/placement-course';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,14 @@ export async function POST(request: NextRequest) {
       return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rate.resetAt });
     }
 
-    const course = await createOrRaiseCourse(userId, native, target, level, 'MANUAL');
+    const course = await createOrRaiseCourse(
+      userId,
+      sottoRequestExecution(request, authed),
+      native,
+      target,
+      level,
+      'MANUAL'
+    );
     return NextResponse.json({ courseId: course.id, level: course.currentLevel }, { status: 201 });
   } catch (error: unknown) {
     logger.error('Manual placement failed', {

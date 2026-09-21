@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useCredentialEditor } from './useCredentialEditor';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { normalizeSottoLanguageCode, SOTTO_LANGUAGE_CODES } from '@/lib/speech-language-support';
@@ -94,16 +95,19 @@ export function TtsProviderCards({
   preferredLanguage,
   onReadyChange,
 }: TtsProviderCardsProps) {
-  const [configured, setConfigured] = useState<Map<string, boolean>>(
-    new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
+  const credentials = useCredentialEditor('byok');
+  const configured = useMemo(
+    () =>
+      new Map(
+        (credentials.snapshot?.keys ?? initialConfigured).map((key) => [key.provider, key.isValid])
+      ),
+    [credentials.snapshot, initialConfigured]
   );
+  useEffect(() => {
+    if (credentials.snapshot) onReadyChange?.(credentials.snapshot.keys.some((key) => key.isValid));
+  }, [credentials.snapshot, onReadyChange]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<
-    Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>
-  >({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const sortedProviderMeta = useMemo(() => {
     return [...providerMeta].sort((a, b) => {
       const aRank = configured.get(a.id) ? 0 : configured.has(a.id) ? 1 : 2;
@@ -113,6 +117,7 @@ export function TtsProviderCards({
   }, [configured, providerMeta]);
 
   const updateFieldValue = (providerId: string, key: string, value: string) => {
+    credentials.edited();
     setFieldValues((prev) => ({
       ...prev,
       [fieldKey(providerId, key)]: value,
@@ -122,6 +127,7 @@ export function TtsProviderCards({
   const handleAllowancePresetChange = (provider: TtsProviderClientMeta, presetId: string): void => {
     const allowance = provider.usageAllowance;
     if (!allowance) return;
+    credentials.edited();
     const preset = allowance.presets.find((item) => item.id === presetId);
 
     setFieldValues((prev) => {
@@ -152,124 +158,73 @@ export function TtsProviderCards({
     );
   };
 
-  const handleSaveKey = async (provider: TtsProviderClientMeta) => {
-    const providerId = provider.id;
-    const authFields = provider.authFields;
-    const apiKey = fieldValues[fieldKey(providerId, 'apiKey')]?.trim();
-    const isConfigured = configured.has(providerId);
-    const hasExtraField =
-      authFields.some(
-        (field) =>
-          field.key !== 'apiKey' &&
-          !isAllowanceField(provider, field.key) &&
-          fieldValues[fieldKey(providerId, field.key)]?.trim()
-      ) ||
-      Boolean(
-        provider.usageAllowance &&
-        [
-          provider.usageAllowance.planField,
-          provider.usageAllowance.allowanceField,
-          provider.usageAllowance.resetDayField,
-        ].some((key) => fieldValues[fieldKey(providerId, key)]?.trim())
-      );
-    if (!apiKey && (!isConfigured || !hasExtraField)) return;
-
-    setSavingId(providerId);
-    setStatus((prev) => ({ ...prev, [providerId]: 'validating' }));
-    setErrors((prev) => ({ ...prev, [providerId]: '' }));
-
-    try {
-      const body: Record<string, string> = { provider: providerId };
-      if (apiKey) body.apiKey = apiKey;
-      for (const field of authFields) {
-        if (field.key !== 'apiKey' && !isAllowanceField(provider, field.key)) {
-          const val = fieldValues[fieldKey(providerId, field.key)]?.trim();
-          if (val) body[field.key] = val;
-        }
-      }
-      if (provider.usageAllowance) {
-        for (const key of [
-          provider.usageAllowance.planField,
-          provider.usageAllowance.allowanceField,
-          provider.usageAllowance.resetDayField,
-        ]) {
-          const val = fieldValues[fieldKey(providerId, key)]?.trim();
-          if (val) body[key] = val;
-        }
-      }
-
-      const res = await fetch('/api/v1/settings/byok', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setErrors((prev) => ({ ...prev, [providerId]: data.error || 'Failed to save key' }));
-        setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
-        return;
-      }
-
-      setConfigured((prev) => {
-        const next = new Map(prev).set(providerId, true);
-        onReadyChange?.(Array.from(next.values()).some(Boolean));
-        return next;
-      });
-      setFieldValues((prev) => {
-        const next = { ...prev };
-        for (const field of authFields) {
-          delete next[fieldKey(providerId, field.key)];
-        }
-        if (provider.usageAllowance) {
-          delete next[fieldKey(providerId, provider.usageAllowance.planField)];
-          delete next[fieldKey(providerId, provider.usageAllowance.allowanceField)];
-          delete next[fieldKey(providerId, provider.usageAllowance.resetDayField)];
-        }
-        return next;
-      });
-      setExpandedId(null);
-      setStatus((prev) => ({ ...prev, [providerId]: 'saved' }));
-      setTimeout(() => setStatus((prev) => ({ ...prev, [providerId]: 'idle' })), 3000);
-    } catch {
-      setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
-      setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
-    } finally {
-      setSavingId(null);
-    }
+  const finishCredentialEdit = (providerId: string) => {
+    setFieldValues((previous) =>
+      Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !key.startsWith(`${providerId}-`))
+      )
+    );
+    setExpandedId(null);
   };
-
-  const handleRemoveKey = async (providerId: string) => {
-    setSavingId(providerId);
-    try {
-      await fetch('/api/v1/settings/byok', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: providerId }),
-      });
-      setConfigured((prev) => {
-        const next = new Map(prev);
-        next.delete(providerId);
-        onReadyChange?.(Array.from(next.values()).some(Boolean));
-        return next;
-      });
-      setStatus((prev) => ({ ...prev, [providerId]: 'removed' }));
-      setTimeout(() => setStatus((prev) => ({ ...prev, [providerId]: 'idle' })), 3000);
-    } catch {
-      setErrors((prev) => ({ ...prev, [providerId]: 'Failed to remove key.' }));
-      setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
-    } finally {
-      setSavingId(null);
+  const handleSaveKey = async (provider: TtsProviderClientMeta) => {
+    const values: Record<string, string | number> = {};
+    for (const field of provider.authFields) {
+      const value = fieldValues[fieldKey(provider.id, field.key)]?.trim();
+      if (value) values[field.key] = field.type === 'number' ? Number(value) : value;
     }
+    const allowance = provider.usageAllowance;
+    if (allowance) {
+      for (const key of [allowance.planField, allowance.allowanceField, allowance.resetDayField]) {
+        const value = fieldValues[fieldKey(provider.id, key)]?.trim();
+        if (value) values[key] = key === allowance.planField ? value : Number(value);
+      }
+    }
+    const patch: Record<string, string | number | null> = { ...values };
+    if (
+      allowance &&
+      values[allowance.planField] &&
+      values[allowance.planField] !== CUSTOM_ALLOWANCE_PRESET
+    )
+      patch[allowance.allowanceField] = null;
+    const result = await credentials.save(
+      provider.id,
+      configured.has(provider.id) ? { patch } : { values }
+    );
+    if (result?.status === 'confirmed') finishCredentialEdit(provider.id);
+  };
+  const handleRemoveKey = async (providerId: string) => {
+    await credentials.remove(providerId);
+  };
+  const handleCredentialAction = async () => {
+    const provider = credentials.feedback?.provider;
+    const result = await credentials.act();
+    if (provider && result?.status === 'confirmed') finishCredentialEdit(provider);
   };
 
   return (
     <div className={styles.grid}>
+      {credentials.feedback && (
+        <div role="status" className={styles.card}>
+          <p>{credentials.feedback.message}</p>
+          {credentials.feedback.action && (
+            <Button onClick={handleCredentialAction} disabled={credentials.busy}>
+              {credentials.feedback.action === 'confirm'
+                ? 'Save without verification'
+                : credentials.feedback.action === 'reconcile'
+                  ? 'Check status'
+                  : 'Reload settings'}
+            </Button>
+          )}
+        </div>
+      )}
       {sortedProviderMeta.map((provider) => {
         const isConfigured = configured.has(provider.id);
         const isValid = configured.get(provider.id) ?? true;
+        const verified =
+          credentials.snapshot?.keys.find((key) => key.provider === provider.id)?.verification
+            .lastConfirmed?.status === 'verified';
         const isExpanded = expandedId === provider.id;
-        const isSaving = savingId === provider.id;
+        const isSaving = credentials.busy;
         const qualityLabel = QUALITY_LABELS[provider.qualityTier] ?? provider.qualityTier;
         const modelCount = provider.models.length;
         const languageSummary = summarizeLanguageSupport(provider, preferredLanguage);
@@ -323,13 +278,15 @@ export function TtsProviderCards({
                   </div>
                 </div>
               </div>
-              {status[provider.id] === 'validating' ? (
+              {credentials.busy ? (
                 <span className={styles.statusValidating}>Saving...</span>
               ) : isConfigured ? (
                 isValid ? (
-                  <span className={styles.statusConnected}>Connected</span>
+                  <span className={styles.statusConnected}>
+                    {verified ? 'Verified' : 'Saved, unverified'}
+                  </span>
                 ) : (
-                  <span className={styles.statusInvalid}>Key Invalid</span>
+                  <span className={styles.statusInvalid}>Key disabled</span>
                 )
               ) : (
                 <span className={styles.statusNone}>Not configured</span>
@@ -341,7 +298,10 @@ export function TtsProviderCards({
                 <button
                   type="button"
                   className={styles.addKeyBtn}
-                  onClick={() => setExpandedId(provider.id)}
+                  onClick={() => {
+                    if (credentials.begin(provider.id)) setExpandedId(provider.id);
+                  }}
+                  disabled={credentials.editingBlocked}
                 >
                   {provider.authFields.length > 1 ? 'Manage credentials' : 'Replace Key'}
                 </button>
@@ -349,13 +309,12 @@ export function TtsProviderCards({
                   variant="ghost"
                   onClick={() => handleRemoveKey(provider.id)}
                   loading={isSaving}
-                  disabled={savingId !== null}
+                  disabled={
+                    credentials.editingBlocked || credentials.feedback?.action === 'confirm'
+                  }
                 >
                   Remove Key
                 </Button>
-                {status[provider.id] === 'removed' && (
-                  <span className={styles.feedbackSuccess}>Removed</span>
-                )}
               </div>
             )}
 
@@ -364,7 +323,10 @@ export function TtsProviderCards({
                 <button
                   type="button"
                   className={styles.addKeyBtn}
-                  onClick={() => setExpandedId(provider.id)}
+                  onClick={() => {
+                    if (credentials.begin(provider.id)) setExpandedId(provider.id);
+                  }}
+                  disabled={credentials.editingBlocked}
                 >
                   Add Key
                 </button>
@@ -385,6 +347,7 @@ export function TtsProviderCards({
               <div className={styles.keyForm}>
                 {visibleAuthFields.map((field) => (
                   <Input
+                    disabled={credentials.editingBlocked}
                     key={field.key}
                     label={field.label}
                     type={field.type ?? 'password'}
@@ -409,6 +372,7 @@ export function TtsProviderCards({
                     <label className={styles.selectField}>
                       <span className={styles.fieldLabel}>Usage plan</span>
                       <select
+                        disabled={credentials.editingBlocked}
                         className={styles.selectInput}
                         value={selectedUsagePlan}
                         onChange={(event) =>
@@ -427,6 +391,7 @@ export function TtsProviderCards({
                     </label>
                     {showCustomAllowance ? (
                       <Input
+                        disabled={credentials.editingBlocked}
                         label={allowanceField?.label ?? 'Monthly limit'}
                         type="number"
                         value={fieldValues[fieldKey(provider.id, allowance.allowanceField)] || ''}
@@ -437,6 +402,7 @@ export function TtsProviderCards({
                       />
                     ) : null}
                     <Input
+                      disabled={credentials.editingBlocked}
                       label={resetDayField?.label ?? 'Billing reset day'}
                       type="number"
                       value={fieldValues[fieldKey(provider.id, allowance.resetDayField)] || ''}
@@ -452,23 +418,25 @@ export function TtsProviderCards({
                     onClick={() => handleSaveKey(provider)}
                     loading={isSaving}
                     disabled={
-                      savingId !== null ||
+                      credentials.editingBlocked ||
+                      credentials.feedback?.action === 'confirm' ||
                       (!isConfigured && !fieldValues[fieldKey(provider.id, 'apiKey')]?.trim()) ||
                       (isConfigured && !hasPendingChanges(provider))
                     }
                   >
                     {isConfigured ? 'Save changes' : 'Save key'}
                   </Button>
-                  <Button variant="ghost" onClick={() => setExpandedId(null)}>
+                  <Button
+                    variant="ghost"
+                    disabled={credentials.editingBlocked}
+                    onClick={() => {
+                      credentials.edited();
+                      setExpandedId(null);
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>
-                {status[provider.id] === 'saved' && (
-                  <span className={styles.feedbackSuccess}>Credentials saved.</span>
-                )}
-                {status[provider.id] === 'error' && (
-                  <span className={styles.feedbackError}>{errors[provider.id]}</span>
-                )}
               </div>
             )}
           </div>

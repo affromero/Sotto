@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
-import { addJob, JobType, scriptWritingQueue } from '@/lib/queue';
+import { admitDurableJob, deepResearchQueue, JobType, scriptWritingQueue } from '@/lib/queue';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { regenerateWithFeedbackSchema } from '@/lib/validations';
 
 import { errorResponse } from '@/lib/api-response';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { randomUUID } from 'node:crypto';
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -18,7 +20,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const userId = authResult.userId;
 
   // Parse optional feedback body
-  let feedbackBody: { feedback?: string; turnComments?: Record<number, string>; highlights?: Array<{ turnIndex: number; text: string; note: string }>; sourceUrls?: string[] } | undefined;
+  let feedbackBody:
+    | {
+        feedback?: string;
+        turnComments?: Record<number, string>;
+        highlights?: Array<{ turnIndex: number; text: string; note: string }>;
+        sourceUrls?: string[];
+      }
+    | undefined;
   try {
     const text = await request.text();
     if (text.trim()) {
@@ -51,48 +60,71 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Discovery not found', 404);
   }
 
-  // Delete existing script, segments, and references
-  await prisma.$transaction([
-    prisma.segment.deleteMany({ where: { episodeId } }),
-    prisma.reference.deleteMany({ where: { episodeId } }),
-    prisma.script.deleteMany({ where: { episodeId } }),
-  ]);
-
   // Re-enter pipeline at script-writing (dossier + outline already exist)
   const dossier = await prisma.researchDossier.findUnique({ where: { episodeId } });
   const outline = await prisma.creativeOutline.findUnique({ where: { episodeId } });
 
   if (!dossier || !outline) {
-    // If no dossier/outline (legacy episode or data loss), restart from research
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'RESEARCHING', lowReferences: false },
-    });
-    await invalidateEpisodeCache(episodeId);
-    await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
-
-    const { deepResearchQueue: researchQueue } = await import('@/lib/queue');
-    await addJob(researchQueue, JobType.DEEP_RESEARCH, {
+    const payload = {
       episodeId,
       userId,
       discoveryId: discovery.id,
-    });
-  } else {
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'SCRIPTING', lowReferences: false },
+    };
+    await admitDurableJob(deepResearchQueue, JobType.DEEP_RESEARCH, payload, {
+      jobId: `research-${episodeId}-${randomUUID()}`,
+      authorize: async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        return { userId };
+      },
+      mutate: async (database, operationId) => {
+        const claimed = await database.episode.updateMany({
+          where: { id: episodeId, userId, status: 'SCRIPT_READY' },
+          data: {
+            status: 'RESEARCHING',
+            lowReferences: false,
+            pipelineGeneration: operationId,
+          },
+        });
+        if (claimed.count !== 1) throw new Error('Episode is no longer ready to regenerate');
+        await database.segment.deleteMany({ where: { episodeId } });
+        await database.reference.deleteMany({ where: { episodeId } });
+        await database.script.deleteMany({ where: { episodeId } });
+      },
     });
     await invalidateEpisodeCache(episodeId);
-    await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
-
-    await addJob(scriptWritingQueue, JobType.WRITE_SCRIPT, {
+    await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
+  } else {
+    const payload = {
       episodeId,
       userId,
       discoveryId: discovery.id,
       dossierId: dossier.id,
       outlineId: outline.id,
       ...(feedbackBody?.sourceUrls?.length ? { sourceUrls: feedbackBody.sourceUrls } : {}),
+    };
+    await admitDurableJob(scriptWritingQueue, JobType.WRITE_SCRIPT, payload, {
+      jobId: `write-${episodeId}-${randomUUID()}`,
+      authorize: async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        return { userId };
+      },
+      mutate: async (database, operationId) => {
+        const claimed = await database.episode.updateMany({
+          where: { id: episodeId, userId, status: 'SCRIPT_READY' },
+          data: {
+            status: 'SCRIPTING',
+            lowReferences: false,
+            pipelineGeneration: operationId,
+          },
+        });
+        if (claimed.count !== 1) throw new Error('Episode is no longer ready to regenerate');
+        await database.segment.deleteMany({ where: { episodeId } });
+        await database.reference.deleteMany({ where: { episodeId } });
+        await database.script.deleteMany({ where: { episodeId } });
+      },
     });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'SCRIPTING' });
   }
 
   return NextResponse.json({ success: true });

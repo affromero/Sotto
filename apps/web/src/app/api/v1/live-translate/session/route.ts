@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { liveTranslateSessionSchema } from '@/lib/validations';
 import { extractAndStoreLiveVocab } from '@/lib/live-vocab';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
 
   const added = await extractAndStoreLiveVocab({
     userId: authed.userId,
+    execution: sottoRequestExecution(request, authed),
     courseId,
     targetLang: course.targetLang,
     nativeLang: course.nativeLang,

@@ -46,14 +46,24 @@ vi.mock('@/lib/extractors', () => ({
   extractContent: (...args: unknown[]) => mockExtractContent(...args),
 }));
 
-const mockAddJob = vi.fn().mockResolvedValue({ id: 'script-job-1' });
+const mockEnqueueDurableJob = vi.fn().mockResolvedValue({ id: 'script-job-1' });
+const mockTransitionDurableQueueJob = vi.fn();
 
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
     DEEP_RESEARCH: 'deep_research',
   },
   deepResearchQueue: { name: 'deep-research' },
+}));
+
+vi.mock('@/lib/sidedoor/jobs/core/durable-queue', () => ({
+  durableJobProviderExecution: (_job: unknown, userId: string, signal?: AbortSignal) => ({
+    userId,
+    signal,
+    authorize: vi.fn(),
+    onCleanupError: vi.fn(),
+  }),
+  transitionDurableQueueJob: (options: unknown) => mockTransitionDurableQueueJob(options),
 }));
 
 vi.mock('@/lib/pipeline-events', () => ({
@@ -100,21 +110,12 @@ vi.mock('@/lib/usage-logger', () => ({
   logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
 
-const mockGetAiKey = vi.fn().mockResolvedValue({ apiKey: 'provider-key', provider: 'openai' });
+const mockResolveCapturedEpisodeAi = vi.fn();
+const mockCapturedLearningAiOptions = vi.fn();
 
-vi.mock('@/lib/byok', () => ({
-  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
-}));
-
-const mockResolveAiModelAndProvider = vi.fn().mockResolvedValue({
-  model: 'gpt-5-mini',
-  provider: 'openai',
-});
-
-vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
-  providerRequiresAiKey: (provider: string) =>
-    provider !== 'claude-code' && provider !== 'codex' && provider !== 'local',
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedEpisodeAi: (...args: unknown[]) => mockResolveCapturedEpisodeAi(...args),
+  capturedLearningAiOptions: (...args: unknown[]) => mockCapturedLearningAiOptions(...args),
 }));
 
 vi.mock('@/lib/media-bias', () => ({
@@ -159,7 +160,23 @@ describe('processContentExtraction', () => {
       aiModel: 'gpt-5-mini',
       user: {},
     });
-    mockAddJob.mockResolvedValue({ id: 'script-job-1' });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'script-job-1' });
+    mockTransitionDurableQueueJob.mockImplementation(
+      async (options: {
+        queue: unknown;
+        type: string;
+        payload: unknown;
+        jobId: string;
+        mutate(database: unknown): Promise<void>;
+      }) => {
+        await options.mutate({
+          episode: { update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args) },
+        });
+        await mockEnqueueDurableJob(options.queue, options.type, options.payload, {
+          jobId: options.jobId,
+        });
+      }
+    );
     mockAssessTopicFeasibility.mockResolvedValue({
       verdict: 'proceed',
       reason: 'Topic is feasible',
@@ -169,8 +186,16 @@ describe('processContentExtraction', () => {
       model: 'test',
     });
     mockLogUsage.mockResolvedValue(undefined);
-    mockGetAiKey.mockResolvedValue({ apiKey: 'provider-key', provider: 'openai' });
-    mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
+    mockResolveCapturedEpisodeAi.mockResolvedValue({
+      provider: 'openai',
+      model: 'gpt-5-mini',
+    });
+    mockCapturedLearningAiOptions.mockResolvedValue({
+      model: 'gpt-5-mini',
+      apiKeyOverride: 'provider-key',
+      fetch: undefined,
+      signal: undefined,
+    });
     mockExtractContent.mockResolvedValue({
       text: 'Extracted content from URL',
       markdown: '# Extracted\n\nContent from URL',
@@ -503,12 +528,13 @@ describe('processContentExtraction', () => {
       });
       await processContentExtraction(job);
 
-      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        episodeAiModel: 'gpt-5-mini',
-        aiKey: null,
-      });
-      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
-      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockResolveCapturedEpisodeAi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-001',
+          aiModel: 'gpt-5-mini',
+          allowSharing: false,
+        })
+      );
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
           topic: 'Private episode infrastructure',
@@ -528,7 +554,9 @@ describe('processContentExtraction', () => {
     });
 
     it('rejects explicit non-local models without a matching provider key', async () => {
-      mockGetAiKey.mockResolvedValue(null);
+      mockResolveCapturedEpisodeAi.mockRejectedValue(
+        new Error('AI key for provider "openai" is required for topic feasibility assessment.')
+      );
 
       await expect(
         processContentExtraction(
@@ -541,24 +569,27 @@ describe('processContentExtraction', () => {
         'AI key for provider "openai" is required for topic feasibility assessment.'
       );
 
-      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
       expect(mockAssessTopicFeasibility).not.toHaveBeenCalled();
     });
 
     it('uses platform credentials only for explicit admin-credit routes', async () => {
+      mockCapturedLearningAiOptions.mockResolvedValueOnce({
+        model: 'gpt-5-mini',
+        apiKeyOverride: undefined,
+        fetch: undefined,
+        signal: undefined,
+      });
       await processContentExtraction(
         createMockJob({
           ...defaultPayload,
           sourceText: 'Source material',
-          useAdminCredits: true,
+          allowSharedCredential: true,
         })
       );
 
-      expect(mockGetAiKey).not.toHaveBeenCalled();
-      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        episodeAiModel: 'gpt-5-mini',
-        aiKey: null,
-      });
+      expect(mockResolveCapturedEpisodeAi).toHaveBeenCalledWith(
+        expect.objectContaining({ allowSharing: true })
+      );
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
           apiKeyOverride: undefined,
@@ -569,16 +600,21 @@ describe('processContentExtraction', () => {
     });
 
     it('uses the configured BYOK provider when the episode has no model', async () => {
-      const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
       mockPrismaEpisodeFindUniqueOrThrow.mockResolvedValue({
         source: 'WEB',
         aiModel: null,
+        aiProvider: null,
         user: {},
       });
-      mockGetAiKey.mockResolvedValue(aiKey);
-      mockResolveAiModelAndProvider.mockResolvedValue({
-        model: 'claude-haiku-4-5-20251001',
+      mockResolveCapturedEpisodeAi.mockResolvedValue({
         provider: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+      });
+      mockCapturedLearningAiOptions.mockResolvedValue({
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+        fetch: undefined,
+        signal: undefined,
       });
 
       await processContentExtraction(
@@ -588,12 +624,9 @@ describe('processContentExtraction', () => {
         })
       );
 
-      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
-      expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
-      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
-        episodeAiModel: null,
-        aiKey,
-      });
+      expect(mockResolveCapturedEpisodeAi).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-001', aiModel: null })
+      );
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
           apiKeyOverride: 'anthropic-key',
@@ -609,7 +642,11 @@ describe('processContentExtraction', () => {
         aiModel: null,
         user: {},
       });
-      mockGetAiKey.mockResolvedValue(null);
+      mockResolveCapturedEpisodeAi.mockRejectedValue(
+        new Error(
+          'AI model is required for topic feasibility assessment when no AI key is configured.'
+        )
+      );
 
       await expect(
         processContentExtraction(
@@ -622,7 +659,6 @@ describe('processContentExtraction', () => {
         'AI model is required for topic feasibility assessment when no AI key is configured.'
       );
 
-      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
       expect(mockAssessTopicFeasibility).not.toHaveBeenCalled();
     });
 
@@ -632,9 +668,15 @@ describe('processContentExtraction', () => {
         aiModel: 'claude-code:opus',
         user: {},
       });
-      mockResolveAiModelAndProvider.mockResolvedValue({
-        model: 'claude-code:opus',
+      mockResolveCapturedEpisodeAi.mockResolvedValue({
         provider: 'claude-code',
+        model: 'claude-code:opus',
+      });
+      mockCapturedLearningAiOptions.mockResolvedValue({
+        model: 'claude-code:opus',
+        apiKeyOverride: undefined,
+        fetch: undefined,
+        signal: undefined,
       });
 
       await processContentExtraction(
@@ -644,7 +686,9 @@ describe('processContentExtraction', () => {
         })
       );
 
-      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveCapturedEpisodeAi).toHaveBeenCalledWith(
+        expect.objectContaining({ aiModel: 'claude-code:opus' })
+      );
       expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
         expect.objectContaining({
           apiKeyOverride: undefined,
@@ -697,14 +741,14 @@ describe('processContentExtraction', () => {
       });
       await processContentExtraction(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith(
+      expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
         { name: 'deep-research' },
         'deep_research',
         {
           episodeId: 'episode-001',
           userId: 'user-001',
           discoveryId: 'discovery-abc',
-          useAdminCredits: undefined,
+          allowSharedCredential: undefined,
         },
         { jobId: expect.any(String) }
       );
@@ -770,7 +814,7 @@ describe('processContentExtraction', () => {
         where: { id: 'episode-001' },
         data: { status: 'RESEARCHING' },
       });
-      expect(mockAddJob).toHaveBeenCalledWith(
+      expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
         { name: 'deep-research' },
         'deep_research',
         expect.objectContaining({
@@ -863,7 +907,7 @@ describe('processContentExtraction', () => {
         publishedDate: null,
         wordCount: 0,
         sourceType: 'youtube',
-        extractionMethod: 'summarize-core',
+        extractionMethod: 'youtube-transcript',
       });
 
       const job = createMockJob({
@@ -899,7 +943,7 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockPrismaDiscoveryUpdate).toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalled();
+      expect(mockEnqueueDurableJob).toHaveBeenCalled();
     });
 
     it('succeeds when sourceText-only is provided without sourceUrl', async () => {

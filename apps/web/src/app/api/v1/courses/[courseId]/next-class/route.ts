@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
@@ -50,14 +51,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
       if (!course) return errorResponse('Course not found', 404);
 
-      void createNextClass(courseId, authed.userId, parsed.data).catch((error: unknown) => {
+      void createNextClass(
+        courseId,
+        authed.userId,
+        sottoRequestExecution(request, authed),
+        parsed.data
+      ).catch((error: unknown) => {
         logBackgroundGenerationFailure(error, courseId);
       });
 
       return NextResponse.json({ started: true }, { status: 202 });
     }
 
-    const result = await createNextClass(courseId, authed.userId, parsed.data);
+    const result = await createNextClass(
+      courseId,
+      authed.userId,
+      sottoRequestExecution(request, authed),
+      parsed.data
+    );
     if (result.kind === 'gated') {
       return errorResponse('Finish the current class before starting a new one.', 409, {
         activeClassId: result.activeClassId,

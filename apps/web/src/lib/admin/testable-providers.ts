@@ -1,13 +1,12 @@
 /**
  * admin/testable-providers.ts — builds the list of provider/model rows the admin
- * Model Tester can smoke-test. Only rows with a platform key or the signed-in
- * admin's BYOK key are returned. Shared by /admin/providers and /admin/models.
+ * Model Tester can smoke-test. Only rows backed by a saved credential or an
+ * authenticated local agent session are returned.
  */
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
-import { getAllProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
-import { getPlatformTtsKey } from '@/lib/tts-generation';
 import { getAgentModelOffering } from '@/lib/agent-models';
 import { getAgentStatus, type AgentReadiness } from '@/lib/agent-availability';
 
@@ -18,7 +17,7 @@ export type TestableProvider = {
   modelId: string;
   modelName: string;
   tier: string;
-  hasPlatformKey: boolean;
+  hasLocalSession: boolean;
   hasByokKey: boolean;
   disabled?: boolean;
   disabledReason?: string;
@@ -30,42 +29,17 @@ export interface TestableProviders {
   stt: TestableProvider[];
 }
 
-function hasPlatformKey(
+function hasLocalSession(
   category: TestableProvider['category'],
   providerId: string,
   agentReadiness: Record<'claude-code' | 'codex', AgentReadiness>
 ): boolean {
   if (category === 'ai') {
     switch (providerId) {
-      case 'anthropic':
-        return !!process.env.ANTHROPIC_API_KEY;
-      case 'openai':
-        return !!process.env.OPENAI_API_KEY;
-      case 'google':
-        return !!process.env.GOOGLE_AI_API_KEY;
       case 'claude-code':
         return agentReadiness['claude-code'] === 'ready';
       case 'codex':
         return agentReadiness.codex === 'ready';
-      default:
-        return false;
-    }
-  }
-  if (category === 'tts') {
-    return !!getPlatformTtsKey(providerId as TtsProviderId);
-  }
-  if (category === 'stt') {
-    switch (providerId) {
-      case 'openai':
-        return !!process.env.OPENAI_API_KEY;
-      case 'elevenlabs':
-        return !!process.env.ELEVENLABS_API_KEY;
-      case 'together':
-        return !!process.env.TOGETHER_API_KEY;
-      case 'deepgram':
-        return !!process.env.DEEPGRAM_API_KEY;
-      case 'assemblyai':
-        return !!process.env.ASSEMBLYAI_API_KEY;
       default:
         return false;
     }
@@ -99,8 +73,8 @@ function hasByokKey(
 export async function getTestableProviders(userId: string): Promise<TestableProviders> {
   const [aiKeys, ttsKeys, claudeOffering, codexOffering, claudeStatus, codexStatus] =
     await Promise.all([
-      listAiProviders(userId),
-      listByokProviders(userId),
+      listAiProviders(userId, true),
+      listByokProviders(userId, true),
       getAgentModelOffering('claude-code'),
       getAgentModelOffering('codex'),
       getAgentStatus('claude-code'),
@@ -114,15 +88,15 @@ export async function getTestableProviders(userId: string): Promise<TestableProv
   const ttsByokSet = new Set(ttsKeys.map((k) => k.provider as string));
 
   const withKeyFlags = (
-    raw: Omit<TestableProvider, 'hasPlatformKey' | 'hasByokKey'>[]
+    raw: Omit<TestableProvider, 'hasLocalSession' | 'hasByokKey'>[]
   ): TestableProvider[] =>
     raw
       .map((p) => ({
         ...p,
-        hasPlatformKey: hasPlatformKey(p.category, p.providerId, agentReadiness),
+        hasLocalSession: hasLocalSession(p.category, p.providerId, agentReadiness),
         hasByokKey: hasByokKey(p.category, p.providerId, aiByokSet, ttsByokSet),
       }))
-      .filter((p) => p.hasPlatformKey || p.hasByokKey);
+      .filter((p) => p.hasLocalSession || p.hasByokKey);
 
   const ai = withKeyFlags(
     getAllAiProviderMeta().flatMap((p) => {

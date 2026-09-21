@@ -8,12 +8,12 @@ Date: 2026-06-13
 
 Most local models should need **zero app code**.
 
-| Capability  | Best local contract                | Sotto config                                                             | Code needed |
-| ----------- | ---------------------------------- | ------------------------------------------------------------------------ | ----------- |
-| LLM         | OpenAI-compatible chat completions | `AI_PROVIDER=local`, `AI_BASE_URL`, `AI_MODEL`                           | No          |
-| STT         | OpenAI-compatible transcriptions   | `STT_PROVIDER=local`, `STT_BASE_URL`, `STT_MODEL`                        | No          |
-| TTS         | Sotto local TTS sidecar            | `TTS_PROVIDER=local`, `TTS_BASE_URL`, optional `TTS_MODEL`, `TTS_VOICES` | No          |
-| Bundled TTS | Kokoro sidecar                     | `TTS_PROVIDER=kokoro`, `TTS_BASE_URL`                                    | No          |
+| Capability  | Best local contract                | Saved Sotto configuration                      | Code needed |
+| ----------- | ---------------------------------- | ---------------------------------------------- | ----------- |
+| LLM         | OpenAI-compatible chat completions | Local provider, base URL, and model            | No          |
+| STT         | OpenAI-compatible transcriptions   | Local provider, base URL, and model            | No          |
+| TTS         | Sotto local TTS sidecar            | Local provider, base URL, model, and voice IDs | No          |
+| Bundled TTS | Kokoro sidecar                     | Kokoro provider and base URL                   | No          |
 
 The rule is: if your local model can sit behind one of these contracts, do that instead of adding a provider.
 
@@ -21,15 +21,7 @@ The rule is: if your local model can sit behind one of these contracts, do that 
 
 Run any OpenAI-compatible local inference server such as Ollama, vLLM, LM Studio, or llama.cpp server.
 
-```env
-AI_PROVIDER=local
-AI_BASE_URL=http://localhost:11434/v1
-AI_MODEL=qwen3
-# Optional if your server requires auth:
-# AI_API_KEY=...
-```
-
-Sotto sends chat-completion requests to `AI_BASE_URL` and passes `AI_MODEL` as the model name. The model ID does not need to exist in Sotto's registry.
+In the welcome flow or Admin settings, choose **Local**, save the server base URL such as `http://localhost:11434/v1`, and enter the served model such as `qwen3`. Save a credential there as well if the server requires one. The model ID does not need to exist in Sotto's registry.
 
 ## Local STT Recipe
 
@@ -39,43 +31,13 @@ Run any OpenAI-compatible Whisper/transcription server that serves:
 POST /v1/audio/transcriptions
 ```
 
-Then configure:
-
-```env
-STT_PROVIDER=local
-STT_BASE_URL=http://localhost:8001/v1
-STT_MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
-# Optional if your server requires auth:
-# STT_API_KEY=...
-```
+Choose **Local** for speech recognition, save a base URL such as `http://localhost:8001/v1`, and enter the served model such as `deepdml/faster-whisper-large-v3-turbo-ct2`. Save a credential if the server requires one.
 
 Sotto sends audio files through the OpenAI SDK with `response_format=verbose_json` and requests word and segment timestamps where the server supports them. If the server only returns text, pronunciation scoring still works with a simpler fallback path.
 
 ## Local TTS Recipe
 
-Run a tiny HTTP sidecar around any TTS model and set:
-
-```env
-TTS_PROVIDER=local
-TTS_BASE_URL=http://localhost:8000
-# Optional model hint sent in POST /tts:
-# TTS_MODEL=my-local-model
-# Optional voice IDs. These must be accepted by your sidecar:
-# TTS_VOICES=voice_a,voice_b,voice_c
-# TTS_HOST_VOICE=voice_a
-# TTS_EXPERT_VOICE=voice_b
-# Optional if your sidecar requires auth:
-# TTS_API_KEY=...
-```
-
-If you are using the bundled Kokoro service, use:
-
-```env
-TTS_PROVIDER=kokoro
-TTS_BASE_URL=http://localhost:8000
-```
-
-Use `TTS_PROVIDER=local` for your own model so the config does not pretend every local TTS engine is Kokoro.
+Run a small HTTP sidecar around any TTS model. Choose **Local** for your own model or **Kokoro** for the bundled service, then save the base URL, optional model, accepted voice IDs, and optional credential in Sotto. The usual local base URL is `http://localhost:8000`.
 
 ## Local TTS Sidecar Contract
 
@@ -123,7 +85,7 @@ Optional fields: `language`, `model`. Sidecars may ignore optional fields.
 
 Response: raw audio bytes. Prefer `audio/wav`, `audio/mpeg`, `audio/ogg`, or `audio/flac` as the `Content-Type`.
 
-Authentication: none by default. If `TTS_API_KEY` is set, Sotto sends `Authorization: Bearer <TTS_API_KEY>`.
+Authentication is optional. When you save a credential for the local TTS provider, Sotto sends `Authorization: Bearer <credential>`.
 
 ## Minimal TTS Sidecar Skeleton
 
@@ -167,7 +129,7 @@ Add a native provider only when the model or vendor cannot reasonably fit the lo
 1. Add the provider ID and metadata to `apps/web/src/lib/providers/tts-registry.ts`.
 2. Add `apps/web/src/lib/providers/tts/<provider>.provider.ts` implementing `TtsProvider`.
 3. Add the lazy import and `createTtsProviderAsync` case in `apps/web/src/lib/providers/tts.ts`.
-4. Add platform key handling in `apps/web/src/lib/tts-generation.ts` if it can be platform-configured.
+4. Add credential capture and request policy handling in `apps/web/src/lib/tts-generation.ts`.
 5. Add voice pool support in `apps/web/src/lib/providers/tts-voices.ts`, `voice-catalog.ts`, and `voice-assigner.ts` if it has preset voices.
 6. Add validation/display support in `apps/web/src/lib/validations.ts` and `packages/shared/src/provider-display.ts`.
 7. Add or update tests for registry DTOs, provider construction, voice catalog, voice assignment, admin test-model, and connectivity smoke tests.
@@ -177,8 +139,8 @@ Add a native provider only when the model or vendor cannot reasonably fit the lo
 1. Add the provider ID and metadata to `apps/web/src/lib/providers/stt-registry.ts`.
 2. Add a provider class in `apps/web/src/lib/providers/stt.ts` implementing `SttProvider`.
 3. Add a `createSttProvider` switch case.
-4. Add platform key handling in `getSttPlatformKey`.
-5. If users can store a BYOK key, add the provider to `apps/web/src/lib/providers/ai-registry.ts` as an STT-only provider with an empty model list, or document why the key is platform-only.
+4. Add credential capture and request policy handling for the provider.
+5. Add the provider to `apps/web/src/lib/providers/ai-registry.ts` as an STT-only provider with an empty model list when it needs a saved credential.
 6. Add validation/display support in `apps/web/src/lib/validations.ts`, `packages/shared/src/provider-display.ts`, `/api/v1/stt-providers`, and admin test-model routes.
 7. Add tests in `apps/web/tests/lib/stt-providers.test.ts`, admin model tests, and any route tests that validate provider enums.
 

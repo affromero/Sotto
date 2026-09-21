@@ -1,138 +1,123 @@
-import { prisma } from './prisma';
-import { addJob, JobType, audioGenerationQueue } from './queue';
+import type { Job } from 'bullmq';
 import { Prisma } from '@/generated/prisma/client';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
+import { audioGenerationQueue, JobType } from './queue';
+import { admitDurableQueueBatch } from '@/lib/sidedoor/jobs/core/durable-queue';
 
-type AudioSegment = {
-  id: string;
-  version: number;
-  speaker: string;
-  text: string;
-};
+type AudioSegment = { id: string; version: number; speaker: string; text: string };
 
-async function queueAudioAttempt(
+export type AudioQueueAdmission =
+  | { parentJob: Job<unknown> }
+  | {
+      authorize: (database: Prisma.TransactionClient) => Promise<{ userId?: string } | void>;
+    };
+
+function children(
   episodeId: string,
   audioGenerationKey: string,
   segments: AudioSegment[],
   directions: Array<string | undefined> = []
-): Promise<void> {
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i];
-    const previousText = i > 0 ? segments[i - 1].text.slice(-500) : undefined;
-    const nextText = i < segments.length - 1 ? segments[i + 1].text.slice(0, 500) : undefined;
-
-    await addJob(
-      audioGenerationQueue,
-      JobType.GENERATE_AUDIO,
-      {
-        episodeId,
-        audioGenerationKey,
-        segmentId: segment.id,
-        segmentVersion: segment.version,
-        speaker: segment.speaker,
-        text: segment.text,
-        previousText,
-        nextText,
-        direction: directions[i],
-      },
-      { jobId: `audio-${episodeId}-${segment.id}-v${segment.version}-${audioGenerationKey}` }
-    );
-  }
+) {
+  return segments.map((segment, index) => ({
+    queue: audioGenerationQueue,
+    type: JobType.GENERATE_AUDIO,
+    payload: {
+      episodeId,
+      audioGenerationKey,
+      segmentId: segment.id,
+      segmentVersion: segment.version,
+      speaker: segment.speaker,
+      text: segment.text,
+      previousText: index > 0 ? segments[index - 1]!.text.slice(-500) : undefined,
+      nextText: index < segments.length - 1 ? segments[index + 1]!.text.slice(0, 500) : undefined,
+      direction: directions[index],
+    },
+    jobId: `audio-${episodeId}-${segment.id}-v${segment.version}-${audioGenerationKey}`,
+  }));
 }
 
-/**
- * Create Segment records from script turns and queue audio generation jobs.
- * Shared by the compile-script worker, the class listening generator, and the
- * script approve endpoint.
- */
+/** Commit segment replacement, every audio child, and parent completion together. */
 export async function createSegmentsAndQueueAudio(
   episodeId: string,
-  turns: Array<{ speaker: string; text: string; direction?: string }>
+  turns: Array<{ speaker: string; text: string; direction?: string }>,
+  admission: AudioQueueAdmission
 ): Promise<void> {
   const audioGenerationKey = randomUUID();
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: { audioGenerationKey },
-  });
-
-  const segments = await prisma.$transaction(async (tx) => {
-    const reconciled = [];
-    for (let i = 0; i < turns.length; i++) {
-      const segment = await tx.segment.upsert({
-        where: { episodeId_order: { episodeId, order: i } },
-        create: {
-          episodeId,
-          speaker: turns[i].speaker,
-          text: turns[i].text,
-          order: i,
-        },
-        update: {
-          speaker: turns[i].speaker,
-          text: turns[i].text,
-          version: { increment: 1 },
-          audioUrl: null,
-          duration: null,
-          startTime: null,
-          wordTimings: Prisma.JsonNull,
-        },
+  await admitDurableQueueBatch({
+    ...admission,
+    prepare: async (database) => {
+      await database.episode.update({
+        where: { id: episodeId },
+        data: { audioGenerationKey, status: 'GENERATING_AUDIO' },
       });
-      reconciled.push(segment);
-    }
-
-    await tx.segment.deleteMany({
-      where: { episodeId, order: { gte: turns.length } },
-    });
-
-    return reconciled;
+      const segments: AudioSegment[] = [];
+      for (let index = 0; index < turns.length; index++) {
+        const turn = turns[index]!;
+        segments.push(
+          await database.segment.upsert({
+            where: { episodeId_order: { episodeId, order: index } },
+            create: { episodeId, speaker: turn.speaker, text: turn.text, order: index },
+            update: {
+              speaker: turn.speaker,
+              text: turn.text,
+              version: { increment: 1 },
+              audioUrl: null,
+              duration: null,
+              startTime: null,
+              wordTimings: Prisma.JsonNull,
+            },
+            select: { id: true, version: true, speaker: true, text: true },
+          })
+        );
+      }
+      await database.segment.deleteMany({
+        where: { episodeId, order: { gte: turns.length } },
+      });
+      return children(
+        episodeId,
+        audioGenerationKey,
+        segments,
+        turns.map((turn) => turn.direction)
+      );
+    },
   });
-
-  await queueAudioAttempt(
-    episodeId,
-    audioGenerationKey,
-    segments,
-    turns.map((turn) => turn.direction)
-  );
 }
 
-/**
- * Start a coherent replacement attempt for an existing segment set. All
- * previous audio is invalidated so provider or voice changes cannot produce a
- * mixed episode.
- */
+/** Commit a coherent segment reset and every replacement child together. */
 export async function restartExistingSegmentAudio(
   episodeId: string,
-  audioGenerationKey: string
+  audioGenerationKey: string,
+  admission: AudioQueueAdmission
 ): Promise<number> {
-  const segments = await prisma.$transaction(async (tx) => {
-    const existing = await tx.segment.findMany({
-      where: { episodeId },
-      orderBy: { order: 'asc' },
-      select: { id: true },
-    });
-
-    const reset = [];
-    for (const { id } of existing) {
-      reset.push(
-        await tx.segment.update({
-          where: { id },
-          data: {
-            version: { increment: 1 },
-            audioUrl: null,
-            duration: null,
-            startTime: null,
-            wordTimings: Prisma.JsonNull,
-          },
-          select: { id: true, version: true, speaker: true, text: true },
-        })
-      );
-    }
-    return reset;
+  let count = 0;
+  await admitDurableQueueBatch({
+    ...admission,
+    prepare: async (database) => {
+      const existing = await database.segment.findMany({
+        where: { episodeId },
+        orderBy: { order: 'asc' },
+        select: { id: true },
+      });
+      if (existing.length === 0)
+        throw new Error(`Episode ${episodeId} has no segments to regenerate`);
+      const segments: AudioSegment[] = [];
+      for (const { id } of existing)
+        segments.push(
+          await database.segment.update({
+            where: { id },
+            data: {
+              version: { increment: 1 },
+              audioUrl: null,
+              duration: null,
+              startTime: null,
+              wordTimings: Prisma.JsonNull,
+            },
+            select: { id: true, version: true, speaker: true, text: true },
+          })
+        );
+      count = segments.length;
+      return children(episodeId, audioGenerationKey, segments);
+    },
   });
-
-  if (segments.length === 0) {
-    throw new Error(`Episode ${episodeId} has no segments to regenerate`);
-  }
-
-  await queueAudioAttempt(episodeId, audioGenerationKey, segments);
-  return segments.length;
+  return count;
 }

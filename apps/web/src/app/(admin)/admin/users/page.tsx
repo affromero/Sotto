@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { UserActions } from './UserActions';
 import { Glyph } from '@/components/Glyph';
-import styles from '../../adminTheme.styles';
+import styles from '@/app/(admin)/adminTheme.styles';
 
 export const metadata = { title: 'Users & access · Sotto admin' };
 

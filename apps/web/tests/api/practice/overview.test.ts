@@ -141,7 +141,13 @@ describe('POST /api/v1/courses/[courseId]/practice', () => {
       COURSE_PARAMS
     );
     expect(res.status).toBe(201);
-    expect(mockStartPractice).toHaveBeenCalledWith('c1', 'u1', 'FULL', { focusTargetId: null });
+    expect(mockStartPractice).toHaveBeenCalledWith(
+      'c1',
+      'u1',
+      'FULL',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      { focusTargetId: null }
+    );
   });
 
   it('passes a selected focus target through to practice start', async () => {
@@ -159,9 +165,15 @@ describe('POST /api/v1/courses/[courseId]/practice', () => {
       COURSE_PARAMS
     );
     expect(res.status).toBe(201);
-    expect(mockStartPractice).toHaveBeenCalledWith('c1', 'u1', 'READING', {
-      focusTargetId: 'ft1',
-    });
+    expect(mockStartPractice).toHaveBeenCalledWith(
+      'c1',
+      'u1',
+      'READING',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      {
+        focusTargetId: 'ft1',
+      }
+    );
   });
 
   it('400s on an invalid kind', async () => {

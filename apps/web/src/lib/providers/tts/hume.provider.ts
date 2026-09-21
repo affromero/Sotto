@@ -15,7 +15,7 @@
  */
 import { logger } from '../../logger';
 import type { WordTiming } from '@sotto/shared';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { HUME_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
@@ -23,6 +23,7 @@ import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expr
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 interface HumeTimestamp {
   word: string;
@@ -40,12 +41,18 @@ interface HumeTtsResponse {
 }
 
 export class HumeProvider implements TtsProvider {
+  static readonly speechEndpoint = 'https://api.hume.ai/v0/tts';
   readonly providerId: TtsProviderId = 'hume';
   private apiKey: string;
   private model: string;
   private lastGenerationId: string | null = null;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    model?: string
+  ) {
+    if (!apiKey.trim()) throw new Error('Hume AI requires an API key');
     this.apiKey = apiKey;
     this.model = model ?? 'octave-v2';
   }
@@ -79,18 +86,26 @@ export class HumeProvider implements TtsProvider {
       utterance.previous_generation_id = params.continuityIds[0];
     }
 
-    const response = await fetch('https://api.hume.ai/v0/tts', {
-      method: 'POST',
-      headers: {
-        'X-Hume-Api-Key': this.apiKey,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      HumeProvider.speechEndpoint,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          'X-Hume-Api-Key': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          utterances: [utterance],
+          format: { type: 'mp3' },
+          version: this.octaveVersion,
+        }),
       },
-      body: JSON.stringify({
-        utterances: [utterance],
-        format: { type: 'mp3' },
-        version: this.octaveVersion,
-      }),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -98,6 +113,7 @@ export class HumeProvider implements TtsProvider {
     }
 
     const data: HumeTtsResponse = await response.json();
+    params.signal?.throwIfAborted();
     if (!data.generations?.length || !data.generations[0].audio) {
       throw new Error('Hume AI returned no audio data');
     }
@@ -138,19 +154,27 @@ export class HumeProvider implements TtsProvider {
       utterance.previous_generation_id = params.continuityIds[0];
     }
 
-    const response = await fetch('https://api.hume.ai/v0/tts', {
-      method: 'POST',
-      headers: {
-        'X-Hume-Api-Key': this.apiKey,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      HumeProvider.speechEndpoint,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          'X-Hume-Api-Key': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          utterances: [utterance],
+          format: { type: 'mp3' },
+          version: this.octaveVersion,
+          include_timestamp_types: ['word'],
+        }),
       },
-      body: JSON.stringify({
-        utterances: [utterance],
-        format: { type: 'mp3' },
-        version: this.octaveVersion,
-        include_timestamp_types: ['word'],
-      }),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -158,6 +182,7 @@ export class HumeProvider implements TtsProvider {
     }
 
     const data: HumeTtsResponse = await response.json();
+    params.signal?.throwIfAborted();
     if (!data.generations?.length || !data.generations[0].audio) {
       throw new Error('Hume AI returned no audio data');
     }
@@ -204,6 +229,19 @@ export class HumeProvider implements TtsProvider {
   getModelId(): string {
     return this.model;
   }
+
+  async getConcurrencyLimit(signal?: AbortSignal): Promise<number> {
+    signal?.throwIfAborted();
+    const limit = await getHumeConcurrencyLimit(this.apiKey);
+    signal?.throwIfAborted();
+    return limit;
+  }
+
+  async observeConcurrencyError(message: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await updateHumeConcurrencyFromError(this.apiKey, message);
+    signal?.throwIfAborted();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +258,11 @@ const DEFAULT_HUME_CONCURRENCY = 5;
 export async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
   const { cache } = await import('../../redis');
   const crypto = await import('crypto');
-  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const keyHash = crypto
+    .createHmac('sha256', apiKey)
+    .update('sotto:hume:concurrency')
+    .digest('hex')
+    .slice(0, 16);
   const cacheKey = `tts:concurrency:hume:${keyHash}`;
 
   const cached = await cache.get<number>(cacheKey);
@@ -241,7 +283,11 @@ export async function updateHumeConcurrencyFromError(
   try {
     const { cache } = await import('../../redis');
     const crypto = await import('crypto');
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+    const keyHash = crypto
+      .createHmac('sha256', apiKey)
+      .update('sotto:hume:concurrency')
+      .digest('hex')
+      .slice(0, 16);
     const cacheKey = `tts:concurrency:hume:${keyHash}`;
 
     const match = errorMessage.match(/(?:limit|concurr\w*)\D*(\d+)/i);

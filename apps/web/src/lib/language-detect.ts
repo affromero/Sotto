@@ -8,6 +8,8 @@ export interface LanguageDetectionAiOptions {
   providerType: AiProviderId;
   model: string;
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
 }
 
 export async function detectLanguage(
@@ -29,6 +31,8 @@ export async function detectLanguage(
         maxTokens: 3,
         model: ai.model,
         apiKeyOverride: ai.apiKeyOverride,
+        fetch: ai.fetch,
+        signal: ai.signal,
         skipModeration: true,
       }
     );

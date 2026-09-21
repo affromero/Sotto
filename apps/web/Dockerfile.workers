@@ -64,7 +64,9 @@ COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
 # image and be owned by the runtime user: Docker seeds a fresh named volume
 # from the image path it covers, so if the path is missing the volume is
 # created root-owned and every write fails with EACCES.
-RUN mkdir -p /app/apps/web/.sotto/storage && chown -R sotto:sotto /app/apps/web/.sotto
+RUN mkdir -p /app/apps/web/.sotto/storage /app/apps/web/.sotto/runtime \
+    && chown -R sotto:sotto /app/apps/web/.sotto \
+    && chmod 0700 /app/apps/web/.sotto/runtime
 
 USER sotto
 

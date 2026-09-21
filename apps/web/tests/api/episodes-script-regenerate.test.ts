@@ -6,7 +6,7 @@ const mockEpisodeFindUnique = vi.fn();
 const mockEpisodeUpdate = vi.fn();
 const mockDiscoveryFindUnique = vi.fn();
 const mockTransaction = vi.fn();
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 const mockResearchDossierFindUnique = vi.fn();
 const mockCreativeOutlineFindUnique = vi.fn();
 
@@ -46,7 +46,7 @@ vi.mock('@/lib/prisma', () => {
 vi.mock('@/lib/queue', () => ({
   scriptWritingQueue: 'script-writing-queue',
   deepResearchQueue: 'deep-research-queue',
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   JobType: { WRITE_SCRIPT: 'WRITE_SCRIPT', DEEP_RESEARCH: 'DEEP_RESEARCH' },
 }));
 
@@ -57,7 +57,6 @@ vi.mock('@/lib/redis', () => ({
   publishEpisodeStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
-
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -66,11 +65,14 @@ import { POST } from '@/app/api/v1/episodes/[episodeId]/script/regenerate/route'
 
 function createRequest(body?: object): NextRequest {
   if (body) {
-    return new NextRequest(new URL('http://localhost:3000/api/v1/episodes/pod-1/script/regenerate'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    return new NextRequest(
+      new URL('http://localhost:3000/api/v1/episodes/pod-1/script/regenerate'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
   }
   return new NextRequest(new URL('http://localhost:3000/api/v1/episodes/pod-1/script/regenerate'), {
     method: 'POST',
@@ -160,7 +162,7 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: 'some content' });
     mockTransaction.mockResolvedValue(undefined);
     mockEpisodeUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -169,7 +171,7 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     expect(body).toEqual({ success: true });
 
     // Verify job payload includes dossierId and outlineId
-    const payload = mockAddJob.mock.calls[0][2];
+    const payload = mockEnqueueDurableJob.mock.calls[0][2];
     expect(payload.dossierId).toBe('dossier-1');
     expect(payload.outlineId).toBe('outline-1');
   });
@@ -180,14 +182,14 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
     mockTransaction.mockResolvedValue(undefined);
     mockEpisodeUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
 
     const response = await POST(
       createRequest({
         feedback: 'Need better sources',
         sourceUrls: ['https://example.com/article', 'https://bbc.co.uk/news'],
       }),
-      await createParams('pod-1'),
+      await createParams('pod-1')
     );
     const body = await response.json();
 
@@ -195,21 +197,34 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     expect(body).toEqual({ success: true });
 
     // Verify sourceUrls in payload
-    const payload = mockAddJob.mock.calls[0][2];
+    const payload = mockEnqueueDurableJob.mock.calls[0][2];
     expect(payload.sourceUrls).toEqual(['https://example.com/article', 'https://bbc.co.uk/news']);
 
-    // Verify lowReferences reset
-    const updateData = mockEpisodeUpdate.mock.calls[0][0].data;
-    expect(updateData.lowReferences).toBe(false);
+    const admission = mockEnqueueDurableJob.mock.calls[0][3];
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    await admission.mutate(
+      {
+        episode: { updateMany },
+        segment: { deleteMany: vi.fn() },
+        reference: { deleteMany: vi.fn() },
+        script: { deleteMany: vi.fn() },
+      },
+      'operation-1'
+    );
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ lowReferences: false }),
+      })
+    );
   });
 
-  it('handles empty body the same as no body (backward compat)', async () => {
+  it('handles an omitted feedback body', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
     mockTransaction.mockResolvedValue(undefined);
     mockEpisodeUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
 
     const response = await POST(createRequest({}), await createParams('pod-1'));
     const body = await response.json();
@@ -224,7 +239,7 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
     mockTransaction.mockResolvedValue(undefined);
     mockEpisodeUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
     mockResearchDossierFindUnique.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -233,19 +248,35 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
 
-    // Verify status set to RESEARCHING
-    const updateData = mockEpisodeUpdate.mock.calls[0][0].data;
-    expect(updateData.status).toBe('RESEARCHING');
+    const admission = mockEnqueueDurableJob.mock.calls[0][3];
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    await admission.mutate(
+      {
+        episode: { updateMany },
+        segment: { deleteMany: vi.fn() },
+        reference: { deleteMany: vi.fn() },
+        script: { deleteMany: vi.fn() },
+      },
+      'operation-1'
+    );
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'RESEARCHING' }),
+      })
+    );
   });
 
   it('returns 400 for invalid feedback body', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
-    const req = new NextRequest(new URL('http://localhost:3000/api/v1/episodes/pod-1/script/regenerate'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 'not valid json',
-    });
+    const req = new NextRequest(
+      new URL('http://localhost:3000/api/v1/episodes/pod-1/script/regenerate'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'not valid json',
+      }
+    );
 
     const response = await POST(req, await createParams('pod-1'));
     const body = await response.json();

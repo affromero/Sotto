@@ -1,12 +1,12 @@
-import { decryptApiKey, encryptApiKey } from './byok';
-import { logger } from './logger';
-import { prisma } from './prisma';
+import { prismaUnfiltered } from './prisma';
+import {
+  listSottoProfileCredentials,
+  resolveSottoProfileCredential,
+  sottoCredentialStorage,
+} from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 export type VisualCueProviderId = 'pexels';
-
-const VISUAL_CUE_PROVIDER_LABEL: Record<VisualCueProviderId, string> = {
-  pexels: 'Pexels',
-};
 
 export interface VisualCueKeyInfo {
   provider: VisualCueProviderId;
@@ -19,102 +19,42 @@ export function isValidVisualCueProviderId(provider: string): provider is Visual
   return provider === 'pexels';
 }
 
-export async function validateVisualCueKey(
-  provider: VisualCueProviderId,
-  apiKey: string
-): Promise<boolean> {
-  if (provider !== 'pexels') return false;
-  try {
-    const url = new URL('https://api.pexels.com/v1/search');
-    url.searchParams.set('query', 'language learning');
-    url.searchParams.set('per_page', '1');
-    const response = await fetch(url, {
-      headers: { Authorization: apiKey },
-      cache: 'no-store',
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-export async function storeVisualCueKey(
-  userId: string,
-  provider: VisualCueProviderId,
-  apiKey: string
-): Promise<void> {
-  const encryptedKey = encryptApiKey(apiKey);
-  await prisma.userVisualCueKey.upsert({
-    where: { userId_provider: { userId, provider } },
-    update: { encryptedKey, isValid: true, updatedAt: new Date() },
-    create: {
-      userId,
-      provider,
-      encryptedKey,
-      isValid: true,
-      label: VISUAL_CUE_PROVIDER_LABEL[provider],
-    },
-  });
-  logger.info('Stored visual cue provider key', { userId, provider });
-}
-
 export async function getVisualCueKey(
   userId: string,
   provider: VisualCueProviderId
 ): Promise<string | null> {
-  const record = await prisma.userVisualCueKey.findUnique({
-    where: { userId_provider: { userId, provider } },
+  return sottoTransaction(prismaUnfiltered, async (tx) => {
+    const selected = await resolveSottoProfileCredential(tx, userId, 'visual', provider, true);
+    if (!selected) return null;
+    const { credential } = selected;
+    const apiKey = credential.values.apiKey;
+    if (typeof apiKey !== 'string' || !apiKey.trim())
+      throw new Error('The visual provider credential has no API key');
+    const storage = await sottoCredentialStorage(tx, 'visual', provider);
+    await storage.owned.recordUse(
+      { ...storage.slot, owner: credential.owner },
+      credential.credentialRevision,
+      Date.now()
+    );
+    return apiKey;
   });
-  if (!record || !record.isValid) return null;
-
-  try {
-    await prisma.userVisualCueKey.update({
-      where: { id: record.id },
-      data: { lastUsedAt: new Date() },
-    });
-    return decryptApiKey(record.encryptedKey);
-  } catch (error) {
-    logger.error('Failed to decrypt visual cue provider key', {
-      userId,
-      provider,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
 }
 
 export async function listVisualCueKeys(userId: string): Promise<VisualCueKeyInfo[]> {
-  const keys = await prisma.userVisualCueKey.findMany({
-    where: { userId },
-    select: {
-      provider: true,
-      isValid: true,
-      lastUsedAt: true,
-      label: true,
-    },
-  });
-
-  return keys.flatMap((key) => {
-    if (!isValidVisualCueProviderId(key.provider)) return [];
-    return [
-      {
-        provider: key.provider,
-        isValid: key.isValid,
-        lastUsedAt: key.lastUsedAt,
-        label: key.label,
-      },
-    ];
-  });
-}
-
-export async function removeVisualCueKey(
-  userId: string,
-  provider: VisualCueProviderId
-): Promise<void> {
-  await prisma.userVisualCueKey
-    .delete({
-      where: { userId_provider: { userId, provider } },
-    })
-    .catch(() => undefined);
-  logger.info('Removed visual cue provider key', { userId, provider });
+  const keys = await sottoTransaction(prismaUnfiltered, (tx) =>
+    listSottoProfileCredentials(tx, userId, ['visual'], true)
+  );
+  return keys
+    .map(({ credential }) => credential)
+    .flatMap((key) => {
+      if (!isValidVisualCueProviderId(key.provider)) return [];
+      return [
+        {
+          provider: key.provider,
+          isValid: key.availability === 'enabled',
+          lastUsedAt: key.metadata.lastUsedAt === null ? null : new Date(key.metadata.lastUsedAt),
+          label: key.label,
+        },
+      ];
+    });
 }

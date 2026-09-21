@@ -12,7 +12,11 @@ vi.mock('@/lib/extractors', () => ({
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 
 const mockGenerateResponse = vi.fn();
@@ -27,6 +31,7 @@ vi.mock('@/lib/prompt-loader', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
 import { prepareClassSource, ClassSourceError } from '@/lib/class-source';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 const LONG_TEXT = 'Authentic article text. '.repeat(40); // > 280 chars
 
@@ -71,6 +76,7 @@ describe('prepareClassSource', () => {
       targetLang: 'de',
       nativeLang: 'en',
       userId: 'u1',
+      execution: blockedProviderExecution('u1'),
     });
 
     expect(result.leveledContent).toContain('Niveau B1');
@@ -105,6 +111,7 @@ describe('prepareClassSource', () => {
         targetLang: 'de',
         nativeLang: 'en',
         userId: 'u1',
+        execution: blockedProviderExecution('u1'),
       })
     ).rejects.toBeInstanceOf(ClassSourceError);
     expect(mockGenerateResponse).not.toHaveBeenCalled();
@@ -119,6 +126,7 @@ describe('prepareClassSource', () => {
         targetLang: 'de',
         nativeLang: 'en',
         userId: 'u1',
+        execution: blockedProviderExecution('u1'),
       })
     ).rejects.toBeInstanceOf(ClassSourceError);
     expect(mockGenerateResponse).not.toHaveBeenCalled();
@@ -139,6 +147,7 @@ describe('prepareClassSource', () => {
         targetLang: 'de',
         nativeLang: 'en',
         userId: 'u1',
+        execution: blockedProviderExecution('u1'),
       })
     ).rejects.toBeInstanceOf(ClassSourceError);
   });

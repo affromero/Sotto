@@ -257,10 +257,10 @@ describe('GET /api/v1/placement', () => {
     const res = await GET(req);
     expect(res.status).toBe(200);
 
-    // generatePlacement(userId, native, target, note, perBand)
+    // generatePlacement(userId, execution, native, target, note, perBand)
     const call = mockGeneratePlacement.mock.calls[0];
-    expect(call[4]).toBe(2); // shorter run for verification
-    expect(call[3]).toContain('B1'); // the focus note names the deduced level
+    expect(call[5]).toBe(2); // shorter run for verification
+    expect(call[4]).toContain('B1'); // the focus note names the deduced level
   });
 });
 
@@ -360,7 +360,12 @@ describe('POST /api/v1/placement', () => {
   it('calls getOrCreateCurriculum to resolve the curriculum', async () => {
     await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
-    expect(mockGetOrCreateCurriculum).toHaveBeenCalledWith('u1', 'en', 'de');
+    expect(mockGetOrCreateCurriculum).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      'en',
+      'de'
+    );
   });
 
   it('grades answers, upserts course with assigned level, and returns result', async () => {

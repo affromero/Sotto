@@ -11,10 +11,8 @@ fi
 
 echo "Health check OK: ${BASE_URL}/api/v1/health"
 
-# On gated instances (SOTTO_ACCESS_PASSWORD set) anonymous API calls must be
-# rejected — a 401 here proves the gate is standing. Ungated instances serve 200.
-expected="200"
-[[ -n "${SOTTO_ACCESS_PASSWORD:-}" ]] && expected="401"
+# Callers select the expected access policy after inspecting canonical state.
+expected="${EXPECTED_ANONYMOUS_STATUS:-200}"
 
 status="$(curl -sS -o /dev/null -w "%{http_code}" "${BASE_URL}/api/v1/tags")"
 if [[ "${status}" != "${expected}" ]]; then

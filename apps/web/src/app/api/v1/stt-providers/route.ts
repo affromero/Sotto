@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
-import { getAiKey, getByokKey } from '@/lib/byok';
+import { getSharedAiKey, getSharedByokKey } from '@/lib/byok';
 import { getAutoModelConfig, resolveSttIncludedModels } from '@/lib/auto-model-config';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getServerInfra } from '@/lib/server-config';
@@ -65,35 +65,30 @@ export async function GET(request: NextRequest) {
     // Check all provider keys in parallel
     const [openAiKey, elevenLabsKey, togetherKey, deepgramKey, assemblyAiKey, autoConfig, infra] =
       await Promise.all([
-        getAiKey(userId, 'openai'),
-        getByokKey(userId, 'elevenlabs'),
-        getAiKey(userId, 'together'),
-        getAiKey(userId, 'deepgram'),
-        getAiKey(userId, 'assemblyai'),
+        getSharedAiKey(userId, 'openai'),
+        getSharedByokKey(userId, 'elevenlabs'),
+        getSharedAiKey(userId, 'together'),
+        getSharedAiKey(userId, 'deepgram'),
+        getSharedAiKey(userId, 'assemblyai'),
         getAutoModelConfig(),
         getServerInfra(),
       ]);
 
     const byokProviders = new Set<string>();
 
-    const hasOpenAi = openAiKey !== null || !!process.env.OPENAI_API_KEY;
-    if (hasOpenAi) configuredProviders.push('openai');
+    if (openAiKey) configuredProviders.push('openai');
     if (openAiKey) byokProviders.add('openai');
 
-    const hasElevenLabs = elevenLabsKey !== null || !!process.env.ELEVENLABS_API_KEY;
-    if (hasElevenLabs) configuredProviders.push('elevenlabs');
+    if (elevenLabsKey) configuredProviders.push('elevenlabs');
     if (elevenLabsKey) byokProviders.add('elevenlabs');
 
-    const hasTogether = togetherKey !== null || !!process.env.TOGETHER_API_KEY;
-    if (hasTogether) configuredProviders.push('together');
+    if (togetherKey) configuredProviders.push('together');
     if (togetherKey) byokProviders.add('together');
 
-    const hasDeepgram = deepgramKey !== null || !!process.env.DEEPGRAM_API_KEY;
-    if (hasDeepgram) configuredProviders.push('deepgram');
+    if (deepgramKey) configuredProviders.push('deepgram');
     if (deepgramKey) byokProviders.add('deepgram');
 
-    const hasAssemblyAi = assemblyAiKey !== null || !!process.env.ASSEMBLYAI_API_KEY;
-    if (hasAssemblyAi) configuredProviders.push('assemblyai');
+    if (assemblyAiKey) configuredProviders.push('assemblyai');
     if (assemblyAiKey) byokProviders.add('assemblyai');
 
     const hasLocal = infra.sttProvider === 'local' && !!infra.sttBaseUrl;

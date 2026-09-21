@@ -1,3 +1,4 @@
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 /**
  * createMockExam builds a full exam from the flagship blueprint by calling the
  * class generator cores per section and persisting into the exam models. Section
@@ -14,6 +15,8 @@ const mockSectionCreate = vi.fn();
 const mockSectionUpdate = vi.fn();
 const mockQuestionCreateMany = vi.fn();
 const mockSpeakingCreateMany = vi.fn();
+const mockSpeakingFindMany = vi.fn();
+const mockPublishSpeakingPromptReferences = vi.fn();
 const mockWritingCreateMany = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -27,7 +30,10 @@ vi.mock('@/lib/prisma', () => ({
       update: (...a: unknown[]) => mockSectionUpdate(...a),
     },
     examQuestion: { createMany: (...a: unknown[]) => mockQuestionCreateMany(...a) },
-    speakingPrompt: { createMany: (...a: unknown[]) => mockSpeakingCreateMany(...a) },
+    speakingPrompt: {
+      createMany: (...a: unknown[]) => mockSpeakingCreateMany(...a),
+      findMany: (...a: unknown[]) => mockSpeakingFindMany(...a),
+    },
     writingPrompt: { createMany: (...a: unknown[]) => mockWritingCreateMany(...a) },
   },
 }));
@@ -48,6 +54,7 @@ vi.mock('@/lib/class-listening-generator', () => ({
 const mockSpeaking = vi.fn();
 vi.mock('@/lib/class-speaking-generator', () => ({
   composeSpeakingPrompts: (...a: unknown[]) => mockSpeaking(...a),
+  publishSpeakingPromptReferences: (...a: unknown[]) => mockPublishSpeakingPromptReferences(...a),
 }));
 const mockWriting = vi.fn();
 vi.mock('@/lib/class-writing-generator', () => ({
@@ -85,6 +92,8 @@ describe('createMockExam', () => {
     mockExamUpdate.mockResolvedValue({});
     mockQuestionCreateMany.mockResolvedValue({ count: 1 });
     mockSpeakingCreateMany.mockResolvedValue({ count: 1 });
+    mockSpeakingFindMany.mockResolvedValue([{ id: 'speaking-1' }]);
+    mockPublishSpeakingPromptReferences.mockResolvedValue(new Map());
     mockWritingCreateMany.mockResolvedValue({ count: 1 });
     mockResolveExamSpec.mockResolvedValue({
       objective: 'Show B1',
@@ -101,19 +110,21 @@ describe('createMockExam', () => {
       ],
     });
     mockSpeaking.mockResolvedValue([
-      { targetPhrase: 'Hallo', translation: 'Hello', ipa: null, referenceTtsUrl: null },
+      { targetPhrase: 'Hallo', translation: 'Hello', ipa: null, referenceTtsAudio: null },
     ]);
     mockWriting.mockResolvedValue([{ task: 'Write a note', guidance: null }]);
   });
 
   it('throws when the course is not owned by the caller', async () => {
     mockCourseFindFirst.mockResolvedValue(null);
-    await expect(createMockExam('c1', 'u1')).rejects.toBeInstanceOf(ExamCourseNotFoundError);
+    await expect(createMockExam('c1', 'u1', blockedProviderExecution('u1'))).rejects.toBeInstanceOf(
+      ExamCourseNotFoundError
+    );
     expect(mockExamCreate).not.toHaveBeenCalled();
   });
 
   it('builds the four Goethe sections and finishes READY', async () => {
-    const examId = await createMockExam('c1', 'u1');
+    const examId = await createMockExam('c1', 'u1', blockedProviderExecution('u1'));
     expect(examId).toBe('exam1');
     // Goethe blueprint: reading (mc), listening, writing, speaking.
     expect(mockSectionCreate).toHaveBeenCalledTimes(4);
@@ -125,7 +136,7 @@ describe('createMockExam', () => {
   });
 
   it('keys speaking/writing prompts to the exam section (reused models)', async () => {
-    await createMockExam('c1', 'u1');
+    await createMockExam('c1', 'u1', blockedProviderExecution('u1'));
     const speakingData = mockSpeakingCreateMany.mock.calls[0][0].data;
     expect(speakingData[0].examSectionId).toMatch(/^sec-/);
     const writingData = mockWritingCreateMany.mock.calls[0][0].data;
@@ -134,7 +145,7 @@ describe('createMockExam', () => {
 
   it('marks a failed section but still finishes READY when others succeed', async () => {
     mockSpeaking.mockRejectedValue(new Error('no TTS key'));
-    const examId = await createMockExam('c1', 'u1');
+    const examId = await createMockExam('c1', 'u1', blockedProviderExecution('u1'));
     expect(examId).toBe('exam1');
     const sectionStatuses = mockSectionUpdate.mock.calls.map(
       (c) => (c[0] as { data: { status: string } }).data.status

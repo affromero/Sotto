@@ -1,21 +1,23 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@/generated/prisma/client';
-import { DeepResearchPayload, addJob, JobType, creativePlanningQueue } from '@/lib/queue';
+import { DeepResearchPayload, JobType, creativePlanningQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { buildResearchDossier, type BuildDossierParams } from '@/lib/research-agent';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey } from '@/lib/byok';
+import { capturedLearningAiOptions, resolveCapturedEpisodeAi } from '@/lib/learning-ai';
 import {
-  providerRequiresAiKey,
-  resolveAiModelAndProvider,
-  type AiProviderId,
-} from '@/lib/providers/ai-registry';
+  durableJobProviderExecution,
+  transitionDurableQueueJob,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
-export async function processDeepResearch(job: Job<DeepResearchPayload>): Promise<void> {
-  const { episodeId, userId, discoveryId, useAdminCredits } = job.data;
+export async function processDeepResearch(
+  job: Job<DeepResearchPayload>,
+  signal?: AbortSignal
+): Promise<void> {
+  const { episodeId, userId, discoveryId, allowSharedCredential } = job.data;
 
   logger.info('Deep research starting', { episodeId });
   await job.updateProgress(5);
@@ -29,25 +31,27 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   if (existingDossier) {
     logger.info('Research dossier already exists, skipping to planning', { episodeId });
 
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'PLANNING' },
-    });
-    await invalidateEpisodeCache(episodeId);
-    await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
-
-    await addJob(
-      creativePlanningQueue,
-      JobType.CREATIVE_PLANNING,
-      {
+    await transitionDurableQueueJob({
+      job,
+      queue: creativePlanningQueue,
+      type: JobType.CREATIVE_PLANNING,
+      payload: {
         episodeId,
         userId,
         discoveryId,
         dossierId: existingDossier.id,
-        useAdminCredits,
+        allowSharedCredential,
       },
-      { jobId: `plan-${episodeId}-${String(job.id)}` }
-    );
+      jobId: `plan-${episodeId}-${String(job.id)}`,
+      mutate: async (database) => {
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { status: 'PLANNING' },
+        });
+      },
+    });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
 
     await job.updateProgress(100);
     return;
@@ -78,24 +82,16 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
 
   await job.updateProgress(10);
 
-  const aiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
-  if (!episode.aiModel && !aiKey) {
-    throw new Error('AI model is required for deep research when no AI key is configured.');
-  }
-
-  // Resolve AI model
-  const { model, provider } = await resolveAiModelAndProvider({
-    episodeAiModel: episode.aiModel,
-    aiKey,
+  const ai = await resolveCapturedEpisodeAi({
+    userId,
+    aiModel: episode.aiModel,
+    aiProvider: episode.aiProvider,
+    allowSharing: Boolean(allowSharedCredential),
+    execution: durableJobProviderExecution(job, userId, signal),
   });
-
-  const providerAiKey =
-    episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
-      ? await getAiKey(userId, provider as AiProviderId)
-      : aiKey;
-  if (episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits && !providerAiKey) {
-    throw new Error(`AI key for provider "${provider}" is required for deep research.`);
-  }
+  const providerOptions = await capturedLearningAiOptions(ai);
+  const { model, apiKeyOverride, fetch: providerFetch, signal: providerSignal } = providerOptions;
+  const provider = ai.provider;
 
   // Determine research mode
   const hasSourceContent = !!discovery.sourceContent;
@@ -123,7 +119,9 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
     focusAreas: discovery.focusAreas || [],
     suppliedSourceUrls: discovery.sourceUrl ? [discovery.sourceUrl] : [],
     discoverySummary,
-    apiKeyOverride: providerAiKey?.apiKey,
+    apiKeyOverride,
+    fetch: providerFetch,
+    signal: providerSignal,
     model,
     provider,
   });
@@ -167,25 +165,27 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   );
 
   // Chain to creative planning
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: { status: 'PLANNING' },
-  });
-  await invalidateEpisodeCache(episodeId);
-  await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
-
-  await addJob(
-    creativePlanningQueue,
-    JobType.CREATIVE_PLANNING,
-    {
+  await transitionDurableQueueJob({
+    job,
+    queue: creativePlanningQueue,
+    type: JobType.CREATIVE_PLANNING,
+    payload: {
       episodeId,
       userId,
       discoveryId,
       dossierId: savedDossier.id,
-      useAdminCredits,
+      allowSharedCredential,
     },
-    { jobId: `plan-${episodeId}-${String(job.id)}` }
-  );
+    jobId: `plan-${episodeId}-${String(job.id)}`,
+    mutate: async (database) => {
+      await database.episode.update({
+        where: { id: episodeId },
+        data: { status: 'PLANNING' },
+      });
+    },
+  });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'PLANNING' });
 
   logger.info('Deep research complete, queued creative planning', {
     episodeId,

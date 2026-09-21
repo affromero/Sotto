@@ -25,7 +25,11 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 const mockGenerateResponse = vi.fn();
 vi.mock('@/lib/providers/ai', () => ({
@@ -41,6 +45,9 @@ import {
   scoreExam,
   ExamNotFoundError,
 } from '@/lib/mock-exam-scoring';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+
+const execution = blockedProviderExecution('u1');
 
 describe('weightedOverall', () => {
   it('weights section scores by their weight', () => {
@@ -119,11 +126,11 @@ describe('scoreExam', () => {
 
   it('throws when the exam is not owned by the caller', async () => {
     mockExamFindFirst.mockResolvedValue(null);
-    await expect(scoreExam('exam1', 'u1', [])).rejects.toBeInstanceOf(ExamNotFoundError);
+    await expect(scoreExam('exam1', 'u1', execution, [])).rejects.toBeInstanceOf(ExamNotFoundError);
   });
 
   it('blends MC + speaking into the weighted overall and a mock band', async () => {
-    const result = await scoreExam('exam1', 'u1', [
+    const result = await scoreExam('exam1', 'u1', execution, [
       { questionId: 'q1', selectedIndex: 0 }, // correct
       { questionId: 'q2', selectedIndex: 0 }, // wrong (correct is 1)
     ]);
@@ -151,7 +158,7 @@ describe('scoreExam', () => {
         },
       ],
     });
-    const result = await scoreExam('exam1', 'u1', []);
+    const result = await scoreExam('exam1', 'u1', execution, []);
     expect(result.sections[0].score).toBe(0);
     expect(result.band).toBe('below B1 (mock)');
   });

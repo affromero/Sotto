@@ -1,6 +1,20 @@
 import { logger } from './logger';
+import { executeMediaProcess } from './audio/media-process';
 
-export type SfxType = 'intro' | 'transition' | 'outro' | 'ambient' | 'laugh_track' | 'music_sting' | 'applause' | 'comedic_hit' | 'rim_shot';
+// Loudness normalization can emit NaNs for finite silent inputs at EOF.
+const LOUDNESS_FILTER =
+  "loudnorm=I=-16:TP=-1.5:LRA=11,aeval=exprs='if(isnan(val(ch)),0,val(ch))':c=same";
+
+export type SfxType =
+  | 'intro'
+  | 'transition'
+  | 'outro'
+  | 'ambient'
+  | 'laugh_track'
+  | 'music_sting'
+  | 'applause'
+  | 'comedic_hit'
+  | 'rim_shot';
 
 const SFX_VOLUME_MAP: Record<SfxType, string> = {
   intro: '0.4',
@@ -37,12 +51,10 @@ export async function stitchWithEffects(params: {
   sfxInserts: SfxInsert[];
   outputPath: string;
   crossfadeMs?: number;
+  signal?: AbortSignal;
 }): Promise<{ duration: number }> {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const execFileAsync = promisify(execFile);
-
-  const { segmentPaths, sfxInserts, outputPath, crossfadeMs = 300 } = params;
+  const { segmentPaths, sfxInserts, outputPath, crossfadeMs = 300, signal } = params;
+  signal?.throwIfAborted();
 
   if (segmentPaths.length === 0) {
     throw new Error('No segments to stitch');
@@ -50,23 +62,27 @@ export async function stitchWithEffects(params: {
 
   // For a single segment with no SFX, do a simple conversion
   if (segmentPaths.length === 1 && sfxInserts.length === 0) {
-    await execFileAsync('ffmpeg', [
-      '-y',
-      '-i',
-      segmentPaths[0],
-      '-c:a',
-      'libmp3lame',
-      '-b:a',
-      '128k',
-      '-ar',
-      '44100',
-      '-ac',
-      '1',
-      '-filter:a',
-      'loudnorm=I=-16:TP=-1.5:LRA=11',
-      outputPath,
-    ]);
-    const duration = await getAudioDuration(outputPath);
+    await executeMediaProcess(
+      'ffmpeg',
+      [
+        '-y',
+        '-i',
+        segmentPaths[0],
+        '-c:a',
+        'libmp3lame',
+        '-b:a',
+        '128k',
+        '-ar',
+        '44100',
+        '-ac',
+        '1',
+        '-filter:a',
+        LOUDNESS_FILTER,
+        outputPath,
+      ],
+      { signal }
+    );
+    const duration = await getAudioDuration(outputPath, signal);
     return { duration };
   }
 
@@ -124,9 +140,10 @@ export async function stitchWithEffects(params: {
       const sfxIdx = sfxStartIndex + i;
       const sfx = sfxInserts[i];
       const volume = sfx.volume?.toString() ?? SFX_VOLUME_MAP[sfx.type] ?? '0.3';
-      const fadeFilter = sfx.fadeOutMs && sfx.durationMs > sfx.fadeOutMs
-        ? `,afade=t=out:st=${((sfx.durationMs - sfx.fadeOutMs) / 1000).toFixed(3)}:d=${(sfx.fadeOutMs / 1000).toFixed(3)}`
-        : '';
+      const fadeFilter =
+        sfx.fadeOutMs && sfx.durationMs > sfx.fadeOutMs
+          ? `,afade=t=out:st=${((sfx.durationMs - sfx.fadeOutMs) / 1000).toFixed(3)}:d=${(sfx.fadeOutMs / 1000).toFixed(3)}`
+          : '';
       filters.push(
         `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${volume}${fadeFilter}[sfx${i}]`
       );
@@ -154,9 +171,9 @@ export async function stitchWithEffects(params: {
     }
 
     // Final loudness normalization
-    filters.push(`[${currentLabel}]loudnorm=I=-16:TP=-1.5:LRA=11[out]`);
+    filters.push(`[${currentLabel}]${LOUDNESS_FILTER}[out]`);
   } else {
-    filters.push(`[speech]loudnorm=I=-16:TP=-1.5:LRA=11[out]`);
+    filters.push(`[speech]${LOUDNESS_FILTER}[out]`);
   }
 
   const filterGraph = filters.join(';');
@@ -182,9 +199,9 @@ export async function stitchWithEffects(params: {
     sfx: String(sfxInserts.length),
   });
 
-  await execFileAsync('ffmpeg', ffmpegArgs, { maxBuffer: 50 * 1024 * 1024 });
+  await executeMediaProcess('ffmpeg', ffmpegArgs, { maxBuffer: 50 * 1024 * 1024, signal });
 
-  const duration = await getAudioDuration(outputPath);
+  const duration = await getAudioDuration(outputPath, signal);
 
   logger.info('Audio stitching complete', {
     outputPath,
@@ -197,68 +214,16 @@ export async function stitchWithEffects(params: {
 }
 
 /**
- * Simple segment concatenation with loudness normalization (no SFX).
- * Kept as a fast path for re-stitching after interactions.
- */
-export async function stitchSegments(segmentPaths: string[], outputPath: string): Promise<void> {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const execFileAsync = promisify(execFile);
-
-  const { writeFile, unlink } = await import('fs/promises');
-  const concatListPath = `${outputPath}.concat.txt`;
-  const concatContent = segmentPaths.map((p) => `file '${p}'`).join('\n');
-
-  await writeFile(concatListPath, concatContent);
-
-  try {
-    await execFileAsync('ffmpeg', [
-      '-y',
-      '-f',
-      'concat',
-      '-safe',
-      '0',
-      '-i',
-      concatListPath,
-      '-c:a',
-      'libmp3lame',
-      '-b:a',
-      '128k',
-      '-ar',
-      '44100',
-      '-ac',
-      '1',
-      '-filter:a',
-      'loudnorm=I=-16:TP=-1.5:LRA=11',
-      outputPath,
-    ]);
-
-    logger.info('Audio stitching complete', {
-      outputPath,
-      segmentCount: String(segmentPaths.length),
-    });
-  } finally {
-    await unlink(concatListPath).catch(() => {});
-  }
-}
-
-/**
  * Get audio duration in seconds using FFprobe
  */
-export async function getAudioDuration(filePath: string): Promise<number> {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const execFileAsync = promisify(execFile);
-
-  const { stdout } = await execFileAsync('ffprobe', [
-    '-v',
-    'quiet',
-    '-show_entries',
-    'format=duration',
-    '-of',
-    'csv=p=0',
-    filePath,
-  ]);
-
-  return parseFloat(stdout.trim());
+export async function getAudioDuration(filePath: string, signal?: AbortSignal): Promise<number> {
+  const { stdout } = await executeMediaProcess(
+    'ffprobe',
+    ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', filePath],
+    { signal }
+  );
+  const duration = Number(stdout.trim());
+  if (!stdout.trim() || !Number.isFinite(duration) || duration < 0)
+    throw new Error('FFprobe returned an invalid audio duration');
+  return duration;
 }

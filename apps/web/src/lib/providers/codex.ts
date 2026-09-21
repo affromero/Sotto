@@ -1,6 +1,6 @@
+import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
 import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
 import { serializeMessages } from '../agent-messages';
-import { formatAgentModelId, parseAgentModelId } from '../agent-models/id';
 
 /** Extract plain text from ChatMessage content (string or ContentPart[]). */
 function textOf(content: ChatMessage['content']): string {
@@ -22,12 +22,6 @@ function rejectImages(messages: ChatMessage[]): void {
   }
 }
 
-function reportedModelFor(model?: string): string {
-  const selected = model && model !== 'codex' ? model : process.env.CODEX_MODEL;
-  const parsed = parseAgentModelId(selected, 'codex');
-  return formatAgentModelId('codex', parsed?.model ?? null, parsed?.effort);
-}
-
 /**
  * Codex CLI provider — routes AI calls through `codex exec` (read-only sandbox).
  * Selected by prefixing the model name with "codex:", e.g. "codex:gpt-5-codex";
@@ -43,23 +37,34 @@ export class CodexProvider implements AIProvider {
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     const { executeCodex } = await import('../codex-client');
     const result = await executeCodex(system, serializeMessages(textMessages), {
+      signal: opts?.signal,
+      onUsage: opts?.onUsage,
       model: opts?.model,
       useWebSearch: opts?.useWebSearch,
     });
-    return { ...result, model: reportedModelFor(opts?.model) };
+    return result;
   }
 
-  async *streamResponse(
+  streamResponse(
     system: string,
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    rejectImages(messages);
-    const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
-    const { streamCodex } = await import('../codex-client');
-    yield* streamCodex(system, serializeMessages(textMessages), {
-      model: opts?.model,
-      useWebSearch: opts?.useWebSearch,
-    });
+    let cleanupError: (error: unknown) => boolean = () => false;
+    return interruptibleStream(
+      async function* (signal) {
+        rejectImages(messages);
+        const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+        const { streamCodex, isCodexCleanupError } = await import('../codex-client');
+        cleanupError = isCodexCleanupError;
+        yield* streamCodex(system, serializeMessages(textMessages), {
+          signal,
+          onUsage: opts?.onUsage,
+          model: opts?.model,
+          useWebSearch: opts?.useWebSearch,
+        });
+      },
+      { signal: opts?.signal, isCleanupError: (error) => cleanupError(error) }
+    );
   }
 }

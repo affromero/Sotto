@@ -6,9 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockGenerateResponse } = vi.hoisted(() => ({ mockGenerateResponse: vi.fn() }));
 
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: vi
+  resolveCapturedLearningAi: vi
     .fn()
     .mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: vi.fn(() => ({ generateResponse: mockGenerateResponse })),
@@ -28,6 +32,9 @@ import {
   deduceLevelFromNotes,
   type PlacementQuestion,
 } from '@/lib/placement-test';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+
+const execution = blockedProviderExecution('user-1');
 
 function q(id: string, cefr: string, skill: string): PlacementQuestion {
   return {
@@ -135,7 +142,7 @@ describe('generatePlacement option shaping', () => {
   });
 
   it('appends the native-language "I don\'t know" as the last option', async () => {
-    const { questions: out } = await generatePlacement('user-1', 'es', 'en');
+    const { questions: out } = await generatePlacement('user-1', execution, 'es', 'en');
     expect(out.length).toBeGreaterThan(0);
     for (const question of out) {
       expect(question.options).toHaveLength(5);
@@ -146,7 +153,7 @@ describe('generatePlacement option shaping', () => {
   });
 
   it('honors a smaller perBand for a shorter verification run', async () => {
-    await generatePlacement('user-1', 'en', 'es', '', 2);
+    await generatePlacement('user-1', execution, 'en', 'es', '', 2);
     const messages = mockGenerateResponse.mock.calls.at(-1)?.[1] as Array<{ content: string }>;
     // 6 CEFR bands (A1..C2) * 2 per band = 12 questions.
     expect(messages[0].content).toContain('2 per CEFR level');
@@ -162,7 +169,13 @@ describe('deduceLevelFromNotes', () => {
       )
     );
 
-    const { deduction } = await deduceLevelFromNotes('user-1', 'en', 'es', 'mi cuaderno');
+    const { deduction } = await deduceLevelFromNotes(
+      'user-1',
+      execution,
+      'en',
+      'es',
+      'mi cuaderno'
+    );
 
     expect(deduction.level).toBe('B1');
     expect(deduction.rationale).toContain('subordinate');
@@ -174,7 +187,7 @@ describe('deduceLevelFromNotes', () => {
       llmResponse('{"level":"Z9","rationale":"","confidence":4}')
     );
 
-    const { deduction } = await deduceLevelFromNotes('user-1', 'en', 'es', 'x');
+    const { deduction } = await deduceLevelFromNotes('user-1', execution, 'en', 'es', 'x');
 
     expect(deduction.level).toBe('A1');
     expect(deduction.confidence).toBe(1);
@@ -183,6 +196,8 @@ describe('deduceLevelFromNotes', () => {
   it('throws on malformed LLM output', async () => {
     mockGenerateResponse.mockResolvedValue(llmResponse('not json'));
 
-    await expect(deduceLevelFromNotes('user-1', 'en', 'es', 'x')).rejects.toThrow(/malformed/i);
+    await expect(deduceLevelFromNotes('user-1', execution, 'en', 'es', 'x')).rejects.toThrow(
+      /malformed/i
+    );
   });
 });

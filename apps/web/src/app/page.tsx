@@ -11,7 +11,8 @@ import { Glyph } from '@/app/welcome/Glyph';
 import type { GlyphName } from '@/app/welcome/data';
 import { getPublicGithubUrl } from '@/lib/public-links';
 import { isSelfHosted } from '@/lib/self-hosted';
-import { hasCompletedInitialOnboarding } from '@/lib/local-user';
+import { getLearnerOnboarding } from '@/lib/sidedoor/access/core/onboarding';
+import { auth } from '@/lib/auth';
 import styles from './page.styles';
 
 const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
@@ -450,7 +451,9 @@ function WalkFrameMock({ frame }: { frame: WalkStep['frame'] }) {
 
 export default async function LandingPage() {
   if (isSelfHosted()) {
-    redirect((await hasCompletedInitialOnboarding()) ? '/learn' : '/welcome');
+    const session = await auth();
+    if (!session?.user) redirect('/access');
+    redirect((await getLearnerOnboarding(session.user.id)).completed ? '/learn' : '/welcome');
   }
 
   const demoMode = true;

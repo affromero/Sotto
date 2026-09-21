@@ -8,8 +8,8 @@ export interface FeasibilityAssessment {
   verdict: FeasibilityVerdict;
   reason: string;
   suggestion: string | null;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   model: string;
 }
 
@@ -20,6 +20,8 @@ export async function assessTopicFeasibility(params: {
   sourceContent?: string;
   depth?: string;
   apiKeyOverride?: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
   model?: string;
   provider: string;
 }): Promise<FeasibilityAssessment> {
@@ -42,6 +44,8 @@ export async function assessTopicFeasibility(params: {
     {
       maxTokens: 512,
       apiKeyOverride: params.apiKeyOverride,
+      fetch: params.fetch,
+      signal: params.signal,
       model: params.model,
       skipModeration: true,
     }

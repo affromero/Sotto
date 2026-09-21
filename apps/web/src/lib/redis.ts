@@ -35,8 +35,8 @@ function getBaseRedisOptions(): RedisOptions {
  * Create a new Redis connection
  * BullMQ requires dedicated connections for workers
  */
-export function createRedisConnection(name?: string): Redis {
-  const client = new Redis(REDIS_URL, getBaseRedisOptions());
+export function createRedisConnection(name?: string, options: RedisOptions = {}): Redis {
+  const client = new Redis(REDIS_URL, { ...getBaseRedisOptions(), ...options });
   const prefix = name ? `[${name}] ` : '';
 
   client.on('error', (error) => {
@@ -126,34 +126,6 @@ export const cache = {
         await client.del(...keys);
       }
     } while (cursor !== '0');
-  },
-};
-
-/**
- * Redis-based semaphore for limiting concurrent operations per key.
- * Each slot is a Redis key with a TTL; acquiring increments a counter,
- * releasing decrements it. TTL acts as a safety net for leaked slots.
- */
-export const semaphore = {
-  async acquire(key: string, maxSlots: number, ttlSeconds: number = 120): Promise<boolean> {
-    const client = getRedisClient();
-    const count = await client.incr(key);
-    if (count === 1) {
-      await client.expire(key, ttlSeconds);
-    }
-    if (count > maxSlots) {
-      await client.decr(key);
-      return false;
-    }
-    return true;
-  },
-
-  async release(key: string): Promise<void> {
-    const client = getRedisClient();
-    const count = await client.decr(key);
-    if (count <= 0) {
-      await client.del(key);
-    }
   },
 };
 
@@ -252,33 +224,151 @@ export async function publishEpisodeStatus(
   await client.publish(`${EPISODE_CHANNEL_PREFIX}${episodeId}`, JSON.stringify(payload));
 }
 
-export function createEpisodeStatusSubscriber(episodeId: string) {
-  const client = createRedisConnection(`sse-pod-${episodeId.slice(0, 8)}`);
-  const channel = `${EPISODE_CHANNEL_PREFIX}${episodeId}`;
+const SUBSCRIBER_CLOSE_TIMEOUT_MS = 10_000;
+
+type SubscriberOptions = {
+  signal: AbortSignal;
+  onLoss: (error: Error) => void;
+};
+
+function withSubscriberTimeout<T>(operation: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${SUBSCRIBER_CLOSE_TIMEOUT_MS}ms`)),
+      SUBSCRIBER_CLOSE_TIMEOUT_MS
+    );
+    timer.unref?.();
+    operation.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+async function closeSubscriber(client: Redis, channel: string): Promise<void> {
+  try {
+    await withSubscriberTimeout(client.unsubscribe(channel), 'Redis subscriber unsubscribe');
+    await withSubscriberTimeout(client.quit(), 'Redis subscriber quit');
+    return;
+  } catch (gracefulError) {
+    if (client.status === 'end') return;
+    const closed = new Promise<void>((resolve) => client.once('end', resolve));
+    client.disconnect(false);
+    try {
+      await withSubscriberTimeout(closed, 'Redis subscriber forced close');
+    } catch (forcedError) {
+      throw new AggregateError(
+        [gracefulError, forcedError],
+        'Redis subscriber closure could not be confirmed',
+        { cause: gracefulError }
+      );
+    }
+  }
+}
+
+function createOwnedSubscriber(name: string, channel: string) {
+  const client = createRedisConnection(name, {
+    connectionName: name,
+    lazyConnect: true,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 0,
+    autoResendUnfulfilledCommands: false,
+    autoResubscribe: false,
+    retryStrategy: null,
+    reconnectOnError: null,
+    commandTimeout: SUBSCRIBER_CLOSE_TIMEOUT_MS,
+  });
+  let closing = false;
+  let subscribed = false;
+  let removeLossListeners = () => {};
+  let cleanupPromise: Promise<void> | undefined;
 
   return {
     channel,
     client,
-    subscribe(onMessage: (data: string) => void) {
-      client.subscribe(channel).catch((err) => {
-        logger.error('Failed to subscribe to episode status channel', {
-          episodeId,
-          error: err instanceof Error ? err.message : String(err),
-        });
+    async subscribe(
+      onMessage: (data: string) => void,
+      { signal, onLoss }: SubscriberOptions
+    ): Promise<void> {
+      if (subscribed) throw new Error('Redis subscriber is already active');
+      signal.throwIfAborted();
+      let admitted = false;
+      let lossReported = false;
+      let rejectAdmission!: (error: Error) => void;
+      const admissionLoss = new Promise<never>((_resolve, reject) => {
+        rejectAdmission = reject;
       });
-      client.on('message', (_ch: string, message: string) => {
+      const lost = (error: Error) => {
+        if (closing || lossReported) return;
+        lossReported = true;
+        if (!admitted) rejectAdmission(error);
+        else onLoss(error);
+      };
+      const ended = () => lost(new Error('Redis subscriber connection ended'));
+      const errored = (error: Error) => lost(error);
+      client.on('end', ended);
+      client.on('error', errored);
+      let removeAbort = () => {};
+      removeLossListeners = () => {
+        client.off('end', ended);
+        client.off('error', errored);
+        removeAbort();
+      };
+      client.on('message', (_receivedChannel: string, message: string) => {
         onMessage(message);
       });
-    },
-    async cleanup() {
+      const aborted = new Promise<never>((_resolve, reject) => {
+        const abort = () => {
+          const reason =
+            signal.reason instanceof Error
+              ? signal.reason
+              : new DOMException('Request aborted', 'AbortError');
+          lost(reason);
+          client.disconnect(false);
+          reject(reason);
+        };
+        signal.addEventListener('abort', abort, { once: true });
+        removeAbort = () => signal.removeEventListener('abort', abort);
+      });
+      const operation = (async () => {
+        await client.connect();
+        await client.subscribe(channel);
+      })();
       try {
-        await client.unsubscribe(channel);
-        await client.quit();
-      } catch {
-        client.disconnect();
+        await withSubscriberTimeout(
+          Promise.race([operation, admissionLoss, aborted]),
+          'Redis subscriber admission'
+        );
+        signal.throwIfAborted();
+        admitted = true;
+        subscribed = true;
+      } catch (error) {
+        closing = true;
+        removeLossListeners();
+        client.disconnect(false);
+        throw error;
       }
     },
+    cleanup() {
+      cleanupPromise ??= (async () => {
+        closing = true;
+        removeLossListeners();
+        await closeSubscriber(client, channel);
+      })();
+      return cleanupPromise;
+    },
   };
+}
+
+export function createEpisodeStatusSubscriber(episodeId: string) {
+  const channel = `${EPISODE_CHANNEL_PREFIX}${episodeId}`;
+  return createOwnedSubscriber(`sse-pod-${episodeId.slice(0, 8)}`, channel);
 }
 
 /**
@@ -307,32 +397,8 @@ export async function publishNotification(
  * Returns an object with the subscriber client and cleanup function.
  */
 export function createNotificationSubscriber(userId: string) {
-  const client = createRedisConnection(`sse-${userId.slice(0, 8)}`);
   const channel = `${NOTIF_CHANNEL_PREFIX}${userId}`;
-
-  return {
-    channel,
-    client,
-    subscribe(onMessage: (data: string) => void) {
-      client.subscribe(channel).catch((err) => {
-        logger.error('Failed to subscribe to notification channel', {
-          userId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-      client.on('message', (_ch: string, message: string) => {
-        onMessage(message);
-      });
-    },
-    async cleanup() {
-      try {
-        await client.unsubscribe(channel);
-        await client.quit();
-      } catch {
-        client.disconnect();
-      }
-    },
-  };
+  return createOwnedSubscriber(`sse-${userId.slice(0, 8)}`, channel);
 }
 
 export async function closeRedis(): Promise<void> {

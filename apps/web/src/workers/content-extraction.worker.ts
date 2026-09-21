@@ -1,24 +1,26 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@/generated/prisma/client';
-import { ExtractContentPayload, addJob, JobType, deepResearchQueue } from '@/lib/queue';
+import { ExtractContentPayload, JobType, deepResearchQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { extractContent } from '@/lib/extractors';
 import { assessTopicFeasibility } from '@/lib/topic-assessor';
 import { markEpisodeFailed } from '@/lib/pipeline-resume';
 import { invalidateEpisodeCache, publishEpisodeStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey } from '@/lib/byok';
+import { capturedLearningAiOptions, resolveCapturedEpisodeAi } from '@/lib/learning-ai';
 import {
-  providerRequiresAiKey,
-  resolveAiModelAndProvider,
-  type AiProviderId,
-} from '@/lib/providers/ai-registry';
+  durableJobProviderExecution,
+  transitionDurableQueueJob,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { analyzeBias } from '@/lib/media-bias';
 
-export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
-  const { episodeId, userId, sourceUrl, sourceText, useAdminCredits } = job.data;
+export async function processContentExtraction(
+  job: Job<ExtractContentPayload>,
+  signal?: AbortSignal
+): Promise<void> {
+  const { episodeId, userId, sourceUrl, sourceText, allowSharedCredential } = job.data;
 
   logger.info('Extracting content', { episodeId });
   await job.updateProgress(10);
@@ -32,24 +34,26 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   if (existingDiscovery?.sourceContent) {
     logger.info('Content already extracted, skipping to deep research', { episodeId });
 
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'RESEARCHING' },
-    });
-    await invalidateEpisodeCache(episodeId);
-    await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
-
-    await addJob(
-      deepResearchQueue,
-      JobType.DEEP_RESEARCH,
-      {
+    await transitionDurableQueueJob({
+      job,
+      queue: deepResearchQueue,
+      type: JobType.DEEP_RESEARCH,
+      payload: {
         episodeId,
         userId,
         discoveryId: existingDiscovery.id,
-        useAdminCredits,
+        allowSharedCredential,
       },
-      { jobId: `research-${episodeId}-${String(job.id)}` }
-    );
+      jobId: `research-${episodeId}-${String(job.id)}`,
+      mutate: async (database) => {
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { status: 'RESEARCHING' },
+        });
+      },
+    });
+    await invalidateEpisodeCache(episodeId);
+    await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
 
     await job.updateProgress(100);
     return;
@@ -126,6 +130,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     select: {
       source: true,
       aiModel: true,
+      aiProvider: true,
     },
   });
 
@@ -133,38 +138,28 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     if (discoveryMeta?.topic) {
       logger.info('Running topic feasibility check', { episodeId });
 
-      const initialAiKey = useAdminCredits || episode.aiModel ? null : await getAiKey(userId);
-      if (!episode.aiModel && !initialAiKey) {
-        throw new Error(
-          'AI model is required for topic feasibility assessment when no AI key is configured.'
-        );
-      }
-
-      const { model, provider } = await resolveAiModelAndProvider({
-        episodeAiModel: episode.aiModel,
-        aiKey: initialAiKey,
+      const ai = await resolveCapturedEpisodeAi({
+        userId,
+        aiModel: episode.aiModel,
+        aiProvider: episode.aiProvider,
+        allowSharing: Boolean(allowSharedCredential),
+        execution: durableJobProviderExecution(job, userId, signal),
       });
-
-      const providerAiKey =
-        episode.aiModel && providerRequiresAiKey(provider) && !useAdminCredits
-          ? await getAiKey(userId, provider as AiProviderId)
-          : initialAiKey;
-      if (
-        episode.aiModel &&
-        providerRequiresAiKey(provider) &&
-        !useAdminCredits &&
-        !providerAiKey
-      ) {
-        throw new Error(
-          `AI key for provider "${provider}" is required for topic feasibility assessment.`
-        );
-      }
+      const {
+        model,
+        apiKeyOverride,
+        fetch: providerFetch,
+        signal: providerSignal,
+      } = await capturedLearningAiOptions(ai);
+      const provider = ai.provider;
 
       const assessment = await assessTopicFeasibility({
         topic: discoveryMeta.topic,
         sourceContent: content || undefined,
         depth: discoveryMeta.depth || undefined,
-        apiKeyOverride: providerAiKey?.apiKey,
+        apiKeyOverride,
+        fetch: providerFetch,
+        signal: providerSignal,
         model,
         provider,
       });
@@ -214,26 +209,26 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
   await job.updateProgress(70);
 
-  // Update episode status
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: { status: 'RESEARCHING' },
-  });
-  await invalidateEpisodeCache(episodeId);
-  await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
-
-  // Chain to deep research
-  await addJob(
-    deepResearchQueue,
-    JobType.DEEP_RESEARCH,
-    {
+  await transitionDurableQueueJob({
+    job,
+    queue: deepResearchQueue,
+    type: JobType.DEEP_RESEARCH,
+    payload: {
       episodeId,
       userId,
       discoveryId: discovery.id,
-      useAdminCredits,
+      allowSharedCredential,
     },
-    { jobId: `research-${episodeId}` }
-  );
+    jobId: `research-${episodeId}`,
+    mutate: async (database) => {
+      await database.episode.update({
+        where: { id: episodeId },
+        data: { status: 'RESEARCHING' },
+      });
+    },
+  });
+  await invalidateEpisodeCache(episodeId);
+  await publishEpisodeStatus(episodeId, { status: 'RESEARCHING' });
 
   await logPipelineStageComplete(episodeId, 'content-extraction');
   await job.updateProgress(100);

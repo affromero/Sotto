@@ -1,157 +1,133 @@
-/**
- * GET /api/v1/onboarding/config — tells the welcome flow whether it should run
- * as persisted self-hosted setup or as the public, non-persisting hosted demo.
- */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @vitest-environment node
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { NextRequest } from 'next/server';
-
-const mockAuth = vi.fn();
-const mockIsUserAdmin = vi.fn();
-const mockGetSiteConfig = vi.fn();
-const mockIsSelfHosted = vi.fn();
-const mockGetAgentStatus = vi.fn();
-
-vi.mock('@/lib/auth', () => ({ auth: (...a: unknown[]) => mockAuth(...a) }));
-vi.mock('@/lib/auth-guards', () => ({
-  isUserAdmin: (...a: unknown[]) => mockIsUserAdmin(...a),
-}));
-vi.mock('@/lib/site-config', () => ({
-  getSiteConfig: (...a: unknown[]) => mockGetSiteConfig(...a),
-}));
-vi.mock('@/lib/self-hosted', () => ({
-  isSelfHosted: (...a: unknown[]) => mockIsSelfHosted(...a),
-}));
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-vi.mock('@/lib/agent-availability', () => ({
-  getAgentStatus: (...args: unknown[]) => mockGetAgentStatus(...args),
-}));
-
+import type { PrismaClient } from '@/generated/prisma/client';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+  type SharedTestIdentity,
+} from '../helpers/setup/shared-instance';
 import { GET } from '@/app/api/v1/onboarding/config/route';
+import { resetAgentStatusCache } from '@/lib/agent-availability';
+import { setSiteConfig } from '@/lib/site-config';
 
-const SITE_CONFIG = {
+const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(binding);
+  return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('child_process')>()),
+  spawn() {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: () => true,
+    });
+    queueMicrotask(() => child.emit('error', new Error('CLI is not installed in the test host')));
+    return child;
+  },
+}));
+const config = {
   aiProvider: 'local',
-  aiModel: 'qwen3',
+  aiModel: 'test-model',
   aiBaseUrl: 'http://localhost:11434',
   sttProvider: 'local',
-  sttBaseUrl: 'http://localhost:8000/v1',
-  sttModel: 'whisper-large',
+  sttBaseUrl: 'http://localhost:8001/v1',
+  sttModel: 'test-stt',
   ttsProvider: 'kokoro',
   ttsBaseUrl: 'http://localhost:8000',
   storageProvider: 'local',
-  s3Bucket: null,
-  s3Region: null,
+  localStorageRoot: '.sotto/storage',
+  objectStorageEndpoint: null,
+  objectStorageBucket: null,
+  objectStorageRegion: null,
+  objectStoragePublicUrl: null,
 };
-
-function req(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/v1/onboarding/config');
+function request(token?: string) {
+  return new NextRequest('http://localhost:3000/api/v1/onboarding/config', {
+    headers: token ? { cookie: `sotto_session=${token}` } : {},
+  });
 }
-
-describe('GET /api/v1/onboarding/config', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockIsSelfHosted.mockReturnValue(true);
-    mockAuth.mockResolvedValue({ user: { id: 'u1' } });
-    mockIsUserAdmin.mockResolvedValue(false);
-    mockGetSiteConfig.mockResolvedValue(SITE_CONFIG);
-    mockGetAgentStatus.mockImplementation(async (provider: string) => ({
-      readiness: 'ready',
-      version: `${provider} 1.0`,
-      detail: null,
-    }));
-  });
-
-  it('returns the public demo config without auth on the managed showcase', async () => {
-    mockIsSelfHosted.mockReturnValue(false);
-    mockAuth.mockResolvedValue(null);
-
-    const res = await GET(req());
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ selfHosted: false, isOwner: false, infra: null, env: null });
-    expect(mockAuth).not.toHaveBeenCalled();
-    expect(mockGetSiteConfig).not.toHaveBeenCalled();
-  });
-
-  it('rejects unauthenticated self-hosted requests', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const res = await GET(req());
-
-    expect(res.status).toBe(401);
-    expect(mockGetSiteConfig).not.toHaveBeenCalled();
-  });
-
-  it('returns self-hosted non-owner config without infra or env presence', async () => {
-    const res = await GET(req());
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ selfHosted: true, isOwner: false, infra: null, env: null });
-  });
-
-  it('returns non-secret infra and env presence for the self-hosted owner', async () => {
-    mockIsUserAdmin.mockResolvedValue(true);
-
-    const res = await GET(req());
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.selfHosted).toBe(true);
-    expect(body.isOwner).toBe(true);
-    expect(body.infra).toEqual(SITE_CONFIG);
-    // Presence booleans/ids only — never values.
-    expect(Array.isArray(body.env.tts)).toBe(true);
-    expect(Array.isArray(body.env.stt)).toBe(true);
-    expect(Array.isArray(body.env.ai)).toBe(true);
-    expect(typeof body.env.storage.R2_ACCOUNT_ID).toBe('boolean');
-    expect(body.agentStatuses.codex.readiness).toBe('ready');
-    expect(JSON.stringify(body.env)).not.toContain('sk_');
-  });
-
-  describe('env presence detection', () => {
-    const VARS = ['CARTESIA_API_KEY', 'ANTHROPIC_API_KEY', 'ASSEMBLYAI_API_KEY', 'R2_ACCOUNT_ID'];
-    const saved: Record<string, string | undefined> = {};
-
-    beforeEach(() => {
-      mockIsUserAdmin.mockResolvedValue(true);
-      for (const name of VARS) {
-        saved[name] = process.env[name];
-        delete process.env[name];
-      }
+describe('Managed onboarding configuration', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('returns the static showcase without a database or account', async () => {
+    vi.stubEnv('SELF_HOSTED', 'false');
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      selfHosted: false,
+      isOwner: false,
+      infra: null,
     });
-
-    afterEach(() => {
-      for (const name of VARS) {
-        if (saved[name] === undefined) delete process.env[name];
-        else process.env[name] = saved[name];
-      }
-    });
-
-    it('reports providers whose platform key is set, keyed by wizard ids', async () => {
-      process.env.CARTESIA_API_KEY = 'sk_car_test';
-      process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-      process.env.ASSEMBLYAI_API_KEY = 'aai-test';
-      process.env.R2_ACCOUNT_ID = 'acct';
-
-      const body = await (await GET(req())).json();
-
-      expect(body.env.tts).toContain('cartesia');
-      expect(body.env.stt).toContain('cartesia');
-      // assemblyai env maps back to the wizard id "assembly".
-      expect(body.env.stt).toContain('assembly');
-      // ANTHROPIC_API_KEY backs the "claude" key method.
-      expect(body.env.ai).toContain('claude');
-      expect(body.env.storage.R2_ACCOUNT_ID).toBe(true);
-    });
-
-    it('omits providers whose key is absent', async () => {
-      const body = await (await GET(req())).json();
-
-      expect(body.env.tts).not.toContain('cartesia');
-      expect(body.env.stt).not.toContain('assembly');
-      expect(body.env.ai).not.toContain('claude');
-      expect(body.env.storage.R2_ACCOUNT_ID).toBe(false);
+  });
+});
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('Onboarding configuration with shared authority', () => {
+  let instance: SharedTestInstance;
+  let identity: SharedTestIdentity;
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('onboarding_config');
+    binding.database = instance.database;
+  });
+  beforeEach(async () => {
+    vi.stubEnv('SELF_HOSTED', 'true');
+    vi.stubEnv('SOTTO_CREDENTIAL_SYNC_DIR', '');
+    vi.stubEnv('CLAUDE_CODE_SSH_HOST', '');
+    vi.stubEnv('CODEX_SSH_HOST', '');
+    for (const name of [
+      'CARTESIA_API_KEY',
+      'ANTHROPIC_API_KEY',
+      'ASSEMBLYAI_API_KEY',
+      'R2_ACCOUNT_ID',
+    ])
+      vi.stubEnv(name, '');
+    resetAgentStatusCache();
+    identity = await instance.reset();
+    await setSiteConfig(config, identity.ownerId);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetAgentStatusCache();
+  });
+  afterAll(async () => {
+    binding.database = null;
+    if (instance) await instance.close();
+  });
+  it('rejects anonymous and revoked sessions', async () => {
+    expect((await GET(request())).status).toBe(401);
+    await identity.access.logout(identity.ownerToken);
+    expect((await GET(request(identity.ownerToken))).status).toBe(401);
+  });
+  it('hides server configuration from household learners and private members', async () => {
+    const household = await identity.household('Learner');
+    await identity.access.addMember(identity.ownerToken, 'Member', 'private member password');
+    const member = await identity.access.login('Member', 'private member password');
+    for (const token of [household.token, member]) {
+      const response = await GET(request(token));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        selfHosted: true,
+        isOwner: false,
+        infra: null,
+      });
+    }
+  });
+  it('returns persisted non-secret owner configuration and actual CLI readiness', async () => {
+    const response = await GET(request(identity.ownerToken));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      selfHosted: true,
+      isOwner: true,
+      infra: config,
+      agentStatuses: {
+        'claude-code': { readiness: 'not_installed', version: null },
+        codex: { readiness: 'not_installed', version: null },
+      },
     });
   });
 });

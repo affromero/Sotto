@@ -26,8 +26,20 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Extracts text from URLs, PDFs, and uploaded files',
     stage: 'Content Pipeline',
   },
-  'script-generation': {
-    description: 'Generates 2-voice conversational episode scripts via LLM',
+  'deep-research': {
+    description: 'Builds a sourced research dossier for an episode',
+    stage: 'Content Pipeline',
+  },
+  'creative-planning': {
+    description: 'Creates the episode format, structure, and creative direction',
+    stage: 'Content Pipeline',
+  },
+  'script-writing': {
+    description: 'Writes the episode script from the approved research and plan',
+    stage: 'Content Pipeline',
+  },
+  'compile-script': {
+    description: 'Compiles the completed script into audio-ready segments',
     stage: 'Content Pipeline',
   },
   'audio-generation': {
@@ -70,10 +82,9 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates waveform peaks JSON and spectrogram PNG from episode audio',
     stage: 'Audio Pipeline',
   },
-  'tts-provider-monitor': {
-    description:
-      'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',
-    stage: 'Platform Ops',
+  'episode-status': {
+    description: 'Refreshes episode caches and notifies connected players to fetch current state',
+    stage: 'Audio Pipeline',
   },
   'worksheet-pdf': {
     description:

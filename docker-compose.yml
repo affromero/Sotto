@@ -68,9 +68,7 @@ services:
   # ---------------------------------------------------------------------------
   # Totally-local inference profile (opt-in):  docker compose --profile local up
   # Runs the whole AI stack on your own hardware with zero cloud keys. Pair with:
-  #   AI_PROVIDER=local   AI_BASE_URL=http://ollama:11434/v1   AI_MODEL=qwen3
-  #   STT_PROVIDER=local  STT_BASE_URL=http://whisper:8000/v1
-  #   TTS_PROVIDER=kokoro TTS_BASE_URL=http://local-tts:8000
+  # Save these service URLs in /welcome or Admin after the containers start.
   # (Inside Docker use the service names above; from the host use localhost +
   # the mapped ports below. See .env.oss.example.)
   # ---------------------------------------------------------------------------

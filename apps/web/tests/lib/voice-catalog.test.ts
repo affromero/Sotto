@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
+const serverConfiguration = vi.hoisted(() => ({
+  values: {} as Record<string, string | undefined>,
+}));
+
+vi.mock('@/lib/server-config', () => ({
+  infra: (key: string) => serverConfiguration.values[key],
+}));
 
 vi.mock('@/lib/redis', () => ({
   cache: {
@@ -21,6 +28,7 @@ import { getVoiceCatalog } from '@/lib/voice-catalog';
 describe('getVoiceCatalog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverConfiguration.values = {};
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(undefined);
   });
@@ -64,8 +72,7 @@ describe('getVoiceCatalog', () => {
     });
 
     it('returns configured local sidecar voices when no /voices endpoint is configured', async () => {
-      vi.stubEnv('TTS_BASE_URL', '');
-      vi.stubEnv('TTS_VOICES', 'voice_a,voice_b');
+      serverConfiguration.values.ttsVoices = 'voice_a,voice_b';
 
       const catalog = await getVoiceCatalog('local');
 
@@ -207,9 +214,8 @@ describe('getVoiceCatalog', () => {
       vi.restoreAllMocks();
     });
 
-    it('fetches local sidecar voices and sends optional auth', async () => {
-      vi.stubEnv('TTS_BASE_URL', 'http://localhost:8000');
-      vi.stubEnv('TTS_API_KEY', 'local-secret');
+    it('fetches voices from the configured local sidecar', async () => {
+      serverConfiguration.values.ttsBaseUrl = 'http://localhost:8000';
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -223,9 +229,7 @@ describe('getVoiceCatalog', () => {
 
       const catalog = await getVoiceCatalog('local');
 
-      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8000/voices', {
-        headers: { Authorization: 'Bearer local-secret' },
-      });
+      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8000/voices');
       expect(catalog).toEqual([
         { id: 'speaker_a', name: 'Speaker A', gender: 'female', description: 'warm' },
         { id: 'speaker_b', name: 'Speaker B', gender: 'male', description: undefined },

@@ -17,7 +17,11 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 
 const mockGenerateResponse = vi.fn();
@@ -36,6 +40,7 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { composeWritingPrompts, generateClassWriting } from '@/lib/class-writing-generator';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 const SAMPLE = JSON.stringify([
   {
@@ -48,6 +53,7 @@ const SAMPLE = JSON.stringify([
 
 const PARAMS = {
   userId: 'u1',
+  execution: blockedProviderExecution('u1'),
   level: 'A2',
   nativeLang: 'en',
   targetLang: 'es',

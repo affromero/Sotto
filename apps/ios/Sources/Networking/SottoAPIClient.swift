@@ -11,19 +11,18 @@ struct SottoAPIClient {
         self.profileId = profileId
     }
 
-    /// Opens the instance access gate. The `sotto_gate` cookie the server sets
-    /// lands in the shared cookie store, so the pairing request that follows is
-    /// let through by the proxy without a Bearer key.
-    func openGate(password: String) async throws {
-        let _: GateResponse = try await post(
-            "/api/v1/gate",
-            body: GateRequest(password: password),
+    /// Starts a Sidedoor household session. Its HTTP-only cookie lands in the
+    /// shared cookie store so the pairing request that follows is authorized.
+    func enterHousehold(password: String) async throws {
+        let _: AccessSessionResponse = try await post(
+            "/api/v1/access/household",
+            body: HouseholdAccessRequest(password: password),
             authorized: false
         )
     }
 
     /// Asks the server for a one-time pairing token, the same one the web app
-    /// renders as a QR. Needs the gate cookie from `openGate` on a
+    /// renders as a QR. Needs the access cookie from `enterHousehold` on a
     /// password-protected instance.
     func requestPairingToken(deviceName: String) async throws -> PairingTokenResponse {
         try await post(
@@ -693,12 +692,12 @@ private struct PracticeDeleteResponse: Decodable {
     let deleted: Bool
 }
 
-private struct GateRequest: Encodable {
+private struct HouseholdAccessRequest: Encodable {
     let password: String
 }
 
-private struct GateResponse: Decodable {
-    let ok: Bool
+private struct AccessSessionResponse: Decodable {
+    let sessionId: String
 }
 
 private struct PairingTokenRequest: Encodable {

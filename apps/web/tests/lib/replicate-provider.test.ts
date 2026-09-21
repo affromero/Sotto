@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createProviderTransport } from 'thesidedoor-core/providers/transport';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -62,6 +63,17 @@ import { ReplicateProvider } from '@/lib/providers/tts/replicate.provider';
 import { mapDirectionToExpression } from '@/lib/tts-expression-mapper';
 
 const mockAudioBytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+const transport = {
+  authenticatedFetch: (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+    fetch(input, init),
+};
+const media = {
+  async downloadMedia(url: string) {
+    return new Uint8Array(await (await fetch(url)).arrayBuffer());
+  },
+};
+const createProvider = (apiKey: string, model?: string) =>
+  new ReplicateProvider(apiKey, transport, media, model);
 
 describe('ReplicateProvider', () => {
   beforeEach(() => {
@@ -91,7 +103,7 @@ describe('ReplicateProvider', () => {
 
       global.fetch = fetchMock;
 
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       const result = await provider.generateSpeech({ text: 'Hello', voiceId: 'Ashley' });
 
       expect(result).toBeInstanceOf(Buffer);
@@ -126,7 +138,7 @@ describe('ReplicateProvider', () => {
 
       global.fetch = fetchMock;
 
-      const provider = new ReplicateProvider('r8_testtoken', 'inworld-tts-1.5-mini');
+      const provider = createProvider('r8_testtoken', 'inworld-tts-1.5-mini');
       await provider.generateSpeech({ text: 'Hello', voiceId: 'Dennis' });
 
       const [apiUrl] = fetchMock.mock.calls[0];
@@ -157,7 +169,7 @@ describe('ReplicateProvider', () => {
 
       global.fetch = fetchMock;
 
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       await provider.generateSpeech({
         text: 'Great news!',
         voiceId: 'Ashley',
@@ -190,7 +202,7 @@ describe('ReplicateProvider', () => {
       global.fetch = fetchMock;
 
       const longText = 'A'.repeat(2500);
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       await provider.generateSpeech({ text: longText, voiceId: 'Ashley' });
 
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -198,13 +210,13 @@ describe('ReplicateProvider', () => {
     });
 
     it('returns Inworld voice IDs for speakers', () => {
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       expect(provider.getVoiceId('HOST', 'pod-1')).toBe('Ashley');
       expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Dennis');
     });
   });
 
-  describe('Qwen3-TTS model (legacy)', () => {
+  describe('Qwen3-TTS model', () => {
     it('uses qwen3-tts endpoint and speaker field', async () => {
       const fetchMock = vi.fn();
 
@@ -225,7 +237,7 @@ describe('ReplicateProvider', () => {
 
       global.fetch = fetchMock;
 
-      const provider = new ReplicateProvider('r8_testtoken', 'qwen3-tts');
+      const provider = createProvider('r8_testtoken', 'qwen3-tts');
       await provider.generateSpeech({ text: 'Hello', voiceId: 'Dylan' });
 
       const [apiUrl] = fetchMock.mock.calls[0];
@@ -239,13 +251,47 @@ describe('ReplicateProvider', () => {
     });
 
     it('returns Qwen3 voice IDs for speakers', () => {
-      const provider = new ReplicateProvider('r8_testtoken', 'qwen3-tts');
+      const provider = createProvider('r8_testtoken', 'qwen3-tts');
       expect(provider.getVoiceId('HOST', 'pod-1')).toBe('Vivian');
       expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Dylan');
     });
   });
 
   describe('shared behavior', () => {
+    it('does not report remote settlement when polling loses an accepted prediction', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({
+            id: 'pred-uncertain',
+            status: 'processing',
+            output: null,
+            error: null,
+          })
+        )
+        .mockRejectedValueOnce(new Error('Polling connection lost'));
+      const observedTransport = createProviderTransport({
+        rules: [
+          ...ReplicateProvider.speechEndpoints.map((url) => ({ method: 'POST', url })),
+          { method: 'GET', url: ReplicateProvider.predictionRoot, descendants: true },
+        ],
+        admit: async () => {},
+        implementation: fetchMock,
+      });
+      const provider = new ReplicateProvider('r8_testtoken', observedTransport, media);
+      let dispatches = 0;
+      let settlements = 0;
+      const generation = provider.generateSpeech({
+        text: 'Test',
+        voiceId: 'Ashley',
+        onDispatch: () => dispatches++,
+        onSettled: () => settlements++,
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(generation).rejects.toThrow('Polling connection lost');
+      expect({ dispatches, settlements }).toEqual({ dispatches: 1, settlements: 0 });
+    });
+
     it('polls for result when initial response is processing', async () => {
       const fetchMock = vi.fn();
 
@@ -286,7 +332,7 @@ describe('ReplicateProvider', () => {
 
       global.fetch = fetchMock;
 
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       const result = await provider.generateSpeech({ text: 'Test', voiceId: 'Ashley' });
 
       expect(result).toBeInstanceOf(Buffer);
@@ -319,7 +365,7 @@ describe('ReplicateProvider', () => {
 
       global.fetch = fetchMock;
 
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Ashley' })).rejects.toThrow(
         'Replicate prediction failed: Model crashed'
       );
@@ -332,7 +378,7 @@ describe('ReplicateProvider', () => {
         text: async () => 'Invalid token',
       });
 
-      const provider = new ReplicateProvider('bad_token');
+      const provider = createProvider('bad_token');
       await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Ashley' })).rejects.toThrow(
         'Replicate API error (401): Invalid token'
       );
@@ -349,7 +395,7 @@ describe('ReplicateProvider', () => {
         }),
       });
 
-      const provider = new ReplicateProvider('r8_testtoken');
+      const provider = createProvider('r8_testtoken');
       await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Ashley' })).rejects.toThrow(
         'Replicate returned no audio output'
       );

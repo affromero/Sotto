@@ -6,6 +6,7 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { extractUploadTexts, isUploadFile } from '@/lib/note-upload';
 import { runNotesDeduction } from '@/lib/placement-notes';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,12 +42,19 @@ export async function POST(request: NextRequest) {
     }
 
     const files = form.getAll('files').filter(isUploadFile);
-    const pasted = typeof form.get('content') === 'string' ? (form.get('content') as string).trim() : '';
+    const pasted =
+      typeof form.get('content') === 'string' ? (form.get('content') as string).trim() : '';
     const { texts, failed } = await extractUploadTexts(files);
     const content = [pasted, ...texts].filter(Boolean).join('\n\n');
     if (!content) return errorResponse('No readable materials uploaded', 422);
 
-    const deduction = await runNotesDeduction(userId, native, target, content);
+    const deduction = await runNotesDeduction(
+      userId,
+      sottoRequestExecution(request, authed),
+      native,
+      target,
+      content
+    );
     return NextResponse.json({
       native,
       target,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const TERMINAL_STATUSES = new Set(['READY', 'FAILED', 'SCRIPT_READY', 'DRAFT']);
 const FALLBACK_POLL_MS = 10_000;
@@ -11,42 +11,14 @@ interface EpisodeStatusEvent {
 }
 
 interface UseEpisodeStatusOptions {
-  /** Episode ID to watch */
   episodeId: string | null;
-  /** Initial status (avoids an extra fetch) */
   initialStatus?: string;
-  /** Called on every status change */
   onStatusChange?: (event: EpisodeStatusEvent) => void;
 }
 
 interface UseEpisodeStatusReturn {
   status: string | null;
   isConnected: boolean;
-}
-
-/**
- * Reconcile current status with a GET fetch.
- * SSE only carries { status } — clients that need failureReason, verificationProgress,
- * etc. get the full object from the cached GET endpoint.
- */
-async function fetchCurrentStatus(
-  episodeId: string,
-  setStatus: (s: string) => void,
-  onStatusChangeRef: React.RefObject<((event: EpisodeStatusEvent) => void) | undefined>
-): Promise<string | null> {
-  try {
-    const res = await fetch(`/api/v1/episodes/${episodeId}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.status) {
-      setStatus(data.status);
-      onStatusChangeRef.current?.(data);
-      return data.status;
-    }
-  } catch {
-    // Silently fail
-  }
-  return null;
 }
 
 export function useEpisodeStatus({
@@ -61,133 +33,159 @@ export function useEpisodeStatus({
     onStatusChangeRef.current = onStatusChange;
   });
 
-  // Ref to track the single fallback interval so reconnects don't stack them
-  const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clearFallbackPolling = useCallback(() => {
-    if (fallbackIntervalRef.current) {
-      clearInterval(fallbackIntervalRef.current);
-      fallbackIntervalRef.current = null;
-    }
-  }, []);
-
-  const startFallbackPolling = useCallback(
-    (id: string, signal: AbortSignal) => {
-      // Clear any existing interval first — prevents stacking
-      clearFallbackPolling();
-
-      fallbackIntervalRef.current = setInterval(async () => {
-        if (signal.aborted) {
-          clearFallbackPolling();
-          return;
-        }
-        if (document.visibilityState === 'hidden') return;
-
-        const currentStatus = await fetchCurrentStatus(id, setStatus, onStatusChangeRef);
-        if (currentStatus && TERMINAL_STATUSES.has(currentStatus)) {
-          clearFallbackPolling();
-        }
-      }, FALLBACK_POLL_MS);
-
-      signal.addEventListener('abort', clearFallbackPolling);
-    },
-    [clearFallbackPolling]
-  );
-
   useEffect(() => {
-    if (!episodeId) return;
-    if (initialStatus && TERMINAL_STATUSES.has(initialStatus)) return;
+    setStatus(episodeId ? (initialStatus ?? null) : null);
+    setIsConnected(false);
+    if (!episodeId || (initialStatus && TERMINAL_STATUSES.has(initialStatus))) return;
+    const id = episodeId;
+    const controller = new AbortController();
+    const { signal } = controller;
+    let sequence = 0;
+    let terminal = false;
+    let pollingRequest = false;
+    let connection: EventSource | null = null;
+    let poll: ReturnType<typeof setInterval> | null = null;
+    let reconnect: ReturnType<typeof setTimeout> | null = null;
+    const invalidations = new Set<string>();
 
-    const abortController = new AbortController();
-    const { signal } = abortController;
-
-    if (typeof EventSource === 'undefined') {
-      startFallbackPolling(episodeId, signal);
-      return () => abortController.abort();
+    function clearPolling() {
+      if (poll) clearInterval(poll);
+      poll = null;
     }
 
-    let es: EventSource | null = null;
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    function clearReconnect() {
+      if (reconnect) clearTimeout(reconnect);
+      reconnect = null;
+    }
+
+    function stopConnection() {
+      connection?.close();
+      connection = null;
+      setIsConnected(false);
+    }
+
+    async function reconcile(source?: EventSource): Promise<boolean> {
+      const request = ++sequence;
+      let applied = false;
+      const current = () =>
+        !signal.aborted && !terminal && request === sequence && (!source || source === connection);
+      try {
+        const response = await fetch(`/api/v1/episodes/${id}`, { signal });
+        if (!response.ok || !current()) return false;
+        const data: unknown = await response.json();
+        if (
+          !current() ||
+          !data ||
+          typeof data !== 'object' ||
+          !('status' in data) ||
+          typeof data.status !== 'string'
+        )
+          return false;
+        setStatus(data.status);
+        applied = true;
+        if (TERMINAL_STATUSES.has(data.status)) {
+          terminal = true;
+          clearPolling();
+          clearReconnect();
+          stopConnection();
+        }
+        onStatusChangeRef.current?.(data as EpisodeStatusEvent);
+        return true;
+      } catch {
+        return applied;
+      }
+    }
+
+    function startPolling() {
+      clearPolling();
+      if (signal.aborted || terminal) return;
+      poll = setInterval(() => {
+        if (document.visibilityState === 'hidden' || pollingRequest) return;
+        pollingRequest = true;
+        void reconcile().finally(() => {
+          pollingRequest = false;
+        });
+      }, FALLBACK_POLL_MS);
+    }
 
     function connect() {
-      if (signal.aborted) return;
-
-      // Clear stale reconnect timeout
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
+      clearReconnect();
+      if (signal.aborted || terminal || connection || document.visibilityState === 'hidden') return;
+      if (typeof EventSource === 'undefined') {
+        startPolling();
+        return;
       }
-
-      es = new EventSource(`/api/v1/episodes/${episodeId}/stream`);
-
-      es.onopen = () => {
+      const source = new EventSource(`/api/v1/episodes/${id}/stream`);
+      connection = source;
+      const active = () => !signal.aborted && !terminal && source === connection;
+      source.onopen = () => {
+        if (!active()) return;
         setIsConnected(true);
-        // Stop fallback polling now that SSE is connected
-        clearFallbackPolling();
-
-        // Reconciliation fetch — catches any status change that happened
-        // between the last known status and the subscription becoming active
-        fetchCurrentStatus(episodeId!, setStatus, onStatusChangeRef).then((s) => {
-          if (s && TERMINAL_STATUSES.has(s)) {
-            es?.close();
-            setIsConnected(false);
-          }
-        });
+        clearPolling();
+        void reconcile(source);
       };
-
-      es.onmessage = (event) => {
+      source.onmessage = (event) => {
+        if (!active()) return;
         try {
-          const data: EpisodeStatusEvent = JSON.parse(event.data);
-          setStatus(data.status);
-
-          // SSE only carries { status } — do a full GET to get failureReason etc.
-          fetchCurrentStatus(episodeId!, setStatus, onStatusChangeRef).then((s) => {
-            if (s && TERMINAL_STATUSES.has(s)) {
-              es?.close();
-              setIsConnected(false);
-            }
+          const data: unknown = JSON.parse(event.data);
+          if (!data || typeof data !== 'object') return;
+          let operationId: string | undefined;
+          if ('kind' in data && data.kind === 'episode-invalidated') {
+            if (
+              !('episodeId' in data) ||
+              data.episodeId !== id ||
+              !('operationId' in data) ||
+              typeof data.operationId !== 'string' ||
+              !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+                data.operationId
+              )
+            )
+              return;
+            operationId = data.operationId;
+            if (invalidations.has(operationId)) return;
+            invalidations.add(operationId);
+            if (invalidations.size > 100)
+              invalidations.delete(invalidations.values().next().value!);
+          } else {
+            if (!('status' in data) || typeof data.status !== 'string') return;
+            setStatus(data.status);
+          }
+          void reconcile(source).then((applied) => {
+            if (!applied && operationId) invalidations.delete(operationId);
           });
         } catch {
-          // Ignore malformed SSE data
+          // Ignore malformed SSE data.
         }
       };
-
-      es.onerror = () => {
-        setIsConnected(false);
-        es?.close();
-        es = null;
-
-        if (!signal.aborted) {
-          startFallbackPolling(episodeId!, signal);
-          reconnectTimeout = setTimeout(connect, 10_000);
-        }
+      source.onerror = () => {
+        if (!active()) return;
+        ++sequence;
+        stopConnection();
+        startPolling();
+        clearReconnect();
+        reconnect = setTimeout(connect, FALLBACK_POLL_MS);
       };
     }
 
-    // Pause SSE when tab goes hidden, reconnect when visible
     function handleVisibility() {
       if (document.visibilityState === 'hidden') {
-        es?.close();
-        es = null;
-        setIsConnected(false);
-        clearFallbackPolling();
-      } else if (!signal.aborted) {
-        connect();
-      }
+        ++sequence;
+        stopConnection();
+        clearPolling();
+        clearReconnect();
+      } else connect();
     }
 
     document.addEventListener('visibilitychange', handleVisibility);
     connect();
-
     return () => {
-      abortController.abort();
-      es?.close();
-      clearFallbackPolling();
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      controller.abort();
+      connection?.close();
+      clearPolling();
+      clearReconnect();
       document.removeEventListener('visibilitychange', handleVisibility);
-      setIsConnected(false);
     };
-  }, [episodeId, initialStatus, startFallbackPolling, clearFallbackPolling]);
+  }, [episodeId, initialStatus]);
 
   return { status, isConnected };
 }

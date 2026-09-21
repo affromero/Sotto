@@ -7,6 +7,7 @@
  */
 
 import { scoreToneMatch, type VoiceMatchMetadata } from '../voice-pool';
+import { infra } from '../server-config';
 
 export interface ProviderVoice {
   id: string;
@@ -359,10 +360,7 @@ export const KOKORO_VOICE_POOL: ProviderVoice[] = [
 
 // ---------------------------------------------------------------------------
 // Generic local TTS sidecar voices. Operators can run any local model behind the
-// Sotto sidecar contract and configure voice IDs without adding app code:
-//   TTS_VOICES=voice_a,voice_b,voice_c
-//   TTS_HOST_VOICE=voice_a
-//   TTS_EXPERT_VOICE=voice_b
+// Sotto sidecar contract and configure comma-separated voice IDs in shared settings.
 // The sidecar should accept these IDs in POST /tts. If unset, the app sends
 // "default" and "alternate"; simple sidecars may map both to their default voice.
 // ---------------------------------------------------------------------------
@@ -373,17 +371,12 @@ export const LOCAL_TTS_VOICE_POOL: ProviderVoice[] = [
 ];
 
 export function getLocalTtsVoicePool(): ProviderVoice[] {
-  const configured = process.env.TTS_VOICES?.split(',')
+  const configured = infra('ttsVoices')
+    ?.split(',')
     .map((v) => v.trim())
     .filter(Boolean);
 
-  const ids =
-    configured && configured.length > 0
-      ? configured
-      : [
-          process.env.TTS_HOST_VOICE?.trim() || 'default',
-          process.env.TTS_EXPERT_VOICE?.trim() || 'alternate',
-        ];
+  const ids = configured && configured.length > 0 ? configured : ['default', 'alternate'];
 
   const unique = Array.from(new Set(ids)).filter(Boolean);
   return unique.map((id, index) => ({
@@ -469,7 +462,7 @@ const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
   local: LOCAL_TTS_VOICE_POOL,
 };
 
-/** Voice IDs that can't be derived from a pool (legacy IDs, sidecar presets). */
+/** Voice IDs that cannot be derived from a provider voice pool. */
 const SPECIAL_TEST_VOICES: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: '21m00Tcm4TlvDq8ikWAM', // Rachel — stable free voice
   openai: 'alloy',
@@ -555,7 +548,6 @@ export function selectVoiceSetFromPool(
 
 /**
  * Select a diverse voice pair from a provider-specific voice pool.
- * Wrapper around selectVoiceSetFromPool for backward compatibility.
  * When metadata is provided, voices are scored by tone-character match
  * and filtered to a preferred tier before hash-selecting.
  */

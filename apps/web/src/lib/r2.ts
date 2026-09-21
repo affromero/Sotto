@@ -1,121 +1,434 @@
 import {
-  S3Client,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
+  ListObjectVersionsCommand,
+  ListMultipartUploadsCommand,
+  AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
-import { constants, createWriteStream } from 'fs';
-import {
-  access,
-  copyFile,
-  mkdir,
-  open,
-  readFile,
-  readdir,
-  stat,
-  unlink,
-  writeFile,
-} from 'fs/promises';
-import { pipeline } from 'stream/promises';
+import { constants } from 'fs';
+import { access, mkdir, readdir, stat, unlink, writeFile } from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
-import { fileURLToPath } from 'url';
+import {
+  LocalStorageCleanup,
+  copyOwnedReadableToFile,
+  StorageReadCleanupError,
+  ObjectStorageCleanup,
+  validateStorageKey,
+  storageBackendBinding,
+  storageCleanupDescriptorSchema,
+  StorageReferenceRegistry,
+  type StorageCleanupDescriptor,
+  type StorageCopyContent,
+} from 'thesidedoor-core/storage';
 import { logger } from './logger';
+import { prismaUnfiltered } from './prisma';
 import { infra } from './server-config';
+import { getSiteConfig, type ServerInfraConfig } from './site-config';
+import { capturedLocalBackend } from '@/lib/storage/sidedoor/captured-local';
+import {
+  configuredStorageProvider,
+  configuredLocalStorageRoot,
+  getObjectStorageConfig,
+  historicalObjectStorageSnapshot,
+  type ObjectStorageCredential,
+  type ObjectStorageConfig,
+} from '@/lib/storage/sidedoor/configuration';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { readLocalStorageFile } from '@/lib/storage/sidedoor/local-object-read';
 
-type StorageProviderId = 'local' | 'r2' | 's3';
-
-interface ObjectStorageConfig {
-  provider: Exclude<StorageProviderId, 'local'>;
-  client: S3Client;
-  bucket: string;
-  publicUrl: string | null;
+function localBaseDir(): string {
+  return configuredLocalStorageRoot();
 }
 
-function configuredStorageProvider(): StorageProviderId {
-  const explicit = infra('storageProvider', 'STORAGE_PROVIDER')?.trim();
-  if (explicit) {
-    if (explicit === 'local' || explicit === 'r2' || explicit === 's3') return explicit;
-    throw new Error(`Unknown storage provider "${explicit}". Expected one of: local, r2, s3.`);
-  }
+export type { StorageCleanupDescriptor } from 'thesidedoor-core/storage';
 
-  // Legacy r2.ts callers historically meant R2 when no storage provider was
-  // explicitly selected. Keep that behavior to avoid silently switching storage.
-  return 'r2';
+export interface CapturedStorageCleanup {
+  descriptor: Readonly<StorageCleanupDescriptor>;
+  normalize(reference: string): string;
+  /** Finish and persist the complete manifest before deleting. Workers must serialize by backend. */
+  list(prefix: string, signal?: AbortSignal): AsyncGenerator<string>;
+  has(key: string, signal?: AbortSignal): Promise<boolean>;
+  delete(key: string, options?: { force?: boolean; signal?: AbortSignal }): Promise<void>;
 }
 
-function requireEnv(name: string, message: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(message);
-  return value;
+export interface CapturedStorageBackend extends CapturedStorageCleanup {
+  /** Reads use this descriptor, never the current mutable storage configuration. */
+  downloadToFile(
+    reference: string,
+    destination: string,
+    signal?: AbortSignal
+  ): Promise<StorageCopyContent>;
+  /** Storage orchestration only: caller persists every erasure scope before I/O; cleanup drains them. */
+  writeBuffer(
+    key: string,
+    body: Uint8Array,
+    contentType: string,
+    signal?: AbortSignal
+  ): Promise<string>;
+  /** Owns the source, including preflight failure. Remote errors remain uncertain until reconciled. */
+  writeStream(
+    key: string,
+    body: Readable,
+    contentType: string,
+    signal?: AbortSignal
+  ): Promise<string>;
 }
 
-function r2NotConfiguredMessage(): string {
-  return 'R2 storage not configured — set R2_* environment variables';
-}
+export type RestoredStorageBackend = CapturedStorageCleanup &
+  Pick<CapturedStorageBackend, 'downloadToFile'>;
 
-function getObjectStorageConfig(): ObjectStorageConfig {
-  const provider = configuredStorageProvider();
-  if (provider === 'local') {
-    throw new Error('Local storage does not use an object storage client.');
-  }
-
-  if (provider === 's3') {
-    const accessKeyId = requireEnv(
-      'AWS_ACCESS_KEY_ID',
-      'STORAGE_PROVIDER=s3 requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Set them in your environment.'
-    );
-    const secretAccessKey = requireEnv(
-      'AWS_SECRET_ACCESS_KEY',
-      'STORAGE_PROVIDER=s3 requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Set them in your environment.'
-    );
-    const region = infra('s3Region', 'AWS_S3_REGION') || 'us-east-1';
-    const bucket = infra('s3Bucket', 'AWS_S3_BUCKET') || 'sotto-storage';
-    return {
-      provider,
-      client: new S3Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      }),
-      bucket,
-      publicUrl: `https://${bucket}.s3.${region}.amazonaws.com`,
-    };
-  }
-
-  const message = r2NotConfiguredMessage();
-  const accountId = requireEnv('R2_ACCOUNT_ID', message);
-  const accessKeyId = requireEnv('R2_ACCESS_KEY_ID', message);
-  const secretAccessKey = requireEnv('R2_SECRET_ACCESS_KEY', message);
+/** Restore a registry-validated historical location without granting new writes. */
+export async function restoreStorageBackend(
+  descriptor: StorageCleanupDescriptor
+): Promise<RestoredStorageBackend> {
+  const saved = storageCleanupDescriptorSchema.parse(descriptor);
+  const backend =
+    saved.kind === 'local'
+      ? await capturedLocalBackend(
+          await LocalStorageCleanup.restore(saved.identity),
+          saved.referenceRoot,
+          LOCAL_STORAGE_URL_PREFIX,
+          assertCleanupKey
+        )
+      : await captureConfiguredStorageBackend(
+          historicalObjectStorageSnapshot(saved, await getSiteConfig()),
+          saved
+        );
   return {
-    provider,
-    client: new S3Client({
-      region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      credentials: { accessKeyId, secretAccessKey },
-    }),
-    bucket: process.env.R2_BUCKET_NAME || 'sotto-storage',
-    publicUrl: process.env.R2_PUBLIC_URL || null,
+    descriptor: backend.descriptor,
+    normalize: backend.normalize,
+    downloadToFile: backend.downloadToFile,
+    list: backend.list,
+    has: backend.has,
+    delete: backend.delete,
   };
 }
 
-function localBaseDir(): string {
-  const configured = process.env.LOCAL_STORAGE_DIR || '/tmp/sotto-storage';
-  if (path.isAbsolute(configured)) return configured;
-  return path.join(/* turbopackIgnore: true */ process.cwd(), configured);
+async function withOwnedStorageStream(
+  body: Readable,
+  write: () => Promise<string>
+): Promise<string> {
+  try {
+    return await write();
+  } finally {
+    body.destroy();
+  }
+}
+
+/** Restore a retained descriptor, or capture the current backend for a new cleanup. */
+export async function captureStorageCleanup(
+  expected?: StorageCleanupDescriptor
+): Promise<CapturedStorageCleanup> {
+  const backend = expected ? await restoreStorageBackend(expected) : await captureStorageBackend();
+  return {
+    descriptor: backend.descriptor,
+    normalize: backend.normalize,
+    list: backend.list,
+    has: backend.has,
+    delete: backend.delete,
+  };
+}
+
+/** Captures one configuration snapshot for writes and their eventual cleanup. */
+export async function captureStorageBackend(
+  expected?: StorageCleanupDescriptor
+): Promise<CapturedStorageBackend> {
+  const saved = expected ? storageCleanupDescriptorSchema.parse(expected) : undefined;
+  const snapshot = await getSiteConfig();
+  return captureConfiguredStorageBackend(snapshot, saved);
+}
+
+/** Capture an explicit destination without activating it in site configuration. */
+export async function captureConfiguredStorageBackend(
+  snapshot: ServerInfraConfig,
+  saved?: StorageCleanupDescriptor,
+  suppliedCredential?: ObjectStorageCredential
+): Promise<CapturedStorageBackend> {
+  if (configuredStorageProvider(snapshot) === 'local') {
+    const configuredRoot = path.resolve(
+      /* turbopackIgnore: true */ configuredLocalStorageRoot(snapshot)
+    );
+    let cleanup = await LocalStorageCleanup.capture(configuredRoot);
+    if (saved) {
+      if (saved.kind !== 'local' || saved.identity.binding !== cleanup.identity.binding)
+        throw new Error('Storage backend changed since cleanup was scheduled');
+      cleanup = await LocalStorageCleanup.restore(saved.identity);
+    }
+    const referenceRoot = saved?.kind === 'local' ? saved.referenceRoot : configuredRoot;
+    return capturedLocalBackend(cleanup, referenceRoot, LOCAL_STORAGE_URL_PREFIX, assertCleanupKey);
+  }
+  if (saved?.kind === 'object' && !saved.access)
+    throw new Error('Object storage attribution does not contain a captured credential revision');
+  const config = await getObjectStorageConfig(
+    snapshot,
+    suppliedCredential,
+    saved?.kind === 'object' ? (saved.access ?? undefined) : undefined
+  );
+  const location = Object.freeze({
+    kind: 'object' as const,
+    endpoint: config.endpoint,
+    bucket: config.bucket,
+  });
+  const binding = storageBackendBinding(location);
+  if (
+    saved &&
+    (saved.kind !== 'object' ||
+      saved.binding !== binding ||
+      storageBackendBinding(saved.location) !== binding)
+  )
+    throw new Error('Storage backend changed since cleanup was scheduled');
+  const publicUrl = saved?.kind === 'object' ? saved.publicUrl : config.publicUrl;
+  const referenceEncoding = saved?.kind === 'object' ? saved.referenceEncoding : 'raw';
+  const cleanup = new ObjectStorageCleanup({
+    location,
+    publicUrl,
+    publicUrlEncoding: referenceEncoding,
+    multipart: {
+      listMultipart: async (prefix, keyMarker, uploadIdMarker, limit, signal) => {
+        const page = await config.client.send(
+          new ListMultipartUploadsCommand({
+            Bucket: config.bucket,
+            Prefix: prefix,
+            KeyMarker: keyMarker,
+            UploadIdMarker: uploadIdMarker,
+            MaxUploads: limit,
+          }),
+          { abortSignal: signal }
+        );
+        return {
+          entries: (page.Uploads ?? []).map((entry) => ({
+            key: entry.Key,
+            uploadId: entry.UploadId,
+          })),
+          isTruncated: page.IsTruncated === true,
+          nextKey: page.NextKeyMarker,
+          nextUploadId: page.NextUploadIdMarker,
+        };
+      },
+      abortMultipart: async (key, uploadId, signal) => {
+        try {
+          await config.client.send(
+            new AbortMultipartUploadCommand({
+              Bucket: config.bucket,
+              Key: key,
+              UploadId: uploadId,
+            }),
+            { abortSignal: signal }
+          );
+        } catch (error) {
+          if (!(error instanceof Error && error.name === 'NoSuchUpload')) throw error;
+        }
+      },
+    },
+    port:
+      config.provider === 's3'
+        ? {
+            kind: 'versioned',
+            listVersions: async (prefix, keyMarker, versionMarker, limit, signal) => {
+              const page = await config.client.send(
+                new ListObjectVersionsCommand({
+                  Bucket: config.bucket,
+                  Prefix: prefix,
+                  KeyMarker: keyMarker,
+                  VersionIdMarker: versionMarker,
+                  MaxKeys: limit,
+                }),
+                { abortSignal: signal }
+              );
+              return {
+                entries: [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].map((entry) => ({
+                  key: entry.Key,
+                  versionId: entry.VersionId,
+                })),
+                isTruncated: page.IsTruncated === true,
+                nextKey: page.NextKeyMarker,
+                nextVersion: page.NextVersionIdMarker,
+              };
+            },
+            deleteVersion: async (key, versionId, signal) => {
+              await config.client.send(
+                new DeleteObjectCommand({
+                  Bucket: config.bucket,
+                  Key: key,
+                  VersionId: versionId,
+                }),
+                { abortSignal: signal }
+              );
+            },
+          }
+        : {
+            kind: 'unversioned',
+            listObjects: async (prefix, token, limit, signal) => {
+              const page = await config.client.send(
+                new ListObjectsV2Command({
+                  Bucket: config.bucket,
+                  Prefix: prefix,
+                  ContinuationToken: token,
+                  MaxKeys: limit,
+                }),
+                { abortSignal: signal }
+              );
+              return {
+                entries: (page.Contents ?? []).map((entry) => ({ key: entry.Key })),
+                isTruncated: page.IsTruncated === true,
+                nextToken: page.NextContinuationToken,
+              };
+            },
+            deleteObject: async (key, signal) => {
+              await config.client.send(
+                new DeleteObjectCommand({ Bucket: config.bucket, Key: key }),
+                { abortSignal: signal }
+              );
+            },
+          },
+  });
+  return {
+    descriptor: Object.freeze({
+      kind: 'object',
+      location,
+      binding,
+      access:
+        saved?.kind === 'object'
+          ? saved.access!
+          : (config.access ?? {
+              provider: config.provider,
+              credentialRevision: randomUUID(),
+              signingRegion: snapshot.objectStorageRegion?.trim() || 'us-east-1',
+            }),
+      publicUrl,
+      referenceEncoding,
+    }),
+    normalize: (reference) => cleanup.normalize(reference),
+    downloadToFile: async (reference, destination, signal) => {
+      signal?.throwIfAborted();
+      const key = cleanup.normalize(reference);
+      return copyOwnedReadableToFile({
+        destination,
+        signal,
+        openSource: async () => {
+          const response = await config.client.send(
+            new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+            { abortSignal: signal }
+          );
+          if (!response.Body) throw new Error(`Empty response downloading ${key} from storage`);
+          if (!(response.Body instanceof Readable))
+            throw new StorageReadCleanupError({
+              cause: new Error('Object storage returned an unsupported body lifecycle'),
+            });
+          return response.Body;
+        },
+      });
+    },
+    list: (prefix, signal) => cleanup.list(prefix, signal),
+    has: (key, signal) => cleanup.has(key, signal),
+    writeBuffer: async (key, body, contentType, signal) => {
+      validateStorageKey(key);
+      if (!contentType.trim()) throw new Error('Storage content type is required');
+      signal?.throwIfAborted();
+      await config.client.send(
+        new PutObjectCommand({
+          Bucket: config.bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          IfNoneMatch: '*',
+        }),
+        { abortSignal: signal }
+      );
+      return publicUrlForKey({ ...config, publicUrl }, key, referenceEncoding);
+    },
+    writeStream: (key, body, contentType, signal) =>
+      withOwnedStorageStream(body, async () => {
+        validateStorageKey(key);
+        if (!contentType.trim()) throw new Error('Storage content type is required');
+        signal?.throwIfAborted();
+        const abortController = new AbortController();
+        const upload = new Upload({
+          client: config.client,
+          params: {
+            Bucket: config.bucket,
+            Key: key,
+            Body: body,
+            ContentType: contentType,
+            // R2 multipart completion has no documented conditional-write contract.
+            // Its destinations require exclusive journal allocation and immutable UUID keys.
+            ...(config.provider === 's3' ? { IfNoneMatch: '*' } : {}),
+          },
+          abortController,
+          leavePartsOnError: true,
+          queueSize: 4,
+          partSize: 5 * 1024 * 1024,
+        });
+        const abort = () => {
+          abortController.abort();
+          body.destroy();
+        };
+        signal?.addEventListener('abort', abort, { once: true });
+        try {
+          await upload.done();
+          return publicUrlForKey({ ...config, publicUrl }, key, referenceEncoding);
+        } catch (error) {
+          abort();
+          signal?.throwIfAborted();
+          throw error;
+        } finally {
+          signal?.removeEventListener('abort', abort);
+        }
+      }),
+    delete: async (key, options) => {
+      assertCleanupKey(key, options);
+      await cleanup.delete(key, options?.signal);
+    },
+  };
+}
+
+function assertCleanupKey(key: string, options?: { force?: boolean }): void {
+  if (!options?.force && PROTECTED_PATH_PATTERNS.some((pattern) => pattern.test(key)))
+    throw new Error('Deleting protected episode audio requires explicit force');
 }
 
 function localPathForKey(keyOrUrl: string): string {
-  if (keyOrUrl.startsWith('file://')) return fileURLToPath(keyOrUrl);
   const base = localBaseDir();
   const resolved = path.resolve(base, keyOrUrl);
   if (resolved !== base && !resolved.startsWith(`${base}${path.sep}`)) {
     throw new Error(`Refusing to access local storage path outside ${base}`);
   }
   return resolved;
+}
+
+function pathInsideRoot(root: string, key: string): string {
+  validateStorageKey(key);
+  const resolved = path.resolve(root, key);
+  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`))
+    throw new Error(`Refusing to access local storage path outside ${root}`);
+  return resolved;
+}
+
+async function attributedStorageReference(reference: string) {
+  return sottoTransaction(prismaUnfiltered, async (database) =>
+    new StorageReferenceRegistry(
+      {
+        query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      },
+      'postgres',
+      SIDEDOOR_STATE_ID
+    ).readReference(reference)
+  );
+}
+
+async function attributedLocalPath(key: string): Promise<string | null> {
+  const attributed = await attributedStorageReference(localUrlForKey(key));
+  if (!attributed || attributed.backend.descriptor.kind !== 'local') return null;
+  if (attributed.asset.prepared.target.key !== key)
+    throw new Error('Local storage route attribution changed');
+  return pathInsideRoot(attributed.backend.descriptor.referenceRoot, key);
 }
 
 function localKeyForPath(filePath: string): string {
@@ -125,15 +438,12 @@ function localKeyForPath(filePath: string): string {
 /**
  * Browser-reachable URL for a locally stored object. Local storage has no
  * public origin, so it is served back through `GET /api/v1/storage/<key>`
- * rather than a `file://` URL, which no browser will fetch from an https page.
- * Rows written before this route existed hold `file://`, so those normalise to
- * the same route form on read.
+ * through an authenticated application route.
  */
 export const LOCAL_STORAGE_URL_PREFIX = '/api/v1/storage';
 
 function localUrlForKey(keyOrUrl: string): string {
-  const key = keyOrUrl.startsWith('file://') ? localKeyForPath(fileURLToPath(keyOrUrl)) : keyOrUrl;
-  const encoded = key.split('/').map(encodeURIComponent).join('/');
+  const encoded = keyOrUrl.split('/').map(encodeURIComponent).join('/');
   return `${LOCAL_STORAGE_URL_PREFIX}/${encoded}`;
 }
 
@@ -185,8 +495,14 @@ async function listLocalFiles(prefix: string): Promise<string[]> {
   return keys;
 }
 
-function publicUrlForKey(config: ObjectStorageConfig, key: string): string {
-  return config.publicUrl ? `${config.publicUrl}/${key}` : key;
+function publicUrlForKey(
+  config: ObjectStorageConfig,
+  key: string,
+  encoding: 'raw' | 'percent' = 'raw'
+): string {
+  if (!config.publicUrl) return key;
+  const suffix = encoding === 'percent' ? key.split('/').map(encodeURIComponent).join('/') : key;
+  return `${config.publicUrl.replace(/\/$/, '')}/${suffix}`;
 }
 
 /**
@@ -207,7 +523,7 @@ export async function assertStorageWritable(): Promise<void> {
     return;
   }
 
-  const config = getObjectStorageConfig();
+  const config = await getObjectStorageConfig();
   await config.client.send(
     new PutObjectCommand({
       Bucket: config.bucket,
@@ -243,7 +559,7 @@ export async function uploadFile(
     return localUrlForKey(key);
   }
 
-  const config = getObjectStorageConfig();
+  const config = await getObjectStorageConfig();
   await config.client.send(
     new PutObjectCommand({
       Bucket: config.bucket,
@@ -259,75 +575,34 @@ export async function uploadFile(
 }
 
 /**
- * Upload a readable stream to R2 using multipart upload.
- * Streams data without buffering the entire payload in memory.
- */
-export async function uploadStream(
-  key: string,
-  body: Readable,
-  contentType: string
-): Promise<string> {
-  if (configuredStorageProvider() === 'local') {
-    const filePath = localPathForKey(key);
-    await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
-    await pipeline(body, createWriteStream(filePath));
-    logger.info('Stream uploaded to local storage', { key });
-    return localUrlForKey(key);
-  }
-
-  const config = getObjectStorageConfig();
-  const upload = new Upload({
-    client: config.client,
-    params: { Bucket: config.bucket, Key: key, Body: body, ContentType: contentType },
-    queueSize: 4,
-    partSize: 5 * 1024 * 1024,
-  });
-
-  await upload.done();
-
-  const url = publicUrlForKey(config, key);
-  logger.info('Stream uploaded to object storage', { key, provider: config.provider });
-  return url;
-}
-
-/**
- * Upload episode audio to R2
- */
-export async function uploadEpisodeAudio(episodeId: string, audio: Buffer): Promise<string> {
-  const key = `episodes/${episodeId}/audio.mp3`;
-  return uploadFile(key, audio, 'audio/mpeg');
-}
-
-/**
- * Upload a segment audio file
- */
-export async function uploadSegmentAudio(
-  episodeId: string,
-  segmentId: string,
-  audio: Buffer
-): Promise<string> {
-  const key = `episodes/${episodeId}/segments/${segmentId}.mp3`;
-  return uploadFile(key, audio, 'audio/mpeg');
-}
-
-/**
  * Get a presigned URL for private access
  */
-export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
-  if (configuredStorageProvider() === 'local') {
-    return localUrlForKey(key);
+export async function getPresignedUrl(reference: string, expiresIn = 3600): Promise<string> {
+  const attributed = await attributedStorageReference(reference);
+  if (attributed) {
+    const { descriptor } = attributed.backend;
+    const key = attributed.asset.prepared.target.key;
+    if (descriptor.kind === 'local') return localUrlForKey(key);
+    if (!descriptor.access)
+      throw new Error('Object storage attribution does not contain a captured credential revision');
+    const snapshot = historicalObjectStorageSnapshot(descriptor, await getSiteConfig());
+    const config = await getObjectStorageConfig(snapshot, undefined, descriptor.access);
+    return getSignedUrl(config.client, new GetObjectCommand({ Bucket: config.bucket, Key: key }), {
+      expiresIn,
+    });
   }
 
-  const config = getObjectStorageConfig();
+  const key = extractR2Key(reference);
+  if (configuredStorageProvider() === 'local') return localUrlForKey(key);
+  const config = await getObjectStorageConfig();
   return getSignedUrl(config.client, new GetObjectCommand({ Bucket: config.bucket, Key: key }), {
     expiresIn,
   });
 }
 
 /**
- * Read a locally stored object for the storage route. `localPathForKey` and
- * `configuredStorageProvider` are private to this module, so the route cannot
- * assemble this itself. An optional HTTP Range yields the requested slice.
+ * Read an attributed local object using its immutable captured root.
+ * An optional HTTP Range yields the requested slice.
  * Returns null when local storage is not the configured provider, the key does
  * not exist, or the range is unsatisfiable.
  */
@@ -335,53 +610,17 @@ export async function readLocalObject(
   key: string,
   range?: string | null
 ): Promise<{ body: Buffer; size: number; contentType: string; start: number; end: number } | null> {
-  if (configuredStorageProvider() !== 'local') return null;
-
-  let size: number;
-  const filePath = localPathForKey(key);
-  try {
-    size = (await stat(/* turbopackIgnore: true */ filePath)).size;
-  } catch {
-    return null;
-  }
-
-  let start = 0;
-  let end = size - 1;
-  if (range) {
-    // Only the single `bytes=a-b` form media elements actually send.
-    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
-    if (!match) return null;
-    const [, rawStart, rawEnd] = match;
-    if (rawStart === '') {
-      // Suffix range: the last N bytes.
-      const suffix = Number(rawEnd);
-      if (!Number.isFinite(suffix) || suffix <= 0) return null;
-      start = Math.max(0, size - suffix);
-    } else {
-      start = Number(rawStart);
-      if (rawEnd !== '') end = Math.min(end, Number(rawEnd));
-    }
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size)
-      return null;
-  }
-
-  const handle = await open(/* turbopackIgnore: true */ filePath, 'r');
-  try {
-    const body = Buffer.alloc(end - start + 1);
-    await handle.read(body, 0, body.length, start);
-    return { body, size, contentType: contentTypeForKey(key), start, end };
-  } finally {
-    await handle.close();
-  }
+  const filePath = await attributedLocalPath(key);
+  if (!filePath) return null;
+  return readLocalStorageFile(filePath, key, range);
 }
 
 /**
  * Extract the R2 object key from a public URL or pass through raw keys.
  */
 export function extractR2Key(urlOrKey: string): string {
-  if (urlOrKey.startsWith('file://')) {
-    return localKeyForPath(fileURLToPath(urlOrKey));
-  }
+  if (urlOrKey.startsWith('file://'))
+    throw new Error('Local storage references must use the authenticated storage route');
   if (urlOrKey.startsWith(`${LOCAL_STORAGE_URL_PREFIX}/`)) {
     return urlOrKey
       .slice(LOCAL_STORAGE_URL_PREFIX.length + 1)
@@ -389,16 +628,9 @@ export function extractR2Key(urlOrKey: string): string {
       .map(decodeURIComponent)
       .join('/');
   }
-  const r2PublicUrl = process.env.R2_PUBLIC_URL;
-  if (r2PublicUrl && urlOrKey.startsWith(r2PublicUrl)) {
-    return urlOrKey.slice(r2PublicUrl.length + 1);
-  }
-  const s3Bucket = infra('s3Bucket', 'AWS_S3_BUCKET');
-  const s3Region = infra('s3Region', 'AWS_S3_REGION') || 'us-east-1';
-  if (s3Bucket) {
-    const s3PublicUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com`;
-    if (urlOrKey.startsWith(s3PublicUrl)) return urlOrKey.slice(s3PublicUrl.length + 1);
-  }
+  const publicUrl = infra('objectStoragePublicUrl');
+  if (publicUrl && urlOrKey.startsWith(`${publicUrl.replace(/\/$/, '')}/`))
+    return urlOrKey.slice(publicUrl.replace(/\/$/, '').length + 1);
   return urlOrKey;
 }
 
@@ -409,70 +641,8 @@ export function extractR2Key(urlOrKey: string): string {
  */
 export async function resolveAudioUrl(audioUrl: string | null): Promise<string | null> {
   if (!audioUrl) return null;
-  const key = extractR2Key(audioUrl);
-  return getPresignedUrl(key);
-}
-
-/**
- * Download a file from R2 by its public URL or key
- */
-export async function downloadFile(urlOrKey: string): Promise<Buffer> {
-  if (configuredStorageProvider() === 'local') {
-    return readFile(/* turbopackIgnore: true */ localPathForKey(extractR2Key(urlOrKey)));
-  }
-
-  const config = getObjectStorageConfig();
-  const key = extractR2Key(urlOrKey);
-
-  const response = await config.client.send(
-    new GetObjectCommand({ Bucket: config.bucket, Key: key })
-  );
-
-  if (!response.Body) {
-    throw new Error(`Empty response downloading ${key} from R2`);
-  }
-
-  const chunks: Uint8Array[] = [];
-  const stream = response.Body as AsyncIterable<Uint8Array>;
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-
-  logger.info('File downloaded from object storage', { key, provider: config.provider });
-  return Buffer.concat(chunks);
-}
-
-/**
- * Stream a file from R2 directly to disk without buffering in memory.
- */
-export async function downloadToFile(urlOrKey: string, destPath: string): Promise<void> {
-  if (configuredStorageProvider() === 'local') {
-    await copyFile(/* turbopackIgnore: true */ localPathForKey(extractR2Key(urlOrKey)), destPath);
-    logger.info('File copied from local storage', { destPath });
-    return;
-  }
-
-  const config = getObjectStorageConfig();
-  const key = extractR2Key(urlOrKey);
-
-  const response = await config.client.send(
-    new GetObjectCommand({ Bucket: config.bucket, Key: key })
-  );
-
-  if (!response.Body) {
-    throw new Error(`Empty response downloading ${key} from R2`);
-  }
-
-  await pipeline(
-    Readable.from(response.Body as AsyncIterable<Uint8Array>),
-    createWriteStream(destPath)
-  );
-
-  logger.info('File streamed from object storage to disk', {
-    key,
-    destPath,
-    provider: config.provider,
-  });
+  if (audioUrl.startsWith(`${LOCAL_STORAGE_URL_PREFIX}/`)) return audioUrl;
+  return getPresignedUrl(audioUrl);
 }
 
 /**
@@ -512,107 +682,10 @@ export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): 
     return;
   }
 
-  const config = getObjectStorageConfig();
+  const config = await getObjectStorageConfig();
   await config.client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
 
   logger.info('File deleted from object storage', { key, provider: config.provider });
-}
-
-/**
- * List top-level prefixes (folders) in the bucket using S3 Delimiter.
- * Single API call — no full bucket scan.
- */
-export async function listPrefixes(): Promise<{ prefix: string }[]> {
-  if (configuredStorageProvider() === 'local') {
-    const entries = await readdir(/* turbopackIgnore: true */ localBaseDir(), {
-      withFileTypes: true,
-    }).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return [];
-      throw error;
-    });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => ({ prefix: `${entry.name}/` }));
-  }
-
-  const config = getObjectStorageConfig();
-  const response = await config.client.send(
-    new ListObjectsV2Command({
-      Bucket: config.bucket,
-      Delimiter: '/',
-    })
-  );
-
-  const prefixes = (response.CommonPrefixes ?? [])
-    .filter((cp): cp is { Prefix: string } => !!cp.Prefix)
-    .map((cp) => ({ prefix: cp.Prefix }));
-
-  logger.info('Listed object storage prefixes', {
-    count: String(prefixes.length),
-    provider: config.provider,
-  });
-  return prefixes;
-}
-
-/**
- * List all objects under a prefix with full metadata (size, lastModified).
- * Handles pagination for large prefixes.
- */
-export async function listObjectsDetailed(prefix: string): Promise<
-  {
-    key: string;
-    sizeBytes: number;
-    lastModified: Date | undefined;
-  }[]
-> {
-  if (configuredStorageProvider() === 'local') {
-    const keys = await listLocalFiles(prefix);
-    return Promise.all(
-      keys.map(async (key) => {
-        const info = await stat(/* turbopackIgnore: true */ localPathForKey(key));
-        return {
-          key,
-          sizeBytes: info.size,
-          lastModified: info.mtime,
-        };
-      })
-    );
-  }
-
-  const config = getObjectStorageConfig();
-  const objects: { key: string; sizeBytes: number; lastModified: Date | undefined }[] = [];
-  let continuationToken: string | undefined;
-
-  do {
-    const response = await config.client.send(
-      new ListObjectsV2Command({
-        Bucket: config.bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
-      })
-    );
-
-    if (response.Contents) {
-      for (const obj of response.Contents) {
-        if (obj.Key) {
-          objects.push({
-            key: obj.Key,
-            sizeBytes: obj.Size ?? 0,
-            lastModified: obj.LastModified,
-          });
-        }
-      }
-    }
-
-    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-  } while (continuationToken);
-
-  logger.info('Listed detailed objects from object storage', {
-    prefix,
-    count: String(objects.length),
-    provider: config.provider,
-  });
-  return objects;
 }
 
 /**
@@ -625,7 +698,7 @@ export async function listFiles(prefix: string): Promise<string[]> {
     return keys;
   }
 
-  const config = getObjectStorageConfig();
+  const config = await getObjectStorageConfig();
   const keys: string[] = [];
   let continuationToken: string | undefined;
 

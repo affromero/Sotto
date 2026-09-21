@@ -122,35 +122,17 @@ Detailed steps live in [02-hosting-infrastructure.md](./02-hosting-infrastructur
 
 ## 2. Configure Providers
 
-Sotto never silently chooses a provider because a key exists. Each capability must be explicit.
+Sotto requires an explicit saved provider for each capability.
 
-| Capability        | Required For                                                              | Typical Setting                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Learning AI       | Placement, class generation, writing grading, practice, memory extraction | `AI_PROVIDER=openai`, `AI_PROVIDER=anthropic`, `AI_PROVIDER=claude-code`, `AI_PROVIDER=codex`, or `AI_PROVIDER=local` |
-| TTS               | Listening audio, reference pronunciation, spoken feedback                 | `TTS_PROVIDER=openai`, `TTS_PROVIDER=elevenlabs`, `TTS_PROVIDER=kokoro`, or `TTS_PROVIDER=local`                      |
-| STT               | Speaking recordings and pronunciation feedback                            | `STT_PROVIDER=openai`, `STT_PROVIDER=elevenlabs`, `STT_PROVIDER=local`, or another supported STT provider             |
-| Storage           | Audio, recordings, workbooks, media exports                               | `STORAGE_PROVIDER=local`, `s3`, or `r2`                                                                               |
-| Live conversation | `/learn/live` only                                                        | BYOK Google key with Gemini Live access                                                                               |
+| Capability        | Required For                                                              | Saved selection examples                        |
+| ----------------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
+| Learning AI       | Placement, class generation, writing grading, practice, memory extraction | OpenAI, Anthropic, Claude Code, Codex, or Local |
+| TTS               | Listening audio, reference pronunciation, spoken feedback                 | OpenAI, ElevenLabs, Kokoro, or Local            |
+| STT               | Speaking recordings and pronunciation feedback                            | OpenAI, ElevenLabs, Local, or another STT       |
+| Storage           | Audio, recordings, workbooks, media exports                               | Local filesystem, S3, or R2                     |
+| Live conversation | `/learn/live` only                                                        | Google credential with Gemini Live access       |
 
-Smallest hosted-provider path:
-
-```env
-AI_PROVIDER=openai
-TTS_PROVIDER=openai
-STT_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-```
-
-Keyless local-agent path:
-
-```env
-AI_PROVIDER=claude-code
-TTS_PROVIDER=openai
-STT_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-```
-
-Use `AI_PROVIDER=codex` for Codex CLI. CLI model options are discovered from saved setup selections, environment lists such as `CLAUDE_CODE_MODELS` and `CODEX_MODELS`, and local CLI config. Reasoning effort options use `CLAUDE_CODE_EFFORTS` or `CODEX_MODEL_REASONING_EFFORTS`, with per-selection IDs stored as `claude-code:<model>#effort=<level>` or `codex:<model>#effort=<level>`.
+The smallest hosted path selects OpenAI for AI, TTS, and STT and saves one OpenAI credential. A local-agent path selects Claude Code or Codex for AI, then saves the speech providers it needs. CLI model options come from saved setup selections and local CLI discovery.
 
 Fully local path:
 
@@ -159,18 +141,7 @@ docker compose --profile local up -d
 docker exec sotto-ollama ollama pull qwen3
 ```
 
-```env
-AI_PROVIDER=local
-AI_BASE_URL=http://localhost:11434/v1
-AI_MODEL=qwen3
-
-STT_PROVIDER=local
-STT_BASE_URL=http://localhost:8001/v1
-STT_MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
-
-TTS_PROVIDER=kokoro
-TTS_BASE_URL=http://localhost:8000
-```
+In `/welcome`, save Local AI at `http://localhost:11434/v1`, Local STT at `http://localhost:8001/v1`, and Kokoro at `http://localhost:8000`.
 
 Provider-extension details live in [05-provider-extension-guide.md](./05-provider-extension-guide.md).
 
@@ -552,18 +523,18 @@ Test restore before treating the deployment as production.
 
 ## Troubleshooting
 
-| Problem                              | Check                                                     | Fix                                                                                                        |
-| ------------------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| App does not open locally            | Containers and port `3000`                                | `docker compose ps`, then `docker compose logs -f`                                                         |
-| Setup asks for a provider capability | Explicit `AI_PROVIDER`, `TTS_PROVIDER`, or `STT_PROVIDER` | Set the provider and matching key/base URL                                                                 |
-| Class stays in composing/generating  | Redis, worker process, provider logs                      | Start workers with `npm run dev:workers` or inspect compose worker logs                                    |
-| Listening audio never becomes ready  | TTS provider and storage                                  | Verify `TTS_PROVIDER`, provider key, `STORAGE_PROVIDER`, and storage write permissions                     |
-| Speaking grading fails               | Browser mic permission and STT provider                   | Allow microphone access and verify `STT_PROVIDER`                                                          |
-| iPad cannot reach the server         | Network, tunnel, DNS, HTTPS                               | Use `/settings/devices`, a private tunnel, or Caddy with a real domain                                     |
-| Workbook print looks wrong           | Browser print settings                                    | Use `Save as PDF`, enable backgrounds if the browser offers it, and use the print-optimized worksheet page |
-| Sourced class URL fails              | Source extraction                                         | Try a readable article URL, paste text into course notes, or use a topic chip                              |
-| TUI cannot log in                    | Pairing code expiry or server URL                         | Generate a new code from `/settings/devices` and confirm the client can reach the URL                      |
-| Live conversation is locked          | Google BYOK key                                           | Add a Google key with Gemini Live access                                                                   |
+| Problem                              | Check                                               | Fix                                                                                                        |
+| ------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| App does not open locally            | Containers and port `3000`                          | `docker compose ps`, then `docker compose logs -f`                                                         |
+| Setup asks for a provider capability | Saved provider selection and credential or base URL | Complete the provider card in `/welcome` or Admin                                                          |
+| Class stays in composing/generating  | Redis, worker process, provider logs                | Start workers with `npm run dev:workers` or inspect compose worker logs                                    |
+| Listening audio never becomes ready  | TTS provider and storage                            | Verify the saved TTS credential, storage configuration, and storage write permissions                      |
+| Speaking grading fails               | Browser mic permission and STT provider             | Allow microphone access and verify the saved STT provider                                                  |
+| iPad cannot reach the server         | Network, tunnel, DNS, HTTPS                         | Use `/settings/devices`, a private tunnel, or Caddy with a real domain                                     |
+| Workbook print looks wrong           | Browser print settings                              | Use `Save as PDF`, enable backgrounds if the browser offers it, and use the print-optimized worksheet page |
+| Sourced class URL fails              | Source extraction                                   | Try a readable article URL, paste text into course notes, or use a topic chip                              |
+| TUI cannot log in                    | Pairing code expiry or server URL                   | Generate a new code from `/settings/devices` and confirm the client can reach the URL                      |
+| Live conversation is locked          | Google BYOK key                                     | Add a Google key with Gemini Live access                                                                   |
 
 ## Use Case Scripts
 
@@ -606,7 +577,7 @@ Test restore before treating the deployment as production.
 ### D. Run with no cloud AI
 
 1. Start the local profile with Ollama, faster-whisper, and Kokoro.
-2. Set `AI_PROVIDER=local`, `STT_PROVIDER=local`, and `TTS_PROVIDER=kokoro`.
+2. Select Local AI, Local STT, and Kokoro in `/welcome` or Admin.
 3. Pull a multilingual model in Ollama.
 4. Run `npm run dev` or the local compose stack.
 5. Create the course and class normally.

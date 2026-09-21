@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
 import { higherLevel } from '@/lib/cefr-levels';
 import type { CefrLevel, PlacementSource } from '@sotto/shared';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 /**
  * Create the (native, target) course at `level`, or raise an existing course's
@@ -17,12 +18,13 @@ import type { CefrLevel, PlacementSource } from '@sotto/shared';
  */
 export async function createOrRaiseCourse(
   userId: string,
+  execution: SottoProviderExecution,
   native: string,
   target: string,
   level: CefrLevel,
-  source?: PlacementSource,
+  source?: PlacementSource
 ) {
-  const curriculum = await getOrCreateCurriculum(userId, native, target);
+  const curriculum = await getOrCreateCurriculum(userId, execution, native, target);
 
   const existing = await prisma.course.findUnique({
     where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },

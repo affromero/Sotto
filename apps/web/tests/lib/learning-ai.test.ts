@@ -3,9 +3,8 @@
  * language-learning generator (placement, classes, listening, speaking,
  * curriculum). Verifies behavior across the two supported paths:
  *  - BYOK: the learner's stored key wins, model comes from the registry.
- *  - Local agent: no key + AI_PROVIDER=claude-code → no-key claude-code path.
- *  - Local server: no key + AI_PROVIDER=local → keyless "local:<model>" path
- *    (Ollama / vLLM / LM Studio), requiring AI_MODEL + AI_BASE_URL.
+ *  - Local agent: no key + shared provider config → no-key claude-code path.
+ *  - Local server: no key + shared local config → keyless "local:<model>" path.
  *  - Neither available → a clear, actionable error.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -20,6 +19,16 @@ const mockGetProviderForModel = vi.fn();
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: (...args: unknown[]) => mockGetAiProviderMeta(...args),
   getProviderForModel: (...args: unknown[]) => mockGetProviderForModel(...args),
+  providerRequiresAiKey: (provider: string) =>
+    !['claude-code', 'codex', 'local'].includes(provider),
+}));
+
+vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: {} }));
+vi.mock('@/lib/providers/ai', () => ({ aiProviderRules: () => [] }));
+
+const mockGetSiteConfig = vi.fn();
+vi.mock('@/lib/site-config', () => ({
+  getSiteConfig: (...args: unknown[]) => mockGetSiteConfig(...args),
 }));
 
 const mockGetAutoModelConfig = vi.fn();
@@ -29,7 +38,33 @@ vi.mock('@/lib/auto-model-config', () => ({
     new Set(config.disabledSystemProviders ?? []),
 }));
 
-import { resolveLearningAi } from '@/lib/learning-ai';
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: (_database: unknown, operation: (database: object) => unknown) => operation({}),
+}));
+
+vi.mock('@/lib/sidedoor/credentials/runtime/credential-execution', () => ({
+  capturePreferredSottoExecutionCredential: async () => {
+    const selected = await mockGetAiKey();
+    if (!selected) return null;
+    return {
+      provider: selected.provider,
+      recipient: { userId: 'user-1' },
+      binding: { endpoint: selected.endpoint },
+      selected: { credential: { values: { apiKey: selected.apiKey } } },
+    };
+  },
+  sottoExecutionCredentialFields: (credential: {
+    selected: { credential: { values: { apiKey: string } } };
+  }) => ({ apiKey: credential.selected.credential.values.apiKey, extraData: {} }),
+}));
+
+import { resolveCapturedLearningAi } from '@/lib/learning-ai';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+
+async function resolveLearningAi(userId: string) {
+  const resolved = await resolveCapturedLearningAi(userId, blockedProviderExecution(userId));
+  return { provider: resolved.provider, model: resolved.model, apiKey: resolved.apiKey };
+}
 
 // Default: configured AI provider differs from the BYOK provider, so the BYOK
 // branch falls back to the provider's registry default model. Individual tests
@@ -45,10 +80,19 @@ function stubAutoConfig(
   });
 }
 
+function stubInfra(
+  aiProvider: string | null = null,
+  aiModel: string | null = null,
+  aiBaseUrl: string | null = null
+) {
+  mockGetSiteConfig.mockResolvedValue({ aiProvider, aiModel, aiBaseUrl });
+}
+
 describe('resolveLearningAi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubAutoConfig();
+    stubInfra();
     mockGetProviderForModel.mockImplementation((id: string) =>
       id?.startsWith('claude-code:')
         ? 'claude-code'
@@ -112,7 +156,7 @@ describe('resolveLearningAi', () => {
 
   it('falls back to the keyless claude-code agent when no BYOK key and AI_PROVIDER=claude-code', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'claude-code');
+    stubInfra('claude-code');
     mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'claude-sonnet-4-6' });
 
     const resolved = await resolveLearningAi('user-1');
@@ -124,7 +168,7 @@ describe('resolveLearningAi', () => {
 
   it('uses the owner-configured claude-code model (wizard CLI picker) when set', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'claude-code');
+    stubInfra('claude-code');
     stubAutoConfig('claude-code', 'opus');
     mockGetProviderForModel.mockImplementation((id: string) =>
       id === 'opus' ? 'claude-code' : null
@@ -139,7 +183,7 @@ describe('resolveLearningAi', () => {
 
   it('uses the owner-configured codex model and effort when AI_PROVIDER=codex', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'codex');
+    stubInfra('codex');
     stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
 
     const resolved = await resolveLearningAi('user-1');
@@ -153,7 +197,7 @@ describe('resolveLearningAi', () => {
     // but the onboarding-era infra AI_PROVIDER=codex kept winning, so the
     // change silently did nothing and codex was still invoked.
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'codex');
+    stubInfra('codex');
     stubAutoConfig('claude-code', 'claude-code:sonnet');
     mockGetProviderForModel.mockImplementation((id: string) =>
       id === 'claude-code:sonnet' ? 'claude-code' : null
@@ -165,10 +209,9 @@ describe('resolveLearningAi', () => {
     expect(resolved).toEqual({ provider: 'claude-code', model: 'claude-code:sonnet' });
   });
 
-  it('uses CODEX_MODEL when Codex is selected without an owner model', async () => {
+  it('uses the shared Codex model when Codex is selected without an owner model', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'codex');
-    vi.stubEnv('CODEX_MODEL', 'gpt-5.5');
+    stubInfra('codex', 'gpt-5.5');
 
     const resolved = await resolveLearningAi('user-1');
 
@@ -177,7 +220,7 @@ describe('resolveLearningAi', () => {
 
   it('does not use claude-code when the admin disabled it', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'claude-code');
+    stubInfra('claude-code');
     stubAutoConfig('anthropic', 'claude-sonnet-4-6', ['claude-code']);
 
     await expect(resolveLearningAi('user-1')).rejects.toThrow(/Claude Code is disabled/);
@@ -185,9 +228,7 @@ describe('resolveLearningAi', () => {
 
   it('falls back to a keyless local server when no BYOK key and AI_PROVIDER=local', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'local');
-    vi.stubEnv('AI_MODEL', 'qwen3');
-    vi.stubEnv('AI_BASE_URL', 'http://localhost:11434/v1');
+    stubInfra('local', 'qwen3', 'http://localhost:11434/v1');
 
     const resolved = await resolveLearningAi('user-1');
 
@@ -195,32 +236,28 @@ describe('resolveLearningAi', () => {
     // dispatch to the local provider without the registry guardrail.
     expect(resolved).toEqual({ provider: 'local', model: 'local:qwen3' });
     expect(resolved.apiKey).toBeUndefined();
-    // The local path resolves the model from env, not the registry.
+    // The local path resolves the model from shared configuration, not the registry.
     expect(mockGetAiProviderMeta).not.toHaveBeenCalled();
   });
 
-  it('throws when AI_PROVIDER=local but AI_MODEL is missing', async () => {
+  it('throws when the shared local model is missing', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'local');
-    vi.stubEnv('AI_BASE_URL', 'http://localhost:11434/v1');
+    stubInfra('local', null, 'http://localhost:11434/v1');
 
-    await expect(resolveLearningAi('user-1')).rejects.toThrow(/AI_MODEL/);
+    await expect(resolveLearningAi('user-1')).rejects.toThrow(/local model/i);
   });
 
-  it('throws when AI_PROVIDER=local but AI_BASE_URL is missing', async () => {
+  it('throws when the shared local endpoint is missing', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'local');
-    vi.stubEnv('AI_MODEL', 'qwen3');
+    stubInfra('local', 'qwen3');
 
-    await expect(resolveLearningAi('user-1')).rejects.toThrow(/AI_BASE_URL/);
+    await expect(resolveLearningAi('user-1')).rejects.toThrow(/local AI endpoint/i);
   });
 
   it('throws an actionable error when no BYOK key and no local agent configured', async () => {
     mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('AI_PROVIDER', 'openai');
+    stubInfra('openai');
 
-    await expect(resolveLearningAi('user-1')).rejects.toThrow(
-      /AI_PROVIDER=claude-code|add an API key/i
-    );
+    await expect(resolveLearningAi('user-1')).rejects.toThrow(/select a local CLI|add an API key/i);
   });
 });

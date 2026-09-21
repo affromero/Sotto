@@ -4,30 +4,19 @@ import { voicePreviewSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { logUsage } from '@/lib/usage-logger';
-import { getByokKey } from '@/lib/byok';
+import {
+  captureSottoExecutionCredential,
+  admitSottoExecutionCredential,
+  sottoExecutionCredentialFields,
+} from '@/lib/sidedoor/credentials/runtime/credential-execution';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { prismaUnfiltered } from '@/lib/prisma';
+import type { Prisma } from '@/generated/prisma/client';
+import { isAccessError } from 'thesidedoor-core/access';
+import { accessErrorStatus } from 'thesidedoor-core/access/http';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
 import { errorResponse } from '@/lib/api-response';
-
-function getPlatformPreviewKey(provider: TtsProviderId): string | undefined {
-  switch (provider) {
-    case 'elevenlabs':
-      return process.env.ELEVENLABS_API_KEY;
-    case 'openai':
-      return process.env.OPENAI_API_KEY;
-    case 'cartesia':
-      return process.env.CARTESIA_API_KEY;
-    case 'hume':
-      return process.env.HUME_API_KEY;
-    case 'fal':
-      return process.env.FAL_KEY;
-    case 'replicate':
-      return process.env.REPLICATE_API_TOKEN;
-    case 'minimax':
-      return process.env.FAL_KEY;
-    case 'mistral':
-      return process.env.MISTRAL_API_KEY;
-  }
-}
 
 export async function POST(request: NextRequest) {
   const authed = await authenticateRequest(request);
@@ -54,16 +43,53 @@ export async function POST(request: NextRequest) {
   const providerName: TtsProviderId = provider;
 
   try {
-    const byokKey = await getByokKey(userId, providerName);
-    const apiKey = byokKey || getPlatformPreviewKey(providerName);
-
-    if (!apiKey) {
+    const authorize = async (database: Prisma.TransactionClient) => {
+      await requireOriginalSottoAdmission(database, request, authed);
+      return { userId };
+    };
+    const saved = await sottoTransaction(prismaUnfiltered, (database) =>
+      captureSottoExecutionCredential(
+        database,
+        authorize,
+        'tts',
+        providerName,
+        true,
+        request.signal
+      )
+    );
+    const credentials = saved ? sottoExecutionCredentialFields(saved) : null;
+    if (!credentials && providerName !== 'local' && providerName !== 'kokoro') {
       return errorResponse(`No ${providerName} API key available`, 400);
     }
 
-    const ttsProvider = await createTtsProviderAsync(providerName, apiKey);
-    audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
+    const ttsProvider = await createTtsProviderAsync(
+      providerName,
+      { userId, authorize, credential: saved, signal: request.signal },
+      credentials?.apiKey,
+      credentials?.extraData
+    );
+    if (
+      ![
+        'playht',
+        'openai',
+        'deepgram',
+        'rime',
+        'hume',
+        'cartesia',
+        'elevenlabs',
+        'local',
+        'kokoro',
+      ].includes(providerName)
+    )
+      await sottoTransaction(prismaUnfiltered, async (database) => {
+        if (saved) await admitSottoExecutionCredential(database, authorize, saved, request.signal);
+        else await authorize(database);
+        request.signal.throwIfAborted();
+      });
+    audioBuffer = await ttsProvider.generateSpeech({ text, voiceId, signal: request.signal });
   } catch (err) {
+    if (isAccessError(err)) return errorResponse(err.code, accessErrorStatus(err));
+    if (request.signal.aborted) return errorResponse('Preview cancelled.', 499);
     const msg = err instanceof Error ? err.message : '';
     const isInvalidId =
       msg.includes('422') ||
@@ -76,7 +102,7 @@ export async function POST(request: NextRequest) {
   }
 
   const meta = getProviderMeta(providerName);
-  logUsage({
+  await logUsage({
     service: providerName,
     category: 'voice_preview',
     inputTokens: text.length,

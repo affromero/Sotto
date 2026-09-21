@@ -1,3 +1,5 @@
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+
 export type AgentUsageProviderId = string;
 export type AgentUsageProviderCategory = 'agent' | 'audio';
 export type AgentUsageProviderStatus = 'ready' | 'action_required' | 'unavailable';
@@ -45,9 +47,7 @@ export interface AgentUsageCacheEntry {
   value: AgentUsageProvider;
 }
 
-export interface UsageProviderContext {
-  userId: string;
-}
+export type UsageProviderContext = SottoProviderExecution;
 
 export type UsageProviderAdapter = (
   context: UsageProviderContext

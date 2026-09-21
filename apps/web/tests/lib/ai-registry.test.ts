@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
+import { modelPresets } from 'thesidedoor-core/ai/catalog';
 import {
   getCheapestModelForProvider,
+  getAiProviderMeta,
   getAiProviderIdsWithPricing,
   isValidModelId,
   resolveAiModelAndProvider,
@@ -81,6 +83,14 @@ describe('isValidModelId', () => {
 });
 
 describe('getAiProviderIdsWithPricing', () => {
+  it('enriches app pricing without changing shared presets for another consumer', () => {
+    expect(getAiProviderMeta('anthropic').models[0]?.pricing).toEqual({
+      inputPerMTok: 1,
+      outputPerMTok: 5,
+    });
+    expect(modelPresets('anthropic')[0]).not.toHaveProperty('pricing');
+    expect(getAiProviderMeta('anthropic').defaultModel).toBe('claude-haiku-4-5-20251001');
+  });
   it('returns only providers whose models have pricing data', () => {
     const ids = getAiProviderIdsWithPricing();
     expect(ids).toContain('anthropic');

@@ -1,18 +1,15 @@
 import { prisma } from '@/lib/prisma';
-import { resolveLearningAi } from '@/lib/learning-ai';
-import { getAiKey } from '@/lib/byok';
-import {
-  getProviderForModel,
-  providerRequiresAiKey,
-  type AiProviderId,
-} from '@/lib/providers/ai-registry';
+import { resolveCapturedLearningAi, resolveCapturedLearningAiForProvider } from '@/lib/learning-ai';
+import { getProviderForModel, type AiProviderId } from '@/lib/providers/ai-registry';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import type { ReferenceInput } from '@/lib/reference-validator';
 import { runReferenceVerification } from './pipeline';
 
 async function resolveEpisodeVerificationAi(
   episodeId: string,
   userId: string,
-  useAdminCredits: boolean
+  allowSharedCredential: boolean,
+  execution: SottoProviderExecution
 ) {
   const episode = await prisma.episode.findUniqueOrThrow({
     where: { id: episodeId },
@@ -20,7 +17,7 @@ async function resolveEpisodeVerificationAi(
   });
 
   if (!episode.aiModel) {
-    return resolveLearningAi(userId);
+    return resolveCapturedLearningAi(userId, execution);
   }
 
   const provider = getProviderForModel(episode.aiModel) ?? episode.aiProvider;
@@ -28,15 +25,13 @@ async function resolveEpisodeVerificationAi(
     throw new Error(`Cannot resolve the AI provider for model "${episode.aiModel}".`);
   }
 
-  const key =
-    providerRequiresAiKey(provider) && !useAdminCredits
-      ? await getAiKey(userId, provider as AiProviderId)
-      : null;
-  if (providerRequiresAiKey(provider) && !useAdminCredits && !key) {
-    throw new Error(`AI key for provider "${provider}" is required for reference verification.`);
-  }
-
-  return { provider, model: episode.aiModel, apiKey: key?.apiKey };
+  return resolveCapturedLearningAiForProvider(
+    userId,
+    provider as AiProviderId,
+    episode.aiModel,
+    execution,
+    allowSharedCredential
+  );
 }
 
 /**
@@ -57,12 +52,18 @@ export async function verifyEpisodeReferences(
   userId: string,
   topic: string,
   turns: Array<{ speaker: string; text: string }>,
-  useAdminCredits = false
+  execution: SottoProviderExecution,
+  allowSharedCredential = false
 ): Promise<ReferenceVerificationSummary> {
   const references = await prisma.reference.findMany({ where: { episodeId } });
   if (references.length === 0) return { total: 0, verified: 0, allVerified: false };
 
-  const ai = await resolveEpisodeVerificationAi(episodeId, userId, Boolean(useAdminCredits));
+  const ai = await resolveEpisodeVerificationAi(
+    episodeId,
+    userId,
+    Boolean(allowSharedCredential),
+    execution
+  );
   const inputs: ReferenceInput[] = references.map((reference) => ({
     id: reference.id,
     number: reference.number,
@@ -78,9 +79,7 @@ export async function verifyEpisodeReferences(
     inputs,
     turns,
     topic,
-    ai.apiKey,
-    ai.model,
-    ai.provider,
+    ai,
     references.length
   );
 

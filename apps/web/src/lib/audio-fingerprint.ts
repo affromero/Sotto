@@ -1,9 +1,7 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import { executeMediaProcess } from './audio/media-process';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-
-const execFileAsync = promisify(execFile);
+import { z } from 'zod';
 
 const SIMILARITY_THRESHOLD = 0.85;
 const DURATION_TOLERANCE = 0.15; // 15% — only compare episodes within this duration range
@@ -17,11 +15,25 @@ interface FingerprintResult {
  * Generate a Chromaprint audio fingerprint using fpcalc.
  * Analyzes the full audio file (not just first 120s).
  */
-export async function generateFingerprint(audioPath: string): Promise<FingerprintResult> {
-  const { stdout } = await execFileAsync('fpcalc', ['-raw', '-json', '-length', '0', audioPath]);
-  const result = JSON.parse(stdout) as { duration: number; fingerprint: number[] };
+export async function generateFingerprint(
+  audioPath: string,
+  signal?: AbortSignal
+): Promise<FingerprintResult> {
+  const { stdout } = await executeMediaProcess(
+    'fpcalc',
+    ['-raw', '-json', '-length', '0', audioPath],
+    { signal }
+  );
+  signal?.throwIfAborted();
+  const result = z
+    .object({
+      duration: z.number().nonnegative(),
+      fingerprint: z.array(z.number().int().min(-2147483648).max(4294967295)),
+    })
+    .parse(JSON.parse(stdout));
   return {
-    fingerprint: result.fingerprint,
+    // PostgreSQL Int[] stores signed words; preserve Chromaprint's exact 32 bits.
+    fingerprint: result.fingerprint.map((word) => word | 0),
     duration: Math.round(result.duration),
   };
 }
@@ -30,10 +42,7 @@ export async function generateFingerprint(audioPath: string): Promise<Fingerprin
  * Compare two Chromaprint fingerprints using bit-level hamming distance.
  * Returns similarity score from 0 (no match) to 1 (identical).
  */
-export function compareFingerprints(
-  a: number[],
-  b: number[],
-): number {
+export function compareFingerprints(a: number[], b: number[]): number {
   const len = Math.min(a.length, b.length);
   if (len === 0) return 0;
 
@@ -70,7 +79,7 @@ interface DuplicateCandidate {
 export async function findDuplicates(
   fingerprint: number[],
   duration: number,
-  excludeEpisodeId?: string,
+  excludeEpisodeId?: string
 ): Promise<DuplicateCandidate[]> {
   const minDuration = Math.round(duration * (1 - DURATION_TOLERANCE));
   const maxDuration = Math.round(duration * (1 + DURATION_TOLERANCE));

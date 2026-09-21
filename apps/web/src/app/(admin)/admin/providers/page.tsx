@@ -9,7 +9,7 @@ import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getTestableProviders } from '@/lib/admin/testable-providers';
 import { ProvidersTabs } from './ProvidersTabs';
-import styles from '../../adminTheme.styles';
+import styles from '@/app/(admin)/adminTheme.styles';
 
 export const metadata = { title: 'Providers & models · Sotto admin' };
 

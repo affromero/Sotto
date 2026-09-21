@@ -1,4 +1,7 @@
 import { stat } from 'fs/promises';
+import { abortable } from 'thesidedoor-core/runtime/stream';
+import { AccessError } from 'thesidedoor-core/access';
+import { captureLocalUsageAccount } from '../account';
 import { homedir } from 'os';
 import path from 'path';
 import { logger } from '../../logger';
@@ -7,6 +10,7 @@ import type {
   AgentUsageCredits,
   AgentUsageProvider,
   AgentUsageWindow,
+  UsageProviderContext,
 } from '../types';
 import {
   buildProvider,
@@ -163,13 +167,16 @@ function parseCodexCredentials(value: unknown, authMtimeMs: number): CodexCreden
   };
 }
 
-async function getCodexCredentials(): Promise<CodexCredentials | null> {
+async function getCodexCredentials(signal?: AbortSignal): Promise<CodexCredentials | null> {
+  signal?.throwIfAborted();
   const codexHome = process.env.CODEX_HOME || path.join(homedir(), '.codex');
   const authPath = path.join(codexHome, 'auth.json');
+  const statResult = stat(authPath).catch(() => null);
   const [authJson, authStat] = await Promise.all([
-    readJson(authPath),
-    stat(authPath).catch(() => null),
+    readJson(authPath, signal),
+    signal ? abortable(statResult, signal) : statResult,
   ]);
+  signal?.throwIfAborted();
   if (!authJson || !authStat) return null;
   return parseCodexCredentials(authJson, authStat.mtimeMs);
 }
@@ -251,13 +258,28 @@ export function parseCodexUsagePayload(
   };
 }
 
-export async function getCodexUsageProvider(): Promise<AgentUsageProvider> {
-  const credentials = await getCodexCredentials();
-  const cacheKey = credentials?.key ?? 'no-auth';
+export async function getCodexUsageProvider(
+  context: UsageProviderContext
+): Promise<AgentUsageProvider> {
+  const { credentials, admission, signal, fingerprint } = await captureLocalUsageAccount(
+    context,
+    'codex',
+    getCodexCredentials
+  );
+  const cacheKey = fingerprint();
   const now = Date.now();
   if (codexCache && codexCache.key === cacheKey && codexCache.expiresAt > now) {
-    return codexCache.value;
+    return structuredClone(codexCache.value);
   }
+  const publish = async (provider: AgentUsageProvider) => {
+    await admission.validate(signal);
+    codexCache = {
+      key: cacheKey,
+      expiresAt: Date.now() + ERROR_CACHE_TTL_MS,
+      value: structuredClone(provider),
+    };
+    return provider;
+  };
 
   if (!credentials) {
     const provider = buildProvider({
@@ -272,17 +294,21 @@ export async function getCodexUsageProvider(): Promise<AgentUsageProvider> {
       credits: null,
       limitReached: false,
     });
-    codexCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider);
   }
 
   try {
+    const transport = admission.createTransport([
+      { method: 'GET', url: 'https://chatgpt.com/backend-api/wham/usage' },
+    ]);
     const { response, payload } = await fetchJsonWithTimeout(
       'https://chatgpt.com/backend-api/wham/usage',
       {
+        signal,
         headers: { Authorization: `Bearer ${credentials.accessToken}` },
       },
-      CODEX_TIMEOUT_MS
+      CODEX_TIMEOUT_MS,
+      transport.authenticatedFetch
     );
 
     if (!response.ok) {
@@ -302,8 +328,7 @@ export async function getCodexUsageProvider(): Promise<AgentUsageProvider> {
         credits: null,
         limitReached: false,
       });
-      codexCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider);
     }
 
     const parsed = parseCodexUsagePayload(payload);
@@ -324,8 +349,7 @@ export async function getCodexUsageProvider(): Promise<AgentUsageProvider> {
         credits: null,
         limitReached: false,
       });
-      codexCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-      return provider;
+      return await publish(provider);
     }
 
     const provider = buildProvider({
@@ -340,12 +364,12 @@ export async function getCodexUsageProvider(): Promise<AgentUsageProvider> {
       credits: parsed.credits,
       limitReached: parsed.limitReached,
     });
-    codexCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return await publish(provider);
   } catch (error) {
-    logger.warn('Failed to fetch Codex usage status', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof AggregateError) throw error;
+    signal.throwIfAborted();
+    if (error instanceof AccessError) throw error;
+    logger.warn('Failed to fetch Codex usage status');
     const provider = buildProvider({
       id: 'codex',
       category: 'agent',
@@ -358,8 +382,7 @@ export async function getCodexUsageProvider(): Promise<AgentUsageProvider> {
       credits: null,
       limitReached: false,
     });
-    codexCache = { key: cacheKey, expiresAt: now + ERROR_CACHE_TTL_MS, value: provider };
-    return provider;
+    return publish(provider);
   }
 }
 

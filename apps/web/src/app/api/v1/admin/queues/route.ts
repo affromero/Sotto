@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) return errorResponse('Unauthorized', 401);
-  if (!(await isUserAdmin(authed.userId))) return errorResponse('Forbidden', 403);
+  if (!(await isUserAdmin(authed))) return errorResponse('Forbidden', 403);
 
   const redis = getRedisClient();
   const queues: Record<

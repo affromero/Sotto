@@ -53,13 +53,13 @@ curl -fsSL https://sotto.fm/install.sh | bash
 
 The installer pulls the pre-built images, asks how to connect your AI (an API key, your local **Claude Code or Codex CLI** with no key, or your Claude agent on a VPS over SSH), writes config to `~/.sotto`, and starts everything. Local CLI login refreshes travel through a networkless credential-sync sidecar that copies only the CLI auth JSON into the app containers.
 
-The installer checks image availability before changing configuration and pins a matching web and worker release. OpenAI can supply generation and speech with one key. Other agents need a separately configured speech provider for listening and speaking.
+The installer checks image availability before changing configuration and pins a matching web and worker release. It initializes Sidedoor and prints a 15-minute owner claim code. OpenAI can supply generation and speech with one key. Other agents need a separately configured speech provider for listening and speaking.
 
 **Desktop controls:** Unsigned preview launchers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Install the stack with the terminal command above first. Sotto Host starts and stops that installation. Your OS may require an explicit security override. On Windows, the launcher must be pointed at the installation inside WSL; using the browser from WSL is the simpler path.
 
-1. Open the local URL printed by the installer and enter its generated instance password.
-2. Choose your languages and providers in the welcome wizard, then take the placement test.
-3. Start your first class gated by mastery, or sharpen one skill in ungated practice
+1. Open the local URL, enter the owner claim code, and set the generated instance password as the owner password.
+2. Enroll an Apple, Android, or browser passkey, then configure languages and providers.
+3. Take the placement test and start your first class.
 
 Manage it from `~/.sotto`: `docker compose logs -f`, `docker compose down`.
 
@@ -220,7 +220,7 @@ use different evidence and should evolve independently.
 - **[PostgreSQL](https://www.postgresql.org/) 16 + [Prisma](https://www.prisma.io/) 7:** user data, vocabulary graph, progress via a node postgres driver adapter.
 - **[Redis](https://redis.io/) 7 + [BullMQ](https://docs.bullmq.io/):** heavy async work such as generation, scoring, and audio stitching.
 - **Explicit provider resolution:** `resolveLearningAi`, `resolveTtsProvider`, and `resolveSttProvider` pick the configured provider, never by key availability.
-- **Keyless local agent:** `AI_PROVIDER=claude-code` or `codex` routes every LLM call through your local CLI; no outbound API key required.
+- **Keyless local agent:** select Claude Code or Codex to route generation through your local CLI with no outbound API key.
 - **[MCP](https://modelcontextprotocol.io/) server** (`packages/mcp`): your local agent calls `ingest_agent_output` and other Sotto tools directly.
 - **Web + PWA:** [Next.js](https://nextjs.org/) + [React](https://react.dev/), installable from any browser; a [Tauri](https://tauri.app/) desktop launcher runs the stack locally with no terminal.
 
@@ -259,6 +259,10 @@ An update dumps the database, refreshes the compose file, pulls the images, runs
 migrations, and waits for the health endpoint before calling it done. If the
 stack does not come up, the dump and `sotto-host rollback` are both there.
 Migrations are forward-only, so a rollback returns the images, not the schema.
+The Sidedoor cutover copies installed provider, model, storage, learner, and
+encrypted credential state in one transaction while the active release keeps
+running. Source tables are removed only after the candidate passes its health
+check. A conversion error rolls back the transaction and stops the update.
 
 Installed before this command existed? Fetch it once:
 
@@ -288,41 +292,35 @@ docker compose --profile local up -d        # ollama + whisper + kokoro
 docker exec sotto-ollama ollama pull qwen3   # any multilingual model: qwen3 / gemma3 / llama3.3
 ```
 
-Then point Sotto at them in `.env.local`: explicit selection, no cloud fallback:
+Open Sotto's welcome flow or Admin settings and save these connections:
 
-```dotenv
-AI_PROVIDER=local    AI_BASE_URL=http://localhost:11434/v1   AI_MODEL=qwen3
-STT_PROVIDER=local   STT_BASE_URL=http://localhost:8001/v1   STT_MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
-TTS_PROVIDER=kokoro  TTS_BASE_URL=http://localhost:8000
-```
+| Capability         | Provider | Base URL                    | Model                                       |
+| ------------------ | -------- | --------------------------- | ------------------------------------------- |
+| AI                 | Local    | `http://localhost:11434/v1` | `qwen3`                                     |
+| Speech recognition | Local    | `http://localhost:8001/v1`  | `deepdml/faster-whisper-large-v3-turbo-ct2` |
+| Speech generation  | Kokoro   | `http://localhost:8000`     | optional                                    |
 
-Multilingual by design: **Qwen3 / Gemma 3** (100+ languages) for generation, **Whisper large-v3-turbo** (99+) for pronunciation, **Kokoro** (8 languages) for narration. A GPU helps the LLM but is not required. Whisper and Kokoro are comfortable on CPU. To bring your own local TTS, keep the `TTS_BASE_URL` pattern with `TTS_PROVIDER=local`; your sidecar only needs `GET /health`, `GET /voices`, and `POST /tts`. See [docs/05-provider-extension-guide.md](docs/05-provider-extension-guide.md).
+Sotto stores provider selection, endpoints, models, voice IDs, and encrypted credentials through Sidedoor. It does not read provider configuration from the process environment. Multilingual support includes **Qwen3 / Gemma 3** for generation, **Whisper large-v3-turbo** for pronunciation, and **Kokoro** for narration. A GPU helps the LLM but is not required. Whisper and Kokoro run comfortably on CPU. A custom local TTS sidecar only needs `GET /health`, `GET /voices`, and `POST /tts`. See [docs/05-provider-extension-guide.md](docs/05-provider-extension-guide.md).
 
 <details>
-<summary><b>Bring your own agent / keys (.env.local)</b></summary>
+<summary><b>Bring your own agent or provider credentials</b></summary>
 
 <br>
 
-Route everything through a local agent when running from source:
+Choose Claude Code or Codex in the welcome flow when running from source. Optional SSH agent settings remain deployment environment variables because they describe the runtime connection:
 
 ```dotenv
-AI_PROVIDER=claude-code            # Codex is also supported in source installs
-# CLAUDE_CODE_SSH_HOST=you@vps     # ...or your agent on a VPS, over SSH
+# CLAUDE_CODE_SSH_HOST=you@vps
 # CODEX_SSH_HOST=you@vps
 # SOTTO_AGENT_SSH_KEY_PATH=/home/sotto/.ssh/id_ed25519
 # SOTTO_AGENT_SSH_KNOWN_HOSTS_PATH=/home/sotto/.ssh/known_hosts
 ```
 
-Or one OpenAI key for everything:
-
-```dotenv
-AI_PROVIDER=openai
-TTS_PROVIDER=openai
-STT_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-```
+You can also select OpenAI for AI, speech generation, and speech recognition, then save one OpenAI credential in the welcome flow. Sidedoor encrypts it and shares it across those capabilities.
 
 `.env.oss.example` defaults to local PostgreSQL, local Redis, local file storage under `.sotto/storage`, and payments disabled.
+
+Dedicated storage ownership connections require `DATABASE_URL` to reach PostgreSQL directly or through session pooling. Transaction pooling cannot preserve their session advisory locks. The standard Compose database connection meets this requirement.
 
 </details>
 
@@ -337,7 +335,7 @@ The product runs on your own stack: you run it, then reach it from anywhere.
 - **Terminal.** `sotto` is a headless Rust + ratatui client. Learn from a tmux pane while you code, with native audio playback and mic recording. See [Terminal client](#terminal-client-sotto) below.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
-**One owner, local profiles.** A self-hosted instance starts with one owner and no login ceremony. The owner can add isolated learner profiles, switch between them, and keep each learner's courses, progress, vocabulary graph, and keys on the same controlled stack.
+**One owner, local profiles.** A self-hosted instance starts with an explicit owner claim. The owner can enroll passkeys, add isolated learner profiles, switch between them, and keep each learner's courses, progress, vocabulary graph, and keys on the same controlled stack.
 
 **Teacher-run mode is the natural classroom shape.** The current profile model already points there: a teacher self-hosts Sotto, creates one profile per student, and keeps practice data on school-controlled infrastructure. The next product layer should add teacher-authored homework, class-prep scenarios, per-student follow-up queues, and reviewable AI feedback so Sotto prepares students between lessons without replacing the teacher.
 
@@ -380,7 +378,7 @@ The typed client is generated from the same Zod schemas the web app uses (`packa
 
 Sotto is built around BYOK from the start, surfaced three ways:
 
-1. **Keyless local agent:** the Docker installer and source installs support `AI_PROVIDER=claude-code` or `codex` to use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex](https://github.com/openai/codex), with no API key. Sotto checks CLI version and login separately, discovers Codex models live, and refreshes local Docker credentials through a networkless sidecar.
+1. **Keyless local agent:** select [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex](https://github.com/openai/codex) in Sotto, with no API key. Sotto checks CLI version and login separately, discovers Codex models live, and refreshes local Docker credentials through a networkless sidecar.
 2. **[MCP](https://modelcontextprotocol.io/) server:** add `packages/mcp` to your Claude Code or Codex config and call `ingest_agent_output` to push content from any agent workflow straight into Sotto.
 3. **BYOK in Settings:** store encrypted per account API keys (LLM, TTS, STT), encrypted at rest with `BYOK_ENCRYPTION_KEY`. You pay your providers; Sotto is the infrastructure layer.
 

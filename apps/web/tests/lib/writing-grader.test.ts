@@ -7,7 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 
 const mockGenerateResponse = vi.fn();
@@ -22,9 +26,11 @@ vi.mock('@/lib/prompt-loader', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
 import { gradeWriting } from '@/lib/writing-grader';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 const PARAMS = {
   userId: 'u1',
+  execution: blockedProviderExecution('u1'),
   nativeLang: 'en',
   targetLang: 'es',
   level: 'A2',

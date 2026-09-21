@@ -106,6 +106,10 @@ npx prisma migrate deploy --config=prisma.config.ts
 # Generate Prisma client
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 
+# Convert installed configuration and initialize canonical access atomically.
+npx tsx apps/web/scripts/access.ts initialize
+npx tsx apps/web/scripts/access.ts finalize
+
 # Seed the fixed language curriculum (idempotent)
 echo "Seeding curriculum..."
 npx tsx apps/web/prisma/seed-curriculum.ts
@@ -118,8 +122,7 @@ echo "  npm run dev:web     Start web only"
 echo "  npm run dev:workers Start workers only"
 echo ""
 echo "Next required setup:"
-echo "  1. Add one provider path to .env.local."
-echo "     Fastest path: set OPENAI_API_KEY and keep AI_PROVIDER/TTS_PROVIDER/STT_PROVIDER as openai."
-echo "  2. Or set AI_PROVIDER=claude-code and keep an explicit TTS provider key."
-echo "  3. Open http://localhost:3000 after npm run dev."
+echo "  1. Open http://localhost:3000 after npm run dev."
+echo "  2. Complete /welcome to save AI, speech, and local/R2/S3 storage settings."
+echo "  3. Enroll a passkey from security settings after the first password sign-in."
 echo ""

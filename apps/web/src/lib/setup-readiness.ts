@@ -1,11 +1,5 @@
 export type SetupCapabilityId =
-  | 'database'
-  | 'queue'
-  | 'storage'
-  | 'generation'
-  | 'tts'
-  | 'agent-ingestion'
-  | 'stt';
+  'database' | 'queue' | 'storage' | 'generation' | 'tts' | 'agent-ingestion' | 'stt';
 
 export type SetupCapabilityStatus = 'ready' | 'action_required' | 'optional';
 
@@ -43,40 +37,22 @@ interface BuildSetupReadinessInput {
   selectedAiProvider?: string | null;
   selectedTtsProvider?: string | null;
   selectedSttProvider?: string | null;
+  aiBaseUrl?: string | null;
+  ttsBaseUrl?: string | null;
+  sttBaseUrl?: string | null;
+  storageConfigured?: boolean;
   claudeCodeAvailable?: boolean;
   codexAvailable?: boolean;
-  env?: Record<string, string | undefined>;
 }
 
-const AI_PLATFORM_KEYS: Record<string, string[]> = {
-  anthropic: ['ANTHROPIC_API_KEY'],
-  openai: ['OPENAI_API_KEY'],
-  google: ['GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY'],
-  together: ['TOGETHER_API_KEY'],
-  local: ['AI_BASE_URL'],
-};
-
-const TTS_PLATFORM_KEYS: Record<string, string[]> = {
-  elevenlabs: ['ELEVENLABS_API_KEY'],
-  openai: ['OPENAI_API_KEY'],
-  cartesia: ['CARTESIA_API_KEY'],
-  hume: ['HUME_API_KEY'],
-  fal: ['FAL_KEY', 'FAL_API_KEY'],
-  replicate: ['REPLICATE_API_TOKEN'],
-  minimax: ['MINIMAX_API_KEY'],
-  mistral: ['MISTRAL_API_KEY'],
-  kokoro: ['TTS_BASE_URL'],
-  local: ['TTS_BASE_URL'],
-};
-
-const STT_PLATFORM_KEYS: Record<string, string[]> = {
-  openai: ['OPENAI_API_KEY'],
-  elevenlabs: ['ELEVENLABS_API_KEY'],
-  together: ['TOGETHER_API_KEY'],
-  deepgram: ['DEEPGRAM_API_KEY'],
-  assemblyai: ['ASSEMBLYAI_API_KEY'],
-  local: ['STT_BASE_URL'],
-};
+const STT_PROVIDERS = new Set([
+  'openai',
+  'elevenlabs',
+  'together',
+  'deepgram',
+  'assemblyai',
+  'local',
+]);
 
 const STT_AI_KEY_PROVIDERS = new Set(['openai', 'together', 'deepgram', 'assemblyai']);
 const STT_TTS_KEY_PROVIDERS = new Set(['elevenlabs']);
@@ -91,26 +67,11 @@ export function buildSttProviderStatuses(
   ];
 }
 
-function hasEnv(env: Record<string, string | undefined>, keys: string[]): boolean {
-  return keys.some((key) => Boolean(env[key]?.trim()));
-}
-
 function hasValidProvider(providers: ProviderStatus[], selectedProvider?: string | null): boolean {
   if (selectedProvider) {
     return providers.some((provider) => provider.provider === selectedProvider && provider.isValid);
   }
   return providers.some((provider) => provider.isValid);
-}
-
-function hasPlatformProvider(
-  env: Record<string, string | undefined>,
-  providerKeys: Record<string, string[]>,
-  selectedProvider?: string | null
-): boolean {
-  if (selectedProvider) {
-    return hasEnv(env, providerKeys[selectedProvider] ?? []);
-  }
-  return Object.values(providerKeys).some((keys) => hasEnv(env, keys));
 }
 
 function normalizeAiProvider(value?: string | null): string | null {
@@ -128,12 +89,11 @@ function isKnownStorageProvider(value: string): value is 'local' | 'r2' | 's3' {
 }
 
 export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadiness {
-  const env = input.env ?? process.env;
-  const storageProvider = input.storageProvider || env.STORAGE_PROVIDER || 'local';
+  const storageProvider = input.storageProvider || 'local';
   const storageProviderKnown = isKnownStorageProvider(storageProvider);
-  const selectedAiProvider = normalizeAiProvider(input.selectedAiProvider || env.AI_PROVIDER);
-  const selectedTtsProvider = input.selectedTtsProvider || env.TTS_PROVIDER || null;
-  const selectedSttProvider = input.selectedSttProvider || env.STT_PROVIDER || null;
+  const selectedAiProvider = normalizeAiProvider(input.selectedAiProvider);
+  const selectedTtsProvider = input.selectedTtsProvider || null;
+  const selectedSttProvider = input.selectedSttProvider || null;
   const claudeCodeSelected = selectedAiProvider === 'claude-code';
   const codexSelected = selectedAiProvider === 'codex';
   const localAiSelected = selectedAiProvider === 'local';
@@ -142,20 +102,18 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   const aiReady =
     (claudeCodeSelected && input.claudeCodeAvailable === true) ||
     (codexSelected && input.codexAvailable === true) ||
-    hasValidProvider(input.aiProviders, selectedAiProvider) ||
-    hasPlatformProvider(env, AI_PLATFORM_KEYS, selectedAiProvider);
+    (localAiSelected && Boolean(input.aiBaseUrl?.trim())) ||
+    hasValidProvider(input.aiProviders, selectedAiProvider);
   const ttsReady =
-    hasValidProvider(input.ttsProviders, selectedTtsProvider) ||
-    hasPlatformProvider(env, TTS_PLATFORM_KEYS, selectedTtsProvider);
-  const sttProviderKnown = selectedSttProvider ? selectedSttProvider in STT_PLATFORM_KEYS : false;
+    (localTtsSelected && Boolean(input.ttsBaseUrl?.trim())) ||
+    hasValidProvider(input.ttsProviders, selectedTtsProvider);
+  const sttProviderKnown = selectedSttProvider ? STT_PROVIDERS.has(selectedSttProvider) : false;
   const sttReady =
     sttProviderKnown &&
-    (hasValidProvider(input.sttProviders, selectedSttProvider) ||
-      hasPlatformProvider(env, STT_PLATFORM_KEYS, selectedSttProvider));
+    ((localSttSelected && Boolean(input.sttBaseUrl?.trim())) ||
+      hasValidProvider(input.sttProviders, selectedSttProvider));
   const storageReady =
-    storageProviderKnown &&
-    (storageProvider === 'local' ||
-      hasEnv(env, ['S3_BUCKET', 'S3_ENDPOINT', 'R2_BUCKET', 'R2_ENDPOINT', 'AWS_BUCKET_NAME']));
+    storageProviderKnown && (storageProvider === 'local' || input.storageConfigured === true);
   const privateSourceIngestionReady =
     input.hasDatabase && input.hasQueue && storageReady && aiReady && ttsReady;
 
@@ -202,7 +160,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
         : claudeCodeSelected
           ? "Install and authenticate the 'claude' CLI for Claude Code."
           : localAiSelected
-            ? 'Set AI_BASE_URL for the local OpenAI-compatible server.'
+            ? 'Save the base URL for the local OpenAI-compatible server.'
             : 'Add an AI key or choose a local agent.',
     },
     {
@@ -217,7 +175,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
           ? `${selectedTtsProvider} selected`
           : 'Voice provider configured'
         : localTtsSelected
-          ? 'Set TTS_BASE_URL for the local TTS sidecar.'
+          ? 'Save the base URL for the local TTS sidecar.'
           : 'Add a TTS provider key.',
     },
     {
@@ -242,7 +200,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
         : selectedSttProvider
           ? sttProviderKnown
             ? localSttSelected
-              ? 'Set STT_BASE_URL for the local Whisper-compatible server.'
+              ? 'Save the base URL for the local Whisper-compatible server.'
               : `Add the ${selectedSttProvider} STT key.`
             : `Unknown STT provider: ${selectedSttProvider}`
           : 'Transcript ingestion works without STT. Add STT only for speaking-practice scoring or raw audio imports.',

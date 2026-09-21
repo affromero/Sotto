@@ -28,16 +28,17 @@ const failedCheck: VerificationCheck = {
 };
 
 describe('reference verification AI routing', () => {
-  it('requires an explicit AI provider and model for reference evaluation', async () => {
+  it('rejects reference evaluation without a captured AI selection', async () => {
     await expect(
       aiEvaluateWithDomainContext(
         [{ ref: reference, domain: 'GENERAL', claimContext, priorChecks: [] }],
-        'Source evaluation topic'
+        'Source evaluation topic',
+        null as never
       )
-    ).rejects.toThrow('AI provider and model are required for reference verification.');
+    ).rejects.toThrow();
   });
 
-  it('requires an explicit AI provider and model for reference grounding', async () => {
+  it('returns no grounded references when captured AI selection is missing', async () => {
     await expect(
       groundFailedReferences(
         [
@@ -48,8 +49,9 @@ describe('reference verification AI routing', () => {
             allChecks: [failedCheck],
           },
         ],
-        'Source grounding topic'
+        'Source grounding topic',
+        null as never
       )
-    ).rejects.toThrow('AI provider and model are required for reference grounding.');
+    ).resolves.toEqual(new Map());
   });
 });

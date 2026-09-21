@@ -5,7 +5,8 @@
 // sum, mapped to a mock band. A mock exam is a self-assessment: it NEVER advances
 // Course.currentLevel. Pure helpers (weighting, band) are unit-tested separately.
 import { prisma } from './prisma';
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -70,6 +71,7 @@ interface FeedbackResult {
 // scored exam always has feedback.
 async function generateFeedback(
   userId: string,
+  execution: SottoProviderExecution,
   examName: string,
   level: string,
   sections: ExamSectionScore[],
@@ -82,7 +84,7 @@ async function generateFeedback(
   };
 
   try {
-    const ai = await resolveLearningAi(userId);
+    const ai = await resolveCapturedLearningAi(userId, execution);
     const systemPrompt = loadAndRender('exams/exam-feedback.md', {
       EXAM_NAME: examName,
       LEVEL: level,
@@ -93,7 +95,7 @@ async function generateFeedback(
     const res = await client.generateResponse(
       systemPrompt,
       [{ role: 'user', content: 'Give the feedback.' }],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1024, temperature: 0.4 }
+      { ...(await capturedLearningAiOptions(ai)), maxTokens: 1024, temperature: 0.4 }
     );
     logUsage({
       service: ai.provider,
@@ -127,6 +129,7 @@ export class ExamNotFoundError extends Error {}
 export async function scoreExam(
   examId: string,
   userId: string,
+  execution: SottoProviderExecution,
   answers: Array<{ questionId: string; selectedIndex: number }>
 ): Promise<ExamScoreResult> {
   const exam = await prisma.mockExam.findFirst({
@@ -173,6 +176,7 @@ export async function scoreExam(
   const blueprint = getBlueprint(exam.institution, exam.level);
   const feedback = await generateFeedback(
     userId,
+    execution,
     blueprint.examName,
     exam.level,
     sectionScores,

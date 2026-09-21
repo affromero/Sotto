@@ -9,44 +9,58 @@
  * @tts-research-date 2026-06-15 — POST /v1/rime-tts, `Authorization: Bearer`, arcana voices
  */
 import { logger } from '../../logger';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { RIME_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { applyPronunciationAliases } from '../../pronunciation-dictionary';
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 
 export class RimeProvider implements TtsProvider {
+  static readonly speechEndpoint = 'https://users.rime.ai/v1/rime-tts';
   readonly providerId: TtsProviderId = 'rime';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey?: string, model?: string) {
-    const key = apiKey || process.env.RIME_API_KEY;
-    if (!key) throw new Error('Rime requires an API key (BYOK or RIME_API_KEY env var)');
-    this.apiKey = key;
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    model?: string
+  ) {
+    if (!apiKey.trim()) throw new Error('Rime requires an API key');
+    this.apiKey = apiKey;
     this.model = model ?? 'arcana';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    const response = await fetch('https://users.rime.ai/v1/rime-tts', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        Accept: 'audio/mpeg',
+    const response = await this.transport.authenticatedFetch(
+      RimeProvider.speechEndpoint,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text: applyPronunciationAliases(params.text),
+          speaker: params.voiceId,
+          modelId: this.model,
+          ...(params.language && { lang: params.language }),
+        }),
       },
-      body: JSON.stringify({
-        text: applyPronunciationAliases(params.text),
-        speaker: params.voiceId,
-        modelId: this.model,
-        ...(params.language && { lang: params.language }),
-      }),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
+      const errorText = await response.text();
+      params.signal?.throwIfAborted();
       throw new Error(`Rime TTS error (${response.status}): ${errorText}`);
     }
 
@@ -59,7 +73,12 @@ export class RimeProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? RIME_VOICE_POOL[0].id : RIME_VOICE_POOL[1].id;

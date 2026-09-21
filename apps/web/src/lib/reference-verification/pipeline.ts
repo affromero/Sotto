@@ -13,6 +13,7 @@ import { classifyEpisodeReference } from './classify-episode-reference';
 import { extractClaimContexts, type ClaimContext } from './claim-extractor';
 import { aiEvaluateWithDomainContext } from './ai-layer';
 import { groundFailedReferences, type GroundingInput } from './grounding';
+import type { CapturedLearningAi } from '@/lib/learning-ai';
 
 const MAX_CONCURRENT = 10;
 
@@ -47,9 +48,7 @@ export async function runReferenceVerification(
   refs: ReferenceInput[],
   scriptTurns: Array<{ speaker: string; text: string }>,
   topic: string,
-  apiKeyOverride?: string,
-  model?: string,
-  provider?: string,
+  ai: CapturedLearningAi,
   requiredRefCount = Infinity
 ): Promise<{
   results: Map<string, VerificationResult>;
@@ -145,13 +144,7 @@ export async function runReferenceVerification(
   // AI layer: single batch call with per-ref domain instructions
   let aiResults: Map<string, VerificationCheck>;
   try {
-    aiResults = await aiEvaluateWithDomainContext(
-      refsWithDomain,
-      topic,
-      apiKeyOverride,
-      model,
-      provider
-    );
+    aiResults = await aiEvaluateWithDomainContext(refsWithDomain, topic, ai);
   } catch (error) {
     logger.warn('AI claim-support evaluation failed; affected references will fail closed', {
       error: error instanceof Error ? error.message : 'Unknown',
@@ -200,13 +193,7 @@ export async function runReferenceVerification(
       claimContext: claimContexts.get(ref.number) ?? { sentences: [], speakerTurns: [] },
       allChecks: allChecks.get(ref.id) ?? [],
     }));
-    const groundingResults = await groundFailedReferences(
-      groundingInputs,
-      topic,
-      apiKeyOverride,
-      model,
-      provider
-    );
+    const groundingResults = await groundFailedReferences(groundingInputs, topic, ai);
     for (const [refId, check] of groundingResults) {
       const existing = allChecks.get(refId) ?? [];
       existing.push(check);

@@ -39,11 +39,10 @@ interface TestResponse {
 }
 
 async function runTest(p: TestableProvider): Promise<TestResponse> {
-  const keySource = p.hasPlatformKey ? 'platform' : 'byok';
   const res = await fetch('/api/v1/admin/test-model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: p.category, provider: p.providerId, model: p.modelId, keySource }),
+    body: JSON.stringify({ type: p.category, provider: p.providerId, model: p.modelId }),
   });
   return res.json() as Promise<TestResponse>;
 }
@@ -72,7 +71,7 @@ function StatusDot({ status }: { status: TestStatus }) {
 function KeyBadges({ p }: { p: TestableProvider }) {
   return (
     <div className={styles.keyCell}>
-      {p.hasPlatformKey && <span className={styles.badgePlatform}>Platform</span>}
+      {p.hasLocalSession && <span className={styles.badgeLocal}>Local session</span>}
       {p.hasByokKey && <span className={styles.badgeByok}>BYOK</span>}
     </div>
   );

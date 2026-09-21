@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { factoryReset } from '@/lib/admin/factory-reset';
 import { errorResponse } from '@/lib/api-response';
 import { requireAdmin } from '@/lib/auth-guards';
-import { ACTIVE_PROFILE_COOKIE } from '@/lib/local-user';
+import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
 import { logger } from '@/lib/logger';
 import { invalidateServerInfra } from '@/lib/server-config';
 import { THEME_PREFS_COOKIE } from '@/lib/theme-prefs';

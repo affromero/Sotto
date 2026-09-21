@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -7,17 +7,39 @@ vi.mock('@/lib/logger', () => ({
 import { withRetry, isRetryableError, RETRYABLE_STATUS } from '@/lib/retry';
 
 describe('retry', () => {
-  // Stub setTimeout to resolve immediately in all withRetry tests
-  let origSetTimeout: typeof globalThis.setTimeout;
-
-  beforeEach(() => {
-    origSetTimeout = globalThis.setTimeout;
-
-    globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
+  it('retains the operation failure when cancellation occurs during execution', async () => {
+    const controller = new AbortController();
+    const failure = Object.assign(new Error('Provider cleanup failed'), {
+      status: 503,
+      cause: new Error('Resource release was not confirmed'),
+    });
+    await expect(
+      withRetry(
+        'cancelled operation',
+        async () => {
+          controller.abort();
+          throw failure;
+        },
+        { signal: controller.signal }
+      )
+    ).rejects.toBe(failure);
   });
-
-  afterEach(() => {
-    globalThis.setTimeout = origSetTimeout;
+  it('cancels backoff without starting another operation', async () => {
+    const controller = new AbortController();
+    const outcomes: string[] = [];
+    const pending = withRetry(
+      'test',
+      async () => {
+        outcomes.push('started');
+        throw Object.assign(new Error('Rate limited'), { status: 429 });
+      },
+      { signal: controller.signal, longBackoff: true }
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.abort();
+    await rejected;
+    expect(outcomes).toEqual(['started']);
   });
 
   describe('isRetryableError', () => {

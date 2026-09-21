@@ -2,8 +2,8 @@
 # Sotto — one-command self-host installer.
 # Usage: curl -fsSL https://sotto.fm/install.sh | bash
 #
-# Pulls the pre-built public images, asks how you want to connect your AI agent,
-# writes ~/.sotto/.env, and starts everything with Docker. No clone, no build.
+# Pulls the pre-built public images, writes ~/.sotto/.env, and starts everything
+# with Docker. Provider and storage setup continues in the browser.
 # Inspect before running:  curl -fsSL https://sotto.fm/install.sh | less
 set -euo pipefail
 umask 077
@@ -37,9 +37,7 @@ WEB_PORT="${WEB_PORT:-${EXISTING_WEB_PORT:-3000}}"
 # A failed download, pull, or configuration prompt must not modify an install.
 INSTALL_DIR="$SOTTO_DIR"
 STAGING_DIR=""
-SECRET_INPUT_ACTIVE=0
 cleanup() {
-  if [ "$SECRET_INPUT_ACTIVE" = 1 ]; then stty echo < /dev/tty || true; fi
   [ -z "${INSTALL_LOCK_DIR:-}" ] || rmdir "$INSTALL_LOCK_DIR"
   [ -z "$STAGING_DIR" ] || rm -rf "$STAGING_DIR"
 }
@@ -58,23 +56,6 @@ ask() {
   read -r __reply < /dev/tty || true
   printf -v "$__var" '%s' "${__reply:-$__default}"
 }
-ask_secret() {
-  local __var=$1 __prompt=$2 __reply
-  if [ "${SOTTO_YES:-}" = 1 ]; then
-    local __setting="SOTTO_$1"
-    printf -v "$__var" '%s' "${!__setting:-}"
-    return
-  fi
-  printf "%b" "$__prompt" > /dev/tty
-  SECRET_INPUT_ACTIVE=1
-  stty -echo < /dev/tty
-  read -r __reply < /dev/tty || true
-  stty echo < /dev/tty
-  SECRET_INPUT_ACTIVE=0
-  printf "\n" > /dev/tty
-  printf -v "$__var" '%s' "$__reply"
-}
-
 gen_secret() { openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 dotenv_quote() {
   local value=$1
@@ -89,8 +70,8 @@ dotenv_quote() {
 printf "\n${BOLD}Sotto${RESET} — learn a language with the agent that already knows you.\n\n"
 printf "This installer will:\n"
 printf "  ${DIM}1.${RESET} Pull the Sotto images + Postgres/Redis (Docker only, no build)\n"
-printf "  ${DIM}2.${RESET} Ask how to connect your AI agent\n"
-printf "  ${DIM}3.${RESET} Write config to ${BOLD}%s${RESET} and start everything\n\n" "$SOTTO_DIR"
+printf "  ${DIM}2.${RESET} Write runtime config to ${BOLD}%s${RESET} and start everything\n" "$SOTTO_DIR"
+printf "  ${DIM}3.${RESET} Open browser setup for access, AI, speech, and storage\n\n"
 if [ "${SOTTO_YES:-}" != "1" ]; then
   ask CONSENT "  Continue? [Y/n] " "Y"
   case "$CONSENT" in [nN]*) fail "Aborted.";; esac
@@ -149,41 +130,19 @@ if [ "$WEB_PORT" != "$EXISTING_WEB_PORT" ] && (command -v lsof >/dev/null 2>&1 &
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Choose how to connect your AI agent
+# 3. Optional remote Claude runtime
 # ---------------------------------------------------------------------------
-printf "\n${BOLD}How should Sotto reach your AI agent?${RESET}\n"
-printf "  ${DIM}1)${RESET} An API key (OpenAI or Anthropic) — simplest\n"
-printf "  ${DIM}2)${RESET} Your local Claude Code CLI (bring your own agent)\n"
-printf "  ${DIM}3)${RESET} Your local Codex CLI (bring your own agent)\n"
-printf "  ${DIM}4)${RESET} Your Claude agent on a VPS, over SSH\n"
-printf "  ${DIM}5)${RESET} Configure providers in the browser after installation\n"
-ask AGENT_CHOICE "  Choose [1/2/3/4/5, default 1]: " "1"
-
-AI_BLOCK=""
 TUNNEL_NOTE=""
-case "$AGENT_CHOICE" in
-  2)
-    AGENT_CLI="claude-code"
-    AI_BLOCK="AI_PROVIDER=\"$AGENT_CLI\""
-    CREDS="$HOME/.claude/.credentials.json"
-    [ -f "$CREDS" ] || fail "No ~/.claude/.credentials.json found. Sign in with Claude Code, then re-run, or use option 1/3/4."
-    ok "Sotto will read refreshed Claude credentials through its networkless sync service."
-    ;;
-  3)
-    AGENT_CLI="codex"
-    AI_BLOCK="AI_PROVIDER=\"$AGENT_CLI\""
-    CREDS="$HOME/.codex/auth.json"
-    [ -f "$CREDS" ] || fail "No ~/.codex/auth.json found. Sign in with Codex, then re-run, or use option 1/2/4."
-    ok "Sotto will read refreshed Codex credentials through its networkless sync service."
-    ;;
-  4)
+printf "\n${BOLD}Will Sotto run Claude Code on a remote SSH host?${RESET}\n"
+ask REMOTE_AGENT "  Configure remote Claude Code? [y/N]: " "N"
+case "$REMOTE_AGENT" in
+  [yY]*)
     ask SSH_HOST "  SSH host for your agent (e.g. you@your-vps): " ""
     [ -n "$SSH_HOST" ] || fail "An SSH host is required for option 4."
     ask SSH_KEY_PATH "  Dedicated private key path [default: ~/.ssh/sotto_agent]: " "$HOME/.ssh/sotto_agent"
     ask SSH_KNOWN_HOSTS "  Pinned known_hosts path [default: ~/.ssh/known_hosts]: " "$HOME/.ssh/known_hosts"
     [ -f "$SSH_KEY_PATH" ] || fail "Dedicated SSH key not found: $SSH_KEY_PATH"
     [ -f "$SSH_KNOWN_HOSTS" ] || fail "known_hosts file not found: $SSH_KNOWN_HOSTS"
-    AI_BLOCK=$'AI_PROVIDER="claude-code"\n'"CLAUDE_CODE_SSH_HOST=\"$SSH_HOST\""
     # Mount only the dedicated key and pinned host database, never the user's
     # complete ~/.ssh directory.
     cat > "$SOTTO_DIR/docker-compose.override.yml" <<YAML
@@ -199,23 +158,7 @@ services:
 YAML
     ok "Sotto will run 'ssh $SSH_HOST claude ...' for every LLM call."
     ;;
-  5)
-    ok "Configure generation and audio providers in the browser after installation."
-    ;;
-  1)
-    ask AI_KEY_PROVIDER "  Provider [openai/anthropic, default openai]: " "openai"
-    case "$AI_KEY_PROVIDER" in openai|anthropic) ;; *) fail "Choose openai or anthropic." ;; esac
-    ask_secret AI_KEY "  API key: "
-    [ -n "$AI_KEY" ] || fail "An API key is required for option 1."
-    AI_KEY=$(dotenv_quote "$AI_KEY")
-    if [ "$AI_KEY_PROVIDER" = "anthropic" ]; then
-      AI_BLOCK=$'AI_PROVIDER="anthropic"\nTTS_PROVIDER="openai"\nSTT_PROVIDER="openai"\n'"ANTHROPIC_API_KEY=$AI_KEY"
-      warn "Anthropic covers the LLM; configure audio in the browser or set OPENAI_API_KEY in $INSTALL_DIR/.env."
-    else
-      AI_BLOCK=$'AI_PROVIDER="openai"\nTTS_PROVIDER="openai"\nSTT_PROVIDER="openai"\n'"OPENAI_API_KEY=$AI_KEY"
-    fi
-    ;;
-  *) fail "Choose an agent option from 1 through 5." ;;
+  *) ok "Local Claude Code and Codex credentials will be discovered automatically." ;;
 esac
 
 # ---------------------------------------------------------------------------
@@ -237,24 +180,9 @@ ensure_env_value() {
   [ -n "$(existing_env_value "$key")" ] || set_env_value "$key" "$value"
 }
 
-apply_env_block() {
-  local block=$1 line key value
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    key=${line%%=*}
-    value=${line#*=}
-    set_env_value "$key" "$value"
-  done <<ENV_BLOCK
-$block
-ENV_BLOCK
-}
-
 POSTGRES_PASSWORD=$(existing_env_value POSTGRES_PASSWORD)
 [ -n "$POSTGRES_PASSWORD" ] || POSTGRES_PASSWORD=$(gen_secret)
 DB_URL="postgresql://sotto:${POSTGRES_PASSWORD}@postgres:5432/sotto?schema=public"
-EXISTING_ACCESS_PASSWORD=$(existing_env_value SOTTO_ACCESS_PASSWORD)
-ACCESS_PASSWORD="${SOTTO_ACCESS_PASSWORD:-${EXISTING_ACCESS_PASSWORD:-$(gen_secret)}}"
-[ "${#ACCESS_PASSWORD}" -ge 16 ] || fail "SOTTO_ACCESS_PASSWORD must be at least 16 characters."
 BYOK_ENCRYPTION_KEY=$(existing_env_value BYOK_ENCRYPTION_KEY)
 [ -n "$BYOK_ENCRYPTION_KEY" ] || BYOK_ENCRYPTION_KEY=$(gen_secret)
 if [ ! -f "$SOTTO_DIR/.env" ]; then
@@ -268,14 +196,12 @@ set_env_value DIRECT_DATABASE_URL "$DB_URL"
 set_env_value POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
 set_env_value REDIS_URL "redis://redis:6379"
 set_env_value BYOK_ENCRYPTION_KEY "$BYOK_ENCRYPTION_KEY"
-set_env_value SOTTO_ACCESS_PASSWORD "$(dotenv_quote "$ACCESS_PASSWORD")"
 EXISTING_APP_URL=$(existing_env_value NEXT_PUBLIC_APP_URL)
 case "$EXISTING_APP_URL" in
   ""|"http://localhost:$EXISTING_WEB_PORT") set_env_value NEXT_PUBLIC_APP_URL "http://localhost:$WEB_PORT" ;;
 esac
-ensure_env_value STORAGE_PROVIDER "local"
-ensure_env_value LOCAL_STORAGE_DIR "./.sotto/storage"
-apply_env_block "$AI_BLOCK"
+ensure_env_value SIDEDOOR_EXECUTION_DIR "./.sotto/executions"
+[ -z "${SSH_HOST:-}" ] || set_env_value CLAUDE_CODE_SSH_HOST "$(dotenv_quote "$SSH_HOST")"
 chmod 600 "$SOTTO_DIR/.env"
 ok "Prepared configuration for $INSTALL_DIR/.env without removing custom settings"
 
@@ -317,6 +243,21 @@ $DC run --rm workers sh -c \
   "cd /app && npx --no-install prisma migrate deploy --config=/app/prisma.config.ts && npx --no-install tsx apps/web/prisma/seed-curriculum.ts" \
   || fail "Database initialization failed. Check '$DC logs' and re-run."
 
+info "Initializing Sidedoor access..."
+$DC run --rm web node dist/access.cjs initialize \
+  || fail "Access initialization failed. Check '$DC logs' and re-run."
+$DC run --rm web node dist/access.cjs finalize \
+  || fail "Access finalization failed. Check '$DC logs' and re-run."
+ACCESS_LIST=$($DC run --rm web node dist/access.cjs list) \
+  || fail "Access state inspection failed. Check '$DC logs' and re-run."
+CLAIM_CODE=""
+if ! printf '%s\n' "$ACCESS_LIST" | grep -q '"role": "owner"'; then
+  CLAIM_RESULT=$($DC run --rm web node dist/access.cjs claim | tail -n 1) \
+    || fail "Owner claim creation failed. Check '$DC logs' and re-run."
+  CLAIM_CODE=$(printf '%s\n' "$CLAIM_RESULT" | sed -nE 's/.*"code"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
+  [ -n "$CLAIM_CODE" ] || fail "Owner claim output was invalid. Check '$DC logs' and re-run."
+fi
+
 info "Starting Sotto..."
 $DC up -d
 
@@ -331,7 +272,10 @@ printf "\n"
 [ "${READY:-}" = "1" ] || fail "Sotto did not become healthy. Run '$DC logs --tail 50 web workers' in $SOTTO_DIR."
 ok "Sotto is running."
 printf "\n  ${BOLD}Open:${RESET}    http://localhost:%s\n" "$WEB_PORT"
-printf "  ${BOLD}Password:${RESET} %s  ${DIM}(saved in %s/.env)${RESET}\n" "$ACCESS_PASSWORD" "$SOTTO_DIR"
+if [ -n "$CLAIM_CODE" ]; then
+  printf "  ${BOLD}Owner claim:${RESET} %s  ${DIM}(expires in 15 minutes)${RESET}\n" "$CLAIM_CODE"
+fi
+printf "  ${BOLD}Continue in your browser:${RESET} claim the owner, configure household access, save AI, speech, and storage, then enroll a passkey.\n"
 printf "  ${BOLD}Manage:${RESET}  cd %s  (then \`%s logs -f\`, \`%s down\`)\n" "$SOTTO_DIR" "$DC" "$DC"
 if [ "${SOTTO_HOST_ON_PATH:-}" = "1" ]; then
   printf "  ${BOLD}Update:${RESET}  sotto-host update   ${DIM}(also: status, rollback, --to <version|commit>)${RESET}\n"

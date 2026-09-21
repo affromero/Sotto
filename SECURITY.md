@@ -64,4 +64,4 @@ The repository runs continuous supply-chain and code-security checks:
 
 ## Supported Versions
 
-We only support the latest deployed version of Sotto. There are no legacy versions to maintain.
+We support the latest deployed version of Sotto.

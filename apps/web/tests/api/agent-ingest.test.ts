@@ -9,7 +9,7 @@ const mockIsModelAllowedForUser = vi.fn();
 const mockGetModelRequiredPlan = vi.fn();
 const mockGetProviderForModel = vi.fn();
 const mockIsValidModelId = vi.fn();
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 const mockGenerateEpisodeSlug = vi.fn();
 const mockEpisodeCreate = vi.fn();
 const mockEpisodeUpdate = vi.fn();
@@ -21,6 +21,7 @@ const mockTransaction = vi.fn();
 const txProxy = {
   episode: {
     create: (...args: unknown[]) => mockEpisodeCreate(...args),
+    update: (...args: unknown[]) => mockEpisodeUpdate(...args),
   },
   discovery: {
     create: (...args: unknown[]) => mockDiscoveryCreate(...args),
@@ -67,7 +68,13 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/queue', () => ({
   contentExtractionQueue: 'content-extraction-queue',
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: async (...args: unknown[]) => {
+    await mockEnqueueDurableJob(...args);
+    const options = args[3] as {
+      mutate(database: typeof txProxy, operationId: string): Promise<void>;
+    };
+    await options.mutate(txProxy, '11111111-1111-4111-a111-111111111111');
+  },
   JobType: { EXTRACT_CONTENT: 'EXTRACT_CONTENT' },
 }));
 
@@ -93,7 +100,8 @@ function createRequest(body: unknown, authHeader?: string): NextRequest {
 const validPayload = {
   title: 'Daily engineering notes',
   topic: 'Summarize the local agent run and decisions',
-  content: 'The agent fixed the billing import bug, added regression tests, and left one follow-up.',
+  content:
+    'The agent fixed the billing import bug, added regression tests, and left one follow-up.',
   idempotencyKey: 'claude-code:run-123',
   sourceUrl: 'https://example.com/runs/123',
   durationTarget: 8,
@@ -127,7 +135,7 @@ describe('POST /api/v1/ingest/agent', () => {
     mockAgentIngestionCreate.mockResolvedValue({ id: 'ingest-1' });
     mockEpisodeUpdate.mockResolvedValue({ id: 'pod-agent-1' });
     mockGenerateEpisodeSlug.mockResolvedValue('daily-engineering-notes');
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
     mockTransaction.mockImplementation(async (callback: (tx: typeof txProxy) => unknown) =>
       callback(txProxy)
     );
@@ -152,7 +160,7 @@ describe('POST /api/v1/ingest/agent', () => {
 
     expect(response.status).toBe(400);
     expect(mockEpisodeCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
   });
 
   it('creates a private AGENT episode from an API-key request', async () => {
@@ -161,14 +169,15 @@ describe('POST /api/v1/ingest/agent', () => {
 
     expect(response.status).toBe(201);
     expect(body).toMatchObject({
-      id: 'pod-agent-1',
+      id: expect.any(String),
       status: 'EXTRACTING',
       source: 'AGENT',
-      discoveryId: 'disc-agent-1',
+      discoveryId: expect.any(String),
     });
     expect(mockEpisodeCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
+        id: body.id,
         title: validPayload.title,
         topic: validPayload.topic,
         status: 'EXTRACTING',
@@ -184,7 +193,8 @@ describe('POST /api/v1/ingest/agent', () => {
     expect(mockDiscoveryCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
-        episodeId: 'pod-agent-1',
+        id: body.discoveryId,
+        episodeId: body.id,
         sourceUrl: validPayload.sourceUrl,
         sourceContent: expect.stringContaining(validPayload.content),
         sourceMetadata: expect.objectContaining({
@@ -201,7 +211,7 @@ describe('POST /api/v1/ingest/agent', () => {
     expect(mockAgentIngestionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
-        episodeId: 'pod-agent-1',
+        episodeId: body.id,
         idempotencyKey: 'claude-code:run-123',
         provider: 'claude-code',
         agentName: 'Claude Code',
@@ -209,15 +219,15 @@ describe('POST /api/v1/ingest/agent', () => {
         contentHash: expect.any(String),
       }),
     });
-    expect(mockAddJob).toHaveBeenCalledWith(
+    expect(mockEnqueueDurableJob).toHaveBeenCalledWith(
       'content-extraction-queue',
       'EXTRACT_CONTENT',
       {
-        episodeId: 'pod-agent-1',
+        episodeId: body.id,
         userId: 'user-1',
         sourceText: expect.stringContaining(validPayload.content),
       },
-      { priority: 1, jobId: 'agent-ingest-pod-agent-1' }
+      expect.objectContaining({ priority: 1, jobId: `agent-ingest-${body.id}` })
     );
   });
 
@@ -237,7 +247,6 @@ describe('POST /api/v1/ingest/agent', () => {
       idempotent: true,
     });
     expect(mockTransaction).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
   });
-
 });

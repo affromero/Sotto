@@ -12,6 +12,10 @@ import {
   setCourseNote,
 } from '@/lib/course-notes';
 import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
+import {
+  sottoRequestExecution,
+  type SottoProviderExecution,
+} from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { extractUploadTexts, isUploadFile } from '@/lib/note-upload';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
@@ -41,10 +45,12 @@ async function updateVocabularyFromNote(
   userId: string,
   courseId: string,
   course: OwnedCourseContext,
-  body: string
+  body: string,
+  execution: SottoProviderExecution
 ): Promise<number> {
   return extractAndStoreNoteVocab({
     userId,
+    execution,
     courseId,
     targetLang: course.targetLang,
     nativeLang: course.nativeLang,
@@ -87,7 +93,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const body = normalizeCourseNote(parsed.data.body);
     await setCourseNote(courseId, body);
-    const addedVocabulary = await updateVocabularyFromNote(authed.userId, courseId, course, body);
+    const addedVocabulary = await updateVocabularyFromNote(
+      authed.userId,
+      courseId,
+      course,
+      body,
+      sottoRequestExecution(request, authed)
+    );
     return NextResponse.json({ body, addedVocabulary });
   } catch (error: unknown) {
     logger.error('Failed to save course note', {
@@ -116,7 +128,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const current = await getCourseNote(courseId);
     const body = mergeCourseNote(current, additions.join('\n\n'));
     await setCourseNote(courseId, body);
-    const addedVocabulary = await updateVocabularyFromNote(authed.userId, courseId, course, body);
+    const addedVocabulary = await updateVocabularyFromNote(
+      authed.userId,
+      courseId,
+      course,
+      body,
+      sottoRequestExecution(request, authed)
+    );
 
     return NextResponse.json({
       body,

@@ -7,10 +7,10 @@
  * The refresh is opt-in via startPricingRefreshInterval() — never fires at build/test time.
  */
 import { STATIC_PRICING } from 'pricetoken';
+import { knownTokenSum } from 'thesidedoor-core/ai/usage';
 import { logger } from './logger';
 import {
   getAllAiProviderMeta,
-  getAiProviderMeta,
   getCheapestModelForProvider,
   isValidModelId,
 } from './providers/ai-registry';
@@ -32,13 +32,6 @@ function buildPricingMap(): Record<string, ModelPricing> {
       if (model.pricing) map[model.id] = model.pricing;
     }
   }
-  // Claude Code — zero-cost local CLI (derived from registry, no pricing field)
-  const ccMeta = getAiProviderMeta('claude-code');
-  for (const m of ccMeta.models) {
-    map[`claude-code:${m.id}`] = { inputPerMTok: 0, outputPerMTok: 0 };
-  }
-  // Codex — zero-cost local CLI (no per-token cost to us)
-  map['codex'] = { inputPerMTok: 0, outputPerMTok: 0 };
   // Embeddings — not in AI registry (not an LLM model)
   map['text-embedding-3-small'] = { inputPerMTok: 0.02, outputPerMTok: 0 };
   return map;
@@ -49,30 +42,29 @@ const AI_PRICING = buildPricingMap();
 /** Mutable in-memory pricing map — starts as registry baseline, updated by DB refresh. */
 let activePricing: Record<string, ModelPricing> = { ...AI_PRICING };
 
-// Default fallback: Sonnet 4.6 pricing (matches prior hardcoded behavior)
-const FALLBACK_PRICING: ModelPricing = { inputPerMTok: 3.0, outputPerMTok: 15.0 };
-
-export function getAiPricing(model: string): ModelPricing {
+export function getAiPricing(model: string): ModelPricing | null {
   if (
     model.startsWith('claude-code:') ||
     model === 'codex' ||
     model.startsWith('codex:') ||
     model.startsWith('codex#')
   ) {
-    return { inputPerMTok: 0, outputPerMTok: 0 };
+    return null;
   }
-  const pricing = activePricing[model];
-  if (!pricing) {
-    logger.warn('Unknown model for pricing lookup, using Sonnet 4.6 fallback', { model });
-    return FALLBACK_PRICING;
-  }
-  return pricing;
+  return activePricing[model] ?? null;
 }
 
-export function getAiCost(model: string, inputTokens: number, outputTokens: number): number {
+export function getAiCost(
+  model: string,
+  inputTokens: number | null | undefined,
+  outputTokens: number | null | undefined
+): number | null {
   const pricing = getAiPricing(model);
-  const inputCost = (inputTokens / 1_000_000) * pricing.inputPerMTok;
-  const outputCost = (outputTokens / 1_000_000) * pricing.outputPerMTok;
+  const input = knownTokenSum(inputTokens);
+  const output = knownTokenSum(outputTokens);
+  if (!pricing || input === null || output === null) return null;
+  const inputCost = (input / 1_000_000) * pricing.inputPerMTok;
+  const outputCost = (output / 1_000_000) * pricing.outputPerMTok;
   return inputCost + outputCost;
 }
 

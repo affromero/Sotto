@@ -10,6 +10,7 @@ import { assignVoicesForEpisode } from '@/lib/voice-assigner';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -140,7 +141,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       mode: 'disabled',
     });
 
-    await createSegmentsAndQueueAudio(episodeId, convertedTurns);
+    await createSegmentsAndQueueAudio(episodeId, convertedTurns, {
+      authorize: async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        const current = await database.episode.findUnique({
+          where: { id: episodeId },
+          select: { userId: true },
+        });
+        if (!current || current.userId !== userId)
+          throw new Error('Episode ownership changed during approval');
+        return { userId };
+      },
+    });
 
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { status: 'GENERATING_AUDIO' });

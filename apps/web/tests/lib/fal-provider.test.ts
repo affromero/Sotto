@@ -51,6 +51,17 @@ vi.mock('@/lib/auto-model-config', () => ({
 import { FalProvider } from '@/lib/providers/tts/fal.provider';
 
 const mockAudioBytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+const transport = {
+  authenticatedFetch: (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+    fetch(input, init),
+};
+const media = {
+  async downloadMedia(url: string) {
+    return new Uint8Array(await (await fetch(url)).arrayBuffer());
+  },
+};
+const provider = (apiKey: string, model?: string) =>
+  new FalProvider(apiKey, transport, media, model);
 
 function mockFetchResponses(apiResponse: unknown, audioBytes: Uint8Array = mockAudioBytes) {
   const fetchMock = vi.fn();
@@ -81,8 +92,10 @@ describe('FalProvider', () => {
       audio: { url: 'https://fal.run/output/audio.wav', duration: 2.5, sample_rate: 24000 },
     });
 
-    const provider = new FalProvider('fal_sk_test');
-    const result = await provider.generateSpeech({ text: 'Hello world', voiceId: 'Vivian' });
+    const result = await provider('fal_sk_test').generateSpeech({
+      text: 'Hello world',
+      voiceId: 'Vivian',
+    });
 
     expect(result).toBeInstanceOf(Buffer);
 
@@ -100,8 +113,10 @@ describe('FalProvider', () => {
       audio: { url: 'https://fal.run/output/audio.wav', duration: 1.0, sample_rate: 24000 },
     });
 
-    const provider = new FalProvider('fal_sk_test', 'qwen3-tts-0.6b');
-    await provider.generateSpeech({ text: 'Test', voiceId: 'Dylan' });
+    await provider('fal_sk_test', 'qwen3-tts-0.6b').generateSpeech({
+      text: 'Test',
+      voiceId: 'Dylan',
+    });
 
     expect(fetchMock.mock.calls[0][0]).toBe(
       'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/0.6b'
@@ -115,10 +130,9 @@ describe('FalProvider', () => {
       text: async () => 'Unauthorized',
     });
 
-    const provider = new FalProvider('bad_key');
-    await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Vivian' })).rejects.toThrow(
-      'Fal API error (401): Unauthorized'
-    );
+    await expect(
+      provider('bad_key').generateSpeech({ text: 'Test', voiceId: 'Vivian' })
+    ).rejects.toThrow('Fal API error (401): Unauthorized');
   });
 
   it('throws when no audio URL in response', async () => {
@@ -127,15 +141,13 @@ describe('FalProvider', () => {
       json: async () => ({ audio: {} }),
     });
 
-    const provider = new FalProvider('fal_sk_test');
-    await expect(provider.generateSpeech({ text: 'Test', voiceId: 'Vivian' })).rejects.toThrow(
-      'Fal returned no audio URL'
-    );
+    await expect(
+      provider('fal_sk_test').generateSpeech({ text: 'Test', voiceId: 'Vivian' })
+    ).rejects.toThrow('Fal returned no audio URL');
   });
 
   it('returns correct voice IDs for speakers', () => {
-    const provider = new FalProvider('fal_sk_test');
-    expect(provider.getVoiceId('HOST', 'pod-1')).toBe('Vivian');
-    expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Dylan');
+    expect(provider('fal_sk_test').getVoiceId('HOST', 'pod-1')).toBe('Vivian');
+    expect(provider('fal_sk_test').getVoiceId('EXPERT', 'pod-1')).toBe('Dylan');
   });
 });

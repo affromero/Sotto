@@ -34,22 +34,29 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- R2 mock ----
 
-const mockUploadFile = vi
-  .fn()
-  .mockResolvedValue('https://r2.example.com/speaking/user-001/prompt-001/uuid.webm');
+const mockCreateSpeakingRecording = vi.fn().mockResolvedValue({
+  id: 'rec-001',
+  status: 'PENDING',
+  operationId: '10000000-0000-4000-8000-000000000001',
+  fingerprint: 'a'.repeat(64),
+});
 
-vi.mock('@/lib/r2', () => ({
-  uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+vi.mock('@/lib/sidedoor/storage/publication/speaking-recording-upload', () => ({
+  createSpeakingRecording: (...args: unknown[]) => mockCreateSpeakingRecording(...args),
 }));
 
 // ---- Queue mock ----
 
-const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-001' });
+const mockEnqueueDurableJob = vi.fn().mockResolvedValue({ id: 'job-001' });
+const mockDeliverSottoJob = vi.fn().mockResolvedValue('delivered');
 
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: (...args: unknown[]) => mockEnqueueDurableJob(...args),
   speakingGradingQueue: {},
   JobType: { SPEAKING_GRADING: 'speaking_grading' },
+}));
+vi.mock('@/lib/sidedoor/jobs/core/job-delivery', () => ({
+  deliverSottoJob: (...args: unknown[]) => mockDeliverSottoJob(...args),
 }));
 
 // ---- Logger mock ----
@@ -107,10 +114,13 @@ describe('POST /api/v1/practice/[sessionId]/speaking/[promptId]', () => {
     mockPracticeSessionFindFirst.mockResolvedValue({ id: 'session-001' });
     mockSpeakingPromptFindFirst.mockResolvedValue({ id: 'prompt-001' });
     mockSpeakingRecordingCreate.mockResolvedValue({ id: 'rec-001', status: 'PENDING' });
-    mockUploadFile.mockResolvedValue(
-      'https://r2.example.com/speaking/user-001/prompt-001/uuid.webm'
-    );
-    mockAddJob.mockResolvedValue({ id: 'job-001' });
+    mockCreateSpeakingRecording.mockResolvedValue({
+      id: 'rec-001',
+      status: 'PENDING',
+      operationId: '10000000-0000-4000-8000-000000000001',
+      fingerprint: 'a'.repeat(64),
+    });
+    mockEnqueueDurableJob.mockResolvedValue({ id: 'job-001' });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -147,10 +157,12 @@ describe('POST /api/v1/practice/[sessionId]/speaking/[promptId]', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toEqual({ recordingId: 'rec-001', status: 'PENDING' });
-    expect(mockUploadFile).toHaveBeenCalledOnce();
-    expect(mockAddJob).toHaveBeenCalledWith(expect.anything(), 'speaking_grading', {
-      recordingId: 'rec-001',
-    });
+    expect(mockCreateSpeakingRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ parent: { practiceSessionId: 'session-001' } })
+    );
+    expect(mockDeliverSottoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ operationId: '10000000-0000-4000-8000-000000000001', version: 1 })
+    );
   });
 
   it('returns 400 for a zero-byte audio upload without storing or queuing', async () => {
@@ -158,9 +170,9 @@ describe('POST /api/v1/practice/[sessionId]/speaking/[promptId]', () => {
     const res = await POST(req, routeParams('session-001', 'prompt-001'));
 
     expect(res.status).toBe(400);
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
   it('returns 400 for random non-audio bytes without storing or queuing', async () => {
@@ -168,8 +180,8 @@ describe('POST /api/v1/practice/[sessionId]/speaking/[promptId]', () => {
     const res = await POST(req, routeParams('session-001', 'prompt-001'));
 
     expect(res.status).toBe(400);
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 });

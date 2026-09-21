@@ -8,6 +8,7 @@ import {
   DEFAULT_LOCAL_STT_BASE_URL,
   DEFAULT_LOCAL_TTS_BASE_URL,
   sttModelProviderId,
+  welcomeVoiceCredentialFields,
 } from '../providerMap';
 import { Glyph } from '../Glyph';
 import {
@@ -18,7 +19,7 @@ import {
 } from '@/lib/speech-language-support';
 import { CARTESIA_USAGE_ALLOWANCE } from '@/lib/provider-usage/allowances';
 import t from '../theme.module.css';
-import c from '../components.styles';
+import c from '@/app/welcome/components.styles';
 
 const VISUAL_CUE_KEY_ID = 'visual:pexels';
 const CARTESIA_ADMIN_KEY_ID = 'cartesia:adminApiKey';
@@ -53,8 +54,7 @@ interface VoicePickerProps {
   onBaseUrl: (id: string, val: string) => void;
   localPlaceholder: string;
   demoMode: boolean;
-  /** Wizard provider ids whose platform key already exists in the server env. */
-  envDetected: string[];
+  savedDetected: string[];
   /** Model options for the currently selected provider (empty for local/none). */
   modelOptions: ModelOption[];
   modelValue: string;
@@ -75,7 +75,7 @@ function VoicePicker({
   onBaseUrl,
   localPlaceholder,
   demoMode,
-  envDetected,
+  savedDetected,
   modelOptions,
   modelValue,
   onModel,
@@ -92,8 +92,8 @@ function VoicePicker({
     : 'Choose a course language first; Sotto checks model-language fit before any provider call.';
   const k = keys[sel.id] ?? '';
   const bu = baseUrls[sel.id] ?? '';
-  const envKeyDetected = envDetected.includes(sel.id);
-  const showDetectedKey = envKeyDetected && !k.trim() && !keyOverrides[sel.id];
+  const savedKeyDetected = savedDetected.includes(sel.id);
+  const showDetectedKey = savedKeyDetected && !k.trim() && !keyOverrides[sel.id];
   const cartesiaMonthlyLimit = keys[CARTESIA_MONTHLY_LIMIT_ID]?.trim() ?? '';
   const cartesiaUsagePlan = keys[CARTESIA_USAGE_PLAN_ID]?.trim() ?? '';
   const cartesiaPlanSelectValue =
@@ -112,7 +112,7 @@ function VoicePicker({
       <div className={c.voicePills}>
         {providers.map((p) => {
           const set =
-            !p.local && ((keys[p.id] ?? '').trim().length > 0 || envDetected.includes(p.id));
+            !p.local && ((keys[p.id] ?? '').trim().length > 0 || savedDetected.includes(p.id));
           const isSelected = value === p.id;
           const isSupported = supportsWelcomeSpeechProviderLanguage(kind, p.id, languageCode);
           const languageCount = getWelcomeSpeechProviderLanguageCount(kind, p.id);
@@ -224,7 +224,7 @@ function VoicePicker({
               <>
                 <span className={c.vkDetected}>
                   <Glyph name="check" size={13} />
-                  Detected from the server environment
+                  Saved for your profile
                 </span>
                 <button
                   type="button"
@@ -244,7 +244,7 @@ function VoicePicker({
                   value={k}
                   onChange={(e) => onKey(sel.id, e.target.value)}
                   aria-label={`${sel.name} API key`}
-                  autoFocus={envKeyDetected && Boolean(keyOverrides[sel.id])}
+                  autoFocus={savedKeyDetected && Boolean(keyOverrides[sel.id])}
                 />
                 {sel.apiUrl ? (
                   <a
@@ -260,6 +260,26 @@ function VoicePicker({
               </>
             )}
           </div>
+          {kind === 'tts' &&
+            !showDetectedKey &&
+            welcomeVoiceCredentialFields(sel.id)
+              .fields.filter((field) => field.required && field.id !== 'apiKey')
+              .map((field) => (
+                <div className={c.vkRow} key={field.id}>
+                  <label className={c.vkLabel} htmlFor={`voice-${sel.id}-${field.id}`}>
+                    {field.label}
+                  </label>
+                  <input
+                    id={`voice-${sel.id}-${field.id}`}
+                    className={c.vkInput}
+                    type={field.secret ? 'password' : field.kind === 'number' ? 'number' : 'text'}
+                    value={keys[`${sel.id}:${field.id}`] ?? ''}
+                    onChange={(event) => onKey(`${sel.id}:${field.id}`, event.target.value)}
+                    placeholder={field.placeholder}
+                    required
+                  />
+                </div>
+              ))}
           {modelOptions.length > 0 && (
             <div className={c.vkRow}>
               <span className={c.vkLabel}>
@@ -360,9 +380,9 @@ function VoicePicker({
             {k.trim()
               ? `Saved to your config · ${sel.note} · edit anytime in admin providers`
               : showDetectedKey
-                ? `Already configured on the server (env) · ${sel.note} · nothing to paste`
-                : envKeyDetected
-                  ? `Paste a key to replace the server one, or leave blank to keep it · ${sel.note}`
+                ? `Saved for your profile · ${sel.note} · nothing to paste`
+                : savedKeyDetected
+                  ? `Paste a key to replace the saved one, or leave blank to keep it · ${sel.note}`
                   : `${sel.note} · paste now or add it later in admin providers`}
           </div>
         </div>
@@ -374,22 +394,21 @@ function VoicePicker({
 function VisualCuePicker({
   voice,
   demoMode,
-  envDetected,
+  savedDetected,
   onProvider,
   onKey,
 }: {
   voice: VoiceState;
   demoMode: boolean;
-  /** Wizard visual provider ids whose platform key already exists in the server env. */
-  envDetected: string[];
+  savedDetected: string[];
   onProvider: (provider: VoiceState['visualCueProvider']) => void;
   onKey: (value: string) => void;
 }) {
   const [keyOverride, setKeyOverride] = useState(false);
   const enabled = voice.visualCueProvider === 'pexels';
   const key = voice.keys[VISUAL_CUE_KEY_ID] ?? '';
-  const envKeyDetected = envDetected.includes('pexels');
-  const showDetectedKey = envKeyDetected && !key.trim() && !keyOverride;
+  const savedKeyDetected = savedDetected.includes('pexels');
+  const showDetectedKey = savedKeyDetected && !key.trim() && !keyOverride;
 
   return (
     <section className={c.learningBlock} aria-labelledby="learning-tools-title">
@@ -475,7 +494,7 @@ function VisualCuePicker({
                 <>
                   <span className={c.vkDetected}>
                     <Glyph name="check" size={13} />
-                    Detected from the server environment
+                    Saved for your profile
                   </span>
                   <button
                     type="button"
@@ -495,7 +514,7 @@ function VisualCuePicker({
                     value={key}
                     onChange={(event) => onKey(event.target.value)}
                     aria-label="Pexels API key"
-                    autoFocus={envKeyDetected && keyOverride}
+                    autoFocus={savedKeyDetected && keyOverride}
                   />
                   <a
                     className={c.vkActionLink}
@@ -513,9 +532,9 @@ function VisualCuePicker({
               {key.trim()
                 ? 'Saved as an encrypted visual cue key when setup finishes.'
                 : showDetectedKey
-                  ? 'Already configured on the server (env) · nothing to paste'
-                  : envKeyDetected
-                    ? 'Paste a key to replace the server one, or leave blank to keep it.'
+                  ? 'Saved for your profile · nothing to paste'
+                  : savedKeyDetected
+                    ? 'Paste a key to replace the saved one, or leave blank to keep it.'
                     : 'Paste now or add it later; image cues stay optional.'}
             </div>
           </div>
@@ -533,11 +552,9 @@ interface Props {
   voice: VoiceState;
   demoMode: boolean;
   language: string;
-  /** Wizard TTS/STT ids whose platform key already exists in the server env (owner only). */
-  envDetectedTts?: string[];
-  envDetectedStt?: string[];
-  /** Wizard visual provider ids (pexels) whose platform key already exists in the server env. */
-  envDetectedVisual?: string[];
+  savedDetectedTts?: string[];
+  savedDetectedStt?: string[];
+  savedDetectedVisual?: string[];
   /** Registry TTS models keyed by provider id (elevenlabs, openai, cartesia, hume). */
   ttsModels?: Record<string, ModelOption[]>;
   /** Registry STT models keyed by registry provider id (openai, deepgram, assemblyai, elevenlabs). */
@@ -570,9 +587,9 @@ export function StepVoice({
   voice,
   demoMode,
   language,
-  envDetectedTts = [],
-  envDetectedStt = [],
-  envDetectedVisual = [],
+  savedDetectedTts = [],
+  savedDetectedStt = [],
+  savedDetectedVisual = [],
   ttsModels = {},
   sttModels = {},
   setVoice,
@@ -735,7 +752,7 @@ export function StepVoice({
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8000"
         demoMode={demoMode}
-        envDetected={envDetectedTts}
+        savedDetected={savedDetectedTts}
         modelOptions={ttsModelOptions}
         modelValue={voice.ttsModel[ttsModelRegId] ?? ''}
         onModel={setTtsModel}
@@ -755,7 +772,7 @@ export function StepVoice({
         onBaseUrl={setBaseUrl}
         localPlaceholder="http://localhost:8001/v1"
         demoMode={demoMode}
-        envDetected={envDetectedStt}
+        savedDetected={savedDetectedStt}
         modelOptions={sttModelOptions}
         modelValue={voice.sttModel[sttModelRegId] ?? ''}
         onModel={setSttModel}
@@ -774,7 +791,7 @@ export function StepVoice({
       <VisualCuePicker
         voice={voice}
         demoMode={demoMode}
-        envDetected={envDetectedVisual}
+        savedDetected={savedDetectedVisual}
         onProvider={(provider) => setVoice((s) => ({ ...s, visualCueProvider: provider }))}
         onKey={(value) => setKey(VISUAL_CUE_KEY_ID, value)}
       />

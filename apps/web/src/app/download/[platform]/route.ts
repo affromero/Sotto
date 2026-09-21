@@ -41,9 +41,7 @@ function normalizeVersion(value: string | null): string {
 
 function getDesktopDownloadBaseUrl(): string | null {
   const baseUrl =
-    process.env.DESKTOP_DOWNLOAD_BASE_URL ||
-    process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_BASE_URL ||
-    process.env.R2_PUBLIC_URL;
+    process.env.DESKTOP_DOWNLOAD_BASE_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_BASE_URL;
 
   return baseUrl ? baseUrl.replace(/\/+$/, '') : null;
 }

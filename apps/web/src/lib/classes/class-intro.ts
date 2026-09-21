@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { resolveLearningAi } from '../learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from '../learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from '../providers/ai';
 import { loadAndRender } from '../prompt-loader';
 import { formatNotesForPrompt } from '../course-notes';
@@ -47,6 +48,7 @@ export interface ClassIntro {
 
 export interface ClassIntroParams {
   userId: string;
+  execution: SottoProviderExecution;
   level: string;
   nativeLang: string;
   targetLang: string;
@@ -142,7 +144,7 @@ function normalizeIntro(value: unknown): ClassIntro | null {
 
 export function classIntroFromSeed(
   seed: unknown,
-  fallback: Omit<ClassIntroParams, 'userId'>
+  fallback: Omit<ClassIntroParams, 'userId' | 'execution'>
 ): ClassIntro {
   if (seed && typeof seed === 'object' && 'intro' in seed) {
     const intro = normalizeIntro((seed as { intro?: unknown }).intro);
@@ -151,7 +153,9 @@ export function classIntroFromSeed(
   return buildFallbackClassIntro(fallback);
 }
 
-export function buildFallbackClassIntro(p: Omit<ClassIntroParams, 'userId'>): ClassIntro {
+export function buildFallbackClassIntro(
+  p: Omit<ClassIntroParams, 'userId' | 'execution'>
+): ClassIntro {
   const immersion = isImmersionLevel(p.level);
   const grammar = p.grammarPoints.map(labelFromKey).slice(0, 4);
   const vocab = p.targetVocab.slice(0, 5);
@@ -372,7 +376,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
   const fallback = buildFallbackClassIntro(p);
 
   try {
-    const ai = await resolveLearningAi(p.userId);
+    const ai = await resolveCapturedLearningAi(p.userId, p.execution);
     const systemPrompt = loadAndRender('class/generate-class-intro.md', {
       NATIVE: p.nativeLang,
       TARGET: p.targetLang,
@@ -397,7 +401,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
     const response = await provider.generateResponse(
       systemPrompt,
       [{ role: 'user', content: 'Write the opening class teaching brief.' }],
-      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 1800, temperature: 0.5 }
+      { ...(await capturedLearningAiOptions(ai)), maxTokens: 1800, temperature: 0.5 }
     );
 
     logUsage({

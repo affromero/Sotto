@@ -4,6 +4,7 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { examSubmitSchema } from '@/lib/validations';
 import { scoreExam, ExamNotFoundError } from '@/lib/mock-exam-scoring';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
 
   try {
-    const result = await scoreExam(examId, authed.userId, parsed.data.answers);
+    const result = await scoreExam(
+      examId,
+      authed.userId,
+      sottoRequestExecution(request, authed),
+      parsed.data.answers
+    );
     return NextResponse.json(result);
   } catch (error: unknown) {
     if (error instanceof ExamNotFoundError) return errorResponse('Exam not found', 404);

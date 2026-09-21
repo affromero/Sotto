@@ -3,7 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllProviderMeta as getAllTtsProviderMeta } from '@/lib/providers/tts-registry';
-import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
+import {
+  getAllSttProviderMeta,
+  sttUsesTtsCredentials,
+  type SttProviderId,
+} from '@/lib/providers/stt-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getServerInfra } from '@/lib/server-config';
 import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
@@ -22,50 +26,58 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, userInterests, categories, byokKeys, aiKeys, latestCourse, autoConfig, infra] =
-    await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          name: true,
-          email: true,
-          image: true,
-          role: true,
-          preferredLanguage: true,
-          preferredTtsModel: true,
-          preferredSttModel: true,
-          preferredAiModel: true,
-          emailNotifications: true,
-          pushNotifications: true,
-          showAgentUsageStatus: true,
+  const [
+    user,
+    userInterests,
+    categories,
+    effectiveTtsKeys,
+    effectiveAiKeys,
+    latestCourse,
+    autoConfig,
+    infra,
+  ] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        preferredLanguage: true,
+        preferredTtsModel: true,
+        preferredSttModel: true,
+        preferredAiModel: true,
+        emailNotifications: true,
+        pushNotifications: true,
+        showAgentUsageStatus: true,
+      },
+    }),
+    prisma.userInterest.findMany({
+      where: { userId, weight: { gt: 0 } },
+      select: { tagId: true },
+    }),
+    prisma.tag.findMany({
+      where: { slug: { in: ONBOARDING_TAG_SLUGS } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        children: {
+          select: { id: true, name: true, slug: true },
+          orderBy: { name: 'asc' },
         },
-      }),
-      prisma.userInterest.findMany({
-        where: { userId, weight: { gt: 0 } },
-        select: { tagId: true },
-      }),
-      prisma.tag.findMany({
-        where: { slug: { in: ONBOARDING_TAG_SLUGS } },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          children: {
-            select: { id: true, name: true, slug: true },
-            orderBy: { name: 'asc' },
-          },
-        },
-      }),
-      listByokProviders(userId),
-      listAiProviders(userId),
-      prisma.course.findFirst({
-        where: { userId },
-        orderBy: { updatedAt: 'desc' },
-        select: { targetLang: true },
-      }),
-      getAutoModelConfig(),
-      getServerInfra(),
-    ]);
+      },
+    }),
+    listByokProviders(userId, true),
+    listAiProviders(userId, true),
+    prisma.course.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: { targetLang: true },
+    }),
+    getAutoModelConfig(),
+    getServerInfra(),
+  ]);
 
   if (!user) return null;
 
@@ -75,23 +87,11 @@ export default async function SettingsPage() {
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
   categories.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
 
-  const configuredProviders = byokKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
-  const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
-  const adminUser = await prisma.user.findFirst({
-    where: { role: 'ADMIN', id: { not: userId } },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true },
-  });
-  const [adminTtsKeys, adminAiKeys] = adminUser
-    ? await Promise.all([listByokProviders(adminUser.id), listAiProviders(adminUser.id)])
-    : [[], []];
   const accessibleTtsProviders = new Set<string>([
-    ...configuredProviders.filter((k) => k.isValid).map((k) => k.provider),
-    ...adminTtsKeys.filter((k) => k.isValid).map((k) => k.provider),
+    ...effectiveTtsKeys.filter((k) => k.isValid).map((k) => k.provider),
   ]);
   const accessibleAiProviders = new Set<string>([
-    ...configuredAiProviders.filter((k) => k.isValid).map((k) => k.provider),
-    ...adminAiKeys.filter((k) => k.isValid).map((k) => k.provider),
+    ...effectiveAiKeys.filter((k) => k.isValid).map((k) => k.provider),
   ]);
   const speechTtsProviderMeta = getAllTtsProviderMeta().map((meta) => ({
     id: meta.id,
@@ -122,24 +122,17 @@ export default async function SettingsPage() {
   if (selectedSttProvider === 'local') {
     if (infra.sttBaseUrl) accessibleAiProviders.add('local');
   }
-  if (process.env.ELEVENLABS_API_KEY) accessibleTtsProviders.add('elevenlabs');
-  if (process.env.OPENAI_API_KEY) {
-    accessibleTtsProviders.add('openai');
-    accessibleAiProviders.add('openai');
-  }
-  if (process.env.CARTESIA_API_KEY) accessibleTtsProviders.add('cartesia');
-  if (process.env.HUME_API_KEY) accessibleTtsProviders.add('hume');
-  if (process.env.FAL_KEY) {
-    accessibleTtsProviders.add('fal');
-    accessibleTtsProviders.add('minimax');
-  }
-  if (process.env.REPLICATE_API_TOKEN) accessibleTtsProviders.add('replicate');
-  if (process.env.MISTRAL_API_KEY) accessibleTtsProviders.add('mistral');
-  if (process.env.TOGETHER_API_KEY) accessibleAiProviders.add('together');
-  if (process.env.DEEPGRAM_API_KEY) accessibleAiProviders.add('deepgram');
-  if (process.env.ASSEMBLYAI_API_KEY) accessibleAiProviders.add('assemblyai');
-  if (process.env.ELEVENLABS_API_KEY || accessibleTtsProviders.has('elevenlabs')) {
+  if (accessibleTtsProviders.has('elevenlabs')) {
     accessibleAiProviders.add('elevenlabs');
+  }
+  for (const key of effectiveTtsKeys) {
+    if (key.isValid) continue;
+    accessibleTtsProviders.delete(key.provider);
+    if (sttUsesTtsCredentials(key.provider as SttProviderId))
+      accessibleAiProviders.delete(key.provider);
+  }
+  for (const key of effectiveAiKeys) {
+    if (!key.isValid) accessibleAiProviders.delete(key.provider);
   }
 
   const managedCourses = (

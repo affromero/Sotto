@@ -13,27 +13,32 @@
  *   the Cartesia-Version header is the API-contract version (model-agnostic), unchanged.
  */
 import { logger } from '../../logger';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { CARTESIA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
 import { applyPronunciationAliases } from '../../pronunciation-dictionary';
 
-const CARTESIA_API_VERSION = '2025-04-16';
+import { CARTESIA_TTS_API_VERSION } from '@/lib/providers/shared/speech-contracts';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 
 export class CartesiaProvider implements TtsProvider {
+  static readonly speechEndpoint = 'https://api.cartesia.ai/tts/bytes';
   readonly providerId: TtsProviderId = 'cartesia';
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey?: string, model?: string) {
-    const key = apiKey || process.env.CARTESIA_API_KEY;
-    if (!key) throw new Error('Cartesia requires an API key (BYOK or CARTESIA_API_KEY env var)');
-    this.apiKey = key;
+  constructor(
+    apiKey: string,
+    private readonly transport: ProviderTransport,
+    model?: string
+  ) {
+    if (!apiKey.trim()) throw new Error('Cartesia requires an API key');
+    this.apiKey = apiKey;
     this.model = model ?? 'sonic-3.5';
   }
 
@@ -69,15 +74,23 @@ export class CartesiaProvider implements TtsProvider {
       };
     }
 
-    const response = await fetch('https://api.cartesia.ai/tts/bytes', {
-      method: 'POST',
-      headers: {
-        'X-API-Key': this.apiKey,
-        'Cartesia-Version': CARTESIA_API_VERSION,
-        'Content-Type': 'application/json',
+    const response = await this.transport.authenticatedFetch(
+      CartesiaProvider.speechEndpoint,
+      {
+        method: 'POST',
+        signal: params.signal,
+        headers: {
+          'X-API-Key': this.apiKey,
+          'Cartesia-Version': CARTESIA_TTS_API_VERSION,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -94,7 +107,12 @@ export class CartesiaProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, episodeId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(
+    speaker: string,
+    episodeId?: string,
+    metadata?: VoiceMatchMetadata,
+    _language?: string
+  ): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!episodeId) {
       return isHostVoice ? CARTESIA_VOICE_POOL[0].id : CARTESIA_VOICE_POOL[1].id;
@@ -105,6 +123,19 @@ export class CartesiaProvider implements TtsProvider {
 
   getModelId(): string {
     return this.model;
+  }
+
+  async getConcurrencyLimit(signal?: AbortSignal): Promise<number> {
+    signal?.throwIfAborted();
+    const limit = await getCartesiaConcurrencyLimit(this.apiKey);
+    signal?.throwIfAborted();
+    return limit;
+  }
+
+  async observeConcurrencyError(message: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await updateCartesiaConcurrencyFromError(this.apiKey, message);
+    signal?.throwIfAborted();
   }
 }
 
@@ -122,7 +153,11 @@ const DEFAULT_CARTESIA_CONCURRENCY = 2;
 export async function getCartesiaConcurrencyLimit(apiKey: string): Promise<number> {
   const { cache } = await import('../../redis');
   const crypto = await import('crypto');
-  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const keyHash = crypto
+    .createHmac('sha256', apiKey)
+    .update('sotto:cartesia:concurrency')
+    .digest('hex')
+    .slice(0, 16);
   const cacheKey = `tts:concurrency:cartesia:${keyHash}`;
 
   const cached = await cache.get<number>(cacheKey);
@@ -135,7 +170,10 @@ export async function getCartesiaConcurrencyLimit(apiKey: string): Promise<numbe
  * Parse a Cartesia 429 error body for the actual concurrency limit and cache it.
  * Cartesia's 429 response includes "Current limit: N" — we extract and cache that value.
  */
-export async function updateCartesiaConcurrencyFromError(apiKey: string, errorMessage: string): Promise<void> {
+export async function updateCartesiaConcurrencyFromError(
+  apiKey: string,
+  errorMessage: string
+): Promise<void> {
   try {
     const match = errorMessage.match(/Current limit:\s*(\d+)/i);
     if (!match) return;
@@ -144,7 +182,11 @@ export async function updateCartesiaConcurrencyFromError(apiKey: string, errorMe
 
     const { cache } = await import('../../redis');
     const crypto = await import('crypto');
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+    const keyHash = crypto
+      .createHmac('sha256', apiKey)
+      .update('sotto:cartesia:concurrency')
+      .digest('hex')
+      .slice(0, 16);
     await cache.set(`tts:concurrency:cartesia:${keyHash}`, limit, 300);
     logger.info('Cartesia concurrency limit detected from 429', { limit });
   } catch {

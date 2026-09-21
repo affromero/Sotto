@@ -2,25 +2,21 @@
  * Generic local TTS sidecar provider.
  *
  * This is the no-code extension point for self-hosters who want to run any
- * local TTS model. Point TTS_PROVIDER=local and TTS_BASE_URL at a small HTTP
- * server that implements:
+ * local TTS model. Save the sidecar base URL in Sotto. The server implements:
  *
  *   POST /tts    { text, voice, language?, model? } -> audio bytes
  *   GET  /voices { voices: [{ id, label? | name?, gender?, description? }] }
  *   GET  /health { status: "ok" }
  *
- * TTS_API_KEY is optional and sent as a Bearer token only when set.
+ * A saved credential is optional and is sent as a Bearer token when present.
  */
 import { logger } from '../../logger';
-import { infra } from '../../server-config';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
+import type { LocalTtsConnection } from '@/lib/providers/shared/local-tts-connection';
 import type { VoiceMatchMetadata } from '../../voice-pool';
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
-import {
-  getLocalTtsVoicePool,
-  selectVoicePairFromPool,
-  selectVoiceSetFromPool,
-} from '../tts-voices';
+import { type ProviderVoice, selectVoicePairFromPool, selectVoiceSetFromPool } from '../tts-voices';
 
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 
@@ -34,24 +30,19 @@ function hashString(s: string): number {
 
 export class LocalTtsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'local';
-  private baseURL: string;
-  private apiKey: string | undefined;
-  private model: string;
+  private readonly endpoint: string;
+  private readonly apiKey: string | undefined;
+  private readonly model: string;
+  private readonly voices: ProviderVoice[];
 
-  constructor(_apiKey?: string, model?: string) {
-    const baseURL = infra('ttsBaseUrl', 'TTS_BASE_URL');
-    if (!baseURL) {
-      throw new Error(
-        'TTS_BASE_URL is required for TTS_PROVIDER=local. Point it at a local ' +
-          'Sotto-compatible TTS sidecar (for example http://localhost:8000 locally, ' +
-          'or http://local-tts:8000 in Docker).'
-      );
-    }
-    this.baseURL = baseURL.replace(/\/+$/, '');
-    this.apiKey = process.env.TTS_API_KEY?.trim() || undefined;
-    const requestedModel = model?.trim();
-    const envModel = process.env.TTS_MODEL?.trim();
-    this.model = requestedModel || envModel || 'local';
+  constructor(
+    connection: LocalTtsConnection,
+    private readonly transport: ProviderTransport
+  ) {
+    this.endpoint = connection.endpoint;
+    this.apiKey = connection.apiKey;
+    this.model = connection.model;
+    this.voices = structuredClone([...connection.voices]);
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
@@ -65,29 +56,28 @@ export class LocalTtsProvider implements TtsProvider {
     };
     if (params.language) body.language = params.language;
 
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseURL}/tts`, {
+    const response = await this.transport.authenticatedFetch(
+      this.endpoint,
+      {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
-      });
-    } catch (err) {
-      throw new Error(
-        `Could not reach the local TTS sidecar at ${this.baseURL}. ` +
-          'Is the service running and TTS_BASE_URL correct? ' +
-          `(${err instanceof Error ? err.message : String(err)})`
-      );
-    }
+        signal: params.signal,
+      },
+      {
+        onDispatch: params.onDispatch ?? (() => {}),
+        onConsumed: settleSynchronousProviderResponse(params.onSettled),
+      }
+    );
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
+      const errorText = await response.text();
       throw new Error(`Local TTS sidecar error (${response.status}): ${errorText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
+    params.signal?.throwIfAborted();
     logger.info('Local TTS speech generated', {
-      baseURL: this.baseURL,
       voiceId: params.voiceId,
       model: params.modelId ?? this.model,
       chars: params.text.length,
@@ -102,7 +92,7 @@ export class LocalTtsProvider implements TtsProvider {
     metadata?: VoiceMatchMetadata,
     _language?: string
   ): string {
-    const pool = getLocalTtsVoicePool();
+    const pool = this.voices;
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
 
     if (pool.length === 0) return isHostVoice ? 'default' : 'alternate';

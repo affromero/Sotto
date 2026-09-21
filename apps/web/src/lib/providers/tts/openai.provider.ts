@@ -13,7 +13,8 @@
  *
  * @tts-research-date 2026-02-27 — gpt-4o-mini-tts instructions, model snapshots, voices
  */
-import type { TtsProvider, SpeechParams } from '../tts';
+import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
+import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 import type { TtsProviderId } from '../tts-registry';
 import {
   selectVoicePair,
@@ -55,24 +56,38 @@ const INSTRUCTION_MODELS = new Set([
 ]);
 
 export class OpenAITtsProvider implements TtsProvider {
+  static async speechEndpoint(apiKey: string, baseURL: string) {
+    const { default: OpenAI } = await import('openai');
+    return new OpenAI({ apiKey, baseURL }).buildURL('/audio/speech', undefined);
+  }
   readonly providerId: TtsProviderId = 'openai';
-  private apiKeyOverride: string | undefined;
   private model: string;
 
-  constructor(byokApiKey?: string, model?: string) {
-    this.apiKeyOverride = byokApiKey;
+  constructor(
+    private readonly apiKey: string,
+    private readonly baseURL: string,
+    private readonly transport: ProviderTransport,
+    model?: string
+  ) {
+    if (!apiKey.trim()) throw new Error('No OpenAI credential is saved');
     this.model = model ?? 'tts-1-hd';
   }
 
-  private async getClient() {
-    const apiKey = this.apiKeyOverride || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
+  private async getClient(observation: Pick<SpeechParams, 'onDispatch' | 'onSettled'>) {
     const { default: OpenAI } = await import('openai');
-    return new OpenAI({ apiKey });
+    return new OpenAI({
+      apiKey: this.apiKey,
+      baseURL: this.baseURL,
+      fetch: (input, init) =>
+        this.transport.authenticatedFetch(input, init, {
+          onDispatch: observation.onDispatch ?? (() => {}),
+          onConsumed: settleSynchronousProviderResponse(observation.onSettled),
+        }),
+    });
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    const client = await this.getClient();
+    const client = await this.getClient(params);
 
     let openaiVoice: string = params.voiceId;
     const entry = findByVoiceId(params.voiceId);
@@ -86,7 +101,7 @@ export class OpenAITtsProvider implements TtsProvider {
 
     // Build request — add instructions for gpt-4o-mini-tts models
     const supportsInstructions = INSTRUCTION_MODELS.has(this.model);
-    const createParams: Record<string, unknown> = {
+    const createParams: Parameters<typeof client.audio.speech.create>[0] = {
       model: this.model,
       voice,
       input: convertInlineAudioTags(params.text, 'openai'),
@@ -100,9 +115,7 @@ export class OpenAITtsProvider implements TtsProvider {
       }
     }
 
-    const response = await client.audio.speech.create(
-      createParams as Parameters<typeof client.audio.speech.create>[0]
-    );
+    const response = await client.audio.speech.create(createParams, { signal: params.signal });
 
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);

@@ -1,609 +1,458 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EventEmitter } from 'events';
-import { PassThrough } from 'stream';
-import type { ChildProcess } from 'child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  executeClaudeCode,
+  streamClaudeCode,
+  resetClaudeRuntimeForTests,
+  serializeMessages,
+  shellQuote,
+  buildAgentInvocation,
+  getClaudeSshHost,
+} from '@/lib/claude-code-client';
+import { usageFromGenerationError } from 'thesidedoor-core/ai/usage';
 
-// ---- Mocks ----
-
-const mockSpawn = vi.fn();
-
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('child_process')>();
-  const mocked = {
-    ...actual,
-    spawn: (...args: unknown[]) => mockSpawn(...args),
-  };
-  return { ...mocked, default: mocked };
-});
-
-vi.mock('@/lib/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
-
-// Helper: create a fake ChildProcess with stdin/stdout/stderr
-// stdout uses PassThrough (async iterable) for streamClaudeCode compatibility
-function createMockProcess(): ChildProcess & {
-  _stdout: PassThrough;
-  _stderr: EventEmitter;
-  _stdin: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
-} {
-  const proc = new EventEmitter() as ChildProcess & {
-    _stdout: PassThrough;
-    _stderr: EventEmitter;
-    _stdin: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
-  };
-
-  proc._stdout = new PassThrough();
-  proc._stderr = new EventEmitter();
-  proc._stdin = { write: vi.fn(), end: vi.fn() };
-
-  proc.stdout = proc._stdout as any;
-  proc.stderr = proc._stderr as any;
-  proc.stdin = proc._stdin as any;
-  proc.kill = vi.fn();
-
-  return proc;
-}
-
-// ---- Tests ----
-
-describe('claude-code-client', () => {
+describe('Claude CLI execution', () => {
+  let directory: string;
   let originalEnv: NodeJS.ProcessEnv;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    originalEnv = { ...process.env };
+  const terminal = {
+    type: 'result',
+    subtype: 'success',
+    usage: {
+      input_tokens: 12,
+      output_tokens: 5,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    },
+  };
+  const assistant = (text: string) => ({
+    type: 'assistant',
+    message: { content: [{ type: 'text', text }] },
   });
-
+  function executable(body: string, name = 'claude') {
+    writeFileSync(join(directory, name), '#!' + process.execPath + '\n' + body, { mode: 0o700 });
+  }
+  function emit(events: unknown[], before = '') {
+    executable(
+      before +
+        '\nprocess.stdin.resume(); process.stdin.on("end", () => {\n' +
+        events
+          .map(
+            (event) => 'process.stdout.write(' + JSON.stringify(JSON.stringify(event) + '\n') + ');'
+          )
+          .join('\n') +
+        '\n});'
+    );
+  }
+  function seed() {
+    const home = join(directory, 'credentials');
+    mkdirSync(home);
+    process.env.CLAUDE_HOME = home;
+    process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
+      claudeAiOauth: { refreshToken: 'seed', refreshTokenExpiresAt: 1000 },
+    });
+    return home;
+  }
+  beforeEach(() => {
+    originalEnv = process.env;
+    directory = mkdtempSync(join(tmpdir(), 'sotto-claude-fixture-'));
+    process.env = { NODE_ENV: 'test', PATH: directory, HOME: directory, TMPDIR: directory };
+    resetClaudeRuntimeForTests();
+  });
   afterEach(() => {
     process.env = originalEnv;
+    resetClaudeRuntimeForTests();
+    rmSync(directory, { recursive: true, force: true });
   });
 
-  describe('serializeMessages', () => {
-    it('returns content directly for a single message', async () => {
-      const { serializeMessages } = await import('@/lib/claude-code-client');
+  it('keeps a single prompt and labels conversation turns', () => {
+    expect(serializeMessages([{ role: 'user', content: 'Hello' }])).toBe('Hello');
+    expect(
+      serializeMessages([
+        { role: 'user', content: 'First' },
+        { role: 'assistant', content: 'Reply' },
+      ])
+    ).toBe('USER: First\n\n---\n\nASSISTANT: Reply');
+    expect(
+      serializeMessages([
+        { role: 'user', content: 'First' },
+        { role: 'assistant', content: 'Reply' },
+        { role: 'user', content: 'Next' },
+      ])
+    ).toBe('USER: First\n\n---\n\nASSISTANT: Reply\n\n---\n\nUSER: Next');
+  });
 
-      const result = serializeMessages([{ role: 'user', content: 'Hello there' }]);
+  it('sends prompts on stdin and preserves model, effort and tool restrictions', async () => {
+    const record = join(directory, 'request.json');
+    executable(
+      'let input = ""; process.stdin.on("data", b => input += b); process.stdin.on("end", () => {' +
+        'require("node:fs").writeFileSync(' +
+        JSON.stringify(record) +
+        ', JSON.stringify({args:process.argv.slice(2),input}));' +
+        'console.log(' +
+        JSON.stringify(JSON.stringify(assistant('  Answer  '))) +
+        ');' +
+        'console.log(' +
+        JSON.stringify(JSON.stringify(terminal)) +
+        '); });'
+    );
+    expect(
+      await executeClaudeCode('System', 'Private prompt', { model: 'sonnet', effort: 'high' })
+    ).toMatchObject({ content: 'Answer', inputTokens: 12, outputTokens: 5 });
+    const request = JSON.parse(readFileSync(record, 'utf8'));
+    expect(request.input).toBe('Private prompt');
+    expect(request.args).toEqual(
+      expect.arrayContaining([
+        '--model',
+        'sonnet',
+        '--system-prompt',
+        'System',
+        '--effort',
+        'high',
+        '--tools',
+        '',
+        '--output-format',
+        'stream-json',
+        '--include-partial-messages',
+      ])
+    );
+    expect(request.args).not.toContain('Private prompt');
+  });
 
-      expect(result).toBe('Hello there');
-    });
-
-    it('formats multi-turn conversations with labels', async () => {
-      const { serializeMessages } = await import('@/lib/claude-code-client');
-
-      const result = serializeMessages([
-        { role: 'user', content: 'What is quantum computing?' },
-        { role: 'assistant', content: 'Quantum computing uses qubits...' },
-        { role: 'user', content: 'Tell me more about qubits' },
-      ]);
-
-      expect(result).toBe(
-        'USER: What is quantum computing?\n\n---\n\nASSISTANT: Quantum computing uses qubits...\n\n---\n\nUSER: Tell me more about qubits'
-      );
-    });
-
-    it('handles two messages correctly', async () => {
-      const { serializeMessages } = await import('@/lib/claude-code-client');
-
-      const result = serializeMessages([
-        { role: 'user', content: 'First message' },
-        { role: 'assistant', content: 'Response' },
-      ]);
-
-      expect(result).toContain('USER: First message');
-      expect(result).toContain('ASSISTANT: Response');
-      expect(result).toContain('---');
+  it('reports missing usage as unknown for assistant-only responses', async () => {
+    emit([assistant('Answer')]);
+    expect(await executeClaudeCode('', 'Prompt')).toEqual({
+      content: 'Answer',
+      inputTokens: null,
+      outputTokens: null,
     });
   });
 
-  describe('executeClaudeCode', () => {
-    it('spawns claude CLI with correct arguments', async () => {
-      process.env.DATABASE_URL = 'must-not-reach-claude';
-      process.env.ANTHROPIC_API_KEY = 'claude-provider-key';
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('You are helpful.', 'Say hello');
-
-      // Simulate successful output
-      proc._stdout.emit('data', Buffer.from('Hello from Claude!'));
-      proc.emit('close', 0);
-
-      const result = await promise;
-
-      expect(result).toEqual({
-        content: 'Hello from Claude!',
-        inputTokens: 0,
-        outputTokens: 0,
-      });
-
-      const [, args, options] = mockSpawn.mock.calls[0] as [
-        string,
-        string[],
-        { env: NodeJS.ProcessEnv },
-      ];
-      expect(args).toEqual(expect.arrayContaining(['--model', 'opus']));
-      expect(args).toEqual(
-        expect.arrayContaining([
-          '--safe-mode',
-          '--disable-slash-commands',
-          '--no-session-persistence',
-          '--strict-mcp-config',
-          '--tools',
-          '',
-          '--permission-mode',
-          'dontAsk',
-        ])
-      );
-      expect(options.env.ANTHROPIC_API_KEY).toBe('claude-provider-key');
-      expect(options.env.DATABASE_URL).toBeUndefined();
-    });
-
-    it('isolates each invocation in its own CLAUDE_CONFIG_DIR and drops API-key env when OAuth credentials exist', async () => {
-      process.env.ANTHROPIC_API_KEY = 'platform-key-must-not-leak';
-      process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
-        claudeAiOauth: { accessToken: 'oauth-token' },
-      });
-      const { executeClaudeCode, resetClaudeRuntimeForTests } =
-        await import('@/lib/claude-code-client');
-      resetClaudeRuntimeForTests();
-
-      const proc1 = createMockProcess();
-      const proc2 = createMockProcess();
-      mockSpawn.mockReturnValueOnce(proc1).mockReturnValueOnce(proc2);
-
-      const p1 = executeClaudeCode('sys', 'one');
-      const p2 = executeClaudeCode('sys', 'two');
-      proc1._stdout.emit('data', Buffer.from('a'));
-      proc2._stdout.emit('data', Buffer.from('b'));
-      proc1.emit('close', 0);
-      proc2.emit('close', 0);
-      await Promise.all([p1, p2]);
-
-      const env1 = (mockSpawn.mock.calls[0] as [string, string[], { env: NodeJS.ProcessEnv }])[2]
-        .env;
-      const env2 = (mockSpawn.mock.calls[1] as [string, string[], { env: NodeJS.ProcessEnv }])[2]
-        .env;
-      expect(env1.CLAUDE_CONFIG_DIR).toBeTruthy();
-      expect(env2.CLAUDE_CONFIG_DIR).toBeTruthy();
-      expect(env1.CLAUDE_CONFIG_DIR).not.toBe(env2.CLAUDE_CONFIG_DIR);
-      expect(env1.ANTHROPIC_API_KEY).toBeUndefined();
-      resetClaudeRuntimeForTests();
-    });
-
-    it('keeps a rotated token instead of reseeding from the configured secret', async () => {
-      // CLAUDE_HOME is the .claude config directory itself.
-      const home = mkdtempSync(join(tmpdir(), 'claude-home-'));
-      const credentials = join(home, '.credentials.json');
-      // What the CLI rotated to on a previous run: outlives the frozen secret.
-      const rotated = JSON.stringify({
-        claudeAiOauth: { refreshToken: 'rotated', refreshTokenExpiresAt: 2_000 },
-      });
-      writeFileSync(credentials, rotated);
-      process.env.CLAUDE_HOME = home;
-      process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
-        claudeAiOauth: { refreshToken: 'retired', refreshTokenExpiresAt: 1_000 },
-      });
-
-      const { executeClaudeCode, resetClaudeRuntimeForTests } =
-        await import('@/lib/claude-code-client');
-      resetClaudeRuntimeForTests();
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-      const promise = executeClaudeCode('sys', 'prompt');
-      const [, , options] = mockSpawn.mock.calls[0] as [
-        string,
-        string[],
-        { env: NodeJS.ProcessEnv },
-      ];
-      const handed = readFileSync(
-        join(options.env.CLAUDE_CONFIG_DIR as string, '.credentials.json'),
-        'utf8'
-      );
-      proc._stdout.emit('data', Buffer.from('ok'));
-      proc.emit('close', 0);
-      await promise;
-
-      expect(handed).toBe(rotated);
-      expect(readFileSync(credentials, 'utf8')).toBe(rotated);
-      resetClaudeRuntimeForTests();
-    });
-
-    it('persists a token the CLI refreshed so it survives the next start', async () => {
-      const home = mkdtempSync(join(tmpdir(), 'claude-home-'));
-      const credentials = join(home, '.credentials.json');
-      process.env.CLAUDE_HOME = home;
-      process.env.CLAUDE_CODE_CREDENTIALS_JSON = JSON.stringify({
-        claudeAiOauth: { refreshToken: 'seed', refreshTokenExpiresAt: 1_000 },
-      });
-
-      const { executeClaudeCode, resetClaudeRuntimeForTests } =
-        await import('@/lib/claude-code-client');
-      resetClaudeRuntimeForTests();
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-      const promise = executeClaudeCode('sys', 'prompt');
-      const [, , options] = mockSpawn.mock.calls[0] as [
-        string,
-        string[],
-        { env: NodeJS.ProcessEnv },
-      ];
-      // Stand in for the CLI rotating its OAuth token mid-invocation.
-      const refreshed = JSON.stringify({
-        claudeAiOauth: { refreshToken: 'rotated', refreshTokenExpiresAt: 5_000 },
-      });
-      writeFileSync(join(options.env.CLAUDE_CONFIG_DIR as string, '.credentials.json'), refreshed);
-      proc._stdout.emit('data', Buffer.from('ok'));
-      proc.emit('close', 0);
-      await promise;
-
-      expect(readFileSync(credentials, 'utf8')).toBe(refreshed);
-      resetClaudeRuntimeForTests();
-    });
-
-    it('passes encoded effort through to the claude CLI', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt', {
-        model: 'claude-code:claude-fable-5#effort=xhigh',
-      });
-
-      proc._stdout.emit('data', Buffer.from('ok'));
-      proc.emit('close', 0);
-      await promise;
-
-      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
-      expect(args).toEqual(
-        expect.arrayContaining(['--model', 'claude-fable-5', '--effort', 'xhigh'])
-      );
-    });
-
-    it('sends image data through stream-json stdin without filesystem tools', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Describe this image', {
-        images: [{ type: 'image_url', url: 'data:image/png;base64,aGVsbG8=' }],
-      });
-      setTimeout(() => {
-        proc._stdout.write(`${JSON.stringify({ type: 'result', result: 'A test image' })}\n`);
-        proc._stdout.end();
-      }, 0);
-
-      await expect(promise).resolves.toMatchObject({ content: 'A test image' });
-      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
-      expect(args).toEqual(
-        expect.arrayContaining(['--input-format', 'stream-json', '--tools', ''])
-      );
-      const stdin = proc._stdin.write.mock.calls[0]?.[0] as string;
-      expect(JSON.parse(stdin)).toMatchObject({
-        type: 'user',
-        message: {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
-            },
-            { type: 'text', text: 'Describe this image' },
-          ],
+  it('streams deltas without repeating the assistant summary', async () => {
+    emit([
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'Hello ' },
         },
-      });
-    });
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'world' },
+        },
+      },
+      assistant('Hello world'),
+      terminal,
+    ]);
+    const chunks: string[] = [];
+    for await (const chunk of streamClaudeCode('', 'Prompt')) chunks.push(chunk);
+    expect(chunks.join('')).toBe('Hello world');
+  });
 
-    it('rejects remote image URLs instead of silently dropping them', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
+  it('ignores unrelated events and decodes split UTF-8 JSON', async () => {
+    const bytes = Buffer.from(
+      JSON.stringify(assistant('café 🌱')) + '\n' + JSON.stringify(terminal)
+    );
+    executable(
+      'process.stdin.resume(); process.stdin.on("end", async () => {' +
+        'console.log(JSON.stringify({type:"system", subtype:"init"}));' +
+        'for (const byte of ' +
+        JSON.stringify([...bytes]) +
+        ') { process.stdout.write(Buffer.from([byte])); await new Promise(resolve => setTimeout(resolve, 1)); }});'
+    );
+    expect((await executeClaudeCode('', 'Prompt')).content).toBe('café 🌱');
+  });
 
-      const promise = executeClaudeCode('', 'Prompt', {
+  it('retains usage on a failed terminal result', async () => {
+    emit([
+      {
+        type: 'result',
+        subtype: 'error_during_execution',
+        is_error: true,
+        errors: ['Quota exhausted'],
+        usage: { ...terminal.usage, input_tokens: 0, output_tokens: 1 },
+      },
+    ]);
+    const failure = await executeClaudeCode('', 'Prompt').catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain('Quota');
+    expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 0, outputTokens: 1 });
+  });
+
+  it('retains terminal failure details without a final newline on unsuccessful exit', async () => {
+    const result = {
+      type: 'result',
+      subtype: 'error_during_execution',
+      is_error: true,
+      errors: ['Quota exhausted'],
+      usage: terminal.usage,
+    };
+    executable(
+      'process.stdin.resume();process.stdin.on("end",()=>{process.stdout.write(' +
+        JSON.stringify(JSON.stringify(result)) +
+        ');process.exitCode=1;});'
+    );
+    const failure = await executeClaudeCode('', 'Prompt').catch((error: unknown) => error);
+    expect((failure as Error).message).toContain('Quota exhausted');
+    expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 12, outputTokens: 5 });
+  });
+
+  it.each([
+    ['process.stderr.write("CLI failed"); process.exit(2);', 'CLI failed'],
+    ['process.stdout.write("Not logged in. Please run /login"); process.exit(1);', 'Not logged in'],
+    ['process.exit(0);', 'empty response'],
+  ])('surfaces CLI failures (%s)', async (body, message) => {
+    executable('process.stdin.resume(); process.stdin.on("end", () => {' + body + '});');
+    await expect(executeClaudeCode('', 'Prompt')).rejects.toThrow(message);
+  });
+
+  it('explains a missing executable', async () => {
+    await expect(executeClaudeCode('', 'Prompt')).rejects.toThrow('installed');
+  });
+
+  it('isolates concurrent OAuth invocations and excludes API credentials', async () => {
+    seed();
+    process.env.ANTHROPIC_API_KEY = 'must-not-reach-child';
+    process.env.ANTHROPIC_AUTH_TOKEN = 'must-not-reach-child';
+    executable(
+      'process.stdin.resume(); process.stdin.on("end", () => {' +
+        'console.log(JSON.stringify({type:"assistant",message:{content:[{type:"text",text:JSON.stringify({directory:process.env.CLAUDE_CONFIG_DIR,key:process.env.ANTHROPIC_API_KEY,token:process.env.ANTHROPIC_AUTH_TOKEN})}]}})); });'
+    );
+    const responses = await Promise.all([
+      executeClaudeCode('', 'First'),
+      executeClaudeCode('', 'Second'),
+    ]);
+    const records = responses.map((response) => JSON.parse(response.content));
+    expect(records[0].directory).not.toBe(records[1].directory);
+    for (const record of records) {
+      expect(record.key).toBeUndefined();
+      expect(record.token).toBeUndefined();
+      expect(existsSync(record.directory)).toBe(false);
+    }
+  });
+
+  it('preserves rotated credentials and persists a newer refresh', async () => {
+    const home = seed();
+    const rotated = { claudeAiOauth: { refreshToken: 'rotated', refreshTokenExpiresAt: 2000 } };
+    writeFileSync(join(home, '.credentials.json'), JSON.stringify(rotated));
+    emit([assistant('Answer')]);
+    await executeClaudeCode('', 'Prompt');
+    expect(JSON.parse(readFileSync(join(home, '.credentials.json'), 'utf8'))).toEqual(rotated);
+    const refreshed = { claudeAiOauth: { refreshToken: 'refreshed', refreshTokenExpiresAt: 5000 } };
+    emit(
+      [assistant('Answer')],
+      'require("node:fs").writeFileSync(require("node:path").join(process.env.CLAUDE_CONFIG_DIR, ".credentials.json"), ' +
+        JSON.stringify(JSON.stringify(refreshed)) +
+        ');'
+    );
+    await executeClaudeCode('', 'Prompt');
+    expect(JSON.parse(readFileSync(join(home, '.credentials.json'), 'utf8'))).toEqual(refreshed);
+  });
+
+  it('surfaces credential cleanup failures without losing measured usage', async () => {
+    seed();
+    emit(
+      [assistant('Answer'), terminal],
+      'require("node:fs").unlinkSync(require("node:path").join(process.env.CLAUDE_CONFIG_DIR, ".credentials.json"));'
+    );
+    const failure = await executeClaudeCode('', 'Prompt').catch((error: unknown) => error);
+    expect((failure as Error).message).toContain('cleanup');
+    expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 12, outputTokens: 5 });
+  });
+
+  it('quotes remote arguments and trims the SSH host', () => {
+    process.env.CLAUDE_CODE_SSH_HOST = '  user@host  ';
+    expect(getClaudeSshHost()).toBe('user@host');
+    expect(shellQuote("it's private")).toBe("'it'\\''s private'");
+    expect(buildAgentInvocation('claude', ['-p'])).toEqual({ command: 'claude', args: ['-p'] });
+    const remote = buildAgentInvocation(
+      'claude',
+      ['--system-prompt', "it's private"],
+      getClaudeSshHost()
+    );
+    expect(remote.command).toBe('ssh');
+    expect(remote.args).toContain('user@host');
+    expect(remote.args.at(-1)).toContain(shellQuote("it's private"));
+  });
+
+  it('sends base64 images as structured stdin and preserves response whitespace', async () => {
+    const record = join(directory, 'image-request.json');
+    executable(
+      'let input = ""; process.stdin.on("data", b => input += b); process.stdin.on("end", () => {' +
+        'require("node:fs").writeFileSync(' +
+        JSON.stringify(record) +
+        ', JSON.stringify({args:process.argv.slice(2),input:JSON.parse(input)}));' +
+        'console.log(' +
+        JSON.stringify(JSON.stringify(assistant('  Image answer  '))) +
+        ');' +
+        'console.log(' +
+        JSON.stringify(JSON.stringify(terminal)) +
+        '); });'
+    );
+    expect(
+      await executeClaudeCode('', 'Describe', {
+        images: [{ type: 'image_url', url: 'data:image/png;base64,aGVsbG8=' }],
+      })
+    ).toMatchObject({ content: '  Image answer  ', inputTokens: 12, outputTokens: 5 });
+    const recordValue = JSON.parse(readFileSync(record, 'utf8'));
+    expect(recordValue.args).toEqual(
+      expect.arrayContaining(['--input-format', 'stream-json', '--tools', ''])
+    );
+    expect(recordValue.input.message.content).toEqual(
+      expect.arrayContaining([
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+        { type: 'text', text: 'Describe' },
+      ])
+    );
+  });
+
+  it('rejects remote images before opening the CLI', async () => {
+    await expect(
+      executeClaudeCode('', 'Describe', {
         images: [{ type: 'image_url', url: 'https://example.com/image.png' }],
-      });
-      await expect(promise).rejects.toThrow('must be base64 data URLs');
-      expect(mockSpawn).not.toHaveBeenCalled();
-    });
-
-    it('trims whitespace from stdout', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc._stdout.emit('data', Buffer.from('  Hello  \n'));
-      proc.emit('close', 0);
-
-      const result = await promise;
-      expect(result.content).toBe('Hello');
-    });
-
-    it('concatenates multiple stdout chunks', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc._stdout.emit('data', Buffer.from('Part 1 '));
-      proc._stdout.emit('data', Buffer.from('Part 2'));
-      proc.emit('close', 0);
-
-      const result = await promise;
-      expect(result.content).toBe('Part 1 Part 2');
-    });
-
-    it('rejects on non-zero exit code', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc._stderr.emit('data', Buffer.from('Something went wrong'));
-      proc.emit('close', 1);
-
-      await expect(promise).rejects.toThrow('claude-code: exited with code 1');
-    });
-
-    it('surfaces stdout when a failing exit wrote nothing to stderr', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc._stdout.emit('data', Buffer.from('Not logged in \u00b7 Please run /login'));
-      proc.emit('close', 1);
-
-      await expect(promise).rejects.toThrow('Not logged in');
-    });
-
-    it('rejects when spawn fails (CLI not found)', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc.emit('error', new Error('ENOENT'));
-
-      await expect(promise).rejects.toThrow('claude-code: failed to spawn');
-      await expect(promise).rejects.toThrow("Is the 'claude' CLI installed?");
-    });
-
-    it('rejects on timeout', async () => {
-      vi.useFakeTimers();
-
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt', { timeoutMs: 5000 });
-
-      vi.advanceTimersByTime(5000);
-
-      await expect(promise).rejects.toThrow('claude-code: timed out after 5000ms');
-      expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
-
-      vi.useRealTimers();
-    });
+      })
+    ).rejects.toThrow('base64');
   });
 
-  describe('streamClaudeCode', () => {
-    it('spawns with stream-json output format', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
+  it('stops a timed out child before returning the failure', async () => {
+    const pidPath = join(directory, 'pid');
+    executable(
+      'require("node:fs").writeFileSync(' +
+        JSON.stringify(pidPath) +
+        ', String(process.pid)); setInterval(() => {}, 1000);'
+    );
+    await expect(executeClaudeCode('', 'Prompt', { timeoutMs: 2000 })).rejects.toThrow(
+      /timed out|timeout/i
+    );
+    const pid = Number(readFileSync(pidPath, 'utf8'));
+    expect(() => process.kill(pid, 0)).toThrow();
+  }, 10000);
 
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
+  it.each(['client', 'provider', 'factory', 'llm'])(
+    'closes a pending %s stream read and reaps the child',
+    async (entry) => {
+      const pidPath = join(directory, 'pid');
+      executable(
+        'require("node:fs").writeFileSync(' +
+          JSON.stringify(pidPath) +
+          ', String(process.pid));' +
+          'console.log(' +
+          JSON.stringify(JSON.stringify(assistant('Ready'))) +
+          '); setInterval(() => {}, 1000);'
+      );
+      const stream =
+        entry === 'client'
+          ? streamClaudeCode('', 'Prompt')
+          : entry === 'factory'
+            ? (await import('@/lib/providers/ai'))
+                .createAIProvider('claude-code')
+                .streamResponse('', [{ role: 'user', content: 'Prompt' }])
+            : entry === 'provider'
+              ? new (
+                  await import('@/lib/providers/claude-code')
+                ).ClaudeCodeProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }])
+              : (await import('@/lib/llm')).streamResponse(
+                  '',
+                  [{ role: 'user', content: 'Prompt' }],
+                  { model: 'claude-code:sonnet', skipModeration: true }
+                );
+      expect(await stream.next()).toMatchObject({ value: 'Ready' });
+      const pending = stream.next().catch((error: unknown) => error);
+      expect(await stream.return(undefined)).toMatchObject({ done: true });
+      expect(await pending).toBeInstanceOf(Error);
+      expect(() => process.kill(Number(readFileSync(pidPath, 'utf8')), 0)).toThrow();
+    }
+  );
 
-      const gen = streamClaudeCode('System', 'Prompt');
-
-      setTimeout(() => {
-        proc._stdout.write(JSON.stringify({ type: 'result', result: 'Hello' }) + '\n');
-        proc._stdout.end();
-      }, 0);
-
-      const chunks: string[] = [];
-      for await (const chunk of gen) {
-        chunks.push(chunk);
-      }
-
-      expect(chunks).toContain('Hello');
-      const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
-      expect(args).toEqual(expect.arrayContaining(['--include-partial-messages']));
-    });
-
-    it('yields text from content_block_delta events', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const gen = streamClaudeCode('System', 'Prompt');
-
-      setTimeout(() => {
-        const event1 = JSON.stringify({ type: 'content_block_delta', delta: { text: 'Hello ' } });
-        const event2 = JSON.stringify({ type: 'content_block_delta', delta: { text: 'world' } });
-        proc._stdout.write(event1 + '\n' + event2 + '\n');
-        proc._stdout.end();
-      }, 0);
-
-      const chunks: string[] = [];
-      for await (const chunk of gen) {
-        chunks.push(chunk);
-      }
-
-      expect(chunks).toEqual(['Hello ', 'world']);
-    });
-
-    it('yields text from assistant message events', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const gen = streamClaudeCode('System', 'Prompt');
-
-      setTimeout(() => {
-        proc._stdout.write(
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'Hi there' }] },
-          }) + '\n'
-        );
-        proc._stdout.end();
-      }, 0);
-
-      const chunks: string[] = [];
-      for await (const chunk of gen) {
-        chunks.push(chunk);
-      }
-
-      expect(chunks).toEqual(['Hi there']);
-    });
-
-    it('skips events with unknown types', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const gen = streamClaudeCode('System', 'Prompt');
-
-      setTimeout(() => {
-        const unknownEvent = JSON.stringify({ type: 'message_start', id: 'msg-1' });
-        const textEvent = JSON.stringify({ type: 'result', result: 'Visible' });
-        proc._stdout.write(unknownEvent + '\n' + textEvent + '\n');
-        proc._stdout.end();
-      }, 0);
-
-      const chunks: string[] = [];
-      for await (const chunk of gen) {
-        chunks.push(chunk);
-      }
-
-      expect(chunks).toEqual(['Visible']);
-    });
-
-    it('handles chunked JSON across multiple data events', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const gen = streamClaudeCode('System', 'Prompt');
-
-      const fullLine = JSON.stringify({ type: 'result', result: 'Complete' });
-
-      setTimeout(() => {
-        proc._stdout.write(fullLine.slice(0, 10));
-        proc._stdout.write(fullLine.slice(10) + '\n');
-        proc._stdout.end();
-      }, 0);
-
-      const chunks: string[] = [];
-      for await (const chunk of gen) {
-        chunks.push(chunk);
-      }
-
-      expect(chunks).toEqual(['Complete']);
-    });
-
-    it('kills process on cleanup even when no output is produced', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const gen = streamClaudeCode('System', 'Prompt');
-
-      setTimeout(() => {
-        proc._stdout.end();
-      }, 0);
-
-      // Generator now throws when no output is produced
-      await expect(async () => {
-        for await (const _chunk of gen) {
-          // consume
-        }
-      }).rejects.toThrow('no output produced');
-
-      // SIGTERM must still be sent via the finally block
-      expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
-    });
+  it('keeps the prompt on stdin when invoking SSH', async () => {
+    process.env.CLAUDE_CODE_SSH_HOST = 'fixture-host';
+    const record = join(directory, 'ssh-request.json');
+    executable(
+      'let input = ""; process.stdin.on("data", b => input += b); process.stdin.on("end", () => {' +
+        'require("node:fs").writeFileSync(' +
+        JSON.stringify(record) +
+        ', JSON.stringify({args:process.argv.slice(2),input}));' +
+        'console.log(' +
+        JSON.stringify(JSON.stringify(assistant('Remote answer'))) +
+        '); });',
+      'ssh'
+    );
+    expect((await executeClaudeCode('', 'Private prompt')).content).toBe('Remote answer');
+    const request = JSON.parse(readFileSync(record, 'utf8'));
+    expect(request.input).toBe('Private prompt');
+    expect(request.args).toContain('fixture-host');
+    expect(request.args.join(' ')).not.toContain('Private prompt');
   });
 
-  describe('remote agent (SSH)', () => {
-    it('shellQuote single-quotes and escapes embedded quotes', async () => {
-      const { shellQuote } = await import('@/lib/claude-code-client');
-      expect(shellQuote('hello world')).toBe("'hello world'");
-      expect(shellQuote("it's")).toBe("'it'\\''s'");
-    });
-
-    it('getClaudeSshHost trims the env; blank becomes undefined', async () => {
-      const { getClaudeSshHost } = await import('@/lib/claude-code-client');
-      process.env.CLAUDE_CODE_SSH_HOST = '  me@vps  ';
-      expect(getClaudeSshHost()).toBe('me@vps');
-      process.env.CLAUDE_CODE_SSH_HOST = '';
-      expect(getClaudeSshHost()).toBeUndefined();
-    });
-
-    it('runs the CLI directly when no host is set', async () => {
-      const { buildAgentInvocation } = await import('@/lib/claude-code-client');
-      expect(buildAgentInvocation('claude', ['-p', '--model', 'm'])).toEqual({
-        command: 'claude',
-        args: ['-p', '--model', 'm'],
+  it.each(['client', 'provider', 'factory'])(
+    'retains cleanup failure and measured usage when closing a pending %s read',
+    async (entry) => {
+      seed();
+      executable(
+        'require("node:fs").unlinkSync(require("node:path").join(process.env.CLAUDE_CONFIG_DIR, ".credentials.json"));' +
+          'console.log(' +
+          JSON.stringify(JSON.stringify(assistant('Ready'))) +
+          ');' +
+          'console.log(' +
+          JSON.stringify(JSON.stringify(terminal)) +
+          '); setInterval(() => {}, 1000);'
+      );
+      let observed!: () => void;
+      const measured = new Promise<void>((resolve) => {
+        observed = resolve;
       });
+      const stream =
+        entry === 'client'
+          ? streamClaudeCode('', 'Prompt', { onUsage: () => observed() })
+          : entry === 'factory'
+            ? (await import('@/lib/providers/ai'))
+                .createAIProvider('claude-code')
+                .streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+                  onUsage: () => observed(),
+                })
+            : new (await import('@/lib/providers/claude-code')).ClaudeCodeProvider().streamResponse(
+                '',
+                [{ role: 'user', content: 'Prompt' }],
+                { onUsage: () => observed() }
+              );
+      expect(await stream.next()).toMatchObject({ value: 'Ready' });
+      const pending = stream.next().catch((error: unknown) => error);
+      await measured;
+      const closed = stream.return(undefined).catch((error: unknown) => error);
+      const failure = await pending;
+      expect(await closed).toBe(failure);
+      expect((failure as Error).message).toContain('cleanup');
+      expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 12, outputTokens: 5 });
+    }
+  );
+
+  it('protects retained usage from callback mutation', async () => {
+    emit([assistant('Answer'), terminal]);
+    const response = await executeClaudeCode('', 'Prompt', {
+      onUsage: (usage) => {
+        usage.inputTokens = 999;
+      },
     });
-
-    it('wraps the CLI in ssh and quotes every arg when a host is set', async () => {
-      const { buildAgentInvocation } = await import('@/lib/claude-code-client');
-      const inv = buildAgentInvocation('claude', ['-p', '--system-prompt', 'be nice'], 'me@vps');
-      expect(inv.command).toBe('ssh');
-      expect(inv.args).toContain('BatchMode=yes');
-      expect(inv.args[inv.args.length - 2]).toBe('me@vps');
-      expect(inv.args[inv.args.length - 1]).toContain('env -i');
-      expect(inv.args[inv.args.length - 1]).toContain("'claude' '-p' '--system-prompt' 'be nice'");
-    });
-
-    it('executeClaudeCode spawns ssh (not claude) with the prompt still on stdin', async () => {
-      process.env.CLAUDE_CODE_SSH_HOST = 'me@vps';
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'the user prompt');
-      proc._stdout.emit('data', Buffer.from('ok'));
-      proc.emit('close', 0);
-      await promise;
-
-      const [command, spawnArgs] = mockSpawn.mock.calls[0] as [string, string[]];
-      expect(command).toBe('ssh');
-      expect(spawnArgs[spawnArgs.length - 2]).toBe('me@vps');
-      expect(spawnArgs[spawnArgs.length - 1]).toContain("'claude'");
-      expect(proc._stdin.write).toHaveBeenCalledWith('the user prompt');
-    });
+    expect(response.inputTokens).toBe(12);
+    emit([
+      {
+        ...terminal,
+        subtype: 'error_during_execution',
+        is_error: true,
+        errors: ['Quota exhausted'],
+      },
+    ]);
+    const failure = await executeClaudeCode('', 'Prompt', {
+      onUsage: (usage) => {
+        usage.inputTokens = 999;
+      },
+    }).catch((error: unknown) => error);
+    expect(usageFromGenerationError(failure)?.inputTokens).toBe(12);
   });
 });

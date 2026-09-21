@@ -2,6 +2,7 @@
 // background, and interests. Feeds placement + per-learner class/practice
 // generation (never the shared curriculum). One editable doc per course.
 import { prisma } from './prisma';
+import type { Prisma } from '@/generated/prisma/client';
 
 export const MAX_NOTE_LENGTH = 12000;
 const UNTRUSTED_CONTEXT_OPEN = '<UNTRUSTED_LEARNER_CONTEXT>';
@@ -49,13 +50,18 @@ export async function getCourseNote(courseId: string): Promise<string> {
 }
 
 /** Upsert the learner's note for a course. Empty body deletes the note. */
-export async function setCourseNote(courseId: string, body: string): Promise<void> {
+export async function setCourseNote(
+  courseId: string,
+  body: string,
+  transaction?: Pick<Prisma.TransactionClient, 'courseNote'>
+): Promise<void> {
+  const database = transaction ?? prisma;
   const trimmed = normalizeCourseNote(body);
   if (trimmed === '') {
-    await prisma.courseNote.deleteMany({ where: { courseId } });
+    await database.courseNote.deleteMany({ where: { courseId } });
     return;
   }
-  await prisma.courseNote.upsert({
+  await database.courseNote.upsert({
     where: { courseId },
     create: { courseId, body: trimmed },
     update: { body: trimmed },

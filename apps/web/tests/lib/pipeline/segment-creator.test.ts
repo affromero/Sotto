@@ -6,26 +6,26 @@ const mocks = vi.hoisted(() => ({
   segmentUpsert: vi.fn(),
   segmentUpdate: vi.fn(),
   segmentDeleteMany: vi.fn(),
-  addJob: vi.fn(),
+  admittedChildren: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    episode: { update: (...args: unknown[]) => mocks.episodeUpdate(...args) },
-    $transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
-      callback({
-        segment: {
-          findMany: (...args: unknown[]) => mocks.segmentFindMany(...args),
-          upsert: (...args: unknown[]) => mocks.segmentUpsert(...args),
-          update: (...args: unknown[]) => mocks.segmentUpdate(...args),
-          deleteMany: (...args: unknown[]) => mocks.segmentDeleteMany(...args),
-        },
-      }),
+vi.mock('@/lib/sidedoor/jobs/core/durable-queue', () => ({
+  admitDurableQueueBatch: async (options: {
+    prepare: (database: unknown) => Promise<Array<Record<string, unknown>>>;
+  }) => {
+    mocks.admittedChildren = await options.prepare({
+      episode: { update: (...args: unknown[]) => mocks.episodeUpdate(...args) },
+      segment: {
+        findMany: (...args: unknown[]) => mocks.segmentFindMany(...args),
+        upsert: (...args: unknown[]) => mocks.segmentUpsert(...args),
+        update: (...args: unknown[]) => mocks.segmentUpdate(...args),
+        deleteMany: (...args: unknown[]) => mocks.segmentDeleteMany(...args),
+      },
+    });
   },
 }));
 
 vi.mock('@/lib/queue', () => ({
-  addJob: (...args: unknown[]) => mocks.addJob(...args),
   JobType: { GENERATE_AUDIO: 'generate_audio' },
   audioGenerationQueue: { name: 'audio-generation' },
 }));
@@ -35,6 +35,7 @@ import { createSegmentsAndQueueAudio, restartExistingSegmentAudio } from '@/lib/
 describe('createSegmentsAndQueueAudio', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.admittedChildren = [];
     mocks.episodeUpdate.mockResolvedValue({});
     mocks.segmentFindMany.mockResolvedValue([]);
     mocks.segmentUpsert
@@ -55,21 +56,26 @@ describe('createSegmentsAndQueueAudio', () => {
         text: 'Second turn',
       });
     mocks.segmentDeleteMany.mockResolvedValue({ count: 0 });
-    mocks.addJob.mockResolvedValue({ id: 'job' });
   });
 
   it('uses a new generation attempt in every audio payload and job identity', async () => {
-    await createSegmentsAndQueueAudio('episode-1', [
-      { speaker: 'HOST', text: 'First turn' },
-      { speaker: 'EXPERT', text: 'Second turn' },
-    ]);
+    await createSegmentsAndQueueAudio(
+      'episode-1',
+      [
+        { speaker: 'HOST', text: 'First turn' },
+        { speaker: 'EXPERT', text: 'Second turn' },
+      ],
+      { authorize: vi.fn() }
+    );
 
     const generationKey = mocks.episodeUpdate.mock.calls[0][0].data.audioGenerationKey as string;
     expect(generationKey).toMatch(/^[a-f0-9-]{36}$/);
-    expect(mocks.addJob).toHaveBeenCalledTimes(2);
-    for (const call of mocks.addJob.mock.calls) {
-      expect(call[2].audioGenerationKey).toBe(generationKey);
-      expect(call[3].jobId).toContain(generationKey);
+    expect(mocks.admittedChildren).toHaveLength(2);
+    for (const child of mocks.admittedChildren) {
+      expect((child.payload as { audioGenerationKey: string }).audioGenerationKey).toBe(
+        generationKey
+      );
+      expect(child.jobId).toContain(generationKey);
     }
   });
 
@@ -89,7 +95,9 @@ describe('createSegmentsAndQueueAudio', () => {
         text: 'Second turn',
       });
 
-    const count = await restartExistingSegmentAudio('episode-1', 'replacement-attempt');
+    const count = await restartExistingSegmentAudio('episode-1', 'replacement-attempt', {
+      authorize: vi.fn(),
+    });
 
     expect(count).toBe(2);
     expect(mocks.segmentUpdate).toHaveBeenCalledTimes(2);
@@ -102,11 +110,16 @@ describe('createSegmentsAndQueueAudio', () => {
         wordTimings: expect.anything(),
       });
     }
-    expect(mocks.addJob).toHaveBeenCalledTimes(2);
-    expect(mocks.addJob.mock.calls.map((call) => call[2].segmentVersion)).toEqual([2, 4]);
-    expect(mocks.addJob.mock.calls.map((call) => call[2].audioGenerationKey)).toEqual([
-      'replacement-attempt',
-      'replacement-attempt',
-    ]);
+    expect(mocks.admittedChildren).toHaveLength(2);
+    expect(
+      mocks.admittedChildren.map(
+        (child) => (child.payload as { segmentVersion: number }).segmentVersion
+      )
+    ).toEqual([2, 4]);
+    expect(
+      mocks.admittedChildren.map(
+        (child) => (child.payload as { audioGenerationKey: string }).audioGenerationKey
+      )
+    ).toEqual(['replacement-attempt', 'replacement-attempt']);
   });
 });

@@ -18,7 +18,11 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({ generateResponse: mockGenerateResponse }),

@@ -84,10 +84,10 @@ Minimum required production categories:
 | Public URL | `NEXT_PUBLIC_APP_URL`                                                                      |
 | Database   | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`, `DIRECT_DATABASE_URL` |
 | Redis      | `REDIS_PASSWORD`, `REDIS_URL`                                                              |
-| Storage    | `STORAGE_PROVIDER` plus the matching local or S3/R2 values                                 |
-| AI         | explicit `AI_PROVIDER` and provider credentials                                            |
-| TTS        | explicit `TTS_PROVIDER` and provider credentials                                           |
-| BYOK       | `BYOK_ENCRYPTION_KEY`                                                                      |
+| Security   | `BYOK_ENCRYPTION_KEY`                                                                      |
+| Recovery   | `SIDEDOOR_EXECUTION_DIR`                                                                   |
+
+Configure AI, speech, and local/R2/S3 storage after startup in `/welcome` or Admin. Sidedoor encrypts credentials and stores the selected providers, endpoints, models, voices, and storage settings in PostgreSQL.
 
 Optional Caddy host for www redirect:
 
@@ -134,12 +134,7 @@ Expected deploy phases:
 
 ## Storage
 
-Use local storage for the simplest self-hosted install:
-
-```bash
-STORAGE_PROVIDER=local
-LOCAL_STORAGE_DIR=./.sotto/storage
-```
+Use local storage for the simplest self-hosted install. Select **Local** in `/welcome` or Admin and save `./.sotto/storage` as the storage root.
 
 For internet-facing deployments, prefer an S3-compatible bucket such as Cloudflare R2, MinIO, AWS S3, or another provider. Configure CORS for your exact `NEXT_PUBLIC_APP_URL`; do not use wildcard origins for private episode audio.
 

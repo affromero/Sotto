@@ -1,21 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 // ---- Hoisted mock handles ----
 
-const { mockClassSectionCreate, mockSpeakingPromptCreateMany, mockUserFindUnique } = vi.hoisted(
-  () => {
-    const classSectionCreate = vi.fn();
-    const speakingPromptCreateMany = vi.fn();
-    const userFindUnique = vi.fn();
-    return {
-      mockClassSectionCreate: classSectionCreate,
-      mockSpeakingPromptCreateMany: speakingPromptCreateMany,
-      mockUserFindUnique: userFindUnique,
-    };
-  }
-);
+const {
+  mockClassSectionCreate,
+  mockSpeakingPromptCreateMany,
+  mockSpeakingPromptFindMany,
+  mockUserFindUnique,
+} = vi.hoisted(() => {
+  const classSectionCreate = vi.fn();
+  const speakingPromptCreateMany = vi.fn();
+  const speakingPromptFindMany = vi.fn();
+  const userFindUnique = vi.fn();
+  return {
+    mockClassSectionCreate: classSectionCreate,
+    mockSpeakingPromptCreateMany: speakingPromptCreateMany,
+    mockSpeakingPromptFindMany: speakingPromptFindMany,
+    mockUserFindUnique: userFindUnique,
+  };
+});
 
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
+const { mockResolveCapturedLearningAi } = vi.hoisted(() => ({
+  mockResolveCapturedLearningAi: vi.fn(),
+}));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
 const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
   const generateResponse = vi.fn();
@@ -30,30 +39,32 @@ const { mockCanResolveTts, mockResolveTtsProvider } = vi.hoisted(() => ({
   mockResolveTtsProvider: vi.fn(),
 }));
 const { mockGetAutoModelConfig } = vi.hoisted(() => ({ mockGetAutoModelConfig: vi.fn() }));
-const { mockAssertStorageWritable, mockUploadFile } = vi.hoisted(() => ({
-  mockAssertStorageWritable: vi.fn(),
-  mockUploadFile: vi.fn(),
-}));
+const { mockWriteStorageReference } = vi.hoisted(() => ({ mockWriteStorageReference: vi.fn() }));
 const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 // ---- Module mocks ----
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
     classSection: {
       create: (...args: unknown[]) => mockClassSectionCreate(...args),
     },
     speakingPrompt: {
       createMany: (...args: unknown[]) => mockSpeakingPromptCreateMany(...args),
+      findMany: (...args: unknown[]) => mockSpeakingPromptFindMany(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
-  },
-}));
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+}));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedLearningAi: (...args: unknown[]) => mockResolveCapturedLearningAi(...args),
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
@@ -62,6 +73,10 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
+  aiProviderRules: vi.fn(() => []),
+}));
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
+  createSottoProviderTransport: vi.fn(),
 }));
 
 vi.mock('@/lib/prompt-loader', () => ({
@@ -78,9 +93,11 @@ vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
-vi.mock('@/lib/r2', () => ({
-  assertStorageWritable: (...args: unknown[]) => mockAssertStorageWritable(...args),
-  uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+vi.mock('@/lib/sidedoor/storage/core/storage-write', () => ({
+  writeStorageReference: (...args: unknown[]) => mockWriteStorageReference(...args),
+}));
+vi.mock('@/lib/sidedoor/storage/core/speaking-storage', () => ({
+  captureSpeakingPromptStorage: vi.fn(),
 }));
 
 vi.mock('@/lib/usage-logger', () => ({
@@ -110,6 +127,7 @@ const SAMPLE_PHRASES_JSON = JSON.stringify([
 ]);
 
 const PARAMS: ClassSpeakingParams = {
+  execution: blockedProviderExecution('u1'),
   userId: 'u1',
   classId: 'class-1',
   level: 'A1',
@@ -129,6 +147,12 @@ const mockGetVoiceId = vi.fn(() => 'voice-abc');
 
 function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
+  mockResolveCapturedLearningAi.mockResolvedValue({
+    provider: 'anthropic',
+    model: 'm',
+    apiKey: 'k',
+    execution: PARAMS.execution,
+  });
   mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
   mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
   mockLoadAndRender.mockReturnValue('You are a speaking prompt author.');
@@ -140,7 +164,6 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
   });
   mockCanResolveTts.mockResolvedValue(withTts);
   if (withTts) {
-    mockAssertStorageWritable.mockResolvedValue(undefined);
     mockGetAutoModelConfig.mockResolvedValue({
       model: {
         aiProvider: 'anthropic',
@@ -154,13 +177,16 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
     mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
     mockResolveTtsProvider.mockResolvedValue({
       provider: { generateSpeech: mockGenerateSpeech, getVoiceId: mockGetVoiceId },
-      source: 'byok',
+      source: 'credential',
       providerId: 'elevenlabs',
     });
-    mockUploadFile.mockResolvedValue('https://r2.example.com/speaking-ref/class-1/0.mp3');
+    mockWriteStorageReference.mockResolvedValue('https://storage.example/speaking-ref/prompt.mp3');
   }
   mockClassSectionCreate.mockResolvedValue({ id: 'section-1' });
   mockSpeakingPromptCreateMany.mockResolvedValue({ count: 4 });
+  mockSpeakingPromptFindMany.mockResolvedValue(
+    Array.from({ length: 4 }, (_, index) => ({ id: `prompt-${index + 1}` }))
+  );
 }
 
 // ---- Tests ----
@@ -264,28 +290,24 @@ describe('generateClassSpeaking', () => {
       );
     });
 
-    it('includes reference TTS URLs in prompt rows when TTS is available', async () => {
+    it('creates prompt rows before publishing owned reference audio', async () => {
       setupHappyPath({ withTts: true });
-      mockUploadFile.mockImplementation((_key: string, _buf: Buffer, _ct: string) =>
-        Promise.resolve('https://r2.example.com/ref.mp3')
-      );
 
       await generateClassSpeaking(PARAMS);
 
       const call = mockSpeakingPromptCreateMany.mock.calls[0][0];
       const firstPrompt = call.data[0];
-      expect(firstPrompt.referenceTtsUrl).toBe('https://r2.example.com/ref.mp3');
+      expect(firstPrompt.referenceTtsUrl).toBeNull();
+      expect(mockWriteStorageReference).toHaveBeenCalledTimes(4);
     });
 
-    it('uploads reference audio to speaking-ref/<classId>-<attempt>/<index>.mp3', async () => {
+    it('publishes reference audio against the canonical prompt consumer', async () => {
       setupHappyPath({ withTts: true });
 
       await generateClassSpeaking(PARAMS);
 
-      expect(mockUploadFile).toHaveBeenCalledWith(
-        'speaking-ref/class-1-1/0.mp3',
-        expect.any(Buffer),
-        'audio/mpeg'
+      expect(mockWriteStorageReference).toHaveBeenCalledWith(
+        expect.objectContaining({ prefix: 'speaking-ref/prompt-1', contentType: 'audio/mpeg' })
       );
     });
   });
@@ -298,7 +320,7 @@ describe('generateClassSpeaking', () => {
 
       expect(result).toEqual({ sectionId: 'section-1' });
       expect(mockResolveTtsProvider).not.toHaveBeenCalled();
-      expect(mockUploadFile).not.toHaveBeenCalled();
+      expect(mockWriteStorageReference).not.toHaveBeenCalled();
 
       const call = mockSpeakingPromptCreateMany.mock.calls[0][0];
       expect(call.data).toHaveLength(4);
@@ -322,9 +344,9 @@ describe('generateClassSpeaking', () => {
       }
     });
 
-    it('creates prompts with null referenceTtsUrl when uploadFile throws', async () => {
+    it('keeps prompts usable when owned storage publication fails', async () => {
       setupHappyPath({ withTts: true });
-      mockUploadFile.mockRejectedValue(new Error('R2 upload failed'));
+      mockWriteStorageReference.mockRejectedValue(new Error('Storage publication failed'));
 
       const result = await generateClassSpeaking(PARAMS);
 
@@ -338,24 +360,18 @@ describe('generateClassSpeaking', () => {
 
   describe('error paths', () => {
     it('throws when there is no BYOK key and no local agent configured', async () => {
-      mockGetAiKey.mockResolvedValue(null);
-      const prev = process.env.AI_PROVIDER;
-      process.env.AI_PROVIDER = '';
-      try {
-        await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/AI provider/i);
-      } finally {
-        process.env.AI_PROVIDER = prev;
-      }
+      mockResolveCapturedLearningAi.mockRejectedValue(new Error('No AI provider available'));
+      await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/AI provider/i);
     });
 
     it('throws when the provider has no default model', async () => {
-      mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
-      mockGetAiProviderMeta.mockReturnValue({ defaultModel: null });
+      mockResolveCapturedLearningAi.mockRejectedValue(new Error('No default AI model configured'));
 
       await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/No default AI model/);
     });
 
     it('throws when LLM response is not valid JSON and produces no phrases', async () => {
+      setupHappyPath();
       mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
       mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
       mockLoadAndRender.mockReturnValue('system prompt');
@@ -419,6 +435,7 @@ describe('composeSpeakingPrompts', () => {
     setupHappyPath();
 
     const prompts = await composeSpeakingPrompts({
+      execution: blockedProviderExecution('u1'),
       userId: 'u1',
       level: 'A1',
       nativeLang: 'en',
@@ -438,10 +455,11 @@ describe('composeSpeakingPrompts', () => {
     expect(mockSpeakingPromptCreateMany).not.toHaveBeenCalled();
   });
 
-  it('namespaces reference TTS audio by refId', async () => {
+  it('returns generated reference audio for publication after persistence', async () => {
     setupHappyPath();
 
-    await composeSpeakingPrompts({
+    const prompts = await composeSpeakingPrompts({
+      execution: blockedProviderExecution('u1'),
       userId: 'u1',
       level: 'A1',
       nativeLang: 'en',
@@ -451,10 +469,6 @@ describe('composeSpeakingPrompts', () => {
       refId: 'practice-1',
     });
 
-    expect(mockUploadFile).toHaveBeenCalledWith(
-      expect.stringContaining('speaking-ref/practice-1/'),
-      expect.anything(),
-      'audio/mpeg'
-    );
+    expect(prompts[0]?.referenceTtsAudio?.byteLength).toBeGreaterThan(0);
   });
 });

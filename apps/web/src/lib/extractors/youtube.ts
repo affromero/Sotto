@@ -1,5 +1,7 @@
 import { logger } from '../logger';
+import { LANG_LABELS } from '../languages';
 import type { ExtractedContent } from './types';
+import { YouTubeTranscriptApi } from 'youtube-transcript-ts';
 
 const YOUTUBE_PATTERNS = [
   /^https?:\/\/(?:www\.)?youtube\.com\/watch\?/,
@@ -42,23 +44,10 @@ export function extractVideoId(url: string): string | null {
   }
 }
 
-// Lazy-loaded to avoid crashing CJS workers — the package only exports ESM
-
-let clientInstance: any = null;
-
-async function getClient() {
-  if (!clientInstance) {
-    const { createLinkPreviewClient } = await import('@steipete/summarize-core');
-    clientInstance = createLinkPreviewClient({
-      openaiApiKey: process.env.OPENAI_API_KEY ?? null,
-      ytDlpPath: process.env.YT_DLP_PATH || 'yt-dlp',
-      onProgress: (event: { kind: string }) => {
-        logger.debug('YouTube extraction progress', { kind: event.kind });
-      },
-    });
-  }
-  return clientInstance;
-}
+const client = new YouTubeTranscriptApi({
+  cache: { enabled: true, maxAge: 60 * 60 * 1000, maxSize: 100 },
+});
+const TRANSCRIPT_LANGUAGES = Object.freeze(Object.keys(LANG_LABELS));
 
 export async function extractYouTubeContent(url: string): Promise<ExtractedContent> {
   const videoId = extractVideoId(url);
@@ -73,58 +62,61 @@ export async function extractYouTubeContent(url: string): Promise<ExtractedConte
       publishedDate: null,
       wordCount: 0,
       sourceType: 'youtube',
-      extractionMethod: 'summarize-core',
+      extractionMethod: 'youtube-transcript',
     };
   }
 
   try {
-    const client = await getClient();
-    const result = await client.fetchLinkContent(url, {
-      youtubeTranscript: 'auto',
-      maxCharacters: MAX_CONTENT_LENGTH,
-      format: 'text',
+    const result = await client.fetchTranscript(url, {
+      languages: [...TRANSCRIPT_LANGUAGES],
+      preserveFormatting: false,
+      formatter: 'text',
     });
 
-    const text = result.content.substring(0, MAX_CONTENT_LENGTH);
+    const text = result.transcript.snippets
+      .map((snippet) => snippet.text.trim())
+      .filter(Boolean)
+      .join(' ')
+      .substring(0, MAX_CONTENT_LENGTH);
     const wordCount = text.split(/\s+/).filter(Boolean).length;
 
     if (!text || wordCount === 0) {
       logger.warn('YouTube extraction returned empty content', {
         url,
-        transcriptSource: result.transcriptSource ?? 'none',
+        transcriptSource: result.transcript.isGenerated ? 'generated' : 'creator',
       });
       return {
         text: '',
         markdown: '',
-        title: result.title,
+        title: result.metadata.title || null,
         description: 'No transcript available for this video',
         siteName: 'YouTube',
         author: null,
         publishedDate: null,
         wordCount: 0,
         sourceType: 'youtube',
-        extractionMethod: 'summarize-core',
+        extractionMethod: 'youtube-transcript',
       };
     }
 
     logger.info('YouTube content extracted', {
       url,
       wordCount: String(wordCount),
-      transcriptSource: result.transcriptSource ?? 'unknown',
-      transcriptionProvider: result.transcriptionProvider ?? 'none',
+      transcriptSource: result.transcript.isGenerated ? 'generated' : 'creator',
+      language: result.transcript.languageCode,
     });
 
     return {
       text,
       markdown: text,
-      title: result.title,
-      description: result.description,
-      siteName: result.siteName ?? 'YouTube',
-      author: null,
-      publishedDate: null,
+      title: result.metadata.title || null,
+      description: result.metadata.description || null,
+      siteName: 'YouTube',
+      author: result.metadata.author || null,
+      publishedDate: result.metadata.publishDate || null,
       wordCount,
       sourceType: 'youtube',
-      extractionMethod: 'summarize-core',
+      extractionMethod: 'youtube-transcript',
     };
   } catch (err) {
     logger.error('YouTube extraction failed', {
@@ -142,7 +134,7 @@ export async function extractYouTubeContent(url: string): Promise<ExtractedConte
       publishedDate: null,
       wordCount: 0,
       sourceType: 'youtube',
-      extractionMethod: 'summarize-core',
+      extractionMethod: 'youtube-transcript',
     };
   }
 }

@@ -223,10 +223,9 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    tag: payload.data?.type || 'sotto-notification',
-    // Renotify if a notification with the same tag is received,
-    // so the user sees the updated content.
-    renotify: true,
+    tag: payload.notificationId || payload.data?.type || 'sotto-notification',
+    // A repeated durable delivery replaces its existing card without another alert.
+    renotify: !payload.notificationId,
     data: {
       url: payload.url || '/',
       ...payload.data,

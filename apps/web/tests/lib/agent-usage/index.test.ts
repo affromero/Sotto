@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatUsageDuration,
+  getAgentUsageStatus,
   parseCartesiaCreditUsagePayload,
   parseClaudeUsageHeaders,
   parseCodexUsagePayload,
@@ -9,6 +10,20 @@ import {
 } from '@/lib/agent-usage';
 
 describe('agent-usage helpers', () => {
+  it('rejects a canceled usage request before inspecting provider accounts', async () => {
+    const controller = new AbortController();
+    const failure = new Error('Usage request canceled');
+    controller.abort(failure);
+    await expect(
+      getAgentUsageStatus({
+        userId: 'canceled-recipient',
+        signal: controller.signal,
+        authorize: async () => {
+          throw new Error('Canceled requests must not reach authorization');
+        },
+      })
+    ).rejects.toBe(failure);
+  });
   it('formats usage reset durations compactly', () => {
     expect(formatUsageDuration(55)).toBe('0m');
     expect(formatUsageDuration(7_500)).toBe('2h05m');

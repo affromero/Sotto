@@ -14,7 +14,7 @@ SHA = 'a' * 40
 OLD = 'sha256:' + 'b' * 64
 NEW = 'sha256:' + 'c' * 64
 BOUNDARY = r'''
-import json, os, pathlib, re, shutil, sys
+import hashlib, json, os, pathlib, re, shutil, sys
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 root = pathlib.Path(os.environ['TEST_ROOT'])
@@ -32,6 +32,8 @@ new = 'sha256:' + 'c' * 64
 sha = 'a' * 40
 if name in ('sleep', 'flock'): finish()
 if name == 'git': finish(sha if args[0] == 'rev-parse' else '')
+if name == 'sha256sum':
+    finish(hashlib.sha256(pathlib.Path(args[0]).read_bytes()).hexdigest() + '  ' + args[0])
 if name == 'capacity':
     state['capacity'] += 1
     fail = (mode == 'pre-capacity' and state['capacity'] == 1) or (mode == 'post-capacity' and state['capacity'] == 2) or (mode == 'final-capacity' and state['capacity'] == 5)
@@ -128,7 +130,7 @@ class DeploymentFailureTests(unittest.TestCase):
             (root / 'state.json').write_text(json.dumps(state))
             bin_path = root / 'bin'
             bin_path.mkdir()
-            for name in ('git', 'docker', 'sudo', 'curl', 'sleep', 'flock', 'capacity'):
+            for name in ('git', 'docker', 'sudo', 'curl', 'sleep', 'flock', 'capacity', 'sha256sum'):
                 path = bin_path / name
                 path.write_text('#!' + sys.executable + '\n' + BOUNDARY)
                 path.chmod(0o755)

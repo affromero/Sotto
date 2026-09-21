@@ -7,6 +7,7 @@ import { createOrRaiseCourse } from '@/lib/placement-course';
 import { getCachedNotesDeduction, clearNotesDeduction } from '@/lib/placement-notes';
 import { getCourseNote, mergeCourseNote, setCourseNote } from '@/lib/course-notes';
 import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,15 @@ export async function POST(request: NextRequest) {
     const cached = await getCachedNotesDeduction(userId, native, target);
     if (!cached) return errorResponse('Deduction expired. Upload your materials again.', 409);
 
-    const course = await createOrRaiseCourse(userId, native, target, cached.level, 'NOTES');
+    const execution = sottoRequestExecution(request, authed);
+    const course = await createOrRaiseCourse(
+      userId,
+      execution,
+      native,
+      target,
+      cached.level,
+      'NOTES'
+    );
 
     // Personalize from day one: keep the materials as the course note and seed
     // the memory graph with vocabulary extracted from them.
@@ -42,6 +51,7 @@ export async function POST(request: NextRequest) {
     await setCourseNote(course.id, merged);
     const addedVocabulary = await extractAndStoreNoteVocab({
       userId,
+      execution,
       courseId: course.id,
       nativeLang: native,
       targetLang: target,
@@ -52,7 +62,7 @@ export async function POST(request: NextRequest) {
     await clearNotesDeduction(userId, native, target);
     return NextResponse.json(
       { courseId: course.id, level: course.currentLevel, addedVocabulary },
-      { status: 201 },
+      { status: 201 }
     );
   } catch (error: unknown) {
     logger.error('Notes-placement confirm failed', {

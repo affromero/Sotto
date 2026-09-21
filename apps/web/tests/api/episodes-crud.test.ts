@@ -9,9 +9,10 @@ const mockEpisodeFindUnique = vi.fn();
 const mockEpisodeUpdate = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
+const mockEpisodeVoiceCreateMany = vi.fn();
 
 const mockGetAutoModelConfig = vi.fn();
-const mockAddJob = vi.fn();
+const mockEnqueueDurableJob = vi.fn();
 
 const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
@@ -33,6 +34,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       create: (...args: unknown[]) => mockDiscoveryCreate(...args),
+    },
+    episodeVoice: {
+      createMany: (...args: unknown[]) => mockEpisodeVoiceCreateMany(...args),
     },
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
@@ -66,7 +70,26 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/queue', () => ({
   contentExtractionQueue: 'content-extraction-queue',
-  addJob: (...args: unknown[]) => mockAddJob(...args),
+  admitDurableJob: async (...args: unknown[]) => {
+    await mockEnqueueDurableJob(...args);
+    const options = args[3] as {
+      mutate(database: unknown, operationId: string): Promise<void>;
+    };
+    await options.mutate(
+      {
+        episode: {
+          create: (...values: unknown[]) => mockEpisodeCreate(...values),
+          findUnique: (...values: unknown[]) => mockEpisodeFindUnique(...values),
+          update: (...values: unknown[]) => mockEpisodeUpdate(...values),
+        },
+        discovery: { create: (...values: unknown[]) => mockDiscoveryCreate(...values) },
+        episodeVoice: {
+          createMany: (...values: unknown[]) => mockEpisodeVoiceCreateMany(...values),
+        },
+      },
+      '11111111-1111-4111-a111-111111111111'
+    );
+  },
   JobType: { EXTRACT_CONTENT: 'EXTRACT_CONTENT' },
 }));
 
@@ -271,6 +294,7 @@ describe('POST /api/v1/episodes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUnique.mockResolvedValue({ preferredAiModel: null });
+    mockEpisodeFindUnique.mockResolvedValue(null);
     mockGetAutoModelConfig.mockResolvedValue({
       model: {
         aiProvider: 'anthropic',
@@ -302,7 +326,7 @@ describe('POST /api/v1/episodes', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
     mockPrisma.episode.create.mockResolvedValue({
       ...mockEpisode,
       status: 'EXTRACTING',
@@ -319,11 +343,16 @@ describe('POST /api/v1/episodes', () => {
 
     expect(response.status).toBe(201);
     const result = await response.json();
-    expect(result.id).toBe('pod-1');
+    expect(result.id).toEqual(expect.any(String));
     expect(result.status).toBe('EXTRACTING');
     expect(mockEpisodeCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ visibility: 'PRIVATE', ...explicitTtsSelection }),
+        data: expect.objectContaining({
+          id: result.id,
+          visibility: 'PRIVATE',
+          pipelineGeneration: '11111111-1111-4111-a111-111111111111',
+          ...explicitTtsSelection,
+        }),
       })
     );
   });
@@ -332,7 +361,7 @@ describe('POST /api/v1/episodes', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
     mockPrisma.episode.create.mockResolvedValue({
       ...mockEpisode,
       status: 'EXTRACTING',
@@ -354,7 +383,7 @@ describe('POST /api/v1/episodes', () => {
           ttsModel: 'tts-1-hd',
           ttsAutoResolved: true,
         }),
-      }),
+      })
     );
   });
 
@@ -362,7 +391,7 @@ describe('POST /api/v1/episodes', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
-    mockAddJob.mockResolvedValue(undefined);
+    mockEnqueueDurableJob.mockResolvedValue(undefined);
     mockPrisma.episode.create.mockResolvedValue(mockEpisode);
 
     const body = {
@@ -378,7 +407,7 @@ describe('POST /api/v1/episodes', () => {
 
     expect(response.status).toBe(201);
     const result = await response.json();
-    expect(result.id).toBe('pod-1');
+    expect(result.id).toEqual(expect.any(String));
   });
 
   it('returns 400 when title is missing', async () => {

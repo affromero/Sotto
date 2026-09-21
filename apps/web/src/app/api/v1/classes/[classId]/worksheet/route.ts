@@ -3,9 +3,18 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered } from '@/lib/prisma';
 import { buildClassDocument } from '@/lib/class-document';
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
-import { addJob, worksheetPdfQueue, JobType } from '@/lib/queue';
+import { worksheetPdfQueue } from '@/lib/queue';
+import { randomUUID } from 'node:crypto';
+import { prepareJob } from 'thesidedoor-core/runtime/outbox';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { getAppBaseUrl } from '@/lib/urls';
 
 type RouteParams = { params: Promise<{ classId: string }> };
 
@@ -44,7 +53,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     if (!cls) return errorResponse('Class not found', 404);
 
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const appBaseUrl = getAppBaseUrl();
     const grammarPoints = Array.isArray(cls.lesson.grammarPoints)
       ? (cls.lesson.grammarPoints as string[])
       : [];
@@ -123,18 +132,45 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!authed) return errorResponse('Unauthorized', 401);
     const { classId } = await params;
 
-    const cls = await prisma.courseClass.findFirst({
-      where: { id: classId, course: { userId: authed.userId } },
-      select: { id: true },
+    const operationId = randomUUID();
+    const record = await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await requireOriginalSottoAdmission(database, request, authed);
+        const cls = await database.courseClass.findFirst({
+          where: { id: classId, course: { userId: authed.userId } },
+          select: { id: true, courseId: true, updatedAt: true },
+        });
+        if (!cls) return null;
+        const ownership = await captureCourseStorage(database, cls.courseId);
+        return sottoJobOutbox(database).enqueue(
+          prepareJob({
+            id: operationId,
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'worksheet-pdf',
+            version: 1,
+            payload: {
+              classId,
+              classUpdatedAt: cls.updatedAt.getTime(),
+              appBaseUrl: getAppBaseUrl(),
+            },
+            scopes: ownership.scopes,
+            delivery: { attempts: 2, priority: 0, availableAt: 0 },
+          })
+        );
+      },
+      { signal: request.signal }
+    );
+    if (!record) return errorResponse('Class not found', 404);
+    await deliverSottoJob({
+      database: prismaUnfiltered,
+      queue: worksheetPdfQueue,
+      operationId,
+      fingerprint: record.fingerprint,
+      version: 1,
     });
 
-    if (!cls) return errorResponse('Class not found', 404);
-
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-    await addJob(worksheetPdfQueue, JobType.WORKSHEET_PDF, { classId, appBaseUrl });
-
-    return NextResponse.json({ status: 'PENDING' }, { status: 202 });
+    return NextResponse.json({ status: 'PENDING', operationId }, { status: 202 });
   } catch (error: unknown) {
     logger.error('Failed to enqueue worksheet PDF job', {
       error: error instanceof Error ? error.message : String(error),

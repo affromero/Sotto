@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PROVIDERS } from '../data';
 import type { AgentState, ModelOption } from '../WelcomeFlow';
 import { aiModelProviderId } from '../providerMap';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
-import c from '../components.styles';
+import c from '@/app/welcome/components.styles';
 import {
   formatAgentModelId,
   parseAgentModelId,
@@ -18,8 +18,10 @@ import type { AgentStatus } from '@/lib/agent-availability';
 interface Props {
   agent: AgentState;
   demoMode: boolean;
-  /** Wizard provider ids whose platform key already exists in the server env (owner only). */
-  envDetected?: string[];
+  savedDetected?: string[];
+  onSave?: () => Promise<'verified' | 'saved' | 'configured' | null>;
+  savedOutcome?: 'verified' | 'saved' | null;
+  onCredentialEdit?: () => void;
   /** Registry AI models keyed by backend provider id (anthropic, openai). */
   aiModels?: Record<string, ModelOption[]>;
   agentStatuses?: Partial<Record<'claude-code' | 'codex', AgentStatus>>;
@@ -33,7 +35,10 @@ const EMPTY_AI_MODELS: Record<string, ModelOption[]> = {};
 export function StepAgent({
   agent,
   demoMode,
-  envDetected = [],
+  savedDetected = [],
+  onSave,
+  savedOutcome = null,
+  onCredentialEdit,
   aiModels = EMPTY_AI_MODELS,
   agentStatuses,
   setAgent,
@@ -43,18 +48,34 @@ export function StepAgent({
   const prov = PROVIDERS.find((p) => p.id === agent.provider);
   const liveTranslationKey = agent.liveTranslationKey ?? '';
 
-  // A key-method provider whose platform key already lives in the server env
-  // needs nothing typed: treat it as connected so the owner can continue, and
-  // any pasted key simply overrides the server one.
-  const envReady =
-    !demoMode && agent.method === 'key' && !agent.value && envDetected.includes(agent.provider);
+  const savedReady = savedDetected.includes(agent.provider);
+  const savedCredentialReady = !demoMode && agent.method === 'key' && !agent.value && savedReady;
   const [keyOverrides, setKeyOverrides] = useState<Record<string, boolean>>({});
-  const showDetectedKey = envReady && !keyOverrides[agent.provider];
+  const [savedProof, setSavedProof] = useState<{
+    fingerprint: string;
+    status: 'verified' | 'saved' | 'configured';
+  } | null>(null);
+  const [saveError, setSaveError] = useState(false);
+  const fingerprint = (value: AgentState) =>
+    JSON.stringify([value.provider, value.method, value.value, value.model]);
+  const proof = savedOutcome
+    ? { status: savedOutcome }
+    : savedProof?.fingerprint === fingerprint(agent)
+      ? savedProof
+      : null;
+  const mounted = useRef(true);
   useEffect(() => {
-    if (envReady && agent.status === 'idle') {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const showDetectedKey = savedCredentialReady && !keyOverrides[agent.provider];
+  useEffect(() => {
+    if ((savedCredentialReady || savedOutcome) && agent.status === 'idle') {
       setAgent((a) => ({ ...a, status: 'connected' }));
     }
-  }, [envReady, agent.status, setAgent]);
+  }, [savedCredentialReady, savedOutcome, agent.status, setAgent]);
 
   // Model options for the current method. key: claude → anthropic, codex → openai.
   // cli: the matching keyless local agent backend (claude-code or codex).
@@ -81,8 +102,11 @@ export function StepAgent({
       : cliReadiness === 'not_authenticated' || cliReadiness === 'not_installed'
         ? c.cliDetectError
         : c.cliDetectPending;
-  const connectionReady =
-    !demoMode && agent.method === 'cli' ? cliReadiness === 'ready' : agent.status === 'connected';
+  const connectionReady = demoMode
+    ? agent.status === 'connected'
+    : agent.method === 'cli'
+      ? cliReadiness === 'ready'
+      : savedCredentialReady || proof !== null;
 
   // The runtime probe is the source of truth for keyless CLI connections.
   // Keep the persisted wizard state in sync so Enter-key navigation and the
@@ -150,6 +174,7 @@ export function StepAgent({
   function pick(id: string) {
     const p = PROVIDERS.find((x) => x.id === id);
     if (!p) return;
+    onCredentialEdit?.();
     setAgent((prev) => ({
       provider: id,
       method: p.cli ? 'cli' : p.kind === 'key' ? 'key' : 'url',
@@ -161,15 +186,31 @@ export function StepAgent({
   }
 
   function setMethod(m: AgentState['method']) {
+    onCredentialEdit?.();
     setAgent((a) => ({ ...a, method: m, value: '', status: 'idle' }));
   }
 
-  function verify() {
+  async function saveConfiguration() {
+    if (!onSave || agent.status === 'verifying') return;
+    const captured = fingerprint(agent);
+    setSaveError(false);
     setAgent((a) => ({ ...a, status: 'verifying' }));
-    setTimeout(
-      () => setAgent((a) => ({ ...a, status: 'connected' })),
-      agent.method === 'cli' ? 900 : 1300
-    );
+    try {
+      const result = await onSave();
+      if (!mounted.current) return;
+      setSavedProof(result ? { fingerprint: captured, status: result } : null);
+      setAgent((current) =>
+        fingerprint(current) === captured
+          ? { ...current, status: result ? 'connected' : 'idle' }
+          : current
+      );
+    } catch {
+      if (!mounted.current) return;
+      setSaveError(true);
+      setAgent((current) =>
+        fingerprint(current) === captured ? { ...current, status: 'idle' } : current
+      );
+    }
   }
 
   const inputMethod = !demoMode && prov && (agent.method === 'key' || agent.method === 'url');
@@ -292,7 +333,7 @@ export function StepAgent({
                   <>
                     <span className={c.vkDetected}>
                       <Glyph name="check" size={13} />
-                      Detected from the server environment
+                      Saved for your profile
                     </span>
                     <button
                       type="button"
@@ -310,18 +351,27 @@ export function StepAgent({
                       type={agent.method === 'key' ? 'password' : 'text'}
                       placeholder={agent.method === 'key' ? prov.keyHint : prov.hint}
                       value={agent.value}
-                      onChange={(e) =>
-                        setAgent((a) => ({ ...a, value: e.target.value, status: 'idle' }))
-                      }
+                      onChange={(e) => {
+                        onCredentialEdit?.();
+                        setAgent((a) => ({ ...a, value: e.target.value, status: 'idle' }));
+                      }}
                       aria-label={agent.method === 'key' ? `${prov.name} API key` : 'Endpoint URL'}
                       autoFocus={agent.method === 'key' && Boolean(keyOverrides[agent.provider])}
                     />
                     <button
                       className={`${t.btn} ${t.btnGhost}`}
-                      disabled={!agent.value || agent.status === 'connected'}
-                      onClick={verify}
+                      disabled={
+                        !agent.value || !onSave || agent.status === 'verifying' || proof !== null
+                      }
+                      onClick={saveConfiguration}
                     >
-                      {agent.status === 'connected' ? 'Connected' : 'Verify'}
+                      {proof
+                        ? proof.status === 'verified'
+                          ? 'Verified'
+                          : 'Saved'
+                        : agent.method === 'url'
+                          ? 'Save endpoint'
+                          : 'Save key'}
                     </button>
                   </>
                 )}
@@ -403,18 +453,20 @@ export function StepAgent({
               </div>
               <div className={c.locknote}>
                 <Glyph name="spark" size={15} />
-                The model your local server serves (sent as AI_MODEL). Change it anytime in admin
-                settings.
+                The model your local server serves. Change it anytime in admin settings.
               </div>
             </div>
           )}
 
+          {saveError && (
+            <p role="alert">Could not save the configuration. Review the settings and try again.</p>
+          )}
           {!demoMode && agent.status === 'verifying' && (
             <div className={`${c.statusPill} ${c.statusPillVerifying}`}>
               <span className={c.spin} />
               {agent.method === 'cli'
                 ? `reusing ${prov.cli?.label} session…`
-                : `handshaking with ${prov.name}…`}
+                : `saving ${prov.name} configuration…`}
             </div>
           )}
           {!demoMode && connectionReady && (
@@ -422,10 +474,13 @@ export function StepAgent({
               <Glyph name="check" size={14} />
               {agent.method === 'cli'
                 ? `${prov.cli?.label} linked · session reused`
-                : envReady
-                  ? `${prov.name} key detected on the server`
-                  : `${prov.name} connected`}{' '}
-              · ready to compose
+                : savedCredentialReady
+                  ? `${prov.name} key saved for your profile`
+                  : proof?.status === 'verified'
+                    ? `${prov.name} credentials verified`
+                    : proof?.status === 'configured'
+                      ? 'Endpoint configured'
+                      : `${prov.name} key saved without verification`}
             </div>
           )}
 
@@ -435,7 +490,7 @@ export function StepAgent({
               ? 'Demo mode only simulates this connection; no key or endpoint is sent or stored.'
               : agent.method === 'cli'
                 ? "Sotto reuses your CLI's existing auth. Nothing new to paste, nothing leaves your machine."
-                : 'Your key stays in your environment. Sotto never proxies it through us. There is no us.'}
+                : 'Your saved key is encrypted on this Sotto server and sent directly to your provider.'}
           </div>
         </div>
       )}
@@ -450,7 +505,10 @@ export function StepAgent({
                 type="password"
                 placeholder="AIza-..."
                 value={liveTranslationKey}
-                onChange={(e) => setAgent((a) => ({ ...a, liveTranslationKey: e.target.value }))}
+                onChange={(e) => {
+                  onCredentialEdit?.();
+                  setAgent((a) => ({ ...a, liveTranslationKey: e.target.value }));
+                }}
                 aria-label="Google Gemini API key for live conversation"
               />
               <a

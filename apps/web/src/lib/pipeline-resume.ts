@@ -20,6 +20,13 @@ interface MarkFailedOptions {
   failureReason?: string;
   technicalError?: string;
   errorId?: string;
+  audioGeneration?: {
+    generationKey: string;
+    segmentId: string;
+    segmentVersion: number;
+    text: string;
+    speaker: string;
+  };
 }
 
 /**
@@ -47,10 +54,28 @@ export async function markEpisodeFailed(
   ) {
     return false;
   }
+  if (opts.audioGeneration && episode.status !== 'GENERATING_AUDIO') return false;
 
   // CAS status transition — prevents concurrent workers from double-marking
   const cas = await prisma.episode.updateMany({
-    where: { id: episodeId, status: episode.status },
+    where: {
+      id: episodeId,
+      status: episode.status,
+      ...(opts.audioGeneration
+        ? {
+            audioGenerationKey: opts.audioGeneration.generationKey,
+            segments: {
+              some: {
+                id: opts.audioGeneration.segmentId,
+                version: opts.audioGeneration.segmentVersion,
+                text: opts.audioGeneration.text,
+                speaker: opts.audioGeneration.speaker,
+                audioUrl: null,
+              },
+            },
+          }
+        : {}),
+    },
     data: {
       status: 'FAILED',
       failedAtStatus: episode.status,

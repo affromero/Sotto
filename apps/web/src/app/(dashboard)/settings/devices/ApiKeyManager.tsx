@@ -52,6 +52,8 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
             lastUsedAt: null,
             createdAt: created.createdAt,
             revokedAt: null,
+            expiresAt: created.expiresAt,
+            status: 'active',
           },
           ...prev,
         ]);
@@ -68,7 +70,9 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
       const response = await fetch(`/api/v1/keys/${keyId}`, { method: 'DELETE' });
       if (response.ok || response.status === 204) {
         setKeys((prev) =>
-          prev.map((k) => (k.id === keyId ? { ...k, revokedAt: new Date().toISOString() } : k))
+          prev.map((k) =>
+            k.id === keyId ? { ...k, revokedAt: new Date().toISOString(), status: 'revoked' } : k
+          )
         );
       }
     } finally {
@@ -88,8 +92,8 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
     setCopied(false);
   }, []);
 
-  const activeKeys = keys.filter((k) => !k.revokedAt);
-  const revokedKeys = keys.filter((k) => k.revokedAt);
+  const activeKeys = keys.filter((k) => k.status === 'active');
+  const revokedKeys = keys.filter((k) => k.status !== 'active');
 
   return (
     <>
@@ -131,6 +135,9 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
                 <div className={styles.keyMeta}>
                   <span>Created {formatDate(apiKey.createdAt)}</span>
                   {apiKey.lastUsedAt && <span>Last used {formatDate(apiKey.lastUsedAt)}</span>}
+                  <span>
+                    {apiKey.expiresAt ? `Expires ${formatDate(apiKey.expiresAt)}` : 'No expiry'}
+                  </span>
                 </div>
               </div>
               <div className={styles.keyActions}>
@@ -153,7 +160,7 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
       {revokedKeys.length > 0 && (
         <div className={styles.keyList}>
           <div className={styles.keyListHeader}>
-            <h3 className={styles.keyListTitle}>Revoked Keys ({revokedKeys.length})</h3>
+            <h3 className={styles.keyListTitle}>Inactive Keys ({revokedKeys.length})</h3>
           </div>
           {revokedKeys.map((apiKey) => (
             <div key={apiKey.id} className={styles.keyRow}>
@@ -162,10 +169,17 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
                 <code className={styles.keyPrefix}>{apiKey.keyPrefix}</code>
                 <div className={styles.keyMeta}>
                   <span>Created {formatDate(apiKey.createdAt)}</span>
-                  <span>Revoked {formatDate(apiKey.revokedAt!)}</span>
+                  {apiKey.revokedAt && <span>Revoked {formatDate(apiKey.revokedAt)}</span>}
+                  {apiKey.expiresAt && <span>Expiry {formatDate(apiKey.expiresAt)}</span>}
                 </div>
               </div>
-              <span className={styles.revokedBadge}>Revoked</span>
+              <span className={styles.revokedBadge}>
+                {apiKey.status === 'revoked'
+                  ? 'Revoked'
+                  : apiKey.status === 'expired'
+                    ? 'Expired'
+                    : 'Unavailable'}
+              </span>
             </div>
           ))}
         </div>

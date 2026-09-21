@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { listAiProviders } from '@/lib/byok';
-import {
-  getAllAiProviderMeta,
-  getAiProviderMeta,
-  type AiProviderId,
-} from '@/lib/providers/ai-registry';
-import {
-  getAutoModelConfig,
-  resolveDisabledSystemAiProviders,
-  resolveIncludedModels,
-} from '@/lib/auto-model-config';
+import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
+import { getAutoModelConfig, resolveDisabledSystemAiProviders } from '@/lib/auto-model-config';
 import { isClaudeAvailable, isCodexAvailable } from '@/lib/agent-availability';
 import { getAgentModelOffering, type AgentModelOffering } from '@/lib/agent-models';
 
@@ -23,12 +15,6 @@ function sortModels<T extends { group: string; displayName: string }>(models: T[
   return [...models].sort(
     (a, b) => a.group.localeCompare(b.group) || a.displayName.localeCompare(b.displayName)
   );
-}
-
-// Derive env var names from registry — no manual map needed
-const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {};
-for (const p of getAllAiProviderMeta()) {
-  if (p.platformEnvKey) PLATFORM_PROVIDER_ENV[p.id] = p.platformEnvKey;
 }
 
 function agentModelRows(
@@ -76,7 +62,6 @@ export async function GET(request: NextRequest) {
     ? agentModelRows(codexOffering, 'codex', 'Codex (Local)', autoConfig)
     : [];
   const isByok = validKeys.length > 0;
-  const includedModelIds = new Set(resolveIncludedModels(autoConfig));
   const modelsById = new Map<
     string,
     {
@@ -88,24 +73,6 @@ export async function GET(request: NextRequest) {
       hint: string;
     }
   >();
-
-  for (const provider of getAllAiProviderMeta()) {
-    if (provider.id === 'claude-code' || provider.id === 'codex' || provider.id === 'local') {
-      continue;
-    }
-    if (!process.env[PLATFORM_PROVIDER_ENV[provider.id] ?? '']) continue;
-    for (const model of provider.models) {
-      if (!includedModelIds.has(model.id)) continue;
-      modelsById.set(model.id, {
-        id: model.id,
-        displayName: model.displayName,
-        tier: model.tier,
-        isDefault: model.id === autoConfig.model.aiModel,
-        group: provider.displayName,
-        hint: provider.displayName,
-      });
-    }
-  }
 
   for (const key of validKeys) {
     const provider = getAiProviderMeta(key.provider as AiProviderId);
@@ -120,6 +87,17 @@ export async function GET(request: NextRequest) {
         hint: provider.displayName,
       });
     }
+  }
+
+  if (autoConfig.model.aiProvider === 'local' && autoConfig.model.aiModel) {
+    modelsById.set(autoConfig.model.aiModel, {
+      id: autoConfig.model.aiModel,
+      displayName: autoConfig.model.aiModel.replace(/^local:/, ''),
+      tier: 'local',
+      isDefault: true,
+      group: 'Local',
+      hint: 'Local',
+    });
   }
 
   return NextResponse.json(

@@ -2,7 +2,8 @@
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
 // model, parse JSON. A single batch of questions spans A1..C2; the learner's
 // level is the highest band they clear on a staircase.
-import { resolveLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
@@ -80,6 +81,7 @@ export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
 
 export async function generatePlacement(
   userId: string,
+  execution: SottoProviderExecution,
   nativeLang: string,
   targetLang: string,
   note = '',
@@ -87,7 +89,7 @@ export async function generatePlacement(
   // questions" path passes a smaller value for a shorter run. Clamped 1..PER_BAND.
   perBand: number = PER_BAND
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
-  const ai = await resolveLearningAi(userId);
+  const ai = await resolveCapturedLearningAi(userId, execution);
   const bandCount = Math.max(1, Math.min(PER_BAND, Math.round(perBand)));
   const count = PLACEMENT_LEVELS.length * bandCount;
 
@@ -110,7 +112,7 @@ export async function generatePlacement(
         content: `Generate exactly ${count} placement questions (${bandCount} per CEFR level).`,
       },
     ],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 6000, temperature: 0.7 }
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 6000, temperature: 0.7 }
   );
 
   logUsage({
@@ -238,11 +240,12 @@ export interface NotesDeduction {
  */
 export async function deduceLevelFromNotes(
   userId: string,
+  execution: SottoProviderExecution,
   nativeLang: string,
   targetLang: string,
   content: string
 ): Promise<{ deduction: NotesDeduction; provider: string; model: string }> {
-  const ai = await resolveLearningAi(userId);
+  const ai = await resolveCapturedLearningAi(userId, execution);
 
   const systemPrompt = loadAndRender('placement/deduce-from-notes.md', {
     NATIVE: nativeLang,
@@ -254,7 +257,7 @@ export async function deduceLevelFromNotes(
   const response = await provider.generateResponse(
     systemPrompt,
     [{ role: 'user', content: 'Assess the CEFR level shown by these materials.' }],
-    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 800, temperature: 0.2 }
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 800, temperature: 0.2 }
   );
 
   logUsage({

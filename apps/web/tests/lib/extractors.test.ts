@@ -3,19 +3,32 @@ import { extractContent, extractFromPdfBuffer } from '@/lib/extractors';
 import { extractHtmlContent } from '@/lib/extractors/html';
 import * as pinchtabModule from '@/lib/extractors/pinchtab';
 
-// Mock summarize-core to avoid real network calls from YouTube extractor
-vi.mock('@steipete/summarize-core', () => ({
-  createLinkPreviewClient: () => ({
-    fetchLinkContent: vi.fn().mockResolvedValue({
-      content: '',
-      title: null,
-      description: null,
-      siteName: 'YouTube',
-      transcriptSource: null,
-      transcriptionProvider: null,
-      wordCount: 0,
-    }),
-  }),
+// Mock the transcript client to avoid real network calls from YouTube extraction.
+vi.mock('youtube-transcript-ts', () => ({
+  YouTubeTranscriptApi: class {
+    fetchTranscript() {
+      return Promise.resolve({
+        transcript: {
+          snippets: [],
+          videoId: 'test',
+          language: 'English',
+          languageCode: 'en',
+          isGenerated: false,
+        },
+        metadata: {
+          id: 'test',
+          title: '',
+          description: '',
+          author: '',
+          channelId: '',
+          lengthSeconds: 0,
+          viewCount: 0,
+          isPrivate: false,
+          isLiveContent: false,
+        },
+      });
+    }
+  },
 }));
 
 // Mock logger to avoid noise
@@ -400,7 +413,7 @@ describe('extractors', () => {
       const result = await extractContent('https://www.youtube.com/watch?v=test123');
 
       expect(result.sourceType).toBe('youtube');
-      expect(result.extractionMethod).toBe('summarize-core');
+      expect(result.extractionMethod).toBe('youtube-transcript');
     });
 
     it('routes PDF URLs (by Content-Type) to Markit extractor', async () => {
