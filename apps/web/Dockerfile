@@ -98,6 +98,9 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=sotto:sotto /app/apps/web/dist/access.cjs ./apps/web/dist/access.cjs
+# Next traces the external package JavaScript but omits its dynamically loaded
+# native binding. Carry the binding built in the dependency stage explicitly.
+COPY --from=deps --chown=sotto:sotto /app/node_modules/thesidedoor-flock/build ./node_modules/thesidedoor-flock/build
 
 # Copy speaker recognition model
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
