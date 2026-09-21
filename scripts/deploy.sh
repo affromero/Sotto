@@ -359,20 +359,29 @@ for kind in WEB WORKERS; do
 done
 schema_hash_script='const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");const root="/app/apps/web/prisma",hash=crypto.createHash("sha256");function add(file){const full=path.join(root,file);if(fs.statSync(full).isDirectory()){for(const name of fs.readdirSync(full).sort())add(path.join(file,name));}else{hash.update(file);hash.update(fs.readFileSync(full));}}add("schema.prisma");if(fs.existsSync(path.join(root,"migrations")))add("migrations");console.log(hash.digest("hex"));'
 candidate_schema=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$schema_hash_script")
+schema_changed=false
 while IFS= read -r previous_image; do
   [ -z "$previous_image" ] && continue
   previous_schema=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$schema_hash_script")
   if [ "$previous_schema" != "$candidate_schema" ]; then
-    echo "ERROR: schema or migration assets differ. Review and deploy the database migration separately." >&2
-    exit 1
+    schema_changed=true
+    if [ "${SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH:-}" != "$previous_schema" ] || \
+       [ "${SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH:-}" != "$candidate_schema" ]; then
+      echo "ERROR: schema or migration assets differ. Supply the exact reviewed previous and candidate schema hashes." >&2
+      exit 1
+    fi
   fi
 done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
+if [ "$schema_changed" = true ]; then
+  echo "Accepted reviewed schema transition: $SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH -> $SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH"
+fi
 
 WORKERS_CHANGED=false
 CADDY_CHANGED=false
 WEB_STARTED=false
 OLD_SLOT_STOPPED=false
 DEPLOYMENT_COMPLETE=false
+PLATFORM_FINALIZED=false
 if [ -f "$CADDY_SITE_PATH" ]; then cp "$CADDY_SITE_PATH" "$IMAGE_OVERRIDES/caddy.previous"; fi
 if [ -f "$SLOT_FILE" ]; then cp "$SLOT_FILE" "$IMAGE_OVERRIDES/slot.previous"; fi
 finish_deployment() {
@@ -380,6 +389,12 @@ finish_deployment() {
   trap - EXIT
   set +e
   if [ "$status" -ne 0 ] && [ "$DEPLOYMENT_COMPLETE" != true ]; then
+    if [ "$PLATFORM_FINALIZED" = true ]; then
+      echo "Deployment metadata failed after platform finalization. Keeping the verified candidate serving because the previous release is no longer schema-compatible." >&2
+      curl --retry 10 --retry-delay 2 --retry-all-errors -fsS --max-time 10 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health" >/dev/null || echo "ERROR: finalized candidate failed public health verification" >&2
+      rm -rf "$IMAGE_OVERRIDES"
+      exit "$status"
+    fi
     echo "Deployment failed. Restoring the previous services and routing." >&2
     if [ "$WORKERS_CHANGED" = true ]; then
       previous_services=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["services"]))' "$PREVIOUS_WORKER_IMAGES")
@@ -679,6 +694,12 @@ echo "=== Finalizing Sidedoor conversion ==="
 docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   web node dist/access.cjs finalize
+PLATFORM_FINALIZED=true
+
+echo "$NEW_SLOT" > "$SLOT_FILE.next-$$"
+mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
+echo ""
+echo "=== Saved active slot: $NEW_SLOT ==="
 
 # --- Stop old slot ---
 # Workers are already out of app compose. No job drain needed here.
@@ -705,10 +726,6 @@ if [ "$(printf '%s' "$public_health" | python3 -c 'import json,sys; print(json.l
   echo "ERROR: public health did not report the deployed release." >&2
   exit 1
 fi
-echo "$NEW_SLOT" > "$SLOT_FILE.next-$$"
-mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
-echo ""
-echo "=== Saved active slot: $NEW_SLOT ==="
 
 # --- Cleanup ---
 
