@@ -8,7 +8,9 @@ ARG WORKER_BASE_IMAGE
 
 # ---- Stage 1: Install dependencies ----
 FROM node:22-slim AS deps
-RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    g++ make openssl python3 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -19,6 +21,7 @@ COPY packages/learning-model/package.json ./packages/learning-model/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --ignore-scripts \
+    && npm rebuild thesidedoor-flock \
     && mkdir -p apps/web/node_modules
 RUN npm rebuild esbuild
 RUN npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
