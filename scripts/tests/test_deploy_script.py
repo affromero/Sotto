@@ -75,10 +75,12 @@ if args[0] == 'inspect':
         if image == old: state['verified_workers'].append(identifier)
         finish('true false 0 ' + image)
     finish()
-if args[0] == 'run': finish('different' if mode == 'schema' and old in args else 'same')
+if args[0] == 'run':
+    if mode.startswith('schema-'): finish(('d' if old in args else 'e') * 64)
+    finish('same')
 if args[0] == 'exec':
     script = args[-1]
-    if 'pg_database_size' in script: finish('1024', code=1 if mode == 'backup' else 0)
+    if 'pg_database_size' in script: finish('1024', code=1 if mode in ('backup', 'schema-reviewed') else 0)
     if 'pg_dump' in script: finish('verified fixture dump')
     finish()
 if args[0] in ('volume', 'tag'): finish()
@@ -114,7 +116,7 @@ finish()
 
 
 class DeploymentFailureTests(unittest.TestCase):
-    def run_deployment(self, failure, stack='sotto-test'):
+    def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, expect_rollback=True):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).parents[2]
@@ -147,16 +149,24 @@ class DeploymentFailureTests(unittest.TestCase):
                       'SOTTO_BACKUP_DIR': str(root / 'backups'), 'PRODUCTION_IMAGE_RETENTION_DIR': str(root / 'retention'),
                       'CADDY_SITE_PATH': str(root / 'caddy.conf'), 'DATABASE_URL': 'postgresql://fixture',
                       **{name: '1048576' for name in ('SOTTO_WEB_IMAGE_BYTES', 'SOTTO_WEB_TRANSFER_BYTES', 'SOTTO_WORKERS_IMAGE_BYTES', 'SOTTO_WORKERS_TRANSFER_BYTES', 'SOTTO_BACKUP_BYTES')}}
+            if reviewed_schema:
+                values['SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH'] = 'd' * 64
+                values['SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH'] = 'e' * 64
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
             result = subprocess.run(['bash', str(root / 'scripts/deploy.sh')], env=environment,
                                     text=True, capture_output=True, timeout=30)
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             after = json.loads((root / 'state.json').read_text())
-            self.assertEqual(after['old_web'], OLD, result.stdout + result.stderr)
-            self.assertEqual(after['workers'], OLD, result.stdout + result.stderr)
-            self.assertIsNone(after['web'], result.stdout + result.stderr)
-            self.assertEqual(slot_file.read_text(), 'blue\n')
-            self.assertEqual((root / 'caddy.conf').read_text(), original_caddy)
+            if expect_rollback:
+                self.assertEqual(after['old_web'], OLD, result.stdout + result.stderr)
+                self.assertEqual(after['workers'], OLD, result.stdout + result.stderr)
+                self.assertIsNone(after['web'], result.stdout + result.stderr)
+                self.assertEqual(slot_file.read_text(), 'blue\n')
+                self.assertEqual((root / 'caddy.conf').read_text(), original_caddy)
+            else:
+                self.assertEqual(after['workers'], NEW, result.stdout + result.stderr)
+                self.assertEqual(after['web'], NEW, result.stdout + result.stderr)
+                self.assertEqual(slot_file.read_text(), 'green\n')
             self.assertFalse(after['premature_route'], result.stdout + result.stderr)
             return after, result.stdout + result.stderr
 
@@ -188,9 +198,15 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertEqual(state['capacity'], 2, output)
 
     def test_schema_difference_never_replaces_running_services(self):
-        state, output = self.run_deployment('schema')
-        self.assertIn('schema or migration assets differ', output)
+        state, output = self.run_deployment('schema-unreviewed')
+        self.assertIn('exact reviewed previous and candidate schema hashes', output)
         self.assertTrue(state['pulled'])
+
+    def test_reviewed_schema_transition_reaches_verified_backup_gate(self):
+        state, output = self.run_deployment('schema-reviewed', reviewed_schema=True)
+        self.assertIn('Accepted reviewed schema transition', output)
+        self.assertIn('Backing up the application database', output)
+        self.assertEqual(state['workers'], OLD, output)
 
     def test_worker_failure_restores_images_routing_slot_and_checks_public_health(self):
         state, output = self.run_deployment('workers')
@@ -200,11 +216,11 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertIsNone(state['public_health'][-1], output)
         self.assertEqual(set(state['verified_workers']), {'workers-heavy', 'workers-pipeline', 'workers-light'}, output)
 
-    def test_final_capacity_failure_restores_the_previous_saved_slot_and_services(self):
-        state, output = self.run_deployment('final-capacity')
+    def test_post_finalization_failure_keeps_the_verified_candidate_serving(self):
+        state, output = self.run_deployment('final-capacity', expect_rollback=False)
         self.assertEqual(state['capacity'], 5, output)
         self.assertIn('Saved active slot: green', output)
-        self.assertEqual(set(state['verified_workers']), {'workers-heavy', 'workers-pipeline', 'workers-light'}, output)
+        self.assertIn('Keeping the verified candidate serving', output)
 
 
 if __name__ == '__main__':
