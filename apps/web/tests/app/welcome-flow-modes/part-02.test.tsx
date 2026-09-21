@@ -273,7 +273,7 @@ describe('welcome hosted-demo mode', () => {
     expect(
       await screen.findByRole('heading', { name: /Review the practice brief/i })
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/example.com/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^example\.com$/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Invisible Cities/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/CEFR B1/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Composing your course/i)).not.toBeInTheDocument();

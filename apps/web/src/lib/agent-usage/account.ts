@@ -67,8 +67,6 @@ export async function captureUsageAccount(
     owner: selected?.credential.owner,
     grant: selected?.sharingRevision,
     binding: credential?.binding,
-    apiKey: fields?.apiKey,
-    extraData: Object.entries(fields?.extraData ?? {}).sort(([a], [b]) => a.localeCompare(b)),
   };
   return Object.freeze({
     fields,

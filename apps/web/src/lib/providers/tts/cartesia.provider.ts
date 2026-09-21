@@ -153,7 +153,11 @@ const DEFAULT_CARTESIA_CONCURRENCY = 2;
 export async function getCartesiaConcurrencyLimit(apiKey: string): Promise<number> {
   const { cache } = await import('../../redis');
   const crypto = await import('crypto');
-  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const keyHash = crypto
+    .createHmac('sha256', apiKey)
+    .update('sotto:cartesia:concurrency')
+    .digest('hex')
+    .slice(0, 16);
   const cacheKey = `tts:concurrency:cartesia:${keyHash}`;
 
   const cached = await cache.get<number>(cacheKey);
@@ -178,7 +182,11 @@ export async function updateCartesiaConcurrencyFromError(
 
     const { cache } = await import('../../redis');
     const crypto = await import('crypto');
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+    const keyHash = crypto
+      .createHmac('sha256', apiKey)
+      .update('sotto:cartesia:concurrency')
+      .digest('hex')
+      .slice(0, 16);
     await cache.set(`tts:concurrency:cartesia:${keyHash}`, limit, 300);
     logger.info('Cartesia concurrency limit detected from 429', { limit });
   } catch {

@@ -7,7 +7,6 @@ import {
 } from 'thesidedoor-core/runtime/cli';
 import { GenerationUsageError } from 'thesidedoor-core/ai/usage';
 import type { TokenUsage } from 'thesidedoor-core/ai';
-import { randomUUID } from 'crypto';
 import {
   copyFileSync,
   mkdirSync,
@@ -158,15 +157,20 @@ function createInvocationConfig(): InvocationConfig {
   const release = () => {
     const failures: unknown[] = [];
     let temporaryCredentials: string | undefined;
+    let temporaryDirectory: string | undefined;
     try {
       const current = readFileSync(
         /* turbopackIgnore: true */ join(dir, '.credentials.json'),
         'utf8'
       );
       if (current !== seeded && supersedesCredentials('claude-code', shared, current)) {
-        temporaryCredentials = `${shared}.tmp-${randomUUID()}`;
+        temporaryDirectory = mkdtempSync(
+          join(/* turbopackIgnore: true */ dirname(shared), '.claude-refresh-')
+        );
+        temporaryCredentials = join(temporaryDirectory, '.credentials.json');
         writeFileSync(/* turbopackIgnore: true */ temporaryCredentials, current, { mode: 0o660 });
         renameSync(/* turbopackIgnore: true */ temporaryCredentials, shared);
+        temporaryCredentials = undefined;
         logger.info('claude-code: persisted refreshed OAuth credentials');
       }
     } catch (error) {
@@ -175,6 +179,13 @@ function createInvocationConfig(): InvocationConfig {
     if (temporaryCredentials) {
       try {
         rmSync(/* turbopackIgnore: true */ temporaryCredentials, { force: true });
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (temporaryDirectory) {
+      try {
+        rmSync(/* turbopackIgnore: true */ temporaryDirectory, { recursive: true, force: true });
       } catch (error) {
         failures.push(error);
       }

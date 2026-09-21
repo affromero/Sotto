@@ -258,7 +258,11 @@ const DEFAULT_HUME_CONCURRENCY = 5;
 export async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
   const { cache } = await import('../../redis');
   const crypto = await import('crypto');
-  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const keyHash = crypto
+    .createHmac('sha256', apiKey)
+    .update('sotto:hume:concurrency')
+    .digest('hex')
+    .slice(0, 16);
   const cacheKey = `tts:concurrency:hume:${keyHash}`;
 
   const cached = await cache.get<number>(cacheKey);
@@ -279,7 +283,11 @@ export async function updateHumeConcurrencyFromError(
   try {
     const { cache } = await import('../../redis');
     const crypto = await import('crypto');
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+    const keyHash = crypto
+      .createHmac('sha256', apiKey)
+      .update('sotto:hume:concurrency')
+      .digest('hex')
+      .slice(0, 16);
     const cacheKey = `tts:concurrency:hume:${keyHash}`;
 
     const match = errorMessage.match(/(?:limit|concurr\w*)\D*(\d+)/i);

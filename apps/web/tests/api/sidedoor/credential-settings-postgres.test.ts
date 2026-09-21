@@ -59,10 +59,9 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
         values: { apiKey: 'personal-provider-secret' },
       });
       vi.stubGlobal('fetch', async (url: URL | string) => {
-        const endpoint = String(url);
-        if (endpoint.includes('api.openai.com')) return Response.json({ object: 'list', data: [] });
-        if (endpoint.includes('api.cartesia.ai'))
-          return Response.json({ data: [], has_more: false });
+        const host = new URL(String(url)).hostname;
+        if (host === 'api.openai.com') return Response.json({ object: 'list', data: [] });
+        if (host === 'api.cartesia.ai') return Response.json({ data: [], has_more: false });
         return Response.json({ photos: [], page: 1, per_page: 1, total_results: 0 });
       });
       const saved = await handler(await request(endpoint, 'POST', credentialSaveRequest(draft)));
