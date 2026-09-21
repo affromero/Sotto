@@ -108,9 +108,12 @@ NODE
 compose exec -T -e SIDEDOOR_SMOKE_CLAIM_CODE="$claim_code" -e SIDEDOOR_SMOKE_OWNER_PASSWORD="$owner_password" web node --input-type=module - "$revision" <<'NODE'
 import assert from 'node:assert/strict';
 import { readFile, unlink } from 'node:fs/promises';
-const base = 'http://127.0.0.1:3000';
+const base = 'http://localhost:3000';
 const request = (path, options = {}) => fetch(base + path, {
-  ...options, signal: AbortSignal.timeout(30000), redirect: 'manual',
+  ...options,
+  headers: { origin: base, ...options.headers },
+  signal: AbortSignal.timeout(30000),
+  redirect: 'manual',
 });
 const response = await request('/api/v1/health');
 assert.equal(response.status, 200);
