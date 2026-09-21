@@ -61,6 +61,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install media tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools
       - name: Verify source
         run: |
           npm ci
