@@ -71,9 +71,7 @@ describe('Sotto shared access HTTP configuration', () => {
     await access.logout(cookie.split(';')[0]!.slice('sotto_session='.length));
     expect((await route(request(), 'session')).status).toBe(401);
   });
-  it('accepts internal proxy URLs only when explicitly enabled', async () => {
-    expect((await handler()(login('http://internal:3000'), 'login')).status).toBe(403);
-    vi.stubEnv('SIDEDOOR_TRUSTED_PROXY', 'true');
+  it('accepts internal proxy URLs for the configured HTTPS origin', async () => {
     expect((await handler()(login('http://internal:3000'), 'login')).status).toBe(200);
   });
   it('allows password aliases while keeping passkey ceremonies on the canonical origin', async () => {

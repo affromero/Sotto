@@ -64,7 +64,7 @@ export function accessHandler(
     ...services,
     origin: appUrl.origin,
     passwordOrigins: aliases,
-    trustedProxy: process.env.SIDEDOOR_TRUSTED_PROXY === 'true',
+    trustedProxy: appUrl.protocol === 'https:',
     useHostHeader: true,
     name: 'Sotto',
     cookieName: SHARED_SESSION_COOKIE,
