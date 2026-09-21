@@ -107,6 +107,7 @@ export function startSottoJobReconciliation(options: {
     onError: options.onError,
     task: async (signal) => {
       const page = await reconcileSottoJobs({ ...options, signal, cursor });
+      if (signal.aborted) return;
       cursor = page.cursor;
       options.onResults(page.results);
     },

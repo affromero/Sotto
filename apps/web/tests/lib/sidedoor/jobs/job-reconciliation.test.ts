@@ -177,6 +177,37 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
       await loop.stop();
     }
   });
+
+  it('does not report a canceled pass as failed during shutdown', async () => {
+    await fixture();
+    let resolveStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      resolveStarted = resolve;
+    });
+    const results: unknown[] = [];
+    const failures: unknown[] = [];
+    const loop = startSottoJobReconciliation({
+      database: instance.database,
+      queues: options().queues,
+      withQueue: async <Result>(_name: string, signal: AbortSignal) => {
+        resolveStarted();
+        return new Promise<Result>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      },
+      onResults: (page) => {
+        results.push(...page);
+      },
+      onError: (error) => {
+        failures.push(error);
+        return undefined;
+      },
+    });
+    await started;
+    await loop.stop();
+    expect(results).toEqual([]);
+    expect(failures).toEqual([]);
+  });
 });
 
 describe('durable queue contract isolation', () => {
