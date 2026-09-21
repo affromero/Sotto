@@ -504,6 +504,8 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(workersComposeSource).toContain(
       'WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}'
     );
+    expect(webDockerSource).toContain('npm rebuild thesidedoor-flock');
+    expect(workerDockerSource).toContain('npm rebuild thesidedoor-flock');
     expect(appComposeSource).toContain('SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials');
     expect(appComposeSource).toContain('${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials');
     expect(workersComposeSource).toContain('credential-sync:');

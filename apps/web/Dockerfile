@@ -6,7 +6,7 @@
 
 # ---- Stage 1: Install dependencies ----
 FROM node:22-alpine AS deps
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache g++ libc6-compat make openssl python3
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -16,7 +16,8 @@ COPY packages/groundcheck/package.json ./packages/groundcheck/
 COPY packages/learning-model/package.json ./packages/learning-model/
 COPY apps/web/prisma ./apps/web/prisma/
 
-RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts \
+    && npm rebuild thesidedoor-flock
 RUN npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
 
 # ---- Stage 2: Build the application ----
