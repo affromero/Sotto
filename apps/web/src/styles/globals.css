@@ -151,12 +151,13 @@ body::before {
   --color-pink-light: #fce7f3;
   --color-pink-lighter: #fdf2f8;
 
-  /* Typography - Fonts (SottoDesign: Newsreader serif · IBM Plex Sans · IBM Plex Mono).
-     next/font (layout.tsx) overrides --font-heading/--font-body/--font-mono with the
-     loaded faces; these literals are the fallback chain. */
+  /* Typography - Fonts (SottoDesign: Newsreader serif · IBM Plex Sans · IBM Plex Mono). */
   --font-heading: 'Newsreader', Georgia, 'Times New Roman', serif;
   --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Monaco, monospace;
+  --font-newsreader: var(--font-heading);
+  --font-ibm-plex-sans: var(--font-body);
+  --font-ibm-plex-mono: var(--font-mono);
 
   /* Typography - Scale */
   --text-display: 700 48px/1.1 var(--font-heading);
