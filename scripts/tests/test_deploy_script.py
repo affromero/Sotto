@@ -44,6 +44,7 @@ if name == 'sudo':
     finish()
 if name == 'curl':
     url = args[-1]
+    if url.endswith('/api/v1/tags'): finish('401')
     public = url.startswith('https://')
     if public:
         state['public_health'].append(state['web'])
@@ -219,6 +220,7 @@ class DeploymentFailureTests(unittest.TestCase):
     def test_post_finalization_failure_keeps_the_verified_candidate_serving(self):
         state, output = self.run_deployment('final-capacity', expect_rollback=False)
         self.assertEqual(state['capacity'], 5, output)
+        self.assertIn('Tags access check OK (status 401)', output)
         self.assertIn('Saved active slot: green', output)
         self.assertIn('Keeping the verified candidate serving', output)
 

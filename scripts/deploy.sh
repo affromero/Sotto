@@ -654,12 +654,7 @@ fi
 
 echo ""
 echo "=== Post-deploy smoke check ==="
-if [ "${SELF_HOSTED:-true}" = "false" ]; then
-  EXPECTED_ANONYMOUS_STATUS=200
-else
-  EXPECTED_ANONYMOUS_STATUS=401
-fi
-BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" EXPECTED_ANONYMOUS_STATUS="$EXPECTED_ANONYMOUS_STATUS" bash scripts/smoke-prod.sh
+BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 
 # --- Restart workers ---
 # Workers are stateless BullMQ consumers; jobs are durable in Redis.
