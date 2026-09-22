@@ -11,12 +11,9 @@ fi
 
 echo "Health check OK: ${BASE_URL}/api/v1/health"
 
-# Callers select the expected access policy after inspecting canonical state.
-expected="${EXPECTED_ANONYMOUS_STATUS:-200}"
-
 status="$(curl -sS -o /dev/null -w "%{http_code}" "${BASE_URL}/api/v1/tags")"
-if [[ "${status}" != "${expected}" ]]; then
-  echo "Tags check failed (status ${status}, expected ${expected}) for ${BASE_URL}/api/v1/tags"
+if [[ "${status}" != "401" ]]; then
+  echo "Tags access check failed (status ${status}, expected 401) for ${BASE_URL}/api/v1/tags"
   exit 1
 fi
-echo "Tags check OK (status ${status}): ${BASE_URL}/api/v1/tags"
+echo "Tags access check OK (status ${status}): ${BASE_URL}/api/v1/tags"
