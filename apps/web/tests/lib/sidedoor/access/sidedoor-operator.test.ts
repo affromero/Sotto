@@ -97,7 +97,7 @@ suite('bundled local access operator', () => {
   });
   afterAll(async () => {
     await database?.$disconnect();
-    if (created) await admin.$executeRawUnsafe(`DROP DATABASE "${name}"`);
+    if (created) await admin.$executeRawUnsafe(`DROP DATABASE "${name}" WITH (FORCE)`);
     await admin?.$disconnect();
     if (runtimeDirectory) await rm(runtimeDirectory, { recursive: true, force: true });
     if (previousEncryptionKey === undefined) delete process.env.BYOK_ENCRYPTION_KEY;
