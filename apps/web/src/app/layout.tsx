@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
@@ -9,29 +8,17 @@ import { NotificationProvider } from '@/components/providers/NotificationProvide
 import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import { getAppBaseUrl } from '@/lib/urls';
+import '@fontsource/newsreader/400.css';
+import '@fontsource/newsreader/400-italic.css';
+import '@fontsource/newsreader/500.css';
+import '@fontsource/newsreader/500-italic.css';
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/500.css';
+import '@fontsource/ibm-plex-sans/600.css';
+import '@fontsource/ibm-plex-sans/700.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
 import '@/styles/globals.css';
-
-const newsreader = Newsreader({
-  subsets: ['latin'],
-  style: ['normal', 'italic'],
-  weight: ['400', '500'],
-  variable: '--font-heading',
-  display: 'swap',
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-body',
-  display: 'swap',
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-mono',
-  display: 'swap',
-});
 
 const appBaseUrl = getAppBaseUrl();
 
@@ -96,11 +83,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${newsreader.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
