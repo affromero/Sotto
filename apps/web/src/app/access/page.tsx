@@ -13,7 +13,6 @@ export default async function AccessPage({
   searchParams: Promise<{ mode?: string; returnTo?: string }>;
 }) {
   const { mode, returnTo } = await searchParams;
-  const selectedMode =
-    mode === 'claim' || mode === 'recover' || mode === 'household' ? mode : 'login';
+  const selectedMode = mode === 'claim' || mode === 'recover' ? mode : 'household';
   return <AccessScreen mode={selectedMode} returnToSecurity={returnTo === 'security'} />;
 }

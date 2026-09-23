@@ -47,6 +47,7 @@ export async function listHouseholdProfiles(
       id: true,
       name: true,
       image: true,
+      role: true,
       courses: {
         select: { targetLang: true, currentLevel: true },
         orderBy: { updatedAt: 'desc' },
@@ -61,11 +62,8 @@ export async function listHouseholdProfiles(
         id: u.id,
         name: u.name ?? 'Learner',
         avatarUrl: resolveProfileAvatar(u.id, u.image).image,
-        isOwner: identity.isOwner && u.id === identity.principalId,
-        role:
-          identity.isOwner && u.id === identity.principalId
-            ? ('ADMIN' as const)
-            : ('USER' as const),
+        isOwner: u.role === 'ADMIN',
+        role: u.role,
         isActive: u.id === identity.userId,
         courseCount: u.courses.length,
         primaryCourse: primary

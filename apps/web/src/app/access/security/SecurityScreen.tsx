@@ -31,6 +31,10 @@ export function SecurityScreen() {
             router.push('/access?returnTo=security');
             router.refresh();
           }}
+          onHouseholdEntered={() => {
+            router.push('/profiles');
+            router.refresh();
+          }}
         />
       </div>
     </main>

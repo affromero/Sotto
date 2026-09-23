@@ -83,9 +83,9 @@ export async function updateSottoProfile(
         ? { image: avatarSlug ? avatarImagePath(avatarSlug) : null }
         : {}),
     },
-    select: { id: true, name: true, image: true },
+    select: { id: true, name: true, image: true, role: true },
   });
-  const isOwner = identity.isOwner && identity.principalId === user.id;
+  const isOwner = user.role === 'ADMIN';
   return {
     id: user.id,
     name: user.name,

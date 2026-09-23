@@ -57,7 +57,7 @@ The installer checks image availability before changing configuration and pins a
 
 **Desktop controls:** Unsigned preview launchers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Install the stack with the terminal command above first. Sotto Host starts and stops that installation. Your OS may require an explicit security override. On Windows, the launcher must be pointed at the installation inside WSL; using the browser from WSL is the simpler path.
 
-1. Open the local URL, enter the owner claim code, and set the generated instance password as the owner password.
+1. Open the local URL, enter the owner claim code, and create the first Admin profile with one shared app password.
 2. Enroll an Apple, Android, or browser passkey, then configure languages and providers.
 3. Take the placement test and start your first class.
 
@@ -335,7 +335,9 @@ The product runs on your own stack: you run it, then reach it from anywhere.
 - **Terminal.** `sotto` is a headless Rust + ratatui client. Learn from a tmux pane while you code, with native audio playback and mic recording. See [Terminal client](#terminal-client-sotto) below.
 - **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
 
-**One owner, local profiles.** A self-hosted instance starts with an explicit owner claim. The owner can enroll passkeys, add isolated learner profiles, switch between them, and keep each learner's courses, progress, vocabulary graph, and keys on the same controlled stack.
+**One password, local profiles.** A self-hosted instance starts with an Admin claim. Its password becomes the shared password for the app. The first profile is Admin. Learners choose a profile after entering the password. Each profile keeps its own courses, progress, vocabulary graph, and keys.
+
+After password entry, Sotto offers to save a passkey with Apple Passwords or another WebAuthn manager. A saved passkey opens the profile picker on later visits. Anyone admitted can select Admin and change settings. Selecting another profile removes Admin access. Admin can revoke household passkeys in account security.
 
 **Teacher-run mode is the natural classroom shape.** The current profile model already points there: a teacher self-hosts Sotto, creates one profile per student, and keeps practice data on school-controlled infrastructure. The next product layer should add teacher-authored homework, class-prep scenarios, per-student follow-up queues, and reviewable AI feedback so Sotto prepares students between lessons without replacing the teacher.
 

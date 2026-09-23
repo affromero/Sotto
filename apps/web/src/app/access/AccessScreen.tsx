@@ -15,10 +15,12 @@ export function AccessScreen({
       <p className={styles.brand}>Sotto</p>
       <div className={styles.content}>
         <h1 className={styles.heading}>Your learning space</h1>
-        <p className={styles.sub}>Sign in or enter your household</p>
+        <p className={styles.sub}>Enter your household, then choose a profile.</p>
         <AccessForm
           endpoint="/api/v1/access"
           initialMode={mode}
+          modes={['household', 'claim', 'recover']}
+          claimModes={['household']}
           classes={{
             root: styles.access,
             form: styles.form,

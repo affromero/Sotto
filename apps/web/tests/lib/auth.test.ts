@@ -68,7 +68,7 @@ describe('shared browser content identity', () => {
       name: 'Learner',
       email: 'learner@localhost',
       image: null,
-      role: 'ADMIN',
+      role: 'USER',
     });
     directory = await mkdtemp(join(tmpdir(), 'sotto-session-'));
     boundary.store = new FileStateStore({
@@ -89,6 +89,10 @@ describe('shared browser content identity', () => {
       'owner password phrase',
       'household'
     );
+    const adminId = (await access.store.read()).principals.find(
+      (principal) => principal.role === 'owner'
+    )!.id;
+    await new HouseholdProfileService(access).select(owner, adminId);
   });
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -100,18 +104,18 @@ describe('shared browser content identity', () => {
     expect(await resolveSession()).toBeNull();
     expect([...boundary.users.keys()]).toEqual(before);
   });
-  it('derives owner authority from the signed-in principal despite the informational database role', async () => {
+  it('derives Admin authority from the selected first profile', async () => {
     boundary.cookies.set('sotto_session', owner);
-    const principal = (await access.authenticate(owner)).principal!;
-    expect(boundary.users.get(principal.id)?.role).toBe('USER');
+    const principal = (await access.authenticate(owner, true)).principal!;
+    expect(boundary.users.get(principal.id)?.role).toBe('ADMIN');
     expect(await resolveSession()).toMatchObject({
       user: { id: principal.id, role: 'ADMIN' },
-      principalId: principal.id,
+      principalId: null,
       isOwner: true,
     });
   });
-  it('selects household content without inheriting the learner ADMIN flag', async () => {
-    const token = await access.enterOpenHousehold();
+  it('selects member content without Admin authority', async () => {
+    const token = await access.enterHousehold('owner password phrase');
     await new HouseholdProfileService(access).select(token, 'household-reader');
     boundary.cookies.set('sotto_session', token);
     expect(await resolveSession()).toMatchObject({
@@ -121,7 +125,7 @@ describe('shared browser content identity', () => {
     });
   });
   it('requires explicit profile selection after household admission', async () => {
-    boundary.cookies.set('sotto_session', await access.enterOpenHousehold());
+    boundary.cookies.set('sotto_session', await access.enterHousehold('owner password phrase'));
     boundary.cookies.set('sotto_profile', 'household-reader');
     expect(await resolveSession()).toBeNull();
   });
@@ -134,7 +138,7 @@ describe('shared browser content identity', () => {
   });
   it('fails closed when the authenticated learner was removed instead of recreating it', async () => {
     boundary.cookies.set('sotto_session', owner);
-    const id = (await access.authenticate(owner)).principal!.id;
+    const id = (await access.authenticate(owner, true)).principal!.id;
     boundary.users.delete(id);
     await expect(resolveSession()).rejects.toMatchObject({ code: 'conflict' });
     expect(boundary.users.has(id)).toBe(false);
@@ -160,7 +164,7 @@ describe('shared browser content identity', () => {
     const request = new Request('https://sotto.example/api/v1/episodes', {
       headers: { authorization: `Bearer ${device}` },
     });
-    const principal = (await access.authenticate(owner)).principal!;
+    const principal = (await access.authenticate(owner, true)).principal!;
     expect(
       await prismaUnfiltered.$transaction((tx) => resolveSottoRequest(tx, request))
     ).toMatchObject({

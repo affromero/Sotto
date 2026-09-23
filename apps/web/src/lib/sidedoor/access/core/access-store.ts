@@ -103,6 +103,10 @@ export async function sottoAccessStore(
               invitation.issuerPrincipalId = installedOwner.id;
           for (const recovery of envelope.access.recoveryCodes)
             if (recovery.principalId === generatedId) recovery.principalId = installedOwner.id;
+          const ownerProfile = envelope.access.householdProfiles?.find(
+            (profile) => profile.id === installedOwner.id
+          );
+          if (ownerProfile) ownerProfile.ownerPrincipalId = installedOwner.id;
           rebound.add(installedOwner.id);
         }
       }
@@ -117,6 +121,21 @@ export async function sottoAccessStore(
           'Remove learner data through the explicit profile deletion workflow'
         );
       for (const principal of envelope.access.principals) {
+        if (principal.role === 'owner' && envelope.access.mode === 'household') {
+          const profile = envelope.access.householdProfiles?.find(
+            (entry) => entry.id === principal.id
+          );
+          if (profile) profile.ownerPrincipalId = principal.id;
+          else {
+            envelope.access.householdProfiles ??= [];
+            envelope.access.householdProfiles.push({
+              id: principal.id,
+              name: principal.name,
+              epoch: principal.epoch,
+              ownerPrincipalId: principal.id,
+            });
+          }
+        }
         if (!previous.has(principal.id) && rebound.has(principal.id)) {
           await database.user.update({
             where: { id: principal.id },
@@ -130,7 +149,7 @@ export async function sottoAccessStore(
               id: principal.id,
               name: principal.name,
               email: `sidedoor+${principal.id}@localhost.invalid`,
-              role: 'USER',
+              role: principal.role === 'owner' ? 'ADMIN' : 'USER',
               createdAt: new Date(principal.createdAt),
             },
           });
@@ -145,13 +164,15 @@ export async function sottoAccessStore(
           )
           .map((principal) => principal.id)
       );
-      await revokeSottoCredentialSharing(
-        database,
-        [...privateIds].filter((id) => previousHousehold.has(id) && !rebound.has(id))
-      );
-      envelope.access.householdProfiles = envelope.access.householdProfiles?.filter(
-        (profile) => !privateIds.has(profile.id)
-      );
+      if (envelope.access.mode === 'individual') {
+        await revokeSottoCredentialSharing(
+          database,
+          [...privateIds].filter((id) => previousHousehold.has(id) && !rebound.has(id))
+        );
+        envelope.access.householdProfiles = envelope.access.householdProfiles?.filter(
+          (profile) => !privateIds.has(profile.id)
+        );
+      }
       envelope.access.deviceTokens = envelope.access.deviceTokens.filter(
         (device) =>
           !device.defaultProfileId ||
