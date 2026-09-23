@@ -98,7 +98,8 @@ export function useProviderCredentialDatabase() {
       store: await sottoAccessStore(tx),
       allowOpenHousehold: true,
     });
-    const token = await new HouseholdProfileService(access).enterOpen(userId);
+    const token = await access.enterHousehold('owner fixture password phrase');
+    await new HouseholdProfileService(access).select(token, userId);
     const request = new Request('http://localhost/api/v1/settings/ai-keys', {
       headers: { cookie: `sotto_session=${token}` },
     });

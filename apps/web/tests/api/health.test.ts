@@ -144,15 +144,9 @@ suite('Health with shared authority and infrastructure boundaries', () => {
     publicPayload(await (await GET(request())).json());
     expect(outgoing).not.toHaveBeenCalled();
   });
-  it('keeps details private from household learners, members, revoked and invalid credentials', async () => {
+  it('keeps details private from household learners, revoked and invalid credentials', async () => {
     const household = await identity.household('Learner');
-    await identity.access.addMember(identity.ownerToken, 'Member', 'private member password');
-    const member = await identity.access.login('Member', 'private member password');
-    for (const current of [
-      request(household.token),
-      request(member),
-      request(identity.ownerToken, 'forged'),
-    ])
+    for (const current of [request(household.token), request(identity.ownerToken, 'forged')])
       publicPayload(await (await GET(current)).json());
     await identity.access.logout(identity.ownerToken);
     publicPayload(await (await GET(request(identity.ownerToken))).json());

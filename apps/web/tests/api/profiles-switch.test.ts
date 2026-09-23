@@ -48,7 +48,7 @@ suite('Profile selection with persistent shared sessions', () => {
   it('requires admission and validates the selection input', async () => {
     expect((await POST(request(undefined, { profileId: 'missing' }))).status).toBe(401);
     expect((await DELETE(request(undefined, undefined, 'DELETE'))).status).toBe(401);
-    const admission = await identity.access.enterOpenHousehold();
+    const admission = await identity.access.enterHousehold('owner password for integration tests');
     expect((await POST(request(admission, {}))).status).toBe(400);
   });
   it('selects learner content and restores its appearance from an admission session', async () => {
@@ -57,7 +57,7 @@ suite('Profile selection with persistent shared sessions', () => {
       where: { id: learner.id },
       data: { themeMode: 'dark', themePalette: 'paper', reducedMotion: true },
     });
-    const admission = await identity.access.enterOpenHousehold();
+    const admission = await identity.access.enterHousehold('owner password for integration tests');
     expect(await authenticateRequest(request(admission))).toBeNull();
     const response = await POST(request(admission, { profileId: learner.id }));
     expect(response.status).toBe(200);
@@ -75,15 +75,20 @@ suite('Profile selection with persistent shared sessions', () => {
       reducedMotion: true,
     });
   });
-  it('rejects private accounts and nonexistent profiles without changing selection', async () => {
+  it('allows Admin selection and rejects nonexistent profiles without changing selection', async () => {
     const learner = await identity.household('Learner');
-    for (const id of [identity.ownerId, 'missing']) {
-      expect((await POST(request(learner.token, { profileId: id }))).status).toBe(403);
-      expect(await authenticateRequest(request(learner.token))).toMatchObject({
-        userId: learner.id,
-      });
-    }
-    expect((await POST(request(identity.ownerToken, { profileId: learner.id }))).status).toBe(403);
+    expect((await POST(request(learner.token, { profileId: 'missing' }))).status).toBe(403);
+    expect(await authenticateRequest(request(learner.token))).toMatchObject({ userId: learner.id });
+    expect((await POST(request(learner.token, { profileId: identity.ownerId }))).status).toBe(200);
+    expect(await authenticateRequest(request(learner.token))).toMatchObject({
+      userId: identity.ownerId,
+      isOwner: true,
+    });
+    expect((await POST(request(identity.ownerToken, { profileId: learner.id }))).status).toBe(200);
+    expect(await authenticateRequest(request(identity.ownerToken))).toMatchObject({
+      userId: learner.id,
+      isOwner: false,
+    });
   });
   it('clears the session and profile cookies without restoring access', async () => {
     const learner = await identity.household('Learner');

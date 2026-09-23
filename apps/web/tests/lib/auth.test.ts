@@ -156,10 +156,13 @@ describe('shared browser content identity', () => {
     }
   );
 
-  it('keeps a principal device on its own learner and honors its delegated scope', async () => {
+  it('keeps a household device on its selected learner and honors its delegated scope', async () => {
     const devices = sottoDeviceService(access);
+    const adminId = (await access.store.read()).principals.find(
+      (principal) => principal.role === 'owner'
+    )!.id;
     const device = await devices.redeemPairing(
-      await devices.issuePairing(owner, ['app'], 'Tablet')
+      await devices.issuePairing(owner, ['app'], 'Tablet', { defaultProfileId: adminId })
     );
     const request = new Request('https://sotto.example/api/v1/episodes', {
       headers: { authorization: `Bearer ${device}` },

@@ -31,7 +31,7 @@ suite('Pairing lifecycle with persistent shared authority', () => {
     binding.database = null;
     if (instance) await instance.close();
   });
-  it('persists only the pairing hash and creates a device belonging to the issuing principal', async () => {
+  it('persists only the pairing hash and binds the device to the selected Admin profile', async () => {
     const pair = await createPairingToken(identity.ownerToken, 'Tablet');
     expect(pair.expiresAt.getTime()).toBeGreaterThan(Date.now());
     const state = await identity.access.store.read();

@@ -152,15 +152,14 @@ suite('API key routes with shared authority', () => {
     ).toBe(404);
     expect(await instance.database.apiKey.count()).toBe(0);
   });
-  it('keeps a private member outside owner key management', async () => {
+  it('keeps a learner outside owner key management', async () => {
     const created = await create();
-    await identity.access.addMember(identity.ownerToken, 'Member', 'private member password');
-    const memberToken = await identity.access.login('Member', 'private member password');
-    expect((await POST(request('POST', { name: 'Member key' }, memberToken))).status).toBe(403);
-    expect(await (await GET(request('GET', undefined, memberToken))).json()).toEqual([]);
+    const learner = await identity.household('Learner');
+    expect((await POST(request('POST', { name: 'Learner key' }, learner.token))).status).toBe(403);
+    expect(await (await GET(request('GET', undefined, learner.token))).json()).toEqual([]);
     expect(
       (
-        await DELETE(request('DELETE', undefined, memberToken), {
+        await DELETE(request('DELETE', undefined, learner.token), {
           params: Promise.resolve({ keyId: created.id }),
         })
       ).status

@@ -86,6 +86,7 @@ describe('native shared access authority', () => {
   let directory: string;
   let access: AccessService;
   let owner: string;
+  let adminId: string;
   beforeEach(async () => {
     boundary.cookies.clear();
     boundary.users.clear();
@@ -116,7 +117,7 @@ describe('native shared access authority', () => {
       'owner password phrase',
       'household'
     );
-    const adminId = (await access.store.read()).principals.find(
+    adminId = (await access.store.read()).principals.find(
       (principal) => principal.role === 'owner'
     )!.id;
     await new HouseholdProfileService(access).select(owner, adminId);
@@ -139,7 +140,9 @@ describe('native shared access authority', () => {
 
   it('keeps device usage and shared revocation metadata consistent with authority', async () => {
     const devices = sottoDeviceService(access);
-    const token = await devices.redeemPairing(await devices.issuePairing(owner, ['app'], 'Tablet'));
+    const token = await devices.redeemPairing(
+      await devices.issuePairing(owner, ['app'], 'Tablet', { defaultProfileId: adminId })
+    );
     const id = tokenHash(token);
     boundary.keys.set(id, { revokedAt: null, lastUsedAt: null });
     expect(await authenticateRequest(request(token))).not.toBeNull();
@@ -194,7 +197,9 @@ describe('native shared access authority', () => {
     async (delegated) => {
       const devices = sottoDeviceService(access);
       const token = await devices.redeemPairing(
-        await devices.issuePairing(owner, delegated ? ['app', 'owner'] : ['app'], 'Tablet')
+        await devices.issuePairing(owner, delegated ? ['app', 'owner'] : ['app'], 'Tablet', {
+          defaultProfileId: adminId,
+        })
       );
       const identity = await validateApiKey(token);
       expect(identity).toMatchObject({ authentication: 'device', isOwner: delegated });
@@ -217,7 +222,7 @@ describe('native shared access authority', () => {
   it('keeps revoked device requests revoked despite a valid owner cookie', async () => {
     const devices = sottoDeviceService(access);
     const token = await devices.redeemPairing(
-      await devices.issuePairing(owner, ['app', 'owner'], 'Tablet')
+      await devices.issuePairing(owner, ['app', 'owner'], 'Tablet', { defaultProfileId: adminId })
     );
     const device = await devices.authenticate(token, ['app']);
     await devices.revoke(owner, device.id);

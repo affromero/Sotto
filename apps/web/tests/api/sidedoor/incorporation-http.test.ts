@@ -278,7 +278,9 @@ suite('incorporation HTTP with canonical access and durable jobs', () => {
       const devices = sottoDeviceService(identity.access);
       const token = valid
         ? await devices.redeemPairing(
-            await devices.issuePairing(identity.ownerToken, ['app'], 'Phone')
+            await devices.issuePairing(identity.ownerToken, ['app'], 'Phone', {
+              defaultProfileId: identity.ownerId,
+            })
           )
         : 'invalid-token';
       const response = await POST(
