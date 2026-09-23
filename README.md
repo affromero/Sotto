@@ -339,6 +339,8 @@ The product runs on your own stack: you run it, then reach it from anywhere.
 
 After password entry, Sotto offers to save a passkey with Apple Passwords or another WebAuthn manager. A saved passkey opens the profile picker on later visits. Anyone admitted can select Admin and change settings. Selecting another profile removes Admin access. Admin can revoke household passkeys in account security.
 
+If you lose the shared password, run `sotto-host access list`, then `sotto-host access recover <Admin principal ID>` on the host. Enter the one-use code and a new shared password at `/access?mode=recover`. Recovery revokes prior household sessions and passkeys.
+
 **Teacher-run mode is the natural classroom shape.** The current profile model already points there: a teacher self-hosts Sotto, creates one profile per student, and keeps practice data on school-controlled infrastructure. The next product layer should add teacher-authored homework, class-prep scenarios, per-student follow-up queues, and reviewable AI feedback so Sotto prepares students between lessons without replacing the teacher.
 
 ---

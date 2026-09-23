@@ -128,6 +128,30 @@ class SelfHostTests(unittest.TestCase):
     def commands(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
 
+    def test_access_recovery_uses_the_bundled_operator(self):
+        for args in (("list",), ("recover", "admin-principal")):
+            result = self.run_script("sotto-host", "access", *args)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        runs = [
+            command["args"]
+            for command in self.commands()
+            if command["command"] == "docker" and command["args"][:2] == ["compose", "run"]
+        ]
+        self.assertEqual(
+            runs,
+            [
+                ["compose", "run", "--rm", "--no-deps", "web", "node", "dist/access.cjs", "list"],
+                ["compose", "run", "--rm", "--no-deps", "web", "node", "dist/access.cjs", "recover", "admin-principal"],
+            ],
+        )
+        self.assert_unchanged()
+
+    def test_access_recovery_rejects_missing_principal_before_starting_a_container(self):
+        result = self.run_script("sotto-host", "access", "recover")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("recover <principal-id>", result.stderr)
+        self.assertFalse(self.log.exists())
+
     def test_unavailable_images_leave_installation_and_rollback_history_untouched(self):
         for _ in range(2):
             result = self.run_script("sotto-host", "update", "--no-backup", TEST_PULL_FAIL="1")
