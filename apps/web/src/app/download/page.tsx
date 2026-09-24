@@ -22,7 +22,7 @@ export default function DownloadPage() {
         <h1 className={styles.title}>Get Sotto</h1>
         <p className={styles.subtitle}>
           Run it on your own computer in one click, reach it from your phone, or host it on a server
-          for the whole household. Your courses, audio, and data stay where you put them.
+          for everyone you share it with. Your courses, audio, and data stay where you put them.
         </p>
       </header>
 

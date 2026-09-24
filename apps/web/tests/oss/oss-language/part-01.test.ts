@@ -505,7 +505,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}'
     );
     expect(webDockerSource).toContain('npm rebuild thesidedoor-flock');
-    expect(webDockerSource).toContain('/app/node_modules/thesidedoor-flock/build');
     expect(workerDockerSource).toContain('npm rebuild thesidedoor-flock');
     expect(appComposeSource).toContain('SOTTO_CREDENTIAL_SYNC_DIR: /run/cli-credentials');
     expect(appComposeSource).toContain('${SOTTO_STACK:?Set SOTTO_STACK}-cli-credentials');

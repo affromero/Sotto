@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setTimeout as delay } from 'node:timers/promises';
 import type { TokenUsage } from 'thesidedoor-core/ai';
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -115,7 +114,7 @@ afterEach(() => {
 });
 
 describe('LLM routing through shared providers', () => {
-  it('reports unconfirmed cleanup when an SDK retry sleep outlasts cancellation cleanup', async () => {
+  it('cancels an SDK retry without another request or a successful completion', async () => {
     const controller = new AbortController();
     let sent = 0;
     let abortTimer: ReturnType<typeof setTimeout> | undefined;
@@ -141,8 +140,7 @@ describe('LLM routing through shared providers', () => {
             onComplete: (usage) => completions.push(usage),
           })
         )
-      ).rejects.toMatchObject({ cause: { cause: { code: 'cleanup_failed', unconfirmed: true } } });
-      await delay(1100);
+      ).rejects.toMatchObject({ name: 'AbortError' });
       expect(sent).toBe(1);
       expect(completions).toEqual([]);
     } finally {

@@ -29,10 +29,10 @@ export default function PrivacyPage() {
 
             <h2>2. Data stored by an instance</h2>
             <p>
-              An instance may store household profiles, courses, generated lessons, source material,
-              scripts, recordings, transcripts, answers, feedback, progress, provider usage records,
-              and encrypted provider credentials. The exact data depends on the features the
-              operator enables.
+              An instance may store profiles, courses, generated lessons, source material, scripts,
+              recordings, transcripts, answers, feedback, progress, provider usage records, and
+              encrypted provider credentials. The exact data depends on the features the operator
+              enables.
             </p>
 
             <h2>3. Configured service providers</h2>
@@ -63,10 +63,9 @@ export default function PrivacyPage() {
 
             <h2>6. Cookies</h2>
             <p>
-              Sotto uses essential cookies for the instance access gate and active household
-              profile. The open-source application does not include advertising cookies. An operator
-              may add a reverse proxy, monitoring, or other services with separate cookie or logging
-              behavior.
+              Sotto uses essential cookies for the app password and active profile. The open-source
+              application does not include advertising cookies. An operator may add a reverse proxy,
+              monitoring, or other services with separate cookie or logging behavior.
             </p>
 
             <h2>7. Children and regulated use</h2>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AccessSecurity } from 'thesidedoor/react';
+import 'thesidedoor/styles.css';
 import theme from '../AccessScreen.module.css';
 import styles from './SecurityScreen.module.css';
 
@@ -16,6 +17,7 @@ export function SecurityScreen() {
           Back to learning
         </Link>
         <AccessSecurity
+          copy={{ passwordManagerName: 'Sotto' }}
           endpoint="/api/v1/access"
           showRecoveryCodes={false}
           classes={{
