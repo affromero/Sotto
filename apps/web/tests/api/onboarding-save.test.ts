@@ -391,14 +391,13 @@ suite('Atomic onboarding with shared authority', () => {
   });
   it('rejects an owner demotion during curriculum lookup without saving infrastructure', async () => {
     const initialConfiguration = await getSiteConfig();
-    const secondOwner = await identity.access.addMember(
-      identity.ownerToken,
-      'Second owner',
-      'second owner password'
+    duringCurriculumRead(() =>
+      identity.access.store.transact((state) => {
+        const owner = state.principals.find((principal) => principal.id === identity.ownerId);
+        if (!owner) throw new Error('Admin profile missing');
+        owner.role = 'member';
+      })
     );
-    await identity.access.setRole(identity.ownerToken, secondOwner, 'owner');
-    const secondToken = await identity.access.login('Second owner', 'second owner password');
-    duringCurriculumRead(() => identity.access.setRole(secondToken, identity.ownerId, 'member'));
     expect(
       (
         await POST(
@@ -411,7 +410,7 @@ suite('Atomic onboarding with shared authority', () => {
           )
         )
       ).status
-    ).toBe(401);
+    ).toBe(403);
     await noLearnerChanges();
     expect(await getSiteConfig()).toEqual(initialConfiguration);
   });

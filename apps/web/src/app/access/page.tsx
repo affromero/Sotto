@@ -10,10 +10,8 @@ export const metadata: Metadata = {
 export default async function AccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 }) {
-  const { mode, returnTo } = await searchParams;
-  const selectedMode =
-    mode === 'claim' || mode === 'recover' || mode === 'household' ? mode : 'login';
-  return <AccessScreen mode={selectedMode} returnToSecurity={returnTo === 'security'} />;
+  const { returnTo } = await searchParams;
+  return <AccessScreen returnToSecurity={returnTo === 'security'} />;
 }

@@ -2,7 +2,11 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { AccessService, HouseholdProfileManagement } from 'thesidedoor-core/access';
+import {
+  AccessService,
+  HouseholdProfileManagement,
+  HouseholdProfileService,
+} from 'thesidedoor-core/access';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaClient, type Prisma } from '@/generated/prisma/client';
@@ -145,7 +149,6 @@ suite('proxy admission with real shared PostgreSQL sessions', () => {
     );
     access = new AccessService({
       store: new SottoAccessStore(database),
-      allowOpenHousehold: true,
     });
     ownerToken = await access.claimOwner(
       await access.issueOperatorToken(),
@@ -153,6 +156,11 @@ suite('proxy admission with real shared PostgreSQL sessions', () => {
       'owner password for proxy tests',
       'household'
     );
+    const ownerId = (await access.store.read()).principals.find(
+      (principal) => principal.role === 'owner'
+    )?.id;
+    if (!ownerId) throw new Error('Owner fixture requires an Admin profile');
+    await new HouseholdProfileService(access).select(ownerToken, ownerId);
   });
   afterAll(async () => {
     connection.database = null;
@@ -182,7 +190,7 @@ suite('proxy admission with real shared PostgreSQL sessions', () => {
     }
   );
   it('allows household admission to reach profile selection without granting selected content', async () => {
-    const household = await access.enterOpenHousehold();
+    const household = await access.enterHousehold('owner password for proxy tests');
     expect((await proxy(request('/profiles', household))).headers.get('x-middleware-next')).toBe(
       '1'
     );

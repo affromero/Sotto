@@ -46,6 +46,6 @@ export async function resolveSottoSession(
     sessionId: session.id,
     userId: profile.id,
     principalId: null,
-    isOwner: false,
+    isOwner: access.householdOwnerFromState(state, token),
   };
 }

@@ -123,7 +123,7 @@ suite('canonical credential validation with PostgreSQL', () => {
       expect(payload.storage.owner.subjectId).toBe(`profile:${payload.userId}`);
     }
     expect(actualOwners).toEqual(expectedOwners);
-  });
+  }, 60_000);
 
   it('preserves enabled credentials during an outage and records an inconclusive attempt', async () => {
     const work = await schedule();

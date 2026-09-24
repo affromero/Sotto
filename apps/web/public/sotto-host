@@ -56,6 +56,15 @@ sotto-host — manage a self-hosted Sotto
   sotto-host status
       Show the pinned image tag, what the stack reports, and its health.
 
+  sotto-host access list
+      List profiles to find the first Admin's principal ID.
+
+  sotto-host access setup
+      Create the first Admin profile and shared password locally.
+
+  sotto-host access reset
+      Replace the shared password locally and sign out existing sessions.
+
   sotto-host rollback
       Return to the tag the last update replaced.
 
@@ -169,6 +178,15 @@ cmd_status() {
   if response=$(health); then
     echo "health:   ${response}"
   fi
+}
+
+cmd_access() {
+  require_install
+  if [ "$#" -ne 1 ] || { [ "${1:-}" != list ] && [ "${1:-}" != setup ] && [ "${1:-}" != reset ]; }; then
+    fail "Use sotto-host access list, setup, or reset."
+  fi
+  cd "$SOTTO_DIR"
+  compose run --rm --no-deps web node dist/access.cjs "$@"
 }
 
 backup_database() {
@@ -357,6 +375,10 @@ BACKUP=1
 TO_REF=""
 command=${1:-help}
 shift || true
+if [ "$command" = access ]; then
+  cmd_access "$@"
+  exit
+fi
 while [ $# -gt 0 ]; do
   argument=$1
   shift

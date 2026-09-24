@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@/generated/prisma/client';
-import { AccessService } from 'thesidedoor-core/access';
+import { AccessService, HouseholdProfileService } from 'thesidedoor-core/access';
 import { SottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { sidedoorStateStore, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
@@ -204,7 +204,8 @@ suite('bundled local access operator', () => {
       code: expect.any(String),
       expiresInMinutes: 15,
     });
-    await new AccessService({ store: new SottoAccessStore(database) }).claimOwner(
+    const access = new AccessService({ store: new SottoAccessStore(database) });
+    const session = await access.claimOwner(
       claim.code,
       'Retained owner',
       'correct horse battery staple',
@@ -213,7 +214,11 @@ suite('bundled local access operator', () => {
     expect(JSON.parse((await command(['list'])).stdout).principals).toEqual([
       expect.objectContaining({ id: 'existing', name: 'Retained owner', role: 'owner' }),
     ]);
-    expect((await sidedoorStateStore(database).read()).access.householdProfiles).toEqual([]);
+    expect((await sidedoorStateStore(database).read()).access.householdProfiles).toEqual([
+      expect.objectContaining({ id: 'existing', ownerPrincipalId: 'existing' }),
+    ]);
+    await new HouseholdProfileService(access).select(session, 'existing');
+    expect((await access.authenticate(session, true)).principal?.id).toBe('existing');
     expect(await database.user.count()).toBe(1);
     await sottoTransaction(database, async (tx) => {
       const storage = await sottoCredentialStorage(tx, 'ai', 'anthropic');

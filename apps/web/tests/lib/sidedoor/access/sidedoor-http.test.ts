@@ -47,16 +47,19 @@ describe('Sotto shared access HTTP configuration', () => {
       devices: sottoDeviceService(access),
     });
   }
-  function login(url: string, headers: Record<string, string> = {}) {
-    return new Request(`${url}/api/v1/access/login`, {
+  function householdRequest(url: string, headers: Record<string, string> = {}) {
+    return new Request(`${url}/api/v1/access/household`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: 'https://sotto.example', ...headers },
-      body: JSON.stringify({ name: 'Owner', password: 'owner password phrase' }),
+      body: JSON.stringify({ password: 'owner password phrase' }),
     });
   }
   it('uses direct Host after framework URL normalization and revokes the resulting session', async () => {
     const route = handler();
-    const response = await route(login('https://localhost', { host: 'sotto.example' }), 'login');
+    const response = await route(
+      householdRequest('https://localhost', { host: 'sotto.example' }),
+      'household'
+    );
     expect(response.status).toBe(200);
     const cookie = response.headers.get('set-cookie')!;
     expect(cookie).toMatch(/sotto_session=/);
@@ -72,13 +75,20 @@ describe('Sotto shared access HTTP configuration', () => {
     expect((await route(request(), 'session')).status).toBe(401);
   });
   it('accepts internal proxy URLs for the configured HTTPS origin', async () => {
-    expect((await handler()(login('http://internal:3000'), 'login')).status).toBe(200);
+    expect((await handler()(householdRequest('http://internal:3000'), 'household')).status).toBe(
+      200
+    );
   });
   it('allows password aliases while keeping passkey ceremonies on the canonical origin', async () => {
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '["https://lan.example"]');
     const route = handler();
     expect(
-      (await route(login('https://lan.example', { origin: 'https://lan.example' }), 'login')).status
+      (
+        await route(
+          householdRequest('https://lan.example', { origin: 'https://lan.example' }),
+          'household'
+        )
+      ).status
     ).toBe(200);
     const request = new Request('https://lan.example/api/v1/access/authentication-options', {
       method: 'POST',
@@ -93,7 +103,7 @@ describe('Sotto shared access HTTP configuration', () => {
   });
   it('checks browser origin before a custom operation can change access state', async () => {
     const response = await accessOperation(
-      login('https://sotto.example', { origin: 'https://attacker.example' }),
+      householdRequest('https://sotto.example', { origin: 'https://attacker.example' }),
       true,
       async () => {
         await access.store.transact((state) => {
@@ -123,17 +133,25 @@ describe('Sotto shared access HTTP configuration', () => {
     ['conflict', 409],
     ['rate_limited', 429],
   ] as const)('returns %s without exposing internal credential details', async (code, status) => {
-    const response = await accessOperation(login('https://sotto.example'), true, async () => {
-      throw new AccessError(code, 'internal credential detail');
-    });
+    const response = await accessOperation(
+      householdRequest('https://sotto.example'),
+      true,
+      async () => {
+        throw new AccessError(code, 'internal credential detail');
+      }
+    );
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ error: code });
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
   it('sanitizes unexpected storage failures', async () => {
-    const response = await accessOperation(login('https://sotto.example'), true, async () => {
-      throw new Error('postgres://secret');
-    });
+    const response = await accessOperation(
+      householdRequest('https://sotto.example'),
+      true,
+      async () => {
+        throw new Error('postgres://secret');
+      }
+    );
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain('postgres://secret');
   });

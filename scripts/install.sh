@@ -250,12 +250,14 @@ $DC run --rm web node dist/access.cjs finalize \
   || fail "Access finalization failed. Check '$DC logs' and re-run."
 ACCESS_LIST=$($DC run --rm web node dist/access.cjs list) \
   || fail "Access state inspection failed. Check '$DC logs' and re-run."
-CLAIM_CODE=""
 if ! printf '%s\n' "$ACCESS_LIST" | grep -q '"role": "owner"'; then
-  CLAIM_RESULT=$($DC run --rm web node dist/access.cjs claim | tail -n 1) \
-    || fail "Owner claim creation failed. Check '$DC logs' and re-run."
-  CLAIM_CODE=$(printf '%s\n' "$CLAIM_RESULT" | sed -nE 's/.*"code"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
-  [ -n "$CLAIM_CODE" ] || fail "Owner claim output was invalid. Check '$DC logs' and re-run."
+  if [ -t 0 ] || (tty -s </dev/tty 2>/dev/null); then
+    info "Create the first Admin profile and shared password before opening Sotto."
+    $DC run --rm web node dist/access.cjs setup </dev/tty \
+      || fail "Local access setup failed. Run 'sotto-host access setup' before opening Sotto."
+  else
+    warn "Run 'sotto-host access setup' before opening Sotto. The web app remains closed until then."
+  fi
 fi
 
 info "Starting Sotto..."
@@ -272,10 +274,7 @@ printf "\n"
 [ "${READY:-}" = "1" ] || fail "Sotto did not become healthy. Run '$DC logs --tail 50 web workers' in $SOTTO_DIR."
 ok "Sotto is running."
 printf "\n  ${BOLD}Open:${RESET}    http://localhost:%s\n" "$WEB_PORT"
-if [ -n "$CLAIM_CODE" ]; then
-  printf "  ${BOLD}Owner claim:${RESET} %s  ${DIM}(expires in 15 minutes)${RESET}\n" "$CLAIM_CODE"
-fi
-printf "  ${BOLD}Continue in your browser:${RESET} claim the owner, configure household access, save AI, speech, and storage, then enroll a passkey.\n"
+printf "  ${BOLD}Continue in your browser:${RESET} enter the shared password, choose Admin, save AI, speech, and storage, then enroll a passkey.\n"
 printf "  ${BOLD}Manage:${RESET}  cd %s  (then \`%s logs -f\`, \`%s down\`)\n" "$SOTTO_DIR" "$DC" "$DC"
 if [ "${SOTTO_HOST_ON_PATH:-}" = "1" ]; then
   printf "  ${BOLD}Update:${RESET}  sotto-host update   ${DIM}(also: status, rollback, --to <version|commit>)${RESET}\n"

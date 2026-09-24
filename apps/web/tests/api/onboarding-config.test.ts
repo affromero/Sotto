@@ -102,19 +102,15 @@ suite('Onboarding configuration with shared authority', () => {
     await identity.access.logout(identity.ownerToken);
     expect((await GET(request(identity.ownerToken))).status).toBe(401);
   });
-  it('hides server configuration from household learners and private members', async () => {
+  it('hides server configuration from household learners', async () => {
     const household = await identity.household('Learner');
-    await identity.access.addMember(identity.ownerToken, 'Member', 'private member password');
-    const member = await identity.access.login('Member', 'private member password');
-    for (const token of [household.token, member]) {
-      const response = await GET(request(token));
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
-        selfHosted: true,
-        isOwner: false,
-        infra: null,
-      });
-    }
+    const response = await GET(request(household.token));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      selfHosted: true,
+      isOwner: false,
+      infra: null,
+    });
   });
   it('returns persisted non-secret owner configuration and actual CLI readiness', async () => {
     const response = await GET(request(identity.ownerToken));

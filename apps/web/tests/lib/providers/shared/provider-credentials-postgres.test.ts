@@ -2,7 +2,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { useProviderCredentialDatabase } from '../../../helpers/runtime/provider-credentials-postgres';
-import { AccessService } from 'thesidedoor-core/access';
 import type { CredentialValues } from 'thesidedoor-core/ai';
 import { OwnedCredentials } from 'thesidedoor-core/configuration/owned-credentials';
 import { prepareStorageTombstone } from 'thesidedoor-core/storage';
@@ -18,7 +17,6 @@ import {
   sottoStorageInstance,
   SIDEDOOR_STATE_ID,
 } from '@/lib/sidedoor/access/state/store';
-import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import {
   revokeSottoCredentialSharing,
   eraseSottoProviderCredentials,
@@ -598,56 +596,7 @@ suite('Sotto provider ownership with PostgreSQL', () => {
     }
   );
 
-  it('revokes household sharing when its key owner activates a private account', async () => {
-    await transaction(async (tx) => {
-      const { request, identity } = await admission(tx);
-      const { storage, owner } = await storeBob(tx);
-      await storage.sharing.set(storage.slot, null, {
-        owner,
-        audience: 'household',
-        excludedRecipients: [],
-        source: 'explicit',
-      });
-      const access = new AccessService({ store: await sottoAccessStore(tx) });
-      await access.recover(await access.issueOperatorToken('bob'), 'bob private account password');
-      expect((await storage.sharing.head(storage.slot)).policy).toBeNull();
-      expect(await resolveSottoRequestCredential(tx, request, identity, 'ai', 'openai')).toBeNull();
-    });
-  });
-
-  it('revokes grants for passkey-only private conversion', async () => {
-    await transaction(async (tx) => {
-      const { storage, owner } = await storeBob(tx);
-      await storage.sharing.set(storage.slot, null, {
-        owner,
-        audience: 'household',
-        excludedRecipients: [],
-        source: 'explicit',
-      });
-      const access = await sottoAccessStore(tx);
-      await access.transact((state) => {
-        state.passkeys.push({
-          id: 'registered-key',
-          principalId: 'bob',
-          publicKey: 'test-public-key',
-          counter: 0,
-          transports: ['internal'],
-          name: 'Device',
-          createdAt: 1000,
-          backedUp: true,
-        });
-      });
-      expect(
-        (await access.read()).principals.find((principal) => principal.id === 'bob')?.passwordHash
-      ).toBeNull();
-      expect((await access.read()).householdProfiles?.some((profile) => profile.id === 'bob')).toBe(
-        false
-      );
-      expect((await storage.sharing.head(storage.slot)).policy).toBeNull();
-    });
-  });
-
-  it('rolls back sharing revocation if private conversion cannot persist', async () => {
+  it('rolls back sharing revocation when the state write cannot persist', async () => {
     await transaction(async (tx) => {
       const { storage, owner } = await storeBob(tx);
       await storage.sharing.set(storage.slot, null, {
@@ -662,11 +611,12 @@ suite('Sotto provider ownership with PostgreSQL', () => {
     });
     await expect(
       transaction(async (tx) => {
-        const access = new AccessService({ store: await sottoAccessStore(tx) });
-        await access.recover(
-          await access.issueOperatorToken('bob'),
-          'bob private account password'
-        );
+        await revokeSottoCredentialSharing(tx, ['bob']);
+        await sidedoorStateStore(tx).transact((state) => {
+          state.access.householdProfiles = state.access.householdProfiles?.filter(
+            (profile) => profile.id !== 'bob'
+          );
+        });
       })
     ).rejects.toThrow();
     await transaction(async (tx) => {

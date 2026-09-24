@@ -323,6 +323,28 @@ export async function prepareInstalledPlatform(
         state.access.initializations.push(INSTALLED_PROFILE_INITIALIZATION);
       changed = true;
     }
+    const owner =
+      state.access.mode === 'household'
+        ? state.access.principals.find((principal) => principal.role === 'owner')
+        : undefined;
+    if (owner && users.some((user) => user.id === owner.id)) {
+      const profile = state.access.householdProfiles?.find((entry) => entry.id === owner.id);
+      if (profile) {
+        if (profile.ownerPrincipalId !== owner.id) {
+          profile.ownerPrincipalId = owner.id;
+          changed = true;
+        }
+      } else {
+        state.access.householdProfiles ??= [];
+        state.access.householdProfiles.push({
+          id: owner.id,
+          name: owner.name,
+          epoch: owner.epoch,
+          ownerPrincipalId: owner.id,
+        });
+        changed = true;
+      }
+    }
     if (changed) state.revision++;
   });
 

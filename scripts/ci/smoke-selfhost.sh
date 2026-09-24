@@ -77,9 +77,46 @@ compose run --rm workers sh -ec \
   'cd /app && npx --no-install tsx apps/web/prisma/seed-curriculum.ts'
 compose run --rm web node dist/access.cjs initialize
 compose run --rm web node dist/access.cjs finalize
-claim_json="$(compose run --rm web node dist/access.cjs claim | tail -n 1)"
-claim_code="$(printf '%s\n' "$claim_json" | sed -nE 's/.*"code"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')"
-[ -n "$claim_code" ]
+SIDEDOOR_SMOKE_OWNER_PASSWORD="$owner_password" python3 - "$smoke_dir" "$project" <<'PY'
+import os
+import pty
+import select
+import subprocess
+import sys
+import time
+
+directory, project = sys.argv[1:]
+master, slave = pty.openpty()
+command = [
+    'docker', 'compose', '--project-directory', directory, '-p', project,
+    '-f', f'{directory}/docker-compose.yml', '-f', f'{directory}/smoke.yml',
+    'run', '--rm', 'web', 'node', 'dist/access.cjs', 'setup',
+]
+process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave)
+os.close(slave)
+prompts = [
+    (b'First Admin profile name: ', b'Owner\n'),
+    (b'Shared password: ', os.environ['SIDEDOOR_SMOKE_OWNER_PASSWORD'].encode() + b'\n'),
+    (b'Confirm shared password: ', os.environ['SIDEDOOR_SMOKE_OWNER_PASSWORD'].encode() + b'\n'),
+]
+seen = bytearray()
+deadline = time.monotonic() + 90
+try:
+    for prompt, answer in prompts:
+        while prompt not in seen:
+            if time.monotonic() >= deadline:
+                raise RuntimeError('Local household setup timed out')
+            if select.select([master], [], [], 1)[0]:
+                seen.extend(os.read(master, 4096))
+        os.write(master, answer)
+        seen.clear()
+    if process.wait(timeout=30) != 0:
+        raise RuntimeError('Local household setup failed')
+finally:
+    os.close(master)
+PY
+owner_id="$(compose run --rm web node dist/access.cjs list | python3 -c 'import json,sys; text=sys.stdin.read(); state=json.loads(text[text.index("{"):]); print(next(p["id"] for p in state["principals"] if p["role"]=="owner"))')"
+[ -n "$owner_id" ]
 compose up -d --wait --wait-timeout 180
 
 compose exec -T workers node --import tsx --input-type=module <<'NODE'
@@ -105,7 +142,7 @@ try {
 }
 NODE
 
-compose exec -T -e SIDEDOOR_SMOKE_CLAIM_CODE="$claim_code" -e SIDEDOOR_SMOKE_OWNER_PASSWORD="$owner_password" web node --input-type=module - "$revision" <<'NODE'
+compose exec -T -e SIDEDOOR_SMOKE_OWNER_ID="$owner_id" -e SIDEDOOR_SMOKE_OWNER_PASSWORD="$owner_password" web node --input-type=module - "$revision" <<'NODE'
 import assert from 'node:assert/strict';
 import { readFile, unlink } from 'node:fs/promises';
 const base = 'http://localhost:3000';
@@ -122,13 +159,18 @@ assert.equal(health.status, 'healthy');
 assert.equal(health.version.slice(0, 8), process.argv[2].slice(0, 8));
 const locked = await request('/api/v1/onboarding/config');
 assert.equal(locked.status, 401, 'Onboarding must require the instance password');
-const claim = await request('/api/v1/access/claim', {
+const admission = await request('/api/v1/access/household', {
   method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ token: process.env.SIDEDOOR_SMOKE_CLAIM_CODE, name: 'Owner', password: process.env.SIDEDOOR_SMOKE_OWNER_PASSWORD, mode: 'household' }),
+  body: JSON.stringify({ password: process.env.SIDEDOOR_SMOKE_OWNER_PASSWORD }),
 });
-assert.equal(claim.status, 200, 'Fresh instance owner claim failed');
-const cookie = claim.headers.get('set-cookie')?.split(';')[0];
-assert.ok(cookie, 'Owner claim did not issue a cookie');
+assert.equal(admission.status, 200, 'Fresh instance household admission failed');
+const cookie = admission.headers.get('set-cookie')?.split(';')[0];
+assert.ok(cookie, 'Household admission did not issue a cookie');
+const selected = await request('/api/v1/access/select-profile', {
+  method: 'POST', headers: { 'content-type': 'application/json', cookie },
+  body: JSON.stringify({ id: process.env.SIDEDOOR_SMOKE_OWNER_ID }),
+});
+assert.equal(selected.status, 200, 'First Admin profile could not be selected');
 const config = await request('/api/v1/onboarding/config', { headers: { cookie } });
 assert.equal(config.status, 200);
 const onboarding = await config.json();

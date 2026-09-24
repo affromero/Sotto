@@ -17,6 +17,7 @@ export function SecurityScreen() {
         </Link>
         <AccessSecurity
           endpoint="/api/v1/access"
+          showRecoveryCodes={false}
           classes={{
             root: styles.security,
             form: theme.form,
@@ -29,6 +30,10 @@ export function SecurityScreen() {
           }}
           onSignInRequired={() => {
             router.push('/access?returnTo=security');
+            router.refresh();
+          }}
+          onHouseholdEntered={() => {
+            router.push('/profiles');
             router.refresh();
           }}
         />

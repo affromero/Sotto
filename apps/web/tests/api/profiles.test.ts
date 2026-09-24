@@ -49,27 +49,19 @@ suite('Household profiles with shared authority', () => {
     expect((await POST(request('POST', undefined, { name: 'Learner' }))).status).toBe(401);
     expect(await instance.database.user.count()).toBe(1);
   });
-  it('lists only household profiles and identifies the selected learner', async () => {
+  it('lists Admin and household profiles and identifies the selected learner', async () => {
     const first = await identity.household('First learner');
     const second = await identity.household('Second learner');
-    await identity.access.addMember(
-      identity.ownerToken,
-      'Private member',
-      'private member password'
-    );
     const response = await GET(request('GET', first.token));
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.profiles).toHaveLength(2);
+    expect(body.profiles).toHaveLength(3);
     expect(body.profiles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: first.id, isActive: true }),
         expect.objectContaining({ id: second.id, isActive: false }),
+        expect.objectContaining({ id: identity.ownerId, isOwner: true, isActive: false }),
       ])
-    );
-    expect(JSON.stringify(body)).not.toContain('Private member');
-    expect(body.profiles.some((profile: { id: string }) => profile.id === identity.ownerId)).toBe(
-      false
     );
   });
   it('creates the canonical household profile and its application avatar together', async () => {
@@ -97,6 +89,6 @@ suite('Household profiles with shared authority', () => {
   ])('rejects invalid profile input without changing authority', async (body) => {
     expect((await POST(request('POST', identity.ownerToken, body))).status).toBe(400);
     expect(await instance.database.user.count()).toBe(1);
-    expect((await identity.access.store.read()).householdProfiles ?? []).toHaveLength(0);
+    expect((await identity.access.store.read()).householdProfiles ?? []).toHaveLength(1);
   });
 });

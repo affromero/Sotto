@@ -114,7 +114,6 @@ export async function createSharedTestInstance(label: string) {
     });
     const access = new AccessService({
       store: new SottoAccessStore(database),
-      allowOpenHousehold: true,
     });
     const ownerToken = await access.claimOwner(
       await access.issueOperatorToken(),
@@ -122,19 +121,22 @@ export async function createSharedTestInstance(label: string) {
       'owner password for integration tests',
       'household'
     );
-    const owner = await access.authenticate(ownerToken);
-    if (!owner.principal) throw new Error('Owner fixture requires a private principal');
+    const ownerId = (await access.store.read()).principals.find(
+      (principal) => principal.role === 'owner'
+    )?.id;
+    if (!ownerId) throw new Error('Owner fixture requires an Admin profile');
+    await new HouseholdProfileService(access).select(ownerToken, ownerId);
     async function household(name: string) {
       const management = new HouseholdProfileManagement(access, { allowHouseholdManagement: true });
       const prepared = management.prepareCreate(name);
       const id = await access.store.transact((state) =>
         prepared.apply(state, { kind: 'session', token: ownerToken })
       );
-      const token = await access.enterOpenHousehold();
+      const token = await access.enterHousehold('owner password for integration tests');
       await new HouseholdProfileService(access).select(token, id);
       return { id, token };
     }
-    return { access, ownerToken, ownerId: owner.principal.id, household };
+    return { access, ownerToken, ownerId, household };
   }
   async function close() {
     try {

@@ -334,7 +334,7 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
       expect(cleanupJob.unresolvedManifests).toBeGreaterThan(0);
     }
   );
-  it('rejects invalid admission, foreign origins and deletion of credentialed profiles', async () => {
+  it('rejects invalid admission, foreign origins and deletion of the Admin profile', async () => {
     const member = await identity.household('Learner');
     expect((await DELETE(request('DELETE', member.id, 'invalid'), context(member.id))).status).toBe(
       401
@@ -350,11 +350,6 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
     expect(
       (await DELETE(request('DELETE', identity.ownerId), context(identity.ownerId))).status
     ).toBe(403);
-    await identity.access.addMember(identity.ownerToken, 'Private', 'private member password');
-    const privateId = (await identity.access.store.read()).principals.find(
-      (principal) => principal.name === 'Private'
-    )!.id;
-    expect((await DELETE(request('DELETE', privateId), context(privateId))).status).toBe(403);
     await assertNoDeletion(member.id);
   });
   it('removes authority and owned data without importing unattributed references', async () => {

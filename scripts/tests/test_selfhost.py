@@ -64,8 +64,6 @@ if name == "docker":
         if command[0] == "run" and "dist/access.cjs" in command:
             if "list" in command:
                 print('{"mode":"household","principals":[]}')
-            elif "claim" in command:
-                print('{"operation":"claim","code":"fixture-owner-claim","expiresInMinutes":15}')
             sys.exit(0)
         if command[:3] == ["exec", "-T", "postgres"]:
             if os.environ.get("TEST_DB_FAIL"):
@@ -127,6 +125,28 @@ class SelfHostTests(unittest.TestCase):
 
     def commands(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def test_access_list_uses_the_bundled_operator(self):
+        result = self.run_script("sotto-host", "access", "list")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        runs = [
+            command["args"]
+            for command in self.commands()
+            if command["command"] == "docker" and command["args"][:2] == ["compose", "run"]
+        ]
+        self.assertEqual(
+            runs,
+            [
+                ["compose", "run", "--rm", "--no-deps", "web", "node", "dist/access.cjs", "list"],
+            ],
+        )
+        self.assert_unchanged()
+
+    def test_access_recovery_is_not_an_operator_command(self):
+        result = self.run_script("sotto-host", "access", "recover")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("access list, setup, or reset", result.stderr)
+        self.assertFalse(self.log.exists())
 
     def test_unavailable_images_leave_installation_and_rollback_history_untouched(self):
         for _ in range(2):
@@ -199,7 +219,7 @@ class SelfHostTests(unittest.TestCase):
         self.assertIn("SOTTO_IMAGE_TAG=12345678\n", configuration)
         self.assertIn("BYOK_ENCRYPTION_KEY=", configuration)
         self.assertTrue((self.install / "images.sh").is_file())
-        self.assertIn("fixture-owner-claim", result.stdout)
+        self.assertIn("sotto-host access setup", result.stdout)
         self.assertIn("Continue in your browser", result.stdout)
 
     def test_install_database_timeout_exits_with_actionable_failure(self):

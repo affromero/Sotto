@@ -86,6 +86,7 @@ describe('native shared access authority', () => {
   let directory: string;
   let access: AccessService;
   let owner: string;
+  let adminId: string;
   beforeEach(async () => {
     boundary.cookies.clear();
     boundary.users.clear();
@@ -95,7 +96,7 @@ describe('native shared access authority', () => {
       name: 'Learner',
       email: 'learner@localhost',
       image: null,
-      role: 'ADMIN',
+      role: 'USER',
     });
     directory = await mkdtemp(join(tmpdir(), 'sotto-session-'));
     boundary.store = new FileStateStore({
@@ -108,7 +109,6 @@ describe('native shared access authority', () => {
     });
     access = new AccessService({
       store: new SottoAccessStore(prismaUnfiltered),
-      allowOpenHousehold: true,
     });
     owner = await access.claimOwner(
       await access.issueOperatorToken(),
@@ -116,6 +116,10 @@ describe('native shared access authority', () => {
       'owner password phrase',
       'household'
     );
+    adminId = (await access.store.read()).principals.find(
+      (principal) => principal.role === 'owner'
+    )!.id;
+    await new HouseholdProfileService(access).select(owner, adminId);
   });
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -135,7 +139,9 @@ describe('native shared access authority', () => {
 
   it('keeps device usage and shared revocation metadata consistent with authority', async () => {
     const devices = sottoDeviceService(access);
-    const token = await devices.redeemPairing(await devices.issuePairing(owner, ['app'], 'Tablet'));
+    const token = await devices.redeemPairing(
+      await devices.issuePairing(owner, ['app'], 'Tablet', { defaultProfileId: adminId })
+    );
     const id = tokenHash(token);
     boundary.keys.set(id, { revokedAt: null, lastUsedAt: null });
     expect(await authenticateRequest(request(token))).not.toBeNull();
@@ -143,7 +149,7 @@ describe('native shared access authority', () => {
     expect(lastUsedAt).toBeInstanceOf(Date);
     await authenticateRequest(request(token));
     expect(boundary.keys.get(id)!.lastUsedAt).toEqual(lastUsedAt);
-    const household = await access.enterOpenHousehold();
+    const household = await access.enterHousehold('owner password phrase');
     await expect(sharedDevices.revoke(household, id)).rejects.toMatchObject({ code: 'forbidden' });
     expect(boundary.keys.get(id)!.revokedAt).toBeNull();
     await sharedDevices.revoke(owner, id);
@@ -161,7 +167,7 @@ describe('native shared access authority', () => {
     await expect(
       issue(owner, { scopes: ['app'], defaultProfileId: 'household-reader' })
     ).rejects.toMatchObject({ code: 'forbidden' });
-    const household = await access.enterOpenHousehold();
+    const household = await access.enterHousehold('owner password phrase');
     await expect(issue(household, { scopes: ['app'] })).rejects.toMatchObject({
       code: 'forbidden',
     });
@@ -175,7 +181,7 @@ describe('native shared access authority', () => {
   });
 
   it('requires profile selection for household browser content', async () => {
-    const session = await access.enterOpenHousehold();
+    const session = await access.enterHousehold('owner password phrase');
     const browser = request();
     browser.headers.set('cookie', `sotto_session=${session}`);
     expect(await authenticateRequest(browser)).toBeNull();
@@ -190,11 +196,13 @@ describe('native shared access authority', () => {
     async (delegated) => {
       const devices = sottoDeviceService(access);
       const token = await devices.redeemPairing(
-        await devices.issuePairing(owner, delegated ? ['app', 'owner'] : ['app'], 'Tablet')
+        await devices.issuePairing(owner, delegated ? ['app', 'owner'] : ['app'], 'Tablet', {
+          defaultProfileId: adminId,
+        })
       );
       const identity = await validateApiKey(token);
       expect(identity).toMatchObject({ authentication: 'device', isOwner: delegated });
-      expect(boundary.users.get(identity!.userId)?.role).toBe('USER');
+      expect(boundary.users.get(identity!.userId)?.role).toBe('ADMIN');
       expect(isUserAdmin(identity!)).toBe(delegated);
       expect(await authenticateRequest(request(token, 'household-reader'))).toBeNull();
     }
@@ -213,7 +221,7 @@ describe('native shared access authority', () => {
   it('keeps revoked device requests revoked despite a valid owner cookie', async () => {
     const devices = sottoDeviceService(access);
     const token = await devices.redeemPairing(
-      await devices.issuePairing(owner, ['app', 'owner'], 'Tablet')
+      await devices.issuePairing(owner, ['app', 'owner'], 'Tablet', { defaultProfileId: adminId })
     );
     const device = await devices.authenticate(token, ['app']);
     await devices.revoke(owner, device.id);

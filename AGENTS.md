@@ -24,7 +24,7 @@ Sotto is fully free and self-hosted: every learner gets full access on infrastru
 | ---------- | ------------------------------------------------------------------------------------------------ |
 | Frontend   | Next.js 16 App Router, TypeScript, CSS Modules                                                   |
 | Database   | PostgreSQL 17 + Prisma 7                                                                         |
-| Auth       | None — single-learner self-hosted instance with no login                                         |
+| Auth       | Sidedoor shared app password or household passkey, then profile selection                        |
 | Queue      | Redis 7 + BullMQ worker pool                                                                     |
 | AI         | Provider-resolved LLM generation through configured model settings                               |
 | Audio      | ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate, and local/provider-specific TTS integrations |
