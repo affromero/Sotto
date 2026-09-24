@@ -11,6 +11,7 @@ export function AccessScreen({ returnToSecurity }: { returnToSecurity: boolean }
         <h1 className={styles.heading}>Open Sotto</h1>
         <p className={styles.sub}>Enter the shared password, then choose a profile.</p>
         <AccessForm
+          copy={{ householdAccount: 'Sotto' }}
           endpoint="/api/v1/access"
           initialMode="household"
           modes={['household']}

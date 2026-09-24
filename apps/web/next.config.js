@@ -1,9 +1,16 @@
 const path = require('path');
+const { createRequire } = require('node:module');
 const { withSentryConfig } = require('@sentry/nextjs');
+const coreRequire = createRequire(require.resolve('thesidedoor-core/storage'));
+const nativeBinding = coreRequire.resolve('thesidedoor-flock/build/Release/fs_ext.node');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  outputFileTracingIncludes: {
+    '/*': [path.relative(__dirname, nativeBinding).split(path.sep).join('/')],
+  },
   // Prisma 7's runtime + pg driver adapter must not be bundled by Turbopack/
   // webpack in server code — they load native/generated modules at runtime.
   serverExternalPackages: [

@@ -57,8 +57,8 @@ The installer checks image availability before changing configuration and pins a
 
 **Desktop controls:** Unsigned preview launchers for macOS `.dmg`, Windows `.exe`, and Linux `.AppImage` are available from **[sotto.fm/download](https://sotto.fm/download)**. Install the stack with the terminal command above first. Sotto Host starts and stops that installation. Your OS may require an explicit security override. On Windows, the launcher must be pointed at the installation inside WSL; using the browser from WSL is the simpler path.
 
-1. Open the local URL and enter the shared password set during installation. Choose the Admin profile.
-2. Enroll an Apple, Android, or browser passkey, then configure languages and providers.
+1. Open the local URL and enter the shared password set during installation. You can save a passkey when prompted or skip it, then choose the Admin profile.
+2. Configure languages and providers.
 3. Take the placement test and start your first class.
 
 Manage it from `~/.sotto`: `docker compose logs -f`, `docker compose down`.
@@ -337,9 +337,9 @@ The product runs on your own stack: you run it, then reach it from anywhere.
 
 **One password, local profiles.** Local setup creates the first Admin profile and shared password before web access. Learners choose a profile after entering that password. Each profile keeps its own courses, progress, vocabulary graph, and keys.
 
-After password entry, Sotto offers to save a passkey with Apple Passwords or another WebAuthn manager. A saved passkey opens the profile picker on later visits. Anyone admitted can select Admin and change settings. Selecting another profile removes Admin access. Admin can revoke household passkeys in account security.
+The entry screen shows only Password and Continue. After password entry, Sotto offers to save a passkey with Apple Passwords or another WebAuthn manager. This step is optional. A saved passkey opens the profile picker on later visits. Anyone admitted can select Admin and change settings. Selecting another profile removes Admin access. Admin can revoke passkeys in App access.
 
-If you lose the shared password, run `sotto-host access reset` on the server. The command asks for a new password without echoing it. Reset signs out existing sessions and revokes household passkeys.
+If you lose the shared password, run `sotto-host access reset` on the server. The command asks for a new password without echoing it. Reset signs out existing sessions and revokes passkeys.
 
 **Teacher-run mode is the natural classroom shape.** The current profile model already points there: a teacher self-hosts Sotto, creates one profile per student, and keeps practice data on school-controlled infrastructure. The next product layer should add teacher-authored homework, class-prep scenarios, per-student follow-up queues, and reviewable AI feedback so Sotto prepares students between lessons without replacing the teacher.
 

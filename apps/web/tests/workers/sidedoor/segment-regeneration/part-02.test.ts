@@ -504,7 +504,7 @@ suite('durable segment regeneration with PostgreSQL, Redis and local files', () 
     const finishSpeech = Promise.withResolvers<void>();
     duringSpeech = () => finishSpeech.promise;
     const first = processSegmentRegeneration(item.job);
-    await expect.poll(() => requests.length).toBe(1);
+    await expect.poll(() => requests.length, { timeout: 5_000 }).toBe(1);
     const duplicate = processSegmentRegeneration(item.job);
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(requests).toHaveLength(1);

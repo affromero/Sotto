@@ -714,7 +714,7 @@ export default async function LandingPage() {
             </h2>
             <p className={styles.sectionLede}>
               Run the whole rehearsal loop on your computer in one click, or host it on a server for
-              the household. Your courses, audio, and data stay where you put them.
+              the people you share it with. Your courses, audio, and data stay where you put them.
             </p>
           </header>
 
