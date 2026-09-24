@@ -59,8 +59,11 @@ sotto-host — manage a self-hosted Sotto
   sotto-host access list
       List profiles to find the first Admin's principal ID.
 
-  sotto-host access recover <principal-id>
-      Create a one-use code to reset the shared app password at /access?mode=recover.
+  sotto-host access setup
+      Create the first Admin profile and shared password locally.
+
+  sotto-host access reset
+      Replace the shared password locally and sign out existing sessions.
 
   sotto-host rollback
       Return to the tag the last update replaced.
@@ -179,9 +182,8 @@ cmd_status() {
 
 cmd_access() {
   require_install
-  if { [ "$#" -ne 1 ] || [ "${1:-}" != list ]; } &&
-    { [ "$#" -ne 2 ] || [ "${1:-}" != recover ] || [ -z "${2:-}" ]; }; then
-    fail "Use sotto-host access list or sotto-host access recover <principal-id>."
+  if [ "$#" -ne 1 ] || { [ "${1:-}" != list ] && [ "${1:-}" != setup ] && [ "${1:-}" != reset ]; }; then
+    fail "Use sotto-host access list, setup, or reset."
   fi
   cd "$SOTTO_DIR"
   compose run --rm --no-deps web node dist/access.cjs "$@"

@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { AccessService, executeAccessCommand, parseAccessCommand } from 'thesidedoor-core/access';
+import {
+  AccessService,
+  executeAccessCommand,
+  parseAccessCommand,
+  readLocalSetupInput,
+  readLocalResetInput,
+} from 'thesidedoor-core/access';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { SottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import {
@@ -22,6 +28,8 @@ export async function runSottoAccessCommand(
   parseAccessCommand(args);
   const access = new AccessService({ store: new SottoAccessStore(database) });
   return executeAccessCommand(access, args, {
+    setupInput: readLocalSetupInput,
+    resetInput: readLocalResetInput,
     initialize: async () => {
       const instanceId = randomUUID();
       const converted = await sottoTransaction(

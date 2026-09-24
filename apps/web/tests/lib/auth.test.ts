@@ -81,7 +81,6 @@ describe('shared browser content identity', () => {
     });
     access = new AccessService({
       store: new SottoAccessStore(prismaUnfiltered),
-      allowOpenHousehold: true,
     });
     owner = await access.claimOwner(
       await access.issueOperatorToken(),

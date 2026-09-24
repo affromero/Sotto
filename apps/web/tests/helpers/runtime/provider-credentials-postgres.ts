@@ -96,7 +96,6 @@ export function useProviderCredentialDatabase() {
   async function admission(tx: Prisma.TransactionClient, userId = 'alice') {
     const access = new AccessService({
       store: await sottoAccessStore(tx),
-      allowOpenHousehold: true,
     });
     const token = await access.enterHousehold('owner fixture password phrase');
     await new HouseholdProfileService(access).select(token, userId);

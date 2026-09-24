@@ -1,25 +1,19 @@
 'use client';
 
-import { AccessForm, type AccessFormMode } from 'thesidedoor/react';
+import { AccessForm } from 'thesidedoor/react';
 import styles from './AccessScreen.module.css';
 
-export function AccessScreen({
-  mode,
-  returnToSecurity,
-}: {
-  mode: AccessFormMode;
-  returnToSecurity: boolean;
-}) {
+export function AccessScreen({ returnToSecurity }: { returnToSecurity: boolean }) {
   return (
     <main className={styles.root}>
       <p className={styles.brand}>Sotto</p>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Your learning space</h1>
-        <p className={styles.sub}>Enter your household, then choose a profile.</p>
+        <h1 className={styles.heading}>Open Sotto</h1>
+        <p className={styles.sub}>Enter the shared password, then choose a profile.</p>
         <AccessForm
           endpoint="/api/v1/access"
-          initialMode={mode}
-          modes={['household', 'claim', 'recover']}
+          initialMode="household"
+          modes={['household']}
           claimModes={['household']}
           classes={{
             root: styles.access,

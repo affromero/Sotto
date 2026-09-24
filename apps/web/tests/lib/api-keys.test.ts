@@ -109,7 +109,6 @@ describe('native shared access authority', () => {
     });
     access = new AccessService({
       store: new SottoAccessStore(prismaUnfiltered),
-      allowOpenHousehold: true,
     });
     owner = await access.claimOwner(
       await access.issueOperatorToken(),

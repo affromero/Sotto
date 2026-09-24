@@ -114,7 +114,6 @@ export async function createSharedTestInstance(label: string) {
     });
     const access = new AccessService({
       store: new SottoAccessStore(database),
-      allowOpenHousehold: true,
     });
     const ownerToken = await access.claimOwner(
       await access.issueOperatorToken(),

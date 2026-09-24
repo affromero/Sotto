@@ -149,7 +149,6 @@ suite('proxy admission with real shared PostgreSQL sessions', () => {
     );
     access = new AccessService({
       store: new SottoAccessStore(database),
-      allowOpenHousehold: true,
     });
     ownerToken = await access.claimOwner(
       await access.issueOperatorToken(),

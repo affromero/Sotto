@@ -11,7 +11,6 @@ export { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identi
 export const sharedAccessStore = new SottoAccessStore(prismaUnfiltered);
 export const sharedAccess = new AccessService({
   store: sharedAccessStore,
-  allowOpenHousehold: true,
 });
 export const sharedProfiles = new HouseholdProfileService(sharedAccess);
 export const sharedDevices: NonNullable<AccessHttpOptions['devices']> = {

@@ -17,6 +17,7 @@ export function SecurityScreen() {
         </Link>
         <AccessSecurity
           endpoint="/api/v1/access"
+          showRecoveryCodes={false}
           classes={{
             root: styles.security,
             form: theme.form,
