@@ -148,6 +148,11 @@ REDIS_PASSWORD=<strong password>
 REDIS_URL=redis://:<strong password>@redis:6379
 ```
 
+Storage ownership uses `DIRECT_DATABASE_URL` for session-level PostgreSQL locks.
+Point it at PostgreSQL directly or a session pool, never a transaction pool.
+When it is unset, storage uses `DATABASE_URL`, which must meet the same requirement.
+An invalid or unavailable configured direct connection fails without switching databases.
+
 Start the stack, open `/welcome`, and choose the AI, speech, and storage providers. Save hosted credentials or local service URLs there. Sidedoor encrypts credentials and applies the same configuration to web and worker processes. Provider usage and limits are configured in Admin alongside the corresponding saved credential.
 
 For local media storage, select **Local** in `/welcome` or Admin and save the mounted shared storage root.
