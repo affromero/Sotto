@@ -3,11 +3,13 @@ import { openPostgresDedicatedConnection } from 'thesidedoor-core/storage';
 
 /** Requires direct PostgreSQL or session pooling. Transaction pooling cannot hold session locks. */
 export async function openSottoStorageConnection(
-  connectionString = process.env.DATABASE_URL,
+  connectionString = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL,
   schema?: string
 ) {
   if (!connectionString || !/^postgres(?:ql)?:\/\//.test(connectionString))
-    throw new Error('Storage ownership requires a PostgreSQL DATABASE_URL');
+    throw new Error(
+      'Storage ownership requires a direct PostgreSQL connection (DIRECT_DATABASE_URL)'
+    );
   if (schema !== undefined && !/^[a-z_][a-z0-9_]*$/.test(schema))
     throw new Error('Storage ownership schema is invalid');
   const client = new Client({

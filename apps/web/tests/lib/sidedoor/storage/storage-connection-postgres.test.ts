@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { randomUUID, createHash } from 'node:crypto';
 import { Client } from 'pg';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   acquirePostgresBackendLock,
   type BackendLock,
@@ -20,8 +20,12 @@ suite('dedicated storage ownership with PostgreSQL', () => {
       throw new Error('Use the isolated local sidedoor_test database');
   });
   afterEach(async () => {
-    for (const lock of locks.splice(0)) await lock.release();
-    for (const connection of connections.splice(0)) await connection.close();
+    try {
+      for (const lock of locks.splice(0)) await lock.release();
+      for (const connection of connections.splice(0)) await connection.close();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
   async function openConnection() {
     const connection = await openSottoStorageConnection(databaseUrl);
@@ -40,6 +44,37 @@ suite('dedicated storage ownership with PostgreSQL', () => {
     locks.push(lock);
     return lock;
   }
+  it.each(['direct', 'primary'] as const)(
+    'opens a dedicated session using the %s URL',
+    async (source) => {
+      vi.stubEnv('DIRECT_DATABASE_URL', source === 'direct' ? databaseUrl : undefined);
+      vi.stubEnv(
+        'DATABASE_URL',
+        source === 'primary' ? databaseUrl : 'postgresql://127.0.0.1:1/unreachable'
+      );
+      const connection = await openSottoStorageConnection();
+      connections.push(connection);
+      expect(await connection.query('SELECT current_database() AS database', [])).toEqual([
+        { database: 'sidedoor_test' },
+      ]);
+      const lock = await acquire({ ...options(), openConnection: async () => connection });
+      lock.assertHeld();
+    }
+  );
+  it('rejects invalid direct configuration while permitting an explicit connection', async () => {
+    vi.stubEnv('DIRECT_DATABASE_URL', 'invalid-direct-url');
+    vi.stubEnv('DATABASE_URL', databaseUrl);
+    await expect(openSottoStorageConnection()).rejects.toThrow('direct PostgreSQL');
+    const connection = await openConnection();
+    expect(await connection.query('SELECT current_database() AS database', [])).toEqual([
+      { database: 'sidedoor_test' },
+    ]);
+  });
+  it('surfaces a failed direct connection without switching to the primary database', async () => {
+    vi.stubEnv('DIRECT_DATABASE_URL', 'postgresql://127.0.0.1:1/unreachable');
+    vi.stubEnv('DATABASE_URL', databaseUrl);
+    await expect(openSottoStorageConnection()).rejects.toThrow();
+  });
   it('excludes a competing session while permitting another backend and later reacquisition', async () => {
     const input = options();
     const owner = await acquire(input);

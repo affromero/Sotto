@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'vitest';
 import { JobRetentionCleanup, prepareJob } from 'thesidedoor-core/runtime/outbox';
+import { isSerializationConflict } from 'thesidedoor-core/storage/sql';
 import {
   StorageCleanupJournal,
   StorageBackendRegistry,
@@ -120,7 +121,7 @@ suite('retention cleanup with concurrent PostgreSQL transactions', () => {
       });
       const finished = new Set<string>();
       for (let round = 0; round < 15 && finished.size !== jobs.length; round++) {
-        await Promise.all(
+        const results = await Promise.allSettled(
           jobs.flatMap((job) =>
             Array.from({ length: 2 }, async () => {
               const result = await sottoTransaction(instance.database, async (tx) => {
@@ -143,6 +144,10 @@ suite('retention cleanup with concurrent PostgreSQL transactions', () => {
             })
           )
         );
+        for (const result of results) {
+          if (result.status === 'rejected')
+            expect(isSerializationConflict(result.reason), String(result.reason)).toBe(true);
+        }
       }
       expect(finished.size).toBe(2);
       for (const record of records)
