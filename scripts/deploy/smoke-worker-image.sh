@@ -2,6 +2,7 @@
 set -euo pipefail
 
 image="${1:?Usage: smoke-worker-image.sh IMAGE}"
+bash "$(dirname "${BASH_SOURCE[0]}")/checks/cli-home.sh" "$image" "${2:-1001}"
 suffix="sotto-image-smoke-$$"
 cleanup() {
   docker rm -f "${suffix}-redis" "${suffix}-postgres" >/dev/null 2>&1 || true

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 image="${1:?Usage: smoke-web-image.sh IMAGE}"
+bash "$(dirname "${BASH_SOURCE[0]}")/checks/cli-home.sh" "$image" "${2:-1001}"
 docker run --rm --network none --entrypoint node "$image" -e '
   const assert = require("node:assert/strict");
   const fs = require("node:fs");

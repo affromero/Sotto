@@ -14,6 +14,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         COMMIT_SHA: ${COMMIT_SHA:-dev}
+        RUNTIME_UID: '1000'
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     restart: unless-stopped
@@ -36,13 +37,7 @@ services:
       SIDEDOOR_EXECUTION_DIR: /app/apps/web/.sotto/runtime/executions
       CLAUDE_HOME: /home/sotto/.claude
       CODEX_HOME: /home/sotto/.codex
-    # The agent credential volumes are shared with papernook and flight-finder,
-    # whose images run as uid 1000. This container runs as 1001, so it joins
-    # their group as a supplementary one; the volume dirs are setgid to it, and
-    # the credential files are written 0660. Without this the lineage splits
-    # back into one dead copy per app.
-    group_add:
-      - '1000'
+    # Shared CLI homes have one UID 1000 owner across web and worker images.
     volumes:
       # Shared with the workers that write it; see docker-compose.workers.yml.
       - storage:/app/apps/web/.sotto/storage
