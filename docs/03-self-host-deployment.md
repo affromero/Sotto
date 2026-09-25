@@ -153,6 +153,20 @@ Point it at PostgreSQL directly or a session pool, never a transaction pool.
 When it is unset, storage uses `DATABASE_URL`, which must meet the same requirement.
 An invalid or unavailable configured direct connection fails without switching databases.
 
+Public images run as UID 1001. Production builds that share CLI homes with other
+applications use `RUNTIME_UID=1000` for both web and workers. Every process sharing
+a CLI home must use its owner UID; supplementary groups cannot access the CLI's
+private directories. Keep one shared credential file so token refreshes remain
+visible to every consumer. Do not recursively change CLI file modes.
+
+Changing an existing deployment's runtime UID requires a coordinated stop of its
+web and workers, a backup, and an ownership migration of its storage and execution
+volumes. Preserve file contents, modes, inodes, and execution markers. Record the
+previous ownership for rollback, including how to reverse ownership of newly
+created files. Shared CLI homes need a separate audit of all consumers before any
+ownership change. The default public images retain their existing UID, so normal
+self-host updates do not require this transition.
+
 Start the stack, open `/welcome`, and choose the AI, speech, and storage providers. Save hosted credentials or local service URLs there. Sidedoor encrypts credentials and applies the same configuration to web and worker processes. Provider usage and limits are configured in Admin alongside the corresponding saved credential.
 
 For local media storage, select **Local** in `/welcome` or Admin and save the mounted shared storage root.

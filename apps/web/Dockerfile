@@ -53,6 +53,7 @@ RUN npm run build
 
 # ---- Stage 3: Production runner ----
 FROM node:22-alpine AS runner
+ARG RUNTIME_UID=1001
 RUN apk add --no-cache libc6-compat openssl openssh-client
 # Pin executable tooling so rebuilding a release cannot silently change it.
 ARG CLAUDE_CODE_VERSION=2.1.225
@@ -66,18 +67,22 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Create non-root user
-RUN addgroup --system --gid 1001 sotto
-RUN adduser --system --uid 1001 sotto
+# Production shares CLI homes with other UID 1000 apps. Public installations
+# retain UID 1001; changing it requires migrating their persistent volumes.
+RUN case "$RUNTIME_UID" in \
+      1000) ;; \
+      1001) addgroup --system --gid 1001 sotto && adduser --system --uid 1001 sotto ;; \
+      *) echo 'RUNTIME_UID must be 1000 or 1001' >&2; exit 1 ;; \
+    esac
 RUN mkdir -p /home/sotto/.codex /home/sotto/.claude /home/sotto/.ssh \
-    && chown -R sotto:sotto /home/sotto
+    && chown -R "$RUNTIME_UID:$RUNTIME_UID" /home/sotto
 
 # Default local-storage root (STORAGE_PROVIDER=local). It must exist in the
 # image and be owned by the runtime user: Docker seeds a fresh named volume
 # from the image path it covers, so if the path is missing the volume is
 # created root-owned and every write fails with EACCES.
 RUN mkdir -p /app/apps/web/.sotto/storage /app/apps/web/.sotto/runtime \
-    && chown -R sotto:sotto /app/apps/web/.sotto \
+    && chown -R "$RUNTIME_UID:$RUNTIME_UID" /app/apps/web/.sotto \
     && chmod 0700 /app/apps/web/.sotto/runtime
 
 ENV HOME=/home/sotto
@@ -95,21 +100,21 @@ WORKDIR /app
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Copy standalone build output
-COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder --chown=sotto:sotto /app/apps/web/dist/access.cjs ./apps/web/dist/access.cjs
+COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/dist/access.cjs ./apps/web/dist/access.cjs
 
 # Copy speaker recognition model
-COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
+COPY --chown=${RUNTIME_UID}:${RUNTIME_UID} apps/web/models ./apps/web/models/
 
 # Copy prompt templates (loaded at runtime by prompt-loader.ts)
-COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
+COPY --chown=${RUNTIME_UID}:${RUNTIME_UID} apps/web/prompts ./apps/web/prompts/
 
 # Copy Prisma schema and generated client for runtime
-COPY --from=builder --chown=sotto:sotto /app/apps/web/prisma ./apps/web/prisma
-COPY --from=builder --chown=sotto:sotto /app/apps/web/src/generated ./apps/web/src/generated
+COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/prisma ./apps/web/prisma
+COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/src/generated ./apps/web/src/generated
 
-USER sotto
+USER ${RUNTIME_UID}
 
 WORKDIR /app/apps/web
 

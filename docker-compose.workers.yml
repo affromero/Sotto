@@ -10,10 +10,8 @@ x-worker-image: &worker-image
     dockerfile: apps/web/Dockerfile.workers
     args:
       WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}
-  # See docker-compose.app.yml: shared agent credential volumes are setgid to
-  # gid 1000, the group the other apps' images run as.
-  group_add:
-    - '1000'
+      RUNTIME_UID: '1000'
+  # Web and workers share the CLI homes as UID 1000.
   volumes:
     # Workers generate the TTS and episode audio that web serves back over
     # /api/v1/storage, so web and workers must mount the same local store.

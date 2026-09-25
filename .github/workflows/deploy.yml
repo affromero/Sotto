@@ -125,6 +125,7 @@ jobs:
           load: true
           build-args: |
             COMMIT_SHA=${{ github.sha }}
+            RUNTIME_UID=1000
             NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PUBLIC_APP_URL }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '' }}
           tags: |
@@ -135,7 +136,7 @@ jobs:
       - name: Verify and publish showcase web
         if: steps.production_image_env.outputs.publish == 'true'
         run: |
-          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
+          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-prod:${{ github.sha }} 1000
           docker push ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
 
       - name: Build personal web candidate
@@ -147,6 +148,7 @@ jobs:
           load: true
           build-args: |
             COMMIT_SHA=${{ github.sha }}
+            RUNTIME_UID=1000
             NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PERSONAL_APP_URL }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '' }}
           tags: |
@@ -157,7 +159,7 @@ jobs:
       - name: Verify and publish personal web
         if: steps.production_image_env.outputs.publish == 'true'
         run: |
-          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }}
+          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }} 1000
           docker push ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }}
 
   workers:
@@ -183,10 +185,11 @@ jobs:
           build-args: |
             WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base@${{ needs.ci.outputs.base_digest }}
             COMMIT_SHA=${{ github.sha }}
+            RUNTIME_UID=1000
           tags: ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
           cache-from: type=gha,scope=sotto-workers-prod
           cache-to: type=gha,mode=max,scope=sotto-workers-prod
       - name: Verify worker runtime before publication
-        run: bash scripts/deploy/smoke-worker-image.sh ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
+        run: bash scripts/deploy/smoke-worker-image.sh ghcr.io/affromero/sotto-workers-prod:${{ github.sha }} 1000
       - name: Publish verified worker
         run: docker push ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}

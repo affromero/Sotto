@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,7 @@ if args[0] == 'version': finish('linux/amd64')
 if args[:2] == ['image', 'inspect']:
     if '--format' not in args: finish(code=0 if state['pulled'] else 1)
     fmt = args[args.index('--format') + 1]
+    if 'Config.User' in fmt: finish('1001' if mode == 'runtime-owner' else '1000')
     finish(sha if 'revision' in fmt else ('linux/amd64' if 'Architecture' in fmt else new))
 if args[0] == 'pull': state['pulled'] = True; finish()
 if args[0] == 'ps':
@@ -188,6 +190,11 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertEqual(state['capacity'], 1, output)
         self.assertFalse(state['pulled'], output)
 
+    def test_wrong_runtime_owner_never_replaces_running_services(self):
+        state, output = self.run_deployment('runtime-owner')
+        self.assertIn('production images must use UID 1000', output)
+        self.assertFalse(state.get('old_web_recreated', False), output)
+
     def test_backup_failure_preserves_the_running_web_container(self):
         state, output = self.run_deployment('backup')
         self.assertIn('Backing up the application database', output)
@@ -223,6 +230,53 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertIn('Tags access check OK (status 401)', output)
         self.assertIn('Saved active slot: green', output)
         self.assertIn('Keeping the verified candidate serving', output)
+
+
+class CliHomeSmokeTests(unittest.TestCase):
+    def run_probe(self, script):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / 'home'
+            home.mkdir(mode=0o700)
+            executable = root / 'codex'
+            executable.write_text('#!/usr/bin/env node\n' + script)
+            executable.chmod(0o755)
+            pid_file = root / 'child.pid'
+            source = Path(__file__).parents[2] / 'scripts/deploy/checks/cli-home.cjs'
+            environment = dict(os.environ, CODEX_HOME=str(home), EXPECTED_UID=str(os.getuid()),
+                               FIXTURE_PID_OUT=str(pid_file),
+                               PATH=str(root) + os.pathsep + os.environ['PATH'])
+            before = home.stat()
+            try:
+                result = subprocess.run(['node', str(source)], env=environment,
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(home.stat().st_ino, before.st_ino)
+                self.assertEqual(home.stat().st_mode, before.st_mode)
+                if pid_file.exists():
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(int(pid_file.read_text()), 0)
+                return result
+            finally:
+                if pid_file.exists():
+                    try:
+                        os.kill(int(pid_file.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+    def test_initialized_cli_that_ignores_termination_is_stopped(self):
+        result = self.run_probe('''
+require('node:fs').writeFileSync(process.env.FIXTURE_PID_OUT, String(process.pid));
+process.on('SIGTERM', () => {});
+process.stdin.once('data', () => console.log(JSON.stringify({id: 1, result: {userAgent: 'fixture'}})));
+setInterval(() => {}, 1000);
+''')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Codex initializes with the private UID', result.stdout)
+
+    def test_cli_startup_failure_is_reported(self):
+        result = self.run_probe("console.error('fixture initialization failure'); process.exit(3);")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('fixture initialization failure', result.stderr)
 
 
 if __name__ == '__main__':
