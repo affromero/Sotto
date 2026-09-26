@@ -106,12 +106,19 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
   );
   const moderation = moderationCredential
     ? {
-        fetch: (
-          await createSottoProviderTransport(
-            { ...ai.execution, credential: moderationCredential },
-            [{ method: 'POST', url: 'https://api.openai.com/v1/moderations' }]
-          )
-        ).authenticatedFetch,
+        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const headers = new Headers(init?.headers);
+          headers.set(
+            'Authorization',
+            `Bearer ${sottoExecutionCredentialFields(moderationCredential).apiKey}`
+          );
+          return (
+            await createSottoProviderTransport(
+              { ...ai.execution, credential: moderationCredential },
+              [{ method: 'POST', url: 'https://api.openai.com/v1/moderations' }]
+            )
+          ).authenticatedFetch(input, { ...init, headers });
+        }) as typeof fetch,
       }
     : undefined;
   return {
@@ -129,6 +136,33 @@ export async function resolveCapturedLearningAi(
   userId: string,
   execution: Omit<SottoProviderExecution, 'userId' | 'credential'>
 ): Promise<CapturedLearningAi> {
+  const learner = await sottoTransaction(prismaUnfiltered, async (database) => {
+    const current = await execution.authorize(database);
+    if (current.userId !== userId) throw new Error('The selected AI user changed');
+    return database.user.findUnique({
+      where: { id: userId },
+      select: { preferredAiProvider: true, preferredAiModel: true },
+    });
+  });
+  if (
+    (learner?.preferredAiProvider === 'codex' ||
+      learner?.preferredAiProvider === 'claude-code') &&
+    learner.preferredAiModel &&
+    getProviderForModel(learner.preferredAiModel) === learner.preferredAiProvider
+  ) {
+    if (await isSystemAiProviderDisabled(learner.preferredAiProvider))
+      throw new Error(`${learner.preferredAiProvider} is disabled in admin provider settings.`);
+    return {
+      provider: learner.preferredAiProvider,
+      model: learner.preferredAiModel,
+      execution: { ...execution, userId },
+    };
+  }
+  const configured = await getAutoModelConfig();
+  if (configured.model.aiProvider === 'codex' || configured.model.aiProvider === 'claude-code') {
+    const selected = await resolveLearningAiWithKey(null);
+    return { ...selected, execution: { ...execution, userId } };
+  }
   const credential = await sottoTransaction(prismaUnfiltered, (database) =>
     capturePreferredSottoExecutionCredential(
       database,

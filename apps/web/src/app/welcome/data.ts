@@ -582,6 +582,7 @@ export const LANGUAGES: Language[] = [
 
 export const BASE_LANGS: BaseLang[] = [
   { code: 'en', name: 'English' },
+  { code: 'ru', name: 'Русский' },
   { code: 'es', name: 'Español' },
   { code: 'fr', name: 'Français' },
   { code: 'de', name: 'Deutsch' },
