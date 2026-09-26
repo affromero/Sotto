@@ -45,6 +45,7 @@ vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
 
 const mockGetLearnerPreference = vi.fn();
 const mockGetModerationCredential = vi.fn();
+const mockGetSelectedCredential = vi.fn();
 const mockAuthenticatedFetch = vi.fn();
 
 vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
@@ -52,7 +53,13 @@ vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
 }));
 
 vi.mock('@/lib/sidedoor/credentials/runtime/credential-execution', () => ({
-  captureSottoExecutionCredential: () => mockGetModerationCredential(),
+  captureSottoExecutionCredential: (
+    _database: unknown,
+    _authorize: unknown,
+    _scope: string,
+    _provider: string,
+    allowSharing: boolean
+  ) => allowSharing ? mockGetModerationCredential() : mockGetSelectedCredential(),
   capturePreferredSottoExecutionCredential: async () => {
     const selected = await mockGetAiKey();
     if (!selected) return null;
@@ -108,6 +115,7 @@ describe('resolveLearningAi', () => {
     stubInfra();
     mockGetLearnerPreference.mockResolvedValue(null);
     mockGetModerationCredential.mockResolvedValue(null);
+    mockGetSelectedCredential.mockResolvedValue(null);
     mockGetProviderForModel.mockImplementation((id: string) =>
       id?.startsWith('claude-code:')
         ? 'claude-code'
@@ -224,6 +232,63 @@ describe('resolveLearningAi', () => {
       apiKey: undefined,
     });
     expect(mockGetAiKey).not.toHaveBeenCalled();
+  });
+
+  it('uses explicit OpenAI and its saved key instead of the shared Codex default', async () => {
+    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: 'sk-user-123' });
+    mockGetSelectedCredential.mockResolvedValue({
+      recipient: { userId: 'user-1' },
+      binding: { endpoint: undefined },
+      selected: { credential: { values: { apiKey: 'sk-user-123' } } },
+    });
+    mockGetLearnerPreference.mockResolvedValue({
+      preferredAiProvider: 'openai',
+      preferredAiModel: 'gpt-5',
+    });
+    stubInfra('codex');
+    stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
+
+    expect(await resolveLearningAi('user-1')).toEqual({
+      provider: 'openai',
+      model: 'gpt-5',
+      apiKey: 'sk-user-123',
+    });
+  });
+
+  it('uses the unsaved wizard choice for a new curriculum', async () => {
+    mockGetLearnerPreference.mockResolvedValue(null);
+    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: 'sk-user-123' });
+    mockGetSelectedCredential.mockResolvedValue({
+      recipient: { userId: 'user-1' },
+      binding: { endpoint: undefined },
+      selected: { credential: { values: { apiKey: 'sk-user-123' } } },
+    });
+    stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
+
+    const resolved = await resolveCapturedLearningAi(
+      'user-1',
+      { ...blockedProviderExecution('user-1'), authorize: async () => ({ userId: 'user-1' }) },
+      { provider: 'openai', model: 'gpt-5' }
+    );
+
+    expect(resolved).toMatchObject({ provider: 'openai', model: 'gpt-5', apiKey: 'sk-user-123' });
+  });
+
+  it('keeps the unsaved local model and endpoint together', async () => {
+    mockGetLearnerPreference.mockResolvedValue(null);
+    stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
+
+    const resolved = await resolveCapturedLearningAi(
+      'user-1',
+      { ...blockedProviderExecution('user-1'), authorize: async () => ({ userId: 'user-1' }) },
+      { provider: 'local', model: 'local:qwen3', endpoint: 'http://localhost:11434/v1' }
+    );
+
+    expect(resolved).toMatchObject({
+      provider: 'local',
+      model: 'local:qwen3',
+      endpoint: 'http://localhost:11434/v1',
+    });
   });
 
   it('sends the captured OpenAI key with moderation requests', async () => {

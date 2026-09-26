@@ -81,7 +81,8 @@ export async function getOrCreateCurriculum(
   userId: string,
   execution: SottoProviderExecution,
   nativeLang: string,
-  targetLang: string
+  targetLang: string,
+  pendingSelection?: { provider: string; model: string; endpoint?: string }
 ): Promise<{ id: string }> {
   const existing = await prisma.curriculum.findUnique({
     where: { nativeLang_targetLang: { nativeLang, targetLang } },
@@ -89,7 +90,7 @@ export async function getOrCreateCurriculum(
   });
   if (existing) return existing;
 
-  const ai = await resolveCapturedLearningAi(userId, execution);
+  const ai = await resolveCapturedLearningAi(userId, execution, pendingSelection);
 
   const systemPrompt = loadAndRender('curriculum/generate-curriculum.md', {
     NATIVE: langName(nativeLang),

@@ -134,7 +134,8 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
 /** Bind a saved AI key and its authority revision to the provider transport that will use it. */
 export async function resolveCapturedLearningAi(
   userId: string,
-  execution: Omit<SottoProviderExecution, 'userId' | 'credential'>
+  execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
+  pendingSelection?: { provider: string; model: string; endpoint?: string }
 ): Promise<CapturedLearningAi> {
   const learner = await sottoTransaction(prismaUnfiltered, async (database) => {
     const current = await execution.authorize(database);
@@ -144,19 +145,38 @@ export async function resolveCapturedLearningAi(
       select: { preferredAiProvider: true, preferredAiModel: true },
     });
   });
-  if (
-    (learner?.preferredAiProvider === 'codex' ||
-      learner?.preferredAiProvider === 'claude-code') &&
-    learner.preferredAiModel &&
-    getProviderForModel(learner.preferredAiModel) === learner.preferredAiProvider
-  ) {
-    if (await isSystemAiProviderDisabled(learner.preferredAiProvider))
-      throw new Error(`${learner.preferredAiProvider} is disabled in admin provider settings.`);
+  const preferred = pendingSelection ??
+    (learner?.preferredAiProvider && learner.preferredAiModel
+      ? { provider: learner.preferredAiProvider, model: learner.preferredAiModel }
+      : null);
+  if (preferred?.provider === 'local' && preferred.model.startsWith('local:')) {
     return {
-      provider: learner.preferredAiProvider,
-      model: learner.preferredAiModel,
+      provider: 'local',
+      model: preferred.model,
+      ...(preferred.endpoint ? { endpoint: preferred.endpoint } : {}),
       execution: { ...execution, userId },
     };
+  }
+  if (preferred && getProviderForModel(preferred.model) === preferred.provider) {
+    if (preferred.provider === 'codex' || preferred.provider === 'claude-code') {
+      if (await isSystemAiProviderDisabled(preferred.provider))
+        throw new Error(`${preferred.provider} is disabled in admin provider settings.`);
+      return {
+        provider: preferred.provider,
+        model: preferred.model,
+        execution: { ...execution, userId },
+      };
+    }
+    return resolveCapturedLearningAiForProvider(
+      userId,
+      preferred.provider as AiProviderId,
+      preferred.model,
+      execution,
+      false
+    );
+  }
+  if (pendingSelection) {
+    throw new Error('The selected AI model does not belong to the selected provider.');
   }
   const configured = await getAutoModelConfig();
   if (configured.model.aiProvider === 'codex' || configured.model.aiProvider === 'claude-code') {

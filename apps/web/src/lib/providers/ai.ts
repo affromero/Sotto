@@ -438,7 +438,7 @@ class LocalProvider extends SharedCompatibleProvider {
   constructor() {
     super('Local', async (opts) => {
       await getServerInfra();
-      const baseUrl = infra('aiBaseUrl');
+      const baseUrl = opts?.endpoint || infra('aiBaseUrl');
       if (!baseUrl)
         throw new Error(
           'No local AI base URL is saved. Point it at your OpenAI-compatible server, such as http://localhost:11434/v1 for Ollama.'
