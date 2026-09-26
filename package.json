@@ -57,7 +57,7 @@
     "prisma": {
       "mysql2": "3.24.2"
     },
-    "react-dom": "19.2.8",
+    "react-dom": "19.3.0",
     "tsup": {
       "esbuild": "$esbuild"
     },
