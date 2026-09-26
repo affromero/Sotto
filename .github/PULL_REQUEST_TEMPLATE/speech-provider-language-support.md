@@ -2,6 +2,16 @@
 
 <!-- What provider/model language support changed, and why? -->
 
+## Problem and approach
+
+<!-- Describe the incorrect or missing behavior, how to reproduce it, and the
+expected result. Explain how this change addresses it and any tradeoffs. -->
+
+## Scope and remaining work
+
+<!-- State what is complete, what is unfinished, and known limitations.
+List concrete follow-up tasks, or write "None." Keep incomplete PRs in draft. -->
+
 ## Provider Or Model
 
 - Provider:
@@ -27,6 +37,11 @@
 
 ## Validation
 
+<!-- Paste exact commands and results, including failures. Explain skipped
+checks and checks not run. Identify regression coverage for bug fixes. -->
+
+- [ ] `npm run ci` passes
+
 - [ ] Ran focused tests:
 
 ```bash
@@ -38,3 +53,30 @@ npm run test --workspace=@sotto/web -- tests/lib/tts-language-support.test.ts te
 ## Notes
 
 <!-- Any limitations, unsupported languages, or provider-specific caveats. -->
+
+## Screenshots or recordings
+
+<!-- For visible UI changes, include before and after screenshots or a recording.
+Write "Not applicable" for other changes. -->
+
+## Checklist
+
+- [ ] I searched for related issues or PRs
+- [ ] Documentation and release notes cover configuration or compatibility changes
+- [ ] No secrets, local environment files, private learner data, or generated credentials are included
+
+## Review assistance
+
+Choose one option for unfinished work and changes requested during review.
+
+- [ ] Maintainers may use AI agents to finish the work and prepare follow-up
+      changes within the scope below. I will review the result.
+- [ ] I will make the follow-up changes myself. Please leave review comments only.
+- [ ] Please ask me before preparing follow-up changes.
+
+Scope, acceptance criteria, and files or behavior that should stay unchanged:
+
+<!-- Describe your constraints, or write "No additional constraints." -->
+
+If the choice is blank or conflicting, maintainers will ask before preparing changes.
+This choice does not approve merging the PR.
