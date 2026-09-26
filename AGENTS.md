@@ -1,6 +1,6 @@
 # AGENTS.md - Sotto
 
-> Single source of agent instructions for every coding agent. There are no `CLAUDE.md` files; Claude Code loads this file through the `SessionStart` hook in `.claude/settings.json`.
+> Single source of agent instructions for every coding agent.
 
 > Open-source, self-hostable language-learning infrastructure. Learn a language with the agent that already knows you. Canonical brand copy lives in `packages/shared/src/brand.ts`.
 
@@ -12,7 +12,7 @@ Sotto is open-source, self-hostable language-learning infrastructure. Learners w
 2. The adaptive listening backbone delivers AI-generated audio lessons; learners can pause, ask contextual questions, and receive spoken clarifications.
 3. Speaking practice captures learner recordings and returns pronunciation feedback through the configured STT/TTS providers.
 4. A personal vocabulary memory graph tracks words and grammar points across all four skills, surfacing spaced-repetition review when needed.
-5. Self-hosters connect their own agents (Claude Code, Codex, OpenClaw, Hermes) and any supported TTS/STT/LLM provider through BYOK configuration.
+5. Self-hosters connect their own agents (Codex, OpenClaw, Hermes) and any supported TTS/STT/LLM provider through BYOK configuration.
 6. Non-technical learners can use managed Sotto-hosted infrastructure when the product offers it.
 7. Each learner works in a private, single-learner space; their courses, progress, and vocabulary graph stay theirs, on a stack they control.
 
