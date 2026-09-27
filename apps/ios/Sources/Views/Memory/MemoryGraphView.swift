@@ -14,6 +14,7 @@ struct MemoryGraphView: View {
     @State private var graph: SottoMemoryGraph?
     @State private var errorMessage: String?
     @State private var filter: Filter = .all
+    @State private var showsWritingPractice = false
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All"
@@ -40,6 +41,12 @@ struct MemoryGraphView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if let graph {
                         summary(graph)
+
+                        if layout.supportsHandwriting {
+                            Button("Practice words with Apple Pencil", systemImage: "pencil.tip") { showsWritingPractice = true }
+                                .buttonStyle(.bordered).controlSize(.large)
+                                .disabled(!graph.nodes.contains { $0.isVocab && !($0.translation ?? "").isEmpty })
+                        }
 
                         Picker("Show", selection: $filter) {
                             ForEach(Filter.allCases) { option in
@@ -90,6 +97,13 @@ struct MemoryGraphView: View {
                 }
             }
             .task { await load() }
+            .sheet(isPresented: $showsWritingPractice) {
+                VocabularyWritingView(
+                    words: (graph?.byStrength ?? []).filter { $0.isVocab && !($0.translation ?? "").isEmpty },
+                    courseID: course.id
+                )
+                .environmentObject(model)
+            }
         }
     }
 

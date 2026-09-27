@@ -22,6 +22,8 @@ struct SettingsView: View {
     @State private var status: String?
     @State private var errorMessage: String?
     @State private var isSaving = false
+    @State private var showDeletionConfirmation = false
+    @State private var isDeleting = false
 
     private static let presetAvatars = [
         "bear", "cat", "deer", "fox", "hedgehog", "otter", "owl", "rabbit",
@@ -63,6 +65,26 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(SottoTheme.muted)
                     }
+
+                    PrivacyPolicyLink()
+                    Button("Withdraw AI permission and unpair") {
+                        model.signOut()
+                        dismiss()
+                    }
+                    .frame(minHeight: 44)
+                    .disabled(isDeleting || isSaving)
+
+                    if account != nil {
+                        Button("Delete learner profile", role: .destructive) {
+                            showDeletionConfirmation = true
+                        }
+                        .frame(minHeight: 44)
+                        .disabled(isDeleting)
+                    }
+
+                    if account != nil, let errorMessage {
+                        Text(errorMessage).foregroundStyle(.red)
+                    }
                 }
                 .padding(layout.pagePadding)
                 .frame(maxWidth: layout.readableWidth, alignment: .leading)
@@ -76,10 +98,26 @@ struct SettingsView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(isSaving || account == nil)
+                        .disabled(isSaving || isDeleting || account == nil)
                 }
             }
             .task { await load() }
+            .confirmationDialog("Delete this learner profile?", isPresented: $showDeletionConfirmation, titleVisibility: .visible) {
+                Button("Delete profile and learning data", role: .destructive) {
+                    Task {
+                        isDeleting = true
+                        defer { isDeleting = false }
+                        do {
+                            try await model.deleteAccount()
+                            dismiss()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                }
+            } message: {
+                Text("This permanently deletes this learner profile and starts removal of its courses, recordings, answers, and progress from your server. Backup and provider retention are controlled by the server operator. This device will be unpaired.")
+            }
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task { await upload(item) }

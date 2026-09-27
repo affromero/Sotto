@@ -12,7 +12,13 @@ struct RootView: View {
         ZStack {
             if model.isPaired {
                 if model.hasSelectedProfile {
-                    if let selectedClass = model.selectedClass {
+                    if !model.hasAIConsent, let serverURL = model.credentials?.serverURL {
+                        PrivacyConsentView(serverURL: serverURL) {
+                            model.acceptedAIScope = model.aiConsentScope
+                        } onDecline: {
+                            model.signOut()
+                        }
+                    } else if let selectedClass = model.selectedClass {
                         ClassSessionView(classDetail: selectedClass)
                             .environmentObject(model)
                     } else {

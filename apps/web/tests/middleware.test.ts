@@ -49,6 +49,8 @@ describe('public proxy routes without a database', () => {
     vi.stubEnv('SELF_HOSTED', 'true');
   });
   it.each([
+    '/privacy',
+    '/terms',
     '/_next/static/main.js',
     '/_next/image?url=test',
     '/fonts/font.woff2',
@@ -67,6 +69,8 @@ describe('public proxy routes without a database', () => {
     expect((await proxy(request(path))).headers.get('x-middleware-next')).toBe('1');
   });
   it.each([
+    '/privacy/private',
+    '/terms/private',
     '/access/security',
     '/api/v1/storage/recordings/private.wav',
     '/api/v1/onboarding/config',
@@ -79,6 +83,9 @@ describe('public proxy routes without a database', () => {
   });
   it('keeps the managed showcase available when shared state is unavailable', async () => {
     vi.stubEnv('SELF_HOSTED', 'false');
+    expect((await proxy(request('/privacy'))).headers.get('x-middleware-next')).toBe('1');
+    expect((await proxy(request('/terms'))).headers.get('x-middleware-next')).toBe('1');
+    expect((await proxy(request('/privacy/private'))).status).toBe(503);
     expect(destination(await proxy(request('/dashboard')))).toBe('/welcome');
     expect((await proxy(request('/welcome'))).headers.get('x-middleware-next')).toBe('1');
     expect((await proxy(request('/'))).headers.get('x-middleware-next')).toBe('1');

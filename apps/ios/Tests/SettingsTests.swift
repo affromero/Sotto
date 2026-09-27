@@ -3,6 +3,12 @@ import XCTest
 @testable import Sotto
 
 final class SettingsTests: XCTestCase {
+    func testDeletionRequestRequiresExplicitConfirmation() throws {
+        let data = try JSONEncoder().encode(AccountDeletionRequest())
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
+        XCTAssertEqual(body, ["confirm": "DELETE"])
+    }
+
     private func decode<T: Decodable>(_ json: String, as type: T.Type) throws -> T {
         try JSONDecoder().decode(type, from: Data(json.utf8))
     }

@@ -3,6 +3,20 @@ import XCTest
 @testable import Sotto
 
 final class PairingTests: XCTestCase {
+    @MainActor
+    func testAnOrdinaryFailureIsDisplayedWithoutCrashing() {
+        let model = SottoAppModel()
+        model.report(SottoAPIError.message("Server unavailable"))
+        XCTAssertTrue(model.errorMessage?.contains("unavailable") == true)
+    }
+
+    @MainActor
+    func testCancellationDoesNotReplaceTheVisibleError() {
+        let model = SottoAppModel()
+        model.errorMessage = "Existing failure"
+        model.report(CancellationError())
+        XCTAssertEqual(model.errorMessage, "Existing failure")
+    }
     func testTypedBareHostBecomesHTTPS() throws {
         let url = try XCTUnwrap(SottoAppModel.serverURL(fromTyped: " sotto.afromero.co "))
         XCTAssertEqual(url.absoluteString, "https://sotto.afromero.co")

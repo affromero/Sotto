@@ -46,6 +46,8 @@ function privateResponse(response: NextResponse): NextResponse {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (
+    pathname === '/privacy' ||
+    pathname === '/terms' ||
     PUBLIC_FILES.has(pathname) ||
     ['/_next', '/fonts', '/avatars'].some((root) => within(pathname, root))
   )

@@ -86,4 +86,14 @@ final class WritingDraftStoreTests: XCTestCase {
 
         XCTAssertEqual(store.draft(for: "p1")?.text, "Halb geschrieben")
     }
+
+    func testReviewedHandwritingBecomesAnEditableAnswerWithoutSubmitting() throws {
+        let store = WritingDraftStore()
+        store.register(try prompt(id: "handwritten"))
+        store.binding(for: "handwritten").wrappedValue = "Ich lerne Deutsch."
+        XCTAssertEqual(store.draft(for: "handwritten")?.text, "Ich lerne Deutsch.")
+        XCTAssertNil(store.draft(for: "handwritten")?.submittedText)
+        XCTAssertNil(store.draft(for: "handwritten")?.grade)
+        XCTAssertEqual(store.changedPromptIds, ["handwritten"])
+    }
 }

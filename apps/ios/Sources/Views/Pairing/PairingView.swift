@@ -60,6 +60,7 @@ struct PairingView: View {
                     .font(isCompact ? .body : .title3)
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
+                PrivacyPolicyLink()
             }
         }
     }

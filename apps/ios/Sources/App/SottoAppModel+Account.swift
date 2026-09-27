@@ -4,6 +4,28 @@ import Foundation
 /// one place the app writes learner preferences rather than learning data, and
 /// because the admin screens gate on the role this loads.
 extension SottoAppModel {
+    func report(_ error: Error) {
+        if error is CancellationError || (error as? URLError)?.code == .cancelled {
+            return
+        }
+        errorMessage = error.localizedDescription
+    }
+
+    func downloadWorkbookPDF(from url: URL) async throws -> Data {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before opening a workbook.")
+        }
+        return try await client.downloadWorkbookPDF(from: url)
+    }
+
+    func deleteAccount() async throws {
+        guard let client = makeClient() else {
+            throw SottoAPIError.message("Pair this device before deleting a profile.")
+        }
+        try await client.deleteAccount()
+        signOut()
+    }
+
     // MARK: - Server admin (read-only)
 
     func fetchHealth() async throws -> SottoHealth {

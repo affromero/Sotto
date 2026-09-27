@@ -3,6 +3,12 @@ import XCTest
 @testable import Sotto
 
 final class MemoryGraphTests: XCTestCase {
+    func testSpellingAcceptsCaseAndWhitespaceButKeepsAccentsMeaningful() {
+        XCTAssertTrue(VocabularySpelling.matches("  Bonjour\n", "bonjour"))
+        XCTAssertTrue(VocabularySpelling.matches("cafe\u{301}", "café"))
+        XCTAssertFalse(VocabularySpelling.matches("cafe", "café"))
+        XCTAssertFalse(VocabularySpelling.matches("", "bonjour"))
+    }
     private func graph(from json: String) throws -> SottoMemoryGraph {
         try JSONDecoder().decode(SottoMemoryGraph.self, from: Data(json.utf8))
     }

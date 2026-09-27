@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <header className={styles.header}>
             <h1 className={styles.title}>Privacy</h1>
             <p className={styles.subtitle}>How data flows through a self-hosted Sotto instance.</p>
-            <p className={styles.lastUpdated}>Last updated: July 19, 2026</p>
+            <p className={styles.lastUpdated}>Last updated: September 26, 2026</p>
           </header>
 
           <div className={styles.content}>
@@ -46,6 +46,23 @@ export default function PrivacyPage() {
 
             <h2>4. Credentials and access</h2>
             <p>
+              The iPhone and iPad app stores pairing credentials in the device Keychain and scans
+              pairing QR codes locally. Handwriting and workbook annotations are saved on the
+              device. Handwriting recognition runs on the device; you can review and edit the
+              recognized text before submitting it to your server for feedback. Photos you choose
+              for your profile are uploaded to your server. The app includes no advertising or
+              tracking SDKs.
+            </p>
+            <p>
+              Live translation asks for permission before streaming microphone audio and translation
+              context directly to Google Gemini. The conversation transcript is saved on your
+              server. Review{' '}
+              <a href="https://policies.google.com/privacy">Google&apos;s privacy policy</a> before
+              using live translation. You can end a live session at any time. Unpair the device to
+              stop using the connected server; unpairing removes access credentials but does not
+              delete learning data.
+            </p>
+            <p>
               Provider keys stored by Sotto are encrypted at rest with the instance&apos;s
               encryption key. Internet-facing instances should use the shared access password,
               HTTPS, firewalling, current software versions, and restricted administrative access.
@@ -55,10 +72,11 @@ export default function PrivacyPage() {
 
             <h2>5. Retention, deletion, and export</h2>
             <p>
-              Sotto includes controls for deleting profiles and associated application data.
-              Operators remain responsible for retention in backups, external storage, logs, and
-              connected providers. Ask the operator of this instance about access, correction,
-              export, deletion, or retention requests.
+              Sotto includes controls for deleting profiles and associated application data. In the
+              iPhone and iPad app, use Delete learner profile in Settings. Operators remain
+              responsible for retention in backups, external storage, logs, and connected providers.
+              Ask the operator of this instance about access, correction, export, deletion, or
+              retention requests.
             </p>
 
             <h2>6. Cookies</h2>

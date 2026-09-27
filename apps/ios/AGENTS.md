@@ -57,6 +57,16 @@ Test **both** families: the layout differs by size class.
 
 ## App Store
 
+- iPad writing prompts offer a Pencil canvas with on-device Vision text recognition.
+  Learners review the recognized text before it enters `WritingDraftStore`; the
+  existing class, practice, and exam submission paths own grading.
+- Memory offers local vocabulary spelling practice. It does not update mastery
+  or spaced-repetition state; the canonical Review flow owns those updates.
+- Workbook ink uses fixed PDF page coordinates, scoped by server, learner,
+  class, and PDF digest. Never overwrite unreadable ink or hide save failures.
+  Download PDFs through `SottoAPIClient.downloadWorkbookPDF`, which restricts
+  credentials to the paired server's origin.
+
 - Universal: `TARGETED_DEVICE_FAMILY = "1,2"`, iOS 18 minimum. iPhone is
   portrait-only; iPad supports all orientations.
 - `Sources/PrivacyInfo.xcprivacy` declares no accessed-API reasons because the
