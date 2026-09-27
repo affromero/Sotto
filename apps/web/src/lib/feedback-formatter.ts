@@ -33,7 +33,7 @@ export function formatUserFeedback(params: {
         const i = Number(idx);
         const turn = params.turns![i];
         if (!turn || !comment.trim()) return null;
-        return `- Turn ${i} (${turn.speaker}): "${comment.trim()}"`;
+        return `- Turn ${i} (${turn.speaker}), original text: ${JSON.stringify(turn.text)}\n  Comment: ${JSON.stringify(comment.trim())}`;
       })
       .filter(Boolean);
 
@@ -54,7 +54,9 @@ export function formatUserFeedback(params: {
 
   if (params.sourceUrls && params.sourceUrls.length > 0) {
     const urlList = params.sourceUrls.map((url) => `- ${url}`).join('\n');
-    sections.push(`### User-Provided Source URLs\nThe user provided these URLs as reference sources. Use them to cite real facts, events, and quotes:\n${urlList}`);
+    sections.push(
+      `### Suggested source URLs (unverified)\nThese suggestions are not evidence and must not be cited without verification:\n${urlList}`
+    );
   }
 
   return sections.join('\n\n');

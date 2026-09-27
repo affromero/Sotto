@@ -257,6 +257,17 @@ describe('processCreativePlanning', () => {
     });
   });
 
+  it.each([false, true])(
+    'preserves revision feedback in the next durable stage, existing result=%s',
+    async (alreadyCreated) => {
+      if (alreadyCreated)
+        mockPrismaCreativeOutlineFindUnique.mockResolvedValue({ id: 'existing-result' });
+      const revisionFeedback = 'Simplify the original greeting without changing verified facts';
+      await processCreativePlanning(createMockJob({ ...defaultPayload, revisionFeedback }));
+      expect(mockEnqueueDurableJob.mock.calls[0][2]).toMatchObject({ revisionFeedback });
+    }
+  );
+
   describe('AI routing', () => {
     it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };

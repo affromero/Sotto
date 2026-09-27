@@ -296,6 +296,12 @@ describe('processScriptWriting', () => {
     });
   });
 
+  it('delivers the durable revision preferences to the script writer', async () => {
+    const revisionFeedback = 'Simplify the original greeting without changing verified facts';
+    await processScriptWriting(createMockJob({ ...defaultPayload, revisionFeedback }));
+    expect(mockWriteScript).toHaveBeenCalledWith(expect.objectContaining({ revisionFeedback }));
+  });
+
   describe('AI routing', () => {
     it('uses the configured BYOK provider when the episode has no model', async () => {
       const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };

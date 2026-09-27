@@ -315,6 +315,31 @@ describe('updateEpisodeSchema', () => {
 });
 
 describe('regenerateWithFeedbackSchema — sourceUrls', () => {
+  it('bounds aggregate feedback and annotation counts', () => {
+    const originalScript = { id: 'script-1', version: 1 };
+    expect(
+      regenerateWithFeedbackSchema.safeParse({
+        originalScript,
+        turnComments: Object.fromEntries(Array.from({ length: 51 }, (_, i) => [i, 'Change this'])),
+      }).success
+    ).toBe(false);
+    expect(
+      regenerateWithFeedbackSchema.safeParse({
+        originalScript,
+        highlights: Array.from({ length: 20 }, () => ({
+          turnIndex: 0,
+          text: 'quote',
+          note: 'a'.repeat(2000),
+        })),
+      }).success
+    ).toBe(false);
+    expect(
+      regenerateWithFeedbackSchema.safeParse({
+        originalScript,
+        turnComments: { '-1': 'Invalid turn' },
+      }).success
+    ).toBe(false);
+  });
   it('accepts valid sourceUrls', () => {
     const result = regenerateWithFeedbackSchema.safeParse({
       sourceUrls: ['https://example.com/article', 'https://bbc.co.uk/news/123'],

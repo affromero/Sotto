@@ -140,7 +140,7 @@ describe('GET /api/v1/episodes/[episodeId]/script', () => {
       { speaker: 'HOST', text: 'Hello' },
       { speaker: 'EXPERT', text: 'Hi there' },
     ];
-    mockScriptFindUnique.mockResolvedValue({ turns, version: 2 });
+    mockScriptFindUnique.mockResolvedValue({ id: 'script-2', turns, version: 2 });
     const refs = [{ id: 'ref-1', number: 1, title: 'Source 1' }];
     mockReferenceFindMany.mockResolvedValue(refs);
 
@@ -148,7 +148,7 @@ describe('GET /api/v1/episodes/[episodeId]/script', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ turns, references: refs, version: 2 });
+    expect(body).toEqual({ scriptId: 'script-2', turns, references: refs, version: 2 });
     expect(body.lowReferences).toBeUndefined();
   });
 

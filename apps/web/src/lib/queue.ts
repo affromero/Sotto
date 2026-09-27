@@ -107,6 +107,7 @@ export interface ValidateReferencesPayload {
 }
 
 export interface DeepResearchPayload {
+  revisionFeedback?: string;
   episodeId: string;
   userId: string;
   discoveryId: string;
@@ -114,6 +115,7 @@ export interface DeepResearchPayload {
 }
 
 export interface CreativePlanningPayload {
+  revisionFeedback?: string;
   episodeId: string;
   userId: string;
   discoveryId: string;
@@ -122,6 +124,7 @@ export interface CreativePlanningPayload {
 }
 
 export interface WriteScriptPayload {
+  revisionFeedback?: string;
   episodeId: string;
   userId: string;
   discoveryId: string;

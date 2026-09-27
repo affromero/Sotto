@@ -9,6 +9,7 @@ const mockTransaction = vi.fn();
 const mockEnqueueDurableJob = vi.fn();
 const mockResearchDossierFindUnique = vi.fn();
 const mockCreativeOutlineFindUnique = vi.fn();
+const mockScriptFindUnique = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -24,6 +25,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockDiscoveryFindUnique(...args),
     },
     script: {
+      findUnique: (...args: unknown[]) => mockScriptFindUnique(...args),
       deleteMany: vi.fn().mockReturnValue({ then: vi.fn() }),
     },
     reference: {
@@ -89,6 +91,12 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     // Default: dossier + outline exist (happy path goes to script-writing)
     mockResearchDossierFindUnique.mockResolvedValue({ id: 'dossier-1' });
     mockCreativeOutlineFindUnique.mockResolvedValue({ id: 'outline-1' });
+    mockScriptFindUnique.mockResolvedValue({
+      id: 'script-1',
+      version: 1,
+      updatedAt: new Date(0),
+      turns: [{ speaker: 'HOST', text: 'Original greeting' }],
+    });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -176,7 +184,7 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     expect(payload.outlineId).toBe('outline-1');
   });
 
-  it('queues script-writing with sourceUrls when provided', async () => {
+  it('rejects unverified source additions before admitting or deleting work', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
@@ -193,29 +201,114 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true });
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('researched and verified');
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
+  });
 
-    // Verify sourceUrls in payload
-    const payload = mockEnqueueDurableJob.mock.calls[0][2];
-    expect(payload.sourceUrls).toEqual(['https://example.com/article', 'https://bbc.co.uk/news']);
+  it.each([true, false])(
+    'carries original dialogue and revision preferences with existing dossier=%s',
+    async (hasDossier) => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1' });
+      if (!hasDossier) mockResearchDossierFindUnique.mockResolvedValue(null);
+      const response = await POST(
+        createRequest({
+          feedback: 'Use simpler language',
+          originalScript: { id: 'script-1', version: 1 },
+          turnComments: { 0: 'More welcoming' },
+          highlights: [{ turnIndex: 0, text: 'greeting', note: 'Expand this' }],
+        }),
+        await createParams('pod-1')
+      );
+      expect(response.status).toBe(200);
+      const payload = mockEnqueueDurableJob.mock.calls[0][2];
+      expect(payload.revisionFeedback).toContain('Use simpler language');
+      expect(payload.revisionFeedback).toContain('Original greeting');
+      expect(payload.revisionFeedback).toContain('More welcoming');
+      expect(payload.revisionFeedback).toContain('Expand this');
+      const admission = mockEnqueueDurableJob.mock.calls[0][3];
+      await expect(
+        admission.mutate(
+          {
+            episode: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+            segment: { deleteMany: vi.fn() },
+            reference: { deleteMany: vi.fn() },
+            script: {
+              deleteMany: async ({ where }: { where: { id: string; version: number } }) => {
+                expect(where).toMatchObject({ id: 'script-1', version: 1 });
+                return { count: 0 };
+              },
+            },
+          },
+          'operation-1'
+        )
+      ).rejects.toThrow('original script changed');
+    }
+  );
 
-    const admission = mockEnqueueDurableJob.mock.calls[0][3];
-    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
-    await admission.mutate(
-      {
-        episode: { updateMany },
-        segment: { deleteMany: vi.fn() },
-        reference: { deleteMany: vi.fn() },
-        script: { deleteMany: vi.fn() },
-      },
-      'operation-1'
+  it('rejects an annotation for text absent from the original turn', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1' });
+    const response = await POST(
+      createRequest({
+        highlights: [{ turnIndex: 0, text: 'different revision', note: 'Change this' }],
+        originalScript: { id: 'script-1', version: 1 },
+      }),
+      await createParams('pod-1')
     );
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ lowReferences: false }),
-      })
+    expect(response.status).toBe(400);
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized raw bodies even when extra fields would be discarded', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    const response = await POST(
+      createRequest({ feedback: 'short', unused: 'x'.repeat(65536) }),
+      await createParams('pod-1')
     );
+    expect(response.status).toBe(413);
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects annotations from a previously replaced script before admission', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1' });
+    const response = await POST(
+      createRequest({
+        turnComments: { 0: 'Shorten this' },
+        originalScript: { id: 'previous-script', version: 1 },
+      }),
+      await createParams('pod-1')
+    );
+    expect(response.status).toBe(409);
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
+  });
+
+  it('returns conflict when the original script changes during admission', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1' });
+    mockEnqueueDurableJob.mockImplementationOnce(async (_queue, _type, _payload, admission) =>
+      admission.mutate(
+        {
+          episode: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          segment: { deleteMany: vi.fn() },
+          reference: { deleteMany: vi.fn() },
+          script: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+        },
+        'operation-1'
+      )
+    );
+    const response = await POST(
+      createRequest({ feedback: 'Simplify' }),
+      await createParams('pod-1')
+    );
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('Reload');
   });
 
   it('handles an omitted feedback body', async () => {

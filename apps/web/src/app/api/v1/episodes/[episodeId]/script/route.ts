@@ -51,6 +51,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   const response: Record<string, unknown> = {
+    scriptId: script.id,
     turns: script.turns as ScriptTurn[],
     references,
     version: script.version,
