@@ -26,7 +26,7 @@ function logBackgroundRegenerationFailure(error: unknown, classId: string): void
   logger.error('Background class regeneration failed', { classId, error: message });
 }
 
-/** GET /api/classes/[classId] — class with sections + questions (answers stripped until submitted). */
+/** GET /api/classes/[classId]: owned practice class with immediate answer feedback. */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const authed = await authenticateRequest(request);
@@ -64,7 +64,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         passageRef: q.passageRef,
         // Sourced-class READING passage (may carry `[N]` citation markers).
         passageText: q.passageText,
-        ...(submitted ? { correctIndex: q.correctIndex, explanation: q.explanation } : {}),
+        correctIndex: q.correctIndex,
+        explanation: q.explanation,
       })),
       prompts: s.prompts.map((p) => ({
         id: p.id,

@@ -135,22 +135,42 @@ No missing capability should be hidden by an implicit provider fallback.
 
 ## 8. Development Commands
 
-| Command                   | What it does                      |
-| ------------------------- | --------------------------------- |
-| `npm run setup`           | bootstrap local OSS development   |
-| `npm run dev`             | start web app and workers         |
-| `npm run dev:web`         | start web app only                |
-| `npm run dev:workers`     | start workers only                |
-| `npm run lint`            | run ESLint                        |
-| `npm run type-check`      | run TypeScript checks             |
-| `npm run test`            | run Vitest                        |
-| `npm run build`           | build web app                     |
-| `npm run ci`              | lint, type-check, test, and build |
-| `npm run prisma:push`     | push Prisma schema                |
-| `npm run prisma:generate` | generate Prisma client            |
-| `npm run prisma:studio`   | open Prisma Studio                |
+| Command                   | What it does                       |
+| ------------------------- | ---------------------------------- |
+| `npm run setup`           | bootstrap local OSS development    |
+| `npm run dev`             | start web app and workers          |
+| `npm run dev:web`         | start web app only                 |
+| `npm run dev:workers`     | start workers only                 |
+| `npm run lint`            | run ESLint                         |
+| `npm run type-check`      | run TypeScript checks              |
+| `npm run test`            | run Vitest                         |
+| `npm run test:browser`    | run isolated learner browser tests |
+| `npm run build`           | build web app                      |
+| `npm run ci`              | lint, type-check, test, and build  |
+| `npm run prisma:push`     | push Prisma schema                 |
+| `npm run prisma:generate` | generate Prisma client             |
+| `npm run prisma:studio`   | open Prisma Studio                 |
 
-Run `npm run ci` before each commit on this refactor branch.
+Run `npm run ci` before each commit.
+
+### Browser tests
+
+The browser suite exercises household sign-in, local-provider onboarding, course creation,
+audio playback, microphone recording, grading, and completing a class at a 375px viewport.
+It runs the production web build and speaking worker against real PostgreSQL, Redis,
+and local storage. A local HTTP fixture supplies deterministic AI, STT, and audio responses.
+This checks application integration; it does not assess a real model's teaching quality.
+
+Install Chromium with `npx --no-install playwright install chromium`. Docker, FFmpeg,
+and Chromaprint must also be available. Set `SIDEDOOR_TEST_DATABASE_URL` to a disposable
+PostgreSQL server on `localhost` or `127.0.0.1`, with a database named `sidedoor_test`
+and a role allowed to create databases. Then run `npm run test:browser`.
+
+The runner creates and removes a unique database, Redis container, storage directory,
+and provider fixture for each run. It supplies `SOTTO_BROWSER_DIRECTORY`,
+`SOTTO_BROWSER_PROVIDER`, and `SOTTO_BROWSER_PORT` internally. Do not configure these
+in application environments. Failure screenshots and traces are written to
+`test-results/browser` and `playwright-report`; CI retains them for seven days.
 
 ---
 

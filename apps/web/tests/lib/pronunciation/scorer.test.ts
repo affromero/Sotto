@@ -82,6 +82,19 @@ describe('SelfContainedScorer', () => {
     expect(scorer.id).toBe('self-contained');
   });
 
+  it('grades with the captured local endpoint', async () => {
+    const endpoint = 'http://localhost:11434/v1';
+    mockGenerateResponse.mockImplementation(async (_prompt, _messages, options) => {
+      if (options.endpoint !== endpoint) throw new Error('Wrong provider destination');
+      return rubricResponse(1, 1, 1, 'Clear pronunciation.');
+    });
+    const result = await scorer.score(
+      makeInput({ aiProvider: 'local', aiModel: 'local:fixture', aiEndpoint: endpoint })
+    );
+    expect(result.overallScore).toBeGreaterThan(0.9);
+    expect(result.feedback).toBe('Clear pronunciation.');
+  });
+
   describe('perfect transcript', () => {
     it('scores above 0.9 overall', async () => {
       mockGenerateResponse.mockResolvedValue(rubricResponse(1, 1, 1, 'Perfect!'));

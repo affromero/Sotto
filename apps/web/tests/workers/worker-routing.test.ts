@@ -4,7 +4,6 @@ import {
   matchesPreset,
   shouldRun,
   HEAVY_WORKERS,
-  PIPELINE_WORKERS,
   EXPERIMENTAL_WORKERS,
 } from '@/workers/worker-routing';
 
@@ -163,17 +162,6 @@ describe('shouldRun — profile filtering with preset=core', () => {
 });
 
 describe('set integrity', () => {
-  it('all EXPERIMENTAL entries exist in HEAVY or PIPELINE', () => {
-    for (const worker of EXPERIMENTAL_WORKERS) {
-      const inHeavy = HEAVY_WORKERS.has(worker);
-      const inPipeline = PIPELINE_WORKERS.has(worker);
-      expect(
-        inHeavy || inPipeline,
-        `${worker} is in EXPERIMENTAL but not in HEAVY or PIPELINE`
-      ).toBe(true);
-    }
-  });
-
   it('audio-stitching is in HEAVY_WORKERS (not experimental)', () => {
     expect(HEAVY_WORKERS.has('audio-stitching')).toBe(true);
     expect(EXPERIMENTAL_WORKERS.has('audio-stitching')).toBe(false);

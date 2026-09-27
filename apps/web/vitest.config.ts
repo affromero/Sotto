@@ -14,6 +14,7 @@ export default defineConfig({
     testTimeout: 20_000,
     hookTimeout: 20_000,
     exclude: [
+      '**/e2e/**',
       '**/node_modules/**',
       '**/dist/**',
       '**/.idea/**',

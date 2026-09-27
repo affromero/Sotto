@@ -1,0 +1,91 @@
+import { createServer } from 'node:http';
+
+export function fixtureAudio() {
+  const samples = 16000 * 8;
+  const wav = Buffer.alloc(44 + samples * 2);
+  wav.write('RIFF');
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(16000, 24);
+  wav.writeUInt32LE(32000, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i++)
+    wav.writeInt16LE(Math.round(Math.sin((i * 440 * 2 * Math.PI) / 16000) * 3000), 44 + i * 2);
+  return wav;
+}
+
+export async function startProvider() {
+  const unexpected = [];
+  const audio = fixtureAudio();
+  const server = createServer(async (request, response) => {
+    try {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const send = (body, status = 200) => {
+        response.writeHead(status, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(body));
+      };
+      if (request.method === 'GET' && request.url === '/health') return send({ status: 'ok' });
+      if (request.method === 'GET' && request.url === '/voices')
+        return send({ voices: [{ id: 'fixture-voice', name: 'Fixture voice' }] });
+      if (request.method === 'POST' && request.url === '/tts') {
+        response.writeHead(200, { 'Content-Type': 'audio/wav' });
+        return response.end(audio);
+      }
+      if (request.method === 'POST' && request.url === '/v1/audio/transcriptions')
+        return send({ text: 'Guten Morgen.' });
+      if (request.method === 'POST' && request.url === '/v1/chat/completions') {
+        const body = JSON.parse(Buffer.concat(chunks).toString());
+        const messages = body.messages.map((message) => message.content).join('\n');
+        let content;
+        if (messages.includes('Grade the response.'))
+          content = JSON.stringify({
+            overallScore: 1,
+            corrections: [],
+            feedback: 'Your greeting is clear.',
+          });
+        else if (messages.includes('Score this pronunciation attempt.'))
+          content = JSON.stringify({
+            accuracy: 1,
+            fluency: 1,
+            completeness: 1,
+            feedback: 'Clear pronunciation.',
+          });
+        else if (/hello|connection|respond.*ok|say.*ok/i.test(messages)) content = 'Hello!';
+        if (content)
+          return send({
+            id: 'browser-response',
+            object: 'chat.completion',
+            created: 1,
+            model: 'browser-fixture',
+            choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 4, completion_tokens: 2, total_tokens: 6 },
+          });
+        unexpected.push({ path: request.url, messages });
+        return send({ error: { message: 'Unexpected fixture prompt' } }, 400);
+      }
+      unexpected.push({ method: request.method, path: request.url });
+      send({ error: { message: 'Unexpected fixture request' } }, 400);
+    } catch (error) {
+      unexpected.push({ method: request.method, path: request.url, error: String(error) });
+      if (!response.headersSent) response.writeHead(400, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ error: { message: 'Invalid fixture request' } }));
+    }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    url: `http://127.0.0.1:${server.address().port}`,
+    unexpected,
+    close: () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeAllConnections();
+      }),
+  };
+}

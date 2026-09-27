@@ -260,7 +260,7 @@ describe('GET /api/v1/classes/[classId]', () => {
     expect(res.status).toBe(404);
   });
 
-  it('strips correctIndex and explanation before submission', async () => {
+  it('provides immediate practice feedback before final submission', async () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_UNSUBMITTED);
 
     const res = await GET(
@@ -274,12 +274,10 @@ describe('GET /api/v1/classes/[classId]', () => {
     expect(body.vocabulary).toEqual([{ lemma: 'hola', gloss: 'hello', pos: null }]);
 
     const questions = body.sections[0].questions;
-    expect(questions[0]).not.toHaveProperty('correctIndex');
-    expect(questions[0]).not.toHaveProperty('explanation');
-    // Safe fields are present
-    expect(questions[0]).toHaveProperty('id');
-    expect(questions[0]).toHaveProperty('question');
-    expect(questions[0]).toHaveProperty('options');
+    expect(questions[0]).toMatchObject({
+      correctIndex: SAMPLE_CLASS_UNSUBMITTED.sections[0].questions[0].correctIndex,
+      explanation: SAMPLE_CLASS_UNSUBMITTED.sections[0].questions[0].explanation,
+    });
   });
 
   it('returns SPEAKING section prompts (phrase + translation + reference audio)', async () => {

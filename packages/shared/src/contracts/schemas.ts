@@ -369,8 +369,8 @@ export const sectionStatusSchema = z.enum([
   'FAILED',
 ]);
 
-// `.loose()`: the route adds correctIndex/explanation only after submission, so
-// the open object covers both the pre- and post-submit projections.
+// Practice classes include immediate correctIndex/explanation feedback.
+// The open object also accepts older projections without those fields.
 export const classQuestionSchema = z
   .object({
     id: z.string(),

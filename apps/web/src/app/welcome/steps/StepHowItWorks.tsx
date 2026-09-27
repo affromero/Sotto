@@ -8,6 +8,7 @@ import styles from './StepHowItWorks.module.css';
 
 interface Props {
   demoMode: boolean;
+  navigationPending: boolean;
   onBack: () => void;
   onNext: () => void;
 }
@@ -96,7 +97,7 @@ function supportsReducedMotion() {
   );
 }
 
-export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
+export function StepHowItWorks({ demoMode, navigationPending, onBack, onNext }: Props) {
   const [lit, setLit] = useState(() => (supportsReducedMotion() ? STEP_COUNT : 0));
   const [current, setCurrent] = useState(() => (supportsReducedMotion() ? -1 : -1));
   const [settled, setSettled] = useState(() => supportsReducedMotion());
@@ -125,9 +126,10 @@ export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
   }, []);
 
   const advance = useCallback(() => {
+    if (navigationPending) return;
     if (settled) onNext();
     else settle();
-  }, [onNext, settle, settled]);
+  }, [navigationPending, onNext, settle, settled]);
 
   useEffect(() => {
     if (settled) return;
@@ -187,7 +189,12 @@ export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
           <OnboardingThemeSwitch />
           <div className={styles.kicker}>{demoMode ? 'Hosted preview' : 'Before you begin'}</div>
           <div className={styles.navControls} aria-label="How it works controls">
-            <button className={styles.navButton} type="button" onClick={onBack}>
+            <button
+              className={styles.navButton}
+              type="button"
+              disabled={navigationPending}
+              onClick={onBack}
+            >
               <Glyph name="back" size={13} />
               Back
             </button>
@@ -282,7 +289,7 @@ export function StepHowItWorks({ demoMode, onBack, onNext }: Props) {
         <button
           className={cx(styles.cta, !settled && styles.pending)}
           type="button"
-          disabled={!settled}
+          disabled={!settled || navigationPending}
           onClick={onNext}
         >
           Get started
