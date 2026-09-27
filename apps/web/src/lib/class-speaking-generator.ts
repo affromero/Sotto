@@ -7,19 +7,16 @@
 // Returns { sectionId }.
 import { isDeepStrictEqual } from 'node:util';
 import { prisma, prismaUnfiltered } from './prisma';
-import { resolveCapturedLearningAi } from './learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import { formatNotesForPrompt } from './course-notes';
-import { aiProviderRules, createAIProvider } from './providers/ai';
+import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { canResolveTts, resolveTtsProvider, getConfiguredTtsProviderId } from './providers/tts';
 import { getAutoModelConfig } from './auto-model-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy } from './classes/class-language-policy';
-import {
-  createSottoProviderTransport,
-  type SottoProviderExecution,
-} from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import { captureSpeakingPromptStorage } from '@/lib/sidedoor/storage/core/speaking-storage';
 
@@ -104,20 +101,13 @@ export async function composeSpeakingPrompts(
   });
 
   const client = createAIProvider(ai.provider);
-  const rules = aiProviderRules(ai.provider);
-  const transport = rules.length
-    ? await createSottoProviderTransport(ai.execution, rules)
-    : undefined;
   const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${SPEAKING_PROMPT_COUNT} speaking prompts.` }],
     {
-      model: ai.model,
-      apiKeyOverride: ai.apiKey,
+      ...(await capturedLearningAiOptions(ai)),
       maxTokens: 2048,
       temperature: 0.7,
-      fetch: transport ? (request, init) => transport.authenticatedFetch(request, init) : undefined,
-      signal: p.execution.signal,
     }
   );
 

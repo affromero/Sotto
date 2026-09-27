@@ -151,6 +151,7 @@ vi.mock('@/lib/learning-ai', () => ({
     provider: 'anthropic',
     model: 'claude-haiku-4-5-20251001',
     apiKey: 'ai-key',
+    endpoint: 'https://api.anthropic.com',
     execution: { userId: 'user-1', authorize: vi.fn() },
   }),
 }));
@@ -161,7 +162,10 @@ vi.mock('@/lib/pronunciation/scorer', () => ({
   resolvePronunciationScorer: vi.fn(() => ({ score: mocks.score })),
 }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/server-config', () => ({ infra: vi.fn(() => undefined) }));
+vi.mock('@/lib/server-config', () => ({
+  infra: vi.fn(() => undefined),
+  getServerInfra: vi.fn().mockResolvedValue({}),
+}));
 vi.mock('@/lib/audio/media-process', () => ({ isMediaCleanupFailure: vi.fn(() => false) }));
 
 import { processSpeakingGrading } from '@/workers/speaking-grading.worker';

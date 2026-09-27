@@ -91,12 +91,16 @@ export function StepStorage({ storage, config, demoMode, setStorage, onNext, onB
         body: JSON.stringify({
           provider: storage.provider,
           localStorageRoot: storage.localRoot,
-          endpoint: storage.endpoint,
-          bucket: storage.bucket,
-          region: storage.region,
-          publicUrl: storage.publicUrl || null,
-          accessKeyId: storage.accessKeyId,
-          secretAccessKey: storage.secretAccessKey,
+          ...(storage.provider === 'local'
+            ? {}
+            : {
+                endpoint: storage.endpoint,
+                bucket: storage.bucket,
+                region: storage.region,
+                publicUrl: storage.publicUrl || null,
+                accessKeyId: storage.accessKeyId,
+                secretAccessKey: storage.secretAccessKey,
+              }),
         }),
       });
       const body = (await response.json().catch(() => null)) as { detail?: string } | null;

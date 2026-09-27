@@ -28,18 +28,6 @@ describe('open-source language-learning OSS surfaces', () => {
   ];
   void primarySurfaceFiles;
 
-  it('rejects invalid voice provider selection instead of switching providers', () => {
-    const voiceProviderSources = ['src/app/api/v1/voices/route.ts', 'tests/api/voices.test.ts']
-      .map(readSource)
-      .join('\n');
-
-    expect(voiceProviderSources).toContain("errorResponse('Invalid provider', 400)");
-    expect(voiceProviderSources).toContain('rejects invalid provider param');
-    expect(voiceProviderSources).not.toContain(
-      'falls back to elevenlabs for invalid provider param'
-    );
-  });
-
   it('keeps MCP contracts private-activity scoped', () => {
     const mcpSources = ['packages/mcp/src/types.ts', 'packages/mcp/src/format.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))

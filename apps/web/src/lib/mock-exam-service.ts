@@ -67,29 +67,47 @@ export async function createMockExam(
     data: { userId, courseId, institution, level, status: 'GENERATING', blueprintId: blueprint.id },
   });
 
-  const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
-  const spec = await resolveExamSpec(course.curriculumId, level);
+  try {
+    const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
+    const spec = await resolveExamSpec(course.curriculumId, level);
 
-  let anyReady = false;
-  for (let i = 0; i < blueprint.sections.length; i++) {
-    const ok = await buildExamSection(
-      exam.id,
-      course,
-      blueprint.sections[i],
-      i + 1,
-      level,
-      spec,
-      note,
-      execution
-    );
-    anyReady = anyReady || ok;
+    let anyReady = false;
+    for (let i = 0; i < blueprint.sections.length; i++) {
+      const ok = await buildExamSection(
+        exam.id,
+        course,
+        blueprint.sections[i],
+        i + 1,
+        level,
+        spec,
+        note,
+        execution
+      );
+      anyReady = anyReady || ok;
+    }
+
+    await prisma.mockExam.update({
+      where: { id: exam.id },
+      data: { status: anyReady ? 'READY' : 'FAILED' },
+    });
+    return exam.id;
+  } catch (error) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.examSection.updateMany({
+          where: { examId: exam.id, status: 'GENERATING' },
+          data: { status: 'FAILED' },
+        });
+        await tx.mockExam.update({ where: { id: exam.id }, data: { status: 'FAILED' } });
+      });
+    } catch (cleanupError) {
+      logger.error('Failed to persist mock exam failure', {
+        examId: exam.id,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+    throw error;
   }
-
-  await prisma.mockExam.update({
-    where: { id: exam.id },
-    data: { status: anyReady ? 'READY' : 'FAILED' },
-  });
-  return exam.id;
 }
 
 async function buildExamSection(
@@ -228,9 +246,19 @@ async function buildExamSection(
       part: section.part,
       error: err instanceof Error ? err.message : String(err),
     });
-    await prisma.examSection
-      .update({ where: { id: examSection.id }, data: { status: 'FAILED' } })
-      .catch(() => undefined);
+    try {
+      await prisma.examSection.update({
+        where: { id: examSection.id },
+        data: { status: 'FAILED' },
+      });
+    } catch (cleanupError) {
+      logger.error('Failed to persist exam section failure', {
+        examId,
+        sectionId: examSection.id,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+      throw err;
+    }
     return false;
   }
 }

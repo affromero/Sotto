@@ -8,6 +8,7 @@ import styles from './StepIntro.module.css';
 
 interface Props {
   demoMode: boolean;
+  navigationPending: boolean;
   onNext: () => void;
 }
 
@@ -54,7 +55,7 @@ function cx(...classes: Array<string | false | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
-export function StepIntro({ demoMode, onNext }: Props) {
+export function StepIntro({ demoMode, navigationPending, onNext }: Props) {
   const [index, setIndex] = useState(0);
   const [settled, setSettled] = useState(false);
   const greeting =
@@ -71,9 +72,10 @@ export function StepIntro({ demoMode, onNext }: Props) {
   }, []);
 
   const advance = useCallback(() => {
+    if (navigationPending) return;
     if (settled) onNext();
     else settle();
-  }, [onNext, settle, settled]);
+  }, [navigationPending, onNext, settle, settled]);
 
   useEffect(() => {
     if (settled) return;
@@ -182,7 +184,7 @@ export function StepIntro({ demoMode, onNext }: Props) {
         <button
           className={styles.cta}
           type="button"
-          disabled={!settled}
+          disabled={!settled || navigationPending}
           onClick={(event) => {
             event.stopPropagation();
             onNext();

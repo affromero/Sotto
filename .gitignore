@@ -63,6 +63,8 @@ __pycache__/
 
 # Generated reports (traffic, analytics)
 /reports/
+/test-results/
+/playwright-report/
 
 # Accounting
 .fava-cache/

@@ -97,6 +97,35 @@ void COMPOSE_LOG;
 void MODULES;
 
 describe('welcome hosted-demo mode', () => {
+  it('waits for credential settings before enabling intro navigation', async () => {
+    const user = userEvent.setup();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal('fetch', async (...args: Parameters<typeof fetch>) => {
+      const response = credentialBoundary.handle(...args);
+      if (response) {
+        await pending;
+        return response;
+      }
+      return Response.json({}, { status: 503 });
+    });
+    render(<WelcomeFlow initialConfig={{ selfHosted: true, isOwner: true }} />);
+    await user.click(screen.getByRole('button', { name: /^Skip$/i }));
+    const start = screen.getByRole('button', { name: /^Get started$/i });
+    expect(start).toBeDisabled();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByText(/How Sotto works/i)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(start).toBeEnabled());
+    await user.click(start);
+    expect(await screen.findByText(/How Sotto works/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Skip animation/i }));
+    await user.click(screen.getByRole('button', { name: /^Get started$/i }));
+    expect(await screen.findByRole('heading', { name: /Who's learning/i })).toBeInTheDocument();
+  });
+
   it('saves the admin learner profile before continuing self-host onboarding', async () => {
     const user = userEvent.setup();
     const onNext = vi.fn();

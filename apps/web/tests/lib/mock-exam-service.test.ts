@@ -1,156 +1,276 @@
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
-/**
- * createMockExam builds a full exam from the flagship blueprint by calling the
- * class generator cores per section and persisting into the exam models. Section
- * generation is best-effort: a failing core marks that section FAILED but the
- * exam still finishes READY when other sections succeed. The real exam-blueprint
- * is used (pure), so a German course exercises the four-section Goethe format.
- */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-const mockCourseFindFirst = vi.fn();
-const mockExamCreate = vi.fn();
-const mockExamUpdate = vi.fn();
-const mockSectionCreate = vi.fn();
-const mockSectionUpdate = vi.fn();
-const mockQuestionCreateMany = vi.fn();
-const mockSpeakingCreateMany = vi.fn();
-const mockSpeakingFindMany = vi.fn();
-const mockPublishSpeakingPromptReferences = vi.fn();
-const mockWritingCreateMany = vi.fn();
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
-    mockExam: {
-      create: (...a: unknown[]) => mockExamCreate(...a),
-      update: (...a: unknown[]) => mockExamUpdate(...a),
-    },
-    examSection: {
-      create: (...a: unknown[]) => mockSectionCreate(...a),
-      update: (...a: unknown[]) => mockSectionUpdate(...a),
-    },
-    examQuestion: { createMany: (...a: unknown[]) => mockQuestionCreateMany(...a) },
-    speakingPrompt: {
-      createMany: (...a: unknown[]) => mockSpeakingCreateMany(...a),
-      findMany: (...a: unknown[]) => mockSpeakingFindMany(...a),
-    },
-    writingPrompt: { createMany: (...a: unknown[]) => mockWritingCreateMany(...a) },
-  },
-}));
-
-const mockResolveExamSpec = vi.fn();
-vi.mock('@/lib/exam-spec', () => ({
-  resolveExamSpec: (...a: unknown[]) => mockResolveExamSpec(...a),
-}));
-
-const mockGenQuestions = vi.fn();
-vi.mock('@/lib/class-generation', () => ({
-  generateSectionQuestions: (...a: unknown[]) => mockGenQuestions(...a),
-}));
-const mockListening = vi.fn();
-vi.mock('@/lib/class-listening-generator', () => ({
-  composeListeningContent: (...a: unknown[]) => mockListening(...a),
-}));
-const mockSpeaking = vi.fn();
-vi.mock('@/lib/class-speaking-generator', () => ({
-  composeSpeakingPrompts: (...a: unknown[]) => mockSpeaking(...a),
-  publishSpeakingPromptReferences: (...a: unknown[]) => mockPublishSpeakingPromptReferences(...a),
-}));
-const mockWriting = vi.fn();
-vi.mock('@/lib/class-writing-generator', () => ({
-  composeWritingPrompts: (...a: unknown[]) => mockWriting(...a),
-}));
-vi.mock('@/lib/course-notes', () => ({ getCourseNote: vi.fn(async () => '') }));
-vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-
+// @vitest-environment node
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PrismaClient } from '@/generated/prisma/client';
 import { createMockExam, ExamCourseNotFoundError } from '@/lib/mock-exam-service';
+import { invalidateServerInfra } from '@/lib/server-config';
+import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+  type SharedTestIdentity,
+} from '../helpers/setup/shared-instance';
 
-const GERMAN_COURSE = {
-  id: 'c1',
-  userId: 'u1',
-  nativeLang: 'en',
-  targetLang: 'de',
-  curriculumId: 'cur1',
-  currentLevel: 'B1',
-};
+const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(binding);
+  return { prisma: database, prismaUnfiltered: database };
+});
 
-function lastStatus(): string | undefined {
-  const calls = mockExamUpdate.mock.calls;
-  return calls.length
-    ? (calls[calls.length - 1][0] as { data: { status: string } }).data.status
-    : undefined;
-}
-
-describe('createMockExam', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockCourseFindFirst.mockResolvedValue(GERMAN_COURSE);
-    mockExamCreate.mockResolvedValue({ id: 'exam1', institution: 'GOETHE', level: 'B1' });
-    let sec = 0;
-    mockSectionCreate.mockImplementation(async () => ({ id: `sec-${++sec}` }));
-    mockSectionUpdate.mockResolvedValue({});
-    mockExamUpdate.mockResolvedValue({});
-    mockQuestionCreateMany.mockResolvedValue({ count: 1 });
-    mockSpeakingCreateMany.mockResolvedValue({ count: 1 });
-    mockSpeakingFindMany.mockResolvedValue([{ id: 'speaking-1' }]);
-    mockPublishSpeakingPromptReferences.mockResolvedValue(new Map());
-    mockWritingCreateMany.mockResolvedValue({ count: 1 });
-    mockResolveExamSpec.mockResolvedValue({
-      objective: 'Show B1',
-      grammarPoints: ['akkusativ'],
-      targetVocab: [{ lemma: 'der Kaffee', gloss: 'coffee' }],
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('persisted mock exams', () => {
+  let instance: SharedTestInstance;
+  let identity: SharedTestIdentity;
+  let courseId: string;
+  let faults: Array<{ model: string; operation: string; error: Error }>;
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('mock_exams');
+    binding.database = instance.database.$extends({
+      query: {
+        $allModels: {
+          async $allOperations({ model, operation, args, query }) {
+            const index = faults.findIndex(
+              (fault) => fault.model === model && fault.operation === operation
+            );
+            if (index !== -1) throw faults.splice(index, 1)[0].error;
+            return query(args);
+          },
+        },
+      },
+    }) as unknown as PrismaClient;
+  });
+  beforeEach(async () => {
+    faults = [];
+    vi.stubEnv('SELF_HOSTED', 'true');
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', '1'.repeat(64));
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
+    vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
+    vi.stubEnv('SIDEDOOR_TRUSTED_PROXY', 'false');
+    identity = await instance.reset();
+    invalidateServerInfra();
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
+      update: {},
+      create: {
+        nativeLang: 'en',
+        targetLang: 'de',
+        title: 'German',
+        lessons: {
+          create: {
+            level: 'B1',
+            order: 1,
+            slug: 'greetings',
+            title: 'Greetings',
+            objective: 'Greet a friend',
+            grammarPoints: ['present'],
+            vocabThemes: ['greetings'],
+            targetVocab: [{ lemma: 'Hallo', gloss: 'Hello' }],
+          },
+        },
+      },
     });
-    mockGenQuestions.mockResolvedValue([
-      { question: 'Q', options: ['a', 'b'], correctIndex: 0, explanation: 'because' },
+    courseId = (
+      await instance.database.course.create({
+        data: {
+          userId: identity.ownerId,
+          curriculumId: curriculum.id,
+          nativeLang: 'en',
+          targetLang: 'de',
+          currentLevel: 'B1',
+        },
+      })
+    ).id;
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'exam-fixture',
+      aiBaseUrl: 'http://localhost:11434/v1',
+    });
+    vi.stubGlobal('fetch', async () =>
+      Response.json({ error: { message: 'Provider unavailable for this test' } }, { status: 400 })
+    );
+  });
+  afterEach(() => {
+    invalidateServerInfra();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+  afterAll(async () => {
+    if (instance) await instance.close();
+    binding.database = null;
+  });
+  function execution() {
+    const request = new Request('http://localhost:3000/api/v1/exams', {
+      headers: { cookie: `sotto_session=${identity.ownerToken}` },
+    });
+    return {
+      userId: identity.ownerId,
+      authorize: async (database: Parameters<typeof resolveSottoRequest>[0]) => {
+        const current = await resolveSottoRequest(database, request);
+        if (!current || current.kind !== 'content') throw new Error('Test session expired');
+        return current;
+      },
+    };
+  }
+  it.each([
+    ['CourseNote', 'findUnique'],
+    ['Lesson', 'findMany'],
+    ['ExamSection', 'create'],
+    ['MockExam', 'update'],
+  ])('marks the saved exam failed when %s.%s fails', async (model, operation) => {
+    const error = new Error('Injected database operation failure');
+    faults.push({ model, operation, error });
+    await expect(createMockExam(courseId, identity.ownerId, execution())).rejects.toBe(error);
+    const saved = await instance.database.mockExam.findMany({
+      where: { courseId },
+      include: { sections: true },
+    });
+    expect(saved).toHaveLength(1);
+    expect(saved[0].status).toBe('FAILED');
+    expect(saved[0].sections.every((section) => section.status !== 'GENERATING')).toBe(true);
+  });
+  it('rejects another learner’s course without creating an exam', async () => {
+    const other = await identity.household('Other learner');
+    await expect(
+      createMockExam(courseId, other.id, { ...execution(), userId: other.id })
+    ).rejects.toBeInstanceOf(ExamCourseNotFoundError);
+    expect(await instance.database.mockExam.findMany({ where: { courseId } })).toEqual([]);
+  });
+  it('preserves the original error when recording failure is also unavailable', async () => {
+    const original = new Error('Exam specification read failed');
+    faults.push(
+      { model: 'Lesson', operation: 'findMany', error: original },
+      { model: 'MockExam', operation: 'update', error: new Error('Database writes unavailable') }
+    );
+    await expect(createMockExam(courseId, identity.ownerId, execution())).rejects.toBe(original);
+    expect(await instance.database.mockExam.findFirst({ where: { courseId } })).toMatchObject({
+      status: 'GENERATING',
+    });
+  });
+  it('persists failure for the whole exam when no provider section succeeds', async () => {
+    const id = await createMockExam(courseId, identity.ownerId, execution());
+    const saved = await instance.database.mockExam.findUniqueOrThrow({
+      where: { id },
+      include: { sections: true },
+    });
+    expect(saved.status).toBe('FAILED');
+    expect(saved.sections.map(({ skill, status }) => ({ skill, status }))).toEqual(
+      expect.arrayContaining([
+        { skill: 'READING', status: 'FAILED' },
+        { skill: 'LISTENING', status: 'FAILED' },
+        { skill: 'SPEAKING', status: 'FAILED' },
+        { skill: 'WRITING', status: 'FAILED' },
+      ])
+    );
+    expect(
+      await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
+    ).toMatchObject({ currentLevel: 'B1' });
+  });
+  it('settles unfinished sections when the first section failure write fails', async () => {
+    faults.push({
+      model: 'ExamSection',
+      operation: 'update',
+      error: new Error('Section write unavailable'),
+    });
+    await expect(createMockExam(courseId, identity.ownerId, execution())).rejects.toThrow(
+      /400|unavailable/i
+    );
+    const saved = await instance.database.mockExam.findFirstOrThrow({
+      where: { courseId },
+      include: { sections: true },
+    });
+    expect(saved.status).toBe('FAILED');
+    expect(saved.sections).toEqual([
+      expect.objectContaining({ skill: 'READING', status: 'FAILED' }),
     ]);
-    mockListening.mockResolvedValue({
-      episodeId: 'pod1',
-      comprehensionQuestions: [
-        { question: 'L', options: ['a', 'b'], correctIndex: 1, explanation: 'why' },
+  });
+  it('keeps usable generated content when listening fails without advancing the course', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      if (request.url !== 'http://localhost:11434/v1/chat/completions')
+        throw new Error(`Unexpected provider destination: ${request.url}`);
+      const body = (await request.json()) as { messages: Array<{ role: string; content: string }> };
+      const prompt = body.messages
+        .filter((message) => message.role === 'user')
+        .map((message) => message.content)
+        .join('\n');
+      let content: unknown;
+      if (/writing tasks/.test(prompt))
+        content = [{ task: 'Schreibe eine Einladung.', guidance: 'Invite a friend for coffee.' }];
+      else if (/speaking prompts/.test(prompt))
+        content = [{ targetPhrase: 'Guten Morgen', translation: 'Good morning' }];
+      else if (/questions|quiz/i.test(prompt))
+        content = {
+          passage: 'Anna trinkt morgens Kaffee.',
+          questions: [
+            {
+              question: 'Was trinkt Anna?',
+              options: ['Kaffee', 'Tee', 'Wasser', 'Saft'],
+              correctIndex: 0,
+              explanation: 'Anna drinks coffee.',
+              passageRef: 'first sentence',
+            },
+          ],
+        };
+      else
+        return Response.json(
+          { error: { message: 'Listening provider unavailable' } },
+          { status: 400 }
+        );
+      return Response.json({
+        id: 'exam-response',
+        object: 'chat.completion',
+        created: 1,
+        model: 'exam-fixture',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: JSON.stringify(content) },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 5, completion_tokens: 8, total_tokens: 13 },
+      });
+    });
+    const id = await createMockExam(courseId, identity.ownerId, execution());
+    const saved = await instance.database.mockExam.findUniqueOrThrow({
+      where: { id },
+      include: {
+        sections: { include: { questions: true, speakingPrompts: true, writingPrompts: true } },
+      },
+    });
+    expect(saved).toMatchObject({
+      userId: identity.ownerId,
+      courseId,
+      level: 'B1',
+      status: 'READY',
+    });
+    expect(saved.sections.find((section) => section.skill === 'READING')).toMatchObject({
+      status: 'READY',
+      questions: [
+        expect.objectContaining({
+          question: 'Was trinkt Anna?',
+          options: ['Kaffee', 'Tee', 'Wasser', 'Saft'],
+          correctIndex: 0,
+          explanation: 'Anna drinks coffee.',
+          passageText: 'Anna trinkt morgens Kaffee.',
+        }),
       ],
     });
-    mockSpeaking.mockResolvedValue([
-      { targetPhrase: 'Hallo', translation: 'Hello', ipa: null, referenceTtsAudio: null },
-    ]);
-    mockWriting.mockResolvedValue([{ task: 'Write a note', guidance: null }]);
-  });
-
-  it('throws when the course is not owned by the caller', async () => {
-    mockCourseFindFirst.mockResolvedValue(null);
-    await expect(createMockExam('c1', 'u1', blockedProviderExecution('u1'))).rejects.toBeInstanceOf(
-      ExamCourseNotFoundError
-    );
-    expect(mockExamCreate).not.toHaveBeenCalled();
-  });
-
-  it('builds the four Goethe sections and finishes READY', async () => {
-    const examId = await createMockExam('c1', 'u1', blockedProviderExecution('u1'));
-    expect(examId).toBe('exam1');
-    // Goethe blueprint: reading (mc), listening, writing, speaking.
-    expect(mockSectionCreate).toHaveBeenCalledTimes(4);
-    expect(mockGenQuestions).toHaveBeenCalledTimes(1); // reading mc
-    expect(mockListening).toHaveBeenCalledTimes(1);
-    expect(mockSpeaking).toHaveBeenCalledTimes(1);
-    expect(mockWriting).toHaveBeenCalledTimes(1);
-    expect(lastStatus()).toBe('READY');
-  });
-
-  it('keys speaking/writing prompts to the exam section (reused models)', async () => {
-    await createMockExam('c1', 'u1', blockedProviderExecution('u1'));
-    const speakingData = mockSpeakingCreateMany.mock.calls[0][0].data;
-    expect(speakingData[0].examSectionId).toMatch(/^sec-/);
-    const writingData = mockWritingCreateMany.mock.calls[0][0].data;
-    expect(writingData[0].examSectionId).toMatch(/^sec-/);
-  });
-
-  it('marks a failed section but still finishes READY when others succeed', async () => {
-    mockSpeaking.mockRejectedValue(new Error('no TTS key'));
-    const examId = await createMockExam('c1', 'u1', blockedProviderExecution('u1'));
-    expect(examId).toBe('exam1');
-    const sectionStatuses = mockSectionUpdate.mock.calls.map(
-      (c) => (c[0] as { data: { status: string } }).data.status
-    );
-    expect(sectionStatuses).toContain('FAILED');
-    expect(lastStatus()).toBe('READY');
+    expect(saved.sections.find((section) => section.skill === 'WRITING')).toMatchObject({
+      status: 'READY',
+      writingPrompts: [expect.objectContaining({ task: 'Schreibe eine Einladung.' })],
+    });
+    expect(saved.sections.find((section) => section.skill === 'SPEAKING')).toMatchObject({
+      status: 'READY',
+      speakingPrompts: [
+        expect.objectContaining({ targetPhrase: 'Guten Morgen', translation: 'Good morning' }),
+      ],
+    });
+    expect(saved.sections.find((section) => section.skill === 'LISTENING')).toMatchObject({
+      status: 'FAILED',
+    });
+    expect(
+      await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
+    ).toMatchObject({ currentLevel: 'B1' });
   });
 });

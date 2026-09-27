@@ -11,7 +11,7 @@
  *   3. LLM rubric call ('speaking/pronunciation-rubric.md') for a blended
  *      { accuracy, fluency, completeness, feedback }.
  *   4. Average deterministic + LLM signals; overall = weighted mean.
- *   5. On LLM parse failure, fall back to pure deterministic scores — never throw.
+ *   5. Reject invalid rubric output instead of publishing an unverified score.
  */
 
 import { alignPhrase, type AlignedToken } from './align';
@@ -40,6 +40,8 @@ export interface PronunciationInput {
   aiModel: string;
   /** Optional BYOK API key override. */
   aiApiKey?: string;
+  /** Captured endpoint for configured local or compatible providers. */
+  aiEndpoint?: string;
   /** Caller's user id — used for usage logging. */
   userId: string;
 }
@@ -57,7 +59,7 @@ export interface PronunciationScore {
   /** Weighted overall score (accuracy×0.5 + fluency×0.25 + completeness×0.25), clamped 0..1. */
   overallScore: number;
   rubricScores: RubricScores;
-  /** Short feedback string from the LLM (or deterministic fallback). */
+  /** Short feedback string from the LLM rubric. */
   feedback: string;
   /** Per-token alignment operations from alignPhrase(). */
   phonemeScores: AlignedToken[];
@@ -230,6 +232,7 @@ export class SelfContainedScorer implements PronunciationScorer {
         fetch: input.fetch,
         model: input.aiModel,
         apiKeyOverride: input.aiApiKey,
+        endpoint: input.aiEndpoint,
         maxTokens: 256,
         temperature: 0.2,
         skipModeration: true,

@@ -621,10 +621,19 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   let stepView: React.ReactNode;
   switch (step) {
     case 0:
-      stepView = <StepIntro demoMode={demoMode} onNext={() => go(1)} />;
+      stepView = (
+        <StepIntro demoMode={demoMode} navigationPending={credentialBusy} onNext={() => go(1)} />
+      );
       break;
     case 1:
-      stepView = <StepHowItWorks demoMode={demoMode} onBack={() => go(0)} onNext={() => go(2)} />;
+      stepView = (
+        <StepHowItWorks
+          demoMode={demoMode}
+          navigationPending={credentialBusy}
+          onBack={() => go(0)}
+          onNext={() => go(2)}
+        />
+      );
       break;
     case 2:
       stepView = (

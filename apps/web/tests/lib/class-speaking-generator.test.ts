@@ -65,6 +65,10 @@ vi.mock('@/lib/byok', () => ({
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: (...args: unknown[]) => mockResolveCapturedLearningAi(...args),
+  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+    model: ai.model,
+    apiKeyOverride: ai.apiKey,
+  }),
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
@@ -73,10 +77,6 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
-  aiProviderRules: vi.fn(() => []),
-}));
-vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
-  createSottoProviderTransport: vi.fn(),
 }));
 
 vi.mock('@/lib/prompt-loader', () => ({

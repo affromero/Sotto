@@ -13,6 +13,7 @@ import {
 } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { resolvePronunciationScorer } from '@/lib/pronunciation/scorer';
 import { logger } from '@/lib/logger';
+import { getServerInfra } from '@/lib/server-config';
 import {
   resolveStorageInput,
   validateStorageInputs,
@@ -209,6 +210,7 @@ async function executeSpeakingGrading(
     const audioBuffer = await readFile(audioPath, { signal });
     await job.updateProgress(35);
 
+    await getServerInfra();
     const resolvedStt = await resolveCapturedSttProvider({
       userId: inputs.userId,
       execution,
@@ -225,7 +227,7 @@ async function executeSpeakingGrading(
     await job.updateProgress(60);
 
     const ai = await resolveCapturedLearningAi(inputs.userId, execution);
-    const rules = aiProviderRules(ai.provider);
+    const rules = aiProviderRules(ai.provider, ai.endpoint);
     const aiTransport = rules.length
       ? await createSottoProviderTransport(ai.execution, rules)
       : undefined;
@@ -237,6 +239,7 @@ async function executeSpeakingGrading(
       aiProvider: ai.provider,
       aiModel: ai.model,
       aiApiKey: ai.apiKey,
+      aiEndpoint: ai.endpoint,
       userId: inputs.userId,
       signal,
       fetch: aiTransport
