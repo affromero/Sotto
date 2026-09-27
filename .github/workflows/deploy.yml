@@ -62,7 +62,7 @@ jobs:
           submodules: recursive
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - name: Install media tools
@@ -87,7 +87,7 @@ jobs:
           load: true
           tags: |
             ghcr.io/affromero/sotto-workers-base:${{ github.sha }}
-            ghcr.io/affromero/sotto-workers-base:node22
+            ghcr.io/affromero/sotto-workers-base:node24
           cache-from: type=gha,scope=sotto-workers-base
           cache-to: type=gha,mode=max,scope=sotto-workers-base
 
@@ -100,7 +100,7 @@ jobs:
           docker push "$base"
           reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$base")
           echo "digest=${reference##*@}" >> "$GITHUB_OUTPUT"
-          docker push ghcr.io/affromero/sotto-workers-base:node22
+          docker push ghcr.io/affromero/sotto-workers-base:node24
 
       - name: Validate production image env
         id: production_image_env

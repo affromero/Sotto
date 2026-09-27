@@ -275,7 +275,7 @@ mkdir -p ~/.local/bin && curl -fsSL https://sotto.fm/sotto-host -o ~/.local/bin/
 
 ### From source (contributors)
 
-Prerequisites: [Node.js](https://nodejs.org/) 22+, [Docker](https://www.docker.com/), [FFmpeg](https://ffmpeg.org/).
+Prerequisites: [Node.js](https://nodejs.org/) 24, [Docker](https://www.docker.com/), [FFmpeg](https://ffmpeg.org/).
 
 ```bash
 git clone https://github.com/affromero/Sotto.git

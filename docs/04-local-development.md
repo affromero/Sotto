@@ -10,10 +10,20 @@
 
 | Tool                            | Version        | Why                               |
 | ------------------------------- | -------------- | --------------------------------- |
-| Node.js                         | 20+            | Next.js, workers, scripts         |
+| Node.js                         | 24             | Next.js, workers, scripts         |
 | Docker Desktop or Docker Engine | Current stable | PostgreSQL and Redis              |
 | FFmpeg                          | 6+             | Audio stitching and normalization |
 | Git                             | 2.40+          | Source control                    |
+
+CI and Docker images use Node.js 24. After changing Node majors, run `npm ci`
+to rebuild native dependencies for the selected runtime. To verify Node 24
+without changing your shell default, run
+`npx --yes --package=node@24 -- sh -c 'npm ci && npm run ci'`.
+Local worker builds use the `sotto-workers-base:node24` alias. Production
+builds pin the verified worker base digest. Image smoke checks exercise native
+file-lock contention and release on Alpine (musl) and Debian (glibc).
+Dependabot keeps Node 24 patch and minor updates enabled. Node major upgrades
+require a coordinated migration of Docker images, CI, and native smoke checks.
 
 Optional:
 
