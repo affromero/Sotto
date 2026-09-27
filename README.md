@@ -11,11 +11,12 @@ Open source language-learning infrastructure you run yourself, with a full **[CE
 <br/>
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-A42E2B.svg?logo=gnu)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/affromero/Sotto?label=release)](https://github.com/affromero/Sotto/releases/latest)
 [![Self-hostable](https://img.shields.io/badge/self--hostable-yes-1F8A5B)](#self-host)
 [![BYOK](https://img.shields.io/badge/BYOK-bring%20your%20own%20keys-D97706)](#bring-your-own-claude--codex)
 [![Bring your own agent](https://img.shields.io/badge/agent-Claude%20Code%20%2F%20Codex-3F4FB0)](#bring-your-own-claude--codex)
 [![Runs 100% offline](https://img.shields.io/badge/runs-100%25%20offline-1F8A5B)](#run-it-100-offline)
-[![CI](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/ci.yml?branch=main&label=CI)](https://github.com/affromero/Sotto/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/deploy.yml?branch=main&label=CI)](https://github.com/affromero/Sotto/actions/workflows/deploy.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/codeql.yml?branch=main&label=CodeQL)](https://github.com/affromero/Sotto/actions/workflows/codeql.yml)
 [![gitleaks](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/gitleaks.yml?branch=main&label=gitleaks)](https://github.com/affromero/Sotto/actions/workflows/gitleaks.yml)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
@@ -31,6 +32,8 @@ Open source language-learning infrastructure you run yourself, with a full **[CE
 <br/>
 
 [**Quick Start**](#quick-start) · [**Use Cases**](docs/06-user-flows.md) · [**Why Sotto**](#why-sotto) · [**What You Get**](#what-you-get) · [**Compare**](#how-sotto-compares) · [**Self-host**](#self-host) · [**BYOK**](#bring-your-own-claude--codex)
+
+[Changelog](CHANGELOG.md) · [Manual release guide](docs/releases.md)
 
 <sub>Private language rehearsal for the context you choose to share.</sub>
 

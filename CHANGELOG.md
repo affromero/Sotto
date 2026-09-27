@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Setup honors the learner's selected AI provider, passes the wizard selection to curriculum generation, and fixes moderation authorization and ElevenLabs output compatibility. ([#96](https://github.com/affromero/Sotto/pull/96)) Thanks @asannikov.
+- Local model generation retains the configured endpoint after setup and during episode generation. ([#100](https://github.com/affromero/Sotto/pull/100), closes [#97](https://github.com/affromero/Sotto/issues/97))
+
 ## [0.1.0] - 2026-06-29
 
 ### Added

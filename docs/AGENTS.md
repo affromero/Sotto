@@ -13,6 +13,7 @@ User-facing documentation for self-hosting, deploying, developing, and extending
 | `05-provider-extension-guide.md` | Local/no-code and native provider extension recipes |
 | `06-user-flows.md`               | End-to-end self-hosted learner and operator flows   |
 | `07-architecture-diagrams.md`    | Mermaid diagrams for architecture and API flows     |
+| `releases.md`                    | Manual release preparation, validation, and tags    |
 
 ## Rules
 

@@ -5,6 +5,7 @@ name: Release surfaces
 # push — a tsconfig line, a dependabot config — paid for a desktop build and an
 # iOS simulator test run.
 on:
+  workflow_dispatch:
   pull_request:
     # Duplicated rather than shared via a YAML anchor: GitHub Actions does not
     # expand anchors, so both lists have to be spelled out.
