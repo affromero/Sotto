@@ -1,4 +1,5 @@
-import { open, readdir, readFile, unlink, lstat } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { open, readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { DockerIsolatedRunner, type IsolatedIdentity } from 'thesidedoor-core/runtime/isolated';
@@ -11,6 +12,32 @@ const identitySchema = z
   })
   .strict();
 const prefix = 'isolated-container-';
+
+/** Read one regular recovery file through the descriptor that was validated.
+ * The caller retains ownership of the parent directory throughout recovery.
+ */
+export async function readIsolatedRecoveryFile(path: string): Promise<string> {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > 4096)
+      throw new Error(
+        'Invalid isolated recovery file: expected a regular file of at most 4096 bytes'
+      );
+    const buffer = Buffer.alloc(4097);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) return buffer.subarray(0, length).toString('utf8');
+      length += bytesRead;
+      if (length > 4096) throw new Error('Isolated recovery file exceeds 4096 bytes');
+    }
+    throw new Error('Isolated recovery file exceeds 4096 bytes');
+  } finally {
+    await handle.close();
+  }
+}
+
 async function syncDirectory(directory: string) {
   const handle = await open(directory, 'r');
   try {
@@ -40,7 +67,7 @@ export function isolatedContainerJournal(directory: string) {
     },
     async recordCleanup(identity: IsolatedIdentity): Promise<void> {
       const path = identityPath(directory, identity);
-      const recorded = identitySchema.parse(JSON.parse(await readFile(path, 'utf8')));
+      const recorded = identitySchema.parse(JSON.parse(await readIsolatedRecoveryFile(path)));
       if (JSON.stringify(recorded) !== JSON.stringify(identitySchema.parse(identity)))
         throw new Error('Isolated container journal identity changed');
       await unlink(path);
@@ -58,10 +85,7 @@ export async function reconcileIsolatedAgentWorkspace(directory: string): Promis
   const journal = isolatedContainerJournal(directory);
   for (const name of entries) {
     const path = join(directory, name);
-    const info = await lstat(path);
-    if (!info.isFile() || info.isSymbolicLink() || info.size > 4096)
-      throw new Error('Invalid isolated container journal file');
-    const identity = identitySchema.parse(JSON.parse(await readFile(path, 'utf8')));
+    const identity = identitySchema.parse(JSON.parse(await readIsolatedRecoveryFile(path)));
     if (identityPath(directory, identity) !== path)
       throw new Error('Isolated container journal path changed');
     await new DockerIsolatedRunner().reconcile(identity);

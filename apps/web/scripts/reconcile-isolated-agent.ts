@@ -1,5 +1,5 @@
-import { readFile, stat } from 'node:fs/promises';
 import { z } from 'zod';
+import { readIsolatedRecoveryFile } from '../src/lib/agents/isolated/isolated-agent-journal';
 
 async function main() {
   const [bindingFile, stopped] = process.argv.slice(2);
@@ -8,7 +8,6 @@ async function main() {
       'Usage: npx tsx scripts/reconcile-isolated-agent.ts <execution-binding.json> --supervisor-stopped. Stop the original worker before recovery.'
     );
   }
-  if ((await stat(bindingFile)).size > 4096) throw new Error('Execution binding is too large');
   const binding = z
     .object({
       id: z.uuid(),
@@ -17,7 +16,7 @@ async function main() {
       fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
     })
     .strict()
-    .parse(JSON.parse(await readFile(bindingFile, 'utf8')));
+    .parse(JSON.parse(await readIsolatedRecoveryFile(bindingFile)));
   const { recoverIsolatedPreparationExecution } =
     await import('../src/lib/agents/isolated/isolated-agent-recovery');
   const { prismaUnfiltered } = await import('../src/lib/prisma');

@@ -4,6 +4,14 @@
     {
       "tool": "knip",
       "mode": "all",
+      "file": "apps/web/tests/lib/agent-clients/isolated-agent-journal.test.ts",
+      "kind": "binaries",
+      "name": "mkfifo",
+      "reason": "System utility creates a real FIFO to verify recovery rejects nonregular files without blocking."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
       "file": "apps/web/package.json",
       "kind": "dependencies",
       "name": "@prisma/client",

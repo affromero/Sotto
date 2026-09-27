@@ -57,9 +57,11 @@ updates:
       actions:
         patterns:
           - '*'
-  # Container base images (Dockerfiles live at the repo root).
+  # Container base images, including Dockerfile.workers and Dockerfile.workers-base.
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /apps/web
+      - /services/local-tts
     schedule:
       interval: weekly
     cooldown:

@@ -1,9 +1,11 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   isolatedContainerJournal,
+  readIsolatedRecoveryFile,
   reconcileIsolatedAgentWorkspace,
 } from '@/lib/agents/isolated/isolated-agent-journal';
 
@@ -13,6 +15,45 @@ const identity = {
   daemonId: 'test-daemon',
 };
 describe('isolated container journal', () => {
+  it('reads a regular recovery file up to the exact byte limit', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'sotto-isolated-read-'));
+    try {
+      const path = join(directory, 'binding.json');
+      const content = 'a'.repeat(4096);
+      await writeFile(path, content);
+      expect(await readIsolatedRecoveryFile(path)).toBe(content);
+      await writeFile(path, '');
+      expect(await readIsolatedRecoveryFile(path)).toBe('');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['symlink', 'oversized', 'directory', 'fifo'] as const)(
+    'rejects a %s before recovery or cleanup can trust its identity',
+    async (kind) => {
+      const directory = await mkdtemp(join(tmpdir(), 'sotto-isolated-invalid-'));
+      try {
+        const path = join(directory, `isolated-container-${identity.containerName}.json`);
+        const target = join(directory, 'original.json');
+        await writeFile(target, JSON.stringify(identity));
+        if (kind === 'symlink') await symlink(target, path);
+        if (kind === 'oversized') await writeFile(path, JSON.stringify(identity).padEnd(4097));
+        if (kind === 'directory') await mkdir(path);
+        if (kind === 'fifo') execFileSync('mkfifo', [path]);
+        await expect(readIsolatedRecoveryFile(path)).rejects.toThrow();
+        await expect(isolatedContainerJournal(directory).recordCleanup(identity)).rejects.toThrow();
+        await expect(reconcileIsolatedAgentWorkspace(directory)).rejects.toThrow();
+        expect(await readFile(target, 'utf8')).toBe(JSON.stringify(identity));
+        expect(await readdir(directory)).toContain(
+          `isolated-container-${identity.containerName}.json`
+        );
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('persists only container identity and requires the same identity before cleanup', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'sotto-isolated-journal-'));
     try {
