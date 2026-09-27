@@ -117,6 +117,7 @@ export async function processScriptWriting(
 
   // Write script
   const result = await writeScript({
+    revisionFeedback: job.data.revisionFeedback,
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
     tone: discovery.tone || 'casual',

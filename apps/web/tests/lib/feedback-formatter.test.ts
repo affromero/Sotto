@@ -21,8 +21,10 @@ describe('formatUserFeedback', () => {
     });
 
     expect(result).toContain('### Turn-Specific Comments');
-    expect(result).toContain('Turn 0 (HOST): "Too formal"');
-    expect(result).toContain('Turn 2 (HOST): "Great question"');
+    expect(result).toContain('Turn 0 (HOST), original text: "Welcome to the show"');
+    expect(result).toContain('Comment: "Too formal"');
+    expect(result).toContain('Turn 2 (HOST), original text: "Let us dive in"');
+    expect(result).toContain('Comment: "Great question"');
   });
 
   it('formats highlights', () => {
@@ -97,7 +99,8 @@ describe('formatUserFeedback', () => {
       sourceUrls: ['https://example.com/article', 'https://bbc.co.uk/news'],
     });
 
-    expect(result).toContain('### User-Provided Source URLs');
+    expect(result).toContain('### Suggested source URLs (unverified)');
+    expect(result).toContain('must not be cited without verification');
     expect(result).toContain('- https://example.com/article');
     expect(result).toContain('- https://bbc.co.uk/news');
   });
@@ -117,9 +120,9 @@ describe('formatUserFeedback', () => {
     });
 
     expect(result).toContain('### General Feedback');
-    expect(result).toContain('### User-Provided Source URLs');
+    expect(result).toContain('### Suggested source URLs (unverified)');
     expect(result.indexOf('General Feedback')).toBeLessThan(
-      result.indexOf('User-Provided Source URLs')
+      result.indexOf('Suggested source URLs')
     );
   });
 });

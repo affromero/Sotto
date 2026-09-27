@@ -672,22 +672,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(harnessSources).not.toContain('forkToListenRatio');
   });
 
-  it('keeps onboarding setup explicit about transcription readiness', () => {
-    const setupSources = ['apps/web/src/lib/setup-readiness.ts', 'apps/web/prisma/schema.prisma']
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-
-    expect(setupSources).toContain("id: 'stt'");
-    expect(setupSources).toContain("id: 'agent-ingestion'");
-    expect(setupSources).toContain('STT_PROVIDER');
-    expect(setupSources).toContain('buildSttProviderStatuses');
-    expect(setupSources).toContain('Transcript ingestion works without STT');
-    expect(setupSources).toContain('required: false');
-    expect(setupSources).toContain('required for imported audio without transcript');
-    expect(setupSources).not.toContain("stored === 'openai' ? undefined");
-    expect(setupSources).not.toContain('sttProvider      String? // null = auto');
-  });
-
   it('keeps voice generation on concrete TTS provider options', () => {
     const ttsSources = [
       'apps/web/src/app/api/v1/episodes/route.ts',

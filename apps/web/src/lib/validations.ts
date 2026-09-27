@@ -246,8 +246,18 @@ export const factoryResetSchema = z.object({
  */
 export const regenerateWithFeedbackSchema = z
   .object({
+    originalScript: z
+      .object({ id: z.string().min(1).max(100), version: z.number().int().positive() })
+      .strict()
+      .optional(),
     feedback: z.string().max(5000).optional(),
-    turnComments: z.record(z.coerce.number(), z.string().max(2000)).optional(),
+    turnComments: z
+      .record(z.coerce.number().int().min(0), z.string().max(2000))
+      .refine(
+        (comments) => Object.keys(comments).length <= 50,
+        'At most 50 turn comments are allowed'
+      )
+      .optional(),
     highlights: z
       .array(
         z.object({
@@ -260,6 +270,17 @@ export const regenerateWithFeedbackSchema = z
       .optional(),
     sourceUrls: z.array(z.string().url()).max(5).optional(),
   })
+  .strict()
+  .refine(
+    (feedback) =>
+      !(Object.keys(feedback.turnComments ?? {}).length || feedback.highlights?.length) ||
+      Boolean(feedback.originalScript),
+    'Annotations require the original script revision'
+  )
+  .refine(
+    (feedback) => JSON.stringify(feedback).length <= 20000,
+    'Feedback exceeds 20000 characters'
+  )
   .optional();
 
 /**

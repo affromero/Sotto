@@ -12,14 +12,6 @@
     {
       "tool": "knip",
       "mode": "all",
-      "file": "apps/web/src/lib/transcript-parser.ts",
-      "kind": "exports",
-      "name": "parseTranscript",
-      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
-    },
-    {
-      "tool": "knip",
-      "mode": "all",
       "file": "apps/web/tests/workers/sidedoor/incorporation-dispatch.test.ts",
       "kind": "binaries",
       "name": "ffmpeg",
@@ -40,30 +32,6 @@
       "kind": "devDependencies",
       "name": "postcss",
       "reason": "Required by the root $postcss override to pin the transitive build dependency."
-    },
-    {
-      "tool": "knip",
-      "mode": "production",
-      "file": "apps/web/src/lib/feedback-formatter.ts",
-      "kind": "files",
-      "name": "apps/web/src/lib/feedback-formatter.ts",
-      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
-    },
-    {
-      "tool": "knip",
-      "mode": "production",
-      "file": "apps/web/src/lib/setup-readiness.ts",
-      "kind": "files",
-      "name": "apps/web/src/lib/setup-readiness.ts",
-      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
-    },
-    {
-      "tool": "knip",
-      "mode": "production",
-      "file": "apps/web/src/lib/transcript-parser.ts",
-      "kind": "files",
-      "name": "apps/web/src/lib/transcript-parser.ts",
-      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
     },
     {
       "tool": "vulture",

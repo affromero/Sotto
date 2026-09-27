@@ -54,7 +54,8 @@ export function ScriptEditor({
 }: ScriptEditorProps) {
   const [turns, setTurns] = useState<TurnState[]>([]);
   const [references, setReferences] = useState<ReferenceData[]>([]);
-  const [, setVersion] = useState(0);
+  const [version, setVersion] = useState(0);
+  const [scriptId, setScriptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -99,6 +100,7 @@ export function ScriptEditor({
         savedTurnsRef.current = turnsWithIds;
         setReferences(data.references ?? []);
         setVersion(data.version ?? 0);
+        setScriptId(data.scriptId ?? null);
         setLoading(false);
       } catch (err) {
         if (!mounted) return;
@@ -342,12 +344,15 @@ export function ScriptEditor({
         const hasAnyFeedback =
           feedbackText || Object.keys(filteredComments).length > 0 || highlights.length > 0;
         const shouldSendBody = withFeedback && hasAnyFeedback;
+        if (shouldSendBody && dirty)
+          throw new Error('Save your script edits before sending revision feedback.');
         const res = await fetch(`/api/v1/episodes/${episodeId}/script/regenerate`, {
           method: 'POST',
           ...(shouldSendBody
             ? {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                  ...(scriptId ? { originalScript: { id: scriptId, version } } : {}),
                   ...(feedbackText ? { feedback: feedbackText } : {}),
                   ...(Object.keys(filteredComments).length > 0
                     ? { turnComments: filteredComments }
@@ -365,14 +370,17 @@ export function ScriptEditor({
               }
             : {}),
         });
-        if (!res.ok) throw new Error('Failed to regenerate');
+        if (!res.ok) {
+          const failure = await res.json().catch(() => null);
+          throw new Error(failure?.error || 'Failed to regenerate');
+        }
         onRegenerate();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to regenerate');
         setRegenerating(false);
       }
     },
-    [episodeId, onRegenerate, generalFeedback, turnComments, highlights]
+    [episodeId, onRegenerate, generalFeedback, turnComments, highlights, scriptId, version, dirty]
   );
 
   // Text selection for highlighting (desktop only)

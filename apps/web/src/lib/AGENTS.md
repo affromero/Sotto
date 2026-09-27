@@ -2,6 +2,23 @@
 
 All shared business logic and external service integrations live here.
 
+Script regeneration snapshots learner annotations against the original script
+revision and carries bounded `revisionFeedback` through research, planning and
+writing jobs. `feedback-formatter.ts` preserves the targeted dialogue. The writer
+treats these preferences as untrusted user data, subject to its existing evidence
+requirements. New source URLs are rejected before regeneration mutates data;
+start a new lesson with source material for research and verification.
+Annotated requests include `originalScript: {id, version}` from the loaded script;
+GET script supplies `scriptId`. Stale bindings and concurrent edits return 409.
+Raw bodies are capped at 65,536 bytes, parsed feedback at 20,000 characters, and
+feedback with its original dialogue at 40,000 characters.
+
+Learner note imports use `note-upload.ts`: text MIME types and supported text
+extensions remain source text, including subtitle timestamps. There is no episode
+subtitle parser or automatic speaker diarization contract. Onboarding readiness
+comes from the live credential session and local speech checks in `/welcome`,
+not a separate provider-key availability heuristic.
+
 Practice content reuses `generateSectionQuestions` for contextual vocabulary and
 focused expressions. Preserve exact word attribution for SRS, and carry reading
 `passageText` through both start and resume projections. Writing generation
@@ -273,7 +290,6 @@ Retain tombstones and cleanup identities while durable jobs can be replayed.
 | `theme-script.ts`              | Inline dark mode init script (`THEME_INIT_SCRIPT`) — prevents flash on page load                                                                                                                                                                                                                                                                                                                                                                                               | Pure utility                                                                                             |
 | `topic-tagger.ts`              | Keyword-based topic tag matcher: maps topics to tag slugs (deterministic, no AI)                                                                                                                                                                                                                                                                                                                                                                                               | Pure utility                                                                                             |
 | `media-bias.ts`                | MBFC media bias detection: domain lookup, alias resolution, political topic detection, `analyzeBias()` for source bias analysis                                                                                                                                                                                                                                                                                                                                                | Filesystem (static JSON)                                                                                 |
-| `transcript-parser.ts`         | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization                                                                                                                                                                                                                                                                                                                                                                                          | Uses `llm.ts`                                                                                            |
 | `tts-text-cleaner.ts`          | TTS text safety net: strips `[SFX:]` markers and `[N]` citations before sending to TTS. Provider-specific tag conversion handled upstream by `tts-tag-converter.ts`                                                                                                                                                                                                                                                                                                            | Pure utility                                                                                             |
 | `tts-generation.ts`            | Shared TTS generation core used by the listening audio pipeline: semaphore-controlled concurrency, `generateSpeech` with full params, BYOK 404 fallback, 429 concurrency updates, FFprobe duration measurement, usage logging. Also exports `getPlatformTtsKey()`                                                                                                                                                                                                              | Uses `providers/tts.ts`, `redis.ts`, `byok.ts`, `elevenlabs.ts`, `audio-stitcher.ts`, `usage-logger.ts`  |
 | `tts-tag-converter.ts`         | Explicit TTS tag converter: disabled by default; converts script inline markup to provider-native format only when a caller supplies an AI runtime                                                                                                                                                                                                                                                                                                                             | Uses `providers/ai.ts`, `tts-doc-fetcher.ts`                                                             |
