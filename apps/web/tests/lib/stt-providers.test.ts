@@ -18,7 +18,6 @@ const mockGetByokKey = vi.fn();
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
-  getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
   getSharedAiKey: (...args: unknown[]) => mockGetAiKey(...args),
   getSharedByokKey: async (...args: unknown[]) => {
     const key = await mockGetByokKey(...args);

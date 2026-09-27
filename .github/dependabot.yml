@@ -1,5 +1,14 @@
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: /apps/desktop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      desktop-npm:
+        patterns: ['*']
   # JavaScript / TypeScript (npm workspaces — the root lockfile covers
   # apps/web, packages/*, and services/*).
   - package-ecosystem: npm

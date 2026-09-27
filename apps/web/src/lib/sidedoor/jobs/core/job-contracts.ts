@@ -18,7 +18,7 @@ export function sottoJobFailureCode(error: unknown): string {
   return error instanceof SottoJobContractError ? error.code : 'database_or_queue_failure';
 }
 
-export const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new Map([
+const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new Map([
   ['content-extraction', [1]],
   ['deep-research', [1]],
   ['creative-planning', [1]],

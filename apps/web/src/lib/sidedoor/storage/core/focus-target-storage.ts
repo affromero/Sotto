@@ -4,7 +4,7 @@ import {
   CourseStorageChangedError,
 } from '@/lib/sidedoor/storage/core/course-storage';
 
-export class FocusTargetStorageChangedError extends Error {
+class FocusTargetStorageChangedError extends Error {
   constructor() {
     super('Learning target storage ownership changed');
     this.name = 'FocusTargetStorageChangedError';

@@ -1,6 +1,6 @@
 import styles from './charts.module.css';
 
-export interface BarRow {
+interface BarRow {
   label: string;
   v: number;
   color?: string;

@@ -1,14 +1,14 @@
-export type SetupCapabilityId =
+type SetupCapabilityId =
   'database' | 'queue' | 'storage' | 'generation' | 'tts' | 'agent-ingestion' | 'stt';
 
-export type SetupCapabilityStatus = 'ready' | 'action_required' | 'optional';
+type SetupCapabilityStatus = 'ready' | 'action_required' | 'optional';
 
 export interface ProviderStatus {
   provider: string;
   isValid: boolean;
 }
 
-export interface SetupCapability {
+interface SetupCapability {
   id: SetupCapabilityId;
   label: string;
   description: string;

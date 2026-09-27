@@ -16,7 +16,7 @@ export interface ModelConfig {
   sttModel: string;
 }
 
-export interface PlatformAiConfig {
+interface PlatformAiConfig {
   aiProvider: AiProviderId;
   aiModel: string;
 }
@@ -202,7 +202,7 @@ export function resolveIncludedModels(config: AutoModelConfigData): string[] {
   return config.includedModels ?? [config.model.aiModel];
 }
 
-export function disabledSystemAiProviderKey(providerId: SystemAiProviderId): string {
+function disabledSystemAiProviderKey(providerId: SystemAiProviderId): string {
   return `${DISABLED_SYSTEM_AI_PROVIDER_PREFIX}${providerId}`;
 }
 

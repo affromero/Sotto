@@ -51,7 +51,7 @@ type StitchingEpisode = Pick<
   segments: Pick<Prisma.SegmentGetPayload<{}>, 'id' | 'order' | 'duration' | 'ttsVoiceId'>[];
 };
 
-export interface StitchingProjection {
+interface StitchingProjection {
   kind: 'initial' | 'incorporation';
   operationId: string;
   fingerprint: string;

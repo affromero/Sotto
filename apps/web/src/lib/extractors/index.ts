@@ -9,13 +9,7 @@ import { safeFetch } from '../url-validator';
 import { logger } from '../logger';
 import { getAppBaseUrl } from '../urls';
 import type { ExtractedContent } from './types';
-
-export type {
-  ExtractedContent,
-  ExtractedTable,
-  ExtractedFigure,
-  ExtractedStatistic,
-} from './types';
+export type { ExtractedContent } from './types';
 
 const MIN_WORD_COUNT = 50;
 const FETCH_TIMEOUT_MS = 15000;

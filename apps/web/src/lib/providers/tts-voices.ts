@@ -365,7 +365,7 @@ export const KOKORO_VOICE_POOL: ProviderVoice[] = [
 // "default" and "alternate"; simple sidecars may map both to their default voice.
 // ---------------------------------------------------------------------------
 
-export const LOCAL_TTS_VOICE_POOL: ProviderVoice[] = [
+const LOCAL_TTS_VOICE_POOL: ProviderVoice[] = [
   { id: 'default', name: 'Default', gender: 'female', character: 'warm narrator' },
   { id: 'alternate', name: 'Alternate', gender: 'male', character: 'authoritative expert' },
 ];

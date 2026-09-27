@@ -150,7 +150,7 @@ const DEFAULT_CARTESIA_CONCURRENCY = 2;
  * Returns a cached value from Redis if available, otherwise the conservative default (2).
  * Unlike ElevenLabs, Cartesia has no API endpoint to query the limit — we learn it from 429 errors.
  */
-export async function getCartesiaConcurrencyLimit(apiKey: string): Promise<number> {
+async function getCartesiaConcurrencyLimit(apiKey: string): Promise<number> {
   const { cache } = await import('../../redis');
   const crypto = await import('crypto');
   const keyHash = crypto
@@ -170,7 +170,7 @@ export async function getCartesiaConcurrencyLimit(apiKey: string): Promise<numbe
  * Parse a Cartesia 429 error body for the actual concurrency limit and cache it.
  * Cartesia's 429 response includes "Current limit: N" — we extract and cache that value.
  */
-export async function updateCartesiaConcurrencyFromError(
+async function updateCartesiaConcurrencyFromError(
   apiKey: string,
   errorMessage: string
 ): Promise<void> {

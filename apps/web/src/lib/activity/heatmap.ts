@@ -13,19 +13,16 @@ import { prisma } from '@/lib/prisma';
  * pick); null falls back to the server's own timezone.
  */
 
-export const ACTIVITY_CATEGORIES = [
-  'full',
-  'grammar',
-  'reading',
-  'listening',
-  'speaking',
-  'writing',
-  'vocab',
-  'class',
-  'exam',
-] as const;
-
-export type ActivityCategory = (typeof ACTIVITY_CATEGORIES)[number];
+export type ActivityCategory =
+  | 'full'
+  | 'grammar'
+  | 'reading'
+  | 'listening'
+  | 'speaking'
+  | 'writing'
+  | 'vocab'
+  | 'class'
+  | 'exam';
 
 export interface ActivityEvent {
   at: Date;

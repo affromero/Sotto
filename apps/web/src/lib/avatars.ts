@@ -46,7 +46,7 @@ export function isBundledAvatarImage(value: string): boolean {
   return ANIMAL_AVATARS.some((avatar) => avatarImagePath(avatar.slug) === value);
 }
 
-export function getAnimalAvatar(slug: string): AnimalAvatar | undefined {
+function getAnimalAvatar(slug: string): AnimalAvatar | undefined {
   return BY_SLUG.get(slug);
 }
 
@@ -56,7 +56,7 @@ export function getAnimalAvatar(slug: string): AnimalAvatar | undefined {
  * instead of a bare initial. Deterministic, so the same profile always maps to
  * the same animal.
  */
-export function animalForSeed(seed: string): AnimalAvatar {
+function animalForSeed(seed: string): AnimalAvatar {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;

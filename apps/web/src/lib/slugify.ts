@@ -23,7 +23,7 @@ export function generateTagSlug(name: string): string {
 /**
  * Convert a title into a URL-safe slug (max 80 chars).
  */
-export function slugify(title: string): string {
+function slugify(title: string): string {
   return (
     title
       .trim()

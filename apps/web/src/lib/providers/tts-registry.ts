@@ -6,7 +6,6 @@ import { providerCredentialForm } from '@/lib/providers/shared/credential-fields
 import {
   CARTESIA_USAGE_ALLOWANCE,
   type ProviderUsageAllowance,
-  type ProviderUsageAllowancePreset,
 } from '../provider-usage/allowances';
 import { TTS_LANGUAGE_SUPPORT_SETS } from '../speech-language-support';
 
@@ -25,18 +24,16 @@ export type TtsProviderId =
   | 'playht'
   | 'local';
 
-export interface TtsProviderAuthField {
+interface TtsProviderAuthField {
   key: string;
   label: string;
   placeholder: string;
   type?: 'password' | 'text' | 'number';
   optional?: boolean;
 }
+type TtsProviderUsageAllowance = ProviderUsageAllowance;
 
-export type TtsProviderUsageAllowancePreset = ProviderUsageAllowancePreset;
-export type TtsProviderUsageAllowance = ProviderUsageAllowance;
-
-export interface TtsModelOption {
+interface TtsModelOption {
   id: string;
   displayName: string;
   tier: 'standard' | 'premium' | 'ultra';
@@ -577,7 +574,7 @@ export function isValidProviderId(id: string): id is TtsProviderId {
 // ---------------------------------------------------------------------------
 
 /** Serializable model option for client components (Set → string[]). */
-export interface TtsModelClientOption {
+interface TtsModelClientOption {
   id: string;
   displayName: string;
   tier: 'standard' | 'premium' | 'ultra';
@@ -630,17 +627,4 @@ export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
         voicesAreCrossLingual: p.voicesAreCrossLingual,
       }))
   );
-}
-
-/**
- * Quality tier ordering for auto-selection (higher = better).
- */
-const QUALITY_ORDER: Record<string, number> = {
-  standard: 0,
-  premium: 1,
-  ultra: 2,
-};
-
-export function compareQuality(a: TtsProviderMeta, b: TtsProviderMeta): number {
-  return (QUALITY_ORDER[b.qualityTier] ?? 0) - (QUALITY_ORDER[a.qualityTier] ?? 0);
 }

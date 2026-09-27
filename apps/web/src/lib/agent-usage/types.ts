@@ -1,8 +1,8 @@
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
-export type AgentUsageProviderId = string;
-export type AgentUsageProviderCategory = 'agent' | 'audio';
-export type AgentUsageProviderStatus = 'ready' | 'action_required' | 'unavailable';
+type AgentUsageProviderId = string;
+type AgentUsageProviderCategory = 'agent' | 'audio';
+type AgentUsageProviderStatus = 'ready' | 'action_required' | 'unavailable';
 
 export interface AgentUsageWindow {
   label: string;

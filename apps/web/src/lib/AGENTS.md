@@ -566,9 +566,8 @@ native provider when the model cannot fit that HTTP contract.
 
 ### Validation schemas & API routes
 
-- [ ] `validations.ts` → `byokSchema` — add to `provider` z.enum (otherwise BYOK key save returns 400)
 - [ ] `validations.ts` → `voicePreviewSchema` — add to `provider` z.enum (otherwise voice preview returns 400)
-- [ ] `api/settings/byok/route.ts` → DELETE uses `byokProviderSchema`; add providers through `byokSchema` so save/delete validation stays aligned
+- [ ] Add credential fields to the shared Sidedoor provider catalog used by credential selection and validation.
 
 ### Display names (shared + UI)
 

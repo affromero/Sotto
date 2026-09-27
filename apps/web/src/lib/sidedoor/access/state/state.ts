@@ -1,17 +1,7 @@
 import { z } from 'zod';
 import { accessStateSchema, initialAccessState } from 'thesidedoor-core/access';
 
-export const CREDENTIAL_SCOPES = [
-  'ai',
-  'tts',
-  'stt',
-  'music',
-  'visual',
-  'storage',
-  'pricing',
-] as const;
 export const INSTALLED_PROFILE_INITIALIZATION = 'sotto-installed-profiles-v1';
-export const credentialScopeSchema = z.enum(CREDENTIAL_SCOPES);
 export const sharedConfigurationValueSchema = z.record(z.string(), z.json());
 
 /** Access and provider ownership changes share one database commit. */
@@ -25,7 +15,7 @@ export const sidedoorStateSchema = z.object({
   }),
 });
 export type SidedoorState = z.infer<typeof sidedoorStateSchema>;
-export type CredentialScope = z.infer<typeof credentialScopeSchema>;
+export type CredentialScope = 'ai' | 'tts' | 'stt' | 'music' | 'visual' | 'storage' | 'pricing';
 
 export function initialSidedoorState(): SidedoorState {
   return {

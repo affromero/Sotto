@@ -9,9 +9,9 @@
 import { z } from 'zod';
 import type { CefrLevel, ExamInstitution, SkillType } from '@sotto/shared';
 
-export type ExamSectionFormat = 'mc' | 'listening' | 'speaking' | 'writing';
+type ExamSectionFormat = 'mc' | 'listening' | 'speaking' | 'writing';
 
-export const blueprintSectionSchema = z.object({
+const blueprintSectionSchema = z.object({
   skill: z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']),
   part: z.string().min(1),
   format: z.enum(['mc', 'listening', 'speaking', 'writing']),

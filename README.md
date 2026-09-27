@@ -457,3 +457,18 @@ See [all contributors](https://github.com/affromero/Sotto/graphs/contributors) a
 <div align="center">
 <sub>Built for people who'd rather own their learning than rent it.</sub>
 </div>
+
+## Dead-code checks
+
+The `Dead code` workflow runs on pull requests, main-branch pushes, and weekly.
+It uses the pinned [shared maintenance action](https://github.com/affromero/repo-maintenance)
+to reject new findings, stale reviewed exceptions, and scanner failures. Reports
+are attached to each workflow run. Dependabot updates the shared action and Knip.
+
+Keep runtime entry points in `knip.json`. Any retained finding in
+`.maintenance-exceptions.json` needs an exact identity and a review reason.
+
+Knip excludes the independently versioned `groundcheck` and `learning-model`
+submodules. Their tests and builds remain part of repository CI.
+The standalone desktop launcher has its own Knip scan and dependency updates,
+since it is intentionally outside the root npm workspaces.

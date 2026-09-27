@@ -12,7 +12,7 @@ import type { ContentDomain } from 'groundcheck';
 import type { ClaimContext } from './claim-extractor';
 import { capturedLearningAiOptions, type CapturedLearningAi } from '@/lib/learning-ai';
 
-export type GroundingReason = 'all_checks_failed' | 'unreliable_source' | 'low_quality_source';
+type GroundingReason = 'all_checks_failed' | 'unreliable_source' | 'low_quality_source';
 
 export interface GroundingInput {
   ref: ReferenceInput;
@@ -26,7 +26,7 @@ export interface GroundingInput {
  * Returns true when NO check passed — external + AI all failed.
  * This means we have zero evidence the reference is real.
  */
-export function needsGrounding(checks: VerificationCheck[]): boolean {
+function needsGrounding(checks: VerificationCheck[]): boolean {
   if (checks.length === 0) return true;
   return checks.every((c) => !c.passed);
 }

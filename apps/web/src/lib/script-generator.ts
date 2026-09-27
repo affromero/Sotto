@@ -424,17 +424,6 @@ const TONE_GUIDANCE_MAIN: Record<string, string> = {
     '- Deploy biting wit and irony to expose contradictions. Use the contrast between dry delivery and absurd subject matter. Employ rhetorical questions that answer themselves. Reference real headlines and public figures for satirical effect. Every joke should make a point. Use [audience laughs] sparingly for the sharpest lines.',
 };
 
-const TONE_GUIDANCE_REVISION: Record<string, string> = {
-  casual: '- Keep it light, use humor freely, casual language',
-  professional: '- Maintain a professional but warm tone',
-  socratic: '- Use the Socratic method — probing questions building on each other',
-  storytelling: '- Frame everything as narrative — characters, conflict, resolution',
-  comedic:
-    '- Maintain John Oliver-style comedy: setup/punchline, callbacks, absurdist escalation. Include [audience laughs] after punchlines.',
-  satirical:
-    '- Deploy biting wit and irony, dry delivery contrasting absurd subject matter. Use [audience laughs] sparingly.',
-};
-
 export interface SourceMetadata {
   title?: string;
   author?: string;
@@ -658,118 +647,6 @@ export async function generateScript(params: {
   const userMessage = params.sourceContent
     ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
     : `Topic: ${params.topic}\nDepth: ${params.depth}`;
-
-  const ai = createAIProvider(params.provider);
-  const response = await ai.generateResponse(
-    systemPrompt,
-    [{ role: 'user', content: userMessage }],
-    {
-      maxTokens: 12288,
-      apiKeyOverride: params.apiKeyOverride,
-      fetch: params.fetch,
-      signal: params.signal,
-      model: params.model,
-      useWebSearch: params.webSearchEnabled !== false,
-    }
-  );
-
-  return parseScriptResponse(response);
-}
-
-/**
- * Regenerate a script incorporating user feedback (general notes, per-turn comments, highlights).
- * Uses a lighter system prompt focused on addressing user preferences.
- */
-export async function generateScriptWithUserFeedback(params: {
-  topic: string;
-  depth: string;
-  audienceLevel: string;
-  audience?: string;
-  focusAreas: string[];
-  tone: string;
-  durationTarget: number;
-  sourceContent?: string;
-  sourceMetadata?: SourceMetadata;
-  speakers?: Array<{ name: string; description: string }>;
-  previousScript: Array<{ speaker: string; text: string; direction?: string }>;
-  previousReferences: Array<{
-    number: number;
-    title: string;
-    authors?: string;
-    year?: number;
-    url?: string;
-    type: string;
-    publisher?: string;
-    doi?: string;
-  }>;
-  userFeedback: string;
-  apiKeyOverride?: string;
-  fetch?: typeof fetch;
-  signal?: AbortSignal;
-  model?: string;
-  provider: string;
-  webSearchEnabled?: boolean;
-}): Promise<{
-  turns: ScriptTurn[];
-  soundCues: SoundCue[];
-  references: GeneratedReference[];
-  vocabulary: GeneratedVocabularyEntry[];
-  places: ScriptPlace[];
-  markdown: string;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  model: string;
-}> {
-  const feedbackSpeakers = params.speakers ?? [
-    { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation' },
-    {
-      name: 'EXPERT',
-      description: 'Knowledgeable, vivid storyteller, uses analogies and examples',
-    },
-  ];
-  const feedbackSpeakerSection = feedbackSpeakers
-    .map((s) => `- ${s.name}: ${s.description}`)
-    .join('\n');
-
-  const systemPrompt = loadAndRender('generation/script-revision-user.md', {
-    SPEAKER_SECTION: feedbackSpeakerSection,
-    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
-    TONE_GUIDANCE: TONE_GUIDANCE_REVISION[params.tone] || '',
-    AUDIENCE: params.audience || 'general',
-    AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
-    DURATION_TARGET: String(params.durationTarget),
-    WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
-    WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
-    WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
-    AUDIENCE_LEVEL: params.audienceLevel,
-    FOCUS_AREAS: params.focusAreas.join(', '),
-    BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
-    CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
-  });
-
-  const previousScriptText = params.previousScript
-    .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
-    .join('\n');
-
-  const previousRefsText = params.previousReferences
-    .map((r) => `[${r.number}] "${r.title}" (${r.type}) — ${r.url || 'no url'}`)
-    .join('\n');
-
-  const userMessage = `Topic: ${params.topic}
-Depth: ${params.depth}
-
-## USER FEEDBACK:
-${params.userFeedback}
-
-## PREVIOUS SCRIPT (to revise):
-${previousScriptText}
-
-## PREVIOUS REFERENCES:
-${previousRefsText}
-
-${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}` : ''}
-
-Revise the script addressing ALL user feedback. Keep what works, change what the user flagged. Return JSON only.`;
 
   const ai = createAIProvider(params.provider);
   const response = await ai.generateResponse(

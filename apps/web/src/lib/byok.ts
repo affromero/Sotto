@@ -16,27 +16,6 @@ export interface ByokKeyInfo {
   label: string | null;
 }
 
-/**
- * Retrieve and decrypt a user's BYOK key for a specific provider.
- * Returns null if the user has no key for that provider.
- */
-export async function getByokKey(
-  userId: string,
-  provider?: TtsProviderId | string
-): Promise<string | null> {
-  return (await getByokCredential(userId, provider))?.apiKey ?? null;
-}
-
-export async function getByokCredential(userId: string, provider?: TtsProviderId | string) {
-  const targetProvider = provider ?? 'elevenlabs';
-  return selectCredential(
-    userId,
-    targetProvider === 'suno' ? 'music' : 'tts',
-    targetProvider,
-    false
-  );
-}
-
 /** Caller has already authorized this learner. Keep all fields and provenance in one snapshot. */
 async function selectCredential(
   userId: string,
@@ -142,18 +121,6 @@ async function listProviderKeys(
   });
 }
 
-/**
- * Check if a user has any BYOK key configured.
- */
-export async function hasByokKey(
-  userId: string,
-  provider?: TtsProviderId | string
-): Promise<boolean> {
-  return (await listByokProviders(userId)).some(
-    (key) => key.isValid && (!provider || key.provider === provider)
-  );
-}
-
 export async function hasSharedByokKey(
   userId: string,
   provider?: TtsProviderId | string
@@ -185,13 +152,6 @@ export async function getAiKey(userId: string, provider?: AiProviderId) {
 export async function getSharedAiKey(userId: string, provider?: AiProviderId) {
   const selected = await selectCredential(userId, 'ai', provider, true);
   return selected ? { ...selected, provider: selected.provider as AiProviderId } : null;
-}
-
-/**
- * Check if a user has any AI BYOK key configured.
- */
-export async function hasAiKey(userId: string): Promise<boolean> {
-  return (await listAiProviders(userId)).some((key) => key.isValid);
 }
 
 /**

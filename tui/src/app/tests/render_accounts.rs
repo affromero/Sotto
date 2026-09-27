@@ -269,9 +269,9 @@
     }
 
     #[tokio::test]
-    async fn whoami_reads_the_live_identity_through_the_api_seam() {
-        // `sotto whoami` prefers a live `me()` call; the StubApi returns a known
-        // identity, proving the contract + Api method are wired end-to-end.
+    async fn api_identity_contract_returns_the_learner_identity() {
+        // Exercise the trait-object identity contract. The CLI uses the
+        // inherent SottoClient method covered by the HTTP client tests.
         let api: Arc<dyn Api> = Arc::new(StubApi);
         let me = api.me().await.expect("stub me");
         assert_eq!(me.id, "u_stub");

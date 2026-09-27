@@ -51,7 +51,7 @@ export interface MemoryNode {
   topicKey?: string;
 }
 
-export interface MemoryEdge {
+interface MemoryEdge {
   source: string;
   target: string;
   type: string;

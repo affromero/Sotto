@@ -3,7 +3,8 @@
  * converted to SFX inserts at render time. Scoped carefully to NOT
  * match speaker-level tags like [laughs], [chuckles], [sighs].
  */
-export const AUDIENCE_REACTION_PATTERN = /\[(?:audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
+const AUDIENCE_REACTION_PATTERN =
+  /\[(?:audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
 
 /**
  * Parenthetical stage directions that should be stripped from TTS input
@@ -11,9 +12,10 @@ export const AUDIENCE_REACTION_PATTERN = /\[(?:audience laughs?|audience laughte
  * correct format is [pause], [laughs], etc. When the LLM writes (pause)
  * in parentheses, TTS speaks it literally.
  */
-export const STAGE_DIRECTION_PATTERN = /\((?:(?:long |short |dramatic )?pause|laughs?|chuckles?|giggles?|sighs?|gasps?|whispers?|excited|sarcastic|curious|nervously|cautiously|beat|silence)\)/gi;
+export const STAGE_DIRECTION_PATTERN =
+  /\((?:(?:long |short |dramatic )?pause|laughs?|chuckles?|giggles?|sighs?|gasps?|whispers?|excited|sarcastic|curious|nervously|cautiously|beat|silence)\)/gi;
 
-export type AudienceReactionType = 'laugh_track' | 'applause';
+type AudienceReactionType = 'laugh_track' | 'applause';
 
 export interface AudienceReaction {
   type: AudienceReactionType;
@@ -26,11 +28,13 @@ export interface AudienceReaction {
  */
 export function extractAudienceReactions(text: string): AudienceReaction[] {
   const reactions: AudienceReaction[] = [];
-  const re = /\[(audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
+  const re =
+    /\[(audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
   let match;
   while ((match = re.exec(text)) !== null) {
     const tag = match[1].toLowerCase();
-    const type: AudienceReactionType = tag.includes('applause') || tag.includes('cheers') ? 'applause' : 'laugh_track';
+    const type: AudienceReactionType =
+      tag.includes('applause') || tag.includes('cheers') ? 'applause' : 'laugh_track';
     reactions.push({ type, offsetChars: match.index });
   }
   return reactions;
