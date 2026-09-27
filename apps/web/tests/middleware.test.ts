@@ -100,6 +100,42 @@ describe('public proxy routes without a database', () => {
       (await proxy(request('/api/v1/onboarding/check-storage', 'opaque-candidate'))).status
     ).toBe(503);
   });
+  it.each([
+    '/install.sh',
+    '/download',
+    '/download/mac?version=v0.1.0',
+    '/download/windows?version=v0.1.0',
+    '/download/linux?version=v0.1.0',
+  ])('serves the showcase distribution route %s without shared state', async (path) => {
+    vi.stubEnv('SELF_HOSTED', 'false');
+    for (const method of ['GET', 'HEAD']) {
+      const response = await proxy(
+        new NextRequest(new URL(path, 'http://localhost:3000'), { method })
+      );
+      expect(response.headers.get('x-middleware-next')).toBe('1');
+    }
+  });
+  it.each(['/install.sh', '/download', '/download/mac', '/download/windows', '/download/linux'])(
+    'keeps private-instance access and showcase writes protected for %s',
+    async (path) => {
+      expect((await proxy(request(path))).status).toBe(503);
+      vi.stubEnv('SELF_HOSTED', 'false');
+      for (const method of ['POST', 'DELETE']) {
+        const response = await proxy(
+          new NextRequest(new URL(path, 'http://localhost:3000'), { method })
+        );
+        expect(response.status).toBe(503);
+        expect(response.headers.get('cache-control')).toContain('no-store');
+      }
+    }
+  );
+  it.each(['/download-private', '/download/mac/private', '/install.sh/private', '/downloads'])(
+    'keeps showcase distribution lookalike paths protected: %s',
+    async (path) => {
+      vi.stubEnv('SELF_HOSTED', 'false');
+      expect((await proxy(request(path))).status).toBe(503);
+    }
+  );
 });
 
 const databaseUrl = process.env.SIDEDOOR_TEST_DATABASE_URL;
