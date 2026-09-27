@@ -5,6 +5,15 @@ import XCTest
 /// Practice sessions carry speaking prompts and a listening episode; both were
 /// decoded and then ignored by the iPad practice sheet.
 final class PracticeSessionContentTests: XCTestCase {
+    func testReadyPracticeAudioDownloadsFromAuthenticatedStorage() async throws {
+        let episode = try JSONDecoder().decode(SottoEpisode.self, from: Data(
+            #"{"id":"episode","audioUrl":"/api/v1/storage/practice.mp3","status":"READY"}"#.utf8
+        ))
+        let file = try await AudioDownloadTestProtocol.client().downloadLearningAudio(from: XCTUnwrap(episode.audioUrl))
+        defer { try? FileManager.default.removeItem(at: file) }
+        XCTAssertEqual(try Data(contentsOf: file), Data("audio fixture".utf8))
+    }
+
     private func start(_ json: String) throws -> SottoPracticeStart {
         try JSONDecoder().decode(SottoPracticeStart.self, from: Data(json.utf8))
     }

@@ -40,6 +40,14 @@ final class WorkbookDownloadTests: XCTestCase {
         var request = URLRequest(url: URL(string: "https://school.example:443/file.pdf")!)
         request.setValue("Bearer secret", forHTTPHeaderField: "Authorization")
         XCTAssertEqual(policy.redirectedRequest(request)?.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
+        let task = URLSession.shared.dataTask(with: request)
+        let redirect = URLRequest(url: URL(string: "https://school.example/final.pdf")!)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 307, httpVersion: nil, headerFields: nil)!
+        policy.urlSession(URLSession.shared, task: task, willPerformHTTPRedirection: response, newRequest: redirect) { safe in
+            XCTAssertEqual(safe?.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
+            XCTAssertFalse(safe?.httpShouldHandleCookies ?? true)
+        }
+        task.cancel()
         for destination in ["file:///tmp/private", "http://school.example/file.pdf", "https://user:password@school.example/file.pdf"] {
             XCTAssertNil(policy.redirectedRequest(URLRequest(url: URL(string: destination)!)))
         }

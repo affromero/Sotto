@@ -31,6 +31,15 @@ final class WorkbookDownloadRedirectPolicy: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        completionHandler(redirectedRequest(request))
+        guard var safe = redirectedRequest(request) else {
+            completionHandler(nil)
+            return
+        }
+        if let url = safe.url, let original = task.originalRequest, let originalURL = original.url,
+           Self.sameOrigin(url, serverURL), Self.sameOrigin(originalURL, serverURL) {
+            safe.setValue(original.value(forHTTPHeaderField: "Authorization"), forHTTPHeaderField: "Authorization")
+            safe.setValue(original.value(forHTTPHeaderField: "X-Sotto-Profile-Id"), forHTTPHeaderField: "X-Sotto-Profile-Id")
+        }
+        completionHandler(safe)
     }
 }

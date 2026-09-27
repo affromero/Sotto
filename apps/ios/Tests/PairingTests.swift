@@ -58,13 +58,13 @@ final class PairingTests: XCTestCase {
         XCTAssertTrue(message.contains("access password"), message)
     }
 
-    func testUnrelatedFailuresKeepTheirOwnMessage() {
+    func testProfileSelectionFailurePreservesTheServerExplanation() {
         let message = SottoAppModel.pairingFailureMessage(
-            for: SottoAPIError.message("Sotto returned HTTP 503."),
+            for: SottoAPIError.message("Choose a household profile first"),
             host: "sotto.afromero.co",
             sentPassword: true
         )
-        XCTAssertEqual(message, "Sotto returned HTTP 503.")
+        XCTAssertEqual(message, "Choose a household profile first")
     }
 
     func testScannedPairingLinkKeepsServerAndToken() throws {

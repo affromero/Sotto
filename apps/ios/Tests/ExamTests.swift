@@ -3,6 +3,17 @@ import XCTest
 @testable import Sotto
 
 final class ExamTests: XCTestCase {
+    func testExamListeningUsesAuthenticatedRelativeAudio() async throws {
+        let episode = try decode(
+            #"{"id":"episode","audioUrl":"/api/v1/storage/exam.mp3","status":"READY"}"#,
+            as: SottoExamEpisode.self
+        )
+        let reference = try XCTUnwrap(episode.audioUrl)
+        let file = try await AudioDownloadTestProtocol.client().downloadLearningAudio(from: reference)
+        defer { try? FileManager.default.removeItem(at: file) }
+        XCTAssertEqual(try Data(contentsOf: file), Data("audio fixture".utf8))
+    }
+
     private func decode<T: Decodable>(_ json: String, as type: T.Type) throws -> T {
         try JSONDecoder().decode(type, from: Data(json.utf8))
     }
