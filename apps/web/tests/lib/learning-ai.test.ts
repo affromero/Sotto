@@ -59,7 +59,7 @@ vi.mock('@/lib/sidedoor/credentials/runtime/credential-execution', () => ({
     _scope: string,
     _provider: string,
     allowSharing: boolean
-  ) => allowSharing ? mockGetModerationCredential() : mockGetSelectedCredential(),
+  ) => (allowSharing ? mockGetModerationCredential() : mockGetSelectedCredential()),
   capturePreferredSottoExecutionCredential: async () => {
     const selected = await mockGetAiKey();
     if (!selected) return null;
@@ -83,7 +83,12 @@ async function resolveLearningAi(userId: string) {
     ...blockedProviderExecution(userId),
     authorize: async () => ({ userId }),
   });
-  return { provider: resolved.provider, model: resolved.model, apiKey: resolved.apiKey };
+  return {
+    provider: resolved.provider,
+    model: resolved.model,
+    apiKey: resolved.apiKey,
+    ...(resolved.endpoint ? { endpoint: resolved.endpoint } : {}),
+  };
 }
 
 // Default: configured AI provider differs from the BYOK provider, so the BYOK
@@ -352,7 +357,11 @@ describe('resolveLearningAi', () => {
 
     // Model carries the "local:" prefix so the llm.ts router/createAIProvider
     // dispatch to the local provider without the registry guardrail.
-    expect(resolved).toEqual({ provider: 'local', model: 'local:qwen3' });
+    expect(resolved).toEqual({
+      provider: 'local',
+      model: 'local:qwen3',
+      endpoint: 'http://localhost:11434/v1',
+    });
     expect(resolved.apiKey).toBeUndefined();
     // The local path resolves the model from shared configuration, not the registry.
     expect(mockGetAiProviderMeta).not.toHaveBeenCalled();

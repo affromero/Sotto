@@ -29,6 +29,22 @@ export interface ResolvedLearningAi {
   apiKey?: string;
 }
 
+async function resolveLocalLearningAi(
+  model?: string,
+  endpoint?: string
+): Promise<ResolvedLearningAi> {
+  const configured = model && endpoint ? null : await getServerInfra();
+  const localModel = (model ?? configured?.aiModel ?? '')
+    .trim()
+    .replace(/^local:/, '')
+    .trim();
+  if (!localModel) throw new Error('The local AI provider requires a configured local model.');
+  const localEndpoint = (endpoint ?? configured?.aiBaseUrl ?? '').trim();
+  if (!localEndpoint)
+    throw new Error('The local AI provider requires a configured local AI endpoint.');
+  return { provider: 'local', model: `local:${localModel}`, endpoint: localEndpoint };
+}
+
 /** Capture the exact provider chosen by durable episode policy. */
 export async function resolveCapturedLearningAiForProvider(
   userId: string,
@@ -51,6 +67,11 @@ export async function resolveCapturedLearningAiForProvider(
     throw new Error('The selected AI credential recipient changed');
   if (!credential && providerRequiresAiKey(provider))
     throw new Error(`AI credential for provider "${provider}" is required.`);
+  if (!credential && provider === 'local')
+    return {
+      ...(await resolveLocalLearningAi(model)),
+      execution: { ...execution, userId, credential },
+    };
   return {
     provider,
     model,
@@ -145,15 +166,14 @@ export async function resolveCapturedLearningAi(
       select: { preferredAiProvider: true, preferredAiModel: true },
     });
   });
-  const preferred = pendingSelection ??
+  const preferred =
+    pendingSelection ??
     (learner?.preferredAiProvider && learner.preferredAiModel
       ? { provider: learner.preferredAiProvider, model: learner.preferredAiModel }
       : null);
   if (preferred?.provider === 'local' && preferred.model.startsWith('local:')) {
     return {
-      provider: 'local',
-      model: preferred.model,
-      ...(preferred.endpoint ? { endpoint: preferred.endpoint } : {}),
+      ...(await resolveLocalLearningAi(preferred.model, preferred.endpoint)),
       execution: { ...execution, userId },
     };
   }
@@ -280,18 +300,7 @@ async function resolveLearningAiWithKey(
   // The model is selected in shared configuration and routed by the "local:" prefix so the
   // llm.ts guardrail does not require it to be a registered model id.
   if (selectedProvider === 'local') {
-    const model = (infra('aiModel') ?? '').trim();
-    if (!model) {
-      throw new Error(
-        'The local AI provider requires a configured local model (for example "qwen3", "gemma3", or "llama3.3").'
-      );
-    }
-    if (!(infra('aiBaseUrl') ?? '').trim()) {
-      throw new Error(
-        'The local AI provider requires a configured local AI endpoint (for example http://localhost:11434/v1 for Ollama).'
-      );
-    }
-    return { provider: 'local', model: `local:${model}` };
+    return resolveLocalLearningAi();
   }
 
   throw new Error(
