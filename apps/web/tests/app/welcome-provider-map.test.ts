@@ -65,7 +65,7 @@ describe('resolveAi', () => {
   });
 
   it('maps cloud LLM key cards (xai/deepseek/mistral/groq/nvidia) to their registry id', () => {
-    for (const p of ['xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
+    for (const p of ['meta', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
       const r = resolveAi(p, 'key', `${p}-key`, '');
       expect(r.preferredAiProvider).toBe(p);
       expect(r.keyPost).toEqual({ endpoint: 'ai-keys', provider: p, apiKey: `${p}-key` });
@@ -323,7 +323,7 @@ describe('model provider id helpers', () => {
   });
 
   it('maps cloud LLM wizard ids to their registry provider', () => {
-    for (const p of ['google', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
+    for (const p of ['google', 'meta', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia']) {
       expect(aiModelProviderId(p)).toBe(p);
     }
   });

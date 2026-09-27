@@ -79,6 +79,35 @@ describe('createSegmentsAndQueueAudio', () => {
     }
   });
 
+  it('binds parent authorization to the exact generation committed with its child jobs', async () => {
+    const bindings: string[] = [];
+    await createSegmentsAndQueueAudio('episode-1', [{ speaker: 'HOST', text: 'First turn' }], {
+      authorize: async () => ({ userId: 'learner-1' }),
+      onPrepared: async (database, generationKey) => {
+        await database.episode.update({
+          where: { id: 'episode-1' },
+          data: { topic: generationKey },
+        });
+        bindings.push(generationKey);
+      },
+    });
+    expect(bindings).toEqual([
+      (mocks.admittedChildren[0].payload as { audioGenerationKey: string }).audioGenerationKey,
+    ]);
+  });
+
+  it('does not admit children when the original preparation refuses generation ownership', async () => {
+    await expect(
+      createSegmentsAndQueueAudio('episode-1', [{ speaker: 'HOST', text: 'First turn' }], {
+        authorize: async () => ({ userId: 'learner-1' }),
+        onPrepared: async () => {
+          throw new Error('Preparation was revoked');
+        },
+      })
+    ).rejects.toThrow('revoked');
+    expect(mocks.admittedChildren).toEqual([]);
+  });
+
   it('invalidates and requeues every segment in a replacement audio attempt', async () => {
     mocks.segmentFindMany.mockResolvedValue([{ id: 'segment-1' }, { id: 'segment-2' }]);
     mocks.segmentUpdate

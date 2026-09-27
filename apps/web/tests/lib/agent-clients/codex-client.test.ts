@@ -5,8 +5,14 @@ import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { executeCodex, streamCodex } from '@/lib/codex-client';
 import { CodexProvider } from '@/lib/providers/codex';
 import { usageFromGenerationError } from 'thesidedoor-core/ai/usage';
+import { isolatedFixture } from './isolated-fixture';
 
 describe('Codex CLI execution', () => {
+  it('fails closed when isolation is requested for an unsupported protocol', async () => {
+    await expect(executeCodex('System', 'Prompt', { isolated: isolatedFixture() })).rejects.toThrow(
+      'Isolated Codex execution is not supported'
+    );
+  });
   let directory: string;
   let originalEnv: NodeJS.ProcessEnv;
   const done = {

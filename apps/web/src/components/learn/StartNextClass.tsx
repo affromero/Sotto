@@ -24,6 +24,22 @@ interface GenerationProgress {
   currentStep: number;
   totalSteps: number;
   elapsedSeconds: number | null;
+  operationId?: string;
+  operationStatus?: string;
+  result?: string | null;
+}
+
+interface PreparationActivity {
+  aiProvider: string;
+  aiModel: string;
+  availableAt: string;
+  timeZone: string;
+  maxProviderRequests: number | null;
+  providerRequestsAdmitted: number | null;
+  events?: { sequence: number; at: number; type: string }[];
+  truncated?: boolean;
+  next?: number;
+  latest?: number;
 }
 
 export function StartNextClass({ courseId, activeClassId }: StartNextClassProps) {
@@ -33,6 +49,11 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
   const [generation, setGeneration] = useState<GenerationProgress | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isMonitoringExisting, setIsMonitoringExisting] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [requestLimit, setRequestLimit] = useState(128);
+  const [activity, setActivity] = useState<PreparationActivity | null>(null);
+  const [acknowledgeUnknownOutcome, setAcknowledgeUnknownOutcome] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   const activeController = useRef<AbortController | null>(null);
   const buttonLabel = activeClassId ? 'Resume class' : 'Take a class';
 
@@ -50,13 +71,14 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     }
   }
 
-  function startPolling(monitoringExisting: boolean) {
+  function startPolling(monitoringExisting: boolean, pollNow = true) {
     activeController.current?.abort();
     const controller = new AbortController();
     activeController.current = controller;
     setIsMonitoringExisting(monitoringExisting);
+    setActivity(null);
     setPhase('generating');
-    void pollGenerationProgress(controller.signal);
+    if (pollNow) void pollGenerationProgress(controller.signal, monitoringExisting);
     return controller;
   }
 
@@ -69,17 +91,19 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       return;
     }
 
-    const controller = startPolling(false);
+    const controller = startPolling(false, false);
     let keepPolling = false;
 
     try {
       const res = await fetch(`/api/v1/courses/${courseId}/next-class`, {
         method: 'POST',
+        headers: { Prefer: 'respond-async' },
         signal: controller.signal,
       });
 
-      if (res.status === 201) {
+      if (res.status === 201 || res.status === 202) {
         keepPolling = true;
+        void pollGenerationProgress(controller.signal, false);
         return;
       }
 
@@ -91,6 +115,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         };
         if (data.status === 'GENERATING') {
           keepPolling = true;
+          void pollGenerationProgress(controller.signal, true);
           return;
         }
         if (data.cancelled) {
@@ -101,6 +126,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         }
         if (data.activeClassId) {
           keepPolling = true;
+          void pollGenerationProgress(controller.signal, true);
           return;
         }
         stopPolling(controller);
@@ -129,6 +155,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       if (progress?.status === 'GENERATING') {
         keepPolling = true;
         setError('');
+        void pollGenerationProgress(controller.signal, true);
         return;
       }
 
@@ -156,6 +183,11 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         setPhase('idle');
         return;
       }
+      const body = (await res.json()) as { cancelling?: boolean };
+      if (body.cancelling) {
+        startPolling(true);
+        return;
+      }
       setGeneration(null);
       setPhase('idle');
       router.refresh();
@@ -164,8 +196,60 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       setGeneration(null);
       setPhase('idle');
     } finally {
-      activeController.current = null;
       setIsCancelling(false);
+    }
+  }
+
+  async function handleSchedule(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    const date = new Date(scheduledAt);
+    if (!Number.isFinite(date.getTime())) {
+      setError('Choose a preparation time.');
+      return;
+    }
+    try {
+      const response = await fetch(`/api/v1/courses/${courseId}/preparation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          availableAt: date.toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          maxProviderRequests: requestLimit,
+          deferAudio: true,
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json()) as { error?: unknown };
+        setError(typeof body.error === 'string' ? body.error : 'Could not schedule preparation.');
+        return;
+      }
+      startPolling(true);
+    } catch {
+      setError('Could not reach Sotto to schedule preparation.');
+    }
+  }
+
+  async function handleRecovery() {
+    setIsRecovering(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/v1/courses/${courseId}/preparation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledgeUnknownOutcome }),
+      });
+      const body = (await response.json()) as { error?: string; status?: string };
+      if (!response.ok) {
+        setError(body.error ?? 'Cleanup could not be confirmed.');
+        return;
+      }
+      setAcknowledgeUnknownOutcome(false);
+      startPolling(true);
+    } catch {
+      setError('Could not reach Sotto to recover preparation.');
+    } finally {
+      setIsRecovering(false);
     }
   }
 
@@ -178,13 +262,59 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
 
     const progress = (await res.json()) as GenerationProgress;
     setGeneration(progress);
+    if (progress.operationId) {
+      try {
+        const result = await fetch(`/api/v1/courses/${courseId}/preparation?limit=100`, {
+          cache: 'no-store',
+          signal,
+        });
+        if (result.ok && !signal?.aborted) {
+          const first = (await result.json()) as PreparationActivity;
+          if (first.next !== undefined && first.latest !== undefined && first.next < first.latest) {
+            const rest = await fetch(
+              `/api/v1/courses/${courseId}/preparation?limit=100&after=${first.next}`,
+              { cache: 'no-store', signal }
+            );
+            if (rest.ok) {
+              const page = (await rest.json()) as PreparationActivity;
+              first.events = [...(first.events ?? []), ...(page.events ?? [])].slice(-128);
+              first.truncated ||= page.truncated;
+            }
+          }
+          if (!signal?.aborted) setActivity(first);
+        }
+      } catch (error) {
+        if (isAbortError(error)) throw error;
+      }
+    } else {
+      setActivity(null);
+    }
     return progress;
   }
 
-  async function pollGenerationProgress(signal: AbortSignal) {
+  async function pollGenerationProgress(signal: AbortSignal, monitoringExisting: boolean) {
     while (!signal.aborted) {
       try {
         const progress = await fetchGenerationProgress(signal);
+        if (signal.aborted) return;
+        if (monitoringExisting && progress?.status === 'IDLE') {
+          if (activeController.current) stopPolling(activeController.current);
+          setPhase('idle');
+          setError('No preparation is currently scheduled.');
+          return;
+        }
+        if (progress?.result === 'done') {
+          if (activeController.current) stopPolling(activeController.current);
+          setPhase('done');
+          return;
+        }
+        if (progress && ['FAILED', 'UNRESOLVED', 'CANCELLED'].includes(progress.status)) {
+          activeController.current?.abort();
+          activeController.current = null;
+          setError(progress.status === 'CANCELLED' ? '' : progress.detail);
+          setPhase('idle');
+          return;
+        }
         if (isClassReadyToOpen(progress)) {
           activeController.current?.abort();
           activeController.current = null;
@@ -198,6 +328,56 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       await wait(1500, signal);
     }
   }
+
+  const activityView = activity && (
+    <details className={styles.schedule}>
+      <summary>Preparation activity</summary>
+      <p>
+        {activity.aiProvider}: {activity.aiModel}
+      </p>
+      <p>
+        Scheduled:{' '}
+        {new Date(activity.availableAt).toLocaleString(undefined, { timeZone: activity.timeZone })}{' '}
+        ({activity.timeZone})
+      </p>
+      <p>
+        {activity.maxProviderRequests === null
+          ? 'Model requests are not counted for this manual preparation.'
+          : `${activity.providerRequestsAdmitted ?? 0} of ${activity.maxProviderRequests} model requests admitted, including retries.`}
+      </p>
+      {activity.truncated && <p>Older activity is no longer retained.</p>}
+      <ol>
+        {activity.events?.map((event) => (
+          <li key={event.sequence}>
+            {event.type.replaceAll('_', ' ')} at {new Date(event.at).toLocaleTimeString()}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+  const recoveryView = generation && ['UNRESOLVED', 'CANCELLING'].includes(generation.status) && (
+    <div className={styles.schedule}>
+      <p>
+        Recovery checks that local work has stopped. It does not repeat the interrupted request.
+      </p>
+      <label className={styles.recoveryConsent}>
+        <input
+          type="checkbox"
+          checked={acknowledgeUnknownOutcome}
+          onChange={(event) => setAcknowledgeUnknownOutcome(event.target.checked)}
+        />
+        I understand that the provider may have charged for an interrupted request.
+      </label>
+      <button
+        type="button"
+        className={styles.button}
+        disabled={!acknowledgeUnknownOutcome || isRecovering}
+        onClick={handleRecovery}
+      >
+        {isRecovering ? 'Checking cleanup...' : 'Check cleanup and recover'}
+      </button>
+    </div>
+  );
 
   if (phase === 'done') {
     return (
@@ -219,7 +399,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     const meta = generation
       ? `Step ${generation.currentStep || 1} of ${generation.totalSteps}`
       : 'Starting generation';
-    const canCancel = !isMonitoringExisting && (!generation || generation.status === 'GENERATING');
+    const canCancel = !generation || generation.status === 'GENERATING';
 
     return (
       <div
@@ -250,6 +430,13 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
             </button>
           ) : null}
         </div>
+        {activityView}
+        {recoveryView}
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
       </div>
     );
   }
@@ -261,6 +448,8 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
           {error}
         </p>
       )}
+      {activityView}
+      {recoveryView}
       <button
         type="button"
         className={styles.button}
@@ -269,21 +458,65 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       >
         {buttonLabel}
       </button>
+      <button type="button" className={styles.cancelButton} onClick={() => startPolling(true)}>
+        Check preparation
+      </button>
+      {!activeClassId && (
+        <details className={styles.schedule}>
+          <summary>Prepare a class later</summary>
+          <form onSubmit={handleSchedule}>
+            <p>
+              Prepare once within the next seven days, using your selected API model. Audio is
+              generated only after you review the class and request it.
+            </p>
+            <p>
+              Preparation uses your course level, saved course notes, and review targets. You can
+              edit your notes and vocabulary before the task runs.
+            </p>
+            <label>
+              Preparation time (your local time)
+              <input
+                type="datetime-local"
+                required
+                value={scheduledAt}
+                onChange={(event) => setScheduledAt(event.target.value)}
+              />
+            </label>
+            <label>
+              Maximum model requests, including retries
+              <input
+                type="number"
+                min={1}
+                max={256}
+                required
+                value={requestLimit}
+                onChange={(event) => setRequestLimit(Number(event.target.value))}
+              />
+            </label>
+            <p>
+              This limits requests, not currency. Provider charges depend on the model and tokens
+              used.
+            </p>
+            <button className={styles.button} type="submit">
+              Schedule preparation
+            </button>
+          </form>
+        </details>
+      )}
     </div>
   );
 }
 
 function wait(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve) => {
-    const timeout = window.setTimeout(resolve, ms);
-    signal.addEventListener(
-      'abort',
-      () => {
-        window.clearTimeout(timeout);
-        resolve();
-      },
-      { once: true }
-    );
+    const finish = () => {
+      window.clearTimeout(timeout);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timeout = window.setTimeout(finish, ms);
+    signal.addEventListener('abort', finish, { once: true });
+    if (signal.aborted) finish();
   });
 }
 

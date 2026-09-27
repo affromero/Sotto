@@ -5,6 +5,7 @@ import { captureEpisodeStorage } from '@/lib/sidedoor/storage/core/episode-stora
 import { resolveStorageInput } from '@/lib/sidedoor/storage/core/storage-inputs';
 import type { CredentialExecutionAuthority } from '@/lib/sidedoor/credentials/runtime/credential-execution';
 import { normalizeCompletedStitchStorage } from '@/lib/sidedoor/jobs/initial/initial-stitch-relocation';
+import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
 
 /** The caller supplies the original request or generation-job authority in this transaction. */
 async function captureInitialStitchState(
@@ -18,6 +19,7 @@ async function captureInitialStitchState(
   if (!generationKey.trim())
     throw new AccessError('invalid', 'An audio generation key is required');
   const identity = await authorize(database);
+  await validatePreparationAudio(database, episodeId, generationKey);
   const storage = await captureEpisodeStorage(database, episodeId);
   if (storage.userId !== identity.userId)
     throw new AccessError('forbidden', 'The stitching owner changed');

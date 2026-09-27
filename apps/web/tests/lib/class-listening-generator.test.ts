@@ -291,6 +291,19 @@ describe('generateClassListening', () => {
   });
 
   describe('happy path', () => {
+    it('prepares scheduled listening for review without starting audio jobs', async () => {
+      setupHappyPath();
+      mockCreateSegmentsAndQueueAudio.mockRejectedValue(
+        new Error('Audio must await learner review')
+      );
+      const result = await generateClassListening({ ...PARAMS, deferAudio: true });
+      expect(result).toEqual({ sectionId: 'section-1', episodeId: 'episode-1' });
+      expect(mockEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-1' },
+        data: { status: 'SCRIPT_READY' },
+      });
+    });
+
     it('returns { sectionId, episodeId } on success', async () => {
       setupHappyPath();
 

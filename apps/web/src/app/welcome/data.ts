@@ -624,6 +624,16 @@ export const PROVIDERS: Provider[] = [
     keyHint: 'xai-…',
   },
   {
+    id: 'meta',
+    name: 'Muse Spark',
+    meta: 'Meta · Standard tier',
+    icon: 'spark',
+    apiUrl: 'https://dev.meta.ai/',
+    apiLabel: 'API',
+    kind: 'key',
+    keyHint: 'Your Meta Model API key',
+  },
+  {
     id: 'deepseek',
     name: 'DeepSeek',
     meta: 'DeepSeek · API key',

@@ -27,6 +27,7 @@ import {
 } from '@/lib/sidedoor/jobs/initial/initial-stitch-admission';
 import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
 
 export async function processAudioGeneration(
   job: Job<GenerateAudioPayload>,
@@ -98,6 +99,7 @@ export async function processAudioGeneration(
   );
   async function authorizeGeneration(database: Prisma.TransactionClient) {
     signal.throwIfAborted();
+    await validatePreparationAudio(database, episodeId, audioGenerationKey);
     await validateEpisodeStorage(database, episodeId, executionOwnership);
     const current = await database.segment.findUnique({
       where: { id: segmentId },
@@ -218,6 +220,7 @@ export async function processAudioGeneration(
   const execution: SottoProviderExecution = {
     userId: episode.userId,
     authorize: async (database) => {
+      await validatePreparationAudio(database, episodeId, audioGenerationKey);
       await validateEpisodeStorage(database, episodeId, executionOwnership);
       await readStorageInputs(database);
       return { userId: episode.userId };
@@ -415,6 +418,7 @@ export async function processAudioGeneration(
   }
   const storageWriter = await captureSottoStorageWriter();
   async function validateStorage(tx: Prisma.TransactionClient, committedReference?: string) {
+    await validatePreparationAudio(tx, episodeId, audioGenerationKey);
     await validateEpisodeStorage(tx, episodeId, captured.ownership);
     if (
       JSON.stringify(await readStorageInputs(tx, committedReference)) !==

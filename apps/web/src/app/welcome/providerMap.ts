@@ -113,7 +113,7 @@ export function aiModelProviderId(wizardId: string): string | null {
   if (wizardId === 'codex') return 'openai';
   // Cloud LLM cards use their registry id directly (google + the OpenAI-compatible
   // providers). local/custom return null (free-text model, not a registry picker).
-  if (['google', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia'].includes(wizardId)) {
+  if (['google', 'meta', 'xai', 'deepseek', 'mistral', 'groq', 'nvidia'].includes(wizardId)) {
     return wizardId;
   }
   return null;

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isolatedFixture } from './isolated-fixture';
 
 const executeCodex = vi.fn();
 const executeClaudeCode = vi.fn();
@@ -19,6 +20,38 @@ vi.mock('@/lib/claude-code-client', () => ({
 }));
 
 describe('CLI agent providers', () => {
+  it('preserves an explicit isolation requirement at the Codex process boundary', async () => {
+    const { CodexProvider } = await import('@/lib/providers/codex');
+    const isolated = isolatedFixture();
+    executeCodex.mockRejectedValueOnce(new Error('Isolated Codex execution is not supported'));
+    await expect(
+      new CodexProvider().generateResponse('', [{ role: 'user', content: 'Prepare practice' }], {
+        isolated,
+      })
+    ).rejects.toThrow('Isolated Codex execution is not supported');
+    expect(executeCodex).toHaveBeenCalledWith(
+      '',
+      'Prepare practice',
+      expect.objectContaining({ isolated })
+    );
+  });
+  it('keeps isolated authority rejection visible to the Claude caller', async () => {
+    const { ClaudeCodeProvider } = await import('@/lib/providers/claude-code');
+    const isolated = isolatedFixture();
+    executeClaudeCode.mockRejectedValueOnce(new Error('broker authority revoked'));
+    await expect(
+      new ClaudeCodeProvider().generateResponse(
+        '',
+        [{ role: 'user', content: 'Prepare practice' }],
+        { model: 'claude-code:claude-test-model', isolated }
+      )
+    ).rejects.toThrow('broker authority revoked');
+    expect(executeClaudeCode).toHaveBeenCalledWith(
+      '',
+      'Prepare practice',
+      expect.objectContaining({ isolated })
+    );
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     executeCodex.mockResolvedValue({

@@ -62,6 +62,7 @@ export class ClaudeCodeProvider implements AIProvider {
       signal: opts?.signal,
       onUsage: opts?.onUsage,
       useWebSearch: opts?.useWebSearch,
+      isolated: opts?.isolated,
       ...(images.length ? { images } : {}),
     });
     return { ...result, model: reportedModel };
@@ -85,6 +86,7 @@ export class ClaudeCodeProvider implements AIProvider {
           signal,
           onUsage: opts?.onUsage,
           useWebSearch: opts?.useWebSearch,
+          isolated: opts?.isolated,
           ...(images.length ? { images } : {}),
         });
       },

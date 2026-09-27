@@ -5,6 +5,7 @@
 
 interface TtsProviderLogoProps {
   provider:
+    | 'meta'
     | 'elevenlabs'
     | 'openai'
     | 'cartesia'
@@ -229,7 +230,15 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#F55036" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
             Gq
           </text>
         </svg>
@@ -238,7 +247,15 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#5B21B6" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
             Gl
           </text>
         </svg>
@@ -247,7 +264,15 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#0B1F3A" />
-          <text x="12" y="16" textAnchor="middle" fill="#3DD6C4" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#3DD6C4"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
             Sm
           </text>
         </svg>
@@ -263,7 +288,15 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#4D6BFE" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
             DS
           </text>
         </svg>
@@ -272,7 +305,15 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#76B900" />
-          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#fff"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
             NV
           </text>
         </svg>
@@ -281,7 +322,15 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#111827" />
-          <text x="12" y="16" textAnchor="middle" fill="#A78BFA" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fill="#A78BFA"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
             Ri
           </text>
         </svg>
@@ -297,14 +346,28 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#D4A574" />
-          <path d="M7.5 8.5l-2 3.5 2 3.5M16.5 8.5l2 3.5-2 3.5M13.5 7l-3 10" stroke="#3D2B1F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path
+            d="M7.5 8.5l-2 3.5 2 3.5M16.5 8.5l2 3.5-2 3.5M13.5 7l-3 10"
+            stroke="#3D2B1F"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
         </svg>
       );
     case 'codex':
       return (
         <svg {...props}>
           <rect width="24" height="24" rx="4" fill="#0B0B0B" />
-          <path d="M7 9l-2.5 3L7 15M17 9l2.5 3L17 15M13.5 8l-3 8" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path
+            d="M7 9l-2.5 3L7 15M17 9l2.5 3L17 15M13.5 8l-3 8"
+            stroke="#fff"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
         </svg>
       );
     case 'kokoro':
@@ -324,6 +387,17 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           </text>
         </svg>
       );
+    case 'meta':
+      return (
+        <svg {...props}>
+          <path
+            d="M12 12C8 3 3 5 3 13c0 7 5 6 9-1s9-8 9 1c0 7-5 6-9-1Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        </svg>
+      );
     case 'local':
       return (
         <svg {...props}>
@@ -338,6 +412,7 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
+  meta: 'Meta (Muse)',
   elevenlabs: 'ElevenLabs',
   openai: 'OpenAI',
   cartesia: 'Cartesia',

@@ -163,6 +163,10 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
       <label className={styles.fieldLabel} htmlFor={`course-notes-${courseId}`}>
         Paste notes from an official course
       </label>
+      <p>
+        These notes guide future preparation. Your practice results determine mastery. Clearing and
+        saving the notes does not remove vocabulary already imported or change your scores.
+      </p>
       <textarea
         id={`course-notes-${courseId}`}
         className={styles.textarea}

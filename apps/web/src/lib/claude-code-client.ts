@@ -28,6 +28,12 @@ import {
   supersedesCredentials,
 } from './agent-credentials';
 import type { ImageContentPart } from './providers/ai';
+import {
+  streamIsolatedClaude,
+  IsolatedCleanupError,
+  CredentialBrokerCleanupError,
+  type IsolatedClaudeExecution,
+} from './agents/isolated/isolated-agent';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
@@ -207,6 +213,7 @@ interface ClaudeCodeResponse extends TokenUsage {
 }
 
 interface ClaudeCodeOptions {
+  isolated?: IsolatedClaudeExecution;
   signal?: AbortSignal;
   onUsage?: (usage: TokenUsage) => void;
   model?: string;
@@ -334,6 +341,8 @@ class ClaudeCleanupError extends Error {}
 export function isClaudeCleanupError(error: unknown): boolean {
   return (
     error instanceof ClaudeCleanupError ||
+    error instanceof IsolatedCleanupError ||
+    error instanceof CredentialBrokerCleanupError ||
     (error instanceof ProcessExecutionError && error.code === 'cleanup_failed')
   );
 }
@@ -365,6 +374,11 @@ async function* streamClaudeRaw(
   opts: ClaudeCodeOptions
 ): AsyncGenerator<string> {
   opts.signal?.throwIfAborted();
+  if (opts.isolated && (opts.useWebSearch || opts.images?.length || getClaudeSshHost())) {
+    throw new Error(
+      'Isolated Claude supports local API-key text generation without search or images'
+    );
+  }
   const selection = resolveSelection(opts);
   const args = buildArgs(selection.model, systemPrompt, 'stream-json', {
     ...opts,
@@ -374,7 +388,7 @@ async function* streamClaudeRaw(
   const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost(), {
     remoteEnvKeys: CLAUDE_ENV_KEYS,
   });
-  const invocation = createInvocationConfig();
+  const invocation = opts.isolated ? null : createInvocationConfig();
   const decoder = new ClaudeOutputDecoder({ maximumLineChars: Number.MAX_SAFE_INTEGER });
   let usage: TokenUsage | undefined;
   let stderr = '';
@@ -413,15 +427,25 @@ async function* streamClaudeRaw(
       .join('\n') ||
     '(no output)';
   try {
-    for await (const chunk of new ProcessRunner().stream({
-      command,
-      args: spawnArgs,
-      environment: invocation.env,
-      input: stdin,
-      signal: opts.signal,
-      timeoutMs: opts.timeoutMs || 600000,
-      maxOutputBytes: Number.MAX_SAFE_INTEGER,
-    })) {
+    const stream = opts.isolated
+      ? streamIsolatedClaude({
+          execution: opts.isolated,
+          model: selection.model,
+          args,
+          prompt: stdin,
+          signal: opts.signal,
+          timeoutMs: opts.timeoutMs || 600000,
+        })
+      : new ProcessRunner().stream({
+          command,
+          args: spawnArgs,
+          environment: invocation!.env,
+          input: stdin,
+          signal: opts.signal,
+          timeoutMs: opts.timeoutMs || 600000,
+          maxOutputBytes: Number.MAX_SAFE_INTEGER,
+        });
+    for await (const chunk of stream) {
       if (chunk.channel === 'stderr') {
         stderr = (stderr + chunk.text).slice(-4000);
         continue;
@@ -472,6 +496,6 @@ async function* streamClaudeRaw(
     primary = { error: reported };
     throw reported;
   } finally {
-    releaseInvocation(invocation, primary, usage);
+    if (invocation) releaseInvocation(invocation, primary, usage);
   }
 }

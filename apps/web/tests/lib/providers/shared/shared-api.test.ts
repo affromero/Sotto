@@ -37,6 +37,39 @@ afterEach(() => {
 });
 
 describe('shared API execution', () => {
+  it('sends Muse structured requests to Meta using only the selected credential', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('https://api.meta.ai/v1/chat/completions');
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer meta-selected-key');
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        model: 'muse-spark-1.3',
+        max_completion_tokens: 4096,
+        response_format: { type: 'json_schema', json_schema: { name: 'grade' } },
+      });
+      return Response.json({
+        choices: [
+          { message: { role: 'assistant', content: '{"correct":true}' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 20 },
+      });
+    });
+    const { createAIProvider } = await import('@/lib/providers/ai');
+    expect(
+      await createAIProvider('meta').generateResponse('Grade this answer.', [], {
+        apiKeyOverride: 'meta-selected-key',
+        skipModeration: true,
+        jsonSchema: {
+          name: 'grade',
+          schema: {
+            type: 'object',
+            properties: { correct: { type: 'boolean' } },
+            required: ['correct'],
+            additionalProperties: false,
+          },
+        },
+      })
+    ).toMatchObject({ content: '{"correct":true}', inputTokens: 10, outputTokens: 20 });
+  });
   it('uses the selected compatible provider credential', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('https://api.groq.com/openai/v1/chat/completions');

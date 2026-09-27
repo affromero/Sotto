@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import type { Prisma } from '@/generated/prisma/client';
 import { AccessError } from 'thesidedoor-core/access';
 import {
   createProviderTransport,
@@ -27,6 +28,23 @@ export interface SottoProviderExecution {
   credential?: SottoExecutionCredential | null;
   signal?: AbortSignal;
   onCleanupError?: (error: unknown) => void;
+  /** Durable learning work pins its non-secret selection before queue admission. */
+  learningSelection?: {
+    provider: string;
+    model: string;
+    endpoint?: string;
+    isolatedImage?: string;
+    credentialFingerprint: string | null;
+    moderationCredentialFingerprint?: string | null;
+  };
+  /** Runs after destination admission, once for each actual HTTP attempt, including SDK retries. */
+  providerRequest?: (request: Request, dispatch: () => Promise<Response>) => Promise<Response>;
+  isolatedWorkspace?: { directory: string; markCleanupUnconfirmed: () => void };
+  registerAudioEpisode?: (
+    database: Prisma.TransactionClient,
+    episodeId: string,
+    audioGenerationKey: string
+  ) => Promise<void>;
 }
 
 export function sottoRequestExecution(
@@ -47,6 +65,7 @@ export function sottoRequestExecution(
 /** Capture platform and personal recipients before constructing a provider. */
 export async function captureSottoProviderAdmission(execution: SottoProviderExecution) {
   const { userId, authorize, signal } = execution;
+  const providerRequest = execution.providerRequest;
   const credential = execution.credential ? structuredClone(execution.credential) : null;
   const owner = await sottoTransaction(
     prismaUnfiltered,
@@ -103,6 +122,14 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
       createProviderTransport({
         rules: structuredClone(rules),
         signal,
+        ...(providerRequest
+          ? {
+              implementation: (input, init) => {
+                const request = new Request(input, init);
+                return providerRequest(request, () => globalThis.fetch(request));
+              },
+            }
+          : {}),
         admit: async (request, requestSignal) => {
           if (
             credential &&

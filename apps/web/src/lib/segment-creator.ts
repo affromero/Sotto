@@ -6,11 +6,14 @@ import { admitDurableQueueBatch } from '@/lib/sidedoor/jobs/core/durable-queue';
 
 type AudioSegment = { id: string; version: number; speaker: string; text: string };
 
-export type AudioQueueAdmission =
+export type AudioQueueAdmission = (
   | { parentJob: Job<unknown> }
   | {
       authorize: (database: Prisma.TransactionClient) => Promise<{ userId?: string } | void>;
-    };
+    }
+) & {
+  onPrepared?: (database: Prisma.TransactionClient, audioGenerationKey: string) => Promise<void>;
+};
 
 function children(
   episodeId: string,
@@ -43,13 +46,15 @@ export async function createSegmentsAndQueueAudio(
   admission: AudioQueueAdmission
 ): Promise<void> {
   const audioGenerationKey = randomUUID();
+  const { onPrepared, ...authority } = admission;
   await admitDurableQueueBatch({
-    ...admission,
+    ...authority,
     prepare: async (database) => {
       await database.episode.update({
         where: { id: episodeId },
         data: { audioGenerationKey, status: 'GENERATING_AUDIO' },
       });
+      await onPrepared?.(database, audioGenerationKey);
       const segments: AudioSegment[] = [];
       for (let index = 0; index < turns.length; index++) {
         const turn = turns[index]!;

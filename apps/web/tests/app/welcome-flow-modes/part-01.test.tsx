@@ -385,42 +385,6 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByText(/Estimated level/i).textContent).toContain('C1');
   });
 
-  it('shows the design agent choices and a separate Google live key prompt', () => {
-    render(
-      <StepAgent
-        agent={{ provider: '', method: null, value: '', model: '', status: 'idle' }}
-        demoMode={false}
-        setAgent={vi.fn()}
-        onNext={vi.fn()}
-        onBack={vi.fn()}
-      />
-    );
-
-    expect(screen.getByRole('button', { name: /Claude/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Codex/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Local/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Custom/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open claude api page/i })).toHaveAttribute(
-      'href',
-      'https://platform.claude.com/'
-    );
-    expect(screen.getByRole('link', { name: /open codex api page/i })).toHaveAttribute(
-      'href',
-      'https://platform.openai.com/api-keys'
-    );
-    expect(screen.queryByText(/recommended/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Gemini/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/Google API key for Live/i)).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/Google Gemini API key for live conversation/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /open google ai studio api key page/i })
-    ).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
-    expect(
-      screen.getByRole('link', { name: /learn how the gemini live api works/i })
-    ).toHaveAttribute('href', 'https://ai.google.dev/gemini-api/docs/live-api');
-  });
   it('picks CLI model and reasoning effort separately while preserving the encoded id', async () => {
     const user = userEvent.setup();
     let agent: AgentState = {

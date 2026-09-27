@@ -33,7 +33,14 @@ const mockSubmitClass = vi.fn();
 const mockRegenerateFailedSections = vi.fn();
 const mockRegenerateCurrentClass = vi.fn();
 const mockDeleteClassForUser = vi.fn();
-const mockCreateNextClass = vi.fn();
+const mockReadPreparation = vi.fn();
+const mockCancelPreparation = vi.fn();
+
+vi.mock('@/lib/classes/preparation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/classes/preparation')>()),
+  readClassPreparation: (...args: unknown[]) => mockReadPreparation(...args),
+  cancelClassPreparation: (...args: unknown[]) => mockCancelPreparation(...args),
+}));
 
 vi.mock('@/lib/class-service', () => {
   class CourseNotFoundError extends Error {}
@@ -44,7 +51,6 @@ vi.mock('@/lib/class-service', () => {
     regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
     regenerateCurrentClass: (...args: unknown[]) => mockRegenerateCurrentClass(...args),
     deleteClassForUser: (...args: unknown[]) => mockDeleteClassForUser(...args),
-    createNextClass: (...args: unknown[]) => mockCreateNextClass(...args),
     CourseNotFoundError,
     ClassGenerationCancelledError,
   };
@@ -57,12 +63,11 @@ vi.mock('@/lib/logger', () => ({
 // ---- Imports under test ----
 import { DELETE as DELETEClass, GET, POST } from '@/app/api/v1/classes/[classId]/route';
 import { POST as POSTSubmit } from '@/app/api/v1/classes/[classId]/submit/route';
-import { POST as POSTNextClass } from '@/app/api/v1/courses/[courseId]/next-class/route';
 import {
   DELETE as DELETEGeneration,
   GET as GETGeneration,
 } from '@/app/api/v1/courses/[courseId]/generation/route';
-import { ClassGenerationCancelledError, CourseNotFoundError } from '@/lib/class-service';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
 // ---- Helpers ----
 
@@ -619,145 +624,144 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
   });
 });
 
-// ---- POST /api/v1/courses/[courseId]/next-class ----
-
-describe('POST /api/v1/courses/[courseId]/next-class', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
-  });
-
-  it('returns 401 when unauthenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 201 with classId when a new class is created', async () => {
-    mockCreateNextClass.mockResolvedValue({ kind: 'created', classId: 'class-new' });
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.classId).toBe('class-new');
-  });
-
-  it('returns 202 immediately for background class generation', async () => {
-    mockCourseFindFirst.mockResolvedValue({ id: 'course-1' });
-    mockCreateNextClass.mockResolvedValue({ kind: 'created', classId: 'class-new' });
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class?background=1', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(202);
-    const body = await res.json();
-    expect(body.started).toBe(true);
-    expect(mockCreateNextClass).toHaveBeenCalledWith(
-      'course-1',
-      'u1',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
-      {}
-    );
-  });
-
-  it('returns 404 for background class generation when the course is missing', async () => {
-    mockCourseFindFirst.mockResolvedValue(null);
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class?background=1', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(404);
-    expect(mockCreateNextClass).not.toHaveBeenCalled();
-  });
-
-  it('returns 409 with activeClassId and status when gated', async () => {
-    mockCreateNextClass.mockResolvedValue({
-      kind: 'gated',
-      activeClassId: 'class-existing',
-      status: 'IN_PROGRESS',
-    });
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.activeClassId).toBe('class-existing');
-    expect(body.status).toBe('IN_PROGRESS');
-  });
-
-  it('returns 200 with {done:true} when curriculum is finished', async () => {
-    mockCreateNextClass.mockResolvedValue({ kind: 'done' });
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.done).toBe(true);
-  });
-
-  it('returns 404 when CourseNotFoundError is thrown', async () => {
-    mockCreateNextClass.mockRejectedValue(new CourseNotFoundError('Course not found'));
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toMatch(/course not found/i);
-  });
-
-  it('returns 409 when generation is cancelled', async () => {
-    mockCreateNextClass.mockRejectedValue(new ClassGenerationCancelledError('class-new'));
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.cancelled).toBe(true);
-  });
-
-  it('returns 500 on unexpected errors', async () => {
-    mockCreateNextClass.mockRejectedValue(new Error('AI meltdown'));
-
-    const res = await POSTNextClass(
-      makeRequest('http://localhost/api/v1/courses/course-1/next-class', 'POST'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(500);
-  });
-});
-
 // ---- GET /api/v1/courses/[courseId]/generation ----
 
 describe('GET /api/v1/courses/[courseId]/generation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+    mockReadPreparation.mockResolvedValue(null);
+  });
+
+  function generationState(status: string, classId = 'older-class', classCreatedAt = 2000) {
+    mockCourseFindFirst.mockResolvedValue({
+      id: 'course-1',
+      classes: [
+        {
+          id: 'current-class',
+          status: 'AVAILABLE',
+          createdAt: new Date(classCreatedAt),
+          updatedAt: new Date(3000),
+          lesson: { title: 'Current lesson' },
+          sections: [],
+        },
+      ],
+    });
+    mockReadPreparation.mockResolvedValue({
+      id: 'operation-1',
+      status,
+      classId,
+      result: status === 'COMPLETED' ? 'done' : null,
+      createdAt: 500,
+      updatedAt: 1000,
+      availableAt: 500,
+      timeZone: 'UTC',
+      maxProviderRequests: 20,
+      deferAudio: true,
+      audioEpisodeIds: [],
+      selection: {
+        provider: 'meta',
+        model: 'muse-spark-1.3',
+        credentialFingerprint: 'private-binding',
+      },
+      grant: { revision: 'private-grant' },
+    });
+  }
+  async function progress() {
+    return (
+      await GETGeneration(
+        makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
+        courseParams('course-1')
+      )
+    ).json();
+  }
+  it.each(['FAILED', 'CANCELLED', 'COMPLETED'])(
+    'shows a newer class after terminal preparation %s',
+    async (status) => {
+      generationState(status);
+      const body = await progress();
+      expect(body).toMatchObject({
+        classId: 'current-class',
+        status: 'AVAILABLE',
+        lessonTitle: 'Current lesson',
+      });
+      expect(body).not.toHaveProperty('operationId');
+      expect(body).not.toHaveProperty('aiProvider');
+    }
+  );
+  it.each(['QUEUED', 'RUNNING', 'CANCELLING', 'UNRESOLVED'])(
+    'keeps unresolved or active preparation visible: %s',
+    async (status) => {
+      generationState(status);
+      expect(await progress()).toMatchObject({
+        operationId: 'operation-1',
+        operationStatus: status,
+      });
+    }
+  );
+  it.each(['FAILED', 'CANCELLED', 'COMPLETED'])(
+    'retains terminal preparation when the other class is not newer: %s',
+    async (status) => {
+      generationState(status, 'older-class', 1000);
+      expect(await progress()).toMatchObject({
+        operationId: 'operation-1',
+        operationStatus: status,
+      });
+    }
+  );
+  it('preserves public operation metadata with matching completed class progress', async () => {
+    generationState('COMPLETED', 'current-class');
+    const operation = await mockReadPreparation();
+    mockReadPreparation.mockResolvedValue({ ...operation, result: 'created' });
+    const body = await progress();
+    expect(body).toMatchObject({
+      operationId: 'operation-1',
+      operationStatus: 'COMPLETED',
+      classId: 'current-class',
+      status: 'AVAILABLE',
+      stage: 'Class ready',
+      progress: 1,
+      aiProvider: 'meta',
+      aiModel: 'muse-spark-1.3',
+      maxProviderRequests: 20,
+    });
+    expect(JSON.stringify(body)).not.toContain('private-');
+  });
+
+  it('reports the durable task before a class record exists without exposing authority data', async () => {
+    mockCourseFindFirst.mockResolvedValue({ id: 'course-1', classes: [] });
+    mockReadPreparation.mockResolvedValue({
+      id: 'operation-1',
+      status: 'QUEUED',
+      classId: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      availableAt: Date.now(),
+      timeZone: 'America/Bogota',
+      maxProviderRequests: 20,
+      deferAudio: true,
+      selection: {
+        provider: 'meta',
+        model: 'muse-spark-1.3',
+        credentialFingerprint: 'private-fingerprint',
+      },
+      grant: { revision: 'private-grant-revision' },
+    });
+    const response = await GETGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
+      courseParams('course-1')
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      operationId: 'operation-1',
+      operationStatus: 'QUEUED',
+      classId: null,
+      stage: 'Queued preparation',
+      audioRequiresReview: true,
+      maxProviderRequests: 20,
+    });
+    expect(JSON.stringify(body)).not.toContain('private-');
   });
 
   it('reports pending listening audio when the class is available but audioUrl is missing', async () => {
@@ -841,6 +845,7 @@ describe('DELETE /api/v1/courses/[courseId]/generation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+    mockCancelPreparation.mockResolvedValue(null);
     mockCourseUpdateMany.mockResolvedValue({ count: 1 });
     mockCourseClassDeleteMany.mockResolvedValue({ count: 1 });
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
@@ -868,7 +873,35 @@ describe('DELETE /api/v1/courses/[courseId]/generation', () => {
     expect(res.status).toBe(404);
   });
 
-  it('deletes the current generating class and clears activeClassId', async () => {
+  it.each(['CANCELLED', 'CANCELLING'])(
+    'cancels durable work before a class exists: %s',
+    async (status) => {
+      mockCancelPreparation.mockResolvedValue({ id: 'operation-1', status, classId: null });
+      const response = await DELETEGeneration(
+        makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+        courseParams('course-1')
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        cancelled: status === 'CANCELLED',
+        cancelling: status === 'CANCELLING',
+        operationId: 'operation-1',
+        classId: null,
+      });
+    }
+  );
+
+  it('surfaces revoked cancellation authority without deleting legacy work', async () => {
+    mockCancelPreparation.mockRejectedValue(new PreparationConflictError('The learner changed.'));
+    const response = await DELETEGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+      courseParams('course-1')
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: 'The learner changed.' });
+  });
+
+  it('deletes the current generating legacy class and clears activeClassId', async () => {
     mockCourseFindFirst.mockResolvedValue({
       id: 'course-1',
       classes: [{ id: 'class-generating' }],

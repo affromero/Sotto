@@ -50,6 +50,7 @@ function textOf(content: string | ContentPart[]): string {
 }
 
 export interface AIOptions {
+  isolated?: import('../agents/isolated/isolated-agent').IsolatedClaudeExecution;
   /** Captured request boundary for authorization and terminal-effect observation. */
   fetch?: typeof fetch;
   signal?: AbortSignal;
@@ -417,6 +418,7 @@ class OpenAiCompatibleProvider extends SharedCompatibleProvider {
 
 // Endpoint and label per OpenAI-compatible LLM provider.
 const OPENAI_COMPATIBLE_LABELS = {
+  meta: 'Meta',
   xai: 'xAI',
   deepseek: 'DeepSeek',
   mistral: 'Mistral',
@@ -547,6 +549,7 @@ export function createAIProvider(type: string): AIProvider {
       return new CodexLazyProvider();
     case 'local':
       return new LocalProvider();
+    case 'meta':
     case 'xai':
     case 'deepseek':
     case 'mistral':
@@ -563,7 +566,7 @@ export function createAIProvider(type: string): AIProvider {
     }
     default:
       throw new Error(
-        `Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`
+        `Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, meta, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`
       );
   }
 }
