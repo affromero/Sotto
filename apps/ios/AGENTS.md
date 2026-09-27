@@ -25,8 +25,9 @@ xcodebuild test -project apps/ios/Sotto.xcodeproj -scheme Sotto \
   -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)'
 ```
 
-CI runs exactly that (`.github/workflows/release-surfaces-ci.yml`, job `ios`).
-Test **both** families: the layout differs by size class.
+CI (`.github/workflows/release-surfaces-ci.yml`, job `ios`) selects an available
+iPhone 17 and iPad Pro 13-inch (M5) on the same installed runtime and passes
+their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size class.
 
 ## Conventions
 

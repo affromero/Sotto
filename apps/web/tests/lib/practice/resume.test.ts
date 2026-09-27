@@ -34,6 +34,18 @@ beforeEach(() => {
 });
 
 describe('resumePractice', () => {
+  it('restores the reading source without revealing its answer', async () => {
+    mockSessionFindFirst.mockResolvedValue({
+      id: 'reading',
+      kind: 'READING',
+      status: 'ACTIVE',
+      items: [{ ...ITEMS[0], passageText: 'Mia fährt am Samstag nach Berlin.' }],
+      episodeId: null,
+    });
+    const result = await resumePractice('reading', 'user-1');
+    expect(result).toMatchObject({ items: [{ passageText: 'Mia fährt am Samstag nach Berlin.' }] });
+    expect(JSON.stringify(result)).not.toContain('correctIndex');
+  });
   it('returns the questions without the answer key', async () => {
     mockSessionFindFirst.mockResolvedValue({
       id: 'sess-1',

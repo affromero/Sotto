@@ -532,6 +532,7 @@ struct SottoPracticeItem: Decodable, Identifiable, Equatable {
     let id: String
     let prompt: String
     let options: [String]
+    let passageText: String?
 }
 
 struct SottoSubmitAnswer: Encodable, Equatable {

@@ -123,3 +123,133 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     saved.sections.flatMap((section) => section.prompts.flatMap((prompt) => prompt.recordings))
   ).toEqual([expect.objectContaining({ status: 'SCORED', transcript: 'Guten Morgen.' })]);
 });
+
+test('full practice keeps skill sections usable on desktop and a 375px screen', async ({
+  page,
+}) => {
+  const fixture = await seedClass();
+  const listening = await database.classSection.findFirstOrThrow({
+    where: { classId: fixture.classId, skill: 'LISTENING' },
+  });
+  const session = await database.practiceSession.create({
+    data: {
+      courseId: fixture.courseId,
+      kind: 'FULL',
+      seed: 'browser-contextual-practice',
+      episodeId: listening.episodeId,
+      items: [
+        {
+          id: 'g0',
+          prompt: 'Mia hat gestern einen Film _____.',
+          options: ['gesehen', 'sehen', 'sieht', 'sah'],
+          correctIndex: 0,
+          explanation: 'Perfekt uses gesehen.',
+          vocabLemma: null,
+          focusTargetId: null,
+        },
+        {
+          id: 'g1',
+          prompt: 'Mia ist ins Kino _____.',
+          options: ['gegangen', 'gehen', 'geht', 'ging'],
+          correctIndex: 0,
+          explanation: 'Perfekt uses gegangen.',
+          vocabLemma: null,
+          focusTargetId: null,
+        },
+        {
+          id: 'r0',
+          prompt: 'Wo war Mia?',
+          options: ['Im Kino', 'Zu Hause', 'Im Park', 'Im Café'],
+          correctIndex: 0,
+          explanation: 'The text says Kino.',
+          passageText: 'Mia war gestern im Kino.',
+          vocabLemma: null,
+          focusTargetId: null,
+        },
+        {
+          id: 'l0',
+          prompt: 'Welche Begrüßung hörst du?',
+          options: ['Hallo', 'Danke', 'Bitte', 'Tschüss'],
+          correctIndex: 0,
+          explanation: 'Hallo is a greeting.',
+          vocabLemma: null,
+          focusTargetId: null,
+        },
+      ],
+      prompts: {
+        create: { order: 1, targetPhrase: 'Guten Morgen.', translation: 'Good morning.' },
+      },
+      writingPrompts: { create: { order: 1, task: 'Setze ins Perfekt.\n\nMia geht ins Kino.' } },
+    },
+  });
+  await page.goto('/access');
+  await page.getByLabel(/password/i).fill('browser test household password');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: /Browser learner/ }).click();
+  await expect(page).toHaveURL(/\/(dashboard|learn)$/);
+  await page.goto('/learn/practice');
+  await page.getByRole('button', { name: 'Resume Full catch-up practice' }).click();
+  const grammar = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: 'Grammar' }) });
+  await grammar.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await grammar.getByRole('button', { name: 'Option 1: gesehen' }).click();
+  await grammar.getByRole('button', { name: 'Next question' }).click();
+  await expect(grammar.getByText('Mia ist ins Kino _____.')).toBeVisible();
+  await expect(grammar.getByText('Mia hat gestern einen Film _____.')).toHaveCount(0);
+  await grammar.getByRole('button', { name: 'Previous question' }).click();
+  await grammar.locator('summary').click();
+  await grammar.locator('summary').click();
+  await expect(grammar.getByRole('button', { name: 'Option 1: gesehen' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  const writing = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: 'Writing' }) });
+  await writing.locator('summary').click();
+  await writing.getByRole('textbox').fill('Mia ist ins Kino gegangen.');
+  await writing.locator('summary').click();
+  await writing.locator('summary').click();
+  await expect(writing.getByRole('textbox')).toHaveValue('Mia ist ins Kino gegangen.');
+  const audioSection = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: 'Listening' }) });
+  await audioSection.locator('summary').click();
+  const audio = audioSection.getByLabel('Practice audio');
+  await expect(audio).toBeVisible();
+  await audio.evaluate((element: HTMLAudioElement) => element.play());
+  await expect
+    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime))
+    .toBeGreaterThan(0.3);
+  await audio.evaluate((element: HTMLAudioElement) => element.pause());
+  const speaking = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: 'Speaking' }) });
+  await speaking.locator('summary').click();
+  await expect(speaking.getByText('Guten Morgen.', { exact: true })).toBeVisible();
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+    await expect(grammar.getByRole('button', { name: 'Option 1: gesehen' })).toBeVisible();
+    await expect(writing.getByRole('textbox')).toHaveValue('Mia ist ins Kino gegangen.');
+    const optionBounds = await grammar
+      .getByRole('button', { name: 'Option 1: gesehen' })
+      .boundingBox();
+    expect(optionBounds).not.toBeNull();
+    expect(optionBounds!.x).toBeGreaterThanOrEqual(0);
+    expect(optionBounds!.x + optionBounds!.width).toBeLessThanOrEqual(width);
+    await page.getByRole('button', { name: 'Practice menu' }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath(`practice-${width}.png`) });
+  }
+  const rejected = await page.request.post(`/api/v1/practice/${session.id}/submit`, {
+    data: { answers: [{ itemId: 'l0', selectedIndex: 0 }] },
+  });
+  expect(rejected.status()).toBe(409);
+  expect(
+    (await database.practiceSession.findUniqueOrThrow({ where: { id: session.id } })).status
+  ).toBe('ACTIVE');
+});

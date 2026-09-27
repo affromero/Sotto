@@ -2,6 +2,15 @@
 
 All shared business logic and external service integrations live here.
 
+Practice content reuses `generateSectionQuestions` for contextual vocabulary and
+focused expressions. Preserve exact word attribution for SRS, and carry reading
+`passageText` through both start and resume projections. Writing generation
+requires supplied source text and a constrained exercise type. Listening checks
+the explicitly configured TTS provider before script generation; missing
+credentials are errors, never a reason to choose another provider. Full practice
+and class submission require usable listening audio and graded speaking work
+before updating progress. Class mastery also requires passing both oral sections.
+
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks
 configuration and authority after lock release. `storage-probe.ts` supplies owner
