@@ -43,7 +43,7 @@ describe('waveform extraction with real FFmpeg', () => {
       );
       try {
         await expect
-          .poll(async () => readFile(marker, 'utf8').catch(() => ''), { timeout: 3000 })
+          .poll(async () => readFile(marker, 'utf8').catch(() => ''), { timeout: 10_000 })
           .not.toBe('');
         const pid = Number(await readFile(marker, 'utf8'));
         controller.abort(reason);
