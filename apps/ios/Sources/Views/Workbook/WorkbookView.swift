@@ -54,11 +54,6 @@ struct WorkbookView: View {
                     }
                     .disabled(isExportingPDF || !annotationStore.canExport)
 
-                    if let url = sourcePDFURL {
-                        Link(destination: url) {
-                            Label("PDF", systemImage: "doc.richtext")
-                        }
-                    }
                 }
             }
             .task(id: response.worksheetPdfUrl) {

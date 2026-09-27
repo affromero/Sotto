@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ClassSessionView: View {
+    @Environment(\.sottoLayout) private var layout
     @EnvironmentObject private var model: SottoAppModel
     let classDetail: SottoClassDetail
 
@@ -85,7 +86,7 @@ struct ClassSessionView: View {
                         result: model.classResult
                     )
                 }
-                .padding(28)
+                .padding(layout == .compact ? 16 : 28)
                 .frame(maxWidth: 980, alignment: .leading)
             }
             .background(SottoTheme.paper)
@@ -98,66 +99,17 @@ struct ClassSessionView: View {
                     }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
-                    ProfileToolbarMenu {
-                        model.closeClass()
-                    }
-
-                    Button {
-                        exportCurrentClass()
-                    } label: {
-                        Label(isExportingClass ? "Exporting" : "Export", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(isExportingClass)
-
-                    Button {
-                        let classId = currentClass.id
-                        model.run {
-                            await model.openWorkbook(for: classId)
-                        }
-                    } label: {
-                        Label("Workbook", systemImage: "pencil.and.scribble")
-                    }
-
-                    Menu {
-                        Button {
-                            model.run {
-                                await model.regenerateSelectedClass()
-                                answers = [:]
-                            }
+                    if layout == .compact {
+                        Menu {
+                            classTools
                         } label: {
-                            Label("Regenerate class", systemImage: "arrow.triangle.2.circlepath")
+                            Label("Class actions", systemImage: "ellipsis.circle")
                         }
-
-                        Button(role: .destructive) {
-                            showingRemoveConfirmation = true
-                        } label: {
-                            Label("Remove class", systemImage: "trash")
-                        }
-                    } label: {
-                        Label("Class settings", systemImage: "ellipsis.circle")
+                    } else {
+                        classTools
                     }
-                    .disabled(model.isLoading)
 
-                    Button {
-                        let classId = currentClass.id
-                        model.run {
-                            let graded = await drafts.submit(
-                                source: .classSession(classId: classId),
-                                model: model,
-                                includingUnchanged: !hasChanges
-                            )
-                            guard graded else { return }
-
-                            let payload = hasChanges ? changedAnswers : everyAnswer
-                            if !payload.isEmpty {
-                                await model.submitClassAnswers(payload)
-                                submittedAnswers = answers
-                            }
-                        }
-                    } label: {
-                        Label("Submit", systemImage: "checkmark.circle.fill")
-                    }
-                    .disabled(drafts.isOverLimit || drafts.isSubmitting)
+                    submitButton
                 }
             }
             .sheet(isPresented: workbookSheetBinding) {
@@ -210,6 +162,73 @@ struct ClassSessionView: View {
                 answers = [:]
             }
         }
+    }
+
+    @ViewBuilder
+    private var classTools: some View {
+        ProfileToolbarMenu {
+            model.closeClass()
+        }
+
+        Button {
+            exportCurrentClass()
+        } label: {
+            Label(isExportingClass ? "Exporting" : "Export", systemImage: "square.and.arrow.up")
+        }
+        .disabled(isExportingClass)
+
+        Button {
+            let classId = currentClass.id
+            model.run {
+                await model.openWorkbook(for: classId)
+            }
+        } label: {
+            Label("Workbook", systemImage: "pencil.and.scribble")
+        }
+
+        Menu {
+            Button {
+                model.run {
+                    await model.regenerateSelectedClass()
+                    answers = [:]
+                }
+            } label: {
+                Label("Regenerate class", systemImage: "arrow.triangle.2.circlepath")
+            }
+
+            Button(role: .destructive) {
+                showingRemoveConfirmation = true
+            } label: {
+                Label("Remove class", systemImage: "trash")
+            }
+        } label: {
+            Label("Class settings", systemImage: "ellipsis.circle")
+        }
+        .disabled(model.isLoading)
+
+    }
+
+    private var submitButton: some View {
+        Button {
+            let classId = currentClass.id
+            model.run {
+                let graded = await drafts.submit(
+                    source: .classSession(classId: classId),
+                    model: model,
+                    includingUnchanged: !hasChanges
+                )
+                guard graded else { return }
+
+                let payload = hasChanges ? changedAnswers : everyAnswer
+                if !payload.isEmpty {
+                    await model.submitClassAnswers(payload)
+                    submittedAnswers = answers
+                }
+            }
+        } label: {
+            Label("Submit", systemImage: "checkmark.circle.fill")
+        }
+        .disabled(drafts.isOverLimit || drafts.isSubmitting)
     }
 
     private var workbookSheetBinding: Binding<Bool> {
