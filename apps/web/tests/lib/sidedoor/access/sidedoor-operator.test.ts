@@ -116,8 +116,14 @@ suite('bundled local access operator', () => {
     });
   });
   it('does not echo database credential material in configuration errors', async () => {
-    await expect(command(['list'], 'secret-credential-must-not-appear')).rejects.toMatchObject({
-      stderr: 'DATABASE_URL must start with postgresql:// or postgres://.\n',
+    const credential = 'secret-credential-must-not-appear';
+    const result = command(['list'], credential);
+    await expect(result).rejects.toMatchObject({
+      stderr: expect.stringContaining('DATABASE_URL must start with postgresql:// or postgres://.'),
+    });
+    await expect(result).rejects.toMatchObject({
+      stdout: expect.not.stringContaining(credential),
+      stderr: expect.not.stringContaining(credential),
     });
   });
   it('atomically converts installed state and binds the owner claim to retained learner data', async () => {
