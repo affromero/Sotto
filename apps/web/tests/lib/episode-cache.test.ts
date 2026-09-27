@@ -71,9 +71,7 @@ vi.mock('@/lib/generation-features', () => ({
   getGenerationFeatures: vi.fn().mockReturnValue({ privateAllowed: false }),
 }));
 
-vi.mock('@/lib/byok', () => ({
-  hasByokKey: vi.fn().mockResolvedValue(false),
-}));
+vi.mock('@/lib/byok', () => ({}));
 
 vi.mock('@/lib/episode-select', () => ({
   EPISODE_PUBLIC_SELECT: {

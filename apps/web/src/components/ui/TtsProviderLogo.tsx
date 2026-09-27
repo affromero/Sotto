@@ -439,26 +439,3 @@ const PROVIDER_NAMES: Record<string, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
 };
-
-/**
- * Render a row of all provider logos — for the landing page "powered by" section.
- */
-export function TtsProviderLogoRow({
-  size = 32,
-  className,
-}: {
-  size?: number;
-  className?: string;
-}) {
-  const providers = ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate'] as const;
-  return (
-    <div
-      className={className}
-      style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
-    >
-      {providers.map((p) => (
-        <TtsProviderLogo key={p} provider={p} size={size} />
-      ))}
-    </div>
-  );
-}

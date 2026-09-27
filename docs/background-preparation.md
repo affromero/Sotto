@@ -1,5 +1,10 @@
 # Background class preparation
 
+New audio generations and ordinary failed-stitch resumes use bundled stock sound
+effects. They do not require a separate premium effects credential. Existing jobs
+retain their recorded sound policy; an explicitly admitted premium job still
+surfaces provider failures without switching to stock effects.
+
 Run `node scripts/tests/browser/preparation-layout.mjs` from the repository root
 to verify the expanded schedule and activity panels at 375px. The browser probe
 uses synthetic HTTP responses and writes screenshots to `test-results/preparation-layout/`.

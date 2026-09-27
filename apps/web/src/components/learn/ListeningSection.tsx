@@ -206,8 +206,13 @@ export function ListeningSection({
           )}
 
           {!hasAudio && (
-            <p className={styles.audioNotice} role="status">
-              Audio is still generating. Your comprehension questions are ready below.
+            <p
+              className={styles.audioNotice}
+              role={episode?.status === 'FAILED' || !episode ? 'alert' : 'status'}
+            >
+              {!episode || episode.status === 'FAILED' || episode.status === 'READY'
+                ? 'Listening audio is unavailable. Regenerate this class before finishing.'
+                : 'Listening audio is generating. You can work on another section while you wait.'}
             </p>
           )}
         </div>

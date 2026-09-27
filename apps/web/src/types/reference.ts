@@ -1,11 +1,5 @@
 import { ReferenceType, VerificationStatus } from '@/generated/prisma/client';
 
-export interface VerificationLayerResult {
-  layer: string;
-  passed: boolean;
-  details?: string;
-}
-
 export interface ReferenceData {
   id: string;
   number: number;

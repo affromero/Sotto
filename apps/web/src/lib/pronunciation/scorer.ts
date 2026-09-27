@@ -46,7 +46,7 @@ export interface PronunciationInput {
   userId: string;
 }
 
-export interface RubricScores {
+interface RubricScores {
   /** Share of words produced correctly (0..1). */
   accuracy: number;
   /** Smoothness and naturalness of delivery (0..1). */

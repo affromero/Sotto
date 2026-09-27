@@ -51,14 +51,7 @@ export interface EvidenceCard {
   freshness: 'current' | 'evergreen' | 'historical';
 }
 
-export interface ResearchAngle {
-  theme: string;
-  description: string;
-  supportingEvidence: string[];
-  narrativePotential: 'high' | 'medium' | 'low';
-}
-
-export interface UserBrief {
+interface UserBrief {
   topic: string;
   audienceLevel: string;
   tone: string;

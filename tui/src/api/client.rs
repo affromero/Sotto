@@ -32,21 +32,6 @@ impl SottoClient {
         })
     }
 
-    /// Access the underlying generated client for typed operation calls.
-    pub fn raw(&self) -> &GeneratedClient {
-        &self.inner
-    }
-
-    /// Liveness probe against `/api/v1/health`.
-    pub async fn health(&self) -> Result<types::HealthResponse> {
-        let resp = self
-            .inner
-            .health()
-            .await
-            .map_err(|e| eyre!("health check failed: {e}"))?;
-        Ok(resp.into_inner())
-    }
-
     /// List the courses available to the authenticated learner.
     pub async fn courses(&self) -> Result<types::CoursesListResponse> {
         let resp = self

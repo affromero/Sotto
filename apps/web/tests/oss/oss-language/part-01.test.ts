@@ -52,7 +52,6 @@ describe('open-source language-learning OSS surfaces', () => {
       .join('\n');
     const sharedPositioningSource = [
       'packages/shared/src/brand.ts',
-      'apps/web/src/lib/marketing-templates.ts',
       'apps/web/prompts/demo/walkthrough.md',
       'apps/web/public/manifest.json',
     ]

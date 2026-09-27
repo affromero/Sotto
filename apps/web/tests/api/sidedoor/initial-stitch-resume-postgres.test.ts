@@ -63,7 +63,7 @@ suite('initial stitching resume through HTTP and canonical admission', () => {
     await instance?.close();
   });
   it.each(['own', 'another-profile'] as const)(
-    'preserves owner authority when resuming an %s episode',
+    'resumes an %s episode with owner authority and stock effects without a premium credential',
     async (owner) => {
       const userId = owner === 'own' ? identity.ownerId : (await identity.household('Learner')).id;
       const { episode } = await createRegenerationSource(
@@ -95,7 +95,7 @@ suite('initial stitching resume through HTTP and canonical admission', () => {
       );
       queued.push(record.job.id);
       expect(payload.inputs.storage.userId).toBe(userId);
-      expect(payload.soundPolicy).toBe('elevenlabs');
+      expect(payload.soundPolicy).toBe('stock');
       expect((await audioStitchingQueue.getJob(record.job.id))?.data).toEqual({
         operationId: record.job.id,
         fingerprint: record.fingerprint,

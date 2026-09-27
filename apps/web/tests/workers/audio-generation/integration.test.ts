@@ -691,6 +691,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
     await processAudioGeneration(next);
     const queued = await queuedStitches(episode.id);
     expect(queued).toHaveLength(1);
+    expect(queued[0]?.payload.soundPolicy).toBe('stock');
     expect(queued[0]?.payload.inputs.segments).toMatchObject([
       { id: segment.id, audioUrl: firstUrl },
       { id: second.id, audioUrl: expect.any(String) },

@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import { DEFAULT_INITIAL_STITCH_SOUND_POLICY } from '@/lib/sidedoor/jobs/initial/initial-stitch-contract';
 import { GenerateAudioPayload, audioStitchingQueue } from '@/lib/queue';
 import { isDeepStrictEqual } from 'node:util';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
@@ -127,7 +128,7 @@ export async function processAudioGeneration(
       authorize: authorizeGeneration,
       episodeId,
       generationKey: audioGenerationKey,
-      soundPolicy: 'elevenlabs',
+      soundPolicy: DEFAULT_INITIAL_STITCH_SOUND_POLICY,
       identities: stitchIdentities,
       fromPhase: 'GENERATING_AUDIO',
       signal,

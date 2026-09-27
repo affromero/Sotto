@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
@@ -13,20 +13,21 @@ import styles from './PracticeRunner.module.css';
 
 // ---- Types (mirror the practice API) ----
 
-export interface PracticeMcItem {
+interface PracticeMcItem {
   id: string;
   prompt: string;
   options: string[];
+  passageText?: string;
 }
 
-export interface PracticeSpeakingItem {
+interface PracticeSpeakingItem {
   id: string;
   targetPhrase: string;
   translation: string;
   referenceTtsUrl?: string | null;
 }
 
-export interface PracticeWritingItem {
+interface PracticeWritingItem {
   id: string;
   task: string;
   guidance?: string | null;
@@ -67,8 +68,20 @@ interface PracticeRunnerProps {
 
 // ---- Listening audio: poll the episode until its audio is ready ----
 
-function ListeningAudio({ episodeId }: { episodeId: string }) {
+function ListeningAudio({
+  episodeId,
+  onStatusChange,
+}: {
+  episodeId: string;
+  onStatusChange?: (status: string) => void;
+}) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    onStatusChange?.(error ? 'Audio unavailable' : audioUrl ? 'Audio ready' : 'Audio generating');
+  }, [error, audioUrl, onStatusChange]);
 
   useEffect(() => {
     let active = true;
@@ -76,15 +89,27 @@ function ListeningAudio({ episodeId }: { episodeId: string }) {
     async function poll() {
       try {
         const res = await fetch(`/api/v1/episodes/${episodeId}`);
-        if (res.ok) {
-          const data = (await res.json()) as { audioUrl?: string | null };
-          if (active && data.audioUrl) {
-            setAudioUrl(data.audioUrl);
-            return;
-          }
+        if (!res.ok) throw new Error('Could not load listening audio.');
+        const data = (await res.json()) as { audioUrl?: string | null; status?: string };
+        if (!active) return;
+        if (data.status === 'FAILED') {
+          setError(
+            'Listening audio generation failed. Start a new listening practice or check again.'
+          );
+          return;
+        }
+        if (data.audioUrl) {
+          setAudioUrl(data.audioUrl);
+          return;
+        }
+        if (data.status === 'READY') {
+          setError('Listening audio is unavailable for this session.');
+          return;
         }
       } catch {
-        /* retry below */
+        if (active)
+          setError('Could not load listening audio. Check your connection and try again.');
+        return;
       }
       if (active) timer = setTimeout(() => void poll(), 3000);
     }
@@ -93,12 +118,33 @@ function ListeningAudio({ episodeId }: { episodeId: string }) {
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [episodeId]);
+  }, [episodeId, attempt]);
+
+  if (error) {
+    return (
+      <div className={styles.audioBlock}>
+        <p className={styles.errorBanner} role="alert">
+          {error}
+        </p>
+        <button
+          type="button"
+          className={styles.primaryButton}
+          onClick={() => {
+            setError('');
+            setAudioUrl(null);
+            setAttempt((value) => value + 1);
+          }}
+        >
+          Check audio again
+        </button>
+      </div>
+    );
+  }
 
   if (!audioUrl) {
     return (
       <p className={styles.audioGenerating} role="status">
-        Audio is generating. The questions below are ready while you wait.
+        Listening audio is generating. You can work on another section while you wait.
       </p>
     );
   }
@@ -109,6 +155,7 @@ function ListeningAudio({ episodeId }: { episodeId: string }) {
       preload="metadata"
       src={audioUrl}
       aria-label="Practice audio"
+      onError={() => setError('Listening audio could not be played. Try loading it again.')}
     />
   );
 }
@@ -140,66 +187,125 @@ function MultipleChoiceList({
   answers: Record<string, number>;
   onAnswer: (itemId: string, selectedIndex: number) => void;
 }) {
+  const [index, setIndex] = useState(0);
+  const it = items[index];
+  if (!it) return null;
   return (
-    <ol className={styles.questionList}>
-      {items.map((it, qi) => {
-        const selected = answers[it.id];
-        return (
-          <li key={it.id} className={styles.question}>
-            <div className={styles.drillCard}>
-              <div className={styles.drillMeta}>
-                <span className={styles.drillIdx}>
-                  {qi + 1} of {items.length}
-                </span>
-              </div>
-              <LearningSelectionMenu
-                courseId={courseId}
-                sourceType="PRACTICE"
-                sourceId={sessionId}
-                sourceLabel="Practice"
-              >
-                <p
-                  className={`${styles.questionText} ${guardStyles.guarded}`}
-                  {...learningTextGuardProps<HTMLParagraphElement>()}
+    <div className={styles.runner}>
+      <ol className={styles.questionList}>
+        {[it].map((it) => {
+          const selected = answers[it.id];
+          return (
+            <li key={it.id} className={styles.question}>
+              <div className={styles.drillCard}>
+                <div className={styles.drillMeta}>
+                  <span className={styles.drillIdx}>
+                    {index + 1} of {items.length}
+                  </span>
+                </div>
+                <LearningSelectionMenu
+                  courseId={courseId}
+                  sourceType="PRACTICE"
+                  sourceId={sessionId}
+                  sourceLabel="Practice"
                 >
-                  {it.prompt}
-                </p>
-              </LearningSelectionMenu>
-              <div className={styles.options} role="group" aria-label={`Options for: ${it.prompt}`}>
-                {it.options.map((opt, idx) => {
-                  const isSelected = selected === idx;
-                  return (
-                    <LearningSelectionMenu
-                      key={idx}
-                      courseId={courseId}
-                      sourceType="PRACTICE"
-                      sourceId={sessionId}
-                      sourceLabel="Practice"
-                    >
-                      <button
-                        type="button"
-                        className={`${styles.option} ${isSelected ? styles.optionSelected : ''} ${guardStyles.guarded}`}
-                        {...learningTextGuardProps<HTMLButtonElement>()}
-                        onClick={() => onAnswer(it.id, idx)}
-                        aria-pressed={isSelected}
-                        aria-label={`Option ${idx + 1}: ${opt}`}
+                  {it.passageText && <p className={styles.passage}>{it.passageText}</p>}
+                  <p
+                    className={`${styles.questionText} ${guardStyles.guarded}`}
+                    {...learningTextGuardProps<HTMLParagraphElement>()}
+                  >
+                    {it.prompt}
+                  </p>
+                </LearningSelectionMenu>
+                <div
+                  className={styles.options}
+                  role="group"
+                  aria-label={`Options for: ${it.prompt}`}
+                >
+                  {it.options.map((opt, idx) => {
+                    const isSelected = selected === idx;
+                    return (
+                      <LearningSelectionMenu
+                        key={idx}
+                        courseId={courseId}
+                        sourceType="PRACTICE"
+                        sourceId={sessionId}
+                        sourceLabel="Practice"
                       >
-                        <span className={styles.optionLetter} aria-hidden="true">
-                          {String.fromCharCode(65 + idx)}
-                        </span>
-                        <span className={styles.optionText}>{opt}</span>
-                      </button>
-                    </LearningSelectionMenu>
-                  );
-                })}
+                        <button
+                          type="button"
+                          className={`${styles.option} ${isSelected ? styles.optionSelected : ''} ${guardStyles.guarded}`}
+                          {...learningTextGuardProps<HTMLButtonElement>()}
+                          onClick={() => onAnswer(it.id, idx)}
+                          aria-pressed={isSelected}
+                          aria-label={`Option ${idx + 1}: ${opt}`}
+                        >
+                          <span className={styles.optionLetter} aria-hidden="true">
+                            {String.fromCharCode(65 + idx)}
+                          </span>
+                          <span className={styles.optionText}>{opt}</span>
+                        </button>
+                      </LearningSelectionMenu>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+      <nav className={styles.actions} aria-label="Question navigation">
+        <button
+          type="button"
+          className={styles.primaryButton}
+          disabled={index === 0}
+          onClick={() => setIndex((value) => value - 1)}
+        >
+          Previous question
+        </button>
+        <span className={styles.progressHint} aria-live="polite">
+          Question {index + 1} of {items.length}
+        </span>
+        <button
+          type="button"
+          className={styles.primaryButton}
+          disabled={index === items.length - 1}
+          onClick={() => setIndex((value) => value + 1)}
+        >
+          Next question
+        </button>
+      </nav>
+    </div>
   );
 }
+
+function PracticeSection({
+  title,
+  progress,
+  children,
+}: {
+  title: string;
+  progress?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className={styles.fullSection}>
+      <summary className={styles.sectionSummary}>
+        {title}
+        {progress && <span>{progress}</span>}
+      </summary>
+      <div className={styles.sectionBody}>{children}</div>
+    </details>
+  );
+}
+
+const MC_SECTIONS = [
+  { prefix: 'f', title: 'Focused review' },
+  { prefix: 'v', title: 'Vocabulary in context' },
+  { prefix: 'g', title: 'Grammar' },
+  { prefix: 'r', title: 'Reading' },
+  { prefix: 'l', title: 'Listening' },
+] as const;
 
 // ---- MC runner (VOCAB / GRAMMAR / READING / LISTENING) ----
 
@@ -306,6 +412,18 @@ function McRunner({
 
 // ---- Speaking runner ----
 
+async function finishPractice(sessionId: string) {
+  const response = await fetch(`/api/v1/practice/${sessionId}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: [] }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? 'Could not finish practice. Please try again.');
+  }
+}
+
 function SpeakingRunner({
   start,
   onDone,
@@ -314,16 +432,19 @@ function SpeakingRunner({
   onDone: () => void;
 }) {
   const [finishing, setFinishing] = useState(false);
+  const [error, setError] = useState('');
 
   async function finish() {
     setFinishing(true);
-    // Apply SRS from whatever recordings have been graded so far.
-    await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers: [] }),
-    }).catch(() => {});
-    onDone();
+    setError('');
+    try {
+      await finishPractice(start.sessionId);
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not finish practice.');
+    } finally {
+      setFinishing(false);
+    }
   }
 
   return (
@@ -332,6 +453,11 @@ function SpeakingRunner({
         endpointBase={`/api/v1/practice/${start.sessionId}/speaking`}
         prompts={start.prompts}
       />
+      {error && (
+        <p className={styles.errorBanner} role="alert">
+          {error}
+        </p>
+      )}
       <div className={styles.actions}>
         <button
           type="button"
@@ -357,6 +483,7 @@ function WritingRunner({
   onDone: () => void;
 }) {
   const [finishing, setFinishing] = useState(false);
+  const [error, setError] = useState('');
 
   const prompts: WritingPromptData[] = useMemo(
     () =>
@@ -382,17 +509,25 @@ function WritingRunner({
       return;
     }
 
-    await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers: [] }),
-    }).catch(() => {});
-    onDone();
+    setError('');
+    try {
+      await finishPractice(start.sessionId);
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not finish practice.');
+    } finally {
+      setFinishing(false);
+    }
   }
 
   return (
     <div className={styles.runner}>
       <WritingSection drafts={drafts} prompts={prompts} />
+      {error && (
+        <p className={styles.errorBanner} role="alert">
+          {error}
+        </p>
+      )}
       {drafts.error && (
         <p className={styles.errorBanner} role="alert">
           {drafts.error}
@@ -427,6 +562,9 @@ function FullRunner({
   const [phase, setPhase] = useState<'answering' | 'submitting' | 'result' | 'error'>('answering');
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [error, setError] = useState('');
+  const [audioStatus, setAudioStatus] = useState(
+    start.episodeId ? 'Audio generating' : 'Audio unavailable'
+  );
 
   const writingPrompts: WritingPromptData[] = useMemo(
     () =>
@@ -495,37 +633,64 @@ function FullRunner({
 
   return (
     <div className={styles.runner}>
-      {start.episodeId && (
-        <div className={styles.audioBlock}>
-          <ListeningAudio episodeId={start.episodeId} />
-        </div>
-      )}
+      <p className={styles.progressHint}>
+        Open a section to practice. Your answers stay here while you move between sections.
+      </p>
+      {MC_SECTIONS.map(({ prefix, title }) => {
+        const items = start.items.filter((item) => item.id.startsWith(prefix));
+        if (prefix === 'f' && items.length === 0) return null;
+        return (
+          <PracticeSection
+            key={prefix}
+            title={title}
+            progress={`${prefix === 'l' ? `${audioStatus} · ` : ''}${items.filter((item) => answers[item.id] !== undefined).length} of ${items.length} answered`}
+          >
+            {prefix === 'l' &&
+              (start.episodeId ? (
+                <ListeningAudio
+                  key={start.episodeId}
+                  episodeId={start.episodeId}
+                  onStatusChange={setAudioStatus}
+                />
+              ) : (
+                <p className={styles.errorBanner} role="alert">
+                  This session has no listening audio. Start a new full practice.
+                </p>
+              ))}
+            {items.length > 0 ? (
+              <MultipleChoiceList
+                courseId={courseId}
+                sessionId={start.sessionId}
+                items={items}
+                answers={answers}
+                onAnswer={(itemId, selectedIndex) =>
+                  setAnswers((prev) => ({ ...prev, [itemId]: selectedIndex }))
+                }
+              />
+            ) : (
+              <p role="status">This session has no {title.toLowerCase()} questions.</p>
+            )}
+          </PracticeSection>
+        );
+      })}
 
-      {start.items.length > 0 && (
-        <MultipleChoiceList
-          courseId={courseId}
-          sessionId={start.sessionId}
-          items={start.items}
-          answers={answers}
-          onAnswer={(itemId, selectedIndex) =>
-            setAnswers((prev) => ({ ...prev, [itemId]: selectedIndex }))
-          }
-        />
-      )}
-
-      {start.speakingPrompts.length > 0 && (
-        <section className={styles.fullSection} aria-label="Speaking">
+      <PracticeSection title="Speaking" progress={`${start.speakingPrompts.length} exercises`}>
+        {start.speakingPrompts.length > 0 ? (
           <SpeakingExercise
             endpointBase={`/api/v1/practice/${start.sessionId}/speaking`}
             prompts={start.speakingPrompts}
           />
-        </section>
-      )}
+        ) : (
+          <p className={styles.errorBanner} role="alert">
+            This session has no speaking exercises. Start a new full practice.
+          </p>
+        )}
+      </PracticeSection>
 
       {writingPrompts.length > 0 && (
-        <section className={styles.fullSection} aria-label="Writing">
+        <PracticeSection title="Writing" progress={`${writingPrompts.length} exercises`}>
           <WritingSection drafts={drafts} prompts={writingPrompts} />
-        </section>
+        </PracticeSection>
       )}
 
       {error && (

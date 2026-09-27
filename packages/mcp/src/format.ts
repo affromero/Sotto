@@ -12,7 +12,7 @@ function formatTags(episode: Episode): string {
   return episode.tags.map((t) => t.tag.name).join(', ');
 }
 
-export function formatEpisodeSummary(p: Episode): string {
+function formatEpisodeSummary(p: Episode): string {
   const lines = [
     `**${p.title}**`,
     `ID: ${p.id}`,

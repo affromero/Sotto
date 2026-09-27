@@ -4,9 +4,9 @@ import {
   credentialRemovalRequestSchema,
 } from 'thesidedoor-core/configuration/credential-client';
 
-export const credentialEndpointSchema = z.enum(['ai-keys', 'byok', 'visual-cues']);
+const credentialEndpointSchema = z.enum(['ai-keys', 'byok', 'visual-cues']);
 export type SottoCredentialEndpoint = z.infer<typeof credentialEndpointSchema>;
-export const credentialSelectionSchema = credentialRemovalRequestSchema
+const credentialSelectionSchema = credentialRemovalRequestSchema
   .omit({ context: true, operationId: true })
   .extend({ endpoint: credentialEndpointSchema });
 export const credentialSelectionEnvelopeSchema = z

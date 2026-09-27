@@ -6,7 +6,7 @@
  */
 
 /** Average spoken words per minute (conversational pace). */
-export const WORDS_PER_MINUTE = 150;
+const WORDS_PER_MINUTE = 150;
 
 /** Average characters per second of speech (~750 chars/min ÷ 60). */
 export const CHARS_PER_SECOND = 12.5;

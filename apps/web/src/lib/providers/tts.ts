@@ -1,11 +1,4 @@
-import {
-  VOICE_POOL,
-  selectVoicePair,
-  resolveVoiceId,
-  findByVoiceId,
-  type VoicePoolEntry,
-  type VoiceMatchMetadata,
-} from '../voice-pool';
+import { type VoiceMatchMetadata } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
 import { isValidProviderId } from './tts-registry';
 import type { WordTiming } from '@sotto/shared';
@@ -489,7 +482,3 @@ export async function canResolveTts(userId: string): Promise<boolean> {
     return true;
   return false;
 }
-
-// Re-export voice pool utilities for convenience
-export { VOICE_POOL, selectVoicePair, resolveVoiceId, findByVoiceId };
-export type { VoicePoolEntry, VoiceMatchMetadata };

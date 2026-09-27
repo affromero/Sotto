@@ -68,9 +68,7 @@ vi.mock('@/lib/generation-features', () => ({
   }),
 }));
 
-vi.mock('@/lib/byok', () => ({
-  hasByokKey: vi.fn().mockResolvedValue(false),
-}));
+vi.mock('@/lib/byok', () => ({}));
 
 // Import route after mocks are set up
 import { POST } from '@/app/api/v1/episodes/[episodeId]/interact/route';

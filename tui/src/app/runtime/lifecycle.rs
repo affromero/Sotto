@@ -119,10 +119,6 @@ impl App {
                     self.action_tx.send(Action::Render)?;
                 }
             }
-            Action::Error(message) => {
-                self.status_bar.set_error(message);
-                self.action_tx.send(Action::Render)?;
-            }
             Action::Up => self.on_up(),
             Action::Down => self.on_down(),
             Action::Select => self.on_select(),

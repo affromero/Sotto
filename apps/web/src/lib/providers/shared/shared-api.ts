@@ -38,7 +38,7 @@ export interface SharedApiOptions {
 }
 
 /** One attempt against one captured selection. Callers own product policy and retries. */
-export function sharedApiEvents(
+function sharedApiEvents(
   selection: SharedApiSelection,
   system: string,
   messages: ChatMessage[],

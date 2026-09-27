@@ -11,7 +11,6 @@ use crate::api::{NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse,
 /// gitpane loop clones actions) but the underlying error type is not, and the
 /// payloads can be large.
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub(crate) enum Action {
     /// Lightweight housekeeping tick.
     Tick,
@@ -21,8 +20,6 @@ pub(crate) enum Action {
     Quit,
     /// The terminal was resized to `(width, height)`.
     Resize(u16, u16),
-    /// Surface a transient error message in the status bar.
-    Error(String),
 
     // --- Navigation / input intents (mapped from key events) ---
     /// Move the active selection cursor up.

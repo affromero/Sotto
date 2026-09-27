@@ -8,6 +8,7 @@ import { blockedProviderExecution } from '../helpers/runtime/provider-execution'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockCourseFindFirst = vi.fn();
+const mockEpisodeFindUnique = vi.fn();
 const mockLearnerVocabCount = vi.fn();
 const mockLearnerVocabFindMany = vi.fn();
 const mockLessonFindFirst = vi.fn();
@@ -30,6 +31,7 @@ const mockSpeakingRecordingFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    episode: { findUnique: (...a: unknown[]) => mockEpisodeFindUnique(...a) },
     course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
     learnerVocab: {
       count: (...a: unknown[]) => mockLearnerVocabCount(...a),
@@ -124,7 +126,21 @@ beforeEach(() => {
   mockPublishSpeakingPromptReferences.mockResolvedValue(new Map());
   mockComposeWritingPrompts.mockResolvedValue([{ task: 'Write a greeting note.', guidance: null }]);
   mockSpeakingRecordingFindMany.mockResolvedValue([]);
+  mockEpisodeFindUnique.mockResolvedValue({ status: 'READY', audioUrl: '/audio.mp3' });
+  mockGenerateSectionQuestions.mockImplementation(
+    async (params: { vocabularyReview?: boolean; targetVocab: Array<{ lemma: string }> }) =>
+      params.vocabularyReview ? contextualQuestions(params.targetVocab) : []
+  );
 });
+
+function contextualQuestions(words: Array<{ lemma: string }>) {
+  return words.map(({ lemma }) => ({
+    question: `Al entrar, Ana dice _____ a sus amigos. (${lemma})`,
+    options: [lemma, 'adiós', 'perdón', 'hasta luego'],
+    correctIndex: 0,
+    explanation: 'The greeting fits the situation.',
+  }));
+}
 
 describe('startPractice — ownership', () => {
   it("throws PracticeCourseNotFoundError when the course is not the user's", async () => {
@@ -135,7 +151,85 @@ describe('startPractice — ownership', () => {
   });
 });
 
+describe('oral practice completion', () => {
+  beforeEach(() => {
+    mockPracticeSessionFindFirst.mockResolvedValue({
+      id: 'session',
+      status: 'ACTIVE',
+      kind: 'FULL',
+      courseId: 'c1',
+      episodeId: 'episode',
+      vocabLemmas: [],
+      grammarKeys: [],
+      items: [
+        {
+          id: 'l0',
+          prompt: 'Where is Mia?',
+          options: ['home', 'cinema'],
+          correctIndex: 1,
+          explanation: '',
+          vocabLemma: null,
+          focusTargetId: null,
+        },
+      ],
+    });
+    mockSpeakingPromptCount.mockResolvedValue(2);
+    mockSpeakingRecordingFindMany.mockResolvedValue([
+      { promptId: 's1', overallScore: 0.8 },
+      { promptId: 's2', overallScore: 0.8 },
+    ]);
+  });
+
+  it.each(['GENERATING_AUDIO', 'FAILED'])(
+    'keeps the session active while audio is %s',
+    async (status) => {
+      mockEpisodeFindUnique.mockResolvedValue({ status, audioUrl: null });
+      await expect(
+        submitPractice('session', 'u1', [{ itemId: 'l0', selectedIndex: 1 }])
+      ).rejects.toThrow(/audio/i);
+      expect(mockPracticeSessionUpdate).not.toHaveBeenCalled();
+      expect(mockApplyReviewOutcome).not.toHaveBeenCalled();
+    }
+  );
+
+  it('requires every listening answer before finishing', async () => {
+    await expect(submitPractice('session', 'u1', [])).rejects.toThrow(/listening question/i);
+    expect(mockPracticeSessionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('cannot replace an unattempted speaking prompt with repeated recordings of another', async () => {
+    mockSpeakingRecordingFindMany.mockResolvedValue([
+      { promptId: 's1', overallScore: 0.9 },
+      { promptId: 's1', overallScore: 0.8 },
+    ]);
+    await expect(
+      submitPractice('session', 'u1', [{ itemId: 'l0', selectedIndex: 1 }])
+    ).rejects.toThrow(/speaking/i);
+    expect(mockPracticeSessionUpdate).not.toHaveBeenCalled();
+    expect(mockApplyReviewOutcome).not.toHaveBeenCalled();
+  });
+});
+
 describe('startPractice — VOCAB', () => {
+  it('rejects gloss-only output instead of persisting a misleading exercise', async () => {
+    mockLearnerVocabCount.mockResolvedValue(3);
+    mockGetDueItems.mockResolvedValue({
+      vocab: [{ id: 'word', lemma: 'gemacht', translation: 'done; made', mastery: 0 }],
+      grammar: [],
+    });
+    mockGenerateSectionQuestions.mockResolvedValue([
+      {
+        question: 'done; made',
+        options: ['gemacht', 'gesehen', 'gehen', 'Reise'],
+        correctIndex: 0,
+        explanation: '',
+      },
+    ]);
+    await expect(
+      startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'))
+    ).rejects.toThrow(/contextual exercise/);
+    expect(mockPracticeSessionCreate).not.toHaveBeenCalled();
+  });
   it('is unavailable (not_enough_vocab) on a cold-start course', async () => {
     mockLearnerVocabCount.mockResolvedValue(1);
     const r = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'));
@@ -143,7 +237,7 @@ describe('startPractice — VOCAB', () => {
     expect(mockPracticeSessionCreate).not.toHaveBeenCalled();
   });
 
-  it('builds recall items with the answer among the options, hidden from the public projection', async () => {
+  it('preserves contextual questions and word attribution without exposing the answer key', async () => {
     mockLearnerVocabCount.mockResolvedValue(10);
     mockGetDueItems.mockResolvedValue({
       vocab: [
@@ -167,8 +261,9 @@ describe('startPractice — VOCAB', () => {
     expect(Object.keys(r.items[0]).sort()).toEqual(['id', 'options', 'prompt']);
     // Each recall item must contain its own answer among the choices.
     const prompts = r.items.map((it) => it.prompt);
-    expect(prompts).toEqual(expect.arrayContaining(['hello', 'thanks']));
-    const helloItem = r.items.find((it) => it.prompt === 'hello')!;
+    expect(prompts.every((prompt) => prompt.includes('_____'))).toBe(true);
+    expect(prompts).not.toContain('hello');
+    const helloItem = r.items.find((it) => it.options.includes('hola'))!;
     expect(helloItem.options).toContain('hola');
 
     expect(mockPracticeSessionCreate).toHaveBeenCalledWith(
@@ -183,19 +278,45 @@ describe('startPractice — VOCAB', () => {
 });
 
 describe('startPractice — GRAMMAR', () => {
+  it('keeps the reading source in the stored session and public response', async () => {
+    mockGetDueItems.mockResolvedValue({
+      vocab: [{ id: 'word', lemma: 'Kino', translation: 'cinema', mastery: 0 }],
+      grammar: [],
+    });
+    mockGenerateSectionQuestions.mockResolvedValue([
+      {
+        question: 'Wo war Mia?',
+        passageText: 'Mia war im Kino.',
+        options: ['Kino', 'Park', 'Bonn', 'Berlin'],
+        correctIndex: 0,
+        explanation: 'The source says Kino.',
+      },
+    ]);
+    const result = await startPractice('c1', 'u1', 'READING', blockedProviderExecution('u1'));
+    expect(result).toMatchObject({ items: [{ passageText: 'Mia war im Kino.' }] });
+    expect(mockPracticeSessionCreate.mock.calls[0][0].data.items[0]).toMatchObject({
+      passageText: 'Mia war im Kino.',
+    });
+    expect(JSON.stringify(result)).not.toContain('correctIndex');
+  });
   it('seeds from due items and generates questions', async () => {
     mockGetDueItems.mockResolvedValue({
       vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
       grammar: [{ id: 'lg1', topicKey: 'ser-vs-estar', title: 'Ser vs Estar', mastery: 0.3 }],
     });
-    mockGenerateSectionQuestions.mockResolvedValue([
-      {
-        question: 'Soy ___ Madrid',
-        options: ['de', 'en', 'a', 'por'],
-        correctIndex: 0,
-        explanation: 'origin',
-      },
-    ]);
+    mockGenerateSectionQuestions.mockImplementation(
+      async (params: { vocabularyReview?: boolean; targetVocab: Array<{ lemma: string }> }) =>
+        params.vocabularyReview
+          ? contextualQuestions(params.targetVocab)
+          : [
+              {
+                question: 'Soy ___ Madrid',
+                options: ['de', 'en', 'a', 'por'],
+                correctIndex: 0,
+                explanation: 'origin',
+              },
+            ]
+    );
 
     const r = await startPractice('c1', 'u1', 'GRAMMAR', blockedProviderExecution('u1'));
     if (r.status !== 'ready') throw new Error('expected ready');
@@ -235,14 +356,19 @@ describe('startPractice — GRAMMAR', () => {
       vocab: [{ id: 'lv1', lemma: 'entender', translation: 'understand', mastery: 0.4 }],
       grammar: [],
     });
-    mockGenerateSectionQuestions.mockResolvedValue([
-      {
-        question: 'What does the speaker find difficult?',
-        options: ['a', 'b', 'c', 'd'],
-        correctIndex: 0,
-        explanation: 'context',
-      },
-    ]);
+    mockGenerateSectionQuestions.mockImplementation(
+      async (params: { vocabularyReview?: boolean; targetVocab: Array<{ lemma: string }> }) =>
+        params.vocabularyReview
+          ? contextualQuestions(params.targetVocab)
+          : [
+              {
+                question: 'What does the speaker find difficult?',
+                options: ['a', 'b', 'c', 'd'],
+                correctIndex: 0,
+                explanation: 'context',
+              },
+            ]
+    );
 
     const r = await startPractice('c1', 'u1', 'READING', blockedProviderExecution('u1'), {
       focusTargetId: 'ft1',
@@ -253,7 +379,8 @@ describe('startPractice — GRAMMAR', () => {
     const createArg = mockPracticeSessionCreate.mock.calls[0][0];
     expect(createArg.data.focusTargetIds).toEqual(['ft1']);
     expect(createArg.data.items[0]).toMatchObject({ focusTargetId: 'ft1' });
-    expect(r.items[0].prompt).toContain('Choose the marked expression');
+    expect(r.items[0].prompt).toContain('_____');
+    expect(r.items[0].prompt).not.toContain('Choose the marked expression');
   });
 });
 
@@ -272,14 +399,19 @@ describe('startPractice — FULL', () => {
     mockLearnerVocabFindMany.mockResolvedValue(
       ['hola', 'gracias', 'adios', 'si', 'no'].map((lemma) => ({ lemma }))
     );
-    mockGenerateSectionQuestions.mockResolvedValue([
-      {
-        question: 'Soy ___ Madrid',
-        options: ['de', 'en', 'a', 'por'],
-        correctIndex: 0,
-        explanation: 'origin',
-      },
-    ]);
+    mockGenerateSectionQuestions.mockImplementation(
+      async (params: { vocabularyReview?: boolean; targetVocab: Array<{ lemma: string }> }) =>
+        params.vocabularyReview
+          ? contextualQuestions(params.targetVocab)
+          : [
+              {
+                question: 'Soy ___ Madrid',
+                options: ['de', 'en', 'a', 'por'],
+                correctIndex: 0,
+                explanation: 'origin',
+              },
+            ]
+    );
     mockComposeListeningContent.mockResolvedValue({
       episodeId: 'ep1',
       comprehensionQuestions: [
@@ -332,17 +464,20 @@ describe('startPractice — FULL', () => {
     // vocabulary in it.
     let vocabSeeded = false;
     mockLearnerVocabCount.mockImplementation(async () => (vocabSeeded ? 6 : 0));
-    mockGenerateSectionQuestions.mockImplementation(async () => {
-      vocabSeeded = true;
-      return [
-        {
-          question: 'Soy ___ Madrid',
-          options: ['de', 'en', 'a', 'por'],
-          correctIndex: 0,
-          explanation: 'origin',
-        },
-      ];
-    });
+    mockGenerateSectionQuestions.mockImplementation(
+      async (params: { vocabularyReview?: boolean; targetVocab: Array<{ lemma: string }> }) => {
+        vocabSeeded = true;
+        if (params.vocabularyReview) return contextualQuestions(params.targetVocab);
+        return [
+          {
+            question: 'Soy ___ Madrid',
+            options: ['de', 'en', 'a', 'por'],
+            correctIndex: 0,
+            explanation: 'origin',
+          },
+        ];
+      }
+    );
     mockGetDueItems.mockResolvedValue({
       vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
       grammar: [],
@@ -352,7 +487,14 @@ describe('startPractice — FULL', () => {
     );
     mockComposeListeningContent.mockResolvedValue({
       episodeId: 'ep1',
-      comprehensionQuestions: [],
+      comprehensionQuestions: [
+        {
+          question: 'Where is Ana?',
+          options: ['home', 'school', 'park', 'shop'],
+          correctIndex: 0,
+          explanation: 'She says she is home.',
+        },
+      ],
     });
     mockPracticeSessionCreate.mockResolvedValue({ id: 'pfull2' });
     mockSpeakingPromptFindMany.mockResolvedValue([]);
@@ -505,12 +647,21 @@ describe('submitPractice — SRS', () => {
   it('applies precise vocab and section-weighted aggregate SRS for FULL sessions', async () => {
     mockPracticeSessionFindFirst.mockResolvedValue({
       id: 'ps-full',
+      episodeId: 'ep1',
       status: 'ACTIVE',
       kind: 'FULL',
       courseId: 'c1',
       vocabLemmas: ['hola', 'seed-word'],
       grammarKeys: ['ser-vs-estar'],
       items: [
+        {
+          id: 'l0',
+          correctIndex: 0,
+          vocabLemma: null,
+          prompt: 'Where is Ana?',
+          options: ['home', 'school'],
+          explanation: '',
+        },
         {
           id: 'v0',
           correctIndex: 1,
@@ -535,19 +686,20 @@ describe('submitPractice — SRS', () => {
     mockWritingPromptCount.mockResolvedValue(1);
 
     const r = await submitPractice('ps-full', 'u1', [
+      { itemId: 'l0', selectedIndex: 0 },
       { itemId: 'v0', selectedIndex: 1 },
       { itemId: 'g0', selectedIndex: 2 },
     ]);
 
-    expect(r.correct).toBe(3);
-    expect(r.total).toBe(4);
-    expect(r.score).toBeCloseTo((0.5 + 0.6 + 0.8) / 3);
+    expect(r.correct).toBe(4);
+    expect(r.total).toBe(5);
+    expect(r.score).toBeCloseTo((2 / 3 + 0.6 + 0.8) / 3);
     expect(mockApplyReviewOutcome).toHaveBeenCalledWith('c1', ['hola'], [], 1, 0, expect.any(Date));
     expect(mockApplyReviewOutcome).toHaveBeenCalledWith(
       'c1',
       ['seed-word'],
       ['ser-vs-estar'],
-      expect.closeTo((0.5 + 0.6 + 0.8) / 3),
+      expect.closeTo((2 / 3 + 0.6 + 0.8) / 3),
       0,
       expect.any(Date)
     );

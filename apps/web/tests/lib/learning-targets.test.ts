@@ -6,7 +6,6 @@ const mockLearnerVocabUpsert = vi.fn();
 const mockLearnerFocusTargetUpsert = vi.fn();
 const mockLearnerFocusTargetFindFirst = vi.fn();
 const mockLearnerFocusTargetUpdate = vi.fn();
-const mockAssertStorageWritable = vi.fn();
 const mockUploadFile = vi.fn();
 const mockWriteStorageReference = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
@@ -29,7 +28,6 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: database, prismaUnfiltered: database };
 });
 vi.mock('@/lib/r2', () => ({
-  assertStorageWritable: (...a: unknown[]) => mockAssertStorageWritable(...a),
   uploadFile: (...a: unknown[]) => mockUploadFile(...a),
 }));
 vi.mock('@/lib/sidedoor/storage/core/storage-write', () => ({
@@ -109,7 +107,6 @@ beforeEach(() => {
     },
   });
   mockLearnerFocusTargetUpdate.mockResolvedValue(TARGET_ROW);
-  mockAssertStorageWritable.mockResolvedValue(undefined);
   mockWriteStorageReference.mockResolvedValue('https://cdn.example/focus.mp3');
 });
 

@@ -110,13 +110,13 @@ export const STT_LANGUAGE_SUPPORT_SETS = buildLanguageSupportSets(
   speechLanguageSupportConfig.sttLanguageSupport
 );
 
-export const WELCOME_TTS_PROVIDER_LANGUAGE_SUPPORT = buildWelcomeProviderLanguageSupport(
+const WELCOME_TTS_PROVIDER_LANGUAGE_SUPPORT = buildWelcomeProviderLanguageSupport(
   'welcomeProviderLanguageSupport.tts',
   speechLanguageSupportConfig.welcomeProviderLanguageSupport.tts,
   TTS_LANGUAGE_SUPPORT_SETS
 );
 
-export const WELCOME_STT_PROVIDER_LANGUAGE_SUPPORT = buildWelcomeProviderLanguageSupport(
+const WELCOME_STT_PROVIDER_LANGUAGE_SUPPORT = buildWelcomeProviderLanguageSupport(
   'welcomeProviderLanguageSupport.stt',
   speechLanguageSupportConfig.welcomeProviderLanguageSupport.stt,
   STT_LANGUAGE_SUPPORT_SETS

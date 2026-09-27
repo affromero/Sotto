@@ -87,7 +87,6 @@ vi.mock('@/lib/providers/tts-registry', () => ({
       modelsWithoutTextContext: [],
     };
   }),
-  compareQuality: vi.fn(),
   isValidProviderId: (id: string) =>
     [
       'elevenlabs',
@@ -104,7 +103,6 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 }));
 
 vi.mock('@/lib/byok', () => ({
-  getByokKey: vi.fn(),
   getSharedByokKey: vi.fn().mockResolvedValue(null),
   hasSharedByokKey: vi.fn().mockResolvedValue(false),
   listByokProviders: vi.fn().mockResolvedValue([]),

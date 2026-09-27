@@ -5,7 +5,7 @@
  * design bundle (`class-data.jsx`). Stroke icons inherit `currentColor`.
  */
 
-export type ClassGlyphName =
+type ClassGlyphName =
   | 'arrow'
   | 'back'
   | 'check'

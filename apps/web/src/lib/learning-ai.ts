@@ -22,7 +22,7 @@ import { aiProviderRules } from './providers/ai';
 import { createSottoProviderTransport } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { learningCredentialFingerprint } from '@/lib/classes/preparation-selection';
 
-export interface ResolvedLearningAi {
+interface ResolvedLearningAi {
   provider: string;
   model: string;
   endpoint?: string;
@@ -113,9 +113,7 @@ export async function resolveCapturedEpisodeAi(options: {
 }
 
 /** The only HTTP boundary for a captured learning-model selection. */
-export async function capturedLearningAiFetch(
-  ai: CapturedLearningAi
-): Promise<typeof fetch | undefined> {
+async function capturedLearningAiFetch(ai: CapturedLearningAi): Promise<typeof fetch | undefined> {
   const rules = aiProviderRules(ai.provider, ai.endpoint);
   if (!rules.length) return undefined;
   return (await createSottoProviderTransport(ai.execution, rules)).authenticatedFetch;

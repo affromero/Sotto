@@ -287,10 +287,10 @@ export function WritingSection({
         <div className={styles.eyebrow}>
           <span className={styles.eyebrowIdx}>{onContinue ? '04 ·' : 'Writing ·'}</span> Writing
         </div>
-        <h1 className={styles.title}>Write back, in your hand.</h1>
+        <h1 className={styles.title}>Writing practice</h1>
         <p className={styles.modLede}>
-          A quick reply. The agent reads it the way a patient friend would, marking only what
-          matters and telling you why. Hover a fix to see the reason.
+          Work through the supplied sentences and facts. Submit your answers for corrections and
+          explanations.
         </p>
       </div>
 

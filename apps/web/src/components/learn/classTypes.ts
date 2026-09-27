@@ -7,7 +7,7 @@
 import type { ReferenceData } from '@/types/reference';
 import type { ReferenceType, VerificationStatus } from '@/generated/prisma/client';
 
-export type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
+type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 
 export interface WritingCorrection {
   old: string;
@@ -115,13 +115,13 @@ export interface ClassSection {
   writingPrompts: WritingPromptData[];
 }
 
-export interface ClassIntroExample {
+interface ClassIntroExample {
   target: string;
   meaning: string;
   note: string;
 }
 
-export interface ClassIntroVisuals {
+interface ClassIntroVisuals {
   timeline: {
     title: string;
     steps: string[];
@@ -187,7 +187,7 @@ export interface ClassData {
   sections: ClassSection[];
 }
 
-export interface ClassSectionResult {
+interface ClassSectionResult {
   id: string;
   skill: string;
   score: number;
@@ -202,7 +202,7 @@ export interface ClassSubmitResult {
   sections: ClassSectionResult[];
 }
 
-export const SKILL_LABELS: Record<string, string> = {
+const SKILL_LABELS: Record<string, string> = {
   GRAMMAR: 'Grammar',
   READING: 'Reading',
   LISTENING: 'Listening',
@@ -210,7 +210,7 @@ export const SKILL_LABELS: Record<string, string> = {
   WRITING: 'Writing',
 };
 
-export const REQUIRED_CLASS_SKILLS: ClassSkill[] = [
+const REQUIRED_CLASS_SKILLS: ClassSkill[] = [
   'GRAMMAR',
   'READING',
   'LISTENING',
@@ -268,36 +268,6 @@ export function classPresentationIssues(cls: ClassData): string[] {
   }
 
   return issues;
-}
-
-export function classPresentationNeedsRegeneration(cls: ClassData): boolean {
-  const sectionsBySkill = new Map(cls.sections.map((section) => [section.skill, section]));
-
-  for (const skill of REQUIRED_CLASS_SKILLS) {
-    if (!sectionsBySkill.has(skill)) return true;
-  }
-
-  const reading = sectionsBySkill.get('READING');
-  if (reading && !reading.questions.some((question) => question.passageText?.trim())) {
-    return true;
-  }
-
-  const listening = sectionsBySkill.get('LISTENING');
-  if (!listening?.episode || listening.episode.status === 'FAILED') {
-    return true;
-  }
-
-  const speaking = sectionsBySkill.get('SPEAKING');
-  if (speaking && speaking.prompts.length === 0) {
-    return true;
-  }
-
-  const writing = sectionsBySkill.get('WRITING');
-  if (writing && writing.writingPrompts.length === 0) {
-    return true;
-  }
-
-  return false;
 }
 
 /** Format seconds as m:ss. */

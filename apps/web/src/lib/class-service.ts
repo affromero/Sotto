@@ -698,6 +698,8 @@ export interface SubmitResult {
   sections: Array<{ id: string; skill: SkillType; score: number; passed: boolean }>;
 }
 
+export class ClassIncompleteError extends Error {}
+
 export async function submitClass(
   classId: string,
   userId: string,
@@ -709,6 +711,7 @@ export async function submitClass(
       sections: {
         include: {
           questions: true,
+          episode: { select: { status: true, audioUrl: true } },
           prompts: { include: { recordings: { orderBy: { createdAt: 'desc' } } } },
           writingPrompts: { include: { responses: { orderBy: { createdAt: 'desc' } } } },
         },
@@ -717,6 +720,38 @@ export async function submitClass(
     },
   });
   if (!cls) return null;
+
+  const listening = cls.sections.find((section) => section.skill === 'LISTENING');
+  const speaking = cls.sections.find((section) => section.skill === 'SPEAKING');
+  if (!listening?.questions.length || !speaking?.prompts.length) {
+    throw new ClassIncompleteError(
+      'This class is missing listening or speaking exercises. Regenerate the class.'
+    );
+  }
+  if (
+    !listening.episode ||
+    listening.episode.status === 'FAILED' ||
+    (listening.episode.status === 'READY' && !listening.episode.audioUrl)
+  ) {
+    throw new ClassIncompleteError('Listening audio is unavailable. Regenerate the class.');
+  }
+  if (listening.episode.status !== 'READY' || !listening.episode.audioUrl) {
+    throw new ClassIncompleteError(
+      'Listening audio is still generating. Wait for it before finishing.'
+    );
+  }
+  if (
+    speaking.prompts.some(
+      (prompt) =>
+        !prompt.recordings.some(
+          (recording) => recording.status === 'SCORED' && recording.overallScore != null
+        )
+    )
+  ) {
+    throw new ClassIncompleteError(
+      'Record every speaking exercise and wait for feedback before finishing.'
+    );
+  }
 
   const answerMap = new Map(answers.map((a) => [a.questionId, a.selectedIndex]));
   const graded: Array<{
@@ -760,7 +795,10 @@ export async function submitClass(
 
   const totalSections = cls.sections.length;
   const overallScore = totalSections > 0 ? passedSections / totalSections : 0;
-  const classPassed = overallScore >= cls.passThreshold;
+  const classPassed =
+    overallScore >= cls.passThreshold &&
+    sectionResults.some((section) => section.skill === 'LISTENING' && section.passed) &&
+    sectionResults.some((section) => section.skill === 'SPEAKING' && section.passed);
   const now = new Date();
 
   await prisma.$transaction([

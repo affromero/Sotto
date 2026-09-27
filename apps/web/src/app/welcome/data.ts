@@ -13,7 +13,7 @@ export interface BaseLang {
   name: string;
 }
 
-export interface ProviderCli {
+interface ProviderCli {
   label: string;
   bin: string;
 }
@@ -934,7 +934,6 @@ export const STEPS = [
   'Compose',
   'Ready',
 ] as const;
-export type StepName = (typeof STEPS)[number];
 
 export const WHISPERS: string[] = [
   'A fresh start begins at the front door.',
@@ -950,18 +949,6 @@ export const WHISPERS: string[] = [
   'Every lesson, shaped to the things you care about.',
   "Step by step, you'll build fluency.",
 ];
-
-export function iconFor(id: string): GlyphName {
-  const map: Record<string, GlyphName> = {
-    repos: 'repo',
-    reading: 'book',
-    notes: 'book',
-    calendar: 'dot',
-    music: 'wave',
-    manual: 'spark',
-  };
-  return map[id] ?? 'dot';
-}
 
 export function nextLevel(l: CefrLevel): CefrLevel {
   const i = LEVELS.indexOf(l);

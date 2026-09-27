@@ -25,9 +25,6 @@ export function getMinReferenceCount(depth: string, durationMinutes?: number): n
   return Math.max(base, scaled);
 }
 
-/** @deprecated Use getMinReferenceCount() instead */
-export const MIN_REFERENCE_COUNTS = BASE_REFERENCE_COUNTS;
-
 export const SERIOUS_REFERENCE_TYPES: Set<string> = new Set(['PAPER', 'BOOK', 'REPORT']);
 
 const BASE_SERIOUS_RATIO: Record<string, number> = {
@@ -44,9 +41,6 @@ export function getMinSeriousRatio(depth: string, tone?: string): number {
   if (tone && LOW_SERIOUS_TONES.has(tone)) return Math.max(0, base * 0.5);
   return base;
 }
-
-/** @deprecated Use getMinSeriousRatio() instead */
-export const MIN_SERIOUS_RATIO = BASE_SERIOUS_RATIO;
 
 export const REFERENCE_TYPE_WEIGHTS: Record<string, number> = {
   PAPER: 1.0,

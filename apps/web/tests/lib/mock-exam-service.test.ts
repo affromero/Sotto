@@ -195,7 +195,14 @@ suite('persisted mock exams', () => {
         .join('\n');
       let content: unknown;
       if (/writing tasks/.test(prompt))
-        content = [{ task: 'Schreibe eine Einladung.', guidance: 'Invite a friend for coffee.' }];
+        content = [
+          {
+            task: 'Schreibe eine Einladung mit diesen Angaben.',
+            taskType: 'guided_reply',
+            sourceText: 'Kaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
+            guidance: 'Verwende alle Angaben.',
+          },
+        ];
       else if (/speaking prompts/.test(prompt))
         content = [{ targetPhrase: 'Guten Morgen', translation: 'Good morning' }];
       else if (/questions|quiz/i.test(prompt))
@@ -258,7 +265,11 @@ suite('persisted mock exams', () => {
     });
     expect(saved.sections.find((section) => section.skill === 'WRITING')).toMatchObject({
       status: 'READY',
-      writingPrompts: [expect.objectContaining({ task: 'Schreibe eine Einladung.' })],
+      writingPrompts: [
+        expect.objectContaining({
+          task: 'Schreibe eine Einladung mit diesen Angaben.\n\nKaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
+        }),
+      ],
     });
     expect(saved.sections.find((section) => section.skill === 'SPEAKING')).toMatchObject({
       status: 'READY',

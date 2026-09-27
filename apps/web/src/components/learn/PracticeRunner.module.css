@@ -21,9 +21,50 @@
 }
 
 .fullSection {
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.sectionSummary {
+  min-height: 48px;
+  padding: 14px 0;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sectionSummary span {
+  display: block;
+  margin: 6px 0 0 18px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.sectionSummary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.sectionBody {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
+  padding: 12px 0 24px;
+  min-width: 0;
+}
+
+.passage {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.65;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
 }
 
 .questionList {

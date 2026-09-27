@@ -7,7 +7,7 @@ import { classPreparationGrant } from './preparation-grant';
 import { validateClassPreparation } from './preparation';
 import { PreparationConflictError, type ClassPreparation } from './preparation-state';
 
-export class PreparationProviderOutcomeUnknown extends Error {
+class PreparationProviderOutcomeUnknown extends Error {
   constructor(options: ErrorOptions) {
     super('A preparation provider request has an unresolved outcome.', options);
     this.name = 'PreparationProviderOutcomeUnknown';

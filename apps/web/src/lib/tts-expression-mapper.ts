@@ -15,7 +15,7 @@ import type { TtsProviderId } from './providers/tts-registry';
 // Output types — per-provider expression params
 // ---------------------------------------------------------------------------
 
-export interface ElevenLabsExpression {
+interface ElevenLabsExpression {
   /** Audio tag to prepend to text (e.g. "[excited] ") */
   audioTagPrefix?: string;
   /** Stability override: 0.0 Creative (most expressive), 0.5 Natural, 1.0 Robust (reduces tag responsiveness) */
@@ -30,7 +30,7 @@ export interface ElevenLabsExpression {
   speed?: number;
 }
 
-export interface CartesiaExpression {
+interface CartesiaExpression {
   /** Emotion value for generation_config (one of 60 Sonic 3 values) */
   emotion?: string;
   /** Speech rate multiplier (0.6–1.5). Goes into generation_config.speed. */
@@ -39,7 +39,7 @@ export interface CartesiaExpression {
   volume?: number;
 }
 
-export interface HumeExpression {
+interface HumeExpression {
   /** Acting instruction for the utterance description field (≤100 chars) */
   description: string;
   /** Speech rate multiplier (0.5–2.0, stable 0.75–1.5). */
@@ -48,17 +48,17 @@ export interface HumeExpression {
   trailingSilence?: number;
 }
 
-export interface OpenAIExpression {
+interface OpenAIExpression {
   /** Delivery instructions for gpt-4o-mini-tts */
   instructions: string;
 }
 
-export interface MinimaxExpression {
+interface MinimaxExpression {
   /** MiniMax emotion value: happy | sad | angry | fearful | disgusted | surprised | neutral */
   emotion?: 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised' | 'neutral';
 }
 
-export interface InworldExpression {
+interface InworldExpression {
   /** Inworld emotion tag to prepend to text (e.g. "[happy]") */
   emotionTag?: string;
 }

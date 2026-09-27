@@ -171,7 +171,7 @@ export function createSttProvider(
 // Centralized STT provider resolution (mirrors resolveTtsProvider pattern)
 // ---------------------------------------------------------------------------
 
-export interface ResolvedSttProvider {
+interface ResolvedSttProvider {
   providerId: SttProviderId;
   apiKey: string;
   model: string;

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { submitClass } from '@/lib/class-service';
+import { submitClass, ClassIncompleteError } from '@/lib/class-service';
 
 type RouteParams = { params: Promise<{ classId: string }> };
 
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!result) return errorResponse('Class not found', 404);
     return NextResponse.json(result);
   } catch (error: unknown) {
+    if (error instanceof ClassIncompleteError) return errorResponse(error.message, 409);
     logger.error('Failed to submit class', {
       error: error instanceof Error ? error.message : String(error),
     });

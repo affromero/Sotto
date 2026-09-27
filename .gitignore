@@ -95,3 +95,6 @@ config/admins.json
 # Removed private financial data and tooling must never be reintroduced.
 /accounting/
 /.claude/skills/
+
+# Local dead-code scanner reports
+.maintenance-reports/

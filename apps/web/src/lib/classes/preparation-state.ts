@@ -3,7 +3,7 @@ import { OptimisticStateStore } from 'thesidedoor-core/storage/optimistic';
 import type { AtomicStateBackend } from 'thesidedoor-core/storage/optimistic';
 import { delegationBindingSchema } from 'thesidedoor-core/runtime/delegation';
 
-export const preparationSchema = z
+const preparationSchema = z
   .object({
     id: z.uuid(),
     courseId: z.string().min(1),
@@ -56,7 +56,7 @@ export const preparationSchema = z
   .strict();
 
 export type ClassPreparation = z.infer<typeof preparationSchema>;
-export const activePreparation = (value: ClassPreparation) =>
+const activePreparation = (value: ClassPreparation) =>
   ['QUEUED', 'RUNNING', 'CANCELLING', 'UNRESOLVED'].includes(value.status);
 
 export class PreparationConflictError extends Error {

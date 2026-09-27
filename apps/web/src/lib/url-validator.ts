@@ -52,7 +52,7 @@ function isPrivateIPv6(ip: string): boolean {
  * Rejects private/reserved IPs, non-HTTP(S) schemes, and known metadata endpoints.
  * Throws UrlValidationError on invalid URLs.
  */
-export async function validateUrl(url: string): Promise<void> {
+async function validateUrl(url: string): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(url);

@@ -64,7 +64,7 @@ export type AiProviderId =
   | 'mistral'
   | 'nvidia';
 
-export interface AiProviderAuthField {
+interface AiProviderAuthField {
   key: string;
   label: string;
   placeholder: string;

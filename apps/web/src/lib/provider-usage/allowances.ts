@@ -1,4 +1,4 @@
-export interface ProviderUsageAllowancePreset {
+interface ProviderUsageAllowancePreset {
   id: string;
   label: string;
   monthlyLimit: number;

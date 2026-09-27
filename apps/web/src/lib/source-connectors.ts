@@ -1,11 +1,11 @@
 import { isCommandAvailable } from './local-command';
 
-export type WorkspaceSourceConnectorId = 'slack' | 'gmail';
-export type LocalAgentSourceId = 'claude-code' | 'codex';
-export type PrivateSourceConnectorId = WorkspaceSourceConnectorId | LocalAgentSourceId;
-export type PrivateSourceKind = 'workspace' | 'local-agent';
-export type PrivateSourceStatus = 'ready' | 'action_required';
-export type ConnectorAuthMode = 'slack-app' | 'google-workspace-cli' | 'local-cli';
+type WorkspaceSourceConnectorId = 'slack' | 'gmail';
+type LocalAgentSourceId = 'claude-code' | 'codex';
+type PrivateSourceConnectorId = WorkspaceSourceConnectorId | LocalAgentSourceId;
+type PrivateSourceKind = 'workspace' | 'local-agent';
+type PrivateSourceStatus = 'ready' | 'action_required';
+type ConnectorAuthMode = 'slack-app' | 'google-workspace-cli' | 'local-cli';
 
 interface ConnectorEnvVar {
   name: string;
@@ -146,7 +146,7 @@ export const LOCAL_AGENT_SOURCES: PrivateSourceConnectorDefinition[] = [
   },
 ];
 
-export const PRIVATE_SOURCE_CONNECTORS = [...SOURCE_CONNECTORS, ...LOCAL_AGENT_SOURCES] as const;
+const PRIVATE_SOURCE_CONNECTORS = [...SOURCE_CONNECTORS, ...LOCAL_AGENT_SOURCES] as const;
 
 function hasEnv(env: Record<string, string | undefined>, names: string[]): boolean {
   return names.some((name) => Boolean(env[name]?.trim()));
