@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreWorkspaces": ["packages/groundcheck", "packages/learning-model"],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "vitest*.config.ts",
+        "scripts/**/*.{ts,mts,mjs,cjs,js}!",
+        "e2e/**/*.{ts,mjs}",
+        "prisma.config.ts"
+      ]
+    },
+    "apps/web": {
+      "entry": [
+        "vitest*.config.ts",
+        "scripts/**/*.{ts,mjs}!",
+        "public/**/*.js!",
+        "src/workers/index.ts!",
+        "prisma/seed*.ts!",
+        "tests/**/*.{ts,tsx}",
+        "e2e/**/*.ts",
+        "sentry.*.config.ts"
+      ]
+    },
+    "packages/mcp": {},
+    "packages/shared": {
+      "entry": ["scripts/**/*.ts!"]
+    }
+  }
+}

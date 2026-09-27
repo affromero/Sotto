@@ -12,10 +12,6 @@ export function isErrorNotification(type: string): boolean {
   return PIPELINE_ERROR_TYPES.has(type);
 }
 
-export function isPipelineNotification(type: string): boolean {
-  return PIPELINE_SUCCESS_TYPES.has(type) || PIPELINE_ERROR_TYPES.has(type);
-}
-
 /**
  * Build a URL to navigate to based on notification type and data.
  * Returns null if no meaningful navigation target exists.

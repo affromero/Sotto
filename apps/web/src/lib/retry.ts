@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 /** Status codes that indicate a transient server-side problem worth retrying. */
 export const RETRYABLE_STATUS = new Set([429, 500, 503, 529]);
-export const MAX_RETRIES = 3;
+const MAX_RETRIES = 3;
 
 export function isRetryableError(err: unknown): boolean {
   return (

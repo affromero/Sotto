@@ -61,7 +61,7 @@ export async function validateCredentialWorkStorage(
 }
 
 /** Enqueue one captured slot. Callers supply provenance or a canonical bounded scan entry. */
-export async function enqueueCredentialValidation(
+async function enqueueCredentialValidation(
   tx: Prisma.TransactionClient,
   payload: CredentialValidationPayload
 ) {

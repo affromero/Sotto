@@ -23,7 +23,7 @@ export function sttUsesTtsCredentials(
   return provider === 'elevenlabs' || provider === 'cartesia';
 }
 
-export interface SttModelOption {
+interface SttModelOption {
   id: string;
   displayName: string;
   tier: 'fast' | 'balanced' | 'best' | 'max';

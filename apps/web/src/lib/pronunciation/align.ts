@@ -3,7 +3,7 @@
 // per-token operations and coverage/error metrics. No I/O, no provider calls —
 // this is the deterministic, unit-tested core of the pronunciation scorer.
 
-export type AlignOp = 'match' | 'substitute' | 'delete' | 'insert';
+type AlignOp = 'match' | 'substitute' | 'delete' | 'insert';
 
 export interface AlignedToken {
   op: AlignOp;
@@ -109,7 +109,8 @@ export function alignTokens(expected: string[], actual: string[]): AlignmentResu
   const expectedCount = m;
   const accuracy = expectedCount === 0 ? (actual.length === 0 ? 1 : 0) : matched / expectedCount;
   const errors = substitutions + deletions + insertions;
-  const wordErrorRate = expectedCount === 0 ? (errors > 0 ? 1 : 0) : Math.min(1, errors / expectedCount);
+  const wordErrorRate =
+    expectedCount === 0 ? (errors > 0 ? 1 : 0) : Math.min(1, errors / expectedCount);
 
   return {
     tokens,

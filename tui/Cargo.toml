@@ -56,9 +56,6 @@ async-trait = "0.1"
 
 # Generated API client + its runtime requirements.
 progenitor = "0.14"
-progenitor-client = "0.14"
-bytes = "1"
-futures-core = "0.3"
 
 # Audio: playback (rodio), capture (cpal), and WAV encoding (hound).
 rodio = "0.22"

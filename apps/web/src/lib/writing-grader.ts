@@ -7,7 +7,7 @@ import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 
-export interface WritingCorrection {
+interface WritingCorrection {
   old: string;
   new: string;
   why: string;

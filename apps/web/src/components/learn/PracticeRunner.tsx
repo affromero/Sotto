@@ -13,20 +13,20 @@ import styles from './PracticeRunner.module.css';
 
 // ---- Types (mirror the practice API) ----
 
-export interface PracticeMcItem {
+interface PracticeMcItem {
   id: string;
   prompt: string;
   options: string[];
 }
 
-export interface PracticeSpeakingItem {
+interface PracticeSpeakingItem {
   id: string;
   targetPhrase: string;
   translation: string;
   referenceTtsUrl?: string | null;
 }
 
-export interface PracticeWritingItem {
+interface PracticeWritingItem {
   id: string;
   task: string;
   guidance?: string | null;

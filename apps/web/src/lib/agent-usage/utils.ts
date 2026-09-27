@@ -50,19 +50,7 @@ export function getBoolean(value: unknown): boolean {
   return value === true;
 }
 
-export function getEnvString(name: string): string | null {
-  return process.env[name]?.trim() || null;
-}
-
-export function getIntegerEnv(name: string): number | null {
-  const raw = process.env[name]?.trim();
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 0) return null;
-  return parsed;
-}
-
-export function clampPercent(value: number): number {
+function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value)));
 }
@@ -153,10 +141,6 @@ export function usageWindow(input: {
 export function capitalizePlan(plan: string | null): string | null {
   if (!plan || plan === 'unknown' || plan === 'free') return null;
   return plan.charAt(0).toUpperCase() + plan.slice(1);
-}
-
-export function providerCacheKey(parts: Array<string | number | null>): string {
-  return parts.map((part) => (part === null ? 'null' : String(part))).join(':');
 }
 
 export async function readJson(pathname: string, signal?: AbortSignal): Promise<unknown | null> {

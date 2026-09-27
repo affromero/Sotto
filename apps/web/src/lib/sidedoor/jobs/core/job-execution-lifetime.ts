@@ -15,7 +15,7 @@ export function sottoJobExecutions(database: Prisma.TransactionClient) {
   return new JobExecutionJournal(executor(database), 'postgres', SIDEDOOR_STATE_ID);
 }
 
-export function resolveSottoExecutionDirectory(): string {
+function resolveSottoExecutionDirectory(): string {
   return resolve(
     /* turbopackIgnore: true */ process.cwd(),
     process.env.SIDEDOOR_EXECUTION_DIR || '.sotto/executions'

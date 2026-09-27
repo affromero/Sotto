@@ -20,7 +20,7 @@ import {
 const CAPTURE_WORKLET_URL = '/worklets/pcm-capture.worklet.js';
 const PLAYBACK_WORKLET_URL = '/worklets/pcm-playback.worklet.js';
 
-export type LiveAudioStatus = 'idle' | 'running' | 'denied' | 'unsupported' | 'error';
+type LiveAudioStatus = 'idle' | 'running' | 'denied' | 'unsupported' | 'error';
 
 export interface UseLiveAudio {
   status: LiveAudioStatus;

@@ -13,7 +13,7 @@ export interface ExtractedFigure {
   mimeType: string;
 }
 
-export interface ExtractedStatistic {
+interface ExtractedStatistic {
   label: string;
   value: string;
   unit: string | null;

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "findings": [
+    {
+      "tool": "knip",
+      "mode": "all",
+      "file": "apps/web/package.json",
+      "kind": "dependencies",
+      "name": "@prisma/client",
+      "reason": "Generated Prisma clients import this runtime; generated files are excluded from the tracked source graph."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
+      "file": "apps/web/src/lib/transcript-parser.ts",
+      "kind": "exports",
+      "name": "parseTranscript",
+      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
+      "file": "apps/web/tests/workers/sidedoor/incorporation-dispatch.test.ts",
+      "kind": "binaries",
+      "name": "ffmpeg",
+      "reason": "External media executable provided by the development and CI system environment."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
+      "file": "package.json",
+      "kind": "devDependencies",
+      "name": "lint-staged",
+      "reason": "Invoked by the repository pre-commit configuration outside the JavaScript module graph."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
+      "file": "package.json",
+      "kind": "devDependencies",
+      "name": "postcss",
+      "reason": "Required by the root $postcss override to pin the transitive build dependency."
+    },
+    {
+      "tool": "knip",
+      "mode": "production",
+      "file": "apps/web/src/lib/feedback-formatter.ts",
+      "kind": "files",
+      "name": "apps/web/src/lib/feedback-formatter.ts",
+      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
+    },
+    {
+      "tool": "knip",
+      "mode": "production",
+      "file": "apps/web/src/lib/setup-readiness.ts",
+      "kind": "files",
+      "name": "apps/web/src/lib/setup-readiness.ts",
+      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
+    },
+    {
+      "tool": "knip",
+      "mode": "production",
+      "file": "apps/web/src/lib/transcript-parser.ts",
+      "kind": "files",
+      "name": "apps/web/src/lib/transcript-parser.ts",
+      "reason": "Retained test-only contract pending the consumer and replacement-coverage review in https://github.com/affromero/Sotto/issues/115."
+    },
+    {
+      "tool": "vulture",
+      "mode": "all",
+      "file": "scripts/tests/test_production_retention.py",
+      "kind": "unused",
+      "name": "RetentionTests.docker_output: unused variable 'kwargs'",
+      "reason": "The subprocess test double accepts keyword arguments required by the subprocess.check_output boundary."
+    }
+  ]
+}

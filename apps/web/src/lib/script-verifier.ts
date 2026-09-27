@@ -56,7 +56,7 @@ const VERIFICATION_MAX_TOKENS = 8192;
 const PARSE_FAILURE_FEEDBACK =
   'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
 
-export const VERIFICATION_JSON_SCHEMA = {
+const VERIFICATION_JSON_SCHEMA = {
   name: 'verification_result',
   schema: {
     type: 'object',

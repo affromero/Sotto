@@ -1,1 +1,1 @@
-export type { NotificationData, PushSubscriptionData } from '@sotto/shared';
+export type { NotificationData } from '@sotto/shared';

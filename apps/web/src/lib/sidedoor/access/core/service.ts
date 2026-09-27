@@ -8,7 +8,7 @@ import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { issueSottoPairing } from '@/lib/sidedoor/access/core/pairing';
 
 export { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
-export const sharedAccessStore = new SottoAccessStore(prismaUnfiltered);
+const sharedAccessStore = new SottoAccessStore(prismaUnfiltered);
 export const sharedAccess = new AccessService({
   store: sharedAccessStore,
 });

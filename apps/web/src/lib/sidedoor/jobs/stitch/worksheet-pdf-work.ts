@@ -7,5 +7,3 @@ export const worksheetPdfPayloadSchema = z
     appBaseUrl: z.url(),
   })
   .strict();
-
-export type WorksheetPdfWorkPayload = z.infer<typeof worksheetPdfPayloadSchema>;

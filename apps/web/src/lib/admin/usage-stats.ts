@@ -59,7 +59,7 @@ export interface LearnerSpend {
 }
 
 /** Registered-learner counts (total + signups in the last 7 days). */
-export async function getLearnerCounts(): Promise<{ total: number; signupsThisWeek: number }> {
+async function getLearnerCounts(): Promise<{ total: number; signupsThisWeek: number }> {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
   const [total, signupsThisWeek] = await Promise.all([
     prisma.user.count(),
