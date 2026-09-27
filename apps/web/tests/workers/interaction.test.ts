@@ -40,31 +40,25 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const {
-  mockCreateAIProvider,
-  mockGenerateResponse,
-  mockGetAiKey,
-  mockHasByokKey,
-  mockResolveAiModelAndProvider,
-} = vi.hoisted(() => {
-  const generateResponse = vi.fn().mockResolvedValue({
-    content: 'Here is the answer to your question.',
-    inputTokens: 150,
-    outputTokens: 50,
-    model: 'claude-haiku-4-5-20251001',
-  });
-
-  return {
-    mockCreateAIProvider: vi.fn((_provider: string) => ({ generateResponse })),
-    mockGenerateResponse: generateResponse,
-    mockGetAiKey: vi.fn().mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' }),
-    mockHasByokKey: vi.fn().mockResolvedValue(false),
-    mockResolveAiModelAndProvider: vi.fn().mockResolvedValue({
+const { mockCreateAIProvider, mockGenerateResponse, mockGetAiKey, mockResolveAiModelAndProvider } =
+  vi.hoisted(() => {
+    const generateResponse = vi.fn().mockResolvedValue({
+      content: 'Here is the answer to your question.',
+      inputTokens: 150,
+      outputTokens: 50,
       model: 'claude-haiku-4-5-20251001',
-      provider: 'anthropic',
-    }),
-  };
-});
+    });
+
+    return {
+      mockCreateAIProvider: vi.fn((_provider: string) => ({ generateResponse })),
+      mockGenerateResponse: generateResponse,
+      mockGetAiKey: vi.fn().mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' }),
+      mockResolveAiModelAndProvider: vi.fn().mockResolvedValue({
+        model: 'claude-haiku-4-5-20251001',
+        provider: 'anthropic',
+      }),
+    };
+  });
 
 const mockLogUsage = vi.fn();
 
@@ -78,7 +72,6 @@ vi.mock('@/lib/usage-logger', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
-  hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
 }));
 
 vi.mock('@/lib/generation-features', () => ({
@@ -214,7 +207,6 @@ describe('processInteraction', () => {
     mockPrismaInteractionUpdate.mockResolvedValue({});
     mockLogUsage.mockReset();
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
-    mockHasByokKey.mockResolvedValue(false);
     mockResolveAiModelAndProvider.mockResolvedValue({
       model: 'claude-haiku-4-5-20251001',
       provider: 'anthropic',

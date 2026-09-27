@@ -27,7 +27,7 @@ export interface CompileInput {
   durationTarget: number;
 }
 
-export interface CompiledReference {
+interface CompiledReference {
   number: number;
   sourceId: string;
   title: string;

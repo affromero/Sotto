@@ -4,7 +4,7 @@
 import { extname } from 'path';
 import { extractViaMarkit } from '@/lib/extractors/markit';
 
-export const MAX_IMPORTED_FILE_CHARS = 3000;
+const MAX_IMPORTED_FILE_CHARS = 3000;
 
 const TEXT_EXTENSIONS = new Set([
   '.csv',
@@ -30,7 +30,7 @@ export function isUploadFile(value: FormDataEntryValue): value is File {
 }
 
 /** Strip NULs, trim, and cap to MAX_IMPORTED_FILE_CHARS with a trimmed marker. */
-export function clipImportedText(text: string): string {
+function clipImportedText(text: string): string {
   const trimmed = text.replace(/\0/g, '').trim();
   if (trimmed.length <= MAX_IMPORTED_FILE_CHARS) return trimmed;
   return `${trimmed.slice(0, MAX_IMPORTED_FILE_CHARS).trim()}\n[Trimmed from a longer upload.]`;
@@ -40,7 +40,7 @@ export function clipImportedText(text: string): string {
  * Extract readable text from an uploaded note/material file, prefixed with the
  * file name. Throws for empty or unsupported files.
  */
-export async function extractUploadText(file: File): Promise<string> {
+async function extractUploadText(file: File): Promise<string> {
   const name = file.name || 'uploaded-notes';
   const extension = extname(name).toLowerCase();
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -69,7 +69,7 @@ export async function extractUploadText(file: File): Promise<string> {
  * successful texts and the count that failed.
  */
 export async function extractUploadTexts(
-  files: File[],
+  files: File[]
 ): Promise<{ texts: string[]; failed: number }> {
   const results = await Promise.allSettled(files.map(extractUploadText));
   const texts = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));

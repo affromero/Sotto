@@ -67,12 +67,6 @@ export interface InteractionSummary {
   answer: string | null;
 }
 
-export interface CreateEpisodeRequest {
-  title: string;
-  topic: string;
-  discoveryId: string;
-}
-
 export interface VerificationProgressSnapshot {
   total: number;
   checked: number;
@@ -89,8 +83,4 @@ export interface VerificationProgressSnapshot {
     urlNotFound: number;
     replacementFound: number;
   };
-}
-
-export interface GenerateEpisodeRequest {
-  episodeId: string;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-export interface AuthUser {
+interface AuthUser {
   id: string;
   name: string | null;
   email: string | null;

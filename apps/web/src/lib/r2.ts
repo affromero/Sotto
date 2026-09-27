@@ -10,8 +10,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
-import { constants } from 'fs';
-import { access, mkdir, readdir, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import {
@@ -431,10 +430,6 @@ async function attributedLocalPath(key: string): Promise<string | null> {
   return pathInsideRoot(attributed.backend.descriptor.referenceRoot, key);
 }
 
-function localKeyForPath(filePath: string): string {
-  return path.relative(localBaseDir(), filePath).split(path.sep).join('/');
-}
-
 /**
  * Browser-reachable URL for a locally stored object. Local storage has no
  * public origin, so it is served back through `GET /api/v1/storage/<key>`
@@ -460,41 +455,6 @@ export function contentTypeForKey(key: string): string {
   return 'application/octet-stream';
 }
 
-async function listLocalFiles(prefix: string): Promise<string[]> {
-  const root = localPathForKey(prefix);
-  const keys: string[] = [];
-
-  async function walk(dir: string): Promise<void> {
-    let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
-    try {
-      entries = await readdir(/* turbopackIgnore: true */ dir, { withFileTypes: true });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-      throw error;
-    }
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(fullPath);
-      } else if (entry.isFile()) {
-        keys.push(localKeyForPath(fullPath));
-      }
-    }
-  }
-
-  const rootStat = await stat(/* turbopackIgnore: true */ root).catch(
-    (error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return null;
-      throw error;
-    }
-  );
-  if (!rootStat) return [];
-  if (rootStat.isFile()) return [localKeyForPath(root)];
-  await walk(root);
-  return keys;
-}
-
 function publicUrlForKey(
   config: ObjectStorageConfig,
   key: string,
@@ -503,44 +463,6 @@ function publicUrlForKey(
   if (!config.publicUrl) return key;
   const suffix = encoding === 'percent' ? key.split('/').map(encodeURIComponent).join('/') : key;
   return `${config.publicUrl.replace(/\/$/, '')}/${suffix}`;
-}
-
-/**
- * Cheap write preflight for workers before they call paid TTS providers.
- * This catches missing or unwritable storage before generating audio.
- */
-export async function assertStorageWritable(): Promise<void> {
-  const provider = configuredStorageProvider();
-  const key = `__sotto-preflight/${randomUUID()}.txt`;
-  if (provider === 'local') {
-    const filePath = localPathForKey(key);
-    await mkdir(/* turbopackIgnore: true */ path.dirname(filePath), { recursive: true });
-    await access(/* turbopackIgnore: true */ path.dirname(filePath), constants.W_OK);
-    await writeFile(/* turbopackIgnore: true */ filePath, 'ok');
-    await unlink(/* turbopackIgnore: true */ filePath).catch((error: NodeJS.ErrnoException) => {
-      logger.warn('Storage preflight cleanup failed', { key, error: error.message });
-    });
-    return;
-  }
-
-  const config = await getObjectStorageConfig();
-  await config.client.send(
-    new PutObjectCommand({
-      Bucket: config.bucket,
-      Key: key,
-      Body: Buffer.from('ok'),
-      ContentType: 'text/plain',
-    })
-  );
-  await config.client
-    .send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }))
-    .catch((error: Error) => {
-      logger.warn('Storage preflight cleanup failed', {
-        key,
-        provider: config.provider,
-        error: error.message,
-      });
-    });
 }
 
 /**
@@ -686,46 +608,4 @@ export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): 
   await config.client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
 
   logger.info('File deleted from object storage', { key, provider: config.provider });
-}
-
-/**
- * List all object keys under a given prefix, handling pagination
- */
-export async function listFiles(prefix: string): Promise<string[]> {
-  if (configuredStorageProvider() === 'local') {
-    const keys = await listLocalFiles(prefix);
-    logger.info('Listed files from local storage', { prefix, count: String(keys.length) });
-    return keys;
-  }
-
-  const config = await getObjectStorageConfig();
-  const keys: string[] = [];
-  let continuationToken: string | undefined;
-
-  do {
-    const response = await config.client.send(
-      new ListObjectsV2Command({
-        Bucket: config.bucket,
-        Prefix: prefix,
-        ContinuationToken: continuationToken,
-      })
-    );
-
-    if (response.Contents) {
-      for (const object of response.Contents) {
-        if (object.Key) {
-          keys.push(object.Key);
-        }
-      }
-    }
-
-    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-  } while (continuationToken);
-
-  logger.info('Listed files from object storage', {
-    prefix,
-    count: String(keys.length),
-    provider: config.provider,
-  });
-  return keys;
 }

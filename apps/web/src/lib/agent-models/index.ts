@@ -18,17 +18,7 @@ import { discoverCodexModels, type CodexModelOffering } from './codex-app-server
 import { getAgentStatus } from '../agent-availability';
 
 type AgentModelEnv = Record<string, string | undefined>;
-
-export {
-  AGENT_EFFORT_LEVELS,
-  CLAUDE_EFFORT_LEVELS,
-  formatAgentModelId,
-  normalizeAgentModelId,
-  parseAgentModelId,
-  type AgentEffortLevel,
-  type AgentModelSelection,
-  type AgentProviderId,
-} from './id';
+export { normalizeAgentModelId, parseAgentModelId, type AgentProviderId } from './id';
 
 interface AgentModelOptionInput {
   provider: AgentProviderId;

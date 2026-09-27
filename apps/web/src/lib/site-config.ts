@@ -47,7 +47,7 @@ export const EMPTY_INFRA: ServerInfraConfig = {
   objectStoragePublicUrl: null,
 };
 
-export const INFRA_KEYS = Object.keys(EMPTY_INFRA) as (keyof ServerInfraConfig)[];
+const INFRA_KEYS = Object.keys(EMPTY_INFRA) as (keyof ServerInfraConfig)[];
 type SharedDatabase = Pick<Prisma.TransactionClient, '$queryRawUnsafe'>;
 
 async function read(database: SharedDatabase): Promise<SiteConfigData> {
@@ -102,8 +102,4 @@ export async function setSiteConfig(
 ): Promise<void> {
   if (transaction) return write(transaction, data, adminId);
   await sottoTransaction(prismaUnfiltered, (database) => write(database, data, adminId));
-}
-
-export async function resetSiteConfig(adminId: string): Promise<void> {
-  await setSiteConfig(EMPTY_INFRA, adminId);
 }

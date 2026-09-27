@@ -1,6 +1,6 @@
 import styles from './charts.module.css';
 
-export interface AreaPoint {
+interface AreaPoint {
   /** The plotted value. */
   v: number;
   /** Optional x-axis tick label (rendered only when truthy). */

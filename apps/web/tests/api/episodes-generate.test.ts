@@ -97,8 +97,6 @@ vi.mock('@/lib/segment-creator', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
-  getByokKey: vi.fn().mockResolvedValue(null),
-  hasByokKey: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/lib/generation-features', () => ({

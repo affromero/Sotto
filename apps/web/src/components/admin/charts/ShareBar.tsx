@@ -1,6 +1,6 @@
 import styles from './charts.module.css';
 
-export interface ShareRow {
+interface ShareRow {
   /** Fractional share (0–1); rows with share <= 0 are skipped. */
   share: number;
   color: string;

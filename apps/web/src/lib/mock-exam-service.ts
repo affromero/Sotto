@@ -265,7 +265,7 @@ async function buildExamSection(
 
 // ---- Read side ----
 
-export interface ExamQuestionPublic {
+interface ExamQuestionPublic {
   id: string;
   order: number;
   question: string;
@@ -277,7 +277,7 @@ export interface ExamQuestionPublic {
   explanation?: string;
 }
 
-export interface ExamSectionPublic {
+interface ExamSectionPublic {
   id: string;
   skill: string;
   part: string;

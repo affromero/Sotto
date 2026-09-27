@@ -2,7 +2,7 @@ import { createAIProvider } from './providers/ai';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 
-export type FeasibilityVerdict = 'proceed' | 'warn' | 'reject';
+type FeasibilityVerdict = 'proceed' | 'warn' | 'reject';
 
 export interface FeasibilityAssessment {
   verdict: FeasibilityVerdict;

@@ -30,7 +30,7 @@ export async function getHouseholdProfiles(
 }
 
 /** Profile visibility follows shared admission, independently of content selection. */
-export async function listHouseholdProfiles(
+async function listHouseholdProfiles(
   database: Prisma.TransactionClient,
   request: Request
 ): Promise<(HouseholdProfile & { isActive: boolean })[]> {

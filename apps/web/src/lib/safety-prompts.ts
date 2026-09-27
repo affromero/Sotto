@@ -5,7 +5,6 @@
  * Each fragment targets a specific concern:
  *   - CONTENT_SAFETY_INSTRUCTIONS: prevents harmful content generation
  *   - INPUT_SANITIZATION_INSTRUCTIONS: defends against prompt injection
- *   - MATURE_AUDIENCE_GUIDANCE: replaces the old "no content restrictions" text
  */
 
 import { loadPrompt } from './prompt-loader';
@@ -22,9 +21,3 @@ export const CONTENT_SAFETY_INSTRUCTIONS = loadPrompt('shared/content-safety.md'
  * and imported source text. Defends against prompt injection and jailbreak attempts.
  */
 export const INPUT_SANITIZATION_INSTRUCTIONS = loadPrompt('shared/input-sanitization.md');
-
-/**
- * Replaces the old AUDIENCE_GUIDANCE.mature text which said "No content restrictions."
- * Allows frank adult discussion but draws clear safety lines.
- */
-export const MATURE_AUDIENCE_GUIDANCE = loadPrompt('shared/audience/mature.md');

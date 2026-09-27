@@ -115,9 +115,7 @@ vi.mock('@/lib/generation-features', () => ({
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
-vi.mock('@/lib/byok', () => ({
-  hasByokKey: vi.fn().mockResolvedValue(false),
-}));
+vi.mock('@/lib/byok', () => ({}));
 
 vi.mock('@/lib/r2', () => ({
   resolveAudioUrl: vi.fn(async (url: string | null) => url),

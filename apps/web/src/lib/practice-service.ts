@@ -12,13 +12,7 @@ import type {
   PracticeMcItemPublic,
   SubmitPracticeResult,
 } from './practice/types';
-
-export type {
-  PracticeAnswer,
-  PracticeMcItem,
-  PracticeMcItemPublic,
-  SubmitPracticeResult,
-} from './practice/types';
+export type { PracticeAnswer, PracticeMcItemPublic, SubmitPracticeResult } from './practice/types';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent } from './class-listening-generator';
 import {
@@ -48,14 +42,14 @@ export class PracticeSessionNotFoundError extends Error {}
 
 // Stored item shape (full — includes the answer). The public projection drops it.
 
-export interface PracticeSpeakingItem {
+interface PracticeSpeakingItem {
   id: string;
   targetPhrase: string;
   translation: string;
   referenceTtsUrl: string | null;
 }
 
-export interface PracticeWritingItem {
+interface PracticeWritingItem {
   id: string;
   task: string;
   guidance: string | null;

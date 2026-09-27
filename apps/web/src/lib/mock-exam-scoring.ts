@@ -13,7 +13,7 @@ import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { getBlueprint } from './exam-blueprint';
 
-export interface ExamSectionScore {
+interface ExamSectionScore {
   sectionId: string;
   skill: string;
   weight: number;

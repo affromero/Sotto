@@ -12,8 +12,8 @@ import { logger } from './logger';
 import { CEFR_ORDER } from './cefr-levels';
 import type { CefrLevel } from '@sotto/shared';
 
-export const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-export const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
+const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
 const PASS_THRESHOLD = 0.7;
 const PER_BAND = 4;
 
@@ -58,7 +58,7 @@ export function idkLabel(nativeLang: string): string {
   return IDK_LABELS[nativeLang.trim().toLowerCase()] ?? IDK_LABELS.en;
 }
 
-export type PlacementSkill = (typeof PLACEMENT_SKILLS)[number];
+type PlacementSkill = (typeof PLACEMENT_SKILLS)[number];
 
 export interface PlacementQuestion {
   id: string;

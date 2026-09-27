@@ -9,7 +9,7 @@ import {
 } from '@/lib/sidedoor/access/core/session-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
-export interface AuthUser {
+interface AuthUser {
   id: string;
   name: string | null;
   email: string | null;

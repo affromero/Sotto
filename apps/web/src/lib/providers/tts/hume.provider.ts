@@ -255,7 +255,7 @@ const DEFAULT_HUME_CONCURRENCY = 5;
  * Returns a cached value from Redis if available, otherwise the conservative default (5).
  * Hume has no API endpoint to query the limit — we learn it from 429 errors.
  */
-export async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
+async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
   const { cache } = await import('../../redis');
   const crypto = await import('crypto');
   const keyHash = crypto
@@ -276,10 +276,7 @@ export async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
  * Uses a generic regex to match any limit/concurrency number in the error.
  * If no number is found, caches (default - 1) with a short TTL to re-probe quickly.
  */
-export async function updateHumeConcurrencyFromError(
-  apiKey: string,
-  errorMessage: string
-): Promise<void> {
+async function updateHumeConcurrencyFromError(apiKey: string, errorMessage: string): Promise<void> {
   try {
     const { cache } = await import('../../redis');
     const crypto = await import('crypto');

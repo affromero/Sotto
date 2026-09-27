@@ -1,9 +1,7 @@
 import type { ClipboardEvent, ClipboardEventHandler, HTMLAttributes } from 'react';
 
-export const LEARNING_TEXT_GUARD_ATTR = 'data-learning-text-guard' as const;
-
 type LearningTextGuardProps<T extends HTMLElement> = HTMLAttributes<T> &
-  Record<typeof LEARNING_TEXT_GUARD_ATTR, 'true'>;
+  Record<'data-learning-text-guard', 'true'>;
 
 function preventLearningTextClipboard<T extends HTMLElement>(event: ClipboardEvent<T>) {
   event.preventDefault();

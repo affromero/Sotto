@@ -11,7 +11,7 @@ const parentSchema = z.object({
   courseId: z.string().min(1),
   parentId: z.string().min(1),
 });
-export const speakingRecordingOwnershipSchema = z.object({
+const speakingRecordingOwnershipSchema = z.object({
   instanceId: z.string().min(1),
   scopes: z.array(scopeSchema).min(1),
   reference: z.string().min(1),
@@ -36,5 +36,3 @@ export const speakingGradingPayloadSchema = z
     ownership: speakingRecordingOwnershipSchema,
   })
   .strict();
-
-export type SpeakingGradingWorkPayload = z.infer<typeof speakingGradingPayloadSchema>;

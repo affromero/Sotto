@@ -5,10 +5,6 @@
 //! load-bearing validation that the committed spec is progenitor-clean —
 //! later phases call the generated, typed methods rather than hand-rolled
 //! requests.
-//!
-//! The wrapper and its typed methods are not yet wired into a screen, so the
-//! module is `allow(dead_code)` until Phase 4 consumes it.
-#![allow(dead_code)]
 
 use async_trait::async_trait;
 use color_eyre::{Result, eyre::eyre};
@@ -231,6 +227,10 @@ pub(crate) trait Api: Send + Sync {
     /// Fetch instance/owner config (self-hosted, owner, non-secret infra).
     async fn onboarding_config(&self) -> Result<types::OnboardingConfigResponse>;
     /// Fetch the authenticated learner's identity (id, name, email).
+    #[allow(
+        dead_code,
+        reason = "Retained Api identity contract exercised by account tests"
+    )]
     async fn me(&self) -> Result<types::MeResponse>;
 
     // --- Adaptive-listening Q&A (P6e) ---

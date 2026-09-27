@@ -1,1 +1,1 @@
-export type { EpisodeVersionSummary, EpisodeVersionDetail } from '@sotto/shared';
+export type { EpisodeVersionSummary } from '@sotto/shared';

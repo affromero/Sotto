@@ -47,7 +47,7 @@ export interface ClassListeningResult {
   episodeId: string;
 }
 
-export interface ListeningComprehensionQuestion {
+interface ListeningComprehensionQuestion {
   question: string;
   options: string[];
   correctIndex: number;

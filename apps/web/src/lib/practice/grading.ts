@@ -21,7 +21,7 @@ interface MultipleChoiceScore {
   sections: Record<string, { correct: number; total: number }>;
 }
 
-export function mcSection(itemId: string): string {
+function mcSection(itemId: string): string {
   const prefix = itemId.charAt(0);
   return prefix === 'v' || prefix === 'g' || prefix === 'r' || prefix === 'l' ? prefix : 'q';
 }
@@ -137,7 +137,7 @@ export async function submitFull(
  * first (the audio is kept), so averaging every row would let one prompt
  * outvote the others and skew the session score.
  */
-export async function latestSpeakingScores(sessionId: string): Promise<number[]> {
+async function latestSpeakingScores(sessionId: string): Promise<number[]> {
   const recordings = await prisma.speakingRecording.findMany({
     where: { practiceSessionId: sessionId, overallScore: { not: null }, status: 'SCORED' },
     orderBy: { createdAt: 'desc' },

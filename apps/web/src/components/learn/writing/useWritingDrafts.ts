@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { WritingPromptData, WritingResponse } from '../classTypes';
 
-export interface WritingDraft {
+interface WritingDraft {
   text: string;
   /** The text this prompt was last graded on; undefined until it is graded. */
   submittedText?: string;

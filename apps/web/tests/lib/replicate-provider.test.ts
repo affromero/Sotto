@@ -7,7 +7,6 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/providers/tts-registry', () => ({
   getProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'inworld-tts-1.5-max' }),
-  compareQuality: vi.fn(),
 }));
 
 vi.mock('@/lib/providers/tts-voices', () => ({
@@ -36,10 +35,8 @@ vi.mock('@/lib/voice-pool', () => ({
 }));
 
 vi.mock('@/lib/byok', () => ({
-  getByokKey: vi.fn(),
   getByokExtraData: vi.fn(),
   listByokProviders: vi.fn().mockResolvedValue([]),
-  hasByokKey: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({

@@ -145,27 +145,10 @@ export const paginationSchema = z.object({
 });
 
 /**
- * Analytics query validation
- */
-export const analyticsQuerySchema = z.object({
-  period: z.enum(['7d', '30d', '90d', 'all']).default('30d'),
-});
-
-/**
  * API key creation validation
  */
 export const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
-});
-
-/**
- * Voice browse query validation
- */
-export const voiceBrowseQuerySchema = z.object({
-  search: z.string().max(100).optional(),
-  sort: z.enum(['newest', 'most_requested']).default('newest'),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(24),
 });
 
 /**
@@ -211,125 +194,6 @@ export const customTagSchema = z.object({
 export const onboardingInterestsSchema = z.object({
   tagIds: z.array(z.string()).max(20),
   customTags: z.array(customTagSchema).max(10).default([]),
-});
-
-/**
- * Picks refresh validation
- */
-export const refreshPicksSchema = z.object({
-  refreshBatch: z.number().int().min(0).default(0),
-});
-
-/**
- * BYOK API key validation (multi-provider)
- */
-const optionalPositiveIntegerString = z
-  .string()
-  .trim()
-  .regex(/^[1-9]\d*$/)
-  .max(32)
-  .optional();
-
-const optionalBillingResetDayString = z
-  .string()
-  .trim()
-  .regex(/^[1-9]\d?$/)
-  .refine((value) => Number(value) >= 1 && Number(value) <= 31)
-  .optional();
-
-const byokBaseSchema = z.object({
-  provider: z.enum([
-    'elevenlabs',
-    'openai',
-    'cartesia',
-    'hume',
-    'fal',
-    'replicate',
-    'minimax',
-    'mistral',
-    'kokoro',
-    'deepgram',
-    'rime',
-    'playht',
-    'suno',
-  ]),
-  userId: z.string().trim().min(1).max(500).optional(),
-  adminApiKey: z.string().trim().min(10).max(500).optional(),
-  usagePlan: z
-    .string()
-    .trim()
-    .regex(/^[a-z0-9_-]+$/i)
-    .max(80)
-    .optional(),
-  monthlyCreditLimit: optionalPositiveIntegerString,
-  billingResetDay: optionalBillingResetDayString,
-});
-
-export const byokSchema = byokBaseSchema.extend({
-  apiKey: z.string().trim().min(10).max(500),
-});
-
-export const byokSaveSchema = byokBaseSchema
-  .extend({
-    apiKey: z.string().trim().min(10).max(500).optional(),
-  })
-  .refine(
-    (value) =>
-      Boolean(
-        value.apiKey ||
-        value.userId ||
-        value.adminApiKey ||
-        value.usagePlan ||
-        value.monthlyCreditLimit ||
-        value.billingResetDay
-      ),
-    { message: 'At least one credential field is required' }
-  );
-
-export const byokProviderSchema = byokBaseSchema.pick({ provider: true });
-
-/**
- * Draft creation validation
- */
-const draftMessageSchema = z.object({
-  role: z.enum(['user', 'assistant']),
-  content: z.string().min(1).max(50000),
-  chips: z.array(z.string()).optional(),
-});
-
-const draftMetadataSchema = z.object({
-  topic: z.string().optional(),
-  depth: z.string().optional(),
-  audienceLevel: z.string().optional(),
-  audience: z.string().optional(),
-  focusAreas: z.array(z.string()).optional(),
-  tone: z.string().optional(),
-  durationTarget: z.number().min(1).max(40).optional(),
-  ready: z.boolean().optional(),
-});
-
-export const createDraftSchema = z.object({
-  tabMode: z.enum(['create', 'import']),
-  messages: z.array(draftMessageSchema).optional(),
-  metadata: draftMetadataSchema.optional(),
-  importData: z
-    .object({
-      title: z.string().max(200).optional(),
-      topic: z.string().max(5000).optional(),
-      sourcePlatform: z.string().max(50).optional(),
-      sttProvider: z.string().optional(),
-    })
-    .optional(),
-});
-
-export const updateDraftSchema = z.object({
-  draftData: z.record(z.string(), z.unknown()).optional(),
-  metadata: draftMetadataSchema.optional(),
-});
-
-export const appendDraftMessagesSchema = z.object({
-  messages: z.array(draftMessageSchema).min(1),
-  metadata: draftMetadataSchema.optional(),
 });
 
 /**
@@ -488,22 +352,6 @@ export const generatedScriptSchema = z.object({
     .catch([]),
 });
 
-/**
- * Invitation link toggle validation (admin)
- */
-export const toggleInvitationSchema = z.object({
-  id: z.string(),
-  enabled: z.boolean(),
-});
-
-/**
- * Invitation link redemption validation (public)
- */
-export const redeemInvitationSchema = z.object({
-  code: z.string().min(1).max(50),
-  email: z.string().email().max(200),
-});
-
 // Sourced classes: build the next class from a real link or an interest topic.
 export const sourcedClassSchema = z.object({
   sourceUrl: z.string().url().max(2048).optional(),
@@ -524,7 +372,7 @@ export const redeemPairingSchema = z.object({
 // Empty strings are normalized to null in setSiteConfig.
 const infraField = z.string().trim().max(512).nullable().optional();
 
-export const serverInfraSchema = z.object({
+const serverInfraSchema = z.object({
   aiProvider: infraField,
   aiModel: infraField,
   aiBaseUrl: infraField,

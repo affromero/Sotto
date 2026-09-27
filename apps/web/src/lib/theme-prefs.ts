@@ -7,8 +7,8 @@
  */
 export const THEME_PREFS_COOKIE = 'sotto_theme';
 
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type ThemePalette = 'aula' | 'paper';
+type ThemeMode = 'system' | 'light' | 'dark';
+type ThemePalette = 'aula' | 'paper';
 
 export interface ThemePrefs {
   mode: ThemeMode;
