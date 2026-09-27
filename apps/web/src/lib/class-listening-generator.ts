@@ -16,6 +16,7 @@ import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
 import { persistGeneratedReferences } from './references';
 import { getConfiguredTtsProviderId } from './providers/tts';
+import { getServerInfra } from './server-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy, isImmersionLevel } from './classes/class-language-policy';
@@ -109,6 +110,7 @@ export async function composeListeningContent(
     where: { id: p.userId },
     select: { preferredTtsModel: true },
   });
+  await getServerInfra();
   const configuredTtsProvider = getConfiguredTtsProviderId();
 
   // Step 2: create a CLASS episode. When the instance pins a TTS provider,

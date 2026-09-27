@@ -6,6 +6,17 @@ const serverConfiguration = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/server-config', () => ({
   infra: (key: string) => serverConfiguration.values[key],
+  getServerInfra: async () => serverConfiguration.values,
+}));
+
+const mockGenerateSharedApi = vi.fn().mockResolvedValue({
+  content: 'test',
+  inputTokens: 10,
+  outputTokens: 20,
+});
+vi.mock('@/lib/providers/shared/shared-api', () => ({
+  generateSharedApi: (...args: unknown[]) => mockGenerateSharedApi(...args),
+  streamSharedApiWithRetry: vi.fn(),
 }));
 
 // Create mock TTS provider classes that will be injected via module.require
@@ -177,6 +188,25 @@ import { resolveTtsProvider, getConfiguredTtsProviderId } from '@/lib/providers/
 
 describe('Provider Factories', () => {
   describe('createAIProvider', () => {
+    it('uses the captured local endpoint during first setup', async () => {
+      serverConfiguration.values.aiBaseUrl = undefined;
+
+      await createAIProvider('local').generateResponse(
+        'system',
+        [{ role: 'user', content: 'hello' }],
+        { model: 'local:qwen3', endpoint: 'http://localhost:11434/v1', skipModeration: true }
+      );
+
+      expect(mockGenerateSharedApi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'qwen3',
+          baseUrl: 'http://localhost:11434/v1',
+        }),
+        'system',
+        [{ role: 'user', content: 'hello' }],
+        expect.any(Object)
+      );
+    });
     it('rejects missing provider instead of defaulting to hosted AI', () => {
       expect(() => createAIProvider(undefined as unknown as string)).toThrow(
         'AI provider type is required'

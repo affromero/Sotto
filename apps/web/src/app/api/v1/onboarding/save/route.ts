@@ -185,7 +185,16 @@ async function save(request: NextRequest) {
     authed.userId,
     { userId: authed.userId, authorize, signal: request.signal },
     course.native,
-    course.target
+    course.target,
+    preferred?.aiProvider && preferred.aiModel
+      ? {
+          provider: preferred.aiProvider,
+          model: preferred.aiModel,
+          ...(preferred.aiProvider === 'local' && infra?.aiBaseUrl
+            ? { endpoint: infra.aiBaseUrl }
+            : {}),
+        }
+      : undefined
   );
   const courseId = await sottoTransaction(prismaUnfiltered, async (database) => {
     const current = await authorize(database);

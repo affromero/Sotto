@@ -121,7 +121,7 @@ describe('elevenlabs', () => {
       await generateSpeech({ ...speechExecution(), text: 'Test', voiceId: 'voice-123' });
 
       const url = mockFetch.mock.calls[0][0];
-      expect(url).toContain('output_format=mp3_44100_192');
+      expect(url).toContain('output_format=mp3_44100_128');
     });
 
     it('includes use_speaker_boost: true in request body', async () => {

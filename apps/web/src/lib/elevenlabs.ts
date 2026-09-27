@@ -72,7 +72,7 @@ export async function generateSpeech(params: {
   }
 
   const response = await params.transport.authenticatedFetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${encodeURIComponent(params.voiceId)}?output_format=mp3_44100_192`,
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${encodeURIComponent(params.voiceId)}?output_format=mp3_44100_128`,
     {
       method: 'POST',
       signal: params.signal,
@@ -220,7 +220,7 @@ export async function generateSpeechWithTimestamps(params: {
   }
 
   const response = await params.transport.authenticatedFetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${encodeURIComponent(params.voiceId)}/with-timestamps?output_format=mp3_44100_192`,
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${encodeURIComponent(params.voiceId)}/with-timestamps?output_format=mp3_44100_128`,
     {
       method: 'POST',
       signal: params.signal,

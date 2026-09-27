@@ -32,12 +32,14 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 const mockGetAiProviderMeta = vi.fn();
+const mockResolveSelection = vi.fn();
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: (...args: unknown[]) => mockGetAiProviderMeta(...args),
 }));
 
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => {
+  resolveCapturedLearningAi: async (...args: unknown[]) => {
+    mockResolveSelection(...args);
     const key = await mockGetAiKey();
     if (key) {
       const model = mockGetAiProviderMeta(key.provider)?.defaultModel;
@@ -162,6 +164,17 @@ describe('getOrCreateCurriculum', () => {
     expect(result).toEqual({ id: 'existing-id' });
     expect(mockGetAiKey).not.toHaveBeenCalled();
     expect(mockGenerateResponse).not.toHaveBeenCalled();
+  });
+
+  it('passes the wizard AI choice when generating an uncached curriculum', async () => {
+    mockCurriculumFindUnique.mockResolvedValue(null);
+    setupSuccessfulTransaction('new-id');
+    const execution = blockedProviderExecution('user-1');
+    const selection = { provider: 'codex', model: 'codex:gpt-5.5#effort=xhigh' };
+
+    await getOrCreateCurriculumWithExecution('user-1', execution, 'ru', 'de', selection);
+
+    expect(mockResolveSelection).toHaveBeenCalledWith('user-1', execution, selection);
   });
 
   it('queries by the nativeLang_targetLang composite when checking existence', async () => {

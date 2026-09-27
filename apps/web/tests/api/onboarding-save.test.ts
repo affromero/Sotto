@@ -10,6 +10,7 @@ import {
   type SharedTestIdentity,
 } from '../helpers/setup/shared-instance';
 import { POST } from '@/app/api/v1/onboarding/save/route';
+import * as curriculumGenerator from '@/lib/curriculum-generator';
 import { getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
@@ -383,6 +384,52 @@ suite('Atomic onboarding with shared authority', () => {
     expect(response.status).toBe(200);
     expect(await getSiteConfig()).toMatchObject({ ttsProvider: 'kokoro' });
     expect(await getAutoModelConfig()).toMatchObject({ model: preferred });
+  });
+  it('passes the wizard AI choice to curriculum generation before saving preferences', async () => {
+    const selection = { aiProvider: 'codex', aiModel: 'codex' };
+    const curriculum = await instance.database.curriculum.findUniqueOrThrow({
+      where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
+    });
+    const generate = vi
+      .spyOn(curriculumGenerator, 'getOrCreateCurriculum')
+      .mockResolvedValue({ id: curriculum.id });
+
+    const response = await POST(
+      await request({ ...base, preferred: selection }, identity.ownerToken)
+    );
+
+    expect(response.status).toBe(200);
+    expect(generate).toHaveBeenCalledWith(
+      identity.ownerId,
+      expect.any(Object),
+      'en',
+      'de',
+      { provider: 'codex', model: 'codex' }
+    );
+  });
+  it('passes the new local endpoint to curriculum generation', async () => {
+    const curriculum = await instance.database.curriculum.findUniqueOrThrow({
+      where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
+    });
+    const generate = vi
+      .spyOn(curriculumGenerator, 'getOrCreateCurriculum')
+      .mockResolvedValue({ id: curriculum.id });
+
+    const response = await POST(
+      await request(
+        { ...base, infra: { aiProvider: 'local', aiModel: 'qwen3', aiBaseUrl: 'http://localhost:11434/v1' } },
+        identity.ownerToken
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(generate).toHaveBeenCalledWith(
+      identity.ownerId,
+      expect.any(Object),
+      'en',
+      'de',
+      { provider: 'local', model: 'local:test-model', endpoint: 'http://localhost:11434/v1' }
+    );
   });
   it('does not complete a save after the issuing session signs out during curriculum lookup', async () => {
     duringCurriculumRead(() => identity.access.logout(identity.ownerToken));

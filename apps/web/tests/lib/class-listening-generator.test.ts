@@ -134,6 +134,10 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 const mockGetConfiguredTtsProviderId = vi.fn(() => null as string | null);
+const mockGetServerInfra = vi.fn().mockResolvedValue({});
+vi.mock('@/lib/server-config', () => ({
+  getServerInfra: () => mockGetServerInfra(),
+}));
 vi.mock('@/lib/providers/tts', () => ({
   getConfiguredTtsProviderId: () => mockGetConfiguredTtsProviderId(),
 }));
@@ -300,6 +304,10 @@ describe('generateClassListening', () => {
 
       await generateClassListening(PARAMS);
 
+      expect(mockGetServerInfra).toHaveBeenCalledOnce();
+      expect(mockGetServerInfra.mock.invocationCallOrder[0]).toBeLessThan(
+        mockGetConfiguredTtsProviderId.mock.invocationCallOrder[0]
+      );
       expect(mockEpisodeCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
