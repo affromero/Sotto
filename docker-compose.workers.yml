@@ -9,7 +9,7 @@ x-worker-image: &worker-image
     context: .
     dockerfile: apps/web/Dockerfile.workers
     args:
-      WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}
+      WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node24}
       RUNTIME_UID: '1000'
   # Web and workers share the CLI homes as UID 1000.
   volumes:

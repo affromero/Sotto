@@ -5,10 +5,13 @@
  */
 
 /** A stored multiple-choice item, answer key included. Never sent to a client. */
+export class PracticeIncompleteError extends Error {}
+
 export interface PracticeMcItem {
   id: string;
   prompt: string;
   options: string[];
+  passageText?: string;
   correctIndex: number;
   explanation: string;
   vocabLemma: string | null;
@@ -20,6 +23,7 @@ export interface PracticeMcItemPublic {
   id: string;
   prompt: string;
   options: string[];
+  passageText?: string;
 }
 
 export interface PracticeAnswer {

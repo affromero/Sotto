@@ -3,6 +3,7 @@ set -euo pipefail
 
 image="${1:?Usage: smoke-worker-image.sh IMAGE}"
 bash "$(dirname "${BASH_SOURCE[0]}")/checks/cli-home.sh" "$image" "${2:-1001}"
+bash "$(dirname "${BASH_SOURCE[0]}")/checks/native-runtime.sh" "$image" glibc
 suffix="sotto-image-smoke-$$"
 cleanup() {
   docker rm -f "${suffix}-redis" "${suffix}-postgres" >/dev/null 2>&1 || true
@@ -40,7 +41,7 @@ docker run --rm --network "$suffix" \
         assert.throws(() => require.resolve(name), { code: "MODULE_NOT_FOUND" });
       }
       await import("./src/generated/prisma/client.ts");
-      for (const file of await readdir("src/workers")) {
+      for (const file of await readdir("src/workers", { recursive: true })) {
         if (file.endsWith(".worker.ts")) await import(`./src/workers/${file}`);
       }
       const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });

@@ -14,7 +14,8 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 
 ## Requirements
 
-- skill = grammar: each question tests one of the listed grammar points in the target language.
+- skill = vocabulary: create exactly one contextual cloze for each supplied target lemma. Give a complete, meaningful target-language sentence or short exchange with one `_____` gap. The correct option must be that exact lemma, used naturally in the sentence. Choose plausible distractors of the same grammatical category; only one may fit the meaning and grammar. Never use a bare translation, isolated word, or a request to identify a memorized gloss as the question. Explain the word's use in this context. Set `passage` to an empty string.
+- skill = grammar: each question tests one of the listed grammar points in a meaningful target-language sentence or short exchange. Supply enough context to distinguish the correct answer; never ask for an isolated word translation.
 - skill = reading without a source passage: write one interesting target-language passage first, appropriate to {{LEVEL}}, then ask comprehension questions about it.
 - skill = reading with a source passage: use the provided source passage as the reading text and ask comprehension questions about it.
 - Reading passages should be concrete and memorable: a small scene, message, short article, diary entry, notice, or story tied to the objective and vocabulary.

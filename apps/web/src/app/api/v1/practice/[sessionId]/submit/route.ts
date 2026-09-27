@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { submitPractice, PracticeSessionNotFoundError } from '@/lib/practice-service';
+import { PracticeIncompleteError } from '@/lib/practice/types';
 
 type RouteParams = { params: Promise<{ sessionId: string }> };
 
@@ -24,7 +25,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const result = await submitPractice(sessionId, authed.userId, parsed.data.answers);
     return NextResponse.json(result);
   } catch (error: unknown) {
-    if (error instanceof PracticeSessionNotFoundError) return errorResponse('Practice session not found', 404);
+    if (error instanceof PracticeIncompleteError) return errorResponse(error.message, 409);
+    if (error instanceof PracticeSessionNotFoundError)
+      return errorResponse('Practice session not found', 404);
     const message = error instanceof Error ? error.message : 'Failed to submit practice';
     logger.error('Failed to submit practice', { error: message });
     return errorResponse(message, 500);

@@ -67,6 +67,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # Node major upgrades require a deliberate supported-runtime migration.
+    # Keep Node 24 patch/minor updates and other Docker image updates enabled.
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
     # Grouped for the same reason as npm: one PR per ecosystem per week.
     # Unfiltered on purpose — base-image bumps are usually digest updates,
     # which an `update-types` filter would push out into their own PRs.

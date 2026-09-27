@@ -15,7 +15,7 @@ import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
 import { persistGeneratedReferences } from './references';
-import { getConfiguredTtsProviderId } from './providers/tts';
+import { getConfiguredTtsProviderId, resolveTtsProvider } from './providers/tts';
 import { getServerInfra } from './server-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -112,6 +112,19 @@ export async function composeListeningContent(
   });
   await getServerInfra();
   const configuredTtsProvider = getConfiguredTtsProviderId();
+  if (!configuredTtsProvider) {
+    throw new Error(
+      'AI audio is not enabled. Select a speech provider in Settings before starting listening practice.'
+    );
+  }
+  const resolvedTts = await resolveTtsProvider({
+    userId: p.userId,
+    execution: p.execution,
+    episodeId: p.firstSeenClassId ?? p.courseId,
+    requestedProvider: configuredTtsProvider,
+    requestedModel: userSpeechPrefs?.preferredTtsModel,
+    language: p.targetLang,
+  });
 
   // Step 2: create a CLASS episode. When the instance pins a TTS provider,
   // such as the keyless local Kokoro sidecar, seed it on
@@ -125,10 +138,8 @@ export async function composeListeningContent(
       visibility: 'PRIVATE',
       language: p.targetLang,
       status: 'PENDING',
-      ttsProvider: configuredTtsProvider ?? undefined,
-      ttsModel: configuredTtsProvider
-        ? (userSpeechPrefs?.preferredTtsModel ?? undefined)
-        : undefined,
+      ttsProvider: resolvedTts.providerId,
+      ttsModel: resolvedTts.provider.getModelId(),
     },
   });
   const episodeId = episode.id;

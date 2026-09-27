@@ -1,5 +1,16 @@
     use super::*;
 
+    #[test]
+    fn practice_reading_keeps_the_passage_with_its_question() {
+        let item: types::PracticeItem = serde_json::from_value(serde_json::json!({
+            "id": "r0", "prompt": "Wo ist Mia?", "options": ["Berlin", "Bonn"],
+            "passageText": "Mia ist in Berlin."
+        })).unwrap();
+        let review = VocabItem::from(&item);
+        assert!(review.prompt.contains("Mia ist in Berlin."));
+        assert!(review.prompt.contains("Wo ist Mia?"));
+    }
+
     fn item(id: &str, options: &[&str]) -> VocabItem {
         VocabItem {
             id: id.to_string(),

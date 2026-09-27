@@ -40,8 +40,10 @@ export async function seedClass() {
     user.id
   );
   invalidateServerInfra();
-  const curriculum = await database.curriculum.create({
-    data: {
+  const curriculum = await database.curriculum.upsert({
+    where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
+    update: {},
+    create: {
       nativeLang: 'en',
       targetLang: 'de',
       title: 'German greetings',
@@ -60,8 +62,12 @@ export async function seedClass() {
     },
     include: { lessons: true },
   });
-  const course = await database.course.create({
-    data: { userId: user.id, nativeLang: 'en', targetLang: 'de', curriculumId: curriculum.id },
+  const course = await database.course.upsert({
+    where: {
+      userId_nativeLang_targetLang: { userId: user.id, nativeLang: 'en', targetLang: 'de' },
+    },
+    update: {},
+    create: { userId: user.id, nativeLang: 'en', targetLang: 'de', curriculumId: curriculum.id },
   });
   const cls = await database.courseClass.create({
     data: {

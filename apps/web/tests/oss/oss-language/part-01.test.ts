@@ -501,7 +501,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'image: ${SOTTO_WORKERS_IMAGE:-sotto-workers}:${SOTTO_IMAGE_TAG:-local}'
     );
     expect(workersComposeSource).toContain(
-      'WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node22}'
+      'WORKER_BASE_IMAGE: ${SOTTO_WORKER_BASE_IMAGE:-ghcr.io/affromero/sotto-workers-base:node24}'
     );
     expect(webDockerSource).toContain('npm rebuild thesidedoor-flock');
     expect(workerDockerSource).toContain('npm rebuild thesidedoor-flock');

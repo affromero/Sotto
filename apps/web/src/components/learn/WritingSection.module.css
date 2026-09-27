@@ -101,6 +101,7 @@
 }
 
 .writeBubble {
+  white-space: pre-wrap;
   font-family: var(--serif);
   font-size: 20px;
   line-height: 1.4;

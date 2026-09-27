@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 image="${1:?Usage: smoke-worker-base.sh IMAGE}"
+docker run --rm --network none --entrypoint node "$image" -e 'require("node:assert/strict").equal(process.versions.node.split(".")[0], "24")'
 docker run --rm --network none --entrypoint sh "$image" -ec '
   test ! -d /root/.npm/_cacache
   claude --version

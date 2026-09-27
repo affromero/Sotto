@@ -34,6 +34,8 @@ export interface ComposedWritingPrompt {
 
 interface RawWritingPrompt {
   task: string;
+  sourceText: string;
+  taskType: 'transformation' | 'correction' | 'completion' | 'guided_reply';
   guidance?: string;
   ideas?: unknown;
 }
@@ -52,7 +54,13 @@ function parseIdeas(value: unknown): string[] {
 function isValidRawPrompt(item: unknown): item is RawWritingPrompt {
   if (typeof item !== 'object' || item === null) return false;
   const obj = item as Record<string, unknown>;
-  return typeof obj.task === 'string' && obj.task.trim() !== '';
+  return (
+    typeof obj.task === 'string' &&
+    obj.task.trim() !== '' &&
+    typeof obj.sourceText === 'string' &&
+    obj.sourceText.trim() !== '' &&
+    ['transformation', 'correction', 'completion', 'guided_reply'].includes(String(obj.taskType))
+  );
 }
 
 export async function composeWritingPrompts(
@@ -104,11 +112,16 @@ export async function composeWritingPrompts(
     raw = [];
   }
 
+  if (raw.some((item) => !isValidRawPrompt(item))) {
+    throw new Error(
+      'Writing generation must supply source text and a supported exercise type for every task.'
+    );
+  }
   const prompts = raw
     .filter(isValidRawPrompt)
     .slice(0, WRITING_PROMPT_COUNT)
     .map((r) => ({
-      task: r.task,
+      task: `${r.task.trim()}\n\n${r.sourceText.trim()}`,
       guidance: typeof r.guidance === 'string' ? r.guidance : null,
       ideas: parseIdeas(r.ideas),
     }));

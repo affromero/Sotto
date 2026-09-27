@@ -17,12 +17,12 @@ install_node() {
   if command -v node &> /dev/null; then
     echo "node: $(node --version)"
   else
-    echo "Installing Node.js 20 LTS..."
+    echo "Installing Node.js 24 LTS..."
     if command -v apt-get &> /dev/null; then
-      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+      curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
       sudo apt-get install -y nodejs
     elif command -v brew &> /dev/null; then
-      brew install node@20
+      brew install node@24
     else
       echo "Error: please install Node.js manually: https://nodejs.org"
       return 1

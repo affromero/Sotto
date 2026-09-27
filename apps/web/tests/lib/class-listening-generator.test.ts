@@ -134,12 +134,14 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 const mockGetConfiguredTtsProviderId = vi.fn(() => null as string | null);
+const mockResolveTtsProvider = vi.fn();
 const mockGetServerInfra = vi.fn().mockResolvedValue({});
 vi.mock('@/lib/server-config', () => ({
   getServerInfra: () => mockGetServerInfra(),
 }));
 vi.mock('@/lib/providers/tts', () => ({
   getConfiguredTtsProviderId: () => mockGetConfiguredTtsProviderId(),
+  resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
 }));
 
 vi.mock('@/lib/prompt-loader', () => ({
@@ -247,6 +249,11 @@ const PARAMS: ClassListeningParams = {
 
 /** Wire all happy-path mocks. */
 function setupHappyPath() {
+  mockGetConfiguredTtsProviderId.mockReturnValue('kokoro');
+  mockResolveTtsProvider.mockImplementation(async (context: { requestedProvider: string }) => ({
+    providerId: context.requestedProvider,
+    provider: { getModelId: () => 'configured-model' },
+  }));
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
   mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
   mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
@@ -487,6 +494,22 @@ describe('generateClassListening', () => {
   });
 
   describe('error paths', () => {
+    it('fails before generating a script or queuing audio when the selected credential is unavailable', async () => {
+      setupHappyPath();
+      mockResolveTtsProvider.mockRejectedValue(new Error('No API key available for cartesia.'));
+      await expect(generateClassListening(PARAMS)).rejects.toThrow(/No API key available/);
+      expect(mockEpisodeCreate).not.toHaveBeenCalled();
+      expect(mockGenerateScript).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('keeps AI audio opt-in when no speech provider is selected', async () => {
+      setupHappyPath();
+      mockGetConfiguredTtsProviderId.mockReturnValue(null);
+      await expect(generateClassListening(PARAMS)).rejects.toThrow(/not enabled/);
+      expect(mockEpisodeCreate).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
     it('throws when there is no BYOK key and no local agent configured', async () => {
       mockGetAiKey.mockResolvedValue(null);
       const prev = process.env.AI_PROVIDER;
@@ -506,6 +529,7 @@ describe('generateClassListening', () => {
     });
 
     it('marks episode FAILED and re-throws when generateScript throws', async () => {
+      setupHappyPath();
       mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
       mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
       mockEpisodeCreate.mockResolvedValue({ id: 'episode-1' });

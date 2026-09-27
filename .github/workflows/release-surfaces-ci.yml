@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 24
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
       - name: Install Linux dependencies
         run: |
@@ -83,6 +83,30 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: Select available iPhone and iPad simulators
+        run: |
+          xcrun simctl list runtimes
+          python3 - <<'PY'
+          import json, os, subprocess
+          inventory = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', '--json']))
+          runtimes = sorted(
+              (runtime for runtime in inventory['runtimes']
+               if runtime['isAvailable'] and runtime['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-')),
+              key=lambda runtime: tuple(map(int, runtime['version'].split('.'))), reverse=True)
+          for runtime in runtimes:
+              devices = {device['name']: device['udid']
+                         for device in inventory['devices'].get(runtime['identifier'], [])
+                         if device['isAvailable']}
+              if 'iPhone 17' not in devices or 'iPad Pro 13-inch (M5)' not in devices:
+                  continue
+              with open(os.environ['GITHUB_ENV'], 'a') as output:
+                  output.write(f"SOTTO_IPHONE_SIMULATOR={devices['iPhone 17']}\n")
+                  output.write(f"SOTTO_IPAD_SIMULATOR={devices['iPad Pro 13-inch (M5)']}\n")
+              print(f"Testing iPhone 17 and iPad Pro 13-inch (M5) on {runtime['name']}")
+              break
+          else:
+              raise SystemExit('No available iOS runtime contains both required simulator devices')
+          PY
       # The app is universal, so it is compiled and tested on both device
       # families: the layout, and the workbook in particular, take different
       # paths per size class.
@@ -91,6 +115,6 @@ jobs:
           xcodebuild test
           -project apps/ios/Sotto.xcodeproj
           -scheme Sotto
-          -destination 'platform=iOS Simulator,name=iPhone 17'
-          -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)'
+          -destination "platform=iOS Simulator,id=$SOTTO_IPHONE_SIMULATOR"
+          -destination "platform=iOS Simulator,id=$SOTTO_IPAD_SIMULATOR"
           CODE_SIGNING_ALLOWED=NO

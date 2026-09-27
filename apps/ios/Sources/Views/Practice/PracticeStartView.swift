@@ -219,6 +219,11 @@ private struct PracticeItemView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let passage = item.passageText, !passage.isEmpty {
+                Text(passage)
+                    .font(.body)
+                    .foregroundStyle(SottoTheme.ink)
+            }
             Text(item.prompt)
                 .font(.headline)
                 .foregroundStyle(SottoTheme.ink)

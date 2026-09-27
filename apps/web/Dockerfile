@@ -5,7 +5,7 @@
 # ============================================
 
 # ---- Stage 1: Install dependencies ----
-FROM node:25-alpine AS deps
+FROM node:24-alpine AS deps
 RUN apk add --no-cache g++ libc6-compat make openssl python3
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts \
 RUN npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
 
 # ---- Stage 2: Build the application ----
-FROM node:25-alpine AS builder
+FROM node:24-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
@@ -52,7 +52,7 @@ WORKDIR /app/apps/web
 RUN npm run build
 
 # ---- Stage 3: Production runner ----
-FROM node:25-alpine AS runner
+FROM node:24-alpine AS runner
 ARG RUNTIME_UID=1001
 RUN apk add --no-cache libc6-compat openssl openssh-client
 # Pin executable tooling so rebuilding a release cannot silently change it.
