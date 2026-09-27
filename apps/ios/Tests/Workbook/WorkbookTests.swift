@@ -61,6 +61,8 @@ final class WorkbookTests: XCTestCase {
         store.record(drawing: drawing(), canvasSize: CGSize(width: 300, height: 200), forPageAt: 0)
         let inkURL = try store.exportAnnotatedPDF(title: "Ink")
         defer { try? FileManager.default.removeItem(at: inkURL) }
+        XCTAssertTrue(plainURL.isFileURL, "Export shares a local PDF without requiring Safari authentication.")
+        XCTAssertTrue(inkURL.isFileURL, "Annotated exports must also be shareable without server credentials.")
         let plain = try XCTUnwrap(PDFDocument(url: plainURL)?.page(at: 0))
         let ink = try XCTUnwrap(PDFDocument(url: inkURL)?.page(at: 0))
         XCTAssertEqual(ink.bounds(for: .mediaBox).size, CGSize(width: 300, height: 200))
