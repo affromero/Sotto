@@ -19,6 +19,13 @@ const HOSTED_MOCK_ROUTES = [
   '/voices',
 ];
 const PUBLIC_API_ROUTES = new Set(['/api/version', '/api/v1/health', '/api/v1/auth/pair/redeem']);
+const SHOWCASE_DOWNLOAD_ROUTES = new Set([
+  '/install.sh',
+  '/download',
+  '/download/mac',
+  '/download/windows',
+  '/download/linux',
+]);
 const PUBLIC_FILES = new Set([
   '/favicon.ico',
   '/icon.svg',
@@ -52,6 +59,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
 
   if (!isSelfHosted()) {
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      SHOWCASE_DOWNLOAD_ROUTES.has(pathname)
+    )
+      return NextResponse.next();
     if (HOSTED_MOCK_ROUTES.some((root) => within(pathname, root)))
       return privateResponse(NextResponse.redirect(new URL('/welcome', request.url)));
     if (pathname === '/' || pathname === '/welcome') return NextResponse.next();
