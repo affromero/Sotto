@@ -24,6 +24,7 @@
     "gen:openapi": "npm run -w @sotto/shared gen:openapi",
     "lint": "npm run lint --workspace=@sotto/web",
     "lint:fix": "npm run lint:fix --workspace=@sotto/web",
+    "release:check": "python3 scripts/release/check.py",
     "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",
     "speech:config": "npm run speech:config --workspace=@sotto/web",
     "speech:config:check": "npm run speech:config:check --workspace=@sotto/web",
