@@ -430,6 +430,12 @@ npm run ci            # lint + type-check + test + build (run before every commi
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** to get started.
 
+## Contributors
+
+Sotto is built with contributions from its community. Thanks to [Anton Sannikov (@asannikov)](https://github.com/asannikov), our first external contributor, for [fixing setup and first-lesson provider issues](https://github.com/affromero/Sotto/pull/96).
+
+See [all contributors](https://github.com/affromero/Sotto/graphs/contributors) and the [changelog](CHANGELOG.md) for contributions included in each release.
+
 ---
 
 ## Related Projects
