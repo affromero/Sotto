@@ -34,6 +34,7 @@ import {
   type FocusPracticeTarget,
 } from './learning-targets';
 import { logger } from './logger';
+import { PracticeIncompleteError } from './practice/types';
 import type { CefrLevel, PracticeKind, SkillType, PedagogyStyle } from '@sotto/shared';
 
 const MC_COUNT = 6;
@@ -41,7 +42,6 @@ const VOCAB_COUNT = 12;
 const FULL_VOCAB_COUNT = 5;
 const FULL_DUE_COUNT = 12;
 const MIN_VOCAB = 2;
-const VOCAB_CHOICES = 4;
 
 export class PracticeCourseNotFoundError extends Error {}
 export class PracticeSessionNotFoundError extends Error {}
@@ -88,20 +88,12 @@ export interface StartPracticeOptions {
 }
 
 function toPublic(it: PracticeMcItem): PracticeMcItemPublic {
-  return { id: it.id, prompt: it.prompt, options: it.options };
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function sample<T>(arr: T[], n: number): T[] {
-  return shuffle(arr).slice(0, n);
+  return {
+    id: it.id,
+    prompt: it.prompt,
+    options: it.options,
+    ...(it.passageText ? { passageText: it.passageText } : {}),
+  };
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -122,58 +114,45 @@ function uniqueVocab(
   return out;
 }
 
-function blankTargetInContext(context: string | null, text: string): string | null {
-  if (!context) return null;
-  const haystack = context.toLowerCase();
-  const needle = text.toLowerCase();
-  const idx = haystack.indexOf(needle);
-  if (idx < 0) return null;
-  return `${context.slice(0, idx)}_____ ${context.slice(idx + text.length)}`
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function buildFocusItems(
+async function buildFocusItems(
   focusTargets: FocusPracticeTarget[],
   idPrefix: string,
-  distractorPool: string[]
-): PracticeMcItem[] {
-  const allDistractors = uniqueStrings([
-    ...focusTargets.map((target) => target.text),
-    ...distractorPool,
-  ]);
-
-  return focusTargets.flatMap((target, index) => {
-    const distractors = sample(
-      allDistractors.filter((value) => value.toLowerCase() !== target.text.toLowerCase()),
-      VOCAB_CHOICES - 1
+  course: CourseCtx,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
+): Promise<PracticeMcItem[]> {
+  const items: PracticeMcItem[] = [];
+  for (const target of focusTargets) {
+    const questions = await generateSectionQuestions({
+      userId: course.userId,
+      execution,
+      skill: 'GRAMMAR',
+      vocabularyReview: true,
+      level: course.currentLevel,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: `Use the selected expression in a new sentence or exchange. The supplied context is background, not an answer to copy: ${target.contextText ?? target.text}`,
+      grammarPoints: [],
+      targetVocab: [{ lemma: target.text, gloss: '' }],
+      seed: `${course.id}-focus-${target.id}-${Date.now()}`,
+    });
+    const question = questions.find(
+      (q) =>
+        q.options[q.correctIndex] === target.text &&
+        q.question.includes('_____') &&
+        q.question.replace(/_+/g, '').trim().length >= 8
     );
-    const options = shuffle(uniqueStrings([target.text, ...distractors])).slice(0, VOCAB_CHOICES);
-    if (options.length < 2) return [];
-
-    const cloze = blankTargetInContext(target.contextText, target.text);
-    const prompt =
-      cloze && target.kind !== 'SENTENCE'
-        ? `Complete the sentence: ${cloze}`
-        : target.contextText
-          ? `Choose the marked expression from this context: ${target.contextText}`
-          : 'Choose the learner-marked expression to practice.';
-
-    return [
-      {
-        id: `${idPrefix}${index}`,
-        prompt,
-        options,
-        correctIndex: options.indexOf(target.text),
-        explanation:
-          target.kind === 'SENTENCE'
-            ? 'This sentence was marked as difficult and is kept in the practice rotation.'
-            : `Keep using "${target.text}" in context until it stops needing support.`,
-        vocabLemma: target.kind === 'SENTENCE' ? null : target.text,
-        focusTargetId: target.id,
-      },
-    ];
-  });
+    if (!question) throw new Error('Focused practice generation produced no contextual exercise.');
+    items.push({
+      id: `${idPrefix}${items.length}`,
+      prompt: question.question,
+      options: question.options,
+      correctIndex: question.correctIndex,
+      explanation: question.explanation,
+      vocabLemma: target.kind === 'SENTENCE' ? null : target.text,
+      focusTargetId: target.id,
+    });
+  }
+  return items;
 }
 
 interface CourseCtx {
@@ -276,7 +255,7 @@ export async function startPractice(
     options.focusTargetId ?? null
   );
 
-  if (kind === 'VOCAB') return startVocab(course, seedToken, focusTargets);
+  if (kind === 'VOCAB') return startVocab(course, seedToken, focusTargets, execution);
 
   const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
   const due = await getDueItems(courseId, kind === 'FULL' ? FULL_DUE_COUNT : MC_COUNT);
@@ -302,7 +281,8 @@ type VocabPracticeBuild =
 async function buildVocabItems(
   course: CourseCtx,
   count: number,
-  idPrefix: string
+  idPrefix: string,
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<VocabPracticeBuild> {
   const totalVocab = await prisma.learnerVocab.count({ where: { courseId: course.id } });
   if (totalVocab < MIN_VOCAB) return { status: 'unavailable', reason: 'not_enough_vocab' };
@@ -320,46 +300,45 @@ async function buildVocabItems(
   }
   if (review.length === 0) return { status: 'unavailable', reason: 'nothing_due' };
 
-  // Distractor pool: other course lemmas, padded from curriculum vocab on cold start.
-  const pool = new Set(
-    (
-      await prisma.learnerVocab.findMany({
-        where: { courseId: course.id },
-        select: { lemma: true },
-        take: 300,
-      })
-    ).map((v) => v.lemma)
-  );
-  if (pool.size < VOCAB_CHOICES) {
-    const lessons = await prisma.lesson.findMany({
-      where: { curriculumId: course.curriculumId },
-      select: { targetVocab: true },
+  const items: PracticeMcItem[] = [];
+  for (let offset = 0; offset < review.length; offset += 5) {
+    const batch = review.slice(offset, offset + 5);
+    const questions = await generateSectionQuestions({
+      userId: course.userId,
+      execution,
+      skill: 'GRAMMAR',
+      vocabularyReview: true,
+      level: course.currentLevel,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: 'Choose words that complete meaningful sentences in context.',
+      grammarPoints: [],
+      targetVocab: batch.map((v) => ({ lemma: v.lemma, gloss: v.translation })),
+      seed: `${course.id}-vocab-${Date.now()}-${offset}`,
     });
-    for (const l of lessons) {
-      for (const tv of (Array.isArray(l.targetVocab) ? l.targetVocab : []) as Array<{
-        lemma: string;
-      }>) {
-        if (tv?.lemma) pool.add(tv.lemma);
+    for (const word of batch) {
+      const question = questions.find(
+        (q) =>
+          q.options[q.correctIndex] === word.lemma &&
+          q.question.includes('_____') &&
+          q.question.replace(/_+/g, '').trim().length >= 8
+      );
+      if (!question) {
+        throw new Error(
+          `Vocabulary generation produced no contextual exercise for "${word.lemma}".`
+        );
       }
+      items.push({
+        id: `${idPrefix}${items.length}`,
+        prompt: question.question,
+        options: question.options,
+        correctIndex: question.correctIndex,
+        explanation: question.explanation,
+        vocabLemma: word.lemma,
+        focusTargetId: null,
+      });
     }
   }
-
-  const items: PracticeMcItem[] = shuffle(review).map((v, i) => {
-    const distractors = sample(
-      [...pool].filter((l) => l !== v.lemma),
-      VOCAB_CHOICES - 1
-    );
-    const options = shuffle([v.lemma, ...distractors]);
-    return {
-      id: `${idPrefix}${i}`,
-      prompt: v.translation,
-      options,
-      correctIndex: options.indexOf(v.lemma),
-      explanation: `"${v.lemma}" means "${v.translation}".`,
-      vocabLemma: v.lemma,
-      focusTargetId: null,
-    };
-  });
 
   return { status: 'ready', items, lemmas: review.map((v) => v.lemma) };
 }
@@ -367,13 +346,15 @@ async function buildVocabItems(
 async function startVocab(
   course: CourseCtx,
   seedToken: string,
-  focusTargets: FocusPracticeTarget[]
+  focusTargets: FocusPracticeTarget[],
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
-  const built = await buildVocabItems(course, VOCAB_COUNT, 'v');
-  const focusItems = buildFocusItems(
+  const built = await buildVocabItems(course, VOCAB_COUNT, 'v', execution);
+  const focusItems = await buildFocusItems(
     focusTargets.filter((target) => target.kind !== 'SENTENCE'),
     'f',
-    built.status === 'ready' ? built.lemmas : []
+    course,
+    execution
   );
   if (built.status === 'unavailable' && focusItems.length === 0) return built;
   const items = built.status === 'ready' ? [...focusItems, ...built.items] : focusItems;
@@ -419,11 +400,7 @@ async function startMc(
     'q',
     execution
   );
-  const focusItems = buildFocusItems(
-    focusTargets,
-    'f',
-    seed.targetVocab.map((v) => v.lemma)
-  );
+  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution);
   const items = [...focusItems, ...generatedItems];
   const session = await prisma.practiceSession.create({
     data: {
@@ -464,6 +441,7 @@ async function buildSectionMcItems(
   return questions.map((q, i) => ({
     id: `${idPrefix}${i}`,
     prompt: q.question,
+    ...(q.passageText ? { passageText: q.passageText } : {}),
     options: q.options,
     correctIndex: q.correctIndex,
     explanation: q.explanation,
@@ -522,18 +500,24 @@ async function startFull(
     note,
   });
 
+  if (
+    !listening.episodeId ||
+    !listening.comprehensionQuestions.length ||
+    !speakingComposed.length
+  ) {
+    throw new Error(
+      'Full practice requires listening audio, listening questions, and speaking exercises.'
+    );
+  }
+
   // Vocabulary is built LAST, not first. Generating the sections above is what
   // seeds LearnerVocab on a course that has none yet, so asking beforehand saw
   // an empty graph, fell under MIN_VOCAB, and silently produced a full
   // catch-up with no vocabulary in it.
-  const vocab = await buildVocabItems(course, FULL_VOCAB_COUNT, 'v');
+  const vocab = await buildVocabItems(course, FULL_VOCAB_COUNT, 'v', execution);
   const vocabItems = vocab.status === 'ready' ? vocab.items : [];
   const vocabLemmas = vocab.status === 'ready' ? vocab.lemmas : [];
-  const focusItems = buildFocusItems(
-    focusTargets,
-    'f',
-    uniqueStrings([...vocabLemmas, ...seed.targetVocab.map((v) => v.lemma)])
-  );
+  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution);
 
   // A full catch-up is meant to cover every skill, so name whatever it could
   // not build. Dropping a section silently is what hid the above for so long.
@@ -670,11 +654,7 @@ async function startListening(
     vocabLemma: null,
     focusTargetId: null,
   }));
-  const focusItems = buildFocusItems(
-    focusTargets,
-    'f',
-    seed.targetVocab.map((v) => v.lemma)
-  );
+  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution);
   const allItems = [...focusItems, ...items];
   const session = await prisma.practiceSession.create({
     data: {
@@ -855,6 +835,46 @@ export async function submitPractice(
   }
 
   const items = (session.items as unknown as PracticeMcItem[]) ?? [];
+  if (session.kind === 'FULL' || session.kind === 'LISTENING') {
+    const episode = session.episodeId
+      ? await prisma.episode.findUnique({
+          where: { id: session.episodeId },
+          select: { status: true, audioUrl: true },
+        })
+      : null;
+    if (
+      !episode ||
+      episode.status === 'FAILED' ||
+      (episode.status === 'READY' && !episode.audioUrl)
+    ) {
+      throw new PracticeIncompleteError(
+        'Listening audio is unavailable. Start a new practice session.'
+      );
+    }
+    if (episode.status !== 'READY' || !episode.audioUrl) {
+      throw new PracticeIncompleteError(
+        'Listening audio is still generating. Wait for it before finishing.'
+      );
+    }
+    const listeningItems =
+      session.kind === 'FULL'
+        ? items.filter((item) => item.id.startsWith('l'))
+        : items.filter((item) => !item.id.startsWith('f'));
+    if (
+      !listeningItems.length ||
+      listeningItems.some(
+        (item) =>
+          !answers.some(
+            (answer) =>
+              answer.itemId === item.id &&
+              answer.selectedIndex >= 0 &&
+              answer.selectedIndex < item.options.length
+          )
+      )
+    ) {
+      throw new PracticeIncompleteError('Answer every listening question before finishing.');
+    }
+  }
   if (session.kind === 'FULL') {
     return submitFull(
       session.id,

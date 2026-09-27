@@ -74,6 +74,38 @@ const BASE: SectionGenParams = {
 
 const PASSAGE = 'Una vez un científico descubrió algo importante en el laboratorio.';
 
+it('requests one contextual vocabulary exercise per target word through the configured provider', async () => {
+  mockGenerateResponse.mockResolvedValue({
+    content: JSON.stringify({
+      passage: '',
+      questions: [
+        {
+          question: 'Mia hat gestern einen Film _____.',
+          options: ['gesehen', 'gelesen', 'geschrieben', 'gehört'],
+          correctIndex: 0,
+          explanation: 'Man sieht einen Film.',
+        },
+      ],
+    }),
+    inputTokens: 1,
+    outputTokens: 1,
+    model: 'm',
+  });
+  const result = await generateSectionQuestions({
+    ...BASE,
+    skill: 'GRAMMAR',
+    vocabularyReview: true,
+    targetLang: 'de',
+    targetVocab: [{ lemma: 'gesehen', gloss: 'seen' }],
+  });
+  expect(result[0]).toMatchObject({
+    question: 'Mia hat gestern einen Film _____.',
+    correctIndex: 0,
+  });
+  const messages = mockGenerateResponse.mock.calls[0][1];
+  expect(messages[0].content).toContain('1 vocabulary');
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });

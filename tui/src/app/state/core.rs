@@ -10,7 +10,10 @@ impl From<&types::PracticeItem> for VocabItem {
     fn from(item: &types::PracticeItem) -> Self {
         Self {
             id: item.id.clone(),
-            prompt: item.prompt.clone(),
+            prompt: match item.passage_text.as_deref().filter(|text| !text.is_empty()) {
+                Some(passage) => format!("{passage}\n\n{}", item.prompt),
+                None => item.prompt.clone(),
+            },
             options: item.options.clone(),
         }
     }

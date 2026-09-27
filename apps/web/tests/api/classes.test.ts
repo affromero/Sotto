@@ -38,7 +38,9 @@ const mockCreateNextClass = vi.fn();
 vi.mock('@/lib/class-service', () => {
   class CourseNotFoundError extends Error {}
   class ClassGenerationCancelledError extends Error {}
+  class ClassIncompleteError extends Error {}
   return {
+    ClassIncompleteError,
     getClassForUser: (...args: unknown[]) => mockGetClassForUser(...args),
     submitClass: (...args: unknown[]) => mockSubmitClass(...args),
     regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
@@ -62,7 +64,11 @@ import {
   DELETE as DELETEGeneration,
   GET as GETGeneration,
 } from '@/app/api/v1/courses/[courseId]/generation/route';
-import { ClassGenerationCancelledError, CourseNotFoundError } from '@/lib/class-service';
+import {
+  ClassGenerationCancelledError,
+  ClassIncompleteError,
+  CourseNotFoundError,
+} from '@/lib/class-service';
 
 // ---- Helpers ----
 
@@ -524,6 +530,19 @@ describe('DELETE /api/v1/classes/[classId]', () => {
 // ---- POST /api/v1/classes/[classId]/submit ----
 
 describe('POST /api/v1/classes/[classId]/submit', () => {
+  it('reports incomplete oral work as a conflict the learner can resolve', async () => {
+    mockSubmitClass.mockRejectedValue(
+      new ClassIncompleteError('Listening audio is still generating.')
+    );
+    const res = await POSTSubmit(
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
+        answers: [{ questionId: 'q1', selectedIndex: 0 }],
+      }),
+      { params: Promise.resolve({ classId: 'class-1' }) }
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/listening/i) });
+  });
   const VALID_ANSWERS = [
     { questionId: 'q1', selectedIndex: 0 },
     { questionId: 'q2', selectedIndex: 1 },

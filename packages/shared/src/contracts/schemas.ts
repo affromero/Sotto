@@ -120,6 +120,7 @@ export const practiceItemSchema = z.object({
   id: z.string(),
   prompt: z.string(),
   options: z.array(z.string()),
+  passageText: z.string().optional(),
 });
 
 export const practiceSpeakingPromptSchema = z.object({

@@ -62,6 +62,8 @@ export interface SectionGenParams {
   userId: string;
   execution: SottoProviderExecution;
   skill: SkillType; // GRAMMAR | READING
+  /** Contextual vocabulary review, with one cloze per supplied lemma (up to five). */
+  vocabularyReview?: boolean;
   level: string;
   nativeLang: string;
   targetLang: string;
@@ -170,8 +172,13 @@ function parseGeneratedQuestions(content: string): ParsedGeneratedQuestions {
   throw new Error('Class generation returned no question array.');
 }
 
-function buildUserPrompt(skill: SkillType, attempt: number, previousError?: string): string {
-  const base = `Generate ${QUESTIONS_PER_SECTION} ${skill.toLowerCase()} questions.`;
+function buildUserPrompt(
+  skill: string,
+  count: number,
+  attempt: number,
+  previousError?: string
+): string {
+  const base = `Generate ${count} ${skill.toLowerCase()} questions.`;
   if (attempt === 1) return base;
   return [
     base,
@@ -236,6 +243,11 @@ function normalizeQuestions(
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
+  const count = p.vocabularyReview ? p.targetVocab.length : QUESTIONS_PER_SECTION;
+  if (count < 1 || count > QUESTIONS_PER_SECTION) {
+    throw new Error('Vocabulary review requires between one and five target words.');
+  }
+  const skill = p.vocabularyReview ? 'vocabulary' : p.skill.toLowerCase();
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   // Sourced READING classes: base the MCQs on the leveled passage. The
@@ -247,8 +259,8 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     : '';
 
   const systemPrompt = loadAndRender('class/generate-section-quiz.md', {
-    COUNT: String(QUESTIONS_PER_SECTION),
-    SKILL: p.skill.toLowerCase(),
+    COUNT: String(count),
+    SKILL: skill,
     LEVEL: p.level,
     NATIVE: p.nativeLang,
     TARGET: p.targetLang,
@@ -275,7 +287,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       [
         {
           role: 'user',
-          content: buildUserPrompt(p.skill, attempt, lastError),
+          content: buildUserPrompt(skill, count, attempt, lastError),
         },
       ],
       {

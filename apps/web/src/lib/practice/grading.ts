@@ -10,6 +10,7 @@ import { prisma } from '../prisma';
 import { applyReviewOutcome } from '../knowledge-graph';
 import { markFocusTargetsPracticed } from '../learning-targets';
 import type { PracticeMcItem, PracticeAnswer, SubmitPracticeResult } from './types';
+import { PracticeIncompleteError } from './types';
 
 interface MultipleChoiceScore {
   correct: number;
@@ -84,6 +85,11 @@ export async function submitFull(
     speakingScores.length > 0
       ? speakingScores.reduce((sum, score) => sum + score, 0) / speakingScores.length
       : null;
+  if (speakingTotal === 0 || speakingScores.length < speakingTotal) {
+    throw new PracticeIncompleteError(
+      'Record every speaking exercise and wait for feedback before finishing.'
+    );
+  }
   const writingAvg =
     responses.length > 0
       ? responses.reduce((sum, r) => sum + (r.overallScore ?? 0), 0) / responses.length
@@ -133,7 +139,7 @@ export async function submitFull(
  */
 export async function latestSpeakingScores(sessionId: string): Promise<number[]> {
   const recordings = await prisma.speakingRecording.findMany({
-    where: { practiceSessionId: sessionId, overallScore: { not: null } },
+    where: { practiceSessionId: sessionId, overallScore: { not: null }, status: 'SCORED' },
     orderBy: { createdAt: 'desc' },
     select: { promptId: true, overallScore: true },
   });
@@ -153,6 +159,12 @@ export async function submitSpeaking(
 ): Promise<SubmitPracticeResult> {
   const scores = await latestSpeakingScores(sessionId);
   const graded = scores.length;
+  const total = await prisma.speakingPrompt.count({ where: { practiceSessionId: sessionId } });
+  if (total === 0 || graded < total) {
+    throw new PracticeIncompleteError(
+      'Record every speaking exercise and wait for feedback before finishing.'
+    );
+  }
   const avg = graded > 0 ? scores.reduce((sum, score) => sum + score, 0) / graded : 0;
   if (vocabLemmas.length > 0) await applyReviewOutcome(courseId, vocabLemmas, [], avg, 0, now);
   await markFocusTargetsPracticed(courseId, focusTargetIds, avg, now);
@@ -160,7 +172,6 @@ export async function submitSpeaking(
     where: { id: sessionId },
     data: { status: 'COMPLETED', score: avg, completedAt: now },
   });
-  const total = await prisma.speakingPrompt.count({ where: { practiceSessionId: sessionId } });
   return { score: avg, correct: graded, total };
 }
 

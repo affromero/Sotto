@@ -34,6 +34,22 @@ import {
 } from '../src/contracts/schemas';
 
 describe('openapi.json drift guard', () => {
+  it('preserves a practice reading passage and accepts historical items without one', () => {
+    const base = {
+      status: 'ready',
+      sessionId: 'session',
+      kind: 'READING',
+      items: [{ id: 'r0', prompt: 'Where is Mia?', options: ['Berlin', 'Bonn'] }],
+    };
+    expect(startPracticeResponseSchema.safeParse(base).success).toBe(true);
+    const withPassage = {
+      ...base,
+      items: [{ ...base.items[0], passageText: 'Mia ist in Berlin.' }],
+    };
+    expect(startPracticeResponseSchema.parse(withPassage)).toMatchObject({
+      items: [{ passageText: 'Mia ist in Berlin.' }],
+    });
+  });
   it('matches the committed spec (run npm run gen:openapi)', () => {
     const committed = JSON.parse(readFileSync(OPENAPI_OUTPUT_PATH, 'utf8'));
     const regenerated = buildOpenApiDocument();

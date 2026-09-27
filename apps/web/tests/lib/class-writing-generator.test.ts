@@ -44,11 +44,13 @@ import { blockedProviderExecution } from '../helpers/runtime/provider-execution'
 
 const SAMPLE = JSON.stringify([
   {
+    taskType: 'guided_reply',
+    sourceText: 'Dinner invitation for Thursday. Accept. You can arrive at 19:00.',
     task: 'Reply to a friend inviting you to dinner.',
     guidance: 'Accept and suggest a time.',
     ideas: ['Gracias, me encantaría.', 'El jueves me viene bien.'],
   },
-  { task: 'Write a short note to your neighbour.' },
+  { task: 'Correct the sentence.', taskType: 'correction', sourceText: 'Ayer yo va al cine.' },
 ]);
 
 const PARAMS = {
@@ -80,11 +82,11 @@ describe('composeWritingPrompts', () => {
     const prompts = await composeWritingPrompts(PARAMS);
     expect(prompts).toEqual([
       {
-        task: 'Reply to a friend inviting you to dinner.',
+        task: 'Reply to a friend inviting you to dinner.\n\nDinner invitation for Thursday. Accept. You can arrive at 19:00.',
         guidance: 'Accept and suggest a time.',
         ideas: ['Gracias, me encantaría.', 'El jueves me viene bien.'],
       },
-      { task: 'Write a short note to your neighbour.', guidance: null, ideas: [] },
+      { task: 'Correct the sentence.\n\nAyer yo va al cine.', guidance: null, ideas: [] },
     ]);
     expect(mockClassSectionCreate).not.toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
@@ -93,7 +95,12 @@ describe('composeWritingPrompts', () => {
   it('keeps at most three ideas and drops entries that are not text', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify([
-        { task: 'Reply to the message.', ideas: ['one', 2, '  ', 'two', 'three', 'four'] },
+        {
+          task: 'Reply to the message.',
+          taskType: 'guided_reply',
+          sourceText: 'Accept dinner on Thursday at 19:00.',
+          ideas: ['one', 2, '  ', 'two', 'three', 'four'],
+        },
       ]),
       inputTokens: 1,
       outputTokens: 1,
@@ -107,7 +114,14 @@ describe('composeWritingPrompts', () => {
 
   it('falls back to no ideas rather than failing when the field is malformed', async () => {
     mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify([{ task: 'Reply to the message.', ideas: 'not a list' }]),
+      content: JSON.stringify([
+        {
+          task: 'Reply to the message.',
+          taskType: 'guided_reply',
+          sourceText: 'Accept dinner on Thursday at 19:00.',
+          ideas: 'not a list',
+        },
+      ]),
       inputTokens: 1,
       outputTokens: 1,
       model: 'm',
@@ -115,7 +129,7 @@ describe('composeWritingPrompts', () => {
 
     const [prompt] = await composeWritingPrompts(PARAMS);
 
-    expect(prompt.task).toBe('Reply to the message.');
+    expect(prompt.task).toContain('Accept dinner on Thursday at 19:00.');
     expect(prompt.ideas).toEqual([]);
   });
 
@@ -127,6 +141,17 @@ describe('composeWritingPrompts', () => {
       model: 'm',
     });
     await expect(composeWritingPrompts(PARAMS)).rejects.toThrow(/no usable tasks/i);
+  });
+
+  it('rejects personal writing prompts without supplied source material', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify([{ task: 'What did you do yesterday?', taskType: 'guided_reply' }]),
+      inputTokens: 1,
+      outputTokens: 1,
+      model: 'm',
+    });
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow(/source text/i);
+    expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
   });
 });
 

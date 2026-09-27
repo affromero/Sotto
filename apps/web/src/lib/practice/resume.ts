@@ -26,7 +26,12 @@ interface StoredMcItem extends PracticeMcItemPublic {
 }
 
 function toPublic(item: StoredMcItem): PracticeMcItemPublic {
-  return { id: item.id, prompt: item.prompt, options: item.options };
+  return {
+    id: item.id,
+    prompt: item.prompt,
+    options: item.options,
+    ...(item.passageText ? { passageText: item.passageText } : {}),
+  };
 }
 
 export async function resumePractice(
