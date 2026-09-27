@@ -7,6 +7,7 @@ struct PairingView: View {
     @State private var manualCode = ""
     @State private var serverAddress = ""
     @State private var accessPassword = ""
+    @State private var householdPairing: HouseholdPairing?
 
     var body: some View {
         GeometryReader { proxy in
@@ -44,6 +45,37 @@ struct PairingView: View {
                 }
             }
         }
+        .sheet(item: $householdPairing) { household in
+            NavigationStack {
+                List {
+                    Section("Choose the learner for this device") {
+                        ForEach(household.profiles) { profile in
+                            Button {
+                                Task {
+                                    await model.completeServerPairing(household, profileID: profile.id)
+                                    if model.isPaired { householdPairing = nil }
+                                }
+                            } label: {
+                                Label(profile.name, systemImage: "person.crop.circle")
+                                    .frame(minHeight: 44)
+                            }
+                            .disabled(model.isLoading)
+                        }
+                    }
+                    if let error = model.errorMessage {
+                        Text(error).foregroundStyle(.red)
+                    }
+                }
+                .navigationTitle("Choose learner")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { householdPairing = nil }
+                            .disabled(model.isLoading)
+                    }
+                }
+                .interactiveDismissDisabled(model.isLoading)
+            }
+        }
     }
 
     private func pairingHeader(isCompact: Bool) -> some View {
@@ -60,6 +92,7 @@ struct PairingView: View {
                     .font(isCompact ? .body : .title3)
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
+                PrivacyPolicyLink()
             }
         }
     }
@@ -91,11 +124,11 @@ struct PairingView: View {
 
             Button {
                 Task {
-                    await model.pairWithServer(urlText: serverAddress, password: accessPassword)
+                    householdPairing = await model.prepareServerPairing(urlText: serverAddress, password: accessPassword)
                     accessPassword = ""
                 }
             } label: {
-                Label("Pair this device", systemImage: "checkmark.shield")
+                Label("Continue to learners", systemImage: "checkmark.shield")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SottoPrimaryButtonStyle())
@@ -137,6 +170,7 @@ struct PairingView: View {
 
     private var scannerPanel: some View {
         QRScannerPanel { value in
+            guard householdPairing == nil, !model.isLoading else { return }
             Task {
                 await model.pair(with: value)
             }

@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -104,14 +103,6 @@ struct ClassSectionView: View {
 private struct ClassListeningAudioBlock: View {
     let episode: SottoClassEpisode?
 
-    @State private var player: AVPlayer?
-    @State private var isPlaying = false
-
-    private var audioURL: URL? {
-        guard let audioUrl = episode?.audioUrl else { return nil }
-        return URL(string: audioUrl)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
@@ -122,29 +113,20 @@ private struct ClassListeningAudioBlock: View {
                     Text(episode?.title ?? "Listening audio")
                         .font(.headline)
                         .foregroundStyle(SottoTheme.ink)
-                    Text(audioURL == nil ? listeningStatus : "Listen first, then answer below.")
+                    Text(episode?.audioUrl == nil ? listeningStatus : "Listen first, then answer below.")
                         .font(.callout)
                         .foregroundStyle(SottoTheme.muted)
                 }
                 Spacer()
             }
 
-            Button {
-                togglePlayback()
-            } label: {
-                Label(isPlaying ? "Pause audio" : "Play audio", systemImage: isPlaying ? "pause.fill" : "play.fill")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if let reference = episode?.audioUrl {
+                LearnerAudioPlayer(reference: reference)
             }
-            .buttonStyle(SottoSecondaryButtonStyle())
-            .disabled(audioURL == nil)
         }
         .padding(16)
         .background(SottoTheme.paper)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .onDisappear {
-            player?.pause()
-            isPlaying = false
-        }
     }
 
     private var listeningStatus: String {
@@ -154,19 +136,6 @@ private struct ClassListeningAudioBlock: View {
         return "Audio is still generating. The comprehension questions are available below."
     }
 
-    private func togglePlayback() {
-        guard let audioURL else { return }
-        if player == nil {
-            player = AVPlayer(url: audioURL)
-        }
-        if isPlaying {
-            player?.pause()
-            isPlaying = false
-        } else {
-            player?.play()
-            isPlaying = true
-        }
-    }
 }
 
 private struct ClassReadingPassageBlock: View {

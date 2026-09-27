@@ -1,0 +1,11 @@
+Learn a language on your own Sotto server, with a native app for iPhone and iPad.
+
+Work through courses in grammar, reading, listening, speaking, and writing. Review vocabulary, practice weak areas, and get feedback through the AI and speech providers configured on your server.
+
+On iPad, use Apple Pencil to write on workbook PDFs and keep your notes between sessions. Write answers by hand, convert them to text on your device, then review and edit the text before submitting it for feedback. Practice vocabulary spelling from memory and compare your answer with the original word.
+
+Export annotated workbooks as PDFs. Your handwriting stays on your device; answers you submit go to your chosen server. Live translation asks for permission before sending microphone audio to Google Gemini.
+
+Sotto requires a running Sotto server. Connect with its address and access password, or scan a pairing code. Server setup and provider configuration happen in the web app. Available features depend on your server configuration. Apple Pencil features require a compatible iPad and Apple Pencil; text-recognition support varies by language.
+
+Sotto is free, open-source, and self-hostable. You control your learning server and its provider choices.

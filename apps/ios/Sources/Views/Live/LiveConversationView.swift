@@ -16,22 +16,17 @@ struct LiveConversationView: View {
     let course: SottoCourse
 
     @State private var direction = "native_to_target"
-    @State private var phase: SessionPhase = .idle
+    @StateObject private var lifecycle = LiveConversationLifecycle()
     @State private var heard = ""
     @State private var spoken = ""
-    @State private var transcript: [String] = []
     @State private var errorMessage: String?
     @State private var session: LiveTranslateSession?
     @State private var audio = LiveAudioEngine()
     @State private var pump: Task<Void, Never>?
+    @State private var startTask: Task<Void, Never>?
+    @State private var showGoogleConsent = false
 
-    /// Named for the session, not the view: a nested `State` would shadow
-    /// SwiftUI's property wrapper.
-    enum SessionPhase: Equatable {
-        case idle
-        case connecting
-        case live
-    }
+    private var phase: LiveConversationLifecycle.Phase { lifecycle.phase }
 
     private var directionLabel: String {
         direction == "native_to_target"
@@ -64,9 +59,9 @@ struct LiveConversationView: View {
                         placeholder: "The translation appears here as it is spoken."
                     )
 
-                    if !transcript.isEmpty {
+                    if !lifecycle.transcript.isEmpty {
                         SettingsCard(title: "This conversation") {
-                            ForEach(Array(transcript.enumerated()), id: \.offset) { _, line in
+                            ForEach(Array(lifecycle.transcript.enumerated()), id: \.offset) { _, line in
                                 Text(line)
                                     .font(.callout)
                                     .foregroundStyle(SottoTheme.muted)
@@ -85,12 +80,21 @@ struct LiveConversationView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        Task { await finish() }
+                        finish()
                         dismiss()
                     }
                 }
             }
-            .onDisappear { Task { await finish() } }
+            .onDisappear { finish() }
+            .confirmationDialog("Share audio with Google Gemini?", isPresented: $showGoogleConsent, titleVisibility: .visible) {
+                Button("Allow and start session") {
+                    guard let request = lifecycle.acceptConsent() else { return }
+                    startTask = Task { await begin(request: request) }
+                }
+                Button("Cancel", role: .cancel) { lifecycle.declineConsent() }
+            } message: {
+                Text("Your microphone audio and translation context are sent directly to Google Gemini to translate and speak replies. The conversation transcript is saved on your Sotto server for learning progress. Only continue if you agree to this processing.")
+            }
         }
     }
 
@@ -106,7 +110,12 @@ struct LiveConversationView: View {
             .disabled(phase != .idle)
 
             Button {
-                Task { phase == .live ? await finish() : await begin() }
+                if phase == .live {
+                    finish()
+                } else {
+                    lifecycle.requestConsent()
+                    showGoogleConsent = true
+                }
             } label: {
                 Label(
                     buttonTitle,
@@ -120,6 +129,9 @@ struct LiveConversationView: View {
                 .font(.caption)
                 .foregroundStyle(SottoTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
+            Link("Google privacy policy", destination: URL(string: "https://policies.google.com/privacy")!)
+                .font(.caption)
+                .frame(minHeight: 44)
         }
     }
 
@@ -141,55 +153,61 @@ struct LiveConversationView: View {
         }
     }
 
-    private func begin() async {
-        guard phase == .idle else { return }
-        phase = .connecting
+    private func begin(request: UUID) async {
+        guard lifecycle.isCurrent(request), !Task.isCancelled else { return }
         errorMessage = nil
         heard = ""
         spoken = ""
 
-        guard await requestMicrophoneAccess() else {
+        let allowed = await requestMicrophoneAccess()
+        guard lifecycle.isCurrent(request), !Task.isCancelled else { return }
+        guard allowed else {
             errorMessage = "Sotto needs the microphone to translate what you say."
-            phase = .idle
+            finish()
             return
         }
 
         do {
             let token = try await model.mintLiveToken(courseId: course.id, direction: direction)
+            guard lifecycle.isCurrent(request), !Task.isCancelled else { return }
             let session = LiveTranslateSession(token: token)
             self.session = session
 
             let events = await session.open()
+            guard lifecycle.isCurrent(request), !Task.isCancelled else {
+                await session.close()
+                return
+            }
             try audio.start { base64 in
                 Task { await session.sendAudio(base64Pcm16k: base64) }
             }
 
-            pump = Task { await consume(events) }
+            pump = Task { await consume(events, request: request) }
         } catch {
+            guard lifecycle.isCurrent(request), !Task.isCancelled else { return }
             errorMessage = SottoLiveFailure.message(for: error)
-            phase = .idle
-            audio.stop()
-            self.session = nil
+            finish()
         }
     }
 
-    private func consume(_ events: AsyncStream<LiveTranslateSession.Event>) async {
+    private func consume(_ events: AsyncStream<LiveTranslateSession.Event>, request: UUID) async {
         for await event in events {
+            guard lifecycle.isCurrent(request), !Task.isCancelled else { return }
             switch event {
             case .opened:
-                phase = .live
+                lifecycle.opened(request)
             case let .audio(base64):
                 audio.enqueue(base64Pcm24k: base64)
             case let .inputTranscript(text, finished):
                 heard += text
                 if finished, !heard.isEmpty {
-                    transcript.append("You: \(heard)")
+                    lifecycle.append("You: \(heard)", request: request)
                     heard = ""
                 }
             case let .outputTranscript(text, finished):
                 spoken += text
                 if finished, !spoken.isEmpty {
-                    transcript.append("Sotto: \(spoken)")
+                    lifecycle.append("Sotto: \(spoken)", request: request)
                     spoken = ""
                 }
             case .interrupted:
@@ -198,27 +216,32 @@ struct LiveConversationView: View {
                 if phase == .live, !reason.isEmpty {
                     errorMessage = "The live session ended: \(reason)"
                 }
-                await finish()
+                finish()
             case let .failed(message):
                 errorMessage = SottoLiveFailure.message(for: SottoAPIError.message(message))
-                await finish()
+                finish()
             }
         }
     }
 
     /// Ends the session and files the transcript, which is what feeds new
     /// vocabulary into the memory graph.
-    private func finish() async {
+    private func finish() {
+        let text = lifecycle.finish()
+        startTask?.cancel()
+        startTask = nil
         pump?.cancel()
         pump = nil
         audio.stop()
-        await session?.close()
+        let closingSession = session
         session = nil
-        phase = .idle
-
-        let text = transcript.joined(separator: "\n")
-        guard !text.isEmpty else { return }
-        try? await model.saveLiveSession(courseId: course.id, transcript: String(text.prefix(20_000)))
+        let credentials = model.credentials
+        Task {
+            await closingSession?.close()
+            guard !text.isEmpty, model.credentials == credentials else { return }
+            do { try await model.saveLiveSession(courseId: course.id, transcript: text) }
+            catch { model.report(error) }
+        }
     }
 
     private func requestMicrophoneAccess() async -> Bool {

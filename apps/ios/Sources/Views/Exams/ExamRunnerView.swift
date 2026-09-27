@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 
 /// Sits one mock exam: mixed-skill sections, then a band result.
@@ -107,9 +106,8 @@ struct ExamRunnerView: View {
                     .foregroundStyle(SottoTheme.primary)
             }
 
-            if let episode = section.episode, let urlString = episode.audioUrl,
-               let url = URL(string: urlString) {
-                ExamListeningPlayer(url: url)
+            if let reference = section.episode?.audioUrl {
+                LearnerAudioPlayer(reference: reference)
             } else if section.skill == "LISTENING", section.episode?.audioUrl == nil {
                 Text("Audio for this section is still being produced.")
                     .font(.caption)
@@ -273,42 +271,6 @@ struct ExamRunnerView: View {
         } catch {
             loadError = error.localizedDescription
         }
-    }
-}
-
-private struct ExamListeningPlayer: View {
-    let url: URL
-
-    @State private var player: AVPlayer?
-    @State private var isPlaying = false
-
-    var body: some View {
-        Button {
-            toggle()
-        } label: {
-            Label(
-                isPlaying ? "Pause audio" : "Play audio",
-                systemImage: isPlaying ? "pause.fill" : "play.fill"
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(SottoSecondaryButtonStyle())
-        .onDisappear {
-            player?.pause()
-            isPlaying = false
-        }
-    }
-
-    private func toggle() {
-        if player == nil {
-            player = AVPlayer(url: url)
-        }
-        if isPlaying {
-            player?.pause()
-        } else {
-            player?.play()
-        }
-        isPlaying.toggle()
     }
 }
 

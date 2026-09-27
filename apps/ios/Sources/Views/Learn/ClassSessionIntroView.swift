@@ -38,7 +38,7 @@ struct ClassHeroHeader: View {
                     }
                 }
 
-                Spacer(minLength: 16)
+                if layout == .regular { Spacer(minLength: 16) }
 
                 ClassProgressDonut(progress: completionProgress, percent: completionPercent)
                     .accessibilityLabel("Class completion \(completionPercent) percent")
@@ -46,7 +46,7 @@ struct ClassHeroHeader: View {
 
             ClassSkillMap(sections: classDetail.sections)
 
-            HStack(spacing: 10) {
+            SottoAdaptiveStack(spacing: 10) {
                 ClassMetricPill(
                     icon: "checklist",
                     label: questionCount == 0 ? "No quiz items" : "\(answeredCount) / \(questionCount) answered"
@@ -60,7 +60,7 @@ struct ClassHeroHeader: View {
                 )
             }
         }
-        .padding(26)
+        .padding(layout == .compact ? 16 : 26)
         .background(
             LinearGradient(
                 colors: [
@@ -110,9 +110,28 @@ struct ClassProgressDonut: View {
 }
 
 struct ClassSkillMap: View {
+    @Environment(\.sottoLayout) private var layout
     let sections: [SottoClassSection]
 
     var body: some View {
+        Group {
+            if layout == .compact {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 84))], spacing: 16) {
+                    ForEach(sections) { section in
+                        SkillNode(section: section)
+                    }
+                }
+            } else {
+                connectedSkills
+            }
+        }
+        .frame(minHeight: 96)
+        .padding(14)
+        .background(SottoTheme.surface.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var connectedSkills: some View {
         ZStack(alignment: .topLeading) {
             SkillConnectorTrack(count: sections.count)
                 .frame(height: 44)
@@ -124,10 +143,6 @@ struct ClassSkillMap: View {
                 }
             }
         }
-        .frame(minHeight: 96)
-        .padding(14)
-        .background(SottoTheme.surface.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -335,7 +350,7 @@ struct ClassIntroBlock: View {
             }
 
             if intro.visuals?.timeline != nil || intro.visuals?.contrast != nil {
-                HStack(alignment: .top, spacing: 14) {
+                SottoAdaptiveStack(spacing: 14) {
                     if let timeline = intro.visuals?.timeline, timeline.steps.count >= 2 {
                         TimelineFigure(timeline: timeline, onSelectionHelp: onSelectionHelp)
                             .frame(maxWidth: .infinity)
@@ -347,7 +362,7 @@ struct ClassIntroBlock: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 18) {
+            SottoAdaptiveStack(spacing: 18) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Focus")
                         .font(.caption.bold())
@@ -452,7 +467,7 @@ struct ClassIntroBlock: View {
                 }
             }
         }
-        .padding(22)
+        .padding(layout == .compact ? 16 : 22)
         .background(SottoTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(

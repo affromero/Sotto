@@ -1,19 +1,97 @@
 import Foundation
 
 struct SottoAPIClient {
+    func downloadLearningAudio(from reference: String) async throws -> URL {
+        guard let url = URL(string: reference, relativeTo: serverURL)?.absoluteURL,
+              !reference.isEmpty, SottoServerURLPolicy.isSupported(url), url.user == nil, url.password == nil else {
+            throw SottoAPIError.message("The listening audio address is not supported.")
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = Self.generationTimeout
+        request.httpShouldHandleCookies = false
+        request.setValue("audio/*, application/octet-stream", forHTTPHeaderField: "Accept")
+        if WorkbookDownloadRedirectPolicy.sameOrigin(url, serverURL), let apiKey {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(profileId, forHTTPHeaderField: "X-Sotto-Profile-Id")
+        }
+        let (temporary, response) = try await session.download(
+            for: request, delegate: WorkbookDownloadRedirectPolicy(serverURL: serverURL)
+        )
+        do {
+            try Task.checkCancellation()
+            guard let http = response as? HTTPURLResponse else {
+                throw SottoAPIError.message("The audio server returned a non-HTTP response.")
+            }
+            guard http.statusCode == 200 else {
+                throw SottoAPIError.message("The audio server returned HTTP \(http.statusCode).")
+            }
+            if let mime = http.mimeType, mime == "text/html" || mime == "application/json" {
+                throw SottoAPIError.message("The server returned a page instead of listening audio.")
+            }
+            let fileExtension = ["mp3", "m4a", "wav", "aac", "aiff", "caf", "ogg"].contains(url.pathExtension.lowercased()) ? url.pathExtension.lowercased() : "audio"
+            let local = FileManager.default.temporaryDirectory.appendingPathComponent("Sotto-audio-\(UUID().uuidString).\(fileExtension)")
+            try FileManager.default.moveItem(at: temporary, to: local)
+            return local
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+    }
+
+    func downloadWorkbookPDF(from url: URL) async throws -> Data {
+        guard SottoServerURLPolicy.isSupported(url), url.user == nil, url.password == nil else {
+            throw SottoAPIError.message("The workbook PDF address is not supported.")
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = Self.defaultTimeout
+        request.httpShouldHandleCookies = false
+        request.setValue("application/pdf", forHTTPHeaderField: "Accept")
+        if WorkbookDownloadRedirectPolicy.sameOrigin(url, serverURL), let apiKey {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(profileId, forHTTPHeaderField: "X-Sotto-Profile-Id")
+        }
+        let (data, response) = try await session.data(
+            for: request, delegate: WorkbookDownloadRedirectPolicy(serverURL: serverURL)
+        )
+        guard let response = response as? HTTPURLResponse else {
+            throw SottoAPIError.message("The workbook server returned a non-HTTP response.")
+        }
+        guard response.statusCode == 200 else {
+            throw SottoAPIError.message("The workbook server returned HTTP \(response.statusCode).")
+        }
+        return data
+    }
+
+    func deleteAccount() async throws {
+        var request = try makeRequest(path: "/api/v1/users/me", method: "DELETE", authorized: true)
+        request.httpBody = try JSONEncoder().encode(AccountDeletionRequest())
+        let response: AccountDeletionResponse = try await send(request, acceptedStatuses: [200, 202])
+        guard response.success else {
+            throw SottoAPIError.message("The server did not confirm profile deletion.")
+        }
+    }
+
     let serverURL: URL
     let apiKey: String?
     let profileId: String?
+    private let session: URLSession
 
-    init(serverURL: URL, apiKey: String?, profileId: String? = nil) {
+    init(serverURL: URL, apiKey: String?, profileId: String? = nil, session: URLSession = .shared) {
         self.serverURL = serverURL
         self.apiKey = apiKey
         self.profileId = profileId
+        self.session = session
     }
 
     /// Starts a Sidedoor household session. Its HTTP-only cookie lands in the
-    /// shared cookie store so the pairing request that follows is authorized.
+    /// session's cookie store so the pairing request that follows is authorized.
     func enterHousehold(password: String) async throws {
+        if password.isEmpty {
+            let _: AccessSessionResponse = try await post(
+                "/api/v1/access/open-household", body: EmptyBody(), authorized: false
+            )
+            return
+        }
         let _: AccessSessionResponse = try await post(
             "/api/v1/access/household",
             body: HouseholdAccessRequest(password: password),
@@ -58,6 +136,17 @@ struct SottoAPIClient {
     func listProfiles() async throws -> [SottoProfile] {
         let response: SottoProfileListResponse = try await get("/api/v1/profiles")
         return response.profiles
+    }
+
+    func selectHouseholdProfile(_ profileID: String) async throws {
+        let response: HouseholdProfileSelectionResponse = try await post(
+            "/api/v1/profiles/switch",
+            body: HouseholdProfileSelectionRequest(profileId: profileID),
+            authorized: false
+        )
+        guard response.ok, response.profileId == profileID else {
+            throw SottoAPIError.message("The server did not confirm the selected learner.")
+        }
     }
 
     func createProfile(name: String, avatarSlug: String?) async throws -> SottoProfile {
@@ -581,8 +670,16 @@ struct SottoAPIClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = timeout
+        request.httpShouldHandleCookies = apiKey == nil
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !authorized, method == "POST" {
+            var origin = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)
+            origin?.path = ""
+            origin?.query = nil
+            origin?.fragment = nil
+            request.setValue(origin?.url?.absoluteString, forHTTPHeaderField: "Origin")
+        }
 
         if authorized, let apiKey {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -598,7 +695,7 @@ struct SottoAPIClient {
         _ request: URLRequest,
         acceptedStatuses: Set<Int>
     ) async throws -> Response {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL))
         guard let http = response as? HTTPURLResponse else {
             throw SottoAPIError.message("Sotto returned a non-HTTP response.")
         }
@@ -620,7 +717,7 @@ struct SottoAPIClient {
     /// For routes that answer 204: there is no body to decode, only a status
     /// to check.
     private func sendIgnoringBody(_ request: URLRequest, acceptedStatuses: Set<Int>) async throws {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL))
         guard let http = response as? HTTPURLResponse else {
             throw SottoAPIError.message("Sotto returned a non-HTTP response.")
         }
@@ -676,6 +773,23 @@ struct SottoAPIClient {
         body.appendString("\r\n--\(boundary)--\r\n")
         return body
     }
+}
+
+struct AccountDeletionRequest: Encodable {
+    let confirm = "DELETE"
+}
+
+private struct HouseholdProfileSelectionRequest: Encodable {
+    let profileId: String
+}
+
+private struct HouseholdProfileSelectionResponse: Decodable {
+    let ok: Bool
+    let profileId: String
+}
+
+struct AccountDeletionResponse: Decodable {
+    let success: Bool
 }
 
 private extension Data {

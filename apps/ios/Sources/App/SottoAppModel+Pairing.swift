@@ -23,40 +23,54 @@ extension SottoAppModel {
         }
     }
 
-    /// Pairs from a typed server address instead of a scanned QR: open the
-    /// Sidedoor household session with the household password, ask that server for a
-    /// one-time token, then redeem it exactly as a scan would. Only the
-    /// resulting API key is stored; the password is never persisted.
-    func pairWithServer(urlText: String, password: String) async {
+    /// Opens a temporary household session and lists learners for explicit selection.
+    func prepareServerPairing(urlText: String, password: String) async -> HouseholdPairing? {
         guard !isLoading else {
-            return
+            return nil
         }
 
         guard let serverURL = SottoAppModel.serverURL(fromTyped: urlText) else {
             errorMessage = "That is not a web address Sotto can reach. Try something like sotto.example.com."
-            return
+            return nil
         }
 
         guard SottoServerURLPolicy.isSupported(serverURL) else {
             errorMessage = SottoServerURLPolicy.unsupportedMessage(for: serverURL)
-            return
+            return nil
         }
 
-        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        let client = SottoAPIClient(serverURL: serverURL, apiKey: nil)
+        let client = SottoAPIClient(serverURL: serverURL, apiKey: nil, session: URLSession(configuration: .ephemeral))
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
 
         do {
-            if !trimmedPassword.isEmpty {
-                try await client.enterHousehold(password: trimmedPassword)
-            }
-            let pairing = try await client.requestPairingToken(deviceName: SottoAppModel.deviceName)
-            await redeemPairingPayload(PairingPayload(serverURL: serverURL, token: pairing.token))
+            return try await HouseholdPairing.open(client: client, password: password)
         } catch {
             errorMessage = SottoAppModel.pairingFailureMessage(
                 for: error,
                 host: serverURL.host() ?? "that server",
-                sentPassword: !trimmedPassword.isEmpty
+                sentPassword: !password.isEmpty
             )
+            return nil
+        }
+    }
+
+    func completeServerPairing(_ household: HouseholdPairing, profileID: String) async {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        do {
+            let payload = try await household.issuePairing(profileID: profileID, deviceName: Self.deviceName)
+            isLoading = false
+            await redeemPairingPayload(payload)
+            if credentials?.serverURL == household.client.serverURL,
+               let selected = profiles.first(where: { $0.id == profileID }) {
+                await selectProfile(selected)
+            }
+        } catch {
+            isLoading = false
+            report(error)
         }
     }
 

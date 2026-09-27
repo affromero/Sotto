@@ -19,6 +19,7 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var classGenerationOperations: [String: SottoLoadingOperation] = [:]
     @Published private(set) var classGenerationErrors: [String: String] = [:]
     @Published var errorMessage: String?
+    @Published var acceptedAIScope: String?
 
     private let credentialStore = CredentialStore()
     private var work: Task<Void, Never>?
@@ -95,15 +96,8 @@ final class SottoAppModel: ObservableObject {
         loadingOperation = nil
     }
 
-    /// Cancellation is a choice the learner made, not a failure to report.
-    func report(_ error: Error) {
-        if error is CancellationError || (error as? URLError)?.code == .cancelled {
-            return
-        }
-        report(error)
-    }
-
     func signOut() {
+        acceptedAIScope = nil
         try? credentialStore.delete()
         credentials = nil
         profiles = []
@@ -116,6 +110,7 @@ final class SottoAppModel: ObservableObject {
     }
 
     func clearSelectedProfile() {
+        acceptedAIScope = nil
         guard let credentials else { return }
         let nextCredentials = SottoCredentials(
             serverURL: credentials.serverURL,

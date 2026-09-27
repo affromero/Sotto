@@ -17,12 +17,16 @@ struct WorkbookView: View {
     @State private var isExportingPDF = false
     @State private var exportError: String?
     @State private var exportedPDF: WorkbookPDFExport?
+    @State private var showUnsavedConfirmation = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 if layout.supportsHandwriting {
                     PencilStatusBar(isRecognized: pencilRecognized)
+                    if let error = annotationStore.saveError {
+                        Text(error).font(.caption).foregroundStyle(.red).padding(12)
+                    }
                 }
                 workbookSurface
             }
@@ -32,7 +36,8 @@ struct WorkbookView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        dismiss()
+                        if annotationStore.saveError == nil { dismiss() }
+                        else { showUnsavedConfirmation = true }
                     }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -49,11 +54,6 @@ struct WorkbookView: View {
                     }
                     .disabled(isExportingPDF || !annotationStore.canExport)
 
-                    if let url = sourcePDFURL {
-                        Link(destination: url) {
-                            Label("PDF", systemImage: "doc.richtext")
-                        }
-                    }
                 }
             }
             .task(id: response.worksheetPdfUrl) {
@@ -61,6 +61,13 @@ struct WorkbookView: View {
             }
             .sheet(item: $exportedPDF) { export in
                 WorkbookShareSheet(activityItems: [export.url])
+            }
+            .interactiveDismissDisabled(annotationStore.saveError != nil)
+            .confirmationDialog("Leave without saving annotations?", isPresented: $showUnsavedConfirmation, titleVisibility: .visible) {
+                Button("Export annotated PDF") { Task { await exportAnnotatedPDF() } }
+                Button("Leave without saving", role: .destructive) { dismiss() }
+            } message: {
+                Text(annotationStore.saveError ?? "Export your annotations before closing this workbook.")
             }
             .alert(
                 "Could not export workbook",
@@ -87,7 +94,7 @@ struct WorkbookView: View {
                 )
                 .background(SottoTheme.paper)
             } else {
-                // ponytail: iPhone reads and shares the workbook; handwriting
+                // iPhone reads and shares the workbook; handwriting
                 // needs the iPad canvas, so no annotation layer here.
                 WorkbookPDFReaderView(pdfData: pdfData)
                     .background(SottoTheme.paper)
@@ -116,20 +123,14 @@ struct WorkbookView: View {
 
     @ViewBuilder
     private var fallbackWorkbookSurface: some View {
-        if layout.supportsHandwriting {
-            HStack(spacing: 0) {
-                worksheetPane
-                    .frame(minWidth: 360, idealWidth: 460, maxWidth: 520)
-
-                Divider()
-
-                PencilCanvasView(pencilRecognized: $pencilRecognized)
-                    .background(Color.white)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 12) {
+            if sourcePDFURL != nil {
+                Button("Retry PDF", systemImage: "arrow.clockwise") {
+                    Task { await loadWorkbookPDF() }
+                }
+                .buttonStyle(.bordered).controlSize(.large)
             }
-        } else {
             worksheetPane
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -186,27 +187,34 @@ struct WorkbookView: View {
 
         isLoadingPDF = true
         pdfLoadError = nil
+        let openingCredentials = model.credentials
+        defer { isLoadingPDF = false }
 
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(from: url)
-
-            if let http = urlResponse as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                throw WorkbookPDFError.loadFailed("Sotto returned HTTP \(http.statusCode) for the workbook PDF.")
-            }
+            let data = try await model.downloadWorkbookPDF(from: url)
+            try Task.checkCancellation()
+            guard model.credentials == openingCredentials else { return }
 
             guard PDFDocument(data: data) != nil else {
                 throw WorkbookPDFError.loadFailed("Sotto returned a workbook file that PDFKit could not open.")
             }
 
-            annotationStore.load(pdfData: data, documentID: response.document.classId)
+            guard let credentials = openingCredentials, let profile = credentials.selectedProfile else {
+                throw WorkbookPDFError.loadFailed("Select a learner before opening a workbook.")
+            }
+            let scope = LearningInkStore.scope(
+                server: credentials.serverURL, profileID: profile.id,
+                activity: "workbook/\(response.document.classId)/\(LearningInkStore.digest(data))"
+            )
+            annotationStore.load(pdfData: data, documentID: scope)
             pdfData = data
         } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
             pdfData = nil
             annotationStore.reset()
-            pdfLoadError = "The generated PDF could not be loaded here, so Sotto is showing the fallback notes canvas. \(error.localizedDescription)"
+            pdfLoadError = "The workbook PDF could not be loaded. You can read the questions below and retry the PDF to write on it. \(error.localizedDescription)"
         }
 
-        isLoadingPDF = false
     }
 
     @MainActor
@@ -300,53 +308,7 @@ private struct PencilStatusBar: View {
     }
 }
 
-struct PencilCanvasView: UIViewRepresentable {
-    @Binding var pencilRecognized: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(pencilRecognized: $pencilRecognized)
-    }
-
-    func makeUIView(context: Context) -> PKCanvasView {
-        let canvas = PKCanvasView()
-        canvas.delegate = context.coordinator
-        canvas.drawingPolicy = .pencilOnly
-        canvas.backgroundColor = .white
-        canvas.alwaysBounceVertical = true
-        canvas.tool = PKInkingTool(.pen, color: .black, width: 4)
-
-        let toolPicker = Self.makeWorkbookToolPicker()
-        toolPicker.addObserver(canvas)
-        toolPicker.setVisible(true, forFirstResponder: canvas)
-        context.coordinator.toolPicker = toolPicker
-        canvas.becomeFirstResponder()
-
-        return canvas
-    }
-
-    func updateUIView(_ canvas: PKCanvasView, context: Context) {
-        if !canvas.isFirstResponder {
-            canvas.becomeFirstResponder()
-        }
-    }
-
-    final class Coordinator: NSObject, PKCanvasViewDelegate {
-        @Binding private var pencilRecognized: Bool
-        var toolPicker: PKToolPicker?
-
-        init(pencilRecognized: Binding<Bool>) {
-            _pencilRecognized = pencilRecognized
-        }
-
-        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            if !canvasView.drawing.strokes.isEmpty {
-                pencilRecognized = true
-            }
-        }
-    }
-}
-
-private extension PencilCanvasView {
+private enum WorkbookTools {
     static func makeWorkbookToolPicker() -> PKToolPicker {
         let toolPicker = PKToolPicker(toolItems: workbookToolItems())
         toolPicker.stateAutosaveName = "SottoWorkbookToolPicker"
@@ -439,9 +401,9 @@ private struct AnnotatedWorkbookPDFView: UIViewRepresentable {
 
     final class Coordinator: NSObject, PDFPageOverlayViewProvider, PKCanvasViewDelegate {
         private let annotationStore: WorkbookAnnotationStore
-        private let toolPicker = PencilCanvasView.makeWorkbookToolPicker()
+        private let toolPicker = WorkbookTools.makeWorkbookToolPicker()
         private var pdfData: Data?
-        private var canvasesByPageIndex: [Int: WorkbookPageCanvasView] = [:]
+        private var canvasesByPageIndex: [Int: InkPaperView] = [:]
         var pencilRecognized: Binding<Bool>
 
         init(annotationStore: WorkbookAnnotationStore, pencilRecognized: Binding<Bool>) {
@@ -470,9 +432,8 @@ private struct AnnotatedWorkbookPDFView: UIViewRepresentable {
                 return nil
             }
 
-            if let canvas = canvasesByPageIndex[pageIndex] {
-                canvas.drawing = annotationStore.drawing(forPageAt: pageIndex)
-                return canvas
+            if let paper = canvasesByPageIndex[pageIndex] {
+                return paper
             }
 
             let canvas = WorkbookPageCanvasView(pageIndex: pageIndex)
@@ -485,12 +446,15 @@ private struct AnnotatedWorkbookPDFView: UIViewRepresentable {
             canvas.alwaysBounceHorizontal = false
             canvas.tool = PKInkingTool(.pen, color: .black, width: 4)
             canvas.drawing = annotationStore.drawing(forPageAt: pageIndex)
-            canvasesByPageIndex[pageIndex] = canvas
-            return canvas
+            let bounds = page.bounds(for: .cropBox)
+            let size = page.rotation % 180 == 0 ? bounds.size : CGSize(width: bounds.height, height: bounds.width)
+            let paper = InkPaperView(canvas: canvas, pageSize: size)
+            canvasesByPageIndex[pageIndex] = paper
+            return paper
         }
 
         func pdfView(_ pdfView: PDFView, willDisplayOverlayView overlayView: UIView, for page: PDFPage) {
-            guard let canvas = overlayView as? WorkbookPageCanvasView else {
+            guard let paper = overlayView as? InkPaperView, let canvas = paper.canvas as? WorkbookPageCanvasView else {
                 return
             }
 
@@ -500,7 +464,7 @@ private struct AnnotatedWorkbookPDFView: UIViewRepresentable {
         }
 
         func pdfView(_ pdfView: PDFView, willEndDisplayingOverlayView overlayView: UIView, for page: PDFPage) {
-            guard let canvas = overlayView as? WorkbookPageCanvasView else {
+            guard let paper = overlayView as? InkPaperView, let canvas = paper.canvas as? WorkbookPageCanvasView else {
                 return
             }
 
@@ -545,7 +509,16 @@ private final class WorkbookPageCanvasView: PKCanvasView {
 }
 
 @MainActor
-private final class WorkbookAnnotationStore: ObservableObject {
+final class WorkbookAnnotationStore: ObservableObject {
+    private let directory: URL
+
+    init(directory: URL? = nil) {
+        self.directory = directory ?? FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0].appendingPathComponent("Sotto/WorkbookInk", isDirectory: true)
+    }
+
+    @Published private(set) var saveError: String?
     @Published private(set) var canExport = false
 
     private struct PageDrawing {
@@ -558,6 +531,7 @@ private final class WorkbookAnnotationStore: ObservableObject {
         let canvasWidth: Double
         let canvasHeight: Double
         let drawingData: Data
+        let checksum: String
     }
 
     private struct PersistedWorkbookDrawing: Codable {
@@ -568,9 +542,12 @@ private final class WorkbookAnnotationStore: ObservableObject {
     private var sourcePDFData: Data?
     private var documentID: String?
     private var drawingsByPageIndex: [Int: PageDrawing] = [:]
+    private var persistenceReadable = true
 
     func load(pdfData: Data, documentID: String) {
         if self.documentID != documentID {
+            saveError = nil
+            persistenceReadable = true
             drawingsByPageIndex = loadPersistedDrawings(documentID: documentID)
         }
 
@@ -626,15 +603,19 @@ private final class WorkbookAnnotationStore: ObservableObject {
                     continue
                 }
 
-                let pageBounds = page.bounds(for: .mediaBox)
+                let crop = page.bounds(for: .cropBox)
+                let pageBounds = CGRect(origin: .zero, size: page.rotation % 180 == 0 ? crop.size : CGSize(width: crop.height, height: crop.width))
                 context.beginPage(withBounds: CGRect(origin: .zero, size: pageBounds.size), pageInfo: [:])
 
-                let cgContext = context.cgContext
-                cgContext.saveGState()
-                cgContext.translateBy(x: -pageBounds.minX, y: pageBounds.height + pageBounds.minY)
-                cgContext.scaleBy(x: 1, y: -1)
-                page.draw(with: .mediaBox, to: cgContext)
-                cgContext.restoreGState()
+                if let sourcePage = page.pageRef {
+                    let cg = context.cgContext
+                    cg.saveGState()
+                    cg.translateBy(x: 0, y: pageBounds.height)
+                    cg.scaleBy(x: 1, y: -1)
+                    cg.concatenate(sourcePage.getDrawingTransform(.cropBox, rect: pageBounds, rotate: 0, preserveAspectRatio: true))
+                    cg.drawPDFPage(sourcePage)
+                    cg.restoreGState()
+                }
 
                 guard let pageDrawing = drawingsByPageIndex[pageIndex] else {
                     continue
@@ -657,17 +638,29 @@ private final class WorkbookAnnotationStore: ObservableObject {
     }
 
     private func loadPersistedDrawings(documentID: String) -> [Int: PageDrawing] {
-        guard let data = try? Data(contentsOf: persistenceURL(for: documentID)),
-              let persisted = try? JSONDecoder().decode(PersistedWorkbookDrawing.self, from: data),
-              persisted.documentID == documentID
-        else {
+        let url = persistenceURL(for: documentID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return [:] }
+        let persisted: PersistedWorkbookDrawing
+        do {
+            persisted = try JSONDecoder().decode(PersistedWorkbookDrawing.self, from: Data(contentsOf: url))
+            guard persisted.documentID == documentID else {
+                throw WorkbookPDFError.loadFailed("Saved workbook identity does not match.")
+            }
+        } catch {
+            persistenceReadable = false
+            saveError = "Saved ink could not be opened. Export any new notes before closing. \(error.localizedDescription)"
             return [:]
         }
 
         var drawings: [Int: PageDrawing] = [:]
         for page in persisted.pages {
-            guard let drawing = try? PKDrawing(data: page.drawingData) else {
-                continue
+            guard page.pageIndex >= 0, page.canvasWidth.isFinite, page.canvasHeight.isFinite,
+                  page.canvasWidth > 0, page.canvasHeight > 0,
+                  page.checksum == LearningInkStore.digest(page.drawingData),
+                  let drawing = try? PKDrawing(data: page.drawingData) else {
+                persistenceReadable = false
+                saveError = "Some saved ink could not be opened. Export new notes before closing; the original file will be preserved."
+                return [:]
             }
 
             drawings[page.pageIndex] = PageDrawing(
@@ -679,7 +672,7 @@ private final class WorkbookAnnotationStore: ObservableObject {
     }
 
     private func savePersistedDrawings() {
-        guard let documentID else {
+        guard let documentID, persistenceReadable else {
             return
         }
 
@@ -690,7 +683,8 @@ private final class WorkbookAnnotationStore: ObservableObject {
                     pageIndex: pageIndex,
                     canvasWidth: pageDrawing.canvasSize.width,
                     canvasHeight: pageDrawing.canvasSize.height,
-                    drawingData: pageDrawing.drawing.dataRepresentation()
+                    drawingData: pageDrawing.drawing.dataRepresentation(),
+                    checksum: LearningInkStore.digest(pageDrawing.drawing.dataRepresentation())
                 )
             }
 
@@ -703,19 +697,15 @@ private final class WorkbookAnnotationStore: ObservableObject {
                 withIntermediateDirectories: true
             )
             let data = try JSONEncoder().encode(persisted)
-            try data.write(to: url, options: [.atomic])
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
+            saveError = nil
         } catch {
-            // Best-effort local cache; export still works from the in-memory drawing.
+            saveError = "Your ink could not be saved. Export it before closing. \(error.localizedDescription)"
         }
     }
 
     private func persistenceURL(for documentID: String) -> URL {
-        let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-
-        return baseURL
-            .appendingPathComponent("Sotto", isDirectory: true)
-            .appendingPathComponent("WorkbookInk", isDirectory: true)
+        directory
             .appendingPathComponent("\(Self.safeFilename(documentID)).json")
     }
 }

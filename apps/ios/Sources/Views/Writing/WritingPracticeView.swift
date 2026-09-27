@@ -45,7 +45,9 @@ struct WritingPracticeView: View {
 /// so this card only edits and shows the grade it already has.
 private struct WritingPromptCard: View {
     @ObservedObject var drafts: WritingDraftStore
+    @EnvironmentObject private var model: SottoAppModel
     @Environment(\.sottoLayout) private var layout
+    @State private var showsHandwriting = false
 
     let prompt: SottoWritingPrompt
     let onSelectionHelp: ((String, String) -> Void)?
@@ -94,6 +96,22 @@ private struct WritingPromptCard: View {
                         .stroke(draft?.isOverLimit == true ? Color.red.opacity(0.6) : SottoTheme.line)
                 )
                 .disabled(drafts.isSubmitting)
+
+            if layout.supportsHandwriting, let credentials = model.credentials,
+               let profile = credentials.selectedProfile {
+                Button("Write with Apple Pencil", systemImage: "pencil.tip") { showsHandwriting = true }
+                    .buttonStyle(.bordered).controlSize(.large)
+                    .disabled(drafts.isSubmitting)
+                    .sheet(isPresented: $showsHandwriting) {
+                        HandwritingView(
+                            title: prompt.task,
+                            storageKey: LearningInkStore.scope(
+                                server: credentials.serverURL, profileID: profile.id,
+                                activity: "writing/\(prompt.id)"
+                            )
+                        ) { text in drafts.binding(for: prompt.id).wrappedValue = text }
+                    }
+            }
 
             if let draft, draft.isOverLimit {
                 Text("\(draft.trimmed.count) / 4000 characters")

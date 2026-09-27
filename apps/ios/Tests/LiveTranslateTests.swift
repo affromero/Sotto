@@ -4,6 +4,63 @@ import XCTest
 @testable import Sotto
 
 final class LiveTranslateTests: XCTestCase {
+    @MainActor
+    func testLiveConnectionRequiresExplicitConsentForEachSession() throws {
+        let lifecycle = LiveConversationLifecycle()
+        XCTAssertNil(lifecycle.acceptConsent())
+        lifecycle.requestConsent()
+        lifecycle.declineConsent()
+        XCTAssertNil(lifecycle.acceptConsent())
+        lifecycle.requestConsent()
+        XCTAssertNotNil(lifecycle.acceptConsent())
+        _ = lifecycle.finish()
+        XCTAssertNil(lifecycle.acceptConsent())
+    }
+
+    @MainActor
+    func testClosingDuringConnectionRejectsLateConnectionAndTranscript() throws {
+        let lifecycle = LiveConversationLifecycle()
+        lifecycle.requestConsent()
+        let pending = try XCTUnwrap(lifecycle.acceptConsent())
+        XCTAssertTrue(lifecycle.isCurrent(pending))
+        XCTAssertEqual(lifecycle.finish(), "")
+        XCTAssertFalse(lifecycle.isCurrent(pending))
+        lifecycle.opened(pending)
+        lifecycle.append("You: late audio", request: pending)
+        XCTAssertEqual(lifecycle.phase, .idle)
+        XCTAssertTrue(lifecycle.transcript.isEmpty)
+    }
+
+    @MainActor
+    func testEndingConversationConsumesItsTranscriptExactlyOnce() throws {
+        let lifecycle = LiveConversationLifecycle()
+        lifecycle.requestConsent()
+        let request = try XCTUnwrap(lifecycle.acceptConsent())
+        lifecycle.opened(request)
+        lifecycle.append("You: Hola", request: request)
+        lifecycle.append("Sotto: Hello", request: request)
+        XCTAssertEqual(lifecycle.finish(), "You: Hola\nSotto: Hello")
+        XCTAssertEqual(lifecycle.finish(), "")
+        XCTAssertTrue(lifecycle.transcript.isEmpty)
+    }
+
+    @MainActor
+    func testNewConversationRejectsEventsFromPreviousSession() throws {
+        let lifecycle = LiveConversationLifecycle()
+        lifecycle.requestConsent()
+        let previous = try XCTUnwrap(lifecycle.acceptConsent())
+        lifecycle.append("Old conversation", request: previous)
+        _ = lifecycle.finish()
+        lifecycle.requestConsent()
+        let current = try XCTUnwrap(lifecycle.acceptConsent())
+        lifecycle.opened(previous)
+        lifecycle.append("Late old text", request: previous)
+        XCTAssertEqual(lifecycle.phase, .connecting)
+        lifecycle.opened(current)
+        lifecycle.append("New conversation", request: current)
+        XCTAssertEqual(lifecycle.finish(), "New conversation")
+    }
+
     private func token(
         value: String = "auth_tokens/abc123",
         model: String = "gemini-live-2.5-flash-preview",
