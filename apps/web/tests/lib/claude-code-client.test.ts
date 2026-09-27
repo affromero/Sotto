@@ -12,8 +12,16 @@ import {
   getClaudeSshHost,
 } from '@/lib/claude-code-client';
 import { usageFromGenerationError } from 'thesidedoor-core/ai/usage';
+import { isolatedFixture } from './agent-clients/isolated-fixture';
 
 describe('Claude CLI execution', () => {
+  it('rejects unsupported isolated search before using subscription credentials', async () => {
+    process.env.CLAUDE_CODE_CREDENTIALS_JSON =
+      'invalid subscription credentials must remain unread';
+    await expect(
+      executeClaudeCode('System', 'Prompt', { isolated: isolatedFixture(), useWebSearch: true })
+    ).rejects.toThrow('without search or images');
+  });
   let directory: string;
   let originalEnv: NodeJS.ProcessEnv;
   const terminal = {

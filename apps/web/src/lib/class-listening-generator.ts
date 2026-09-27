@@ -25,6 +25,8 @@ import { verifyEpisodeReferences } from './reference-verification/verify-episode
 const LISTENING_QUIZ_COUNT = 4;
 
 export interface ClassListeningParams {
+  /** Scheduled preparation leaves scripts for explicit learner review before audio spending. */
+  deferAudio?: boolean;
   userId: string;
   execution: SottoProviderExecution;
   classId: string;
@@ -59,6 +61,7 @@ interface ListeningComprehensionQuestion {
 // and returns both. The caller decides where to persist the questions (a class
 // section, or a practice session). No ClassSection/LessonQuestion rows here.
 export interface ListeningContentParams {
+  deferAudio?: boolean;
   userId: string;
   execution: SottoProviderExecution;
   courseId: string;
@@ -112,19 +115,21 @@ export async function composeListeningContent(
   });
   await getServerInfra();
   const configuredTtsProvider = getConfiguredTtsProviderId();
-  if (!configuredTtsProvider) {
+  if (!p.deferAudio && !configuredTtsProvider) {
     throw new Error(
       'AI audio is not enabled. Select a speech provider in Settings before starting listening practice.'
     );
   }
-  const resolvedTts = await resolveTtsProvider({
-    userId: p.userId,
-    execution: p.execution,
-    episodeId: p.firstSeenClassId ?? p.courseId,
-    requestedProvider: configuredTtsProvider,
-    requestedModel: userSpeechPrefs?.preferredTtsModel,
-    language: p.targetLang,
-  });
+  const resolvedTts = p.deferAudio
+    ? null
+    : await resolveTtsProvider({
+        userId: p.userId,
+        execution: p.execution,
+        episodeId: p.firstSeenClassId ?? p.courseId,
+        requestedProvider: configuredTtsProvider,
+        requestedModel: userSpeechPrefs?.preferredTtsModel,
+        language: p.targetLang,
+      });
 
   // Step 2: create a CLASS episode. When the instance pins a TTS provider,
   // such as the keyless local Kokoro sidecar, seed it on
@@ -138,8 +143,9 @@ export async function composeListeningContent(
       visibility: 'PRIVATE',
       language: p.targetLang,
       status: 'PENDING',
-      ttsProvider: resolvedTts.providerId,
-      ttsModel: resolvedTts.provider.getModelId(),
+      ttsProvider: resolvedTts?.providerId ?? configuredTtsProvider ?? undefined,
+      ttsModel:
+        resolvedTts?.provider.getModelId() ?? userSpeechPrefs?.preferredTtsModel ?? undefined,
     },
   });
   const episodeId = episode.id;
@@ -147,6 +153,7 @@ export async function composeListeningContent(
   try {
     // Step 3: generate the script
     const result = await generateScript({
+      ...(await capturedLearningAiOptions(ai)),
       topic: p.objective,
       depth: 'standard',
       audienceLevel: p.level,
@@ -226,11 +233,20 @@ export async function composeListeningContent(
     // before the segment jobs run.
     await prisma.episode.update({
       where: { id: episodeId },
-      data: { status: 'GENERATING_AUDIO' },
+      data: { status: p.deferAudio ? 'SCRIPT_READY' : 'GENERATING_AUDIO' },
     });
-    await createSegmentsAndQueueAudio(episodeId, result.turns, {
-      authorize: p.execution.authorize,
-    });
+    if (!p.deferAudio) {
+      const registerAudioEpisode = p.execution.registerAudioEpisode;
+      await createSegmentsAndQueueAudio(episodeId, result.turns, {
+        authorize: p.execution.authorize,
+        ...(registerAudioEpisode
+          ? {
+              onPrepared: (database, audioGenerationKey) =>
+                registerAudioEpisode(database, episodeId, audioGenerationKey),
+            }
+          : {}),
+      });
+    }
 
     // Step 6: log usage
     logUsage({
@@ -366,6 +382,7 @@ export async function generateClassListening(
     objective: p.objective,
     mustIncludeVocab: p.mustIncludeVocab,
     firstSeenClassId: p.classId,
+    deferAudio: p.deferAudio,
     note: p.note,
     sourceContent: p.sourceContent,
     sourceMetadata: p.sourceMetadata,

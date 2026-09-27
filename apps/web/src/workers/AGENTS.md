@@ -15,6 +15,11 @@ access/device migrations and storage-instance initialization must precede dispat
 
 ## Worker Index
 
+`classes/class-preparation.worker.ts` consumes the `class-preparation` queue with concurrency 2.
+Admission and outbox writes precede all generation. It pins learner/course identity and
+model credentials, preserves unknown outcomes, and validates inherited audio authority.
+See `docs/background-preparation.md` for scheduling and recovery semantics.
+
 | Worker                 | Queue Name             | Concurrency | Input                                                                                                                                                                                                                                                     | Output                                                                                                    |
 | ---------------------- | ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `content-extraction`   | `content-extraction`   | 2           | URL/text → extracted content                                                                                                                                                                                                                              | Updates Discovery.sourceContent                                                                           |

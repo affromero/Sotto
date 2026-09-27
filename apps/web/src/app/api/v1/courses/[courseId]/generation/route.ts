@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { prisma } from '@/lib/prisma';
+import {
+  readClassPreparation,
+  cancelClassPreparation,
+  preparationProgress,
+} from '@/lib/classes/preparation';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
@@ -37,7 +44,7 @@ function estimateRemainingSeconds(elapsedSeconds: number | null, progress: numbe
 
 function isListeningAudioStillRendering(episode: SectionProgress['episode']): boolean {
   return Boolean(
-    episode && !episode.audioUrl && episode.status !== 'READY' && episode.status !== 'FAILED'
+    episode && !episode.audioUrl && !['READY', 'FAILED', 'SCRIPT_READY'].includes(episode.status)
   );
 }
 
@@ -185,7 +192,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   if (!course) return errorResponse('Course not found', 404);
 
+  const operation = await readClassPreparation(courseId, authed.userId);
   const cls = course.classes[0];
+  const terminalOperationSuperseded =
+    operation &&
+    cls &&
+    ['FAILED', 'CANCELLED', 'COMPLETED'].includes(operation.status) &&
+    cls.id !== operation.classId &&
+    cls.createdAt.getTime() > operation.updatedAt;
+  if (
+    !terminalOperationSuperseded &&
+    operation?.status === 'COMPLETED' &&
+    operation.result === 'done'
+  ) {
+    return NextResponse.json({ ...preparationProgress(operation), result: 'done', progress: 1 });
+  }
+  if (!terminalOperationSuperseded && operation && operation.status !== 'COMPLETED') {
+    return NextResponse.json(preparationProgress(operation));
+  }
   if (!cls) {
     return NextResponse.json({
       status: 'IDLE',
@@ -212,6 +236,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const progress = clamp(described.progress, 0, 1);
 
   return NextResponse.json({
+    ...(operation?.status === 'COMPLETED' && operation.classId === cls.id
+      ? preparationProgress(operation)
+      : {}),
     status: cls.status,
     classId: cls.id,
     lessonTitle: cls.lesson.title,
@@ -232,6 +259,26 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!authed) return errorResponse('Unauthorized', 401);
 
   const { courseId } = await params;
+  try {
+    const operation = await cancelClassPreparation(
+      courseId,
+      sottoRequestExecution(request, authed)
+    );
+    if (operation?.status === 'UNRESOLVED') {
+      return errorResponse('Preparation needs recovery before cancellation can finish.', 409);
+    }
+    if (operation) {
+      return NextResponse.json({
+        cancelled: operation.status === 'CANCELLED',
+        cancelling: operation.status === 'CANCELLING',
+        operationId: operation.id,
+        classId: operation.classId,
+      });
+    }
+  } catch (error) {
+    if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
+    return errorResponse('Could not cancel preparation.', 500);
+  }
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId: authed.userId },
     select: {

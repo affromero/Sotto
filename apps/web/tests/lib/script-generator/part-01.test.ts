@@ -31,6 +31,45 @@ describe('generateScript', () => {
   });
 
   describe('prompt construction', () => {
+    it('preserves the captured transport, endpoint and cancellation for listening generation', async () => {
+      const controller = new AbortController();
+      const dispatched: string[] = [];
+      const fetch = async (input: RequestInfo | URL) => {
+        dispatched.push(String(input));
+        return new Response(
+          JSON.stringify({
+            turns: [{ speaker: 'HOST', text: 'Hola' }],
+            soundCues: [],
+            references: [],
+          })
+        );
+      };
+      mockGenerateResponse.mockImplementation(
+        async (
+          ...args: [string, unknown, { signal: AbortSignal; fetch: typeof fetch; endpoint: string }]
+        ) => {
+          const options = args[2];
+          if (options.signal !== controller.signal)
+            throw new Error('Original cancellation was lost');
+          const response = await options.fetch(options.endpoint);
+          return { content: await response.text(), inputTokens: 1, outputTokens: 1 };
+        }
+      );
+      const result = await generateScript({
+        topic: 'Travel',
+        depth: 'standard',
+        audienceLevel: 'A1',
+        focusAreas: [],
+        tone: 'casual',
+        durationTarget: 1,
+        fetch,
+        signal: controller.signal,
+        endpoint: 'https://provider.invalid/v1',
+      });
+      expect(result.turns[0].text).toBe('Hola');
+      expect(dispatched).toEqual(['https://provider.invalid/v1']);
+    });
+
     it('returns structured output with turns, soundCues, references, and markdown', async () => {
       const mockResponse = {
         turns: [

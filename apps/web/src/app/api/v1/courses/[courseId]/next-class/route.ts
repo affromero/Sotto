@@ -1,93 +1,74 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
-import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
-import {
-  createNextClass,
-  ClassGenerationCancelledError,
-  CourseNotFoundError,
-} from '@/lib/class-service';
-import { ClassSourceError } from '@/lib/class-source';
 import { sourcedClassSchema } from '@/lib/validations';
+import { readClassPreparation, requestClassPreparation } from '@/lib/classes/preparation';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
-
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-function wantsBackgroundGeneration(request: NextRequest): boolean {
-  return (
-    request.nextUrl.searchParams.get('background') === '1' ||
-    request.headers.get('prefer')?.toLowerCase().includes('respond-async') === true
-  );
-}
-
-function logBackgroundGenerationFailure(error: unknown, courseId: string): void {
-  const message = error instanceof Error ? error.message : 'Failed to create class';
-  logger.error('Background class generation failed', { courseId, error: message });
-}
-
-/**
- * POST /api/courses/[courseId]/next-class — generate the next gated class.
- * Optional body `{ sourceUrl?, topic? }` builds the class from a real link/paper
- * or an interest topic (sourced class); empty body = a normal curriculum class.
- */
+/** Heavy generation belongs to the worker. Synchronous clients may wait for its durable result. */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const { courseId } = await params;
-
-    const body = await request.json().catch(() => ({}));
-    const parsed = sourcedClassSchema.safeParse(body ?? {});
+    const course = await prisma.course.findFirst({
+      where: { id: courseId, userId: authed.userId },
+      select: { id: true },
+    });
+    if (!course) return errorResponse('Course not found', 404);
+    const parsed = sourcedClassSchema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
-
-    if (wantsBackgroundGeneration(request)) {
-      const course = await prisma.course.findFirst({
-        where: { id: courseId, userId: authed.userId },
-        select: { id: true },
-      });
-      if (!course) return errorResponse('Course not found', 404);
-
-      void createNextClass(
-        courseId,
-        authed.userId,
-        sottoRequestExecution(request, authed),
-        parsed.data
-      ).catch((error: unknown) => {
-        logBackgroundGenerationFailure(error, courseId);
-      });
-
-      return NextResponse.json({ started: true }, { status: 202 });
-    }
-
-    const result = await createNextClass(
+    const admitted = await requestClassPreparation(
       courseId,
-      authed.userId,
       sottoRequestExecution(request, authed),
       parsed.data
     );
-    if (result.kind === 'gated') {
-      return errorResponse('Finish the current class before starting a new one.', 409, {
-        activeClassId: result.activeClassId,
-        status: result.status,
-      });
+    const accepted = () =>
+      NextResponse.json(
+        {
+          started: true,
+          operationId: admitted.id,
+          status: admitted.status,
+        },
+        { status: 202 }
+      );
+    if (
+      request.nextUrl.searchParams.get('background') === '1' ||
+      request.headers.get('prefer')?.toLowerCase().includes('respond-async')
+    )
+      return accepted();
+    const deadline = Date.now() + 270_000;
+    while (Date.now() < deadline) {
+      const current = await readClassPreparation(courseId, authed.userId);
+      if (!current || current.id !== admitted.id) return errorResponse('Preparation changed.', 409);
+      if (current.status === 'COMPLETED') {
+        if (current.result === 'done') return NextResponse.json({ done: true });
+        if (current.result === 'gated')
+          return errorResponse('Finish the current class before starting a new one.', 409, {
+            activeClassId: current.classId,
+          });
+        return NextResponse.json({ classId: current.classId }, { status: 201 });
+      }
+      if (current.status === 'CANCELLED' || current.status === 'CANCELLING')
+        return errorResponse('Class preparation was cancelled.', 409, { cancelled: true });
+      if (current.status === 'FAILED' && current.failure === 'source_unreadable')
+        return errorResponse('The class source could not be read. Try another source.', 422);
+      if (current.status === 'FAILED')
+        return errorResponse('Class preparation failed. Start a new attempt.', 502);
+      if (current.status === 'UNRESOLVED')
+        return errorResponse('Class preparation needs execution recovery.', 409);
+      await delay(500, undefined, { signal: request.signal });
     }
-    if (result.kind === 'done') {
-      return NextResponse.json({ done: true });
-    }
-    return NextResponse.json({ classId: result.classId }, { status: 201 });
-  } catch (error: unknown) {
-    if (error instanceof CourseNotFoundError) return errorResponse('Course not found', 404);
-    if (error instanceof ClassGenerationCancelledError) {
-      return errorResponse('Class generation was cancelled.', 409, { cancelled: true });
-    }
-    // The source link couldn't be read/leveled — actionable 422, no class created.
-    if (error instanceof ClassSourceError) return errorResponse(error.message, 422);
-    const message = error instanceof Error ? error.message : 'Failed to create class';
-    logger.error('Failed to create next class', { error: message });
-    return errorResponse(message, 500);
+    return accepted();
+  } catch (error) {
+    if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
+    return errorResponse('Could not admit or read class preparation.', 500);
   }
 }

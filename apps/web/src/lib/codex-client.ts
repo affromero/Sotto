@@ -33,6 +33,7 @@ interface CodexResponse extends TokenUsage {
 }
 
 interface CodexOptions {
+  isolated?: import('./agents/isolated/isolated-agent').IsolatedClaudeExecution;
   signal?: AbortSignal;
   onUsage?: (usage: TokenUsage & { model: string }) => void;
   model?: string;
@@ -246,6 +247,8 @@ async function* runCodex(
   output?: string
 ): AsyncGenerator<string> {
   opts.signal?.throwIfAborted();
+  if (opts.isolated)
+    throw new Error('Isolated Codex execution is not supported by the reviewed broker protocol');
   const { args } = codexArgs(opts, output, selection);
   const invocation = buildAgentInvocation('codex', args, host, { remoteEnvKeys: CODEX_ENV_KEYS });
   const environment = codexEnvironment();

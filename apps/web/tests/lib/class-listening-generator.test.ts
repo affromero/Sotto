@@ -298,6 +298,21 @@ describe('generateClassListening', () => {
   });
 
   describe('happy path', () => {
+    it('prepares scheduled listening without requiring a speech provider or starting audio jobs', async () => {
+      setupHappyPath();
+      mockGetConfiguredTtsProviderId.mockReturnValue(null);
+      mockResolveTtsProvider.mockRejectedValue(new Error('No speech credential configured'));
+      mockCreateSegmentsAndQueueAudio.mockRejectedValue(
+        new Error('Audio must await learner review')
+      );
+      const result = await generateClassListening({ ...PARAMS, deferAudio: true });
+      expect(result).toEqual({ sectionId: 'section-1', episodeId: 'episode-1' });
+      expect(mockEpisodeUpdate).toHaveBeenCalledWith({
+        where: { id: 'episode-1' },
+        data: { status: 'SCRIPT_READY' },
+      });
+    });
+
     it('returns { sectionId, episodeId } on success', async () => {
       setupHappyPath();
 

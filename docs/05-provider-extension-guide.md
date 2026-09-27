@@ -1,10 +1,60 @@
 # Provider Extension Guide
 
-Date: 2026-06-13
+Date: 2026-09-27
 
 > **Summary**: Add local LLM, STT, and TTS models to Sotto with the least possible code. Prefer OpenAI-compatible local servers for LLM and STT, and the Sotto local TTS sidecar contract for TTS. Only write a native provider adapter when a model or vendor cannot fit those simple HTTP shapes.
 
-## Fast Path
+## Meta Muse
+
+Choose **Meta (Muse)** in provider settings or **Muse Spark** during onboarding,
+save your Meta Model API key, and explicitly select **Muse Spark 1.3 (Standard)**.
+Existing provider defaults stay unchanged. The integration uses Sidedoor's
+OpenAI-compatible transport at `https://api.meta.ai/v1`, including structured
+output, streaming, cancellation and normalized token usage.
+
+Metadata verified against Meta documentation on 2026-09-27: Standard input costs
+$1.25 per million tokens and output costs $4.25. Its context is 1,048,576 tokens.
+The published Chat Completions schema accepts `max_completion_tokens` but does
+not state a numeric output ceiling, so the catalog records that limit as unknown.
+Contributor models permit training on prompts and completions and are excluded
+from Sotto's model choices. See [models](https://dev.meta.ai/docs/models),
+[pricing](https://dev.meta.ai/docs/pricing-rate-limits), and the
+[request schema](https://dev.meta.ai/docs/api-reference/chat-completions/schemas).
+
+This integration supports text and images. Hosted search is unavailable through
+the selected Chat Completions transport. Spark 1.3 audio understanding is degraded
+according to Meta. Muse Voice Transcribe is a separate API with turn timestamps
+and no word timestamps; it is not registered as a Sotto pronunciation provider.
+Serve Muse Glimmer through the existing local OpenAI-compatible provider.
+
+### Repeatable learning evaluation
+
+Run the synthetic fixtures without network access:
+
+```bash
+npx tsx apps/web/scripts/learning-evaluation/run.ts
+```
+
+To measure the selected model, set a credential in an environment variable and
+explicitly enable live requests. This sends only the checked-in synthetic prompts:
+
+```bash
+npx tsx apps/web/scripts/learning-evaluation/run.ts --live --provider meta \
+  --model muse-spark-1.3 --api-key-env META_EVALUATION_KEY --repetitions 3
+```
+
+The JSON report includes every response, failed checks, measured latency, token
+usage and an uncached cost estimate where catalog pricing exists. Fixture reports
+mark performance and cost as unmeasured. A failed request stops the run; it never
+switches providers. Each case repeats to expose inconsistent grading.
+
+Checks cover structured output, requested vocabulary, passage length, literal
+answer support, agreement correction and overcorrection of a valid answer.
+They are limited proxies. Human review of language accuracy, CEFR level and
+teaching value is required before changing a production default. No live quality
+result is implied by fixture success.
+
+## Local provider contracts
 
 Most local models should need **zero app code**.
 

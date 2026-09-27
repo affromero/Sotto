@@ -170,6 +170,7 @@ const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
 };
 
 const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
+  'class-preparation': { attempts: 1 },
   'content-extraction': { attempts: 3 },
   'deep-research': { attempts: 3 },
   'creative-planning': { attempts: 3 },

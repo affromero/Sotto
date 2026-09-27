@@ -194,6 +194,7 @@ interface ClassBuildCourse {
 }
 
 interface ClassContentBuildParams {
+  deferAudio?: boolean;
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution;
   classId: string;
   courseId: string;
@@ -266,6 +267,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
   try {
     await assertClassStillGenerating(p.classId);
     await generateClassListening({
+      deferAudio: p.deferAudio,
       userId: p.userId,
       execution: p.execution,
       classId: p.classId,
@@ -352,7 +354,12 @@ export async function createNextClass(
   courseId: string,
   userId: string,
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
-  opts?: SourcedClassOpts
+  opts?: SourcedClassOpts,
+  lifecycle?: {
+    deferAudio?: boolean;
+    create: (data: Prisma.CourseClassUncheckedCreateInput) => Promise<{ id: string }>;
+    publish: (classId: string, adaptiveSeed: Prisma.InputJsonObject) => Promise<void>;
+  }
 ): Promise<NextClassResult> {
   const initialCourse = await prisma.course.findFirst({
     where: { id: courseId, userId },
@@ -442,20 +449,22 @@ export async function createNextClass(
     override = { level: course.currentLevel, objective: opts.topic };
   }
 
-  const cls = await prisma.courseClass.create({
-    data: {
-      courseId,
-      lessonId: lesson.id,
-      order: lesson.order,
-      status: 'GENERATING',
-      sourceUrl,
-      sourceTitle,
-    },
-  });
+  const classData: Prisma.CourseClassUncheckedCreateInput = {
+    courseId,
+    lessonId: lesson.id,
+    order: lesson.order,
+    status: 'GENERATING',
+    sourceUrl,
+    sourceTitle,
+  };
+  const cls = lifecycle
+    ? await lifecycle.create(classData)
+    : await prisma.courseClass.create({ data: classData });
 
   let adaptiveSeed: Prisma.InputJsonObject;
   try {
     adaptiveSeed = await buildClassContent({
+      deferAudio: lifecycle?.deferAudio,
       execution,
       classId: cls.id,
       courseId,
@@ -470,8 +479,12 @@ export async function createNextClass(
   } catch (err) {
     await rethrowIfGenerationWasCancelled(cls.id, err);
     // Roll back the half-built class so the learner can retry cleanly.
-    await prisma.courseClass.delete({ where: { id: cls.id } }).catch(() => {});
+    if (!lifecycle) await prisma.courseClass.delete({ where: { id: cls.id } }).catch(() => {});
     throw err;
+  }
+  if (lifecycle) {
+    await lifecycle.publish(cls.id, adaptiveSeed);
+    return { kind: 'created', classId: cls.id };
   }
   await prisma.courseClass.update({
     where: { id: cls.id },

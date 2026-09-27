@@ -17,6 +17,7 @@ import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/s
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { classifyError, userMessage } from '@/lib/byok-errors';
+import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
 
 const authoritySchema = z.discriminatedUnion('kind', [
   z
@@ -26,6 +27,7 @@ const authoritySchema = z.discriminatedUnion('kind', [
       ownerUserId: z.string().min(1),
       userId: z.string().min(1),
       pipelineGeneration: z.string().nullable(),
+      preparationAudioGenerationKey: z.string().min(1).optional(),
       snapshot: z.json(),
     })
     .strict(),
@@ -103,6 +105,9 @@ async function captureAuthority(database: Prisma.TransactionClient, payload: unk
         ownerUserId: snapshot.userId,
         userId,
         pipelineGeneration: episode.pipelineGeneration,
+        ...(typeof input.audioGenerationKey === 'string'
+          ? { preparationAudioGenerationKey: input.audioGenerationKey }
+          : {}),
         snapshot: jsonClone(snapshot),
       },
       scopes: snapshot.scopes,
@@ -139,6 +144,12 @@ export async function validateDurableAuthority(
   authority: DurableAuthority
 ): Promise<{ userId: string } | null> {
   if (authority.kind === 'episode') {
+    if (authority.preparationAudioGenerationKey)
+      await validatePreparationAudio(
+        database,
+        authority.episodeId,
+        authority.preparationAudioGenerationKey
+      );
     const episode = await database.episode.findUnique({
       where: { id: authority.episodeId },
       select: { pipelineGeneration: true },

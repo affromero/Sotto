@@ -20,11 +20,13 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { aiProviderRules } from './providers/ai';
 import { createSottoProviderTransport } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { learningCredentialFingerprint } from '@/lib/classes/preparation-selection';
 
 interface ResolvedLearningAi {
   provider: string;
   model: string;
   endpoint?: string;
+  isolatedImage?: string;
   /** Undefined for keyless backends (claude-code, local) — they authenticate themselves. */
   apiKey?: string;
 }
@@ -53,6 +55,11 @@ export async function resolveCapturedLearningAiForProvider(
   execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
   allowSharing: boolean
 ): Promise<CapturedLearningAi> {
+  if (provider === 'claude-code' && process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim()) {
+    const { captureIsolatedLearningAi } = await import('./agents/isolated/isolated-learning-ai');
+    const isolated = await captureIsolatedLearningAi(userId, model, execution);
+    if (isolated) return isolated;
+  }
   const credential = await sottoTransaction(prismaUnfiltered, (database) =>
     captureSottoExecutionCredential(
       database,
@@ -112,17 +119,29 @@ async function capturedLearningAiFetch(ai: CapturedLearningAi): Promise<typeof f
   return (await createSottoProviderTransport(ai.execution, rules)).authenticatedFetch;
 }
 
-export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
-  const moderationCredential = await sottoTransaction(prismaUnfiltered, (database) =>
+export function captureLearningModerationCredential(execution: SottoProviderExecution) {
+  return sottoTransaction(prismaUnfiltered, (database) =>
     captureSottoExecutionCredential(
       database,
-      ai.execution.authorize,
+      execution.authorize,
       'ai',
       'openai',
       true,
-      ai.execution.signal
+      execution.signal
     )
   );
+}
+
+export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
+  const moderationCredential = await captureLearningModerationCredential(ai.execution);
+  const expectedModeration = ai.execution.learningSelection?.moderationCredentialFingerprint;
+  if (
+    expectedModeration !== undefined &&
+    learningCredentialFingerprint(moderationCredential) !== expectedModeration
+  )
+    throw new Error(
+      'The moderation credential changed after preparation was admitted. Start a new task.'
+    );
   const moderation = moderationCredential
     ? {
         fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -147,6 +166,13 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
     fetch: await capturedLearningAiFetch(ai),
     moderation,
     signal: ai.execution.signal,
+    ...(ai.isolatedImage
+      ? {
+          isolated: await (
+            await import('./agents/isolated/isolated-learning-ai')
+          ).createCapturedIsolatedClaude(ai),
+        }
+      : {}),
   };
 }
 
@@ -154,8 +180,34 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
 export async function resolveCapturedLearningAi(
   userId: string,
   execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
-  pendingSelection?: { provider: string; model: string; endpoint?: string }
+  pendingSelection?: { provider: string; model: string; endpoint?: string; isolatedImage?: string }
 ): Promise<CapturedLearningAi> {
+  if (execution.learningSelection) {
+    const selected = execution.learningSelection;
+    const resolved = await resolveCapturedLearningAi(
+      userId,
+      {
+        ...execution,
+        learningSelection: undefined,
+      },
+      {
+        provider: selected.provider,
+        model: selected.model,
+        endpoint: selected.endpoint,
+        isolatedImage: selected.isolatedImage,
+      }
+    );
+    if (
+      resolved.provider !== selected.provider ||
+      resolved.model !== selected.model ||
+      resolved.endpoint !== selected.endpoint ||
+      resolved.isolatedImage !== selected.isolatedImage ||
+      learningCredentialFingerprint(resolved.execution.credential) !==
+        selected.credentialFingerprint
+    )
+      throw new Error('The AI selection changed after preparation was admitted. Start a new task.');
+    return { ...resolved, execution: { ...resolved.execution, learningSelection: selected } };
+  }
   const learner = await sottoTransaction(prismaUnfiltered, async (database) => {
     const current = await execution.authorize(database);
     if (current.userId !== userId) throw new Error('The selected AI user changed');
@@ -179,6 +231,20 @@ export async function resolveCapturedLearningAi(
     if (preferred.provider === 'codex' || preferred.provider === 'claude-code') {
       if (await isSystemAiProviderDisabled(preferred.provider))
         throw new Error(`${preferred.provider} is disabled in admin provider settings.`);
+      if (
+        preferred.provider === 'claude-code' &&
+        (process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim() || pendingSelection?.isolatedImage)
+      ) {
+        const { captureIsolatedLearningAi } =
+          await import('./agents/isolated/isolated-learning-ai');
+        const isolated = await captureIsolatedLearningAi(
+          userId,
+          preferred.model,
+          execution,
+          pendingSelection?.isolatedImage
+        );
+        if (isolated) return isolated;
+      }
       return {
         provider: preferred.provider,
         model: preferred.model,
@@ -199,6 +265,11 @@ export async function resolveCapturedLearningAi(
   const configured = await getAutoModelConfig();
   if (configured.model.aiProvider === 'codex' || configured.model.aiProvider === 'claude-code') {
     const selected = await resolveLearningAiWithKey(null);
+    if (selected.provider === 'claude-code' && process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim()) {
+      const { captureIsolatedLearningAi } = await import('./agents/isolated/isolated-learning-ai');
+      const isolated = await captureIsolatedLearningAi(userId, selected.model, execution);
+      if (isolated) return isolated;
+    }
     return { ...selected, execution: { ...execution, userId } };
   }
   const credential = await sottoTransaction(prismaUnfiltered, (database) =>

@@ -5,6 +5,7 @@
 
 interface TtsProviderLogoProps {
   provider:
+    | 'meta'
     | 'elevenlabs'
     | 'openai'
     | 'cartesia'
@@ -386,6 +387,17 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           </text>
         </svg>
       );
+    case 'meta':
+      return (
+        <svg {...props}>
+          <path
+            d="M12 12C8 3 3 5 3 13c0 7 5 6 9-1s9-8 9 1c0 7-5 6-9-1Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        </svg>
+      );
     case 'local':
       return (
         <svg {...props}>
@@ -400,6 +412,7 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
+  meta: 'Meta (Muse)',
   elevenlabs: 'ElevenLabs',
   openai: 'OpenAI',
   cartesia: 'Cartesia',

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DEFAULT_INITIAL_STITCH_SOUND_POLICY } from '@/lib/sidedoor/jobs/initial/initial-stitch-contract';
 import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { authenticateRequest, type AuthenticatedRequest } from '@/lib/api-keys';
 import { AccessError, isAccessError } from 'thesidedoor-core/access';
@@ -514,7 +515,7 @@ async function routeResume(
             admitInitialStitch(tx, {
               episodeId,
               generationKey,
-              soundPolicy: 'elevenlabs',
+              soundPolicy: DEFAULT_INITIAL_STITCH_SOUND_POLICY,
               identities,
               fromPhase: 'FAILED',
               signal: admission.request.signal,

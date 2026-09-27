@@ -7,6 +7,7 @@ import { getMinReferenceCount, getMinSeriousRatio } from './reference-thresholds
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
 import type { BiasAnalysis } from './media-bias';
+import type { AIOptions } from './providers/ai';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
 
 /** Extract the first complete JSON object or array from a string containing surrounding text. */
@@ -557,6 +558,9 @@ ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join
 }
 
 export async function generateScript(params: {
+  isolated?: AIOptions['isolated'];
+  endpoint?: string;
+  moderation?: AIOptions['moderation'];
   topic: string;
   depth: string;
   audienceLevel: string;
@@ -656,6 +660,9 @@ export async function generateScript(params: {
       maxTokens: 12288,
       apiKeyOverride: params.apiKeyOverride,
       fetch: params.fetch,
+      endpoint: params.endpoint,
+      moderation: params.moderation,
+      isolated: params.isolated,
       signal: params.signal,
       model: params.model,
       useWebSearch: params.webSearchEnabled !== false,

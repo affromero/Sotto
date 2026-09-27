@@ -50,8 +50,10 @@ it('preserves every existing credential form and help link after shared catalog 
 describe('AI Provider Client DTO', () => {
   const meta = getAllAiProviderClientMeta();
 
-  it('returns 13 providers and excludes the keyless server-configured providers', () => {
-    expect(meta).toHaveLength(13);
+  it('includes Meta Standard and excludes the keyless server-configured providers', () => {
+    expect(
+      meta.find((provider) => provider.id === 'meta')?.models.map((model) => model.id)
+    ).toEqual(['muse-spark-1.3']);
     // claude-code and local are keyless, server-configured backends — never
     // surfaced in the BYOK client metadata (they have no API-key fields).
     expect(meta.map((m) => m.id)).not.toContain('claude-code');

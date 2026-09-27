@@ -13,6 +13,7 @@ export const HEAVY_WORKERS = new Set(['audio-generation', 'audio-stitching']);
 
 /** Pipeline orchestration workers */
 const PIPELINE_WORKERS = new Set([
+  'class-preparation',
   'content-extraction',
   'deep-research',
   'creative-planning',

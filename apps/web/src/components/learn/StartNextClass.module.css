@@ -5,7 +5,9 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 1;
 }
 
 .button {
@@ -71,7 +73,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 14px;
   border: 1px solid color-mix(in srgb, var(--bad) 34%, var(--line));
   border-radius: var(--r);
@@ -111,4 +113,57 @@
   color: var(--bad);
   text-align: right;
   max-width: 200px;
+}
+
+.schedule {
+  width: min(100%, 360px);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+
+.schedule summary {
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.schedule form,
+.schedule label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule input {
+  min-height: 44px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.recoveryConsent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 12px;
+}
+
+.recoveryConsent input {
+  width: 24px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .root {
+    width: 100%;
+    align-items: stretch;
+  }
 }

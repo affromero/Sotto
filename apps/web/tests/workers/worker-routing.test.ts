@@ -20,6 +20,16 @@ function opts(overrides: Partial<Parameters<typeof shouldRun>[1]> = {}) {
 }
 
 describe('matchesProfile', () => {
+  it('runs class preparation on pipeline workers while honoring explicit exclusions', () => {
+    expect(shouldRun('class-preparation', opts({ profile: 'pipeline', preset: 'core' }))).toBe(
+      true
+    );
+    expect(shouldRun('class-preparation', opts({ profile: 'light' }))).toBe(false);
+    expect(shouldRun('class-preparation', opts({ profile: 'heavy' }))).toBe(false);
+    expect(
+      shouldRun('class-preparation', opts({ excludeFilter: new Set(['class-preparation']) }))
+    ).toBe(false);
+  });
   it('routes episode invalidation to light workers and respects explicit exclusion', () => {
     expect(shouldRun('episode-status', opts({ profile: 'light', preset: 'core' }))).toBe(true);
     expect(shouldRun('episode-status', opts({ profile: 'heavy' }))).toBe(false);

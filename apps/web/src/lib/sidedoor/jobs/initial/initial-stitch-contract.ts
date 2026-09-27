@@ -6,6 +6,9 @@ import { storageInputSchema } from '@/lib/sidedoor/storage/core/storage-inputs';
 
 const id = z.string().min(1).max(200);
 export const initialStitchSoundPolicySchema = z.enum(['none', 'stock', 'elevenlabs']);
+export const DEFAULT_INITIAL_STITCH_SOUND_POLICY = 'stock' satisfies z.infer<
+  typeof initialStitchSoundPolicySchema
+>;
 const initialStitchOutputsSchema = z
   .object({
     versionId: z.uuid(),

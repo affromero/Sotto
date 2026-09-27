@@ -21,6 +21,7 @@ import { sottoJobFailureCode } from '@/lib/sidedoor/jobs/core/job-contracts';
 import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from '@/workers/content-extraction.worker';
+import { processClassPreparation } from '@/workers/classes/class-preparation.worker';
 import { processDeepResearch } from '@/workers/deep-research.worker';
 import { processCreativePlanning } from '@/workers/creative-planning.worker';
 import { processScriptWriting } from '@/workers/script-writing.worker';
@@ -84,6 +85,11 @@ logger.info('Starting Sotto workers...', {
 
 // Create workers filtered by WORKER_PROFILE
 const workers = [
+  shouldRun('class-preparation') &&
+    createWorker('class-preparation', processClassPreparation, {
+      concurrency: 2,
+      lockDuration: 300000,
+    }),
   shouldRun('content-extraction') &&
     createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
   shouldRun('deep-research') &&

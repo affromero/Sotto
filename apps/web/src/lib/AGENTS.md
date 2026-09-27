@@ -1,5 +1,17 @@
 # src/lib/ — Core Libraries
 
+`agents/isolated/isolated-agent.ts` is the explicit API-key Claude isolation adapter. It requires
+a local Linux Docker host, a reviewed immutable image with Claude 2.1.283, parent
+credential admission and durable container identity callbacks. Provider keys stay
+in the parent broker. Subscription auth, Codex, search, images and SSH are unsupported
+in this mode and must fail closed. Local and SSH defaults remain unchanged.
+`agents/isolated/isolated-learning-ai.ts` captures the opt-in image and separate personal Anthropic
+credential. `agents/isolated/isolated-agent-journal.ts` fsyncs container identities inside the job
+journal's workspace. `agents/isolated/isolated-agent-recovery.ts` validates the exact operator
+binding, fences the task, verifies container and workspace cleanup, and releases
+the local execution journal. Provider outcomes remain unknown until the learner
+acknowledges them separately. A missing attached workspace fails closed.
+
 All shared business logic and external service integrations live here.
 
 Script regeneration snapshots learner annotations against the original script

@@ -46,6 +46,15 @@ describe('getCheapestModelForProvider', () => {
 });
 
 describe('isValidModelId', () => {
+  it('routes Standard Muse explicitly and excludes the training-eligible tier', async () => {
+    expect(await resolveAiModelAndProvider({ episodeAiModel: 'muse-spark-1.3' })).toEqual({
+      model: 'muse-spark-1.3',
+      provider: 'meta',
+    });
+    expect(isValidModelId('muse-spark-1.3-contributor')).toBe(false);
+    expect(getModelMaxOutputTokens('muse-spark-1.3')).toBeNull();
+    expect(getAiProviderMeta('meta').capabilities).toEqual({ web: false, vision: true });
+  });
   it('returns true for known Anthropic model', () => {
     expect(isValidModelId('claude-sonnet-4-6')).toBe(true);
   });

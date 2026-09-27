@@ -43,6 +43,7 @@ async function buildModelMeta(selfHosted: boolean): Promise<ModelMeta> {
       // Cloud LLM cards.
       xai: opt(getAiProviderMeta('xai').models),
       deepseek: opt(getAiProviderMeta('deepseek').models),
+      meta: opt(getAiProviderMeta('meta').models),
       mistral: opt(getAiProviderMeta('mistral').models),
       groq: opt(getAiProviderMeta('groq').models),
       nvidia: opt(getAiProviderMeta('nvidia').models),

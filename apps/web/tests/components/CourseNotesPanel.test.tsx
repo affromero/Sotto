@@ -30,6 +30,9 @@ describe('CourseNotesPanel', () => {
     await user.click(screen.getByRole('button', { name: /course notes/i }));
     const textarea = await screen.findByLabelText(/paste notes from an official course/i);
     expect(textarea).toHaveValue('capitolo uno');
+    expect(
+      screen.getByText(/clearing and saving the notes does not remove vocabulary/i)
+    ).toBeInTheDocument();
 
     await user.clear(textarea);
     await user.type(textarea, 'capitolo due');

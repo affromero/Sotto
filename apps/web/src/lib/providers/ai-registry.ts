@@ -46,6 +46,7 @@ export function getPricetokenModelInfo(modelId: string): {
 }
 
 export type AiProviderId =
+  | 'meta'
   | 'anthropic'
   | 'openai'
   | 'google'
@@ -294,6 +295,16 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
       fields: aiCredentialForm('google').fields,
     },
   },
+  meta: {
+    id: 'meta',
+    displayName: 'Meta (Muse)',
+    shortLabel: 'Muse',
+    defaultModel: 'muse-spark-1.3',
+    getApiKeyUrl: aiCredentialForm('meta').getApiKeyUrl,
+    models: modelPresets('meta'),
+    capabilities: { web: false, vision: true },
+    auth: { fields: aiCredentialForm('meta').fields },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -403,6 +414,10 @@ const AI_CLIENT_DESCRIPTIONS: Record<
     badge: 'optional',
   },
   xai: { description: 'Grok 4 with a 1M-token context window', badge: 'optional' },
+  meta: {
+    description: 'Muse Spark Standard. Prompts and completions are not used for training.',
+    badge: 'optional',
+  },
   deepseek: { description: 'DeepSeek V4 — frontier quality at ~1/10 the cost', badge: 'optional' },
   mistral: { description: 'Mistral Small/Medium/Large open-weight LLMs', badge: 'optional' },
   nvidia: { description: 'NVIDIA NIM — hosted Nemotron reasoning models', badge: 'optional' },

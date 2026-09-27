@@ -1,4 +1,5 @@
 export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
+  meta: { label: 'Meta (Muse)', shortLabel: 'Muse' },
   anthropic: { label: 'Anthropic (Claude)', shortLabel: 'Claude' },
   openai: { label: 'OpenAI', shortLabel: 'GPT' },
   google: { label: 'Google (Gemini)', shortLabel: 'Gemini' },
@@ -92,6 +93,7 @@ for (const m of openaiModels) {
 }
 
 export const AI_MODEL_DISPLAY: Record<string, string> = {
+  'muse-spark-1.3': 'Muse Spark 1.3 (Standard)',
   'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
   'claude-sonnet-4-6': 'Claude Sonnet 4.6',
   'claude-opus-4-6': 'Claude Opus 4.6',
@@ -125,6 +127,7 @@ export const AI_MODEL_DISPLAY: Record<string, string> = {
 
 /** Short model names without the provider prefix (for "Provider · Model" badges) */
 export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
+  'muse-spark-1.3': 'Spark 1.3',
   'claude-haiku-4-5-20251001': 'Haiku 4.5',
   'claude-sonnet-4-6': 'Sonnet 4.6',
   'claude-opus-4-6': 'Opus 4.6',

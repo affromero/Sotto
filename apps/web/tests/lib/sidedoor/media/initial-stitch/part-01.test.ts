@@ -37,6 +37,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { z } from 'zod';
 import { createRegenerationSource } from '../../../../helpers/runtime/regeneration-source';
 import {
+  linkPreparationAudio,
+  settlePreparationAudio,
+} from '../../../../helpers/runtime/preparation-audio';
+import {
   createSharedTestInstance,
   type SharedTestIdentity,
   type SharedTestInstance,
@@ -104,6 +108,20 @@ suite('initial stitching admission with PostgreSQL and attributed storage', () =
     };
     return { episodeId: episode.id, authorize };
   }
+
+  it('rejects stitching publication authority after the linked preparation is revoked', async () => {
+    const { episodeId, authorize } = await source();
+    const parent = await linkPreparationAudio(instance.database, identity.ownerId, episodeId);
+    const captured = await sottoTransaction(instance.database, (tx) =>
+      captureInitialStitchInputs(tx, authorize, episodeId, 'generation-one')
+    );
+    await settlePreparationAudio(instance.database, parent, 'revoked');
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        validateInitialStitchInputs(tx, authorize, captured, 'GENERATING_AUDIO')
+      )
+    ).rejects.toThrow();
+  });
 
   it.each(['concurrent', 'rollback', 'superseded'] as const)(
     'settles terminal processing failure with %s delivery',

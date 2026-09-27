@@ -3,17 +3,9 @@ import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { QUEUE_METADATA, PIPELINE_STAGE_ORDER } from '@/app/(admin)/admin/queues/queue-metadata';
 
 describe('queue-metadata', () => {
-  it('has metadata for every queue in ALL_QUEUE_NAMES', () => {
-    for (const name of ALL_QUEUE_NAMES) {
-      expect(QUEUE_METADATA[name]).toBeDefined();
-    }
-  });
-
-  it('does not have metadata for queues not in ALL_QUEUE_NAMES', () => {
-    const knownNames = new Set<string>(ALL_QUEUE_NAMES);
-    for (const name of Object.keys(QUEUE_METADATA)) {
-      expect(knownNames.has(name)).toBe(true);
-    }
+  it('explains durable class preparation in the content pipeline', () => {
+    expect(QUEUE_METADATA['class-preparation'].stage).toBe('Content Pipeline');
+    expect(QUEUE_METADATA['class-preparation'].description).toMatch(/durable.*requests/i);
   });
 
   it('covers exactly the same queues as ALL_QUEUE_NAMES', () => {

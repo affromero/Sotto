@@ -1,5 +1,10 @@
 # src/app/ — Next.js App Router Pages & API Routes
 
+Class preparation is durably admitted through `courses/[courseId]/next-class`.
+The `courses/[courseId]/preparation` route exposes explicit scheduling (POST),
+sanitized activity (GET), and acknowledged recovery after verified cleanup (PATCH).
+Generation status and cancellation include queued work before a class exists.
+
 ## Page Index
 
 | Path                           | File                                                                                  | Auth  | Description                                                                                                                                                                                                                                                                                                                                                                                                              |

@@ -19,6 +19,7 @@ export function sottoJobFailureCode(error: unknown): string {
 }
 
 const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new Map([
+  ['class-preparation', [1]],
   ['content-extraction', [1]],
   ['deep-research', [1]],
   ['creative-planning', [1]],

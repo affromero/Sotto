@@ -22,6 +22,10 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
+  'class-preparation': {
+    description: 'Prepares learner classes from durable scheduled or immediate requests',
+    stage: 'Content Pipeline',
+  },
   'content-extraction': {
     description: 'Extracts text from URLs, PDFs, and uploaded files',
     stage: 'Content Pipeline',
