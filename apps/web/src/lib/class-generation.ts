@@ -295,6 +295,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
 
   const provider = createAIProvider(ai.provider);
   const reviewPrompt = loadAndRender('class/review-section-quiz.md', {
+    REVIEW_SCHEMA: JSON.stringify(SECTION_QUALITY_JSON_SCHEMA.schema),
     LEVEL: p.level,
     NATIVE: p.nativeLang,
     TARGET: p.targetLang,

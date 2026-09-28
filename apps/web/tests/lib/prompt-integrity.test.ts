@@ -100,7 +100,14 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
-  'class/review-section-quiz.md': ['LANGUAGE_POLICY', 'LEVEL', 'NATIVE', 'SKILL', 'TARGET'],
+  'class/review-section-quiz.md': [
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'REVIEW_SCHEMA',
+    'SKILL',
+    'TARGET',
+  ],
   'live/extract-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
   'live/extract-learning-targets.md': ['LEVEL', 'MAX_GRAMMAR', 'MAX_VOCAB', 'NATIVE', 'TARGET'],
   'exams/exam-feedback.md': ['EXAM_NAME', 'LEVEL', 'OVERALL', 'SECTIONS'],
