@@ -8,24 +8,31 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+  capturedLearningAiOptions: async (ai: {
+    model: string;
+    apiKey?: string;
+    signal?: AbortSignal;
+    authenticatedFetch?: typeof fetch;
+  }) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
+    signal: ai.signal,
+    fetch: ai.authenticatedFetch,
   }),
 }));
 
 const mockGenerateResponse = vi.fn();
+const mockReviewResponse = vi.fn();
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
+  createAIProvider: () => ({
+    generateResponse: (...args: unknown[]) =>
+      (args[2] as { jsonSchema: { name: string } }).jsonSchema.name === 'class_section_quality'
+        ? mockReviewResponse(...args)
+        : mockGenerateResponse(...args),
+  }),
 }));
 
-const mockLoadAndRender = vi.fn();
-vi.mock('@/lib/prompt-loader', () => ({
-  loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a),
-}));
-vi.mock('@/lib/course-notes', () => ({
-  formatNotesForPrompt: (n: string) => (n ? `\nNOTE: ${n}\n` : ''),
-}));
+vi.mock('@/lib/prisma', () => ({ prisma: {}, prismaUnfiltered: {} }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -52,6 +59,13 @@ const SAMPLE_QUESTIONS = [
     explanation: 'y',
   },
 ];
+SAMPLE_QUESTIONS.push(
+  ...[2, 3, 4].map((index) => ({
+    ...SAMPLE_QUESTIONS[0],
+    question: `Question ${index}`,
+    correctIndex: 0,
+  }))
+);
 
 const SAMPLE_ARRAY = JSON.stringify(SAMPLE_QUESTIONS);
 const SAMPLE = JSON.stringify({
@@ -109,7 +123,20 @@ it('requests one contextual vocabulary exercise per target word through the conf
 beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
-  mockLoadAndRender.mockReturnValue('system prompt');
+  mockReviewResponse.mockImplementation(async (_system, messages) => ({
+    content: JSON.stringify({
+      passageAcceptable: true,
+      issues: [],
+      questions: JSON.parse(messages[0].content).questions.map((q: { index: number }) => ({
+        index: q.index,
+        acceptableOptionIndices: [q.index === 1 ? 1 : 0],
+        issues: [],
+      })),
+    }),
+    model: 'm',
+    inputTokens: 1,
+    outputTokens: 1,
+  }));
   mockGenerateResponse.mockResolvedValue({
     content: SAMPLE,
     inputTokens: 10,
@@ -119,31 +146,221 @@ beforeEach(() => {
 });
 
 describe('generateSectionQuestions', () => {
+  function verdict(overrides: Record<string, unknown> = {}) {
+    return {
+      content: JSON.stringify({
+        passageAcceptable: true,
+        issues: [],
+        questions: SAMPLE_QUESTIONS.map((q, index) => ({
+          index,
+          acceptableOptionIndices: [q.correctIndex],
+          issues: [],
+        })),
+        ...overrides,
+      }),
+      model: 'm',
+      inputTokens: 1,
+      outputTokens: 1,
+    };
+  }
+
+  it('keeps the captured authority, cancellation, and model on generation and review', async () => {
+    const signal = new AbortController().signal;
+    const authenticatedFetch = vi.fn();
+    mockResolveLearningAi.mockResolvedValue({
+      provider: 'anthropic',
+      model: 'captured-model',
+      apiKey: 'captured-key',
+      signal,
+      authenticatedFetch,
+    });
+    await generateSectionQuestions(BASE);
+    for (const boundary of [mockGenerateResponse, mockReviewResponse]) {
+      expect(boundary.mock.calls[0][2]).toMatchObject({
+        model: 'captured-model',
+        apiKeyOverride: 'captured-key',
+        signal,
+        fetch: authenticatedFetch,
+      });
+    }
+    expect(mockResolveLearningAi).toHaveBeenCalledWith(BASE.userId, BASE.execution);
+  });
+
+  it.each([
+    [
+      'ambiguous options',
+      {
+        questions: SAMPLE_QUESTIONS.map((_, index) => ({
+          index,
+          acceptableOptionIndices: [0, 1],
+          issues: [],
+        })),
+      },
+    ],
+    [
+      'incorrect answer key',
+      {
+        questions: SAMPLE_QUESTIONS.map((_, index) => ({
+          index,
+          acceptableOptionIndices: [3],
+          issues: [],
+        })),
+      },
+    ],
+    ['nonidiomatic passage', { passageAcceptable: false }],
+    ['missing verdict', { questions: [] }],
+    [
+      'duplicate verdict',
+      {
+        questions: SAMPLE_QUESTIONS.map(() => ({
+          index: 0,
+          acceptableOptionIndices: [0],
+          issues: [],
+        })),
+      },
+    ],
+    ['uncertain judgment', { issues: ['uncertain'] }],
+  ])('never publishes %s', async (_name, overrides) => {
+    mockReviewResponse.mockResolvedValue(verdict(overrides));
+    await expect(generateSectionQuestions(BASE)).rejects.toThrow(/educational quality/);
+  });
+
+  it('retries a rejected candidate using bounded issue codes then publishes a reviewed replacement', async () => {
+    mockReviewResponse.mockResolvedValueOnce(verdict({ issues: ['ambiguous'] }));
+    const questions = await generateSectionQuestions(BASE);
+    expect(questions).toHaveLength(5);
+    expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
+      'educational quality: ambiguous'
+    );
+    const reviewed = JSON.parse(mockReviewResponse.mock.calls[0][1][0].content);
+    expect(reviewed.passage).toBe(GENERATED_PASSAGE);
+    expect(reviewed.questions[0]).toEqual({
+      index: 0,
+      question: SAMPLE_QUESTIONS[0].question,
+      options: SAMPLE_QUESTIONS[0].options,
+    });
+    expect(mockReviewResponse.mock.calls[0][2]).toMatchObject({ model: 'm', apiKeyOverride: 'k' });
+  });
+
+  it('reviews the immutable published source and fails immediately if it is defective', async () => {
+    mockReviewResponse.mockResolvedValue(verdict({ passageAcceptable: false }));
+    await expect(generateSectionQuestions({ ...BASE, sourceContent: PASSAGE })).rejects.toThrow(
+      /supplied reading passage/
+    );
+    expect(JSON.parse(mockReviewResponse.mock.calls[0][1][0].content).passage).toBe(PASSAGE);
+    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+  });
+
+  it('does not let JSON repair bypass semantic rejection', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: '{' })
+      .mockResolvedValueOnce({ content: '{' });
+    mockReviewResponse.mockResolvedValue(verdict({ issues: ['ambiguous'] }));
+    await expect(generateSectionQuestions(BASE)).rejects.toThrow(/educational quality/);
+    expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
+  });
+
+  it('bounds mixed quality and syntax retries to five model requests', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: SAMPLE })
+      .mockResolvedValueOnce({ content: '{' });
+    mockReviewResponse.mockResolvedValueOnce(verdict({ issues: ['ambiguous'] }));
+    const questions = await generateSectionQuestions(BASE);
+    expect(questions).toHaveLength(5);
+    expect(mockGenerateResponse.mock.calls.length + mockReviewResponse.mock.calls.length).toBe(5);
+    expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
+  });
+
+  it('rejects a cloze whose context permits two different past participles', async () => {
+    const questions = SAMPLE_QUESTIONS.map((q) => ({
+      ...q,
+      question: 'Am Sonntag hat Nora zu Hause _____.',
+      options: ['gekocht', 'geputzt', 'kochen', 'putzen'],
+      correctIndex: 0,
+    }));
+    mockGenerateResponse.mockResolvedValue({ content: JSON.stringify({ passage: '', questions }) });
+    mockReviewResponse.mockResolvedValue(
+      verdict({
+        questions: questions.map((_, index) => ({
+          index,
+          acceptableOptionIndices: [0, 1],
+          issues: ['ambiguous'],
+        })),
+      })
+    );
+    await expect(
+      generateSectionQuestions({ ...BASE, skill: 'GRAMMAR', targetLang: 'de' })
+    ).rejects.toThrow(/educational quality/);
+  });
+
+  it('rejects an unnatural travel collocation even when every answer agrees with the key', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        passage: 'Mit der Straßenbahn bin ich zum Rathaus gelaufen.',
+        questions: SAMPLE_QUESTIONS,
+      }),
+    });
+    mockReviewResponse.mockResolvedValue(
+      verdict({ passageAcceptable: false, issues: ['unnatural'] })
+    );
+    await expect(generateSectionQuestions({ ...BASE, targetLang: 'de' })).rejects.toThrow(
+      /educational quality/
+    );
+  });
+
+  it.each(['cancelled', 'authorization denied', 'dispatch outcome unknown'])(
+    'propagates review %s without retry',
+    async (message) => {
+      const error = new Error(message);
+      mockReviewResponse.mockRejectedValue(error);
+      await expect(generateSectionQuestions(BASE)).rejects.toBe(error);
+      expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+    }
+  );
+
+  it('propagates repair provider errors without disguising them as malformed output', async () => {
+    const error = new Error('dispatch outcome unknown');
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: '{' })
+      .mockResolvedValueOnce({ content: '{' })
+      .mockRejectedValueOnce(error);
+    await expect(generateSectionQuestions(BASE)).rejects.toBe(error);
+  });
+
+  it.each([
+    ['wrong count', SAMPLE_QUESTIONS.slice(1)],
+    ['fractional key', SAMPLE_QUESTIONS.map((q) => ({ ...q, correctIndex: 0.5 }))],
+    ['string key', SAMPLE_QUESTIONS.map((q) => ({ ...q, correctIndex: '0' }))],
+    ['out-of-range key', SAMPLE_QUESTIONS.map((q) => ({ ...q, correctIndex: 4 }))],
+    ['duplicate options', SAMPLE_QUESTIONS.map((q) => ({ ...q, options: ['a', ' A ', 'b', 'c'] }))],
+    ['empty explanation', SAMPLE_QUESTIONS.map((q) => ({ ...q, explanation: ' ' }))],
+  ])('rejects %s before semantic review', async (_name, questions) => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({ passage: GENERATED_PASSAGE, questions }),
+    });
+    await expect(generateSectionQuestions(BASE)).rejects.toThrow(/no usable questions/);
+    expect(mockReviewResponse.mock.calls).toHaveLength(0);
+  });
+
   it('returns parsed MCQs for a curriculum READING section with a generated passage', async () => {
     const qs = await generateSectionQuestions(BASE);
 
-    expect(qs).toHaveLength(2);
+    expect(qs).toHaveLength(5);
     expect(qs[0]).toMatchObject({ question: expect.any(String), correctIndex: 0 });
     expect(qs[0].passageText).toBe(GENERATED_PASSAGE);
-    // The {{SOURCE}} placeholder is rendered empty.
-    expect(mockLoadAndRender).toHaveBeenCalledWith(
-      'class/generate-section-quiz.md',
-      expect.objectContaining({ SOURCE: '' })
+    expect(mockGenerateResponse.mock.calls[0][0]).not.toContain(
+      'Source passage (base READING questions on it):'
     );
   });
 
   it('attaches the leveled passage as passageText for a sourced READING section', async () => {
     const qs = await generateSectionQuestions({ ...BASE, sourceContent: PASSAGE });
 
-    expect(qs).toHaveLength(2);
+    expect(qs).toHaveLength(5);
     for (const q of qs) {
       expect(q.passageText).toBe(PASSAGE);
     }
-    // The passage is rendered into the {{SOURCE}} block of the prompt.
-    expect(mockLoadAndRender).toHaveBeenCalledWith(
-      'class/generate-section-quiz.md',
-      expect.objectContaining({ SOURCE: expect.stringContaining(PASSAGE) })
-    );
+    expect(mockGenerateResponse.mock.calls[0][0]).toContain(PASSAGE);
   });
 
   it('does NOT attach passageText for a GRAMMAR section even if sourceContent is present', async () => {
@@ -156,10 +373,7 @@ describe('generateSectionQuestions', () => {
     for (const q of qs) {
       expect(q.passageText).toBeUndefined();
     }
-    expect(mockLoadAndRender).toHaveBeenCalledWith(
-      'class/generate-section-quiz.md',
-      expect.objectContaining({ SOURCE: '' })
-    );
+    expect(mockGenerateResponse.mock.calls[0][0]).not.toContain(PASSAGE);
   });
 
   it('throws when the model returns no usable questions', async () => {
@@ -182,7 +396,7 @@ describe('generateSectionQuestions', () => {
 
     const qs = await generateSectionQuestions(BASE);
 
-    expect(qs).toHaveLength(2);
+    expect(qs).toHaveLength(5);
     expect(qs[0].question).toBe('¿Qué descubrió el científico?');
   });
 
@@ -196,7 +410,7 @@ describe('generateSectionQuestions', () => {
 
     const qs = await generateSectionQuestions({ ...BASE, skill: 'GRAMMAR' as SkillType });
 
-    expect(qs).toHaveLength(2);
+    expect(qs).toHaveLength(5);
     expect(qs[1].correctIndex).toBe(1);
   });
 
@@ -228,7 +442,7 @@ describe('generateSectionQuestions', () => {
 
     const qs = await generateSectionQuestions(BASE);
 
-    expect(qs).toHaveLength(2);
+    expect(qs).toHaveLength(5);
     expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
     expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
       'Return ONLY a valid JSON object matching the schema'
@@ -262,7 +476,7 @@ describe('generateSectionQuestions', () => {
 
     const qs = await generateSectionQuestions(BASE);
 
-    expect(qs).toHaveLength(2);
+    expect(qs).toHaveLength(5);
     expect(mockGenerateResponse).toHaveBeenCalledTimes(3);
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
     expect(mockGenerateResponse.mock.calls[2][1][0].content).toContain('Malformed response:');

@@ -22,6 +22,8 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 - Reading questions must test actual comprehension of the passage, not grammar form in disguise.
 - Spread coverage across the listed grammar points and vocabulary.
 - Each question has exactly 4 options and exactly 1 correct answer. Match {{LEVEL}} difficulty.
+- Independently try every option in the stated context. Rewrite any item where another option is grammatical and meaningful; intended tense or meaning alone does not exclude an alternative. Add explicit contextual constraints when needed.
+- Use idiomatic vocabulary and collocations throughout the passage and questions. Check that verbs fit their objects and situations naturally; grammatical form alone is insufficient.
 - Follow the language policy for all learner-visible fields: passage, question, options, explanation, and passageRef.
 - One-sentence explanation per question.
 - Put the full generated reading text in the top-level `passage` field. For grammar, set `passage` to an empty string.

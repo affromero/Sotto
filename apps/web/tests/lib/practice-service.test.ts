@@ -24,6 +24,7 @@ const mockWritingPromptFindMany = vi.fn();
 const mockWritingPromptCount = vi.fn();
 const mockWritingResponseFindMany = vi.fn();
 const mockComposeListeningContent = vi.fn();
+const mockQueueListeningAudio = vi.fn();
 const mockComposeSpeakingPrompts = vi.fn();
 const mockPublishSpeakingPromptReferences = vi.fn();
 const mockComposeWritingPrompts = vi.fn();
@@ -82,6 +83,7 @@ vi.mock('@/lib/class-generation', () => ({
 
 vi.mock('@/lib/class-listening-generator', () => ({
   composeListeningContent: (...a: unknown[]) => mockComposeListeningContent(...a),
+  queueListeningAudio: (...a: unknown[]) => mockQueueListeningAudio(...a),
 }));
 vi.mock('@/lib/class-speaking-generator', () => ({
   composeSpeakingPrompts: (...a: unknown[]) => mockComposeSpeakingPrompts(...a),
@@ -108,6 +110,7 @@ const COURSE = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockCourseFindFirst.mockResolvedValue(COURSE);
+  mockLessonFindFirst.mockResolvedValue(null);
   mockGetPracticeFocusTargets.mockResolvedValue([]);
   mockMarkFocusTargetsPracticed.mockResolvedValue(undefined);
   mockPracticeSessionCreate.mockResolvedValue({ id: 'ps1' });
@@ -119,7 +122,12 @@ beforeEach(() => {
   mockWritingPromptFindMany.mockResolvedValue([]);
   mockWritingPromptCount.mockResolvedValue(0);
   mockWritingResponseFindMany.mockResolvedValue([]);
-  mockComposeListeningContent.mockResolvedValue({ episodeId: 'ep1', comprehensionQuestions: [] });
+  mockComposeListeningContent.mockResolvedValue({
+    episodeId: 'ep1',
+    comprehensionQuestions: [],
+    turns: [{ speaker: 'HOST', text: 'Hola.' }],
+  });
+  mockQueueListeningAudio.mockResolvedValue(undefined);
   mockComposeSpeakingPrompts.mockResolvedValue([
     { targetPhrase: 'Hola', translation: 'Hello', ipa: null, referenceTtsAudio: null },
   ]);
@@ -382,6 +390,91 @@ describe('startPractice — GRAMMAR', () => {
     expect(r.items[0].prompt).toContain('_____');
     expect(r.items[0].prompt).not.toContain('Choose the marked expression');
   });
+});
+
+describe('practice content topics', () => {
+  const due = {
+    vocab: [{ id: 'lv-due', lemma: 'mesa', translation: 'table', mastery: 0.4 }],
+    grammar: [{ id: 'lg-due', topicKey: 'prepositions', title: 'Prepositions', mastery: 0.3 }],
+  };
+  const focus = {
+    id: 'focus-place',
+    kind: 'SENTENCE',
+    text: 'Está al lado.',
+    normalizedText: 'está al lado.',
+    contextText: 'El café está al lado del parque.',
+    priorityBoost: 0.5,
+  };
+  const lesson = {
+    objective: '  Describe places in a neighborhood.  ',
+    grammarPoints: ['articles'],
+    targetVocab: [{ lemma: 'calle', gloss: 'street' }],
+  };
+
+  it('does not admit listening audio when the final practice association fails to persist', async () => {
+    mockGetDueItems.mockResolvedValue(due);
+    mockPracticeSessionCreate.mockRejectedValueOnce(new Error('Practice persistence failed'));
+    await expect(
+      startPractice('c1', 'u1', 'LISTENING', blockedProviderExecution('u1'))
+    ).rejects.toThrow('Practice persistence failed');
+    expect(mockQueueListeningAudio).not.toHaveBeenCalled();
+  });
+
+  it('uses the curriculum topic while retaining the exact due grammar and vocabulary', async () => {
+    mockGetDueItems.mockResolvedValue(due);
+    mockLessonFindFirst.mockResolvedValue(lesson);
+    mockGenerateSectionQuestions.mockResolvedValue(contextualQuestions(due.vocab));
+    const result = await startPractice('c1', 'u1', 'GRAMMAR', blockedProviderExecution('u1'));
+    expect(result.status).toBe('ready');
+    expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        objective: 'Describe places in a neighborhood.',
+        grammarPoints: ['prepositions'],
+        targetVocab: [{ lemma: 'mesa', gloss: 'table' }],
+      })
+    );
+    expect(mockPracticeSessionCreate.mock.calls[0][0].data.grammarKeys).toEqual(['prepositions']);
+  });
+
+  it.each([null, { ...lesson, objective: '   ' }])(
+    'keeps due-only listening about everyday content when no usable lesson objective exists',
+    async (currentLesson) => {
+      mockGetDueItems.mockResolvedValue(due);
+      mockLessonFindFirst.mockResolvedValue(currentLesson);
+      const result = await startPractice('c1', 'u1', 'LISTENING', blockedProviderExecution('u1'));
+      expect(result.status).toBe('ready');
+      expect(mockComposeListeningContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          objective: 'Everyday conversations and situations.',
+          mustIncludeVocab: [{ word: 'mesa', translation: 'table' }],
+        })
+      );
+    }
+  );
+
+  it.each([null, lesson])(
+    'retains focus material without turning it into the listening topic',
+    async (currentLesson) => {
+      mockGetDueItems.mockResolvedValue({ vocab: [], grammar: [] });
+      mockLessonFindFirst.mockResolvedValue(currentLesson);
+      mockGetPracticeFocusTargets.mockResolvedValue([focus]);
+      const result = await startPractice('c1', 'u1', 'LISTENING', blockedProviderExecution('u1'));
+      expect(result.status).toBe('ready');
+      expect(mockComposeListeningContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          objective: currentLesson
+            ? 'Describe places in a neighborhood.'
+            : 'Everyday conversations and situations.',
+          mustIncludeVocab: expect.arrayContaining([
+            { word: focus.text, translation: focus.contextText },
+          ]),
+        })
+      );
+      const stored = mockPracticeSessionCreate.mock.calls[0][0].data;
+      expect(stored.focusTargetIds).toEqual([focus.id]);
+      expect(stored.vocabLemmas).toContain(focus.text);
+    }
+  );
 });
 
 describe('startPractice — FULL', () => {

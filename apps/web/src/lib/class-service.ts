@@ -3,6 +3,10 @@
 // in a different form (retrieval practice / anti-copy).
 import { prisma } from './prisma';
 import { generateSectionQuestions } from './class-generation';
+import {
+  claimPristineRegeneration,
+  validatePristineRegeneration,
+} from './classes/regeneration/pristine';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
 import { prepareClassSource, type PreparedClassSource } from './class-source';
@@ -500,12 +504,16 @@ export async function createNextClass(
 export async function regenerateCurrentClass(
   classId: string,
   userId: string,
-  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
+  pristineSnapshot?: string
 ): Promise<boolean> {
-  const cls = await prisma.courseClass.findFirst({
-    where: { id: classId, course: { userId } },
-    include: { lesson: true, course: true },
-  });
+  if (execution.userId !== userId) throw new Error('Class regeneration owner changed.');
+  const cls = pristineSnapshot
+    ? await validatePristineRegeneration(classId, execution, pristineSnapshot)
+    : await prisma.courseClass.findFirst({
+        where: { id: classId, course: { userId } },
+        include: { lesson: true, course: true },
+      });
   if (!cls || cls.status === 'PASSED') return false;
   if (cls.status === 'GENERATING') throw new Error('Class is already regenerating.');
 
@@ -548,22 +556,26 @@ export async function regenerateCurrentClass(
   }
 
   const attempt = cls.attempt + 1;
-  await prisma.courseClass.update({
-    where: { id: classId },
-    data: {
-      status: 'GENERATING',
-      attempt,
-      sourceTitle,
-      sourceUrl,
-      adaptiveSeed: Prisma.JsonNull,
-      worksheetPdfUrl: null,
-      submittedAt: null,
-      passedAt: null,
-      failedAt: null,
-    },
-  });
-  await prisma.classSubmission.deleteMany({ where: { classId } });
-  await prisma.classSection.deleteMany({ where: { classId } });
+  if (pristineSnapshot) {
+    await claimPristineRegeneration(classId, execution, pristineSnapshot);
+  } else {
+    await prisma.courseClass.update({
+      where: { id: classId },
+      data: {
+        status: 'GENERATING',
+        attempt,
+        sourceTitle,
+        sourceUrl,
+        adaptiveSeed: Prisma.JsonNull,
+        worksheetPdfUrl: null,
+        submittedAt: null,
+        passedAt: null,
+        failedAt: null,
+      },
+    });
+    await prisma.classSubmission.deleteMany({ where: { classId } });
+    await prisma.classSection.deleteMany({ where: { classId } });
+  }
 
   try {
     const adaptiveSeed = await buildClassContent({
@@ -583,6 +595,8 @@ export async function regenerateCurrentClass(
       data: {
         status: 'AVAILABLE',
         adaptiveSeed,
+        sourceTitle,
+        sourceUrl,
       },
     });
     await prisma.course.update({ where: { id: cls.courseId }, data: { activeClassId: classId } });

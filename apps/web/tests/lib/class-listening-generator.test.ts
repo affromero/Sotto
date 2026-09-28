@@ -412,18 +412,34 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('marks the episode as generating audio before queueing segment audio', async () => {
+    it('keeps composed audio unqueued until the class association and questions persist', async () => {
       setupHappyPath();
-
+      let associationPersisted = false;
+      let questionsPersisted = false;
+      mockClassSectionCreate.mockImplementationOnce(async () => {
+        associationPersisted = true;
+        return { id: 'section-1' };
+      });
+      mockLessonQuestionCreateMany.mockImplementationOnce(async () => {
+        questionsPersisted = true;
+        return { count: 4 };
+      });
+      mockCreateSegmentsAndQueueAudio.mockImplementationOnce(async () => {
+        if (!associationPersisted || !questionsPersisted)
+          throw new Error('Unpublished learning association');
+      });
       await generateClassListening(PARAMS);
-
       expect(mockEpisodeUpdate).toHaveBeenCalledWith({
         where: { id: 'episode-1' },
-        data: { status: 'GENERATING_AUDIO' },
+        data: { status: 'SCRIPT_READY' },
       });
-      expect(mockEpisodeUpdate.mock.invocationCallOrder[0]).toBeLessThan(
-        mockCreateSegmentsAndQueueAudio.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
-      );
+    });
+
+    it('does not admit audio when persisting the class questions fails', async () => {
+      setupHappyPath();
+      mockLessonQuestionCreateMany.mockRejectedValueOnce(new Error('Question persistence failed'));
+      await expect(generateClassListening(PARAMS)).rejects.toThrow('Question persistence failed');
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('upserts each generated vocabulary word into learnerVocab', async () => {
@@ -644,6 +660,8 @@ describe('composeListeningContent', () => {
     const content = await composeListeningContent(CONTENT_PARAMS);
 
     expect(content.episodeId).toBe('episode-1');
+    expect(content.turns).toEqual(SAMPLE_TURNS);
+    expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     expect(content.comprehensionQuestions.length).toBeGreaterThan(0);
     expect(content.comprehensionQuestions[0]).toMatchObject({
       question: expect.any(String),
@@ -737,9 +755,7 @@ describe('composeListeningContent', () => {
         SAMPLE_SCRIPT_RESULT.turns,
         CONTENT_PARAMS.execution
       );
-      expect(mockVerifyEpisodeReferences.mock.invocationCallOrder[0]).toBeLessThan(
-        mockCreateSegmentsAndQueueAudio.mock.invocationCallOrder[0]
-      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('does not create audio when no cited claim can be verified', async () => {
@@ -794,24 +810,19 @@ describe('composeListeningContent', () => {
       });
 
       await expect(composeListeningContent(SOURCED_PARAMS)).resolves.toBeDefined();
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
-    it('still creates segments exactly once (no double-queue)', async () => {
+    it('leaves sourced content ready for its caller to attach before audio admission', async () => {
       setupHappyPath();
       mockGenerateScript.mockResolvedValue({
         ...SAMPLE_SCRIPT_RESULT,
         references: SOURCED_REFERENCES,
       });
 
-      await composeListeningContent(SOURCED_PARAMS);
-
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
-        'episode-1',
-        SAMPLE_TURNS,
-        expect.objectContaining({ authorize: expect.any(Function) })
-      );
+      const content = await composeListeningContent(SOURCED_PARAMS);
+      expect(content.turns).toEqual(SAMPLE_TURNS);
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
   });
 });

@@ -246,6 +246,74 @@ suite('audio generation through real transactions, local storage and Redis', () 
     }
   );
 
+  it('retries a stale same-speaker voice snapshot without repeating either segment speech request', async () => {
+    const { episode, segment, job } = await fixture();
+    const second = await instance.database.segment.create({
+      data: { episodeId: episode.id, speaker: 'HOST', text: 'Buenos días.', order: 1 },
+    });
+    const secondJob = await audioGenerationQueue.add('generate_audio', {
+      ...job.data,
+      segmentId: second.id,
+      segmentVersion: second.version,
+      text: second.text,
+    });
+    let snapshotRead!: () => void;
+    const captured = new Promise<void>((resolve) => {
+      snapshotRead = resolve;
+    });
+    let releaseSnapshot!: () => void;
+    const released = new Promise<void>((resolve) => {
+      releaseSnapshot = resolve;
+    });
+    let paused = false;
+    binding.database = instance.database.$extends({
+      query: {
+        episode: {
+          async findUniqueOrThrow({ args, query }) {
+            const result = await query(args);
+            if (!paused && args.select?.voices) {
+              paused = true;
+              snapshotRead();
+              await released;
+            }
+            return result;
+          },
+        },
+      },
+    }) as unknown as PrismaClient;
+    const firstAttempt = processAudioGeneration(job).then(
+      () => null,
+      (error: unknown) => error
+    );
+    try {
+      await captured;
+      await processAudioGeneration(secondJob);
+      releaseSnapshot();
+      expect(await firstAttempt).toMatchObject({
+        message: 'Episode storage ownership or inputs changed',
+      });
+      expect(requests).toHaveLength(1);
+      expect(
+        (await instance.database.segment.findUniqueOrThrow({ where: { id: segment.id } })).audioUrl
+      ).toBeNull();
+
+      await processAudioGeneration(job);
+      const voice = await instance.database.episodeVoice.findUniqueOrThrow({
+        where: { episodeId_speaker: { episodeId: episode.id, speaker: 'HOST' } },
+      });
+      expect(requests).toHaveLength(2);
+      expect(requests.map((request) => request.voice)).toEqual([voice.voiceId, voice.voiceId]);
+      const saved = await instance.database.segment.findMany({ where: { episodeId: episode.id } });
+      expect(saved).toHaveLength(2);
+      expect(saved.every((item) => !!item.audioUrl)).toBe(true);
+      expect(await queuedStitches(episode.id)).toHaveLength(1);
+    } finally {
+      releaseSnapshot();
+      await firstAttempt;
+      binding.database = instance.database;
+    }
+  });
+
   it('retains unreferenced write attribution when the segment commit fails', async () => {
     const { episode, segment, job } = await fixture();
     await instance.database.$executeRawUnsafe(

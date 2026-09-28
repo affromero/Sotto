@@ -11,6 +11,13 @@ import {
   regenerateFailedSections,
 } from '@/lib/class-service';
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
+import { z } from 'zod';
+import {
+  pristineSnapshotSchema,
+  PristineRegenerationConflict,
+  readPristineRegenerationSnapshot,
+  validatePristineRegeneration,
+} from '@/lib/classes/regeneration/pristine';
 
 type RouteParams = { params: Promise<{ classId: string }> };
 
@@ -33,8 +40,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!authed) return errorResponse('Unauthorized', 401);
     const { classId } = await params;
 
+    const pristineSnapshot =
+      request.nextUrl.searchParams.get('pristineSnapshot') === '1'
+        ? await readPristineRegenerationSnapshot(classId, sottoRequestExecution(request, authed))
+        : undefined;
     const cls = await getClassForUser(classId, authed.userId);
     if (!cls) return errorResponse('Class not found', 404);
+    if (pristineSnapshot)
+      await validatePristineRegeneration(
+        classId,
+        sottoRequestExecution(request, authed),
+        pristineSnapshot
+      );
 
     const submitted = cls.submission !== null;
     const sections = cls.sections.map((s) => ({
@@ -124,6 +141,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json({
+      ...(pristineSnapshot ? { pristineSnapshot } : {}),
       id: cls.id,
       courseId: cls.courseId,
       status: cls.status,
@@ -150,6 +168,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       sections,
     });
   } catch (error: unknown) {
+    if (error instanceof PristineRegenerationConflict) return errorResponse(error.message, 409);
     logger.error('Failed to load class', {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -163,7 +182,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const { classId } = await params;
-    const body = (await request.json().catch(() => ({}))) as { scope?: unknown };
+    const parsed = z
+      .object({
+        scope: z.unknown().optional(),
+        pristineSnapshot: pristineSnapshotSchema.optional(),
+      })
+      .safeParse(await request.json().catch(() => ({})));
+    if (!parsed.success) return errorResponse('Invalid regeneration request', 400);
+    const body = parsed.data;
+    if (body.pristineSnapshot && body.scope !== 'class')
+      return errorResponse('Pristine regeneration requires class scope', 400);
+    if (body.pristineSnapshot && wantsBackgroundRegeneration(request))
+      return errorResponse('Pristine regeneration requires a synchronous request', 400);
 
     if (body.scope === 'class') {
       if (wantsBackgroundRegeneration(request)) {
@@ -192,7 +222,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const ok = await regenerateCurrentClass(
         classId,
         authed.userId,
-        sottoRequestExecution(request, authed)
+        sottoRequestExecution(request, authed),
+        body.pristineSnapshot
       );
       if (!ok) return errorResponse('Class not found or already passed.', 400);
       return NextResponse.json({ regenerated: true, scope: 'class' });
@@ -206,6 +237,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!ok) return errorResponse('No failed sections to regenerate (or class not found).', 400);
     return NextResponse.json({ regenerated: true });
   } catch (error: unknown) {
+    if (error instanceof PristineRegenerationConflict) return errorResponse(error.message, 409);
     const message = error instanceof Error ? error.message : 'Failed to regenerate sections';
     logger.error('Failed to regenerate sections', { error: message });
     return errorResponse(message, 500);

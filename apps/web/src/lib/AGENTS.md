@@ -40,6 +40,24 @@ credentials are errors, never a reason to choose another provider. Full practice
 and class submission require usable listening audio and graded speaking work
 before updating progress. Class mastery also requires passing both oral sections.
 
+`classes/section-quality.ts` validates independent review verdicts for grammar,
+reading, and contextual vocabulary. `class-generation.ts` rejects malformed
+question structure before review, then uses the same captured provider and
+authority for a separate solve without the proposed key or explanations. Both
+normal and JSON-repaired candidates must pass. Two generation attempts and one
+optional repair bound the work, with at most one review per valid candidate.
+These review requests consume the existing preparation budget. Provider errors
+and cancellation propagate without retrying under another provider. This is a
+probabilistic check of questions, options, and passages, not an explanation audit.
+
+`classes/regeneration/pristine.ts` supports optional guarded class regeneration.
+The existing class GET with `pristineSnapshot=1` returns an opaque content hash;
+the synchronous class POST accepts it alongside `scope: 'class'`. Revalidate
+ownership, the full snapshot, absence of learner work, and settled linked jobs
+before deleting pristine sections in the serializable admission transaction.
+Conflicts return 409; async guarded requests return 400. Never delete submissions
+through this guarded path.
+
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks
 configuration and authority after lock release. `storage-probe.ts` supplies owner

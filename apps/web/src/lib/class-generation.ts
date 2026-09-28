@@ -8,6 +8,12 @@ import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy } from './classes/class-language-policy';
+import {
+  assessSectionReview,
+  sectionReviewInput,
+  SECTION_QUALITY_JSON_SCHEMA,
+  SectionQualityError,
+} from './classes/section-quality';
 import type { SkillType } from '@sotto/shared';
 
 const QUESTIONS_PER_SECTION = 5;
@@ -192,7 +198,7 @@ function loggedOutputSnippet(content: string): string {
   return sanitizeLlmJson(content).replace(/\s+/g, ' ').slice(0, LOGGED_OUTPUT_SNIPPET_CHARS);
 }
 
-function buildRepairPrompt(content: string, previousError: string): string {
+function buildRepairPrompt(content: string, previousError: string, count: number): string {
   return [
     'Repair the malformed response below into ONLY valid JSON matching the class_section_questions schema.',
     `Parser error: ${previousError}`,
@@ -200,7 +206,7 @@ function buildRepairPrompt(content: string, previousError: string): string {
     'Rules:',
     '- Preserve the educational meaning where possible.',
     '- Return one top-level `passage` string. Use an empty string for grammar.',
-    `- Return at most ${QUESTIONS_PER_SECTION} questions.`,
+    `- Return exactly ${count} questions.`,
     '- Each question must have exactly 4 options and a 0-based correctIndex.',
     '- Include passageRef as a short anchor to the reading passage, or an empty string for grammar.',
     '- No markdown fences, prose, comments, or trailing commas.',
@@ -212,6 +218,7 @@ function buildRepairPrompt(content: string, previousError: string): string {
 
 function normalizeQuestions(
   raw: RawGeneratedQuestion[],
+  count: number,
   useSourcePassage: boolean,
   sourceContent?: string,
   generatedPassage?: string
@@ -221,25 +228,34 @@ function normalizeQuestions(
     : generatedPassage?.trim()
       ? generatedPassage.trim()
       : undefined;
-  return raw
-    .filter(
+  if (
+    raw.length !== count ||
+    !raw.every(
       (q) =>
+        q &&
         typeof q.question === 'string' &&
+        q.question.trim().length > 0 &&
+        typeof q.explanation === 'string' &&
+        q.explanation.trim().length > 0 &&
         Array.isArray(q.options) &&
         q.options.length === 4 &&
-        q.options.every((option) => typeof option === 'string') &&
-        Number.isFinite(
-          typeof q.correctIndex === 'number' ? q.correctIndex : Number(q.correctIndex)
-        )
+        q.options.every((option) => typeof option === 'string' && option.trim().length > 0) &&
+        new Set(q.options.map((option: string) => option.trim().toLowerCase())).size === 4 &&
+        typeof q.correctIndex === 'number' &&
+        Number.isInteger(q.correctIndex) &&
+        q.correctIndex >= 0 &&
+        q.correctIndex <= 3
     )
-    .map((q) => ({
-      question: q.question as string,
-      options: (q.options as string[]).slice(0, 4),
-      correctIndex: Math.max(0, Math.min(3, Number(q.correctIndex))),
-      explanation: typeof q.explanation === 'string' ? q.explanation : '',
-      passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
-      passageText: readingPassage,
-    }));
+  )
+    throw new Error('response contained no usable questions: invalid question structure or count');
+  return raw.map((q) => ({
+    question: q.question as string,
+    options: (q.options as string[]).slice(0, 4),
+    correctIndex: q.correctIndex as number,
+    explanation: typeof q.explanation === 'string' ? q.explanation : '',
+    passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
+    passageText: readingPassage,
+  }));
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
@@ -278,8 +294,41 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   });
 
   const provider = createAIProvider(ai.provider);
+  const reviewPrompt = loadAndRender('class/review-section-quiz.md', {
+    LEVEL: p.level,
+    NATIVE: p.nativeLang,
+    TARGET: p.targetLang,
+    SKILL: skill,
+    LANGUAGE_POLICY: classLanguagePolicy({
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+    }),
+  });
+  const review = async (questions: GeneratedQuestion[]): Promise<string[]> => {
+    const response = await provider.generateResponse(
+      reviewPrompt,
+      [{ role: 'user', content: sectionReviewInput(questions) }],
+      {
+        ...(await capturedLearningAiOptions(ai)),
+        maxTokens: 2048,
+        temperature: 0,
+        jsonSchema: SECTION_QUALITY_JSON_SCHEMA,
+      }
+    );
+    logUsage({
+      service: ai.provider,
+      model: response.model,
+      category: 'class-section-review',
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+      userId: p.userId,
+    });
+    return assessSectionReview(response.content, questions, useSourcePassage);
+  };
   let lastError = 'invalid class-section output';
   let lastMalformedContent = '';
+  let qualityFailed = false;
 
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
     const response = await provider.generateResponse(
@@ -307,28 +356,33 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       userId: p.userId,
     });
 
+    let candidate: GeneratedQuestion[] | undefined;
     try {
       const parsed = parseGeneratedQuestions(response.content);
       const questions = normalizeQuestions(
         parsed.questions,
+        count,
         useSourcePassage,
         p.sourceContent,
         p.skill === 'READING' ? parsed.passage : undefined
       );
-      if (questions.length === 0) {
-        lastError = 'response contained no usable questions';
-        lastMalformedContent = '';
-        continue;
-      }
-      if (p.skill === 'READING' && !useSourcePassage && !questions.some((q) => q.passageText)) {
+      if (p.skill === 'READING' && !questions[0].passageText?.trim()) {
         lastError = 'reading response omitted the required passage';
         lastMalformedContent = response.content;
         continue;
       }
-      return questions;
+      candidate = questions;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       lastMalformedContent = response.content;
+    }
+
+    if (candidate) {
+      const issues = await review(candidate);
+      if (issues.length === 0) return candidate;
+      qualityFailed = true;
+      lastError = `educational quality: ${issues.join(', ')}`;
+      lastMalformedContent = '';
     }
 
     if (attempt < MAX_GENERATION_ATTEMPTS) {
@@ -347,49 +401,53 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       outputSnippet: loggedOutputSnippet(lastMalformedContent),
     });
 
+    const repairResponse = await provider.generateResponse(
+      [
+        systemPrompt,
+        '',
+        'You are repairing malformed JSON. Return ONLY valid JSON matching the provided schema.',
+      ].join('\n'),
+      [{ role: 'user', content: buildRepairPrompt(lastMalformedContent, lastError, count) }],
+      {
+        ...(await capturedLearningAiOptions(ai)),
+        maxTokens: 4096,
+        temperature: 0,
+        jsonSchema: CLASS_SECTION_QUIZ_JSON_SCHEMA,
+      }
+    );
+
+    logUsage({
+      service: ai.provider,
+      model: repairResponse.model,
+      category: 'class-section-repair',
+      inputTokens: repairResponse.inputTokens,
+      outputTokens: repairResponse.outputTokens,
+      userId: p.userId,
+    });
+
+    let candidate: GeneratedQuestion[] | undefined;
     try {
-      const repairResponse = await provider.generateResponse(
-        [
-          systemPrompt,
-          '',
-          'You are repairing malformed JSON. Return ONLY valid JSON matching the provided schema.',
-        ].join('\n'),
-        [{ role: 'user', content: buildRepairPrompt(lastMalformedContent, lastError) }],
-        {
-          ...(await capturedLearningAiOptions(ai)),
-          maxTokens: 4096,
-          temperature: 0,
-          jsonSchema: CLASS_SECTION_QUIZ_JSON_SCHEMA,
-        }
-      );
-
-      logUsage({
-        service: ai.provider,
-        model: repairResponse.model,
-        category: 'class-section-repair',
-        inputTokens: repairResponse.inputTokens,
-        outputTokens: repairResponse.outputTokens,
-        userId: p.userId,
-      });
-
       const parsed = parseGeneratedQuestions(repairResponse.content);
       const questions = normalizeQuestions(
         parsed.questions,
+        count,
         useSourcePassage,
         p.sourceContent,
         p.skill === 'READING' ? parsed.passage : undefined
       );
-      if (questions.length === 0) {
-        lastError = 'repaired response contained no usable questions';
-        throw new Error(lastError);
-      }
-      if (p.skill === 'READING' && !useSourcePassage && !questions.some((q) => q.passageText)) {
+      if (p.skill === 'READING' && !questions[0].passageText?.trim()) {
         lastError = 'repaired reading response omitted the required passage';
         throw new Error(lastError);
       }
-      return questions;
+      candidate = questions;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
+    }
+    if (candidate) {
+      const issues = await review(candidate);
+      if (issues.length === 0) return candidate;
+      qualityFailed = true;
+      lastError = `educational quality: ${issues.join(', ')}`;
     }
   }
 
@@ -397,9 +455,9 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     error: lastError,
     outputSnippet: lastMalformedContent ? loggedOutputSnippet(lastMalformedContent) : undefined,
   });
+  if (qualityFailed) throw new SectionQualityError();
   throw new Error(
-    lastError === 'response contained no usable questions' ||
-      lastError === 'repaired response contained no usable questions'
+    lastError.includes('no usable questions')
       ? 'Class generation produced no usable questions.'
       : 'Class generation returned malformed output.'
   );

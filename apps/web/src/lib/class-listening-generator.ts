@@ -2,7 +2,7 @@
 // 1. Creates a CLASS episode seeded with due vocabulary.
 // 2. Generates a short conversational script via generateScript().
 // 3. Persists Script and VocabularyEntry rows for the class episode.
-// 4. Queues audio generation via createSegmentsAndQueueAudio().
+// 4. Holds the script until its final learning association is persisted.
 // 5. Upserts each generated vocab word into the learner's knowledge graph.
 // 6. Generates comprehension MC questions over the transcript.
 // 7. Creates the ClassSection + LessonQuestion rows (status: READY).
@@ -56,7 +56,7 @@ interface ListeningComprehensionQuestion {
   explanation: string;
 }
 
-// Content-only listening generation: builds the CLASS episode (script → audio)
+// Content-only listening generation: builds the CLASS episode and script
 // and the comprehension questions, feeds generated vocab into the memory graph,
 // and returns both. The caller decides where to persist the questions (a class
 // section, or a practice session). No ClassSection/LessonQuestion rows here.
@@ -86,6 +86,24 @@ export interface ListeningContentParams {
 export interface ListeningContent {
   episodeId: string;
   comprehensionQuestions: ListeningComprehensionQuestion[];
+  turns: Array<{ speaker: string; text: string; direction?: string }>;
+}
+
+/** Admit audio only after the caller has persisted the final learning association. */
+export async function queueListeningAudio(
+  content: ListeningContent,
+  execution: SottoProviderExecution
+) {
+  const registerAudioEpisode = execution.registerAudioEpisode;
+  await createSegmentsAndQueueAudio(content.episodeId, content.turns, {
+    authorize: execution.authorize,
+    ...(registerAudioEpisode
+      ? {
+          onPrepared: (database, audioGenerationKey) =>
+            registerAudioEpisode(database, content.episodeId, audioGenerationKey),
+        }
+      : {}),
+  });
 }
 
 /**
@@ -228,25 +246,11 @@ export async function composeListeningContent(
       }
     }
 
-    // Step 5: queue audio generation segments. Class listening audio uses the
-    // same worker path as normal episodes, so it must enter GENERATING_AUDIO
-    // before the segment jobs run.
+    // The caller attaches the class, practice, or exam before admitting audio.
     await prisma.episode.update({
       where: { id: episodeId },
-      data: { status: p.deferAudio ? 'SCRIPT_READY' : 'GENERATING_AUDIO' },
+      data: { status: 'SCRIPT_READY' },
     });
-    if (!p.deferAudio) {
-      const registerAudioEpisode = p.execution.registerAudioEpisode;
-      await createSegmentsAndQueueAudio(episodeId, result.turns, {
-        authorize: p.execution.authorize,
-        ...(registerAudioEpisode
-          ? {
-              onPrepared: (database, audioGenerationKey) =>
-                registerAudioEpisode(database, episodeId, audioGenerationKey),
-            }
-          : {}),
-      });
-    }
 
     // Step 6: log usage
     logUsage({
@@ -356,7 +360,7 @@ export async function composeListeningContent(
       throw new Error('Listening quiz generation produced no usable questions.');
     }
 
-    return { episodeId, comprehensionQuestions: questions };
+    return { episodeId, comprehensionQuestions: questions, turns: result.turns };
   } catch (err) {
     // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
     await prisma.episode
@@ -372,7 +376,7 @@ export async function generateClassListening(
   p: ClassListeningParams
 ): Promise<ClassListeningResult> {
   const attempt = p.attempt ?? 1;
-  const { episodeId, comprehensionQuestions } = await composeListeningContent({
+  const content = await composeListeningContent({
     userId: p.userId,
     execution: p.execution,
     courseId: p.courseId,
@@ -388,6 +392,7 @@ export async function generateClassListening(
     sourceMetadata: p.sourceMetadata,
     sourceUrl: p.sourceUrl,
   });
+  const { episodeId, comprehensionQuestions } = content;
 
   try {
     const section = await prisma.classSection.create({
@@ -414,6 +419,8 @@ export async function generateClassListening(
         explanation: q.explanation,
       })),
     });
+
+    if (!p.deferAudio) await queueListeningAudio(content, p.execution);
 
     logger.info('Listening section generated', {
       classId: p.classId,

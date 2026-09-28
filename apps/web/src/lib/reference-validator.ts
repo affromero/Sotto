@@ -297,21 +297,20 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
       };
     }
 
-    // CrossRef doesn't know this DOI. Many real DOIs are DataCite-registered
-    // (institutional resources like grammis, datasets, reports), so check the
-    // other major registrar — with the same title gate — before treating the
-    // DOI as fabricated.
+    // CrossRef did not return metadata. Check DataCite with the same title
+    // gate, preserving unavailable responses as missing evidence.
     const dcResponse = await fetchWithTimeout(
       `https://api.datacite.org/dois/${encodeURIComponent(cleanDoi)}`,
       8000
     );
 
     if (!dcResponse.ok) {
+      const absent = response.status === 404 && dcResponse.status === 404;
       return {
         layer: 'doi',
         passed: false,
-        confidence: 0,
-        detail: `DOI not found (CrossRef ${response.status}, DataCite ${dcResponse.status})`,
+        confidence: absent ? 0 : 0.5,
+        detail: `${absent ? 'DOI not found' : 'DOI verification unavailable'} (CrossRef ${response.status}, DataCite ${dcResponse.status})`,
       };
     }
 

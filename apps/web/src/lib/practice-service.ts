@@ -14,7 +14,7 @@ import type {
 } from './practice/types';
 export type { PracticeAnswer, PracticeMcItemPublic, SubmitPracticeResult } from './practice/types';
 import { generateSectionQuestions } from './class-generation';
-import { composeListeningContent } from './class-listening-generator';
+import { composeListeningContent, queueListeningAudio } from './class-listening-generator';
 import {
   composeSpeakingPrompts,
   publishSpeakingPromptReferences,
@@ -190,15 +190,15 @@ async function resolveSeed(
 ): Promise<PracticeSeed | null> {
   const grammarPoints = due.grammar.map((g) => g.topicKey);
   const targetVocab = due.vocab.map((v) => ({ lemma: v.lemma, gloss: v.translation }));
-  if (grammarPoints.length > 0 || targetVocab.length > 0) {
-    return { objective: 'Review what is due for spaced repetition.', grammarPoints, targetVocab };
-  }
-
   const lesson = await prisma.lesson.findFirst({
     where: { curriculumId: course.curriculumId, level: course.currentLevel },
     orderBy: { order: 'asc' },
     select: { objective: true, grammarPoints: true, targetVocab: true },
   });
+  const objective = lesson?.objective.trim() || 'Everyday conversations and situations.';
+  if (grammarPoints.length > 0 || targetVocab.length > 0) {
+    return { objective, grammarPoints, targetVocab };
+  }
   if (!lesson) return null;
   const lessonVocab = (Array.isArray(lesson.targetVocab) ? lesson.targetVocab : []) as Array<{
     lemma: string;
@@ -208,13 +208,13 @@ async function resolveSeed(
     Array.isArray(lesson.grammarPoints) ? lesson.grammarPoints : []
   ) as string[];
   if (lessonGrammar.length === 0 && lessonVocab.length === 0) return null;
-  return { objective: lesson.objective, grammarPoints: lessonGrammar, targetVocab: lessonVocab };
+  return { objective, grammarPoints: lessonGrammar, targetVocab: lessonVocab };
 }
 
 function focusSeedFallback(focusTargets: FocusPracticeTarget[]): PracticeSeed | null {
   if (focusTargets.length === 0) return null;
   return {
-    objective: 'Practice learner-marked difficult material from previous classes.',
+    objective: 'Everyday conversations and situations.',
     grammarPoints: [],
     targetVocab: [],
   };
@@ -226,9 +226,8 @@ function applyFocusToSeed(seed: PracticeSeed, focusTargets: FocusPracticeTarget[
     lemma: target.text,
     gloss: target.contextText ?? '',
   }));
-  const focusText = focusTargets.map((target) => target.text).join('; ');
   return {
-    objective: `${seed.objective} Prioritize learner-marked difficult material: ${focusText}.`,
+    objective: seed.objective,
     grammarPoints: seed.grammarPoints,
     targetVocab: uniqueVocab([...focusVocab, ...seed.targetVocab]),
   };
@@ -603,6 +602,8 @@ async function startFull(
     referenceTtsUrl: references.get(prompt.id) ?? prompt.referenceTtsUrl,
   }));
 
+  await queueListeningAudio(listening, execution);
+
   logger.info('Full practice generated', {
     sessionId: session.id,
     itemCount: String(items.length),
@@ -628,7 +629,7 @@ async function startListening(
   focusTargets: FocusPracticeTarget[],
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
 ): Promise<StartPracticeResult> {
-  const { episodeId, comprehensionQuestions } = await composeListeningContent({
+  const listening = await composeListeningContent({
     userId: course.userId,
     execution,
     courseId: course.id,
@@ -639,6 +640,7 @@ async function startListening(
     mustIncludeVocab: seed.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
     note,
   });
+  const { episodeId, comprehensionQuestions } = listening;
   const items: PracticeMcItem[] = comprehensionQuestions.map((q, i) => ({
     id: `l${i}`,
     prompt: q.question,
@@ -662,6 +664,7 @@ async function startListening(
       focusTargetIds: focusTargets.map((target) => target.id),
     },
   });
+  await queueListeningAudio(listening, execution);
   return {
     status: 'ready',
     sessionId: session.id,
