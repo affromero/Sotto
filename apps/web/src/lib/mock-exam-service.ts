@@ -13,7 +13,7 @@ import {
 } from './exam-blueprint';
 import { resolveExamSpec, type ExamSpec } from './exam-spec';
 import { generateSectionQuestions } from './class-generation';
-import { composeListeningContent } from './class-listening-generator';
+import { composeListeningContent, queueListeningAudio } from './class-listening-generator';
 import {
   composeSpeakingPrompts,
   publishSpeakingPromptReferences,
@@ -161,7 +161,7 @@ async function buildExamSection(
         })),
       });
     } else if (section.format === 'listening') {
-      const { episodeId, comprehensionQuestions } = await composeListeningContent({
+      const listening = await composeListeningContent({
         userId: course.userId,
         execution,
         courseId: course.id,
@@ -172,6 +172,7 @@ async function buildExamSection(
         mustIncludeVocab: spec.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
         note,
       });
+      const { episodeId, comprehensionQuestions } = listening;
       await prisma.examSection.update({ where: { id: examSection.id }, data: { episodeId } });
       await prisma.examQuestion.createMany({
         data: comprehensionQuestions.slice(0, section.itemCount).map((q, i) => ({
@@ -184,6 +185,7 @@ async function buildExamSection(
           explanation: q.explanation,
         })),
       });
+      await queueListeningAudio(listening, execution);
     } else if (section.format === 'speaking') {
       const composed = await composeSpeakingPrompts({
         execution,

@@ -54,10 +54,12 @@ export async function sendPushToSubscription(
   message: PushMessage
 ): Promise<'delivered' | 'disabled'> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) return 'disabled';
-  pushTransport ??= import('web-push').catch((error: unknown) => {
-    pushTransport = undefined;
-    throw error;
-  });
+  pushTransport ??= import('web-push')
+    .then((module) => module.default)
+    .catch((error: unknown) => {
+      pushTransport = undefined;
+      throw error;
+    });
   const webpush = await pushTransport;
   await webpush.sendNotification(
     {

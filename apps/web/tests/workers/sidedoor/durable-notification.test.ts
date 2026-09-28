@@ -36,7 +36,7 @@ vi.mock('@/lib/prisma', async () => {
   );
   return { prisma: database, prismaUnfiltered: database };
 });
-vi.mock('web-push', () => ({ sendNotification: boundary.send }));
+vi.mock('web-push', () => ({ default: { sendNotification: boundary.send } }));
 vi.mock('@/lib/redis', () => ({ publishNotification: boundary.publish }));
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('durable notification inbox and device receipts', () => {

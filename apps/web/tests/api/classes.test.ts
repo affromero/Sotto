@@ -414,7 +414,8 @@ describe('POST /api/v1/classes/[classId] (regenerate)', () => {
     expect(mockRegenerateCurrentClass).toHaveBeenCalledWith(
       'class-1',
       'u1',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) })
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
+      undefined
     );
     expect(mockRegenerateFailedSections).not.toHaveBeenCalled();
     const body = await res.json();
@@ -649,13 +650,20 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
     mockReadPreparation.mockResolvedValue(null);
   });
 
-  function generationState(status: string, classId = 'older-class', classCreatedAt = 2000) {
+  function generationState(
+    status: string,
+    classId = 'older-class',
+    classCreatedAt = 2000,
+    attempt = 1,
+    classStatus = 'AVAILABLE'
+  ) {
     mockCourseFindFirst.mockResolvedValue({
       id: 'course-1',
       classes: [
         {
           id: 'current-class',
-          status: 'AVAILABLE',
+          status: classStatus,
+          attempt,
           createdAt: new Date(classCreatedAt),
           updatedAt: new Date(3000),
           lesson: { title: 'Current lesson' },
@@ -708,13 +716,38 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
   it.each(['QUEUED', 'RUNNING', 'CANCELLING', 'UNRESOLVED'])(
     'keeps unresolved or active preparation visible: %s',
     async (status) => {
-      generationState(status);
+      generationState(status, 'current-class', 500, 2);
       expect(await progress()).toMatchObject({
         operationId: 'operation-1',
         operationStatus: status,
       });
     }
   );
+  it.each([
+    ['FAILED', 'GENERATING'],
+    ['FAILED', 'AVAILABLE'],
+    ['FAILED', 'FAILED'],
+    ['CANCELLED', 'GENERATING'],
+    ['CANCELLED', 'AVAILABLE'],
+    ['CANCELLED', 'FAILED'],
+    ['COMPLETED', 'AVAILABLE'],
+  ])('shows the regenerated class after %s preparation as %s', async (status, classStatus) => {
+    generationState(status, 'current-class', 500, 2, classStatus);
+    mockReadPreparation.mockResolvedValue({
+      ...(await mockReadPreparation()),
+      result: status === 'COMPLETED' ? 'gated' : null,
+    });
+    const body = await progress();
+    expect(body).toMatchObject({ classId: 'current-class', status: classStatus });
+    expect(body).not.toHaveProperty('operationId');
+  });
+  it('keeps cancellation visible for the original class attempt', async () => {
+    generationState('CANCELLED', 'current-class', 500);
+    expect(await progress()).toMatchObject({
+      operationId: 'operation-1',
+      operationStatus: 'CANCELLED',
+    });
+  });
   it.each(['FAILED', 'CANCELLED', 'COMPLETED'])(
     'retains terminal preparation when the other class is not newer: %s',
     async (status) => {

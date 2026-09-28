@@ -153,6 +153,9 @@ suite('persisted mock exams', () => {
       include: { sections: true },
     });
     expect(saved.status).toBe('FAILED');
+    expect(
+      await instance.database.segment.count({ where: { episode: { userId: identity.ownerId } } })
+    ).toBe(0);
     expect(saved.sections.map(({ skill, status }) => ({ skill, status }))).toEqual(
       expect.arrayContaining([
         { skill: 'READING', status: 'FAILED' },
@@ -188,13 +191,26 @@ suite('persisted mock exams', () => {
       const request = new Request(input, init);
       if (request.url !== 'http://localhost:11434/v1/chat/completions')
         throw new Error(`Unexpected provider destination: ${request.url}`);
-      const body = (await request.json()) as { messages: Array<{ role: string; content: string }> };
+      const body = (await request.json()) as {
+        messages: Array<{ role: string; content: string }>;
+        response_format?: { json_schema?: { name?: string } };
+      };
       const prompt = body.messages
         .filter((message) => message.role === 'user')
         .map((message) => message.content)
         .join('\n');
       let content: unknown;
-      if (/writing tasks/.test(prompt))
+      if (body.response_format?.json_schema?.name === 'class_section_quality') {
+        content = {
+          passageAcceptable: true,
+          issues: [],
+          questions: Array.from({ length: 5 }, (_, index) => ({
+            index,
+            acceptableOptionIndices: [0],
+            issues: [],
+          })),
+        };
+      } else if (/writing tasks/.test(prompt))
         content = [
           {
             task: 'Schreibe eine Einladung mit diesen Angaben.',
@@ -209,14 +225,18 @@ suite('persisted mock exams', () => {
         content = {
           passage: 'Anna trinkt morgens Kaffee.',
           questions: [
-            {
-              question: 'Was trinkt Anna?',
-              options: ['Kaffee', 'Tee', 'Wasser', 'Saft'],
-              correctIndex: 0,
-              explanation: 'Anna drinks coffee.',
-              passageRef: 'first sentence',
-            },
-          ],
+            'Was trinkt Anna?',
+            'Welches Getränk trinkt Anna morgens?',
+            'Was steht morgens in Annas Tasse?',
+            'Welches Getränk nennt der Text?',
+            'Was trinkt Anna am Morgen?',
+          ].map((question) => ({
+            question,
+            options: ['Kaffee', 'Tee', 'Wasser', 'Saft'],
+            correctIndex: 0,
+            explanation: 'Anna drinks coffee.',
+            passageRef: 'first sentence',
+          })),
         };
       else
         return Response.json(
@@ -253,7 +273,7 @@ suite('persisted mock exams', () => {
     });
     expect(saved.sections.find((section) => section.skill === 'READING')).toMatchObject({
       status: 'READY',
-      questions: [
+      questions: expect.arrayContaining([
         expect.objectContaining({
           question: 'Was trinkt Anna?',
           options: ['Kaffee', 'Tee', 'Wasser', 'Saft'],
@@ -261,7 +281,7 @@ suite('persisted mock exams', () => {
           explanation: 'Anna drinks coffee.',
           passageText: 'Anna trinkt morgens Kaffee.',
         }),
-      ],
+      ]),
     });
     expect(saved.sections.find((section) => section.skill === 'WRITING')).toMatchObject({
       status: 'READY',

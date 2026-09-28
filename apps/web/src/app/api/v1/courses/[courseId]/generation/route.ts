@@ -174,6 +174,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         select: {
           id: true,
           status: true,
+          attempt: true,
           createdAt: true,
           updatedAt: true,
           lesson: { select: { title: true } },
@@ -194,12 +195,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const operation = await readClassPreparation(courseId, authed.userId);
   const cls = course.classes[0];
+  // Durable preparation creates attempt 1; whole-class regeneration owns later attempts.
   const terminalOperationSuperseded =
     operation &&
     cls &&
     ['FAILED', 'CANCELLED', 'COMPLETED'].includes(operation.status) &&
-    cls.id !== operation.classId &&
-    cls.createdAt.getTime() > operation.updatedAt;
+    (cls.id === operation.classId
+      ? cls.attempt > 1
+      : cls.createdAt.getTime() > operation.updatedAt);
   if (
     !terminalOperationSuperseded &&
     operation?.status === 'COMPLETED' &&
@@ -236,7 +239,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const progress = clamp(described.progress, 0, 1);
 
   return NextResponse.json({
-    ...(operation?.status === 'COMPLETED' && operation.classId === cls.id
+    ...(!terminalOperationSuperseded &&
+    operation?.status === 'COMPLETED' &&
+    operation.classId === cls.id
       ? preparationProgress(operation)
       : {}),
     status: cls.status,

@@ -30,8 +30,6 @@ vi.mock('web-push', async () => {
       setVapidDetails: mockSetVapidDetails,
       sendNotification: mockSendNotification,
     },
-    setVapidDetails: mockSetVapidDetails,
-    sendNotification: mockSendNotification,
   };
 });
 
