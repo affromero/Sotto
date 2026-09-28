@@ -48,14 +48,16 @@ async function readPristine(database: Prisma.TransactionClient, classId: string,
   });
   if (
     !cls ||
-    cls.status !== 'AVAILABLE' ||
+    !['AVAILABLE', 'FAILED'].includes(cls.status) ||
     cls.submission ||
     cls.submittedAt ||
     cls.passedAt ||
-    cls.failedAt ||
+    (cls.status !== 'FAILED' && cls.failedAt) ||
     cls.sections.some(
       (section) =>
-        section.status !== 'READY' ||
+        !(cls.status === 'FAILED'
+          ? ['PENDING', 'GENERATING', 'READY', 'FAILED'].includes(section.status)
+          : section.status === 'READY') ||
         section.score !== null ||
         section.passed !== null ||
         section.prompts.some((prompt) => prompt.recordings.length > 0) ||
@@ -165,9 +167,10 @@ export async function claimPristineRegeneration(
       const { cls, snapshot } = await readPristine(database, classId, execution.userId);
       if (snapshot !== expected) throw new PristineRegenerationConflict();
       const claimed = await database.courseClass.updateMany({
-        where: { id: classId, status: 'AVAILABLE', updatedAt: cls.updatedAt, attempt: cls.attempt },
+        where: { id: classId, status: cls.status, updatedAt: cls.updatedAt, attempt: cls.attempt },
         data: {
           status: 'GENERATING',
+          failedAt: null,
           attempt: cls.attempt + 1,
           adaptiveSeed: Prisma.JsonNull,
           worksheetPdfUrl: null,

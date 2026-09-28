@@ -56,7 +56,10 @@ the synchronous class POST accepts it alongside `scope: 'class'`. Revalidate
 ownership, the full snapshot, absence of learner work, and settled linked jobs
 before deleting pristine sections in the serializable admission transaction.
 Conflicts return 409; async guarded requests return 400. Never delete submissions
-through this guarded path.
+through this guarded path. Available classes and failed generation attempts may
+be claimed when pristine. Failed attempts may retain incomplete generation sections;
+learner interaction states, scores, submissions, and unsettled jobs still block
+regeneration. Claim the inspected status atomically and clear the prior failure time.
 
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks
