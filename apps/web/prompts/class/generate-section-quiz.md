@@ -20,6 +20,8 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 - skill = reading with a source passage: use the provided source passage as the reading text and ask comprehension questions about it.
 - Reading passages should be concrete and memorable: a small scene, message, short article, diary entry, notice, or story tied to the objective and vocabulary.
 - Reading questions must test actual comprehension of the passage, not grammar form in disguise.
+- Every correct reading answer must have clear evidence in the passage. Write distractors that the passage rules out; do not require unstated facts or assumed intentions.
+- For reading, use level-appropriate supporting vocabulary whenever natural phrasing requires it. Do not force target vocabulary into unsuitable collocations or situations to cover a list.
 - Spread coverage across the listed grammar points and vocabulary.
 - Each question has exactly 4 options and exactly 1 correct answer. Match {{LEVEL}} difficulty.
 - Independently try every option in the stated context. Rewrite any item where another option is grammatical and meaningful; intended tense or meaning alone does not exclude an alternative. Add explicit contextual constraints when needed.
