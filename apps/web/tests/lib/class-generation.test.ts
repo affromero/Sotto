@@ -37,6 +37,7 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { generateSectionQuestions } from '@/lib/class-generation';
+import { SECTION_QUALITY_JSON_SCHEMA } from '@/lib/classes/section-quality';
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
@@ -240,6 +241,9 @@ describe('generateSectionQuestions', () => {
       options: SAMPLE_QUESTIONS[0].options,
     });
     expect(mockReviewResponse.mock.calls[0][2]).toMatchObject({ model: 'm', apiKeyOverride: 'k' });
+    expect(mockReviewResponse.mock.calls[0][0]).toContain(
+      JSON.stringify(SECTION_QUALITY_JSON_SCHEMA.schema)
+    );
   });
 
   it('reviews the immutable published source and fails immediately if it is defective', async () => {
