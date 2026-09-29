@@ -135,6 +135,68 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls).toHaveLength(3);
   });
 
+  it('replaces a structurally valid intro rejected by teaching review', async () => {
+    const replacement = {
+      ...intro,
+      examples: [{ ...intro.examples[0], note: 'Use sein with movement in the Perfekt.' }],
+    };
+    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
+
+    await expect(generateClassIntro(params)).resolves.toMatchObject(replacement);
+    expect(boundary.generate).toHaveBeenCalledTimes(4);
+    expect(boundary.generate.mock.calls[2][2].jsonSchema.name).toBe('class_intro_repair');
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(
+      'failed an independent teaching-quality review'
+    );
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(
+      'Correct its teaching meaning, grammar, idiomatic usage, and collocations'
+    );
+  });
+
+  it('fails closed when the bounded quality replacement is also rejected', async () => {
+    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' });
+
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    expect(boundary.generate).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not add another replacement after structural repair fails teaching review', async () => {
+    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: '{', model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' });
+
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    expect(boundary.generate).toHaveBeenCalledTimes(3);
+  });
+
+  it('propagates quality replacement provider failure without another call', async () => {
+    const error = new Error('authorization denied');
+    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' })
+      .mockRejectedValueOnce(error);
+
+    await expect(generateClassIntro(params)).rejects.toBe(error);
+    expect(boundary.generate).toHaveBeenCalledTimes(3);
+  });
+
   it('fails closed when repaired teaching remains unusable', async () => {
     boundary.generate
       .mockReset()
@@ -165,7 +227,7 @@ describe('intro teaching gate', () => {
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
       .mockResolvedValue({ content, model: 'captured-model' });
     await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
-    expect(boundary.generate.mock.calls).toHaveLength(2);
+    expect(boundary.generate.mock.calls).toHaveLength(3);
   });
 
   it.each(['provider unavailable', 'authorization denied', 'cancelled', 'budget exhausted'])(
