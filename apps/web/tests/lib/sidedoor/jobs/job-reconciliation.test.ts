@@ -3,12 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { Queue, Worker } from 'bullmq';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
-import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import {
   reconcileSottoJobs,
   startSottoJobReconciliation,
 } from '@/lib/sidedoor/jobs/core/job-reconciliation';
-import { validateSottoQueueContract } from '@/lib/sidedoor/jobs/core/job-contracts';
+import {
+  sottoJobFailureCode,
+  validateSottoQueueContract,
+} from '@/lib/sidedoor/jobs/core/job-contracts';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import {
@@ -101,6 +104,47 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
     expect(
       (await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).listIncomplete())).jobs
     ).toContainEqual({ id: unsupported.job.id, fingerprint: unsupported.fingerprint });
+  });
+
+  it('keeps exhausted notification work pending without reporting a database outage', async () => {
+    const record = await fixture(4);
+    await deliverSottoJob({
+      database: instance.database,
+      queue,
+      operationId: record.job.id,
+      version: 4,
+    });
+    const worker = new Worker(
+      queue.name,
+      async () => {
+        throw new Error('notification transport unavailable');
+      },
+      { connection, prefix: queue.opts.prefix, autorun: false }
+    );
+    try {
+      const exhausted = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Notification job did not exhaust')), 5000);
+        worker.on('failed', async (job) => {
+          if (job?.id !== record.job.id || (await job.getState()) !== 'failed') return;
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      void worker.run();
+      await worker.waitUntilReady();
+      await exhausted;
+      const page = await reconcileSottoJobs(options());
+      const result = page.results.find((item) => item.id === record.job.id);
+      expect(result?.status).toBe('failed');
+      if (!result || result.status !== 'failed') throw new Error('Expected terminal failure');
+      expect(sottoJobFailureCode(result.error)).toBe('terminal_failed');
+      expect(
+        await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
+      ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
+      expect((await queue.getJob(record.job.id))?.name).toBe('notifications.v4');
+    } finally {
+      await worker.close();
+    }
   });
 
   it('observes completion racing queue acceptance without reopening work', async () => {

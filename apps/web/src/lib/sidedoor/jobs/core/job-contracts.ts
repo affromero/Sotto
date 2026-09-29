@@ -1,3 +1,5 @@
+import { SottoTerminalDeliveryError } from './job-delivery';
+
 /** Durable queue contracts implemented by this application version. */
 export class SottoJobContractError extends Error {
   constructor(
@@ -15,7 +17,9 @@ export class SottoJobContractError extends Error {
 }
 
 export function sottoJobFailureCode(error: unknown): string {
-  return error instanceof SottoJobContractError ? error.code : 'database_or_queue_failure';
+  if (error instanceof SottoJobContractError) return error.code;
+  if (error instanceof SottoTerminalDeliveryError) return `terminal_${error.observation.state}`;
+  return 'database_or_queue_failure';
 }
 
 const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new Map([

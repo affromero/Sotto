@@ -60,6 +60,45 @@ export interface ClassIntroParams {
   sourceTitle?: string | null;
 }
 
+const introVisualsSchema = z.object({
+  timeline: z
+    .object({
+      title: z.string().min(1),
+      steps: z.array(z.string().min(1)).min(2).max(6),
+    })
+    .nullable()
+    .optional(),
+  contrast: z
+    .object({
+      title: z.string().min(1),
+      leftLabel: z.string().min(1),
+      leftItems: z.array(z.string().min(1)).min(1).max(5),
+      rightLabel: z.string().min(1),
+      rightItems: z.array(z.string().min(1)).min(1).max(5),
+    })
+    .nullable()
+    .optional(),
+  callouts: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        text: z.string().min(1),
+        tone: z.enum(['blue', 'teal', 'rose', 'amber']).optional(),
+      })
+    )
+    .max(4)
+    .optional(),
+  links: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        url: z.string().url(),
+      })
+    )
+    .max(3)
+    .optional(),
+});
+
 const introSchema = z.object({
   purpose: z.string().min(1),
   about: z.string().min(1),
@@ -75,50 +114,10 @@ const introSchema = z.object({
     .min(1)
     .max(5),
   tips: z.array(z.string().min(1)).min(1).max(5),
-  visuals: z
-    .object({
-      timeline: z
-        .object({
-          title: z.string().min(1),
-          steps: z.array(z.string().min(1)).min(2).max(6),
-        })
-        .nullable()
-        .optional(),
-      contrast: z
-        .object({
-          title: z.string().min(1),
-          leftLabel: z.string().min(1),
-          leftItems: z.array(z.string().min(1)).min(1).max(5),
-          rightLabel: z.string().min(1),
-          rightItems: z.array(z.string().min(1)).min(1).max(5),
-        })
-        .nullable()
-        .optional(),
-      callouts: z
-        .array(
-          z.object({
-            label: z.string().min(1),
-            text: z.string().min(1),
-            tone: z.enum(['blue', 'teal', 'rose', 'amber']).optional(),
-          })
-        )
-        .max(4)
-        .optional(),
-      links: z
-        .array(
-          z.object({
-            label: z.string().min(1),
-            url: z.string().url(),
-          })
-        )
-        .max(3)
-        .optional(),
-    })
-    .optional(),
+  visuals: z.unknown().optional(),
 });
 
-type ParsedIntro = z.infer<typeof introSchema>;
-type ParsedIntroVisuals = ParsedIntro['visuals'];
+type ParsedIntroVisuals = z.infer<typeof introVisualsSchema> | undefined;
 
 function cleanJson(text: string): string {
   return text
@@ -139,7 +138,11 @@ function labelFromKey(key: string): string {
 function normalizeIntro(value: unknown): ClassIntro | null {
   const parsed = introSchema.safeParse(value);
   if (!parsed.success) return null;
-  return completeIntro(parsed.data);
+  const visuals = introVisualsSchema.safeParse(parsed.data.visuals);
+  return completeIntro({
+    ...parsed.data,
+    visuals: visuals.success ? visuals.data : undefined,
+  });
 }
 
 export function classIntroFromSeed(

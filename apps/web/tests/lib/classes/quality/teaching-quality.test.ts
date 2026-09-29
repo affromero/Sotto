@@ -64,6 +64,36 @@ describe('intro teaching gate', () => {
     expect(result.examples[0].target).toBe(intro.examples[0].target);
   });
 
+  it('keeps provider-authored teaching when optional visuals are invalid', async () => {
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          ...intro,
+          visuals: {
+            callouts: [{ label: 'Past tense', text: 'Use sein with movement.', tone: 'green' }],
+          },
+        }),
+        model: 'captured-model',
+      })
+      .mockResolvedValue({ content: JSON.stringify(approved), model: 'captured-model' });
+
+    const result = await generateClassIntro(params);
+
+    expect(result.purpose).toBe(intro.purpose);
+    expect(result.examples).toEqual(intro.examples);
+    expect(result.visuals?.callouts).toEqual(
+      intro.tips.map((tip, index) => ({
+        label: `Tip ${index + 1}`,
+        text: tip,
+        tone: ['blue', 'teal', 'rose', 'amber'][index],
+      }))
+    );
+    expect(JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[0].content).toEqual(
+      result
+    );
+  });
+
   it('reviews the deterministic fallback after malformed JSON', async () => {
     boundary.generate
       .mockReset()

@@ -202,7 +202,7 @@ const reconciliation = [...durableQueues.keys()].some(shouldRun)
       withQueue: withDispatchQueue,
       onResults: (results) => {
         for (const result of results) {
-          if (result.status === 'failed')
+          if (result.status === 'failed' && sottoJobFailureCode(result.error) !== 'terminal_failed')
             logger.error('Durable job delivery failed; work remains pending', {
               operationId: result.id,
               reason: sottoJobFailureCode(result.error),
