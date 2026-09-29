@@ -155,6 +155,9 @@ describe('intro teaching gate', () => {
       'failed an independent teaching-quality review'
     );
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
+      'Review issue codes: ["unnatural"]'
+    );
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(
       'Correct its teaching meaning, grammar, idiomatic usage, and collocations'
     );
   });
