@@ -60,7 +60,8 @@ separate request so keys and explanations never reach the blind solver. Writing
 review distinguishes intentional correction sources from instructions requiring
 incorrect output. Provider, cancellation, and review failures propagate. These
 requests use the same captured provider and consume its existing request budget:
-intro uses at most three calls when malformed output needs one bounded JSON repair,
+intro uses at most four calls when a structurally valid candidate needs one
+bounded quality replacement and a second review,
 writing uses at most two calls, and section generation uses at most seven
 including two candidates, optional JSON repair, blind reviews and teaching
 reviews. A teaching-quality rejection enters the same bounded replacement path
