@@ -7,7 +7,10 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
-import { reviewTeachingContent } from './classes/quality/teaching-quality';
+import {
+  reviewTeachingContent,
+  TeachingQualityRejectionError,
+} from './classes/quality/teaching-quality';
 import { classLanguagePolicy } from './classes/class-language-policy';
 import {
   assessSectionReview,
@@ -352,7 +355,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           items: questions,
         });
       } catch (error) {
-        if (error instanceof SectionQualityError) return ['teaching_quality'];
+        if (error instanceof TeachingQualityRejectionError) return ['teaching_quality'];
         throw error;
       }
     }

@@ -160,6 +160,15 @@ beforeEach(() => {
 });
 
 describe('generateSectionQuestions', () => {
+  it('fails closed on a malformed teaching review without generating a replacement', async () => {
+    mockTeachingResponse.mockResolvedValue({ content: 'not-json', model: 'm' });
+
+    await expect(generateSectionQuestions(BASE)).rejects.toThrow('educational quality');
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(1);
+    expect(mockReviewResponse).toHaveBeenCalledTimes(1);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+  });
+
   it('retries a teaching-quality rejection and publishes the reviewed replacement', async () => {
     const replacement = SAMPLE_QUESTIONS.map((question) => ({
       ...question,
