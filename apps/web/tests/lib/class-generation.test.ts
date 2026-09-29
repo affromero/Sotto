@@ -23,12 +23,15 @@ vi.mock('@/lib/learning-ai', () => ({
 
 const mockGenerateResponse = vi.fn();
 const mockReviewResponse = vi.fn();
+const mockTeachingResponse = vi.fn();
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({
     generateResponse: (...args: unknown[]) =>
-      (args[2] as { jsonSchema: { name: string } }).jsonSchema.name === 'class_section_quality'
-        ? mockReviewResponse(...args)
-        : mockGenerateResponse(...args),
+      (args[2] as { jsonSchema: { name: string } }).jsonSchema.name === 'class_teaching_quality'
+        ? mockTeachingResponse(...args)
+        : (args[2] as { jsonSchema: { name: string } }).jsonSchema.name === 'class_section_quality'
+          ? mockReviewResponse(...args)
+          : mockGenerateResponse(...args),
   }),
 }));
 
@@ -124,6 +127,16 @@ it('requests one contextual vocabulary exercise per target word through the conf
 beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
+  mockTeachingResponse.mockImplementation(async (_system, messages) => ({
+    content: JSON.stringify({
+      items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
+        index: item.index,
+        acceptable: true,
+        issues: [],
+      })),
+    }),
+    model: 'm',
+  }));
   mockReviewResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
       passageAcceptable: true,
@@ -147,6 +160,38 @@ beforeEach(() => {
 });
 
 describe('generateSectionQuestions', () => {
+  it('rejects a teaching error after blind solving without another generation attempt', async () => {
+    mockTeachingResponse.mockResolvedValue({
+      content: JSON.stringify({
+        items: SAMPLE_QUESTIONS.map((_, index) => ({
+          index,
+          acceptable: false,
+          issues: ['unnatural'],
+        })),
+      }),
+      model: 'm',
+    });
+    await expect(generateSectionQuestions(BASE)).rejects.toThrow('educational quality');
+    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+    const blind = mockReviewResponse.mock.calls[0][1][0].content;
+    expect(blind).not.toContain('correctIndex');
+    expect(blind).not.toContain('explanation');
+    const teaching = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+    expect(teaching.items[0].content).toMatchObject(SAMPLE_QUESTIONS[0]);
+    expect(mockTeachingResponse.mock.calls[0][2]).toMatchObject({
+      model: 'm',
+      apiKeyOverride: 'k',
+    });
+  });
+
+  it.each(['authorization denied', 'cancelled', 'budget exhausted'])(
+    'propagates teaching review %s',
+    async (message) => {
+      mockTeachingResponse.mockRejectedValue(new Error(message));
+      await expect(generateSectionQuestions(BASE)).rejects.toThrow(message);
+      expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+    }
+  );
   function verdict(overrides: Record<string, unknown> = {}) {
     return {
       content: JSON.stringify({
@@ -301,14 +346,18 @@ describe('generateSectionQuestions', () => {
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
   });
 
-  it('bounds mixed quality and syntax retries to five model requests', async () => {
+  it('bounds mixed quality and syntax retries to six model requests including teaching review', async () => {
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE })
       .mockResolvedValueOnce({ content: '{' });
     mockReviewResponse.mockResolvedValueOnce(verdict({ issues: ['ambiguous'] }));
     const questions = await generateSectionQuestions(BASE);
     expect(questions).toHaveLength(5);
-    expect(mockGenerateResponse.mock.calls.length + mockReviewResponse.mock.calls.length).toBe(5);
+    expect(
+      mockGenerateResponse.mock.calls.length +
+        mockReviewResponse.mock.calls.length +
+        mockTeachingResponse.mock.calls.length
+    ).toBe(6);
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
   });
 

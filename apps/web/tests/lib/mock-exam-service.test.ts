@@ -200,7 +200,15 @@ suite('persisted mock exams', () => {
         .map((message) => message.content)
         .join('\n');
       let content: unknown;
-      if (body.response_format?.json_schema?.name === 'class_section_quality') {
+      if (body.response_format?.json_schema?.name === 'class_teaching_quality') {
+        content = {
+          items: JSON.parse(prompt).items.map((item: { index: number }) => ({
+            index: item.index,
+            acceptable: true,
+            issues: [],
+          })),
+        };
+      } else if (body.response_format?.json_schema?.name === 'class_section_quality') {
         content = {
           passageAcceptable: true,
           issues: [],
