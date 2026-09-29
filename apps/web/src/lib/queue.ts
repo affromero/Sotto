@@ -287,8 +287,7 @@ function logWorkerJobFailure(queueName: string, job: Job<unknown> | undefined, e
   });
 }
 
-function genericContractVersion(queueName: string, jobName: string): number | null {
-  if (queueName === 'notifications') return jobName === 'notifications.v4' ? 4 : null;
+function genericContractVersion(queueName: string): number | null {
   return new Set([
     'content-extraction',
     'deep-research',
@@ -374,7 +373,7 @@ export function createWorker<T>(
     queueName,
     async (job, token, signal) => {
       validateSottoQueueContract(queueName, job);
-      const genericVersion = genericContractVersion(queueName, job.name);
+      const genericVersion = genericContractVersion(queueName);
       if (genericVersion === null) return executeSottoJob(job, processor, token, signal);
       const work = await sottoTransaction(prisma, (database) =>
         loadDurableQueueJob<T>(database, job as Job<unknown>, queueName, genericVersion)
@@ -430,7 +429,7 @@ export function createWorker<T>(
   worker.on('failed', (job, err) => {
     logWorkerJobFailure(queueName, job as Job<unknown> | undefined, err);
     if (!job || job.attemptsMade < (job.opts.attempts ?? queueDefinition.attempts ?? 1)) return;
-    const version = genericContractVersion(queueName, job.name);
+    const version = genericContractVersion(queueName);
     if (version === null) return;
     void reconcileDurableQueueFailure({
       database: prisma,

@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { Queue, QueueEvents } from 'bullmq';
+import Redis from 'ioredis';
 import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from 'vitest';
 import { prepareJob, type OutboxJob } from 'thesidedoor-core/runtime/outbox';
 import { StorageCleanupJournal, prepareStorageCleanup } from 'thesidedoor-core/storage';
@@ -18,6 +20,8 @@ import {
 } from '../../helpers/setup/shared-instance';
 
 const boundary = vi.hoisted(() => {
+  if (process.env.SIDEDOOR_TEST_REDIS_URL)
+    vi.stubEnv('REDIS_URL', process.env.SIDEDOOR_TEST_REDIS_URL);
   vi.stubEnv('NEXT_PUBLIC_VAPID_PUBLIC_KEY', 'public');
   vi.stubEnv('VAPID_PRIVATE_KEY', 'private');
   vi.stubEnv('VAPID_SUBJECT', 'mailto:test@example.com');
@@ -37,7 +41,10 @@ vi.mock('@/lib/prisma', async () => {
   return { prisma: database, prismaUnfiltered: database };
 });
 vi.mock('web-push', () => ({ default: { sendNotification: boundary.send } }));
-vi.mock('@/lib/redis', () => ({ publishNotification: boundary.publish }));
+vi.mock('@/lib/redis', async (original) => ({
+  ...(await original<typeof import('@/lib/redis')>()),
+  publishNotification: boundary.publish,
+}));
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('durable notification inbox and device receipts', () => {
   let instance: SharedTestInstance;
@@ -129,6 +136,7 @@ suite('durable notification inbox and device receipts', () => {
       });
       const storage = await sottoStorageInstance(tx).read();
       await tx.pushSubscription.createMany({
+        skipDuplicates: true,
         data: ['generic-first', 'generic-second'].map((id) => ({
           id,
           userId: ownerId,
@@ -197,6 +205,72 @@ suite('durable notification inbox and device receipts', () => {
       await tx.user.delete({ where: { id: ownerId } });
     });
   }
+
+  it.skipIf(!process.env.SIDEDOOR_TEST_REDIS_URL)(
+    'dispatches immutable v4 references through the real worker, including replay and erasure',
+    async () => {
+      const redisUrl = new URL(process.env.SIDEDOOR_TEST_REDIS_URL!);
+      if (!['localhost', '127.0.0.1'].includes(redisUrl.hostname) || redisUrl.pathname !== '/15')
+        throw new Error('Use disposable local Redis database 15');
+      vi.stubEnv('REDIS_URL', redisUrl.toString());
+      const { createWorker } = await import('@/lib/queue');
+      const { processNotification } = await import('@/workers/notification.worker');
+      const { deliverSottoJob } = await import('@/lib/sidedoor/jobs/core/job-delivery');
+      const connection = new Redis(redisUrl.toString(), { maxRetriesPerRequest: null });
+      const queue = new Queue('notifications', { connection });
+      const events = new QueueEvents('notifications', { connection });
+      const worker = createWorker('notifications', processNotification, { concurrency: 1 });
+      const ids: string[] = [];
+      async function dispatch(record: OutboxJob) {
+        ids.push(record.job.id);
+        await deliverSottoJob({
+          database: instance.database,
+          queue,
+          operationId: record.job.id,
+          fingerprint: record.fingerprint,
+          version: record.job.version,
+        });
+        const job = await queue.getJob(record.job.id);
+        if (!job) throw new Error('Missing dispatched notification');
+        await job.waitUntilFinished(events, 10000);
+      }
+      try {
+        await Promise.all([worker.waitUntilReady(), events.waitUntilReady()]);
+        const parent = await genericFixture();
+        await dispatch(parent);
+        const first = await instance.database.notification.findMany();
+        expect(first).toHaveLength(1);
+        const job = await queue.getJob(parent.job.id);
+        await job!.retry('completed');
+        await job!.waitUntilFinished(events, 10000);
+        expect(await instance.database.notification.findMany()).toEqual(first);
+        for (const delivery of await children()) await dispatch(delivery);
+        expect(boundary.send.mock.calls.map(([target]) => target.endpoint).sort()).toEqual([
+          'https://push.example.com/generic-first',
+          'https://push.example.com/generic-second',
+        ]);
+        expect(boundary.publish.mock.calls).toHaveLength(1);
+        const revoked = await genericFixture();
+        await eraseRecipient(parent);
+        await expect(dispatch(revoked)).rejects.toThrow('Durable work recipient changed');
+        expect(
+          await sottoTransaction(instance.database, (database) =>
+            sottoJobOutbox(database).receipt(revoked.job.id)
+          )
+        ).toMatchObject({ status: 'pending' });
+        await job!.retry('completed');
+        await job!.waitUntilFinished(events, 10000);
+        expect(await instance.database.notification.count()).toBe(0);
+        expect(boundary.send.mock.calls).toHaveLength(2);
+      } finally {
+        await worker.close();
+        for (const id of ids) await (await queue.getJob(id))?.remove();
+        await events.close();
+        await queue.close();
+        await connection.quit();
+      }
+    }
+  );
 
   it('processes the generic v4 contract exactly once with its independent inbox identity', async () => {
     const notificationId = randomUUID();

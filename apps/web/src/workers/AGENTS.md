@@ -127,6 +127,12 @@ current storage scopes, and the shared transcript projection before upload and
 publication. Immutable attribution, `pdfUrl` and job completion commit together.
 Recovery verifies the exact receipt, URL, and captured inputs.
 
+All notification versions retain immutable outbox references through `createWorker`.
+Version 4 uses `durable-generic-notification.ts` for recipient authority, inbox
+publication and device snapshot admission. It owns its completion transaction;
+generic payload unwrapping and pipeline failure reconciliation do not apply.
+Failed notifications remain pending for explicit durable recovery.
+
 `durable-notification.ts` handles `notifications.v1` stitching effects. It
 validates parent receipts and recipient scopes, then commits one inbox entry
 and a sealed shared snapshot of device identities together. Snapshot capture
