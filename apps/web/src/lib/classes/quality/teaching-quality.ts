@@ -5,6 +5,7 @@ import { loadAndRender } from '../../prompt-loader';
 import { logUsage } from '../../usage-logger';
 import { SectionQualityError } from '../section-quality';
 import { logger } from '../../logger';
+import { classLanguagePolicy } from '../class-language-policy';
 
 const verdictSchema = z
   .object({
@@ -26,6 +27,7 @@ const verdictSchema = z
                 ])
               )
               .max(6),
+            feedback: z.array(z.string().trim().min(1).max(300)).max(6),
           })
           .strict()
       )
@@ -41,7 +43,10 @@ export const TEACHING_QUALITY_JSON_SCHEMA = {
 
 /** A complete, protocol-valid review that rejects the learner-visible content. */
 export class TeachingQualityRejectionError extends SectionQualityError {
-  constructor(readonly issues: readonly string[] = []) {
+  constructor(
+    readonly issues: readonly string[] = [],
+    readonly feedback: ReadonlyArray<{ index: number; feedback: readonly string[] }> = []
+  ) {
     super();
     this.name = 'TeachingQualityRejectionError';
   }
@@ -66,6 +71,7 @@ export async function reviewTeachingContent(options: {
       NATIVE: options.nativeLang,
       TARGET: options.targetLang,
       KIND: options.kind,
+      LANGUAGE_POLICY: classLanguagePolicy(options),
     }),
     [
       {
@@ -94,6 +100,10 @@ export async function reviewTeachingContent(options: {
   try {
     parsed = verdictSchema.parse(JSON.parse(response.content));
   } catch {
+    logger.warn('Teaching review protocol rejected content', {
+      kind: options.kind,
+      reason: 'invalid_verdict',
+    });
     throw new SectionQualityError();
   }
   if (
@@ -101,11 +111,31 @@ export async function reviewTeachingContent(options: {
     new Set(parsed.items.map((item) => item.index)).size !== options.items.length ||
     parsed.items.some((item) => item.index >= options.items.length)
   ) {
+    logger.warn('Teaching review protocol rejected content', {
+      kind: options.kind,
+      reason: 'indices',
+    });
+    throw new SectionQualityError();
+  }
+  if (
+    parsed.items.some((item) =>
+      item.acceptable ? item.feedback.length > 0 : item.feedback.length === 0
+    )
+  ) {
+    logger.warn('Teaching review protocol rejected content', {
+      kind: options.kind,
+      reason: 'feedback',
+    });
     throw new SectionQualityError();
   }
   if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
     const issues = [...new Set(parsed.items.flatMap((item) => item.issues))];
     logger.warn('Teaching quality review rejected content', { kind: options.kind, issues });
-    throw new TeachingQualityRejectionError(issues);
+    throw new TeachingQualityRejectionError(
+      issues,
+      parsed.items
+        .filter((item) => !item.acceptable || item.issues.length > 0)
+        .map(({ index, feedback }) => ({ index, feedback }))
+    );
   }
 }
