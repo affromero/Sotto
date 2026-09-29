@@ -23,6 +23,46 @@ const FALLBACK = {
 };
 
 describe('classIntroFromSeed', () => {
+  it.each([
+    ['Perfekt for completed activities', 'Präteritum with war and hatte'],
+    ['Use als for a past event', 'Use wenn for repeated conditions'],
+  ])(
+    'compares exact examples without inferring grammar claims from focus %s',
+    async (left, right) => {
+      const { classIntroFromSeed } = await loadClassIntro();
+      const examples = [
+        {
+          target: 'Gestern habe ich gearbeitet.',
+          meaning: 'Yesterday I worked.',
+          note: 'A completed activity.',
+        },
+        {
+          target: 'Gestern war ich zu Hause.',
+          meaning: 'Yesterday I was at home.',
+          note: 'A past state.',
+        },
+      ];
+      const intro = classIntroFromSeed(
+        {
+          intro: {
+            purpose: 'Describe past events.',
+            about: 'Compare two ways to describe yesterday.',
+            focus: [left, right],
+            examples,
+            tips: [left, right],
+          },
+        },
+        FALLBACK
+      );
+      expect(intro.visuals?.contrast).toEqual({
+        title: 'Compare the examples',
+        leftLabel: examples[0].target,
+        leftItems: [examples[0].meaning, examples[0].note],
+        rightLabel: examples[1].target,
+        rightItems: [examples[1].meaning, examples[1].note],
+      });
+    }
+  );
   it('filters duplicate single-word examples and contrast panels', async () => {
     const { classIntroFromSeed } = await loadClassIntro();
 

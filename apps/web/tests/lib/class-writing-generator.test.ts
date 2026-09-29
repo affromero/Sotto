@@ -145,7 +145,12 @@ describe('composeWritingPrompts', () => {
     ]);
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' })
-      .mockResolvedValueOnce({ content: replacement, inputTokens: 11, outputTokens: 21, model: 'm' });
+      .mockResolvedValueOnce({
+        content: replacement,
+        inputTokens: 11,
+        outputTokens: 21,
+        model: 'm',
+      });
     mockTeachingResponse
       .mockResolvedValueOnce({
         content: JSON.stringify({
@@ -184,6 +189,9 @@ describe('composeWritingPrompts', () => {
     });
     expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
       'supply every fact the learner needs'
+    );
+    expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
+      'Review issue codes: ["unnatural"]'
     );
     expect(mockGenerateResponse.mock.calls[1][2]).toEqual(
       expect.objectContaining({ temperature: 0, model: 'm', apiKeyOverride: 'k' })

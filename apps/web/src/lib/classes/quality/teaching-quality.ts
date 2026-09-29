@@ -4,6 +4,7 @@ import type { AIProvider } from '../../providers/ai';
 import { loadAndRender } from '../../prompt-loader';
 import { logUsage } from '../../usage-logger';
 import { SectionQualityError } from '../section-quality';
+import { logger } from '../../logger';
 
 const verdictSchema = z
   .object({
@@ -40,7 +41,7 @@ export const TEACHING_QUALITY_JSON_SCHEMA = {
 
 /** A complete, protocol-valid review that rejects the learner-visible content. */
 export class TeachingQualityRejectionError extends SectionQualityError {
-  constructor() {
+  constructor(readonly issues: readonly string[] = []) {
     super();
     this.name = 'TeachingQualityRejectionError';
   }
@@ -103,6 +104,8 @@ export async function reviewTeachingContent(options: {
     throw new SectionQualityError();
   }
   if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
-    throw new TeachingQualityRejectionError();
+    const issues = [...new Set(parsed.items.flatMap((item) => item.issues))];
+    logger.warn('Teaching quality review rejected content', { kind: options.kind, issues });
+    throw new TeachingQualityRejectionError(issues);
   }
 }
