@@ -62,7 +62,8 @@ incorrect output. Provider, cancellation, and review failures propagate. These
 requests use the same captured provider and consume its existing request budget:
 intro uses at most four calls when a structurally valid candidate needs one
 bounded quality replacement and a second review,
-writing uses at most two calls, and section generation uses at most seven
+writing uses at most four calls when a structurally valid set needs one bounded
+quality replacement and a second review, and section generation uses at most seven
 including two candidates, optional JSON repair, blind reviews and teaching
 reviews. A teaching-quality rejection enters the same bounded replacement path
 as a blind-review rejection.

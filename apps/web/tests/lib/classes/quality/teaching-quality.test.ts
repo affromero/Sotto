@@ -218,10 +218,20 @@ describe('intro teaching gate', () => {
   it.each([
     'not-json',
     JSON.stringify({ items: [] }),
+    JSON.stringify({ items: [{ index: 1, acceptable: true, issues: [] }] }),
+  ])('fails closed on malformed review protocol %s without replacement', async (content) => {
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValue({ content, model: 'captured-model' });
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    expect(boundary.generate.mock.calls).toHaveLength(2);
+  });
+
+  it.each([
     JSON.stringify({ items: [{ index: 0, acceptable: false, issues: ['incorrect'] }] }),
     JSON.stringify({ items: [{ index: 0, acceptable: true, issues: ['uncertain'] }] }),
-    JSON.stringify({ items: [{ index: 1, acceptable: true, issues: [] }] }),
-  ])('fails closed on verdict %s', async (content) => {
+  ])('uses one bounded replacement for semantic rejection %s', async (content) => {
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })

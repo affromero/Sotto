@@ -38,6 +38,14 @@ export const TEACHING_QUALITY_JSON_SCHEMA = {
   schema: z.toJSONSchema(verdictSchema, { target: 'draft-7' }),
 };
 
+/** A complete, protocol-valid review that rejects the learner-visible content. */
+export class TeachingQualityRejectionError extends SectionQualityError {
+  constructor() {
+    super();
+    this.name = 'TeachingQualityRejectionError';
+  }
+}
+
 /** Review exact learner-visible teaching content after independent question solving. */
 export async function reviewTeachingContent(options: {
   ai: CapturedLearningAi;
@@ -90,10 +98,11 @@ export async function reviewTeachingContent(options: {
   if (
     parsed.items.length !== options.items.length ||
     new Set(parsed.items.map((item) => item.index)).size !== options.items.length ||
-    parsed.items.some(
-      (item) => item.index >= options.items.length || !item.acceptable || item.issues.length > 0
-    )
+    parsed.items.some((item) => item.index >= options.items.length)
   ) {
     throw new SectionQualityError();
+  }
+  if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
+    throw new TeachingQualityRejectionError();
   }
 }

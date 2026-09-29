@@ -11,7 +11,10 @@ import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy } from './classes/class-language-policy';
-import { reviewTeachingContent } from './classes/quality/teaching-quality';
+import {
+  reviewTeachingContent,
+  TeachingQualityRejectionError,
+} from './classes/quality/teaching-quality';
 
 const WRITING_PROMPT_COUNT = 3;
 
@@ -86,64 +89,83 @@ export async function composeWritingPrompts(
   });
 
   const client = createAIProvider(ai.provider);
-  const res = await client.generateResponse(
-    systemPrompt,
-    [{ role: 'user', content: `Generate ${WRITING_PROMPT_COUNT} writing tasks.` }],
-    { ...(await capturedLearningAiOptions(ai)), maxTokens: 2048, temperature: 0.7 }
-  );
-
-  logUsage({
-    service: ai.provider,
-    model: res.model,
-    category: 'class-writing-prompts',
-    inputTokens: res.inputTokens,
-    outputTokens: res.outputTokens,
-    userId: p.userId,
-  });
-
-  const cleaned = res.content
-    .replace(/```json\n?/g, '')
-    .replace(/```\n?/g, '')
-    .trim();
-  let raw: unknown[];
-  try {
-    const parsed = JSON.parse(cleaned);
-    raw = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    raw = [];
-  }
-
-  if (raw.some((item) => !isValidRawPrompt(item))) {
-    throw new Error(
-      'Writing generation must supply source text and a supported exercise type for every task.'
-    );
-  }
-  const prompts = raw
-    .filter(isValidRawPrompt)
-    .slice(0, WRITING_PROMPT_COUNT)
-    .map((r) => ({
-      task: `${r.task.trim()}\n\n${r.sourceText.trim()}`,
-      guidance: typeof r.guidance === 'string' ? r.guidance : null,
-      ideas: parseIdeas(r.ideas),
+  const generate = async (request: string, category: string, temperature: number) => {
+    const res = await client.generateResponse(systemPrompt, [{ role: 'user', content: request }], {
+      ...(await capturedLearningAiOptions(ai)),
+      maxTokens: 2048,
+      temperature,
+    });
+    logUsage({
+      service: ai.provider,
+      model: res.model,
+      category,
+      inputTokens: res.inputTokens,
+      outputTokens: res.outputTokens,
+      userId: p.userId,
+    });
+    const cleaned = res.content
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+    let raw: unknown[];
+    try {
+      const parsed = JSON.parse(cleaned);
+      raw = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      raw = [];
+    }
+    if (raw.some((item) => !isValidRawPrompt(item))) {
+      throw new Error(
+        'Writing generation must supply source text and a supported exercise type for every task.'
+      );
+    }
+    const valid = raw.filter(isValidRawPrompt).slice(0, WRITING_PROMPT_COUNT);
+    const prompts = valid.map((item) => ({
+      task: `${item.task.trim()}\n\n${item.sourceText.trim()}`,
+      guidance: typeof item.guidance === 'string' ? item.guidance : null,
+      ideas: parseIdeas(item.ideas),
     }));
+    if (prompts.length === 0) {
+      throw new Error('Writing prompt generation produced no usable tasks.');
+    }
+    return {
+      prompts,
+      reviewItems: prompts.map((prompt, index) => ({
+        ...prompt,
+        taskType: valid[index].taskType,
+      })),
+    };
+  };
 
-  if (prompts.length === 0) {
-    throw new Error('Writing prompt generation produced no usable tasks.');
+  const review = (items: Array<ComposedWritingPrompt & { taskType: RawWritingPrompt['taskType'] }>) =>
+    reviewTeachingContent({
+      ai,
+      provider: client,
+      userId: p.userId,
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+      kind: 'writing',
+      items,
+    });
+
+  let generated = await generate(
+    `Generate ${WRITING_PROMPT_COUNT} writing tasks.`,
+    'class-writing-prompts',
+    0.7
+  );
+  try {
+    await review(generated.reviewItems);
+  } catch (error) {
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    generated = await generate(
+      `Replace the rejected writing tasks below with an independent corrected set. Return only the requested JSON array. Every task must be accurate and idiomatic ${p.targetLang} at ${p.level}, test the stated objective, supply every fact the learner needs, and avoid ambiguous instructions, unsupported answers, personal disclosure, or invented autobiographical content.\n\nRejected tasks:\n${JSON.stringify(generated.reviewItems)}`,
+      'class-writing-prompts-repair',
+      0
+    );
+    await review(generated.reviewItems);
   }
-  await reviewTeachingContent({
-    ai,
-    provider: client,
-    userId: p.userId,
-    level: p.level,
-    nativeLang: p.nativeLang,
-    targetLang: p.targetLang,
-    kind: 'writing',
-    items: prompts.map((prompt, index) => ({
-      ...prompt,
-      taskType: (raw[index] as RawWritingPrompt).taskType,
-    })),
-  });
-  return prompts;
+  return generated.prompts;
 }
 
 export interface ClassWritingParams {

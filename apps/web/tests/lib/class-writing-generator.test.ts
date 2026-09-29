@@ -101,6 +101,7 @@ describe('composeWritingPrompts', () => {
     });
     await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('educational quality');
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(1);
   });
 
   it('propagates writing review budget denial before persistence without redispatch', async () => {
@@ -130,7 +131,124 @@ describe('composeWritingPrompts', () => {
     });
     await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('educational quality');
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
-    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+    expect(mockGenerateResponse.mock.calls).toHaveLength(2);
+  });
+
+  it('replaces a rejected writing set once and requires the replacement to pass review', async () => {
+    const replacement = JSON.stringify([
+      {
+        taskType: 'completion',
+        sourceText: 'Mañana ___ una cena con Ana a las ocho.',
+        task: 'Complete the supplied sentence with the correct form of tener.',
+        guidance: 'Use the near future.',
+      },
+    ]);
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' })
+      .mockResolvedValueOnce({ content: replacement, inputTokens: 11, outputTokens: 21, model: 'm' });
+    mockTeachingResponse
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          items: [
+            { index: 0, acceptable: false, issues: ['unnatural'] },
+            { index: 1, acceptable: true, issues: [] },
+          ],
+        }),
+        model: 'm',
+      })
+      .mockImplementationOnce(async (_system, messages) => ({
+        content: JSON.stringify({
+          items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
+            index: item.index,
+            acceptable: true,
+            issues: [],
+          })),
+        }),
+        model: 'm',
+      }));
+
+    const prompts = await composeWritingPrompts(PARAMS);
+
+    expect(prompts).toEqual([
+      {
+        task: 'Complete the supplied sentence with the correct form of tener.\n\nMañana ___ una cena con Ana a las ocho.',
+        guidance: 'Use the near future.',
+        ideas: [],
+      },
+    ]);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(mockTeachingResponse.mock.calls[1][1][0].content).items[0].content).toEqual({
+      ...prompts[0],
+      taskType: 'completion',
+    });
+    expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
+      'supply every fact the learner needs'
+    );
+    expect(mockGenerateResponse.mock.calls[1][2]).toEqual(
+      expect.objectContaining({ temperature: 0, model: 'm', apiKeyOverride: 'k' })
+    );
+  });
+
+  it('fails when the bounded replacement is malformed without another review', async () => {
+    mockTeachingResponse.mockResolvedValue({
+      content: JSON.stringify({
+        items: [
+          { index: 0, acceptable: false, issues: ['unnatural'] },
+          { index: 1, acceptable: true, issues: [] },
+        ],
+      }),
+      model: 'm',
+    });
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' })
+      .mockResolvedValueOnce({
+        content: JSON.stringify([{ task: 'Missing source.', taskType: 'completion' }]),
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'm',
+      });
+
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow(/source text/i);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates a second-review cancellation without another dispatch', async () => {
+    mockTeachingResponse
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          items: [
+            { index: 0, acceptable: false, issues: ['unnatural'] },
+            { index: 1, acceptable: true, issues: [] },
+          ],
+        }),
+        model: 'm',
+      })
+      .mockRejectedValueOnce(new Error('Preparation cancelled'));
+
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('Preparation cancelled');
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates a replacement provider failure without another dispatch', async () => {
+    mockTeachingResponse.mockResolvedValue({
+      content: JSON.stringify({
+        items: [
+          { index: 0, acceptable: false, issues: ['unnatural'] },
+          { index: 1, acceptable: true, issues: [] },
+        ],
+      }),
+      model: 'm',
+    });
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' })
+      .mockRejectedValueOnce(new Error('Provider unavailable'));
+
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('Provider unavailable');
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
   });
   it('returns parsed tasks without persisting class rows', async () => {
     const prompts = await composeWritingPrompts(PARAMS);

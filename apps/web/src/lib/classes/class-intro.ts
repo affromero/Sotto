@@ -5,7 +5,10 @@ import { createAIProvider } from '../providers/ai';
 import { loadAndRender } from '../prompt-loader';
 import { formatNotesForPrompt } from '../course-notes';
 import { logUsage } from '../usage-logger';
-import { reviewTeachingContent } from './quality/teaching-quality';
+import {
+  reviewTeachingContent,
+  TeachingQualityRejectionError,
+} from './quality/teaching-quality';
 import { classLanguagePolicy, isImmersionLevel } from './class-language-policy';
 import { SectionQualityError } from './section-quality';
 
@@ -510,7 +513,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
       items: [intro],
     });
   } catch (error) {
-    if (!(error instanceof SectionQualityError) || repaired) throw error;
+    if (!(error instanceof TeachingQualityRejectionError) || repaired) throw error;
     intro = await repairIntro(JSON.stringify(intro), intro);
     await reviewTeachingContent({
       ai,
