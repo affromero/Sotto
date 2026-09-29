@@ -15,6 +15,7 @@ vi.mock('@/lib/learning-ai', () => ({
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
+import { logger } from '@/lib/logger';
 
 const params = {
   userId: 'fixture',
@@ -40,7 +41,17 @@ const intro = {
   ],
   tips: ['Name the transport.'],
 };
-const approved = { items: [{ index: 0, acceptable: true, issues: [] }] };
+const approved = { items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] };
+const rejected = {
+  items: [
+    {
+      index: 0,
+      acceptable: false,
+      issues: ['unnatural'],
+      feedback: ['The example uses the wrong auxiliary for movement.'],
+    },
+  ],
+};
 
 beforeEach(() => {
   boundary.generate.mockReset();
@@ -56,12 +67,13 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
-  it('reviews the exact normalized visible intro and visuals with captured options', async () => {
+  it('reviews the exact visible intro without inventing missing visual labels', async () => {
     const result = await generateClassIntro(params);
     const call = boundary.generate.mock.calls[1];
     expect(JSON.parse(call[1][0].content).items).toEqual([{ index: 0, content: result }]);
     expect(call[2]).toMatchObject({ model: 'captured-model', signal: expect.any(AbortSignal) });
     expect(result.examples[0].target).toBe(intro.examples[0].target);
+    expect(result.visuals).toBeUndefined();
   });
 
   it('keeps provider-authored teaching when optional visuals are invalid', async () => {
@@ -82,13 +94,7 @@ describe('intro teaching gate', () => {
 
     expect(result.purpose).toBe(intro.purpose);
     expect(result.examples).toEqual(intro.examples);
-    expect(result.visuals?.callouts).toEqual(
-      intro.tips.map((tip, index) => ({
-        label: `Tip ${index + 1}`,
-        text: tip,
-        tone: ['blue', 'teal', 'rose', 'amber'][index],
-      }))
-    );
+    expect(result.visuals).toBeUndefined();
     expect(JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[0].content).toEqual(
       result
     );
@@ -140,7 +146,6 @@ describe('intro teaching gate', () => {
       ...intro,
       examples: [{ ...intro.examples[0], note: 'Use sein with movement in the Perfekt.' }],
     };
-    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
@@ -157,13 +162,20 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
       'Review issue codes: ["unnatural"]'
     );
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(rejected.items[0].feedback[0]);
+    expect(boundary.generate.mock.calls[2][0]).toContain('Do not return visuals');
+    expect(boundary.generate.mock.calls[2][0]).not.toContain('visual aids');
+    for (const system of [boundary.generate.mock.calls[0][0], boundary.generate.mock.calls[2][0]]) {
+      expect(system).toContain(params.title);
+      expect(system).toContain(params.objective);
+      expect(system).toContain('Immediate immersion for A2');
+    }
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
       'Correct its teaching meaning, grammar, idiomatic usage, and collocations'
     );
   });
 
   it('fails closed when the bounded quality replacement is also rejected', async () => {
-    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
@@ -175,8 +187,34 @@ describe('intro teaching gate', () => {
     expect(boundary.generate).toHaveBeenCalledTimes(4);
   });
 
+  it('keeps review feedback and malformed output out of diagnostic logs', async () => {
+    const privateFeedback = 'Private learner content must never appear in diagnostic logs.';
+    const warning = vi.spyOn(logger, 'warn');
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          items: [
+            { index: 0, acceptable: false, issues: ['incorrect'], feedback: [privateFeedback] },
+          ],
+        }),
+        model: 'captured-model',
+      })
+      .mockResolvedValueOnce({ content: `${privateFeedback}{`, model: 'captured-model' });
+    try {
+      await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+      expect(JSON.stringify(warning.mock.calls)).not.toContain(privateFeedback);
+      expect(warning).toHaveBeenCalledWith('Class intro protocol rejected content', {
+        stage: 'replacement',
+        reason: 'invalid_json',
+      });
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it('does not add another replacement after structural repair fails teaching review', async () => {
-    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: '{', model: 'captured-model' })
@@ -189,7 +227,6 @@ describe('intro teaching gate', () => {
 
   it('propagates quality replacement provider failure without another call', async () => {
     const error = new Error('authorization denied');
-    const rejected = { items: [{ index: 0, acceptable: false, issues: ['unnatural'] }] };
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
@@ -221,7 +258,19 @@ describe('intro teaching gate', () => {
   it.each([
     'not-json',
     JSON.stringify({ items: [] }),
-    JSON.stringify({ items: [{ index: 1, acceptable: true, issues: [] }] }),
+    JSON.stringify({ items: [{ index: 1, acceptable: true, issues: [], feedback: [] }] }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: false, issues: ['incorrect'], feedback: [] }],
+    }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: false, issues: ['incorrect'], feedback: ['x'.repeat(301)] }],
+    }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: false, issues: ['incorrect'], feedback: ['   '] }],
+    }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: true, issues: [], feedback: ['Unneeded instruction.'] }],
+    }),
   ])('fails closed on malformed review protocol %s without replacement', async (content) => {
     boundary.generate
       .mockReset()
@@ -232,8 +281,19 @@ describe('intro teaching gate', () => {
   });
 
   it.each([
-    JSON.stringify({ items: [{ index: 0, acceptable: false, issues: ['incorrect'] }] }),
-    JSON.stringify({ items: [{ index: 0, acceptable: true, issues: ['uncertain'] }] }),
+    JSON.stringify({
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['incorrect'],
+          feedback: ['The example uses the wrong auxiliary.'],
+        },
+      ],
+    }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: true, issues: ['uncertain'], feedback: [] }],
+    }),
   ])('uses one bounded replacement for semantic rejection %s', async (content) => {
     boundary.generate
       .mockReset()

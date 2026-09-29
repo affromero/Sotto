@@ -25,6 +25,9 @@ Rules:
 - Keep it concise enough to read before practice: no more than 180 words total across prose fields.
 - Do not invent exam claims, official certification claims, or unsupported cultural facts.
 - Make tips specific to the grammar/vocabulary, not generic study advice.
+- Verify every complete example for idiomatic verb-object combinations and correct auxiliary/participle pairs. Use vocabulary only where it fits naturally; do not force every supplied word into an example.
+- Meanings must closely paraphrase the actual sentence. Do not add an unstated action, result, means of travel, or interpretation. Distinguish going on foot from travelling by vehicle.
+- State the scope of every grammar rule. A verb-position rule for a main clause must explicitly say that it applies to main clauses. Do not present a common pattern as a universal rule.
 - Visuals must be pedagogical, not decorative: timelines, contrast maps, memory callouts, and helpful external links only when directly useful.
 - Use links sparingly. Only include stable, relevant URLs that help the learner inspect a real reference or official explanation.
 

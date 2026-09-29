@@ -67,6 +67,12 @@ quality replacement and a second review, and section generation uses at most sev
 including two candidates, optional JSON repair, blind reviews and teaching
 reviews. A teaching-quality rejection enters the same bounded replacement path
 as a blind-review rejection.
+Teaching verdicts carry indexed feedback bounded to six 300-character entries
+per item. Replacements treat it as untrusted data and preserve the captured
+context and request limits. Logs contain only static protocol diagnostics and
+issue codes. Generated and restored intros preserve absent visuals; only explicit
+metadata fallback construction derives visuals. Intro repair uses its dedicated
+trusted-context template without the initial generation template's visual schema.
 
 `classes/regeneration/pristine.ts` supports optional guarded class regeneration.
 The existing class GET with `pristineSnapshot=1` returns an opaque content hash;

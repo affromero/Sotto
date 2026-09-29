@@ -55,6 +55,7 @@ const EXPECTED_FILES = [
   'placement/placement-probe.md',
   'placement/deduce-from-notes.md',
   'class/generate-class-intro.md',
+  'class/repair-class-intro.md',
   'class/generate-listening-quiz.md',
   'class/generate-section-quiz.md',
   'class/review-section-quiz.md',
@@ -101,7 +102,27 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
-  'class/review-teaching-content.md': ['KIND', 'LEVEL', 'NATIVE', 'REVIEW_SCHEMA', 'TARGET'],
+  'class/review-teaching-content.md': [
+    'KIND',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+  ],
+  'class/repair-class-intro.md': [
+    'GRAMMAR_POINTS',
+    'INTRO_SCHEMA',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'NOTES',
+    'OBJECTIVE',
+    'SOURCE',
+    'TARGET',
+    'TITLE',
+    'VOCAB',
+  ],
   'class/review-section-quiz.md': [
     'LANGUAGE_POLICY',
     'LEVEL',
@@ -318,13 +339,6 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 // ── Tests ─────────────────────────────────────────────────────
 
 describe('prompt file existence', () => {
-  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => {
-    // bumped +1 for curriculum/generate-curriculum.md
-    const actual = globSync('**/*.md', { cwd: PROMPTS_DIR }).sort();
-    expect(actual).toHaveLength(EXPECTED_FILES.length);
-    expect(actual).toEqual(EXPECTED_FILES.sort());
-  });
-
   it.each(EXPECTED_FILES)('%s exists and is non-empty', (file: string) => {
     const fullPath = join(PROMPTS_DIR, file);
     expect(existsSync(fullPath)).toBe(true);

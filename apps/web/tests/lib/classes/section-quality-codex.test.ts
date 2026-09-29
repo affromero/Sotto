@@ -34,7 +34,9 @@ describe('section review through the Codex provider', () => {
         );
         expect(user).toContain(question.explanation);
         return {
-          content: JSON.stringify({ items: [{ index: 0, acceptable: true, issues: [] }] }),
+          content: JSON.stringify({
+            items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+          }),
           model: 'fixture-model',
         };
       }
