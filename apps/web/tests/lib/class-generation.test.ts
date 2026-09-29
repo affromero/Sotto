@@ -160,7 +160,57 @@ beforeEach(() => {
 });
 
 describe('generateSectionQuestions', () => {
-  it('rejects a teaching error after blind solving without another generation attempt', async () => {
+  it('retries a teaching-quality rejection and publishes the reviewed replacement', async () => {
+    const replacement = SAMPLE_QUESTIONS.map((question) => ({
+      ...question,
+      explanation: `Corrected: ${question.explanation}`,
+    }));
+    mockGenerateResponse.mockResolvedValueOnce({ content: SAMPLE }).mockResolvedValueOnce({
+      content: JSON.stringify({ passage: GENERATED_PASSAGE, questions: replacement }),
+    });
+    mockTeachingResponse
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          items: SAMPLE_QUESTIONS.map((_, index) => ({
+            index,
+            acceptable: false,
+            issues: ['unnatural'],
+          })),
+        }),
+        model: 'm',
+      })
+      .mockImplementationOnce(async (_system, messages) => ({
+        content: JSON.stringify({
+          items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
+            index: item.index,
+            acceptable: true,
+            issues: [],
+          })),
+        }),
+        model: 'm',
+      }));
+    await expect(generateSectionQuestions(BASE)).resolves.toHaveLength(5);
+    expect(mockGenerateResponse.mock.calls).toHaveLength(2);
+    expect(mockTeachingResponse.mock.calls).toHaveLength(2);
+    const blind = mockReviewResponse.mock.calls[0][1][0].content;
+    expect(blind).not.toContain('correctIndex');
+    expect(blind).not.toContain('explanation');
+    const teaching = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+    expect(teaching.items[0].content).toMatchObject(SAMPLE_QUESTIONS[0]);
+    expect(mockTeachingResponse.mock.calls[0][2]).toMatchObject({
+      model: 'm',
+      apiKeyOverride: 'k',
+    });
+    expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
+      'educational quality: teaching_quality'
+    );
+  });
+
+  it('fails closed after a repaired candidate also fails teaching review', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: SAMPLE })
+      .mockResolvedValueOnce({ content: '{' })
+      .mockResolvedValueOnce({ content: SAMPLE });
     mockTeachingResponse.mockResolvedValue({
       content: JSON.stringify({
         items: SAMPLE_QUESTIONS.map((_, index) => ({
@@ -171,17 +221,16 @@ describe('generateSectionQuestions', () => {
       }),
       model: 'm',
     });
+
     await expect(generateSectionQuestions(BASE)).rejects.toThrow('educational quality');
-    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
-    const blind = mockReviewResponse.mock.calls[0][1][0].content;
-    expect(blind).not.toContain('correctIndex');
-    expect(blind).not.toContain('explanation');
-    const teaching = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
-    expect(teaching.items[0].content).toMatchObject(SAMPLE_QUESTIONS[0]);
-    expect(mockTeachingResponse.mock.calls[0][2]).toMatchObject({
-      model: 'm',
-      apiKeyOverride: 'k',
-    });
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(3);
+    expect(mockReviewResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
+    expect(
+      mockGenerateResponse.mock.calls.length +
+        mockReviewResponse.mock.calls.length +
+        mockTeachingResponse.mock.calls.length
+    ).toBe(7);
   });
 
   it.each(['authorization denied', 'cancelled', 'budget exhausted'])(

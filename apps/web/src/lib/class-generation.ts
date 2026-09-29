@@ -340,16 +340,21 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     });
     const issues = assessSectionReview(response.content, questions, useSourcePassage);
     if (issues.length === 0) {
-      await reviewTeachingContent({
-        ai,
-        provider,
-        userId: p.userId,
-        level: p.level,
-        nativeLang: p.nativeLang,
-        targetLang: p.targetLang,
-        kind: 'explanations',
-        items: questions,
-      });
+      try {
+        await reviewTeachingContent({
+          ai,
+          provider,
+          userId: p.userId,
+          level: p.level,
+          nativeLang: p.nativeLang,
+          targetLang: p.targetLang,
+          kind: 'explanations',
+          items: questions,
+        });
+      } catch (error) {
+        if (error instanceof SectionQualityError) return ['teaching_quality'];
+        throw error;
+      }
     }
     return issues;
   };
