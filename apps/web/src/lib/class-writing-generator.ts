@@ -11,6 +11,7 @@ import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy } from './classes/class-language-policy';
+import { reviewTeachingContent } from './classes/quality/teaching-quality';
 
 const WRITING_PROMPT_COUNT = 3;
 
@@ -129,6 +130,19 @@ export async function composeWritingPrompts(
   if (prompts.length === 0) {
     throw new Error('Writing prompt generation produced no usable tasks.');
   }
+  await reviewTeachingContent({
+    ai,
+    provider: client,
+    userId: p.userId,
+    level: p.level,
+    nativeLang: p.nativeLang,
+    targetLang: p.targetLang,
+    kind: 'writing',
+    items: prompts.map((prompt, index) => ({
+      ...prompt,
+      taskType: (raw[index] as RawWritingPrompt).taskType,
+    })),
+  });
   return prompts;
 }
 

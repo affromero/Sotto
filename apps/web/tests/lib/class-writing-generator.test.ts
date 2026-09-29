@@ -25,8 +25,14 @@ vi.mock('@/lib/learning-ai', () => ({
 }));
 
 const mockGenerateResponse = vi.fn();
+const mockTeachingResponse = vi.fn();
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: mockGenerateResponse }),
+  createAIProvider: () => ({
+    generateResponse: (...args: unknown[]) =>
+      (args[2] as { jsonSchema?: { name: string } })?.jsonSchema?.name === 'class_teaching_quality'
+        ? mockTeachingResponse(...args)
+        : mockGenerateResponse(...args),
+  }),
 }));
 
 const mockLoadAndRender = vi.fn();
@@ -66,6 +72,16 @@ const PARAMS = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
+  mockTeachingResponse.mockImplementation(async (_system, messages) => ({
+    content: JSON.stringify({
+      items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
+        index: item.index,
+        acceptable: true,
+        issues: [],
+      })),
+    }),
+    model: 'm',
+  }));
   mockLoadAndRender.mockReturnValue('system prompt');
   mockGenerateResponse.mockResolvedValue({
     content: SAMPLE,
@@ -78,6 +94,44 @@ beforeEach(() => {
 });
 
 describe('composeWritingPrompts', () => {
+  it('rejects incomplete teaching coverage rather than accepting unreviewed writing', async () => {
+    mockTeachingResponse.mockResolvedValue({
+      content: JSON.stringify({ items: [{ index: 0, acceptable: true, issues: [] }] }),
+      model: 'm',
+    });
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('educational quality');
+    expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('propagates writing review budget denial before persistence without redispatch', async () => {
+    mockTeachingResponse.mockRejectedValue(new Error('Budget exhausted'));
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('Budget exhausted');
+    expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
+    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+  });
+  it('reviews intentional correction exercises with exact published content and task type', async () => {
+    const prompts = await composeWritingPrompts(PARAMS);
+    const reviewed = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+    expect(reviewed.items.map((item: { content: unknown }) => item.content)).toEqual([
+      { ...prompts[0], taskType: 'guided_reply' },
+      { ...prompts[1], taskType: 'correction' },
+    ]);
+  });
+
+  it('rejects instructions requiring incorrect output before writing prompts are persisted', async () => {
+    mockTeachingResponse.mockResolvedValue({
+      content: JSON.stringify({
+        items: [
+          { index: 0, acceptable: false, issues: ['infeasible'] },
+          { index: 1, acceptable: true, issues: [] },
+        ],
+      }),
+      model: 'm',
+    });
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow('educational quality');
+    expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
+    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
+  });
   it('returns parsed tasks without persisting class rows', async () => {
     const prompts = await composeWritingPrompts(PARAMS);
     expect(prompts).toEqual([

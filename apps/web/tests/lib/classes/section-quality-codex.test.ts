@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SECTION_QUALITY_JSON_SCHEMA } from '@/lib/classes/section-quality';
+import { TEACHING_QUALITY_JSON_SCHEMA } from '@/lib/classes/quality/teaching-quality';
 import { generateSectionQuestions } from '@/lib/class-generation';
 import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
 
@@ -27,6 +28,16 @@ describe('section review through the Codex provider', () => {
       explanation: 'Hola is a greeting.',
     };
     execute.mockImplementation(async (system: string, user: string) => {
+      if (system.includes('teaching content for')) {
+        expect(JSON.parse(/```json\s*([\s\S]*?)\s*```/.exec(system)![1])).toEqual(
+          TEACHING_QUALITY_JSON_SCHEMA.schema
+        );
+        expect(user).toContain(question.explanation);
+        return {
+          content: JSON.stringify({ items: [{ index: 0, acceptable: true, issues: [] }] }),
+          model: 'fixture-model',
+        };
+      }
       if (!system.includes('independently evaluate')) {
         return {
           content: JSON.stringify({ passage: '', questions: [question] }),

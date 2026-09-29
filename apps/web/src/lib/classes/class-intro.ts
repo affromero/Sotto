@@ -5,7 +5,7 @@ import { createAIProvider } from '../providers/ai';
 import { loadAndRender } from '../prompt-loader';
 import { formatNotesForPrompt } from '../course-notes';
 import { logUsage } from '../usage-logger';
-import { logger } from '../logger';
+import { reviewTeachingContent } from './quality/teaching-quality';
 import { classLanguagePolicy, isImmersionLevel } from './class-language-policy';
 
 export interface ClassIntroExample {
@@ -375,50 +375,58 @@ function deriveContrast(intro: Omit<ClassIntro, 'visuals'>): ClassIntroVisuals['
 export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntro> {
   const fallback = buildFallbackClassIntro(p);
 
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
+  const systemPrompt = loadAndRender('class/generate-class-intro.md', {
+    NATIVE: p.nativeLang,
+    TARGET: p.targetLang,
+    LEVEL: p.level,
+    LANGUAGE_POLICY: classLanguagePolicy({
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+    }),
+    TITLE: p.title,
+    OBJECTIVE: p.objective,
+    GRAMMAR_POINTS: p.grammarPoints.join(', '),
+    VOCAB: p.targetVocab
+      .slice(0, 12)
+      .map((item) => `${item.lemma} (${item.gloss})`)
+      .join('; '),
+    SOURCE: p.sourceTitle ?? '',
+    NOTES: formatNotesForPrompt(p.note ?? ''),
+  });
+
+  const provider = createAIProvider(ai.provider);
+  const response = await provider.generateResponse(
+    systemPrompt,
+    [{ role: 'user', content: 'Write the opening class teaching brief.' }],
+    { ...(await capturedLearningAiOptions(ai)), maxTokens: 1800, temperature: 0.5 }
+  );
+
+  logUsage({
+    service: ai.provider,
+    model: response.model,
+    category: 'class-intro',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    userId: p.userId,
+  });
+
+  let intro = fallback;
   try {
-    const ai = await resolveCapturedLearningAi(p.userId, p.execution);
-    const systemPrompt = loadAndRender('class/generate-class-intro.md', {
-      NATIVE: p.nativeLang,
-      TARGET: p.targetLang,
-      LEVEL: p.level,
-      LANGUAGE_POLICY: classLanguagePolicy({
-        level: p.level,
-        nativeLang: p.nativeLang,
-        targetLang: p.targetLang,
-      }),
-      TITLE: p.title,
-      OBJECTIVE: p.objective,
-      GRAMMAR_POINTS: p.grammarPoints.join(', '),
-      VOCAB: p.targetVocab
-        .slice(0, 12)
-        .map((item) => `${item.lemma} (${item.gloss})`)
-        .join('; '),
-      SOURCE: p.sourceTitle ?? '',
-      NOTES: formatNotesForPrompt(p.note ?? ''),
-    });
-
-    const provider = createAIProvider(ai.provider);
-    const response = await provider.generateResponse(
-      systemPrompt,
-      [{ role: 'user', content: 'Write the opening class teaching brief.' }],
-      { ...(await capturedLearningAiOptions(ai)), maxTokens: 1800, temperature: 0.5 }
-    );
-
-    logUsage({
-      service: ai.provider,
-      model: response.model,
-      category: 'class-intro',
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-      userId: p.userId,
-    });
-
-    const parsed = normalizeIntro(JSON.parse(cleanJson(response.content)));
-    return parsed ?? fallback;
-  } catch (err) {
-    logger.warn('generateClassIntro failed; using deterministic fallback', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return fallback;
+    intro = normalizeIntro(JSON.parse(cleanJson(response.content))) ?? fallback;
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
   }
+  await reviewTeachingContent({
+    ai,
+    provider,
+    userId: p.userId,
+    level: p.level,
+    nativeLang: p.nativeLang,
+    targetLang: p.targetLang,
+    kind: 'intro',
+    items: [intro],
+  });
+  return intro;
 }

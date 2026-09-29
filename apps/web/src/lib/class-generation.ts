@@ -7,6 +7,7 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { reviewTeachingContent } from './classes/quality/teaching-quality';
 import { classLanguagePolicy } from './classes/class-language-policy';
 import {
   assessSectionReview,
@@ -337,7 +338,20 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       outputTokens: response.outputTokens,
       userId: p.userId,
     });
-    return assessSectionReview(response.content, questions, useSourcePassage);
+    const issues = assessSectionReview(response.content, questions, useSourcePassage);
+    if (issues.length === 0) {
+      await reviewTeachingContent({
+        ai,
+        provider,
+        userId: p.userId,
+        level: p.level,
+        nativeLang: p.nativeLang,
+        targetLang: p.targetLang,
+        kind: 'explanations',
+        items: questions,
+      });
+    }
+    return issues;
   };
   let lastError = 'invalid class-section output';
   let lastMalformedContent = '';
