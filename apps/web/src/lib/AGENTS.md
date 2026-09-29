@@ -54,13 +54,14 @@ These review requests consume the existing preparation budget. Provider errors
 and cancellation propagate without retrying under another provider. This is a
 probabilistic check, not a guarantee of pedagogical correctness.
 `classes/quality/teaching-quality.ts` adds one fail-closed review of the exact normalized
-intro (including deterministic fallback and visuals), writing tasks, or question
+intro (including repaired content and visuals), writing tasks, or question
 explanations after a successful blind solve. The keyed teaching audit remains a
 separate request so keys and explanations never reach the blind solver. Writing
 review distinguishes intentional correction sources from instructions requiring
 incorrect output. Provider, cancellation, and review failures propagate. These
 requests use the same captured provider and consume its existing request budget:
-intro and writing use at most two calls each; section generation uses at most six
+intro uses at most three calls when malformed output needs one bounded JSON repair,
+writing uses at most two calls, and section generation uses at most six
 including two candidates, optional JSON repair, blind reviews and one teaching
 review. Teaching rejection does not start another generation attempt.
 

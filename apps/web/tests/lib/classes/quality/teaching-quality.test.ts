@@ -94,28 +94,57 @@ describe('intro teaching gate', () => {
     );
   });
 
-  it('reviews the deterministic fallback after malformed JSON', async () => {
+  it('repairs malformed generated teaching before reviewing the exact result', async () => {
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: '{', model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
       .mockResolvedValue({ content: JSON.stringify(approved), model: 'captured-model' });
     const result = await generateClassIntro(params);
-    expect(JSON.parse(boundary.generate.mock.calls[1][1][0].content).items).toEqual([
+    expect(boundary.generate.mock.calls[1][2]).toMatchObject({
+      model: 'captured-model',
+      signal: expect.any(AbortSignal),
+      temperature: 0,
+      jsonSchema: expect.objectContaining({ name: 'class_intro_repair' }),
+    });
+    expect(boundary.generate.mock.calls[1][0]).toContain('Level: A2');
+    expect(boundary.generate.mock.calls[1][0]).toContain('target language is "de"');
+    expect(boundary.generate.mock.calls[1][1][0].content).toContain('"required"');
+    expect(boundary.generate.mock.calls[1][1][0].content).toContain('"purpose"');
+    expect(JSON.parse(boundary.generate.mock.calls[2][1][0].content).items).toEqual([
       { index: 0, content: result },
     ]);
   });
 
-  it('rejects a deterministic fallback that fails its teaching review', async () => {
+  it('repairs generated teaching whose examples normalize to empty', async () => {
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          ...intro,
+          examples: [{ target: 'Reise', meaning: 'Reise', note: 'Reise' }],
+        }),
+        model: 'captured-model',
+      })
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValue({ content: JSON.stringify(approved), model: 'captured-model' });
+
+    const result = await generateClassIntro(params);
+
+    expect(result.examples).toEqual(intro.examples);
+    expect(boundary.generate.mock.calls).toHaveLength(3);
+  });
+
+  it('fails closed when repaired teaching remains unusable', async () => {
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: '{', model: 'captured-model' })
       .mockResolvedValue({
-        content: JSON.stringify({
-          items: [{ index: 0, acceptable: false, issues: ['unsupported'] }],
-        }),
+        content: JSON.stringify({ ...intro, examples: [] }),
         model: 'captured-model',
       });
     await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    expect(boundary.generate.mock.calls).toHaveLength(2);
   });
 
   it('propagates authority capture failure without dispatch or fallback', async () => {
@@ -140,13 +169,22 @@ describe('intro teaching gate', () => {
   });
 
   it.each(['provider unavailable', 'authorization denied', 'cancelled', 'budget exhausted'])(
-    'propagates %s from generation without fallback',
+    'propagates %s from generation without repair',
     async (message) => {
       boundary.generate.mockReset().mockRejectedValue(new Error(message));
       await expect(generateClassIntro(params)).rejects.toThrow(message);
       expect(boundary.generate.mock.calls).toHaveLength(1);
     }
   );
+
+  it('propagates repair provider failure without returning metadata fallback', async () => {
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: '{', model: 'captured-model' })
+      .mockRejectedValueOnce(new Error('repair unavailable'));
+    await expect(generateClassIntro(params)).rejects.toThrow('repair unavailable');
+    expect(boundary.generate.mock.calls).toHaveLength(2);
+  });
 
   it('propagates reviewer failure without returning the generated or fallback intro', async () => {
     boundary.generate
