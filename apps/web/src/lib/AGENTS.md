@@ -61,9 +61,10 @@ review distinguishes intentional correction sources from instructions requiring
 incorrect output. Provider, cancellation, and review failures propagate. These
 requests use the same captured provider and consume its existing request budget:
 intro uses at most three calls when malformed output needs one bounded JSON repair,
-writing uses at most two calls, and section generation uses at most six
-including two candidates, optional JSON repair, blind reviews and one teaching
-review. Teaching rejection does not start another generation attempt.
+writing uses at most two calls, and section generation uses at most seven
+including two candidates, optional JSON repair, blind reviews and teaching
+reviews. A teaching-quality rejection enters the same bounded replacement path
+as a blind-review rejection.
 
 `classes/regeneration/pristine.ts` supports optional guarded class regeneration.
 The existing class GET with `pristineSnapshot=1` returns an opaque content hash;
