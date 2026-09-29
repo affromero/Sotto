@@ -206,6 +206,7 @@ suite('persisted mock exams', () => {
             index: item.index,
             acceptable: true,
             issues: [],
+            feedback: [],
           })),
         };
       } else if (body.response_format?.json_schema?.name === 'class_section_quality') {
