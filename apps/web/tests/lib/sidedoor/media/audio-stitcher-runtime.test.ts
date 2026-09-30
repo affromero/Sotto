@@ -36,6 +36,12 @@ describe('stitching finite audio with FFmpeg', () => {
         { mode: 0o700 }
       );
       vi.stubEnv('PATH', directory);
+      if (command === 'ffmpeg')
+        await writeFile(
+          join(directory, 'ffprobe'),
+          `#!${process.execPath}\nconsole.log(JSON.stringify({streams:[{sample_rate:'16000'}],frames:[{nb_samples:16000}]}));\n`,
+          { mode: 0o700 }
+        );
       const controller = new AbortController();
       const reason = new Error('Worker stopped');
       const running =
@@ -101,6 +107,114 @@ describe('stitching finite audio with FFmpeg', () => {
     expect(samples.every(Number.isFinite)).toBe(true);
     return samples;
   }
+  it.each([undefined, 0])(
+    'anchors effects to decoded segment ends while preserving explicit delay %s',
+    async (explicitDelay) => {
+      const speech = await source('silence', 'anullsrc=r=44100:cl=mono');
+      const effect = await source('effect', 'sine=frequency=990:sample_rate=44100');
+      const output = join(directory, 'anchored.mp3');
+      await stitchWithEffects({
+        segmentPaths: [speech, speech, speech],
+        outputPath: output,
+        sfxInserts: [
+          {
+            path: effect,
+            type: 'ambient',
+            insertAfterSegment: 1,
+            durationMs: 200,
+            volume: 1,
+            delayMs: explicitDelay,
+          },
+        ],
+      });
+      const samples = await decode(output);
+      const energy = (start: number) =>
+        samples
+          .slice(Math.round(start * 44100), Math.round((start + 0.1) * 44100))
+          .reduce((sum, value) => sum + value * value, 0);
+      expect(energy(explicitDelay === 0 ? 0.05 : 1.75)).toBeGreaterThan(0.01);
+      expect(energy(explicitDelay === 0 ? 1.75 : 0.05)).toBeLessThan(0.000001);
+    }
+  );
+  it.each([false, true])(
+    'returns decoded segment offsets with MP3 padding and effects=%s',
+    async (effects) => {
+      const paths: string[] = [];
+      const lengths: number[] = [];
+      for (const [index, frequency] of [330, 550, 990].entries()) {
+        const path = join(directory, `padded-${index}.mp3`);
+        await execute('ffmpeg', [
+          '-v',
+          'error',
+          '-f',
+          'lavfi',
+          '-i',
+          `sine=frequency=${frequency}:sample_rate=16000`,
+          '-t',
+          String(1.013 + index * 0.107),
+          '-c:a',
+          'libmp3lame',
+          path,
+        ]);
+        paths.push(path);
+        lengths.push((await decode(path)).length / 44100);
+      }
+      const output = join(directory, 'timeline.mp3');
+      const result = await stitchWithEffects({
+        segmentPaths: paths,
+        outputPath: output,
+        sfxInserts: effects
+          ? [
+              {
+                path: paths[0],
+                type: 'ambient',
+                insertAfterSegment: 0,
+                durationMs: 200,
+                volume: 0.01,
+              },
+            ]
+          : [],
+      });
+      expect(result.segmentStarts[0]).toBe(0);
+      expect(result.segmentStarts[1]).toBeCloseTo(lengths[0] - 0.3, 4);
+      expect(result.segmentStarts[2]).toBeCloseTo(lengths[0] + lengths[1] - 0.6, 4);
+      expect(result.segmentStarts.every((start) => start >= 0 && start < result.duration)).toBe(
+        true
+      );
+      const samples = await decode(output);
+      const last = Math.round((result.segmentStarts[2] + 0.35) * 44100);
+      const window = samples.slice(last, last + 4410);
+      const crossings = window.filter(
+        (sample, index) => index > 0 && sample > 0 && window[index - 1] <= 0
+      ).length;
+      expect(crossings).toBeGreaterThan(95);
+      expect(crossings).toBeLessThan(103);
+    }
+  );
+  it.each([0, -1, NaN, Infinity])(
+    'rejects invalid crossfade %s before media work',
+    async (crossfadeMs) => {
+      await expect(
+        stitchWithEffects({
+          segmentPaths: ['unused'],
+          sfxInserts: [],
+          outputPath: 'unused',
+          crossfadeMs,
+        })
+      ).rejects.toThrow('Crossfade');
+    }
+  );
+  it('rejects a segment shorter than the overlap', async () => {
+    const input = await source('short', 'sine=frequency=440');
+    await expect(
+      stitchWithEffects({
+        segmentPaths: [input, input],
+        sfxInserts: [],
+        outputPath: join(directory, 'bad.mp3'),
+        crossfadeMs: 1100,
+      })
+    ).rejects.toThrow('longer than');
+  });
   it.each(['mono', 'stereo'])(
     'preserves silent %s audio through single and multiple inputs',
     async (channels) => {

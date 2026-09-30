@@ -465,7 +465,11 @@ suite('durable segment regeneration with PostgreSQL, Redis and local files', () 
       });
       stitchJobs.push(stitchId);
       const stitchJob = (await audioStitchingQueue.getJob(stitchId))! as Job;
-      await writeFile(join(directory, 'ffprobe'), "#!/bin/sh\nprintf '3000\\n'\n", { mode: 0o755 });
+      await writeFile(
+        join(directory, 'ffprobe'),
+        `#!${process.execPath}\nconst decoded = process.argv.includes('frame=nb_samples:stream=sample_rate');\nconsole.log(decoded ? JSON.stringify({streams:[{sample_rate:'44100'}],frames:[{nb_samples:44108820}]}) : '3000');\n`,
+        { mode: 0o755 }
+      );
       vi.stubEnv('PATH', `${directory}:${process.env.PATH}`);
       if (fault === 'rollback')
         await instance.database.$executeRawUnsafe(
@@ -474,7 +478,12 @@ suite('durable segment regeneration with PostgreSQL, Redis and local files', () 
       if (fault === 'lost-response') binding.loseCommit = stitchId;
       try {
         if (fault === 'none') await processAudioStitching(stitchJob);
-        else await expect(processAudioStitching(stitchJob)).rejects.toThrow();
+        else
+          await expect(processAudioStitching(stitchJob)).rejects.toThrow(
+            fault === 'rollback'
+              ? 'reject_failed_status'
+              : 'Lost response after committed transaction'
+          );
         const current = await instance.database.episode.findUniqueOrThrow({
           where: { id: item.episode.id },
         });

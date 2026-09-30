@@ -23,7 +23,7 @@ describe('stitch sound policies', () => {
   };
   const script = { soundCues: [cue], turns: [{ speaker: 'HOST', text: 'Hello [applause]' }] };
   function options(signal = new AbortController().signal) {
-    return { directory, durations: [1.25, 2], signal, progress: async () => undefined };
+    return { directory, segmentCount: 2, signal, progress: async () => undefined };
   }
 
   it('creates no effects or files when sounds are off', async () => {
@@ -42,13 +42,13 @@ describe('stitch sound policies', () => {
       {
         insertAfterSegment: 0,
         durationMs: 2000,
-        delayMs: 1250,
         type: 'intro',
         volume: 0.2,
         fadeOutMs: 500,
       },
-      { insertAfterSegment: 0, durationMs: 2000, delayMs: 1250, type: 'applause', volume: 0.3 },
+      { insertAfterSegment: 0, durationMs: 2000, type: 'applause', volume: 0.3 },
     ]);
+    expect(inserts.every((insert) => insert.delayMs === undefined)).toBe(true);
     expect(await readFile(inserts[0]!.path)).toEqual(
       await readFile(join(process.cwd(), 'src/assets/sfx/intro-warm.mp3'))
     );

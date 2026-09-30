@@ -272,13 +272,33 @@ function normalizeQuestions(
   )
     throw new Error('response contained no usable questions: invalid question structure or count');
   return raw.map((q) => ({
-    question: q.question as string,
-    options: (q.options as string[]).slice(0, 4),
+    question: (q.question as string).trim(),
+    options: (q.options as string[]).map((option) => option.trim()),
     correctIndex: q.correctIndex as number,
-    explanation: typeof q.explanation === 'string' ? q.explanation : '',
-    passageRef: typeof q.passageRef === 'string' ? q.passageRef : undefined,
+    explanation: typeof q.explanation === 'string' ? q.explanation.trim() : '',
+    passageRef: typeof q.passageRef === 'string' ? q.passageRef.trim() : undefined,
     passageText: readingPassage,
   }));
+}
+
+function assessVocabularyCoverage(questions: GeneratedQuestion[], lemmas: string[]): string[] {
+  const issues: string[] = [];
+  if (
+    lemmas.some(
+      (lemma) => questions.filter((q) => q.options[q.correctIndex] === lemma).length !== 1
+    )
+  )
+    issues.push('vocabulary_target_coverage');
+  if (
+    questions.some((q) => {
+      const gaps = q.question.match(/_+/g) ?? [];
+      return (
+        gaps.length !== 1 || gaps[0] !== '_____' || q.question.replace(/_+/g, '').trim().length < 8
+      );
+    })
+  )
+    issues.push('vocabulary_context');
+  return issues;
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
@@ -286,6 +306,12 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   if (count < 1 || count > QUESTIONS_PER_SECTION) {
     throw new Error('Vocabulary review requires between one and five target words.');
   }
+  const vocabularyLemmas = p.vocabularyReview ? p.targetVocab.map((word) => word.lemma) : [];
+  if (
+    vocabularyLemmas.some((lemma) => !lemma.trim() || lemma !== lemma.trim()) ||
+    new Set(vocabularyLemmas).size !== vocabularyLemmas.length
+  )
+    throw new Error('Vocabulary review requires distinct, nonempty, unpadded target lemmas.');
   const skill = p.vocabularyReview ? 'vocabulary' : p.skill.toLowerCase();
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
@@ -332,6 +358,10 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let teachingRejection: TeachingQualityRejectionError | undefined;
   const review = async (questions: GeneratedQuestion[]): Promise<string[]> => {
     teachingRejection = undefined;
+    const coverageIssues = p.vocabularyReview
+      ? assessVocabularyCoverage(questions, vocabularyLemmas)
+      : [];
+    if (coverageIssues.length) return coverageIssues;
     const response = await provider.generateResponse(
       reviewPrompt,
       [{ role: 'user', content: sectionReviewInput(questions) }],
@@ -446,7 +476,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       logger.warn('Retrying class-section generation after unusable LLM response', {
         skill: p.skill,
         error: lastError,
-        outputSnippet: loggedOutputSnippet(response.content),
+        outputSnippet: qualityFailed ? undefined : loggedOutputSnippet(response.content),
       });
     }
   }

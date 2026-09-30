@@ -525,9 +525,9 @@ revalidates queued identities against registered historical backends. Callers ch
 application ownership and erasure scopes in the same transaction. Unknown
 references require explicit attribution; resolution never guesses the current backend.
 
-`audio/segment-boundaries.ts` contains the stitching worker's cross-correlation
-detection and cumulative timing calculation. Callers pass the crossfade used
-to produce the audio; detected starts already include that overlap.
+`audio-stitcher.ts` returns segment starts from decoded input sample counts and
+the exact crossfade used by FFmpeg. It validates the resulting output duration.
+Generated sound cues anchor to this timeline; explicit sound delays remain absolute.
 
 `sidedoor/episode-storage.ts` captures current instance, episode, profile and linked
 course generations in one transaction, including each course owner's profile.

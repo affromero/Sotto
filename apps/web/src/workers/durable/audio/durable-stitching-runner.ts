@@ -9,7 +9,6 @@ import type { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { restoreStorageBackend } from '@/lib/r2';
 import { stitchWithEffects } from '@/lib/audio-stitcher';
-import { detectSegmentBoundaries, resolveSegmentStarts } from '@/lib/audio/segment-boundaries';
 import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import {
@@ -171,12 +170,12 @@ async function executeDurableStitching(
   const sfxInserts = await buildStitchSoundEffects({
     execution: soundExecution,
     directory,
-    durations: episode.segments.map((segment) => segment.duration),
+    segmentCount: episode.segments.length,
     signal,
     progress: (value) => job.updateProgress(value),
   });
   const outputPath = join(directory, 'audio.mp3');
-  const { duration } = await stitchWithEffects({
+  const { duration, segmentStarts: starts } = await stitchWithEffects({
     segmentPaths: paths,
     sfxInserts,
     outputPath,
@@ -241,11 +240,6 @@ async function executeDurableStitching(
     await job.updateProgress(100);
     return;
   }
-  const starts = resolveSegmentStarts(
-    await detectSegmentBoundaries(outputPath, paths, directory, signal),
-    episode.segments.map((segment) => segment.duration),
-    0.3
-  );
   const audio = await readFile(outputPath, { signal });
   const audioFingerprint = await generateFingerprint(outputPath, signal).catch((error: unknown) => {
     rethrowMediaInterruption(error, signal);
