@@ -14,6 +14,7 @@ export const DEFAULT_AGENT: AgentState = {
   provider: '',
   method: null,
   value: '',
+  apiKey: '',
   model: '',
   liveTranslationKey: '',
   status: 'idle',
@@ -104,6 +105,7 @@ function parseAgent(value: unknown): AgentState {
         ? record.method
         : null,
     value: record.method === 'url' ? resumeEndpoint(record.value) : '',
+    apiKey: '',
     model: typeof record.model === 'string' ? record.model : '',
     liveTranslationKey: '',
     status: 'idle',

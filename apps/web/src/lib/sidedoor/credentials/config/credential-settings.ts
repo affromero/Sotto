@@ -5,7 +5,7 @@ import { OwnedCredentialConflictError } from 'thesidedoor-core/configuration/own
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import type { AuthenticatedRequest } from '@/lib/api-keys';
 import {
-  captureSottoCredentialProbe,
+  captureConfiguredSottoCredentialProbe,
   validateSottoCredentialProbe,
 } from '@/lib/providers/shared/credential-validation';
 import {
@@ -120,7 +120,12 @@ export async function saveSottoCredential(
           throw new AccessError('invalid', 'Provider credentials are required');
         values = edit.values;
       }
-      const probe = captureSottoCredentialProbe(input.scope, input.provider, values);
+      const probe = await captureConfiguredSottoCredentialProbe(
+        tx,
+        input.scope,
+        input.provider,
+        values
+      );
       if (probe.kind === 'unsupported')
         throw new AccessError('invalid', 'This provider does not use saved API credentials');
       const now = Date.now();
@@ -166,7 +171,12 @@ export async function saveSottoCredential(
           storage.owner.generation !== captured.owner.generation
         )
           throw new OwnedCredentialConflictError();
-        const current = captureSottoCredentialProbe(input.scope, input.provider, captured.values);
+        const current = await captureConfiguredSottoCredentialProbe(
+          tx,
+          input.scope,
+          input.provider,
+          captured.values
+        );
         if (
           current.kind === 'unsupported' ||
           current.binding.protocol !== captured.probe.binding.protocol ||

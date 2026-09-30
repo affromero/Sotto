@@ -9,6 +9,7 @@ import {
   scheduleCredentialValidationPage,
 } from '@/lib/sidedoor/credentials/runtime/credential-validation-work';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { setSiteConfig } from '@/lib/site-config';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import {
   captureSottoCredentialOwner,
@@ -134,6 +135,27 @@ suite('canonical credential validation with PostgreSQL', () => {
       verification: { lastAttempt: { status: 'inconclusive' }, lastConfirmed: null },
     });
     expect(await jobs('notifications')).toEqual([]);
+  });
+
+  it('does not send a local key to a changed endpoint during queued verification', async () => {
+    await setSiteConfig({ aiBaseUrl: 'http://localhost:11434/v1' }, ownerId, instance.database);
+    await instance.seedAiCredential(ownerId, 'local', 'local-secret');
+    await scheduleCredentialValidationPage(instance.database, null);
+    const work = (await jobs('key-validation')).find(
+      (record) => credentialValidationPayloadSchema.parse(record.job.payload).provider === 'local'
+    )!;
+    await setSiteConfig({ aiBaseUrl: 'http://localhost:9999/v1' }, ownerId, instance.database);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await processCredentialValidation(instance.database, queued(work));
+    expect(fetch).not.toHaveBeenCalled();
+    const selected = await sottoTransaction(instance.database, (tx) =>
+      resolveSottoProfileCredential(tx, ownerId, 'ai', 'local', false)
+    );
+    expect(selected?.credential).toMatchObject({
+      availability: 'enabled',
+      verification: { lastAttempt: { status: 'inconclusive' } },
+    });
   });
 
   it('attributes a rejected shared credential to its owner without disabling recipient credentials', async () => {

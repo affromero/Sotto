@@ -10,7 +10,7 @@ export function createWelcomeCredentialBoundary() {
   const snapshots = new Map<string, CredentialSettingsSnapshot>();
   const saved = new Map<string, Record<string, string | number | boolean>>();
   const providers = {
-    'ai-keys': ['anthropic', 'openai', 'google'],
+    'ai-keys': ['anthropic', 'openai', 'google', 'local'],
     byok: ['cartesia', 'elevenlabs', 'playht'],
     'visual-cues': ['pexels'],
   };

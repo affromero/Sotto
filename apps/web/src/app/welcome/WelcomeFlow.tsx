@@ -50,6 +50,8 @@ export interface AgentState {
   provider: string;
   method: 'cli' | 'key' | 'url' | null;
   value: string;
+  /** Optional authentication for a local/custom OpenAI-compatible endpoint. */
+  apiKey?: string;
   /** The model a local/custom OpenAI-compatible server serves (AI_MODEL). */
   model: string;
   /** Optional Google/Gemini key that unlocks the Gemini Live translation mode. */
@@ -214,7 +216,13 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   );
   const pendingCredentialPosts = useRef<readonly KeyPost[]>([]);
   const clearCredentialSecrets = useCallback(() => {
-    setAgent((previous) => ({ ...previous, value: '', liveTranslationKey: '', status: 'idle' }));
+    setAgent((previous) => ({
+      ...previous,
+      value: '',
+      apiKey: '',
+      liveTranslationKey: '',
+      status: 'idle',
+    }));
     setVoice((previous) => ({ ...previous, keys: {} }));
     setStorage((previous) => ({ ...previous, accessKeyId: '', secretAccessKey: '' }));
     pendingCredentialPosts.current = [];
@@ -452,6 +460,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         agent: {
           ...agent,
           value: agent.method === 'url' ? resumeEndpoint(agent.value) : '',
+          apiKey: '',
           liveTranslationKey: '',
         },
         voice: { ...voice, keys: {}, baseUrls: resumeEndpoints(voice.baseUrls) },
@@ -567,8 +576,9 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
       });
       return false;
     }
-    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
-    if (!(await saveCredentials(ai.keyPost ? [ai.keyPost] : []))) return false;
+    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model, agent.apiKey);
+    const posts = ai.keyPost ? [ai.keyPost] : [];
+    if (agent.method !== 'url' && !(await saveCredentials(posts))) return false;
     if (!config.isOwner || Object.keys(ai.infra).length === 0) return true;
     const signal = credentialLifetime.current?.signal;
     if (!signal || signal.aborted || credentialLock.current) return false;
@@ -587,7 +597,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         throw new Error(
           'Could not save the selected AI configuration. Review it and continue again.'
         );
-      return true;
     } catch (error) {
       if (!signal.aborted)
         setCredentialFeedback({
@@ -601,6 +610,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         setCredentialBusy(false);
       }
     }
+    // Bind optional endpoint credentials only after the URL has been saved.
+    return agent.method !== 'url' || saveCredentials(posts);
   }
 
   function addContextItems(items: Array<Omit<ContextItem, 'id'>>) {
@@ -669,7 +680,14 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           demoMode={demoMode}
           savedDetected={welcomeCredentialDiscovery(credentialSession, 'saved').ai}
           savedOutcome={(() => {
-            const post = resolveAi(agent.provider, agent.method, agent.value, agent.model).keyPost;
+            if (agent.method === 'url') return null;
+            const post = resolveAi(
+              agent.provider,
+              agent.method,
+              agent.value,
+              agent.model,
+              agent.apiKey
+            ).keyPost;
             return post ? credentialSession.receiptStatus(post) : null;
           })()}
           agentStatuses={config.agentStatuses ?? undefined}

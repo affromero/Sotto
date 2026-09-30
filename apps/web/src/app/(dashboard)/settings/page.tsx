@@ -12,6 +12,7 @@ import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getServerInfra } from '@/lib/server-config';
 import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
 import { SettingsForm } from './SettingsForm';
+import { LocalAiSettings } from '@/components/settings/LocalAiSettings';
 import { CourseManagement } from '@/components/settings/CourseManagement';
 import styles from './page.module.css';
 
@@ -181,6 +182,10 @@ export default async function SettingsPage() {
         initialPushNotifications={user.pushNotifications}
         initialShowAgentUsageStatus={user.showAgentUsageStatus}
       />
+
+      {user.role === 'ADMIN' && (
+        <LocalAiSettings initialBaseUrl={infra.aiBaseUrl ?? ''} initialModel={infra.aiModel ?? ''} />
+      )}
 
       <CourseManagement courses={managedCourses} />
     </main>

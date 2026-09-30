@@ -10,6 +10,8 @@ import {
 import { useProviderCredentialDatabase } from '../../helpers/runtime/provider-credentials-postgres';
 import type { SottoCredentialEndpoint } from '@/lib/sidedoor/credentials/config/credential-http';
 import { resolveSottoProfileCredential } from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
+import { EMPTY_INFRA, setSiteConfig } from '@/lib/site-config';
 
 let database: PrismaClient;
 vi.mock('@/lib/prisma', () => ({
@@ -45,11 +47,18 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
   }
   it.each([
     { endpoint: 'ai-keys' as const, provider: 'openai' },
+    { endpoint: 'ai-keys' as const, provider: 'local' },
     { endpoint: 'byok' as const, provider: 'cartesia' },
     { endpoint: 'visual-cues' as const, provider: 'pexels' },
   ])(
     'saves and removes $endpoint credentials through revision-bound commands',
     async ({ endpoint, provider }) => {
+      if (provider === 'local')
+        await fixture.transaction((tx) =>
+          sidedoorStateStore(tx).transact((state) => {
+            state.configuration.site = { ...EMPTY_INFRA, aiBaseUrl: 'http://localhost:11434/v1' };
+          })
+        );
       const handler = createHandler(endpoint);
       const response = await handler(await request(endpoint, 'GET'));
       expect(response.status).toBe(200);
@@ -58,13 +67,22 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
       const draft = prepareCredentialSave(displayed, provider, {
         values: { apiKey: 'personal-provider-secret' },
       });
-      vi.stubGlobal('fetch', async (url: URL | string) => {
+      vi.stubGlobal('fetch', async (url: URL | string, init?: RequestInit) => {
         const host = new URL(String(url)).hostname;
+        if (host === 'localhost') {
+          expect(String(url)).toBe('http://localhost:11434/v1/models');
+          expect(new Headers(init?.headers).get('authorization')).toBe(
+            'Bearer personal-provider-secret'
+          );
+          return Response.json({ object: 'list', data: [{ id: 'served-model' }] });
+        }
         if (host === 'api.openai.com') return Response.json({ object: 'list', data: [] });
         if (host === 'api.cartesia.ai') return Response.json({ data: [], has_more: false });
         return Response.json({ photos: [], page: 1, per_page: 1, total_results: 0 });
       });
-      const saved = await handler(await request(endpoint, 'POST', credentialSaveRequest(draft)));
+      const saved = await handler(
+        await request(endpoint, 'POST', credentialSaveRequest(draft, provider === 'local'))
+      );
       expect(saved.status).toBe(200);
       expect(await saved.json()).toMatchObject({ status: 'saved', revision: draft.operationId });
       const current = credentialSettingsSnapshotSchema.parse(
@@ -94,6 +112,8 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
         )
       );
       expect(stored?.credential.values).toEqual({ apiKey: 'personal-provider-secret' });
+      if (provider === 'local')
+        expect(stored?.credential.binding.endpoint).toBe('http://localhost:11434/v1');
       const removed = await handler(await request(endpoint, 'DELETE', removal));
       expect(removed.status).toBe(200);
       expect(await removed.json()).toMatchObject({
@@ -107,6 +127,30 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
       expect(final.keys).toEqual([]);
     }
   );
+  it('rejects a local credential save when the configured URL changes during verification', async () => {
+    await fixture.transaction((tx) =>
+      sidedoorStateStore(tx).transact((state) => {
+        state.configuration.site = { ...EMPTY_INFRA, aiBaseUrl: 'http://localhost:11434/v1' };
+      })
+    );
+    const handler = createHandler('ai-keys');
+    const displayed = credentialSettingsSnapshotSchema.parse(
+      await (await handler(await request('ai-keys', 'GET'))).json()
+    );
+    const draft = prepareCredentialSave(displayed, 'local', { values: { apiKey: 'local-secret' } });
+    vi.stubGlobal('fetch', async () => {
+      await setSiteConfig({ aiBaseUrl: 'http://localhost:9999/v1' }, 'alice', fixture.database);
+      return Response.json({ object: 'list', data: [{ id: 'served-model' }] });
+    });
+    expect(
+      (await handler(await request('ai-keys', 'POST', credentialSaveRequest(draft, true)))).status
+    ).toBe(409);
+    expect(
+      await fixture.transaction((tx) =>
+        resolveSottoProfileCredential(tx, 'alice', 'ai', 'local', false)
+      )
+    ).toBeNull();
+  });
   it('rejects unauthenticated reads and oversized mutation bodies', async () => {
     const handler = createHandler('visual-cues');
     expect(

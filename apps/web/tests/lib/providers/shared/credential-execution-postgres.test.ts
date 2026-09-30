@@ -17,6 +17,7 @@ import {
 } from '@/lib/sidedoor/access/core/request-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { captureSottoCredentialProbe } from '@/lib/providers/shared/credential-validation';
+import { setSiteConfig } from '@/lib/site-config';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -82,6 +83,38 @@ suite('credential execution admission with PostgreSQL', () => {
       admitSottoExecutionCredential(tx, authorize, captured!)
     );
     expect((await head()).credential?.metadata.lastUsedAt).toEqual(expect.any(Number));
+  });
+
+  it('captures the configured local URL and key and rejects endpoint changes before dispatch', async () => {
+    await setSiteConfig(
+      { aiBaseUrl: 'http://localhost:11434/v1', aiModel: 'served-model' },
+      identity.ownerId,
+      instance.database
+    );
+    await instance.seedAiCredential(identity.ownerId, 'local', 'endpoint-key');
+    const authorize = await authority();
+    const captured = await sottoTransaction(instance.database, (tx) =>
+      captureSottoExecutionCredential(tx, authorize, 'ai', 'local', false)
+    );
+    expect(captured?.binding).toEqual({
+      protocol: 'compatible',
+      endpoint: 'http://localhost:11434/v1',
+    });
+    expect(captured?.selected.credential.values).toEqual({ apiKey: 'endpoint-key' });
+    await sottoTransaction(instance.database, (tx) =>
+      validateSottoExecutionCredential(tx, authorize, captured!)
+    );
+    await setSiteConfig(
+      { aiBaseUrl: 'http://localhost:9999/v1' },
+      identity.ownerId,
+      instance.database
+    );
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        admitSottoExecutionCredential(tx, authorize, captured!)
+      )
+    ).rejects.toThrow('endpoint changed');
+    expect(captured?.binding.endpoint).toBe('http://localhost:11434/v1');
   });
 
   it.each(['rotate', 'remove', 'cancel'] as const)(

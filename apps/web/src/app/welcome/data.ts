@@ -681,7 +681,7 @@ export const PROVIDERS: Provider[] = [
     apiUrl: 'https://ollama.com/',
     apiLabel: 'Docs',
     kind: 'url',
-    hint: 'http://localhost:11434',
+    hint: 'http://localhost:11434/v1',
   },
   {
     id: 'custom',

@@ -64,6 +64,9 @@ explicit unverified consent, cancellation, and uncertain-outcome reconciliation.
 Form edits invalidate pending confirmation. A pending uncertain write blocks edits
 until the user checks its status.
 
+`settings/LocalAiSettings` is shown to admins on `/settings`; it updates the shared
+OpenAI-compatible AI endpoint and model and manages its optional encrypted key.
+
 1. Create `src/components/domain/ComponentName.tsx`
 2. Create `src/components/domain/ComponentName.module.css`
 3. Export from component (no barrel files needed — import directly)

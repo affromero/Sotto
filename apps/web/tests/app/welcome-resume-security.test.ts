@@ -42,11 +42,12 @@ it('resumes a local AI URL without restoring its previous connection claim', () 
           provider: 'local',
           method: 'url',
           value: 'http://localhost:8000/v1',
+          apiKey: 'private-endpoint-key',
           status: 'connected',
         },
       })
     )?.agent
-  ).toMatchObject({ method: 'url', value: 'http://localhost:8000/v1', status: 'idle' });
+  ).toMatchObject({ method: 'url', value: 'http://localhost:8000/v1', apiKey: '', status: 'idle' });
 });
 
 it.each(['http://localhost:8000/v1', 'https://models.example.com/api'])(

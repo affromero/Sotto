@@ -139,7 +139,13 @@ try {
   });
   await command(
     'npx',
-    ['--no-install', 'playwright', 'test', '--config=e2e/playwright.config.ts'],
+    [
+      '--no-install',
+      'playwright',
+      'test',
+      '--config=e2e/playwright.config.ts',
+      ...process.argv.slice(2),
+    ],
     env
   );
   if (provider.unexpected.length)

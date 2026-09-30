@@ -25,7 +25,12 @@ function speechSelection(id: string, kind: 'tts' | 'stt'): Selection | null {
 
 export function welcomeCredentialSelections(agent: AgentState, voice: VoiceState): Selection[] {
   const selections: Selection[] = [];
-  const ai = agent.method === 'key' ? aiModelProviderId(agent.provider) : null;
+  const ai =
+    agent.method === 'url'
+      ? 'local'
+      : agent.method === 'key'
+        ? aiModelProviderId(agent.provider)
+        : null;
   if (ai) selections.push({ endpoint: 'ai-keys', provider: ai });
   if (agent.liveTranslationKey?.trim())
     selections.push({ endpoint: 'ai-keys', provider: 'google' });
@@ -49,7 +54,7 @@ export function welcomeCredentialDiscovery(
     ).includes(selection.provider);
   return {
     ai: PROVIDERS.filter((provider) => {
-      const id = aiModelProviderId(provider.id);
+      const id = provider.kind === 'url' ? 'local' : aiModelProviderId(provider.id);
       return id !== null && includes({ endpoint: 'ai-keys', provider: id });
     }).map((provider) => provider.id),
     tts: TTS_PROVIDERS.filter((provider) => includes(speechSelection(provider.id, 'tts'))).map(

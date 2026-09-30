@@ -4,7 +4,7 @@ import type { CredentialValidation } from 'thesidedoor-core/ai';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import {
-  captureSottoCredentialProbe,
+  captureConfiguredSottoCredentialProbe,
   validateSottoCredentialProbe,
 } from '@/lib/providers/shared/credential-validation';
 import {
@@ -177,7 +177,8 @@ export async function processCredentialValidation(
           fingerprint: work.fingerprint,
           scopes: work.scopes,
           ticket,
-          probe: captureSottoCredentialProbe(
+          probe: await captureConfiguredSottoCredentialProbe(
+            tx,
             work.payload.modality,
             work.payload.provider,
             selected.values
@@ -209,7 +210,8 @@ export async function processCredentialValidation(
         if (current.complete) return;
         if (!isDeepStrictEqual(current.payload, captured.payload))
           throw new Error('Credential validation payload changed');
-        const endpoint = captureSottoCredentialProbe(
+        const endpoint = await captureConfiguredSottoCredentialProbe(
+          tx,
           current.payload.modality,
           current.payload.provider,
           {}

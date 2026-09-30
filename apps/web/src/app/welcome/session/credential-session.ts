@@ -43,6 +43,7 @@ function groupedEdits(posts: readonly KeyPost[]) {
     {
       endpoint: CredentialEndpoint;
       provider: string;
+      baseUrl?: string;
       values: Record<string, string | number | boolean>;
     }
   >();
@@ -63,8 +64,13 @@ function groupedEdits(posts: readonly KeyPost[]) {
     const edit = grouped.get(slot) ?? {
       endpoint: post.endpoint,
       provider: post.provider,
+      baseUrl: post.baseUrl,
       values: {},
     };
+    if (edit.baseUrl !== post.baseUrl)
+      throw new Error(
+        `The ${post.provider} selections contain different endpoints. Review them before saving.`
+      );
     for (const [name, raw] of Object.entries({ apiKey: post.apiKey, ...post.extra })) {
       const field = fields.find((candidate) => candidate.id === name);
       if (!field) throw new Error(`Unknown credential field for ${post.provider}`);
@@ -114,9 +120,10 @@ export class WelcomeCredentialSession {
       this.snapshots.get(post.endpoint)?.heads[post.provider] !== entry.draft.operationId
     )
       return null;
-    const signature = JSON.stringify(
-      Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right))
-    );
+    const signature = JSON.stringify([
+      edit.baseUrl ?? null,
+      Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right)),
+    ]);
     return entry.signature === signature ? this.savedStatus(post.endpoint, post.provider) : null;
   }
 
@@ -316,9 +323,10 @@ export class WelcomeCredentialSession {
         signal.throwIfAborted();
         const snapshot = this.snapshots.get(edit.endpoint);
         if (!snapshot) throw new Error('Load credential settings before entering keys.');
-        const signature = JSON.stringify(
-          Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right))
-        );
+        const signature = JSON.stringify([
+          edit.baseUrl ?? null,
+          Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right)),
+        ]);
         let entry = this.entries.get(slot);
         if (entry && (entry.state === 'saved' || entry.state === 'uncertain')) {
           const previous = this.accept(entry, await this.reconcile(entry, signal));

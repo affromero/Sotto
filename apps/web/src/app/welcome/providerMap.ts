@@ -39,6 +39,8 @@ export interface KeyPost {
   endpoint: 'ai-keys' | 'byok' | 'visual-cues';
   provider: string;
   apiKey: string;
+  /** Local URL participates in receipt reuse without becoming a credential field. */
+  baseUrl?: string;
   extra?: Record<string, string>;
 }
 
@@ -135,7 +137,8 @@ export function resolveAi(
   provider: string,
   method: AiMethod,
   value: string,
-  model: string
+  model: string,
+  apiKey?: string
 ): AiResolution {
   const v = clean(value);
   const m = clean(model);
@@ -166,8 +169,9 @@ export function resolveAi(
   }
 
   if (method === 'url' && v) {
+    const key = clean(apiKey);
     return {
-      keyPost: null,
+      keyPost: key ? { endpoint: 'ai-keys', provider: 'local', apiKey: key, baseUrl: v } : null,
       preferredAiProvider: 'local',
       preferredAiModel: m ? `local:${m}` : null,
       infra: { aiProvider: 'local', aiBaseUrl: v, ...(m && { aiModel: m }) },

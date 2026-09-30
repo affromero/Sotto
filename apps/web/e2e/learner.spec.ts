@@ -31,7 +31,7 @@ test('a learner configures local providers and creates a persistent course', asy
   await page.getByRole('button', { name: /^Local/ }).click();
   await page.getByLabel('Endpoint URL').fill(`${process.env.SOTTO_BROWSER_PROVIDER}/v1`);
   await page.getByLabel('Local model name').fill('browser-fixture');
-  await page.getByRole('button', { name: 'Save endpoint', exact: true }).click();
+  await page.getByRole('button', { name: 'Save configuration', exact: true }).click();
   await page.getByRole('button', { name: /^Continue/ }).click();
   await page.getByRole('button', { name: /^Kokoro/ }).click();
   await page.getByRole('button', { name: /^Whisper/ }).click();
@@ -66,6 +66,52 @@ test('a learner configures local providers and creates a persistent course', asy
     user: { hasCompletedOnboarding: true },
   });
   expect(course.note?.body).toContain('greet Spanish-speaking friends');
+});
+
+test('Local and Custom save URL, key, and model and use them for a real compatible request', async ({
+  page,
+}) => {
+  await page.goto('/access');
+  await page.getByLabel(/password/i).fill('browser test household password');
+  await page.getByRole('button', { name: /sign in|continue|enter/i }).click();
+  await page.getByRole('button', { name: /Browser learner/ }).click();
+  await expect(page).toHaveURL(/\/(welcome|dashboard|learn)$/);
+  await page.goto('/welcome?step=4');
+  for (const [provider, width, key] of [
+    ['Local', 1280, 'browser-local-key'],
+    ['Custom', 375, 'browser-custom-key'],
+  ] as const) {
+    await page.setViewportSize({ width, height: 812 });
+    await page.getByRole('button', { name: new RegExp(`^${provider}`) }).click();
+    const endpoint = page.getByLabel('Endpoint URL');
+    const apiKey = page.getByLabel(`${provider} API key`);
+    const model = page.getByLabel(`${provider} model name`);
+    await endpoint.fill(`${process.env.SOTTO_BROWSER_PROVIDER}/v1`);
+    await apiKey.fill(key);
+    await expect(apiKey).toHaveAttribute('type', 'password');
+    await expect(
+      page.getByRole('button', { name: 'Save configuration', exact: true })
+    ).toBeDisabled();
+    await model.fill('browser-fixture');
+    await page.getByRole('button', { name: 'Save configuration', exact: true }).click();
+    await page.getByRole('button', { name: 'Save without verification', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Save configuration', exact: true })
+    ).toBeEnabled();
+    await page.getByRole('button', { name: 'Save configuration', exact: true }).click();
+    await expect(page.getByText('Endpoint configured', { exact: true })).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+    const response = await page.request.post('/api/v1/admin/test-model', {
+      headers: { origin: process.env.NEXT_PUBLIC_APP_URL! },
+      data: { type: 'ai', provider: 'local', model: 'browser-fixture' },
+    });
+    expect(await response.json()).toMatchObject({ success: true, response: 'Hello!' });
+    await model.fill('another-model');
+    await expect(page.getByRole('button', { name: /^Continue/ })).toBeDisabled();
+    await model.fill('browser-fixture');
+  }
 });
 
 test('a learner plays audio and completes all five skills on a narrow screen', async ({ page }) => {
