@@ -36,7 +36,7 @@ export function validateStitchSoundScript(script: Script) {
 export async function buildStitchSoundEffects(options: {
   execution: StitchSoundExecution;
   directory: string;
-  durations: readonly (number | null)[];
+  segmentCount: number;
   signal: AbortSignal;
   progress: (value: number) => Promise<void>;
 }): Promise<SfxInsert[]> {
@@ -44,8 +44,6 @@ export async function buildStitchSoundEffects(options: {
   signal.throwIfAborted();
   if (execution.policy === 'none') return [];
   const { cues, turns } = validateStitchSoundScript(execution.script);
-  let cumulative = 0;
-  const delays = options.durations.map((duration) => (cumulative += (duration ?? 0) * 1000));
   const inserts: SfxInsert[] = [];
   for (const [index, cue] of cues.entries()) {
     signal.throwIfAborted();
@@ -60,19 +58,17 @@ export async function buildStitchSoundEffects(options: {
       await writeFile(path, audio, { signal });
     } else await copyFile(join(stockDirectory, stockFiles[cue.type]), path);
     signal.throwIfAborted();
-    const after = Math.min(cue.insertAfterTurn, delays.length - 1);
     inserts.push({
       path,
       insertAfterSegment: cue.insertAfterTurn,
       durationMs: cue.durationSeconds * 1000,
-      delayMs: after >= 0 ? Math.round(delays[after] ?? 0) : 0,
       type: cue.type,
       volume: cue.volume,
       fadeOutMs: cue.fadeOutMs,
     });
     await progress(50 + Math.round((index / cues.length) * 15));
   }
-  for (let index = 0; index < turns.length && index < delays.length; index++) {
+  for (let index = 0; index < turns.length && index < options.segmentCount; index++) {
     for (const [reactionIndex, reaction] of extractAudienceReactions(
       turns[index]!.text
     ).entries()) {
@@ -84,7 +80,6 @@ export async function buildStitchSoundEffects(options: {
         path,
         insertAfterSegment: index,
         durationMs: 2000,
-        delayMs: Math.round(delays[index] ?? 0),
         type: reaction.type,
         volume: 0.3,
       });

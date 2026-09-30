@@ -1,5 +1,6 @@
 import { logger } from './logger';
 import { executeMediaProcess } from './audio/media-process';
+import { z } from 'zod';
 
 // Loudness normalization can emit NaNs for finite silent inputs at EOF.
 const LOUDNESS_FILTER =
@@ -32,7 +33,7 @@ export interface SfxInsert {
   path: string;
   insertAfterSegment: number; // index of the segment after which to insert SFX
   durationMs: number;
-  delayMs?: number; // cumulative offset from start of speech track (computed by worker)
+  delayMs?: number; // explicit absolute offset; otherwise anchor after insertAfterSegment
   type: SfxType;
   volume?: number; // 0.0-1.0, overrides SFX_VOLUME_MAP
   fadeOutMs?: number; // fade-out duration in ms
@@ -52,13 +53,47 @@ export async function stitchWithEffects(params: {
   outputPath: string;
   crossfadeMs?: number;
   signal?: AbortSignal;
-}): Promise<{ duration: number }> {
+}): Promise<{ duration: number; segmentStarts: number[] }> {
   const { segmentPaths, sfxInserts, outputPath, crossfadeMs = 300, signal } = params;
   signal?.throwIfAborted();
 
   if (segmentPaths.length === 0) {
     throw new Error('No segments to stitch');
   }
+  if (!Number.isFinite(crossfadeMs) || crossfadeMs <= 0)
+    throw new Error('Crossfade must be finite and positive');
+  const crossfadeSec = crossfadeMs / 1000;
+  const durations: number[] = [];
+  for (const path of segmentPaths) {
+    const duration = await getDecodedAudioDuration(path, signal);
+    if (duration <= 0 || (segmentPaths.length > 1 && duration <= crossfadeSec))
+      throw new Error('Audio segment must be positive and longer than the crossfade');
+    durations.push(duration);
+  }
+  let elapsed = 0;
+  const segmentStarts = durations.map((duration, index) => {
+    const start = elapsed;
+    elapsed += duration - (index < durations.length - 1 ? crossfadeSec : 0);
+    return start;
+  });
+  // Inputs use decoded samples; allow only final MP3 padding and resampling rounding.
+  const paddingTolerance = 0.06 + durations.length / 44100;
+  const result = (duration: number) => {
+    if (
+      !Number.isFinite(duration) ||
+      duration <= 0 ||
+      Math.abs(duration - elapsed) > paddingTolerance ||
+      segmentStarts.some(
+        (start, index) =>
+          !Number.isFinite(start) ||
+          start < 0 ||
+          start >= duration ||
+          start + durations[index] > duration + paddingTolerance
+      )
+    )
+      throw new Error('Stitched audio duration does not match its segment timeline');
+    return { duration, segmentStarts };
+  };
 
   // For a single segment with no SFX, do a simple conversion
   if (segmentPaths.length === 1 && sfxInserts.length === 0) {
@@ -83,7 +118,7 @@ export async function stitchWithEffects(params: {
       { signal }
     );
     const duration = await getAudioDuration(outputPath, signal);
-    return { duration };
+    return result(duration);
   }
 
   // Build FFmpeg inputs and filter graph
@@ -107,7 +142,6 @@ export async function stitchWithEffects(params: {
 
   // Build filter graph
   const filters: string[] = [];
-  const crossfadeSec = crossfadeMs / 1000;
 
   // Step 1: Normalize each speech segment to consistent format
   for (let i = 0; i < segmentPaths.length; i++) {
@@ -152,7 +186,10 @@ export async function stitchWithEffects(params: {
     // Apply adelay to position each SFX at the correct timestamp
     for (let i = 0; i < sfxInserts.length; i++) {
       const sfx = sfxInserts[i];
-      const delayMs = sfx.delayMs ?? 0;
+      const after = Math.min(sfx.insertAfterSegment, segmentStarts.length - 1);
+      const delayMs =
+        sfx.delayMs ??
+        (after < 0 ? 0 : Math.round((segmentStarts[after] + durations[after]) * 1000));
       if (delayMs > 0) {
         filters.push(`[sfx${i}]adelay=${delayMs}|${delayMs}[sfxd${i}]`);
       } else {
@@ -210,7 +247,7 @@ export async function stitchWithEffects(params: {
     duration: String(Math.round(duration)),
   });
 
-  return { duration };
+  return result(duration);
 }
 
 /**
@@ -226,4 +263,34 @@ export async function getAudioDuration(filePath: string, signal?: AbortSignal): 
   if (!stdout.trim() || !Number.isFinite(duration) || duration < 0)
     throw new Error('FFprobe returned an invalid audio duration');
   return duration;
+}
+
+/** Decoded frame lengths exclude MP3 encoder delay/padding discarded by FFmpeg. */
+async function getDecodedAudioDuration(filePath: string, signal?: AbortSignal): Promise<number> {
+  const { stdout } = await executeMediaProcess(
+    'ffprobe',
+    [
+      '-v',
+      'error',
+      '-select_streams',
+      'a:0',
+      '-show_entries',
+      'frame=nb_samples:stream=sample_rate',
+      '-of',
+      'json',
+      filePath,
+    ],
+    { signal, maxBuffer: 50 * 1024 * 1024 }
+  );
+  const decoded = z
+    .object({
+      streams: z.array(z.object({ sample_rate: z.string().regex(/^\d+$/) })).length(1),
+      frames: z.array(z.object({ nb_samples: z.number().int().positive() })).min(1),
+    })
+    .parse(JSON.parse(stdout));
+  const rate = Number(decoded.streams[0].sample_rate);
+  const samples = decoded.frames.reduce((sum, frame) => sum + frame.nb_samples, 0);
+  if (!Number.isSafeInteger(rate) || rate <= 0 || !Number.isSafeInteger(samples))
+    throw new Error('Invalid decoded audio sample count');
+  return Math.round((samples * 44100) / rate) / 44100;
 }

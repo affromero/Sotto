@@ -152,7 +152,7 @@ suite('initial stitching terminal delivery and administrator retry', () => {
       .toBe('failed');
     await worker.close();
     const failed = (await queue().getJob(operationId))!;
-    if (actualProcessing) expect(failed.failedReason).toContain('ffmpeg');
+    if (actualProcessing) expect(failed.failedReason).toContain('ffprobe process exit_failed');
     return failed;
   }
   const retryRequest = (jobId: string, token = identity.ownerToken) =>

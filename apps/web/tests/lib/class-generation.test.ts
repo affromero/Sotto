@@ -124,6 +124,143 @@ it('requests one contextual vocabulary exercise per target word through the conf
   expect(messages[0].content).toContain('1 vocabulary');
 });
 
+describe('contextual vocabulary coverage', () => {
+  const made = {
+    question: 'Ich habe gestern meine Hausaufgaben _____.',
+    options: ['gemacht', 'gegessen', 'getrunken', 'gehört'],
+    correctIndex: 0,
+    explanation: 'Hausaufgaben macht man.',
+    passageRef: '',
+  };
+  const seen = {
+    ...made,
+    question: 'Mia hat den Film mit den Augen _____.',
+    options: ['gesehen', 'gegessen', 'getrunken', 'geschrieben'],
+    explanation: 'Mit den Augen sieht man einen Film.',
+  };
+  const params = {
+    ...BASE,
+    skill: 'GRAMMAR' as SkillType,
+    vocabularyReview: true,
+    targetLang: 'de',
+    targetVocab: [{ lemma: 'gemacht', gloss: 'done; made' }],
+  };
+  const response = (questions: (typeof made)[]) => ({
+    content: JSON.stringify({ passage: '', questions }),
+    model: 'm',
+  });
+
+  it('trims response boundaries while preserving the exact target spelling and internal spaces', async () => {
+    mockGenerateResponse.mockResolvedValue(
+      response([
+        {
+          ...made,
+          question: '  Sie hat _____ fotografiert.  ',
+          options: [' die Straße ', 'den Bahnhof', 'das Rathaus', 'den Fluss'],
+          explanation: '  Der Satz beschreibt ein Foto von der Straße.  ',
+          passageRef: '  ',
+        },
+      ])
+    );
+    await expect(
+      generateSectionQuestions({
+        ...params,
+        targetVocab: [{ lemma: 'die Straße', gloss: 'the street' }],
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        question: 'Sie hat _____ fotografiert.',
+        options: ['die Straße', 'den Bahnhof', 'das Rathaus', 'den Fluss'],
+        explanation: 'Der Satz beschreibt ein Foto von der Straße.',
+        passageRef: '',
+      }),
+    ]);
+  });
+
+  it.each([
+    { name: 'wrong keyed target', invalid: seen },
+    {
+      name: 'wrong target case',
+      invalid: { ...made, options: ['Gemacht', ...made.options.slice(1)] },
+    },
+    { name: 'absent cloze', invalid: { ...made, question: 'done; made' } },
+    { name: 'multiple clozes', invalid: { ...made, question: 'Ich habe _____ und _____.' } },
+    { name: 'invalid gap', invalid: { ...made, question: 'Ich habe die Hausaufgaben ______.' } },
+    { name: 'no meaningful context', invalid: { ...made, question: '_____' } },
+  ])('replaces a $name inside the existing bounded generation path', async ({ invalid }) => {
+    mockGenerateResponse
+      .mockResolvedValueOnce(response([invalid]))
+      .mockResolvedValueOnce(response([made]));
+    await expect(generateSectionQuestions(params)).resolves.toEqual([
+      expect.objectContaining(made),
+    ]);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain('Rejected candidate JSON:');
+    expect(mockReviewResponse).toHaveBeenCalledTimes(1);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires one keyed question for each target rather than duplicate coverage of one word', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce(response([made, made]))
+      .mockResolvedValueOnce(
+        response([
+          seen,
+          { ...made, options: ['gegessen', 'gemacht', 'getrunken', 'gehört'], correctIndex: 1 },
+        ])
+      );
+    const result = await generateSectionQuestions({
+      ...params,
+      targetVocab: [
+        { lemma: 'gemacht', gloss: 'done; made' },
+        { lemma: 'gesehen', gloss: 'seen' },
+      ],
+    });
+    expect(result.map((question) => question.options[question.correctIndex])).toEqual([
+      'gesehen',
+      'gemacht',
+    ]);
+  });
+
+  it('rejects repeated coverage defects without unlocking a malformed JSON repair', async () => {
+    mockGenerateResponse.mockResolvedValue(response([seen]));
+    await expect(generateSectionQuestions(params)).rejects.toThrow(/quality/i);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockReviewResponse).not.toHaveBeenCalled();
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+  });
+
+  it('checks vocabulary coverage on a repaired malformed response before returning it', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: '{broken', model: 'm' })
+      .mockResolvedValueOnce({ content: '{broken again', model: 'm' })
+      .mockResolvedValueOnce(response([seen]));
+    await expect(generateSectionQuestions(params)).rejects.toThrow(/quality/i);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(3);
+    expect(mockReviewResponse).not.toHaveBeenCalled();
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'empty', targetVocab: [{ lemma: '', gloss: 'empty' }] },
+    { name: 'padded', targetVocab: [{ lemma: ' gemacht', gloss: 'padded' }] },
+    {
+      name: 'duplicate',
+      targetVocab: [
+        { lemma: 'gemacht', gloss: 'done' },
+        { lemma: 'gemacht', gloss: 'made' },
+      ],
+    },
+  ])('rejects $name targets before contacting the provider', async ({ targetVocab }) => {
+    await expect(generateSectionQuestions({ ...params, targetVocab })).rejects.toThrow(
+      /target lemmas/i
+    );
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+    expect(mockReviewResponse).not.toHaveBeenCalled();
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+  });
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
