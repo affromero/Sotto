@@ -42,13 +42,15 @@ describe('agent model selectors', () => {
         'codex:gpt-5.5',
         'codex:gpt-5.5#effort=high',
         'codex:gpt-5.6#effort=xhigh',
-        'codex:gpt-5.6-sol',
-        'codex:gpt-5.6-sol#effort=ultra',
+        'codex:gpt-6-astra',
+        'codex:gpt-6-sol#effort=high',
+        'codex:gpt-6-luna',
       ])
     );
-    expect(models.find((model) => model.id === 'codex:gpt-5.6-sol')?.displayName).toBe(
-      'GPT-5.6 Sol'
-    );
+    expect(models.find((model) => model.id === 'codex:gpt-6-luna')).toMatchObject({
+      displayName: 'GPT-6 Luna',
+      tier: 'fast',
+    });
   });
 
   it('discovers configured Claude Code models from env without registry changes', () => {

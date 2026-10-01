@@ -57,7 +57,7 @@ ARG RUNTIME_UID=1001
 RUN apk add --no-cache libc6-compat openssl openssh-client
 # Pin executable tooling so rebuilding a release cannot silently change it.
 ARG CLAUDE_CODE_VERSION=2.1.225
-ARG CODEX_VERSION=0.144.6
+ARG CODEX_VERSION=0.160.0
 RUN --mount=type=cache,target=/root/.npm npm install -g \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}"
