@@ -492,7 +492,17 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       if (issues.length === 0) return candidate;
       qualityFailed = true;
       lastError = `educational quality: ${issues.join(', ')}`;
-      rejectedCandidate = sectionReviewInput(candidate);
+      rejectedCandidate = JSON.stringify({
+        passage: candidate[0]?.passageText ?? '',
+        questions: candidate.map((question, index) => ({
+          index,
+          question: question.question,
+          options: question.options,
+          correctIndex: question.correctIndex,
+          explanation: question.explanation,
+          passageRef: question.passageRef,
+        })),
+      });
       lastMalformedContent = '';
     }
 
