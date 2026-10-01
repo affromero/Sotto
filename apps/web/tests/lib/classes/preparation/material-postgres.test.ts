@@ -420,6 +420,56 @@ suite('complete class material and retained repair', () => {
     );
   });
 
+  it('retains a failed repair outcome and learner history after worker cleanup', async () => {
+    const { cls, grammar, writing } = await repairTarget();
+    const writingHistory = await instance.database.writingPrompt.findUniqueOrThrow({
+      where: { id: writing.writingPrompts[0].id },
+      include: { responses: true },
+    });
+    vi.stubGlobal('fetch', async () =>
+      Response.json({ error: { message: 'Private provider rejection' } }, { status: 400 })
+    );
+    const admitted = await requestClassPreparation(courseId, execution, {
+      intent: { kind: 'REPAIR', classId: cls.id, expectedAttempt: cls.attempt },
+    });
+    const job = await queuedJob(admitted.id);
+    await processClassPreparation(job);
+    await processClassPreparation(job);
+    expect(await classPreparationStore(instance.database, courseId).read()).toMatchObject({
+      id: admitted.id,
+      status: 'FAILED',
+      failure: 'generation_failed',
+    });
+    expect(
+      await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })
+    ).toMatchObject({
+      status: 'FAILED',
+      attempt: 8,
+      learnerAnswers: cls.learnerAnswers,
+      writingDrafts: cls.writingDrafts,
+    });
+    expect(
+      await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
+    ).toMatchObject({ activeClassId: cls.id });
+    expect(
+      await instance.database.lessonQuestion.findMany({
+        where: { sectionId: grammar.id },
+        orderBy: { order: 'asc' },
+      })
+    ).toEqual(grammar.questions);
+    expect(
+      await instance.database.writingPrompt.findUniqueOrThrow({
+        where: { id: writing.writingPrompts[0].id },
+        include: { responses: true },
+      })
+    ).toEqual(writingHistory);
+    expect(
+      await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(admitted.id)
+      )
+    ).toMatchObject({ complete: true });
+  });
+
   it('rejects a competing repair intent without leaving another claimed attempt', async () => {
     const { cls } = await repairTarget();
     const first = await requestClassPreparation(courseId, execution, {

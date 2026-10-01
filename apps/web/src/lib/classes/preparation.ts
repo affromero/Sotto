@@ -363,8 +363,9 @@ export async function requestClassPreparation(
       )
         return current;
       if (current?.status === 'FAILED') {
-        current = await settleCancelledPreparation(database, current);
-        if (current.status !== 'CANCELLED')
+        const cleanup = await settlePreparationCleanup(database, current);
+        current = cleanup.operation;
+        if (!cleanup.settled)
           throw new PreparationConflictError(
             'The previous preparation still needs execution cleanup.'
           );
@@ -506,15 +507,23 @@ export async function settleCancelledPreparation(
   database: Prisma.TransactionClient,
   operation: ClassPreparation
 ) {
+  return (await settlePreparationCleanup(database, operation)).operation;
+}
+
+async function settlePreparationCleanup(
+  database: Prisma.TransactionClient,
+  operation: ClassPreparation
+): Promise<{ operation: ClassPreparation; settled: boolean }> {
   if (!['CANCELLING', 'CANCELLED', 'UNRESOLVED', 'FAILED'].includes(operation.status))
-    return operation;
+    return { operation, settled: false };
   const record = await sottoJobOutbox(database).read(operation.id);
   if (!record) throw new PreparationConflictError('The preparation receipt is missing.');
   const executions = sottoJobExecutions(database);
-  if (await executions.blockingStatus(operation.id, record.fingerprint)) return operation;
+  if (await executions.blockingStatus(operation.id, record.fingerprint))
+    return { operation, settled: false };
   await executions.requireParentDrained(operation.id, record.fingerprint);
   const audio = await settlePreparationAudio(database, operation);
-  if (!audio.settled) return operation;
+  if (!audio.settled) return { operation, settled: false };
   if (operation.intent) {
     await database.courseClass.updateMany({
       where: {
@@ -542,12 +551,13 @@ export async function settleCancelledPreparation(
     }
   }
   await sottoJobOutbox(database).complete(operation.id, record.fingerprint);
-  return classPreparationStore(database, operation.courseId).transact((current) => {
+  const settled = await classPreparationStore(database, operation.courseId).transact((current) => {
     if (!current || current.id !== operation.id) throw new PreparationConflictError();
-    current.status = 'CANCELLED';
+    if (current.status !== 'FAILED') current.status = 'CANCELLED';
     current.updatedAt = Date.now();
     return current;
   });
+  return { operation: settled, settled: true };
 }
 
 /** Acknowledgement never substitutes for execution or descendant cleanup receipts. */
@@ -570,12 +580,12 @@ export async function recoverClassPreparation(
       await validateClassPreparation(database, courseId, operation.id, true);
       if (!['UNRESOLVED', 'CANCELLING', 'CANCELLED'].includes(operation.status)) return operation;
       await classPreparationGrant(database, operation).revoke(operation.grant);
-      const recovered = await settleCancelledPreparation(database, operation);
-      if (recovered.status !== 'CANCELLED')
+      const recovered = await settlePreparationCleanup(database, operation);
+      if (!recovered.settled)
         throw new PreparationConflictError(
           'Execution cleanup is not confirmed. Wait for active work or complete operator recovery.'
         );
-      return recovered;
+      return recovered.operation;
     },
     { signal: execution.signal }
   );

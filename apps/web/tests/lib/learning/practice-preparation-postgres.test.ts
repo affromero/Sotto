@@ -166,6 +166,43 @@ suite('Durable practice preparation against PostgreSQL', () => {
     expect(await instance.database.practiceSession.count()).toBe(1);
   });
 
+  it('reports failed generation without inventing a settings diagnosis or exposing private errors', async () => {
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    await instance.database.lesson.upsert({
+      where: { curriculumId_slug: { curriculumId: course.curriculumId, slug: 'full-fixture' } },
+      update: {},
+      create: {
+        curriculumId: course.curriculumId,
+        slug: 'full-fixture',
+        level: 'A1',
+        order: 1,
+        title: 'Greetings',
+        objective: 'Greet Ana and describe where Mia lives',
+        grammarPoints: ['present'],
+        targetVocab: [{ lemma: 'Hallo', gloss: 'hello' }],
+        vocabThemes: ['greetings'],
+      },
+    });
+    const privateError = 'Private provider rejection';
+    vi.stubGlobal('fetch', async () =>
+      Response.json({ error: { message: privateError } }, { status: 400 })
+    );
+    const operation = await requestPracticePreparation(courseId, 'FULL', execution);
+    await processPracticePreparation(await queuedJob(operation.id));
+    expect((await saved(operation.sessionId)).operation).toMatchObject({
+      status: 'FAILED',
+      failure: 'generation_failed',
+    });
+    const result = practicePreparingSchema.parse(
+      await resumePractice(operation.sessionId, identity.ownerId)
+    );
+    expect(result.preparationStatus).toBe('FAILED');
+    expect(result.message).toMatch(/generation failed/i);
+    expect(result.message).toMatch(/new attempt/i);
+    expect(result.message).not.toMatch(/provider settings/i);
+    expect(JSON.stringify(result)).not.toContain(privateError);
+  });
+
   it('allows independent practice requests and rejects reuse for a different skill or selected focus', async () => {
     const first = await requestPracticePreparation(courseId, 'FULL', execution);
     const second = await requestPracticePreparation(courseId, 'FULL', execution);
