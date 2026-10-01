@@ -367,6 +367,17 @@ function setupHappyPath() {
 // ---- Tests ----
 
 describe('generateClassListening', () => {
+  it('rejects malformed blind review before publishing listening questions', async () => {
+    setupHappyPath();
+    mockBlindResponse.mockResolvedValue({ content: '{"questions":[]}', model: 'm' });
+    await expect(generateClassListening(PARAMS)).rejects.toThrow(/exact audio script/);
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(mockEpisodeUpdate).toHaveBeenCalledWith({
+      where: { id: 'episode-1' },
+      data: { status: 'FAILED' },
+    });
+  });
+
   it('renders with the captured personal TTS selection instead of the instance default', async () => {
     setupHappyPath();
     await generateClassListening({ ...PARAMS, ttsProvider: 'cartesia' });

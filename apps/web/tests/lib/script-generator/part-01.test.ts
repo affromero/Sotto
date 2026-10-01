@@ -354,7 +354,7 @@ describe('generateScript', () => {
           ],
           soundCues: [],
           references: [],
-          vocabulary: [],
+          vocabulary: [{ number: 1, word: 'Guten Morgen', translation: 'Good morning' }],
         }),
         inputTokens: 400,
         outputTokens: 500,

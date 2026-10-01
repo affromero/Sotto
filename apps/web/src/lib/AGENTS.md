@@ -36,9 +36,39 @@ focused expressions. Preserve exact word attribution for SRS, and carry reading
 `passageText` through both start and resume projections. Writing generation
 requires supplied source text and a constrained exercise type. Listening checks
 the explicitly configured TTS provider before script generation; missing
-credentials are errors, never a reason to choose another provider. Full practice
-and class submission require usable listening audio and graded speaking work
-before updating progress. Class mastery also requires passing both oral sections.
+credentials are errors, never a reason to choose another provider. Classes and
+FULL practice require grammar, reading, and writing. Listening requires configured
+TTS access; speaking requires configured STT access. Missing access exempts only
+the corresponding oral skill. Invalid configuration, failed work, and unsettled
+evidence never waive requirements. Classes require mastery in every required
+section; complete practice remains finishable at low scores.
+
+`learning/skill-requirements.ts`, `speech-configuration.ts`, and `speech-selection.ts`
+capture versioned requirements and explicit provider bindings without paid probes.
+`learning/script-hash.ts` binds listening questions to the preserved script.
+`learning/session-evaluation.ts` validates complete material and current evidence.
+`learning/reading-vocabulary.ts` extracts passage vocabulary independently of
+listening and credits only assessed targets backed by course memory.
+`learning/progress.ts` and `progress-route.ts` persist revision-bound choices and
+writing drafts. Conflicts preserve local work until the learner reconciles it.
+`learning/database.ts` defines the transaction boundary shared by these helpers.
+
+`learning/classes/current-sections.ts` selects the latest section before filtering
+its state. `class-material.ts` validates counts, reading provenance, exact scripts,
+and owned reference audio. `class-generation-state.ts` and `class-repair.ts` retain
+attempt identity and surviving learner work. `class-submission.ts` commits receipts,
+assessed-target review, mastery, and conditional course progression atomically.
+`learning/preparation/preparation-grant.ts` and `preparation-provider.ts` share
+captured authority and request journals across class, practice, and writing work.
+`learning/writing/writing-execution.ts` admits synchronous grading with a durable
+receipt; `writing-submission.ts` binds it to the latest prompt and learner text.
+Unknown provider or cleanup outcomes remain fenced rather than replaying paid work.
+
+`practice/material.ts` validates preserved FULL material before completion.
+`practice/preparation-state.ts` and `preparation.ts` admit durable queued generation,
+visible status, cancellation, and explicit recovery. `practice/submission.ts` seals
+feedback and SRS effects once; `practice/resume.ts` restores choices, drafts,
+latest productive evidence, preparation state, and completed results.
 
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
@@ -46,10 +76,15 @@ question structure before review, then uses the same captured provider and
 authority for a separate solve without the proposed key or explanations. Both
 normal and JSON-repaired candidates must pass. Two generation attempts and one
 optional repair bound the work, with at most one review per valid candidate.
-Semantic retries include the normalized rejected passage and questions as untrusted
-content without keys or explanations, alongside bounded review issue codes.
+Semantic retries include the normalized rejected passage and indexed questions,
+including rejected keys and explanations, as untrusted correction context alongside
+bounded review issue codes. Blind reviewers still receive neither keys nor explanations.
 Rewrite generated content for meaning and evidence; supplied source passages remain
 immutable. Parser repair remains separate from semantic revision.
+Vocabulary coverage retries receive bounded missing/duplicate target feedback,
+indexed unexpected keyed answers, and invalid cloze indices. Preserve exact spelling
+and case for SRS attribution; change sentence placement rather than the target form.
+These coverage failures precede both independent reviews, which still gate replacements.
 These review requests consume the existing preparation budget. Provider errors
 and cancellation propagate without retrying under another provider. This is a
 probabilistic check, not a guarantee of pedagogical correctness.
@@ -74,16 +109,21 @@ issue codes. Generated and restored intros preserve absent visuals; only explici
 metadata fallback construction derives visuals. Intro repair uses its dedicated
 trusted-context template without the initial generation template's visual schema.
 
-`classes/regeneration/pristine.ts` supports optional guarded class regeneration.
-The existing class GET with `pristineSnapshot=1` returns an opaque content hash;
-the synchronous class POST accepts it alongside `scope: 'class'`. Revalidate
-ownership, the full snapshot, absence of learner work, and settled linked jobs
-before deleting pristine sections in the serializable admission transaction.
-Conflicts return 409; async guarded requests return 400. Never delete submissions
-through this guarded path. Available classes and failed generation attempts may
-be claimed when pristine. Failed attempts may retain incomplete generation sections;
-learner interaction states, scores, submissions, and unsettled jobs still block
-regeneration. Claim the inspected status atomically and clear the prior failure time.
+`script-generator.ts` aligns vocabulary marker numbers before producing markdown.
+It remaps only a unique exact word identity already in the generated vocabulary,
+preserves correct numbered identities and legitimate surface variations, and rejects
+duplicate numbers, ambiguous remapping, or missing identities. It never rewrites
+spoken text, infers a translation, or adds provider calls.
+
+`classes/regeneration/pristine.ts` supports guarded durable class regeneration.
+The class GET with `pristineSnapshot=1` returns an opaque content hash. Class POST
+requires `expectedAttempt` and accepts the hash alongside `scope: 'class'`.
+Revalidate ownership, the snapshot, absence of learner work, and settled linked
+jobs in the serializable admission transaction. Successful admission returns HTTP
+202 with its durable identity; conflicts return 409. Preserve submissions and
+attempt history. Section repair retains complete unsubmitted work, replaces only
+selected incomplete sections, and preserves old material until publication.
+Never claim a replacement while earlier provider or execution cleanup is unresolved.
 
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks

@@ -15,7 +15,9 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 ## Requirements
 
 - skill = vocabulary: create exactly one contextual cloze for each supplied target lemma. Give a complete, meaningful target-language sentence or short exchange with one `_____` gap. The correct option must be that exact lemma, used naturally in the sentence. Choose plausible distractors of the same grammatical category; only one may fit the meaning and grammar. Never use a bare translation, isolated word, or a request to identify a memorized gloss as the question. Explain the word's use in this context. Set `passage` to an empty string.
+- For skill = vocabulary only: preserve each target lemma's exact spelling and capitalization. Place a lowercase target inside the sentence rather than at its start; rewrite the context instead of changing the supplied form. Preserve the spelling and spacing of multiword targets too.
 - skill = grammar: each question tests one of the listed grammar points in a meaningful target-language sentence or short exchange. Supply enough context to distinguish the correct answer; never ask for an isolated word translation.
+- When testing a particular tense or construction, state that requirement explicitly if another form would otherwise be grammatical. A past-time expression alone does not necessarily distinguish two past tenses. Keep the task within the listed grammar points; do not turn unrelated exercises into a tense drill.
 - skill = reading without a source passage: write one interesting target-language passage first, appropriate to {{LEVEL}}, then ask comprehension questions about it.
 - skill = reading with a source passage: use the provided source passage as the reading text and ask comprehension questions about it.
 - Reading passages should be concrete and memorable: a small scene, message, short article, diary entry, notice, or story tied to the objective and vocabulary.
@@ -28,6 +30,7 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 - Use idiomatic vocabulary and collocations throughout the passage and questions. Check that verbs fit their objects and situations naturally; grammatical form alone is insufficient.
 - Follow the language policy for all learner-visible fields: passage, question, options, explanation, and passageRef.
 - One-sentence explanation per question.
+- Explain the actual grammatical constraint, contextual meaning, or passage evidence that makes the answer correct. Do not invent passage facts or present a context-specific choice as a universal grammar rule.
 - Put the full generated reading text in the top-level `passage` field. For grammar, set `passage` to an empty string.
 - For reading questions, `passageRef` should be a short locator such as "paragraph 1" or "the notice"; do not duplicate the full passage in each question.
 

@@ -11,7 +11,79 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 // ---- Import under test ----
-import { generateScript as generateScriptImpl } from '@/lib/script-generator';
+import { generateScript as generateScriptImpl, parseScriptResponse } from '@/lib/script-generator';
+
+describe('vocabulary marker identity', () => {
+  const parse = (
+    text: string,
+    vocabulary: Array<{ number: number; word: string; translation: string }>
+  ) =>
+    parseScriptResponse({
+      content: JSON.stringify({
+        turns: [{ speaker: 'HOST', text }],
+        references: [],
+        soundCues: [],
+        vocabulary,
+      }),
+      model: 'm',
+      inputTokens: 1,
+      outputTokens: 1,
+    });
+  const entries = [
+    { number: 5, word: 'besucht', translation: 'visited' },
+    { number: 6, word: 'gemacht', translation: 'made' },
+  ];
+
+  it('links a misnumbered word to its unique exact entry before generating markdown', () => {
+    const result = parse('Ich habe Oma [V6:besucht] und Tee [V6:gemacht].', entries);
+    expect(result.turns[0].text).toBe('Ich habe Oma [V5:besucht] und Tee [V6:gemacht].');
+    expect(result.markdown).toContain(result.turns[0].text);
+    expect(result.vocabulary.map((entry) => [entry.number, entry.word])).toEqual([
+      [5, 'besucht'],
+      [6, 'gemacht'],
+    ]);
+  });
+
+  it('recovers an absent marker number only from a unique exact word identity', () => {
+    expect(parse('[V99:besucht]', entries).turns[0].text).toBe('[V5:besucht]');
+  });
+
+  it('preserves surface variation linked to an existing entry', () => {
+    const result = parse('Die [V7:Reise] war kurz.', [
+      { number: 7, word: 'die Reise', translation: 'the trip' },
+    ]);
+    expect(result.turns[0].text).toBe('Die [V7:Reise] war kurz.');
+  });
+
+  it('preserves an already correct number when another entry has the same word', () => {
+    expect(
+      parse('[V5:besucht]', [
+        ...entries,
+        { number: 8, word: 'besucht', translation: 'visited someone' },
+      ]).turns[0].text
+    ).toBe('[V5:besucht]');
+  });
+
+  it('rejects an ambiguous remapping instead of selecting a translation', () => {
+    expect(() =>
+      parse('[V6:besucht]', [
+        ...entries,
+        { number: 8, word: 'besucht', translation: 'visited someone' },
+      ])
+    ).toThrow(/ambiguous entry identity/);
+  });
+
+  it('rejects duplicate entry numbers and unknown marker identities', () => {
+    expect(() =>
+      parse('[V5:besucht]', [...entries, { number: 5, word: 'gesehen', translation: 'seen' }])
+    ).toThrow(/duplicate entry numbers/);
+    expect(() => parse('[V99:unbekannt]', entries)).toThrow(/no matching entry/);
+  });
+
+  it('preserves ordinary scripts without vocabulary markers or entries', () => {
+    expect(parse('Guten Morgen!', []).turns[0].text).toBe('Guten Morgen!');
+  });
+});
 
 const AI_RUNTIME = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' };
 type GenerateScriptParams = Parameters<typeof generateScriptImpl>[0];

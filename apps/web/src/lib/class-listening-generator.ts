@@ -407,7 +407,7 @@ export async function composeListeningContent(
       userId: p.userId,
       episodeId,
     });
-    if (assessSectionReview(blindReview.content, reviewedQuestions, true).length)
+    if (assessSectionReview(blindReview.content, reviewedQuestions, true).issues.length)
       throw new SectionQualityError(
         'Listening questions are not supported by the exact audio script.'
       );
