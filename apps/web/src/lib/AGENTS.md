@@ -51,6 +51,10 @@ including rejected keys and explanations, as untrusted correction context alongs
 bounded review issue codes. Blind reviewers still receive neither keys nor explanations.
 Rewrite generated content for meaning and evidence; supplied source passages remain
 immutable. Parser repair remains separate from semantic revision.
+Vocabulary coverage retries receive bounded missing/duplicate target feedback,
+indexed unexpected keyed answers, and invalid cloze indices. Preserve exact spelling
+and case for SRS attribution; change sentence placement rather than the target form.
+These coverage failures precede both independent reviews, which still gate replacements.
 These review requests consume the existing preparation budget. Provider errors
 and cancellation propagate without retrying under another provider. This is a
 probabilistic check, not a guarantee of pedagogical correctness.
@@ -74,6 +78,12 @@ context and request limits. Logs contain only static protocol diagnostics and
 issue codes. Generated and restored intros preserve absent visuals; only explicit
 metadata fallback construction derives visuals. Intro repair uses its dedicated
 trusted-context template without the initial generation template's visual schema.
+
+`script-generator.ts` aligns vocabulary marker numbers before producing markdown.
+It remaps only a unique exact word identity already in the generated vocabulary,
+preserves correct numbered identities and legitimate surface variations, and rejects
+duplicate numbers, ambiguous remapping, or missing identities. It never rewrites
+spoken text, infers a translation, or adds provider calls.
 
 `classes/regeneration/pristine.ts` supports optional guarded class regeneration.
 The existing class GET with `pristineSnapshot=1` returns an opaque content hash;
