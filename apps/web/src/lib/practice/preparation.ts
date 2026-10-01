@@ -49,7 +49,7 @@ export function practicePreparationProgress(
     CANCELLING: 'Stopping generation and waiting for active work to settle.',
     CANCELLED: 'Practice generation was cancelled.',
     COMPLETED: 'Practice preparation finished.',
-    FAILED: 'Practice generation failed. Start a new attempt after checking provider settings.',
+    FAILED: 'Practice generation failed. You can start a new attempt.',
     UNRESOLVED: 'Generation was interrupted. Execution cleanup must be confirmed before recovery.',
   };
   return {

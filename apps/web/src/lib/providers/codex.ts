@@ -41,6 +41,7 @@ export class CodexProvider implements AIProvider {
       onUsage: opts?.onUsage,
       model: opts?.model,
       useWebSearch: opts?.useWebSearch,
+      jsonSchema: opts?.jsonSchema,
       ...(opts?.isolated ? { isolated: opts.isolated } : {}),
     });
     return result;
@@ -63,6 +64,7 @@ export class CodexProvider implements AIProvider {
           onUsage: opts?.onUsage,
           model: opts?.model,
           useWebSearch: opts?.useWebSearch,
+          jsonSchema: opts?.jsonSchema,
           ...(opts?.isolated ? { isolated: opts.isolated } : {}),
         });
       },

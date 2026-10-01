@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
 import {
@@ -33,6 +34,7 @@ interface CodexResponse extends TokenUsage {
 }
 
 interface CodexOptions {
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
   isolated?: import('./agents/isolated/isolated-agent').IsolatedClaudeExecution;
   signal?: AbortSignal;
   onUsage?: (usage: TokenUsage & { model: string }) => void;
@@ -69,7 +71,8 @@ function resolveSelection(opts?: CodexOptions): { model: string; effort?: AgentE
 function codexArgs(
   opts?: CodexOptions,
   outFile?: string,
-  selection = resolveSelection(opts)
+  selection = resolveSelection(opts),
+  outputSchema?: string
 ): {
   args: string[];
   model: string;
@@ -94,6 +97,7 @@ function codexArgs(
     '--skip-git-repo-check',
   ];
   if (outFile) args.push('-o', outFile);
+  if (outputSchema) args.push('--output-schema', outputSchema);
   if (model) args.push('-m', model);
   if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
   args.push('-');
@@ -128,7 +132,9 @@ function modelIdentity(selection: Selection): string {
   return formatAgentModelId('codex', selection.model || null, selection.effort);
 }
 
-class CodexCleanupError extends Error {}
+class CodexCleanupError extends Error {
+  override name = 'CodexCleanupError';
+}
 
 export function isCodexCleanupError(error: unknown): boolean {
   return (
@@ -246,11 +252,71 @@ async function* runCodex(
   host?: string,
   output?: string
 ): AsyncGenerator<string> {
+  if (!opts.jsonSchema) {
+    yield* runCodexProcess(systemPrompt, prompt, opts, selection, host, output);
+    return;
+  }
   opts.signal?.throwIfAborted();
   if (opts.isolated)
     throw new Error('Isolated Codex execution is not supported by the reviewed broker protocol');
-  const { args } = codexArgs(opts, output, selection);
-  const invocation = buildAgentInvocation('codex', args, host, { remoteEnvKeys: CODEX_ENV_KEYS });
+  const schema = opts.jsonSchema.schema;
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema))
+    throw new Error('Codex output schema must be a JSON object');
+  const json = JSON.stringify(schema);
+  if (Buffer.byteLength(json) > 1_048_576)
+    throw new Error('Codex output schema exceeds its size limit');
+  let directory: string | undefined;
+  let schemaPath: string | undefined;
+  let primary: { error: unknown } | undefined;
+  let usage: TokenUsage = { inputTokens: null, outputTokens: null };
+  try {
+    if (!host) {
+      directory = await mkdtemp(join(tmpdir(), 'sotto-codex-schema-'));
+      schemaPath = join(directory, 'schema.json');
+      await writeFile(schemaPath, json, { mode: 0o600, flag: 'wx' });
+    }
+    yield* runCodexProcess(
+      systemPrompt,
+      prompt,
+      {
+        ...opts,
+        onUsage(value) {
+          usage = { inputTokens: value.inputTokens, outputTokens: value.outputTokens };
+          opts.onUsage?.(value);
+        },
+      },
+      selection,
+      host,
+      output,
+      schemaPath,
+      host ? { json, cleanupToken: randomUUID() } : undefined
+    );
+  } catch (error) {
+    primary = { error };
+    throw error;
+  } finally {
+    await releaseOutput(directory, primary, usage);
+  }
+}
+
+async function* runCodexProcess(
+  systemPrompt: string,
+  prompt: string,
+  opts: CodexOptions,
+  selection: Selection,
+  host?: string,
+  output?: string,
+  schemaPath?: string,
+  remoteOutputSchema?: { json: string; cleanupToken: string }
+): AsyncGenerator<string> {
+  opts.signal?.throwIfAborted();
+  if (opts.isolated)
+    throw new Error('Isolated Codex execution is not supported by the reviewed broker protocol');
+  const { args } = codexArgs(opts, output, selection, schemaPath);
+  const invocation = buildAgentInvocation('codex', args, host, {
+    remoteEnvKeys: CODEX_ENV_KEYS,
+    ...(remoteOutputSchema ? { remoteOutputSchema } : {}),
+  });
   const environment = codexEnvironment();
   const decoder = new CodexOutputDecoder(Number.MAX_SAFE_INTEGER);
   let usage: TokenUsage | undefined;
@@ -276,9 +342,17 @@ async function* runCodex(
       }
     }
   }
+  const cleanupProof = remoteOutputSchema
+    ? 'SOTTO_CODEX_SCHEMA_CLEANED ' + remoteOutputSchema.cleanupToken
+    : null;
+  const cleanupConfirmed = () => !cleanupProof || stderr.split('\n').includes(cleanupProof);
   const diagnostic = () =>
     failure ||
-    stderr.trim() ||
+    stderr
+      .split('\n')
+      .filter((line) => line !== cleanupProof)
+      .join('\n')
+      .trim() ||
     stdout
       .split('\n')
       .filter((line) =>
@@ -306,6 +380,8 @@ async function* runCodex(
     }
     finished = true;
     yield* observe(decoder.finish());
+    if (!cleanupConfirmed())
+      throw new CodexCleanupError('Remote Codex output schema cleanup could not be confirmed');
     if (terminalFailure) throw new Error(classifyCodexFailure(1, diagnostic()));
     if (!produced && !output) throw new Error('codex: no output produced (empty response)');
   } catch (error) {
@@ -334,6 +410,16 @@ async function* runCodex(
       });
     if (error instanceof CliProtocolError && diagnostic() !== '(no output)')
       reported = new Error(classifyCodexFailure(1, diagnostic()), { cause: error });
+    const neverStarted =
+      error instanceof ProcessExecutionError &&
+      (error.code === 'start_failed' || error.code === 'busy');
+    if (!neverStarted && !cleanupConfirmed() && !(reported instanceof CodexCleanupError))
+      reported = new CodexCleanupError(
+        'Remote Codex output schema cleanup could not be confirmed',
+        {
+          cause: reported,
+        }
+      );
     if (usage)
       throw new GenerationUsageError(
         reported instanceof Error ? reported.message : 'Codex execution failed',

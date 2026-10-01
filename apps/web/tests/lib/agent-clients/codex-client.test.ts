@@ -6,6 +6,7 @@ import { executeCodex, streamCodex } from '@/lib/codex-client';
 import { CodexProvider } from '@/lib/providers/codex';
 import { usageFromGenerationError } from 'thesidedoor-core/ai/usage';
 import { isolatedFixture } from './isolated-fixture';
+import { isDurableQueueCleanupFailure } from '@/lib/sidedoor/jobs/core/durable-queue';
 
 describe('Codex CLI execution', () => {
   it('fails closed when isolation is requested for an unsupported protocol', async () => {
@@ -137,6 +138,164 @@ describe('Codex CLI execution', () => {
     expect(
       JSON.parse((await executeCodex('', 'Prompt', { useWebSearch: true })).content)
     ).toContain('web_search="live"');
+  });
+
+  const jsonSchema = {
+    name: 'answer',
+    schema: {
+      type: 'object',
+      properties: { answer: { type: 'string', description: "It's $(echo untrusted) text." } },
+      required: ['answer'],
+      additionalProperties: false,
+    },
+  };
+
+  function schemaExecutable() {
+    executable(
+      'const file=args[args.indexOf("--output-schema")+1];' +
+        'const info={schema:JSON.parse(fs.readFileSync(file,"utf8")),file,' +
+        'fileMode:fs.statSync(file).mode&511,directoryMode:fs.statSync(require("node:path").dirname(file)).mode&511,' +
+        'input,args,key:process.env.CODEX_API_KEY,database:process.env.DATABASE_URL};' +
+        'if(output)fs.writeFileSync(output,JSON.stringify(info));else console.log(JSON.stringify({type:"item.completed",item:{id:"answer",type:"agent_message",text:JSON.stringify(info)}}));' +
+        event(done)
+    );
+  }
+
+  it.each([false, true])(
+    'supplies the exact private output schema and cleans it up (SSH %s)',
+    async (remote) => {
+      process.env.PATH = directory + ':/usr/bin:/bin';
+      process.env.CODEX_API_KEY = 'fixture-key';
+      process.env.DATABASE_URL = 'must-not-reach-cli';
+      if (remote) {
+        process.env.CODEX_SSH_HOST = 'fixture-host';
+        executable(
+          'const child=require("node:child_process").spawn("/bin/sh",["-c",args.at(-1)],{stdio:["pipe","inherit","inherit"]});' +
+            'child.stdin.end(input);child.on("exit",code=>{process.exitCode=code});',
+          'ssh'
+        );
+      }
+      schemaExecutable();
+      const response = await new CodexProvider().generateResponse(
+        'System',
+        [{ role: 'user', content: 'Private prompt' }],
+        {
+          model: 'codex:chosen#effort=high',
+          jsonSchema,
+        }
+      );
+      const request = JSON.parse(response.content);
+      expect(request.schema).toEqual(jsonSchema.schema);
+      expect(request.fileMode).toBe(0o600);
+      expect(request.directoryMode).toBe(0o700);
+      expect(request.input).toContain('Private prompt');
+      expect(request.args.join(' ')).not.toContain('Private prompt');
+      expect(request.key).toBe('fixture-key');
+      expect(request.database).toBeUndefined();
+      expect(response.model).toBe('codex:chosen#effort=high');
+      expect(existsSync(request.file)).toBe(false);
+      expect(existsSync(join(request.file, '..'))).toBe(false);
+    }
+  );
+
+  it('supplies a schema during streaming and removes it after completion', async () => {
+    schemaExecutable();
+    const chunks: string[] = [];
+    for await (const chunk of new CodexProvider().streamResponse(
+      '',
+      [{ role: 'user', content: 'Prompt' }],
+      { jsonSchema }
+    ))
+      chunks.push(chunk);
+    const response = JSON.parse(chunks.join(''));
+    expect(response.schema).toEqual(jsonSchema.schema);
+    expect(existsSync(response.file)).toBe(false);
+  });
+
+  it('preserves schema rejection and measured usage without another invocation', async () => {
+    const record = join(directory, 'schema-rejection');
+    executable(
+      'fs.writeFileSync(' +
+        JSON.stringify(record) +
+        ',args[args.indexOf("--output-schema")+1],{flag:"wx"});' +
+        event(done) +
+        'process.stderr.write("Unsupported output schema");process.exitCode=7;'
+    );
+    const failure = await executeCodex('', 'Prompt', { jsonSchema }).catch(
+      (error: unknown) => error
+    );
+    expect((failure as Error).message).toContain('Unsupported output schema');
+    expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 20, outputTokens: 7 });
+    expect(existsSync(readFileSync(record, 'utf8'))).toBe(false);
+  });
+
+  it('reports uncertain remote cleanup even when the lost transport supplied a completed answer', async () => {
+    process.env.CODEX_SSH_HOST = 'fixture-host';
+    executable(event(answer('Answer')) + event(done), 'ssh');
+    const failure = await executeCodex('', 'Prompt', { jsonSchema }).catch(
+      (error: unknown) => error
+    );
+    expect((failure as Error).message).toContain(
+      'Remote Codex output schema cleanup could not be confirmed'
+    );
+    expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 20, outputTokens: 7 });
+    expect(isDurableQueueCleanupFailure(failure)).toBe(true);
+  });
+
+  it('does not retain a remote cleanup fence when SSH could not start', async () => {
+    process.env.CODEX_SSH_HOST = 'fixture-host';
+    const failure = await executeCodex('', 'Prompt', { jsonSchema }).catch(
+      (error: unknown) => error
+    );
+    expect((failure as Error).message).toContain('failed to spawn');
+    expect(isDurableQueueCleanupFailure(failure)).toBe(false);
+  });
+
+  it('reaps a cancelled schema stream before deleting its private schema', async () => {
+    const record = join(directory, 'cancelled-schema');
+    executable(
+      'fs.writeFileSync(' +
+        JSON.stringify(record) +
+        ',JSON.stringify({pid:process.pid,file:args[args.indexOf("--output-schema")+1]}));' +
+        event(answer('Ready')) +
+        'setInterval(()=>{},1000);'
+    );
+    const stream = new CodexProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+      jsonSchema,
+    });
+    expect(await stream.next()).toMatchObject({ value: 'Ready' });
+    const state = JSON.parse(readFileSync(record, 'utf8'));
+    expect(existsSync(state.file)).toBe(true);
+    const pending = stream.next().catch((error: unknown) => error);
+    await stream.return(undefined);
+    expect(await pending).toBeInstanceOf(Error);
+    expect(() => process.kill(state.pid, 0)).toThrow();
+    expect(existsSync(state.file)).toBe(false);
+  });
+
+  it('retains a cleanup fence when a cancelled SSH stream cannot confirm remote settlement', async () => {
+    process.env.CODEX_SSH_HOST = 'fixture-host';
+    const record = join(directory, 'cancelled-remote-schema');
+    executable(
+      'fs.writeFileSync(' +
+        JSON.stringify(record) +
+        ',JSON.stringify({pid:process.pid}));' +
+        event(answer('Ready')) +
+        'setInterval(()=>{},1000);',
+      'ssh'
+    );
+    const stream = new CodexProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+      jsonSchema,
+    });
+    expect(await stream.next()).toMatchObject({ value: 'Ready' });
+    const state = JSON.parse(readFileSync(record, 'utf8'));
+    const pending = stream.next();
+    const results = await Promise.allSettled([pending, stream.return(undefined)]);
+    const failures = results
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason);
+    expect(failures.some(isDurableQueueCleanupFailure)).toBe(true);
+    expect(() => process.kill(state.pid, 0)).toThrow();
   });
 
   it('collects remote JSON messages without sending a local output path or prompt in argv', async () => {

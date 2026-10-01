@@ -14,6 +14,13 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+Codex generation forwards requested JSON schemas to the CLI through private
+per-invocation files. Local completion and stream cancellation remove those
+files after child settlement. SSH runs use a remote wrapper that reports schema
+cleanup after the child exits. Missing cleanup proof remains unresolved, including
+when answer text arrived. Model selection, stdin prompts and credential restrictions
+remain captured by the existing provider boundary.
+
 Script regeneration snapshots learner annotations against the original script
 revision and carries bounded `revisionFeedback` through research, planning and
 writing jobs. `feedback-formatter.ts` preserves the targeted dialogue. The writer

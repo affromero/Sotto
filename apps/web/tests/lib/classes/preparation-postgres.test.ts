@@ -32,6 +32,7 @@ import {
   classPreparationStore,
   validateClassPreparation,
   recordClassPreparationFailure,
+  settleCancelledPreparation,
 } from '@/lib/classes/preparation';
 import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
@@ -519,6 +520,53 @@ suite('durable preparation admission and provider accounting', () => {
       (await recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true }))
         .status
     ).toBe('CANCELLED');
+  });
+
+  it('retains a failed outcome and admits another attempt only after its execution settles', async () => {
+    const operation = await running();
+    const record = await sottoTransaction(instance.database, (database) =>
+      sottoJobOutbox(database).read(operation.id)
+    );
+    if (!record) throw new Error('Missing outbox fixture');
+    const binding = {
+      id: randomUUID(),
+      parentId: operation.id,
+      fingerprint: record.fingerprint,
+      executorId: randomUUID(),
+    };
+    await sottoTransaction(instance.database, async (database) => {
+      await sottoJobExecutions(database).begin(binding);
+      await recordClassPreparationFailure(database, operation, record.fingerprint, false);
+    });
+    const cleanUp = () =>
+      sottoTransaction(instance.database, async (database) => {
+        const current = await classPreparationStore(database, courseId).read();
+        if (!current) throw new Error('Missing failed operation');
+        return settleCancelledPreparation(database, current);
+      });
+    expect(await cleanUp()).toMatchObject({
+      id: operation.id,
+      status: 'FAILED',
+      failure: 'generation_failed',
+    });
+    await expect(requestClassPreparation(courseId, execution)).rejects.toThrow(/cleanup/);
+    expect((await readPreparationActivity(courseId, execution))?.status).toBe('FAILED');
+    await sottoTransaction(instance.database, (database) =>
+      sottoJobExecutions(database).settle(binding)
+    );
+    expect(await cleanUp()).toMatchObject({
+      id: operation.id,
+      status: 'FAILED',
+      failure: 'generation_failed',
+    });
+    expect(
+      await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(operation.id)
+      )
+    ).toMatchObject({ complete: true });
+    const next = await requestClassPreparation(courseId, execution);
+    expect(next.id).not.toBe(operation.id);
+    expect(next.status).toBe('QUEUED');
   });
 
   it('preserves published authority when the publication commit acknowledgement is lost', async () => {

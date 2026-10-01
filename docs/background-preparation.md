@@ -1,5 +1,9 @@
 # Background class preparation
 
+Updated: October 1, 2026
+
+Durable class and practice preparation preserves learner authority, execution cleanup, and visible outcomes.
+
 New audio generations and ordinary failed-stitch resumes use bundled stock sound
 effects. They do not require a separate premium effects credential. Existing jobs
 retain their recorded sound policy; an explicitly admitted premium job still
@@ -30,6 +34,12 @@ Raw source URLs and topics live in the scoped job payload so existing erasure ru
 ## Cancellation and recovery
 
 Cancellation revokes the preparation grant. Queued work cannot begin new model requests, and linked audio jobs cannot make further provider requests or publish results under revoked authority. Work already sent to a remote provider may still incur charges. Sotto waits for local execution cleanup before treating cancellation as settled.
+
+Class preparations recorded as `FAILED` retain that outcome after cleanup.
+Completing cleanup does not mean the learner cancelled the task. A new class attempt is admitted only after
+the execution and descendant audio receipts confirm that cleanup settled.
+Practice failures report unsuccessful generation without assuming the provider
+settings caused it. Reviewer feedback and generated content remain private.
 
 Interrupted requests can have an unknown remote outcome. Sotto records that state and does not repeat the request automatically. **Check cleanup and recover** requires acknowledging possible provider charges and verifies the canonical execution and child-job receipts. The acknowledgement cannot override active work or unconfirmed cleanup. A completed class is retained when its remaining background work is cancelled.
 

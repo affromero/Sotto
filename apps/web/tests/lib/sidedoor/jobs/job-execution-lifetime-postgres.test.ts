@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { AccessError } from 'thesidedoor-core/access';
@@ -12,6 +15,8 @@ import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { isMediaCleanupFailure } from '@/lib/audio/media-process';
+import { executeCodex } from '@/lib/codex-client';
+import { isDurableQueueCleanupFailure } from '@/lib/sidedoor/jobs/core/durable-queue';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -103,6 +108,50 @@ suite('durable execution admission and cleanup', () => {
       })
     ).rejects.toMatchObject({ errors: [reason, expect.any(Error)] });
     expect((await unresolved()).executions).toMatchObject([{ status: 'cleanup-unconfirmed' }]);
+  });
+  it('keeps lost remote schema cleanup unresolved and prevents another provider execution', async () => {
+    const { options, unresolved } = await fixture();
+    const directory = await mkdtemp(join(tmpdir(), 'sotto-lost-schema-'));
+    const originalEnv = process.env;
+    try {
+      await writeFile(
+        join(directory, 'ssh'),
+        '#!' +
+          process.execPath +
+          '\n' +
+          'process.stdin.resume();process.stdin.on("end",()=>{' +
+          'console.log(JSON.stringify({type:"item.completed",item:{id:"answer",type:"agent_message",text:"Answer"}}));' +
+          'console.log(JSON.stringify({type:"turn.completed",usage:{input_tokens:20,output_tokens:7}}));});',
+        { mode: 0o700 }
+      );
+      process.env = { ...originalEnv, PATH: directory, CODEX_SSH_HOST: 'fixture-host' };
+      const failure = await withSottoJobExecution({
+        ...options,
+        isCleanupFailure: isDurableQueueCleanupFailure,
+        run: async () =>
+          executeCodex('', 'Prompt', {
+            jsonSchema: { name: 'answer', schema: { type: 'object' } },
+          }),
+      }).catch((error: unknown) => error);
+      expect(isDurableQueueCleanupFailure(failure)).toBe(true);
+      expect((await unresolved()).executions).toMatchObject([{ status: 'cleanup-unconfirmed' }]);
+      let repeated = false;
+      await expect(
+        withSottoJobExecution({
+          ...options,
+          isCleanupFailure: isDurableQueueCleanupFailure,
+          run: async () => {
+            repeated = true;
+            return 'Repeated';
+          },
+        })
+      ).rejects.toThrow();
+      expect(repeated).toBe(false);
+      expect((await unresolved()).executions).toMatchObject([{ status: 'cleanup-unconfirmed' }]);
+    } finally {
+      process.env = originalEnv;
+      await rm(directory, { recursive: true, force: true });
+    }
   });
   it.each(['eligible', 'cancelled', 'revoked', 'revoked-wrapped'] as const)(
     'recovers an accepted admission COMMIT when work becomes %s',
