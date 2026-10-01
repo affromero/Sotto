@@ -37,9 +37,9 @@ interface AgentModelDiscoveryOptions {
 // Used only when live App Server discovery fails. Exact current offerings come
 // from `model/list`; keeping this list deliberately small limits stale data.
 const CODEX_DEFAULT_MODELS: AgentModelOptionInput[] = [
-  ['gpt-5.6-sol', 'GPT-5.6 Sol', 'best'],
-  ['gpt-5.6-terra', 'GPT-5.6 Terra', 'balanced'],
-  ['gpt-5.6-luna', 'GPT-5.6 Luna', 'fast'],
+  ['gpt-6-astra', 'GPT-6 Astra', 'best'],
+  ['gpt-6-sol', 'GPT-6 Sol', 'balanced'],
+  ['gpt-6-luna', 'GPT-6 Luna', 'fast'],
 ].map(([model, displayName, tier]) => ({
   provider: 'codex',
   model,
