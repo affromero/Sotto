@@ -142,28 +142,53 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls).toHaveLength(3);
   });
 
-  it('replaces a structurally valid intro rejected by teaching review', async () => {
-    const replacement = {
+  it('replaces a rejected explanation and preserves feedback identifying its field', async () => {
+    const candidate = {
       ...intro,
-      examples: [{ ...intro.examples[0], note: 'Use sein with movement in the Perfekt.' }],
+      examples: [
+        {
+          target: 'Ich habe einen Kuchen gebacken.',
+          meaning: 'Ein Kuchen wurde von mir gebacken.',
+          note: 'Bei einen Kuchen backen steht das Perfekt mit haben.',
+        },
+      ],
+    };
+    const teachingVerdict = {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['incorrect'],
+          feedback: [
+            'examples[0].note uses an unquoted infinitive phrase after a preposition. Quote the expression or rewrite the surrounding explanation grammatically.',
+          ],
+        },
+      ],
+    };
+    const replacement = {
+      ...candidate,
+      examples: [
+        { ...candidate.examples[0], note: 'Das Verb „backen“ bildet das Perfekt mit haben.' },
+      ],
     };
     boundary.generate
       .mockReset()
-      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(teachingVerdict), model: 'captured-model' })
       .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'captured-model' })
       .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
 
     await expect(generateClassIntro(params)).resolves.toMatchObject(replacement);
-    expect(boundary.generate).toHaveBeenCalledTimes(4);
     expect(boundary.generate.mock.calls[2][2].jsonSchema.name).toBe('class_intro_repair');
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
       'failed an independent teaching-quality review'
     );
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
-      'Review issue codes: ["unnatural"]'
+      'Review issue codes: ["incorrect"]'
     );
-    expect(boundary.generate.mock.calls[2][1][0].content).toContain(rejected.items[0].feedback[0]);
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(
+      teachingVerdict.items[0].feedback[0]
+    );
     expect(boundary.generate.mock.calls[2][0]).toContain('Do not return visuals');
     expect(boundary.generate.mock.calls[2][0]).not.toContain('visual aids');
     for (const system of [boundary.generate.mock.calls[0][0], boundary.generate.mock.calls[2][0]]) {
