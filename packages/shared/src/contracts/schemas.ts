@@ -3,6 +3,14 @@
 // response schemas are authored here to mirror the actual route behavior
 // (read against the routes + practice-service, not invented).
 import { z } from 'zod';
+import { readingVocabularySchema } from '../reading-vocabulary';
+import { skillRequirementsSchema } from '../learning-requirements';
+import {
+  practicePreparingSchema,
+  practiceReceiptSchema,
+  speakingEvidenceSchema,
+  writingFeedbackSchema,
+} from '../learning-evidence';
 
 // ---------------------------------------------------------------------------
 // Shared primitives
@@ -24,7 +32,13 @@ export const practiceKindSchema = z.enum([
   'VOCAB',
 ]);
 
-export const practiceStatusSchema = z.enum(['ACTIVE', 'COMPLETED']);
+export const practiceStatusSchema = z.enum([
+  'GENERATING',
+  'ACTIVE',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+]);
 
 export const userRoleSchema = z.enum(['USER', 'ADMIN']);
 
@@ -113,6 +127,7 @@ export const practiceOverviewResponseSchema = z.object({
 export const startPracticeRequestSchema = z.object({
   kind: practiceKindSchema,
   focusTargetId: z.string().min(1).optional(),
+  requestId: z.uuid().optional(),
 });
 
 // Public projection of a multiple-choice item (toPublic drops the answer).
@@ -128,13 +143,24 @@ export const practiceSpeakingPromptSchema = z.object({
   targetPhrase: z.string(),
   translation: z.string(),
   referenceTtsUrl: z.string().nullable(),
+  latestRecording: speakingEvidenceSchema.nullable().optional(),
 });
 
 export const practiceWritingPromptSchema = z.object({
   id: z.string(),
   task: z.string(),
   guidance: z.string().nullable(),
+  ideas: z.array(z.string()).optional(),
+  savedDraft: z.string().optional(),
+  response: writingFeedbackSchema.nullable().optional(),
 });
+
+const learningProgressFields = {
+  progressRevision: z.number().int().nonnegative().optional(),
+  learnerAnswers: z.record(z.string(), z.number().int().min(0).max(3)).optional(),
+  writingDrafts: z.record(z.string(), z.string()).optional(),
+  submissionResult: practiceReceiptSchema.nullable().optional(),
+};
 
 // Each StartPractice variant is its own schema so it can be registered as a
 // named OpenAPI component and referenced from the response's oneOf/discriminator.
@@ -144,6 +170,8 @@ export const startPracticeUnavailableSchema = z.object({
 });
 
 export const startPracticeReadySchema = z.object({
+  ...learningProgressFields,
+  skillRequirements: skillRequirementsSchema.optional(),
   status: z.literal('ready'),
   sessionId: z.string(),
   kind: practiceKindSchema,
@@ -152,18 +180,24 @@ export const startPracticeReadySchema = z.object({
 });
 
 export const startPracticeReadySpeakingSchema = z.object({
+  ...learningProgressFields,
+  skillRequirements: skillRequirementsSchema.optional(),
   status: z.literal('ready_speaking'),
   sessionId: z.string(),
   prompts: z.array(practiceSpeakingPromptSchema),
 });
 
 export const startPracticeReadyWritingSchema = z.object({
+  ...learningProgressFields,
+  skillRequirements: skillRequirementsSchema.optional(),
   status: z.literal('ready_writing'),
   sessionId: z.string(),
   prompts: z.array(practiceWritingPromptSchema),
 });
 
 export const startPracticeReadyFullSchema = z.object({
+  ...learningProgressFields,
+  skillRequirements: skillRequirementsSchema.optional(),
   status: z.literal('ready_full'),
   sessionId: z.string(),
   kind: z.literal('FULL'),
@@ -174,6 +208,7 @@ export const startPracticeReadyFullSchema = z.object({
 });
 
 export const startPracticeResponseSchema = z.discriminatedUnion('status', [
+  practicePreparingSchema,
   startPracticeUnavailableSchema,
   startPracticeReadySchema,
   startPracticeReadySpeakingSchema,
@@ -235,11 +270,7 @@ export const submitPracticeRequestSchema = z.object({
   ),
 });
 
-export const submitPracticeResponseSchema = z.object({
-  score: z.number(),
-  correct: z.number(),
-  total: z.number(),
-});
+export const submitPracticeResponseSchema = practiceReceiptSchema;
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/episodes/{episodeId}  (auth: bearer for private; public otherwise)
@@ -391,6 +422,11 @@ export const classSpeakingPromptSchema = z.object({
   translation: z.string(),
   ipa: z.string().nullable(),
   referenceTtsUrl: z.string().nullable(),
+  latestRecording: speakingEvidenceSchema
+    .omit({ recordingId: true })
+    .extend({ id: z.string() })
+    .nullable()
+    .optional(),
 });
 
 // `.loose()`: `response` is a graded WritingResponse row (text/score/corrections/
@@ -401,6 +437,9 @@ export const classWritingPromptSchema = z
     order: z.number().int(),
     task: z.string(),
     guidance: z.string().nullable(),
+    ideas: z.array(z.string()).optional(),
+    savedDraft: z.string().optional(),
+    response: writingFeedbackSchema.nullable().optional(),
   })
   .loose();
 
@@ -432,6 +471,12 @@ export const classSectionSchema = z
 // attribution the client does not need; only the modeled fields are read.
 export const classDetailResponseSchema = z
   .object({
+    skillRequirements: skillRequirementsSchema.nullable().optional(),
+    readingVocabulary: readingVocabularySchema.nullable().optional(),
+    learnerAnswers: z.record(z.string(), z.number().int().min(0).max(3)).nullable().optional(),
+    writingDrafts: z.record(z.string(), z.string()).nullable().optional(),
+    progressRevision: z.number().int().nonnegative().optional(),
+    attempt: z.number().int().positive().optional(),
     id: z.string(),
     courseId: z.string(),
     status: classStatusSchema,

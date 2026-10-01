@@ -1,16 +1,33 @@
 import SwiftUI
 
 struct PracticeStartView: View {
+    @Environment(\.sottoLayout) private var layout
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dismiss) private var dismiss
     let start: SottoPracticeStart
 
     @State private var answers: [String: Int] = [:]
+    @ObservedObject var progress: LearningProgressStore
+    @State private var hydrated = false
+    @State private var preparationError: String?
+    @State private var showingRecovery = false
     @State private var submittedAnswers: [String: Int] = [:]
-    @StateObject private var drafts = WritingDraftStore()
+    @ObservedObject var drafts: WritingDraftStore
+
+    private var currentStart: SottoPracticeStart {
+        model.practiceStart?.sessionId == start.sessionId ? (model.practiceStart ?? start) : start
+    }
+
+    private var writingPrompts: [SottoWritingPrompt] {
+        (currentStart.writingPrompts ?? []).map { original in
+            var prompt = original
+            prompt.savedDraft = currentStart.writingDrafts?[prompt.id] ?? prompt.savedDraft
+            return prompt
+        }
+    }
 
     private var items: [SottoPracticeItem] {
-        start.items ?? []
+        currentStart.items ?? []
     }
 
     /// Only the choices that moved since the last submit. A second pass after
@@ -35,25 +52,51 @@ struct PracticeStartView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
 
-                    if let result = model.practiceResult {
+                    if let result = model.practiceResult ?? currentStart.submissionResult {
                         PracticeResultBanner(result: result)
+                        PracticeReceiptFeedback(result: result)
                     }
 
-                    if start.status == "unavailable" {
-                        UnavailablePractice(reason: start.reason)
-                    } else {
-                        if let episodeId = start.episodeId {
+                    if currentStart.status == "preparing" {
+                        preparationControls
+                    } else if currentStart.status == "unavailable" {
+                        UnavailablePractice(reason: currentStart.reason)
+                    } else if model.practiceResult == nil && currentStart.submissionResult == nil {
+                        if let episodeId = currentStart.episodeId {
                             PracticeListeningPlayer(episodeId: episodeId)
                         }
 
                         practiceItems
                         promptSections
-                        submitBar
+                        if model.practiceResult == nil && currentStart.submissionResult == nil { submitBar }
                     }
                 }
-                .padding(28)
+                .padding(layout == .compact ? 16 : 28)
                 .frame(maxWidth: 940, alignment: .leading)
             }
+            .task(id: "\(currentStart.sessionId)/\(currentStart.status)/\(currentStart.preparationStatus ?? "")") {
+                if currentStart.status == "preparing" {
+                    while !Task.isCancelled && model.practiceStart?.status == "preparing" {
+                        do {
+                            try await model.refreshPractice(sessionId: start.sessionId)
+                            if !["QUEUED", "RUNNING", "CANCELLING"].contains(model.practiceStart?.preparationStatus ?? "") { return }
+                            try await Task.sleep(for: .seconds(2))
+                        } catch {
+                            if !Task.isCancelled { preparationError = error.localizedDescription }
+                            return
+                        }
+                    }
+                } else if !hydrated {
+                    progress.configure(client: model.makeClient(), path: "/api/v1/practice/\(start.sessionId)",
+                        revision: currentStart.progressRevision ?? 0)
+                    answers = progress.answers ?? currentStart.learnerAnswers ?? [:]
+                    drafts.register(writingPrompts, savedDrafts: currentStart.writingDrafts ?? [:])
+                    hydrated = true
+                }
+            }
+            .onChange(of: answers) { _, _ in saveProgress() }
+            .onChange(of: drafts.texts) { _, _ in saveProgress() }
+            .onDisappear { Task { await progress.flush() } }
             .background(SottoTheme.paper)
             .navigationTitle(practiceTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -76,6 +119,7 @@ struct PracticeStartView: View {
     /// answers that moved and the writing drafts that were edited, nothing else.
     private var submitBar: some View {
         VStack(alignment: .leading, spacing: 10) {
+            LearningSaveFailureView(progress: progress)
             if let message = drafts.errorMessage {
                 Text(message)
                     .font(.caption)
@@ -89,15 +133,12 @@ struct PracticeStartView: View {
                         let graded = await drafts.submit(
                             source: .practice(sessionId: start.sessionId),
                             model: model,
-                            includingUnchanged: !hasChanges
+                            includingUnchanged: false
                         )
                         guard graded else { return }
 
-                        let payload = hasChanges ? changedAnswers : everyAnswer
-                        if !payload.isEmpty {
-                            await model.submitPracticeAnswers(payload)
-                            submittedAnswers = answers
-                        }
+                        await model.submitPracticeAnswers(everyAnswer)
+                        submittedAnswers = answers
                     }
                 } label: {
                     Label("Submit", systemImage: "checkmark.circle.fill")
@@ -117,9 +158,7 @@ struct PracticeStartView: View {
         if drafts.isOverLimit {
             return "One answer is over the 4000 character limit."
         }
-        if !hasChanges {
-            return "Nothing changed since the last submit. Sending again re-grades what is here."
-        }
+        if !hasChanges { return "Finishes this session using every answer and the saved speaking and writing grades." }
 
         var parts: [String] = []
         if !changedAnswers.isEmpty {
@@ -130,6 +169,45 @@ struct PracticeStartView: View {
             parts.append("\(writing) written answer\(writing == 1 ? "" : "s")")
         }
         return "Sends \(parts.joined(separator: " and "))."
+    }
+
+    private func saveProgress() {
+        guard hydrated, model.practiceResult == nil, currentStart.submissionResult == nil else { return }
+        progress.update(answers: answers, writingDrafts: drafts.texts)
+    }
+
+    private var preparationControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(currentStart.message ?? "Preparing practice.").foregroundStyle(SottoTheme.muted)
+            if let preparationError { Text(preparationError).foregroundStyle(.red) }
+            Button("Check status") {
+                Task {
+                    do { try await model.refreshPractice(sessionId: start.sessionId); preparationError = nil }
+                    catch { preparationError = error.localizedDescription }
+                }
+            }.buttonStyle(.bordered)
+            if currentStart.canRecover == true {
+                Button("Recover interrupted preparation") { showingRecovery = true }.buttonStyle(.bordered)
+            } else if ["QUEUED", "RUNNING"].contains(currentStart.preparationStatus ?? "") {
+                Button("Cancel preparation", role: .destructive) {
+                    Task {
+                        do { try await model.practiceGenerationAction(sessionId: start.sessionId, action: "cancel") }
+                        catch { preparationError = error.localizedDescription }
+                    }
+                }.buttonStyle(.bordered)
+            }
+        }
+        .confirmationDialog("Recover interrupted preparation?", isPresented: $showingRecovery, titleVisibility: .visible) {
+            Button("Acknowledge and recover") {
+                Task {
+                    do { try await model.practiceGenerationAction(sessionId: start.sessionId, action: "recover", acknowledgeUnknownOutcome: true) }
+                    catch { preparationError = error.localizedDescription }
+                }
+            }
+            Button("Keep waiting", role: .cancel) {}
+        } message: {
+            Text("An interrupted provider request may have incurred charges. Recovery waits for active work to settle.")
+        }
     }
 
     private var header: some View {
@@ -145,7 +223,7 @@ struct PracticeStartView: View {
     }
 
     private var practiceTitle: String {
-        switch start.kind {
+        switch currentStart.kind {
         case "GRAMMAR":
             return "Grammar practice"
         case "READING":
@@ -164,10 +242,10 @@ struct PracticeStartView: View {
     }
 
     private var statusCopy: String {
-        if start.status == "unavailable" {
+        if currentStart.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."
         }
-        return "\(answers.count) of \(items.count) multiple-choice items answered. Speaking is graded as you record; the rest goes with the submit at the end."
+        return "\(answers.count) of \(items.count) choices answered. Finish after every required speaking and writing exercise has feedback."
     }
 
     private var practiceItems: some View {
@@ -198,14 +276,18 @@ struct PracticeStartView: View {
 
     private var promptSections: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let speakingPrompts = start.speakingPrompts, !speakingPrompts.isEmpty {
+            ForEach(currentStart.skillRequirements?.exemptions ?? [], id: \.self) { skill in
+                Text("\(skill.capitalized) is exempt because its speech provider is not connected.")
+                    .foregroundStyle(SottoTheme.muted)
+            }
+            if let speakingPrompts = currentStart.speakingPrompts, !speakingPrompts.isEmpty {
                 ClassSpeakingPracticeView(
                     source: .practice(sessionId: start.sessionId),
                     prompts: speakingPrompts
                 )
             }
 
-            if let writingPrompts = start.writingPrompts, !writingPrompts.isEmpty {
+            if !writingPrompts.isEmpty {
                 WritingPracticeView(drafts: drafts, prompts: writingPrompts)
             }
         }
@@ -298,7 +380,7 @@ private struct PracticeResultBanner: View {
                 Text("Practice graded")
                     .font(.title2.bold())
                     .foregroundStyle(SottoTheme.ink)
-                Text("\(result.correct) of \(result.total) correct, \(Int(result.score * 100))% score.")
+                Text("\(result.correct) of \(result.answered ?? result.total) choices correct. \(result.graded ?? 0) speaking and writing exercises graded. \(Int(result.score * 100))% score.")
                     .font(.body)
                     .foregroundStyle(SottoTheme.muted)
             }

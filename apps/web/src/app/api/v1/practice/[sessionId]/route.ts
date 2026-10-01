@@ -5,8 +5,17 @@ import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { PracticeSessionNotFoundError } from '@/lib/practice-service';
 import { resumePractice } from '@/lib/practice/resume';
+import { patchLearningProgress } from '@/lib/learning/progress-route';
+import { readingVocabularySchema } from '@sotto/shared';
+import { cancelPracticePreparation } from '@/lib/practice/preparation';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
 type RouteParams = { params: Promise<{ sessionId: string }> };
+
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  return patchLearningProgress(request, 'PRACTICE', (await params).sessionId);
+}
 
 /** GET /api/v1/practice/[sessionId] — re-enter a practice session still in progress. */
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -47,9 +56,14 @@ async function pruneUntouchedTargets(
   // Read AFTER the session row is gone, so it cannot vouch for its own targets.
   const survivors = await prisma.practiceSession.findMany({
     where: { courseId },
-    select: { vocabLemmas: true, grammarKeys: true },
+    select: { vocabLemmas: true, grammarKeys: true, readingVocabulary: true },
   });
   const claimedLemmas = new Set(survivors.flatMap((s) => s.vocabLemmas));
+  for (const survivor of survivors) {
+    if (survivor.readingVocabulary)
+      for (const word of readingVocabularySchema.parse(survivor.readingVocabulary).words)
+        claimedLemmas.add(word.lemma);
+  }
   const claimedKeys = new Set(survivors.flatMap((s) => s.grammarKeys));
 
   const orphanLemmas = lemmas.filter((lemma) => !claimedLemmas.has(lemma));
@@ -89,15 +103,40 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // session by guessing an id.
     const session = await prisma.practiceSession.findFirst({
       where: { id: sessionId, course: { userId: authed.userId } },
-      select: { id: true, courseId: true, vocabLemmas: true, grammarKeys: true },
+      select: {
+        id: true,
+        courseId: true,
+        vocabLemmas: true,
+        grammarKeys: true,
+        readingVocabulary: true,
+        generationState: true,
+      },
     });
     if (!session) return errorResponse('Practice session not found', 404);
+    if (session.generationState) {
+      const cancelled = await cancelPracticePreparation(
+        sessionId,
+        sottoRequestExecution(request, authed),
+        false,
+        true
+      );
+      if (['QUEUED', 'RUNNING', 'CANCELLING', 'UNRESOLVED'].includes(cancelled.status))
+        return errorResponse(
+          'Generation cleanup must settle before deleting this saved attempt.',
+          409
+        );
+    }
 
     await prisma.practiceSession.delete({ where: { id: session.id } });
 
     const pruned = await pruneUntouchedTargets(
       session.courseId,
-      session.vocabLemmas,
+      [
+        ...session.vocabLemmas,
+        ...(session.readingVocabulary
+          ? readingVocabularySchema.parse(session.readingVocabulary).words.map((word) => word.lemma)
+          : []),
+      ],
       session.grammarKeys
     );
     if (pruned.vocab > 0 || pruned.grammar > 0) {
@@ -110,6 +149,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ deleted: true, pruned });
   } catch (error: unknown) {
+    if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
     const message = error instanceof Error ? error.message : 'Failed to delete practice';
     logger.error('Failed to delete practice session', { error: message });
     return errorResponse(message, 500);

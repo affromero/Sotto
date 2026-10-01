@@ -9,3 +9,8 @@ export function blockedProviderExecution(userId: string): SottoProviderExecution
     },
   };
 }
+
+/** Authenticated actor for unit database boundaries; provider I/O must still be mocked. */
+export function authorizedLearnerExecution(userId: string): SottoProviderExecution {
+  return { userId, authorize: async () => ({ userId }) };
+}

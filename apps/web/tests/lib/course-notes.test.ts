@@ -44,11 +44,12 @@ describe('getCourseNote', () => {
 
 describe('setCourseNote', () => {
   it('upserts a non-empty note', async () => {
-    await setCourseNote('c1', 'focus on speaking');
+    await setCourseNote('c1', '  focus on speaking  ');
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { courseId: 'c1' },
         create: expect.objectContaining({ body: 'focus on speaking' }),
+        update: { body: 'focus on speaking' },
       })
     );
     expect(mockDeleteMany).not.toHaveBeenCalled();

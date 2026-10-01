@@ -12,6 +12,12 @@ import {
   readPristineRegenerationSnapshot,
 } from '@/lib/classes/regeneration/pristine';
 import { regenerateCurrentClass } from '@/lib/class-service';
+import {
+  claimClassRegeneration,
+  settleClassGenerationFailure,
+  withClassGeneration,
+} from '@/lib/learning/classes/class-generation-state';
+import { createSkillRequirements } from '@sotto/shared';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
@@ -151,6 +157,171 @@ suite.each(['AVAILABLE', 'FAILED'] as const)(
         await instance.database.courseClass.findUnique({ where: { id: classId } })
       ).toMatchObject({ status: 'GENERATING', attempt: 2, failedAt: null });
       expect(await instance.database.classSection.count({ where: { classId } })).toBe(0);
+    });
+
+    it.each([
+      { learnerAnswers: { savedQuestion: 0 } },
+      { writingDrafts: { savedPrompt: 'My unfinished response' } },
+      { learnerAnswers: ['invalid'] },
+      { writingDrafts: { savedPrompt: 42 } },
+    ])('preserves saved or malformed learner work %j', async (data) => {
+      await instance.database.courseClass.update({ where: { id: classId }, data });
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
+        'learner work'
+      );
+      expect(await instance.database.classSection.count({ where: { classId } })).toBe(1);
+    });
+
+    it('allows initialized empty drafts and allocates beyond every historical attempt', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { writingDrafts: { unusedPrompt: '  ' } },
+      });
+      await instance.database.classSection.update({
+        where: { id: sectionId },
+        data: { attempt: 7 },
+      });
+      const snapshot = await readPristineRegenerationSnapshot(classId, execution);
+      const claimed = await claimPristineRegeneration(classId, execution, snapshot);
+      expect(claimed.attempt).toBe(8);
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: classId } })
+      ).toMatchObject({ status: 'GENERATING', attempt: 8 });
+    });
+
+    it('rejects an obsolete producer while a newer attempt is generating', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { status: 'GENERATING', attempt: 3 },
+      });
+      const publish = (attempt: number) =>
+        withClassGeneration(execution, classId, attempt, (database) =>
+          database.classSection.create({
+            data: {
+              classId,
+              skill: 'WRITING',
+              attempt,
+              seed: `writing-${attempt}`,
+              spec: {},
+              status: 'READY',
+            },
+          })
+        );
+      await expect(publish(2)).rejects.toThrow('cancelled');
+      const current = await publish(3);
+      expect(current).toMatchObject({ attempt: 3, status: 'READY' });
+      expect(
+        await instance.database.classSection.count({ where: { classId, skill: 'WRITING' } })
+      ).toBe(1);
+    });
+
+    it('claims full regeneration once without removing earlier material or saved work', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { learnerAnswers: { savedQuestion: 2 } },
+      });
+      await instance.database.classSection.update({
+        where: { id: sectionId },
+        data: { attempt: 4 },
+      });
+      const expected = await instance.database.courseClass.findUniqueOrThrow({
+        where: { id: classId },
+      });
+      const requirements = createSkillRequirements({
+        scope: 'CLASS',
+        nativeLang: 'en',
+        targetLang: 'de',
+        level: 'A2',
+        ttsProvider: null,
+        sttProvider: null,
+      });
+      const results = await Promise.allSettled([
+        claimClassRegeneration(execution, classId, expected, requirements),
+        claimClassRegeneration(execution, classId, expected, requirements),
+      ]);
+      expect(results.filter((result) => result.status === 'fulfilled')).toEqual([
+        { status: 'fulfilled', value: 5 },
+      ]);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: classId } })
+      ).toMatchObject({
+        attempt: 5,
+        status: 'GENERATING',
+        learnerAnswers: { savedQuestion: 2 },
+        skillRequirements: requirements,
+      });
+      expect(await instance.database.lessonQuestion.count({ where: { sectionId } })).toBe(1);
+    });
+
+    it('preserves material when regeneration authority was revoked before admission', async () => {
+      const expected = await instance.database.courseClass.findUniqueOrThrow({
+        where: { id: classId },
+      });
+      const requirements = createSkillRequirements({
+        scope: 'CLASS',
+        nativeLang: 'en',
+        targetLang: 'de',
+        level: 'A2',
+        ttsProvider: null,
+        sttProvider: null,
+      });
+      const revoked = {
+        ...execution,
+        authorize: async () => {
+          throw new Error('Learner authority revoked');
+        },
+      };
+      await expect(
+        claimClassRegeneration(revoked, classId, expected, requirements)
+      ).rejects.toThrow('authority revoked');
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: classId } })
+      ).toMatchObject({ status, attempt: 1 });
+      expect(await instance.database.lessonQuestion.count({ where: { sectionId } })).toBe(1);
+    });
+
+    it('rolls back returned material when execution aborts during publication', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { status: 'GENERATING' },
+      });
+      const controller = new AbortController();
+      await expect(
+        withClassGeneration(
+          { ...execution, signal: controller.signal },
+          classId,
+          1,
+          async (database) => {
+            await database.classSection.create({
+              data: { classId, skill: 'WRITING', seed: 'aborted', spec: {}, status: 'READY' },
+            });
+            controller.abort(new Error('Preparation stopped'));
+          }
+        )
+      ).rejects.toThrow('Preparation stopped');
+      expect(
+        await instance.database.classSection.count({ where: { classId, skill: 'WRITING' } })
+      ).toBe(0);
+    });
+
+    it('settles a failed claim after authority expires and preserves newer or published attempts', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { status: 'GENERATING', attempt: 3 },
+      });
+      expect(await settleClassGenerationFailure(classId, 2, execution.userId)).toBe(false);
+      expect(await settleClassGenerationFailure(classId, 3, 'different-learner')).toBe(false);
+      expect(await settleClassGenerationFailure(classId, 3, execution.userId)).toBe(true);
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: classId } })
+      ).toMatchObject({ status: 'FAILED', attempt: 3 });
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { status: 'AVAILABLE' },
+      });
+      expect(await settleClassGenerationFailure(classId, 3, execution.userId)).toBe(false);
+      expect(await instance.database.lessonQuestion.count({ where: { sectionId } })).toBe(1);
     });
 
     it.each(['IN_PROGRESS', 'SUBMITTED', 'PASSED'] as const)(

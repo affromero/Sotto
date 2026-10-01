@@ -5,6 +5,7 @@
  */
 
 import type { ReferenceData } from '@/types/reference';
+import { requiredLearningSkills, type SkillRequirements } from '@sotto/shared';
 import type { ReferenceType, VerificationStatus } from '@/generated/prisma/client';
 
 type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
@@ -23,6 +24,7 @@ export interface WritingResponse {
 }
 
 export interface WritingPromptData {
+  savedDraft?: string;
   id: string;
   order: number;
   task: string;
@@ -170,6 +172,11 @@ export interface ClassFeedbackNote {
 }
 
 export interface ClassData {
+  attempt?: number;
+  progressRevision?: number;
+  learnerAnswers?: Record<string, number> | null;
+  writingDrafts?: Record<string, string> | null;
+  skillRequirements?: SkillRequirements | null;
   id: string;
   courseId: string;
   status: string;
@@ -234,7 +241,9 @@ export function classPresentationIssues(cls: ClassData): string[] {
   const issues: string[] = [];
   const sectionsBySkill = new Map(cls.sections.map((section) => [section.skill, section]));
 
-  for (const skill of REQUIRED_CLASS_SKILLS) {
+  for (const skill of cls.skillRequirements
+    ? requiredLearningSkills(cls.skillRequirements)
+    : REQUIRED_CLASS_SKILLS) {
     if (!sectionsBySkill.has(skill)) {
       issues.push(`Missing ${skillLabel(skill)} section.`);
     }
@@ -265,6 +274,27 @@ export function classPresentationIssues(cls: ClassData): string[] {
   const writing = sectionsBySkill.get('WRITING');
   if (writing && writing.writingPrompts.length === 0) {
     issues.push('Writing section has no writing prompts.');
+  }
+
+  if (cls.skillRequirements) {
+    for (const skill of requiredLearningSkills(cls.skillRequirements)) {
+      const section = sectionsBySkill.get(skill);
+      const requirement = cls.skillRequirements.skills[skill];
+      if (!section || requirement.state !== 'REQUIRED') continue;
+      const count =
+        skill === 'SPEAKING'
+          ? section.prompts.length
+          : skill === 'WRITING'
+            ? section.writingPrompts.length
+            : section.questions.length;
+      if (count !== requirement.expectedCount)
+        issues.push(`${skillLabel(skill)} needs ${requirement.expectedCount} exercises.`);
+    }
+    if (
+      cls.skillRequirements.referenceAudioRequired &&
+      speaking?.prompts.some((prompt) => !prompt.referenceTtsUrl)
+    )
+      issues.push('Speaking reference audio is incomplete.');
   }
 
   return issues;

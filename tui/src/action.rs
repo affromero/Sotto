@@ -81,6 +81,12 @@ pub(crate) enum Action {
     DueLoaded(u64, ApiResult<types::PracticeOverviewResponse>),
     /// `POST /courses/{id}/practice` returned (or failed).
     PracticeStarted(u64, ApiResult<types::StartPracticeResponse>),
+    PracticeCancel,
+    PracticeRecover,
+    PracticeReconcile,
+    PracticeReconciled(String, u64, ApiResult<serde_json::Value>),
+    PlayReference,
+    PracticeProgressSaved(String, u64, ApiResult<types::LearningProgressResponse>),
     /// `POST /practice/{sessionId}/submit` returned (or failed).
     Submitted(u64, ApiResult<types::SubmitPracticeResponse>),
     /// `GET /episodes/{id}` returned (or failed) for a listening session.

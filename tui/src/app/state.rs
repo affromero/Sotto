@@ -19,6 +19,7 @@ use crate::api::types;
 
 include!("state/core.rs");
 include!("state/sections.rs");
+include!("state/practice.rs");
 include!("state/placement.rs");
 include!("state/view.rs");
 include!("state/reducers.rs");

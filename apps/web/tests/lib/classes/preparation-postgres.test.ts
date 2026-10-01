@@ -1,4 +1,5 @@
 // @vitest-environment node
+
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -151,7 +152,9 @@ suite('durable preparation admission and provider accounting', () => {
       data: {
         curriculumId: course.curriculumId,
         level: 'A1',
-        order: 1,
+        order:
+          (await instance.database.lesson.count({ where: { curriculumId: course.curriculumId } })) +
+          1,
         slug: randomUUID(),
         title: 'Greetings',
         objective: 'Greet a friend',
@@ -393,7 +396,7 @@ suite('durable preparation admission and provider accounting', () => {
   });
 
   it('retains unknown provider outcomes without replaying or refunding the attempt', async () => {
-    const operation = await running(1);
+    const operation = await running(3);
     let uncertain = false;
     let sends = 0;
     const provider = preparationProviderRequest(operation, new AbortController().signal, () => {
@@ -412,7 +415,7 @@ suite('durable preparation admission and provider accounting', () => {
         sends += 1;
         return new Response('{}');
       })
-    ).rejects.toMatchObject({ code: 'budget' });
+    ).rejects.toThrow('unresolved');
     expect({ uncertain, sends }).toEqual({ uncertain: true, sends: 1 });
     expect((await readPreparationActivity(courseId, execution))?.events.at(-1)?.type).toBe(
       'unknown'

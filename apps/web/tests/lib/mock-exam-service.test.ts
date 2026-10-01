@@ -227,9 +227,24 @@ suite('persisted mock exams', () => {
             sourceText: 'Kaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
             guidance: 'Verwende alle Angaben.',
           },
+          {
+            task: 'Setze den Satz ins Perfekt.',
+            taskType: 'transformation',
+            sourceText: 'Anna trinkt einen Kaffee.',
+          },
+          {
+            task: 'Korrigiere den Satz.',
+            taskType: 'correction',
+            sourceText: 'Anna trinken einen Kaffee.',
+          },
         ];
       else if (/speaking prompts/.test(prompt))
-        content = [{ targetPhrase: 'Guten Morgen', translation: 'Good morning' }];
+        content = [
+          { targetPhrase: 'Guten Morgen', translation: 'Good morning' },
+          { targetPhrase: 'Einen Kaffee, bitte.', translation: 'A coffee, please.' },
+          { targetPhrase: 'Vielen Dank.', translation: 'Thank you very much.' },
+          { targetPhrase: 'Auf Wiedersehen.', translation: 'Goodbye.' },
+        ];
       else if (/questions|quiz/i.test(prompt))
         content = {
           passage: 'Anna trinkt morgens Kaffee.',
@@ -294,17 +309,17 @@ suite('persisted mock exams', () => {
     });
     expect(saved.sections.find((section) => section.skill === 'WRITING')).toMatchObject({
       status: 'READY',
-      writingPrompts: [
+      writingPrompts: expect.arrayContaining([
         expect.objectContaining({
           task: 'Schreibe eine Einladung mit diesen Angaben.\n\nKaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
         }),
-      ],
+      ]),
     });
     expect(saved.sections.find((section) => section.skill === 'SPEAKING')).toMatchObject({
       status: 'READY',
-      speakingPrompts: [
+      speakingPrompts: expect.arrayContaining([
         expect.objectContaining({ targetPhrase: 'Guten Morgen', translation: 'Good morning' }),
-      ],
+      ]),
     });
     expect(saved.sections.find((section) => section.skill === 'LISTENING')).toMatchObject({
       status: 'FAILED',

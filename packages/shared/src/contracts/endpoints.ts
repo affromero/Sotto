@@ -4,6 +4,14 @@
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
 import {
+  classRegenerationRequestSchema,
+  classRegenerationAcceptedSchema,
+  learningProgressRequestSchema,
+  learningProgressResponseSchema,
+  practiceGenerationActionSchema,
+  practicePreparingSchema,
+} from '../learning-evidence';
+import {
   askInteractionRequestSchema,
   classDetailResponseSchema,
   addLearningTargetRequestSchema,
@@ -127,12 +135,38 @@ export const endpoints: EndpointDef[] = [
     id: 'startPractice',
     method: 'POST',
     path: '/api/v1/courses/{courseId}/practice',
-    summary: 'Start an ungated, single-skill practice session.',
+    summary: 'Admit durable practice preparation or resume the original request.',
     auth: 'bearer',
     request: startPracticeRequestSchema,
     response: startPracticeResponseSchema,
-    // 200 when the session is unavailable; 201 when a session is created.
-    successStatuses: [200, 201],
+    // 202 acknowledges saved preparation; 200 restores an already published request.
+    successStatuses: [200, 202],
+  },
+  {
+    id: 'resumePractice',
+    method: 'GET',
+    path: '/api/v1/practice/{sessionId}',
+    summary: 'Restore saved material, progress, feedback or preparation status.',
+    auth: 'bearer',
+    response: startPracticeResponseSchema,
+  },
+  {
+    id: 'savePracticeProgress',
+    method: 'PATCH',
+    path: '/api/v1/practice/{sessionId}',
+    summary: 'Save learner answers and drafts under the current progress revision.',
+    auth: 'bearer',
+    request: learningProgressRequestSchema,
+    response: learningProgressResponseSchema,
+  },
+  {
+    id: 'practiceGenerationAction',
+    method: 'POST',
+    path: '/api/v1/practice/{sessionId}/generation',
+    summary: 'Cancel saved preparation or acknowledge an interrupted outcome for guarded recovery.',
+    auth: 'bearer',
+    request: practiceGenerationActionSchema,
+    response: practicePreparingSchema,
   },
   {
     id: 'submitPractice',
@@ -224,6 +258,16 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     response: classDetailResponseSchema,
     successStatuses: [200],
+  },
+  {
+    id: 'regenerateClass',
+    method: 'POST',
+    path: '/api/v1/classes/{classId}',
+    summary: 'Queue class repair or regeneration against the observed attempt.',
+    auth: 'bearer',
+    request: classRegenerationRequestSchema,
+    response: classRegenerationAcceptedSchema,
+    successStatuses: [202],
   },
   {
     id: 'submitClass',

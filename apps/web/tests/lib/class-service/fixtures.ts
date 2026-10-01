@@ -1,4 +1,59 @@
+import { learningScriptHash } from '@/lib/learning/script-hash';
+import { createHash } from 'node:crypto';
+import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import { vi } from 'vitest';
+
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
+  capturedLearningAiOptions: async () => ({}),
+}));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({
+    generateResponse: async (
+      _system: string,
+      messages: { content: string }[],
+      options: { jsonSchema?: unknown }
+    ) => {
+      const input = JSON.parse(messages[0]!.content);
+      return {
+        content: JSON.stringify(
+          options.jsonSchema
+            ? {
+                items: input.items.map((_: unknown, index: number) => ({
+                  index,
+                  acceptable: true,
+                  issues: [],
+                  feedback: [],
+                })),
+              }
+            : [
+                {
+                  lemma: 'hola',
+                  gloss: 'hello',
+                  pos: 'expression',
+                  sourceForm: 'Hola',
+                  questionIndices: [],
+                },
+              ]
+        ),
+        model: 'fixture',
+      };
+    },
+  }),
+}));
+vi.mock('@/lib/sidedoor/storage/core/storage-inputs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sidedoor/storage/core/storage-inputs')>()),
+  resolveStorageInput: async () => ({
+    input: { consumer: 'fixture', reference: '/reference.mp3' },
+  }),
+}));
+vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+
+export const mockResolveSkillRequirements = vi.fn();
+vi.mock('@/lib/learning/skill-requirements', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/learning/skill-requirements')>()),
+  resolveSkillRequirements: (...args: unknown[]) => mockResolveSkillRequirements(...args),
+}));
 
 // ---- Hoisted mock handles ----
 
@@ -18,20 +73,115 @@ const mockSpeakingRecordingDeleteMany = vi.fn();
 const mockClassSubmissionUpsert = vi.fn();
 const mockClassSubmissionDeleteMany = vi.fn();
 const mockCourseUpdate = vi.fn();
+const mockCourseUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockTransaction = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
+    $queryRaw: async () => [],
     course: {
       findFirst: (...args: unknown[]) => mockCourseFindFirst(...args),
       update: (...args: unknown[]) => mockCourseUpdate(...args),
+      updateMany: (...args: unknown[]) => mockCourseUpdateMany(...args),
     },
     courseClass: {
-      findFirst: (...args: unknown[]) => mockCourseClassFindFirst(...args),
+      findFirst: async (...args: unknown[]) => {
+        const cls = await mockCourseClassFindFirst(...args);
+        return cls ? { updatedAt: new Date('2026-09-30T00:00:00Z'), sections: [], ...cls } : null;
+      },
       findUnique: (...args: unknown[]) => mockCourseClassFindUnique(...args),
+      findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
+        const created = mockCourseClassCreate.mock.calls.at(-1)?.[0]?.data;
+        const updates = mockCourseClassUpdate.mock.calls.map(([input]) => input.data);
+        const contract =
+          updates.findLast((data) => data?.skillRequirements)?.skillRequirements ??
+          created?.skillRequirements ??
+          createSkillRequirements({
+            scope: 'CLASS',
+            nativeLang: 'en',
+            targetLang: 'es',
+            level: 'A1',
+            ttsProvider: 'cartesia',
+            sttProvider: 'openai',
+          });
+        const passageText = 'Hola, Ana.';
+        return {
+          id: where.id,
+          course: { userId: 'u1' },
+          courseId: created?.courseId ?? 'course-1',
+          skillRequirements: contract,
+          readingVocabulary: updates.findLast((data) => data?.readingVocabulary)
+            ?.readingVocabulary ?? {
+            passageText,
+            sourceHash: createHash('sha256').update(passageText).digest('hex'),
+            words: [
+              {
+                lemma: 'hola',
+                gloss: 'hello',
+                pos: 'expression',
+                sourceForm: 'Hola',
+                questionIds: [],
+              },
+            ],
+          },
+          sections: learningSkills
+            .filter((skill) => contract.skills[skill].state === 'REQUIRED')
+            .map((skill) => ({
+              id: 'section-' + skill,
+              skill,
+              status: 'READY',
+              attempt: 1,
+              spec:
+                skill === 'LISTENING'
+                  ? { scriptHash: learningScriptHash([{ speaker: 'Ana', text: 'Hola.' }]) }
+                  : {},
+              questions: ['GRAMMAR', 'READING', 'LISTENING'].includes(skill)
+                ? Array.from({ length: contract.skills[skill].expectedCount }, (_, index) => ({
+                    id: skill === 'READING' && index === 0 ? 'reading-question' : skill + index,
+                    skill,
+                    question: 'Choose the greeting.',
+                    options: ['Hola', 'Adiós', 'Ayer', 'Mañana'],
+                    correctIndex: 0,
+                    explanation: 'Hola greets people.',
+                    passageText: skill === 'READING' ? passageText : null,
+                  }))
+                : [],
+              prompts:
+                skill === 'SPEAKING'
+                  ? Array.from({ length: 4 }, (_, index) => ({
+                      id: 's' + index,
+                      targetPhrase: 'Hola',
+                      translation: 'Hello',
+                      referenceTtsUrl: contract.referenceAudioRequired ? '/reference.mp3' : null,
+                    }))
+                  : [],
+              writingPrompts:
+                skill === 'WRITING'
+                  ? Array.from({ length: 3 }, (_, index) => ({
+                      id: 'w' + index,
+                      task: 'Greet Ana.',
+                    }))
+                  : [],
+              episode:
+                skill === 'LISTENING'
+                  ? {
+                      userId: 'u1',
+                      status: 'PENDING',
+                      audioUrl: null,
+                      deletedAt: null,
+                      script: { turns: [{ speaker: 'Ana', text: 'Hola.' }] },
+                    }
+                  : null,
+            })),
+        };
+      },
       findMany: (...args: unknown[]) => mockCourseClassFindMany(...args),
       create: (...args: unknown[]) => mockCourseClassCreate(...args),
       update: (...args: unknown[]) => mockCourseClassUpdate(...args),
+      updateMany: async (args: unknown) => {
+        await mockCourseClassUpdate(args);
+        return { count: 1 };
+      },
       delete: (...args: unknown[]) => mockCourseClassDelete(...args),
     },
     classSection: {
@@ -40,9 +190,18 @@ vi.mock('@/lib/prisma', () => ({
       deleteMany: (...args: unknown[]) => mockClassSectionDeleteMany(...args),
     },
     lessonQuestion: {
+      findMany: async () => [
+        {
+          id: 'reading-question',
+          question: 'What greeting is used?',
+          options: ['Hola', 'Adiós', 'Ayer', 'Mañana'],
+          passageText: 'Hola, Ana.',
+        },
+      ],
       create: (...args: unknown[]) => mockLessonQuestionCreate(...args),
       deleteMany: (...args: unknown[]) => mockLessonQuestionDeleteMany(...args),
     },
+    learnerVocab: { findMany: async () => [{ lemma: 'hola' }] },
     speakingRecording: {
       deleteMany: (...args: unknown[]) => mockSpeakingRecordingDeleteMany(...args),
     },
@@ -50,9 +209,14 @@ vi.mock('@/lib/prisma', () => ({
       upsert: (...args: unknown[]) => mockClassSubmissionUpsert(...args),
       deleteMany: (...args: unknown[]) => mockClassSubmissionDeleteMany(...args),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
-  },
-}));
+  };
+  const client = {
+    ...database,
+    $transaction: (work: ((db: typeof database) => Promise<unknown>) | Promise<unknown>[]) =>
+      typeof work === 'function' ? work(database) : mockTransaction(work),
+  };
+  return { prisma: client, prismaUnfiltered: client };
+});
 
 const mockGenerateSectionQuestions = vi.fn();
 const mockGenerateClassIntro = vi.fn();
@@ -200,6 +364,7 @@ export {
   mockClassSubmissionUpsert,
   mockClassSubmissionDeleteMany,
   mockCourseUpdate,
+  mockCourseUpdateMany,
   mockTransaction,
   mockGenerateSectionQuestions,
   mockGenerateClassIntro,

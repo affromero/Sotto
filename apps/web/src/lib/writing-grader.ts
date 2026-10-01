@@ -6,6 +6,7 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
+import { z } from 'zod';
 
 interface WritingCorrection {
   old: string;
@@ -29,15 +30,15 @@ export interface GradeWritingParams {
   text: string;
 }
 
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n));
-}
-
-function isCorrection(item: unknown): item is WritingCorrection {
-  if (typeof item !== 'object' || item === null) return false;
-  const o = item as Record<string, unknown>;
-  return typeof o.old === 'string' && typeof o.new === 'string' && typeof o.why === 'string';
-}
+const writingGradeSchema = z
+  .object({
+    overallScore: z.number().finite().min(0).max(1),
+    corrections: z.array(
+      z.object({ old: z.string().min(1), new: z.string(), why: z.string().trim().min(1) }).strict()
+    ),
+    feedback: z.string().trim().min(1),
+  })
+  .strict();
 
 export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade> {
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
@@ -77,11 +78,21 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
     throw new Error('Writing grading returned malformed output.');
   }
 
-  const overallScore = clamp01(typeof parsed.overallScore === 'number' ? parsed.overallScore : 0);
-  const corrections = Array.isArray(parsed.corrections)
-    ? parsed.corrections.filter(isCorrection)
-    : [];
-  const feedback = typeof parsed.feedback === 'string' ? parsed.feedback : '';
-
-  return { overallScore, corrections, feedback };
+  const result = writingGradeSchema.safeParse(parsed);
+  if (!result.success) throw new Error('Writing grading returned invalid scores or feedback.');
+  const used: Array<{ start: number; end: number }> = [];
+  for (const correction of result.data.corrections) {
+    let start = p.text.indexOf(correction.old);
+    while (
+      start >= 0 &&
+      used.some((range) => start < range.end && start + correction.old.length > range.start)
+    )
+      start = p.text.indexOf(correction.old, start + 1);
+    if (start < 0 || correction.old === correction.new)
+      throw new Error(
+        'Writing grading returned a correction that does not match the learner response.'
+      );
+    used.push({ start, end: start + correction.old.length });
+  }
+  return result.data;
 }

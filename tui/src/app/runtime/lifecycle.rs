@@ -67,6 +67,9 @@ impl App {
             player: None,
             recorder: Recorder::new(),
             pending_course: None,
+            pending_admissions: Default::default(),
+            practice_cache: Default::default(),
+            progress_sequence: 0,
             theme,
             theme_picker: ThemePicker::closed(),
             help_open: false,
@@ -115,6 +118,7 @@ impl App {
                 tui.terminal.resize(Rect::new(0, 0, w, h))?;
             }
             Action::Tick => {
+                self.practice_tick();
                 if self.status_bar.clear_expired() {
                     self.action_tx.send(Action::Render)?;
                 }
@@ -163,6 +167,16 @@ impl App {
             Action::CoursesLoaded(req_gen, result) => self.on_courses_loaded(req_gen, result),
             Action::DueLoaded(req_gen, result) => self.on_due_loaded(req_gen, result),
             Action::PracticeStarted(req_gen, result) => self.on_practice_started(req_gen, result),
+            Action::PracticeCancel => self.practice_change_preparation(false),
+            Action::PracticeRecover => self.practice_change_preparation(true),
+            Action::PracticeReconcile => self.reconcile_practice_progress(),
+            Action::PracticeReconciled(id, sequence, result) => {
+                self.on_practice_reconciled(id, sequence, result)
+            }
+            Action::PlayReference => self.play_speaking_reference(),
+            Action::PracticeProgressSaved(id, sequence, result) => {
+                self.on_practice_progress_saved(id, sequence, result)
+            }
             Action::Submitted(req_gen, result) => self.on_submitted(req_gen, result),
             Action::EpisodeLoaded(req_gen, result) => self.on_episode_loaded(req_gen, result),
             Action::AudioDownloaded(req_gen, result) => self.on_audio_downloaded(req_gen, result),

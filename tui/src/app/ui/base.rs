@@ -53,8 +53,18 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
         View::ListeningReview { .. } => draw_listening_review(frame, area, view, p),
         View::SpeakingReview { .. } => draw_speaking_review(frame, area, view, p),
         View::Result { course, result } => draw_result(frame, area, course, result, p),
-        View::Class { .. } => draw_class(frame, area, view, p),
-        View::ClassOutcome { course, result } => draw_class_result(frame, area, course, result, p),
+        View::Class { .. } | View::Practice { .. } => draw_class(frame, area, view, p),
+        View::PracticePreparing { message, status, can_recover, recovery_confirmation, .. } => {
+            let inner = panel(frame, area, &format!("Practice preparation · {status}"), p);
+            let detail = if *recovery_confirmation { "An interrupted provider request may have incurred charges. Press R again to acknowledge and request recovery." } else { message };
+            let hints = if *can_recover { "r check status · x cancel · R recover · q back" } else { "r check status or retry admission · x cancel · q back" };
+            frame.render_widget(Paragraph::new(format!("{detail}\n\n{hints}")).wrap(Wrap { trim: true }), inner);
+        },
+        View::ClassRepair { course, message, .. } => {
+            let inner = panel(frame, area, &format!("{} · repair class", course.title), p);
+            frame.render_widget(Paragraph::new(format!("{message}\\n\\nn repair saved class · q back")).wrap(Wrap { trim: true }), inner);
+        },
+        View::ClassOutcome { course, result, .. } => draw_class_result(frame, area, course, result, p),
         View::ClassDone { course } => draw_class_done(frame, area, course, p),
         View::Exam { .. } => draw_exam(frame, area, view, p),
         View::ExamOutcome { course, result } => draw_exam_result(frame, area, course, result, p),
@@ -267,7 +277,7 @@ fn draw_course_home(
 
     // Skill menu.
     let can_review = can_review_vocab(due);
-    let items: Vec<ListItem> = SkillChoice::MENU
+    let mut items: Vec<ListItem> = SkillChoice::MENU
         .iter()
         .map(|skill| {
             // Vocab is disabled (greyed) when there is nothing to review.
@@ -284,12 +294,13 @@ fn draw_course_home(
             )))
         })
         .collect();
+    items.extend(due.recent.iter().map(|session| ListItem::new(format!("Resume {} ({})", session.kind, session.status))));
     let list = List::new(items)
         .highlight_style(Style::default().fg(p.primary).add_modifier(Modifier::BOLD))
         .highlight_symbol("▌ ");
     let mut list_state = ListState::default();
     list_state.select(Some(
-        menu_cursor.min(SkillChoice::MENU.len().saturating_sub(1)),
+        menu_cursor.min((SkillChoice::MENU.len() + due.recent.len()).saturating_sub(1)),
     ));
     frame.render_stateful_widget(list, chunks[1], &mut list_state);
 
@@ -420,7 +431,7 @@ fn draw_result(
     let inner = panel(frame, area, &format!("{} · results", course.title), p);
     let chunks = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
 
-    let body = Text::from(vec![
+    let mut body = Text::from(vec![
         Line::default(),
         Line::from(Span::styled(
             "Review complete",
@@ -432,11 +443,12 @@ fn draw_result(
             Style::default().fg(p.pink).add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            format!("{} of {} correct", result.correct, result.total),
+            format!("{} of {} answers correct · {} graded", result.correct, result.answered, result.graded),
             Style::default().fg(p.ink_soft),
         )),
     ]);
-    frame.render_widget(Paragraph::new(body).alignment(Alignment::Center), chunks[0]);
+    for feedback in &result.feedback { body.lines.push(Line::from(feedback.clone())); }
+    frame.render_widget(Paragraph::new(body).wrap(Wrap { trim: true }), chunks[0]);
 
     frame.render_widget(
         Paragraph::new(hint_line(&["enter continue", "q back"], p)),
@@ -651,7 +663,7 @@ fn draw_speaking_review(frame: &mut Frame, area: Rect, view: &View, p: &Palette)
                 )));
             }
         }
-        SpeakingPhase::Failed { message } => lines.push(Line::from(Span::styled(
+        SpeakingPhase::UnknownUpload { message } | SpeakingPhase::Failed { message } => lines.push(Line::from(Span::styled(
             message.clone(),
             Style::default().fg(p.pink),
         ))),
@@ -665,7 +677,7 @@ fn draw_speaking_review(frame: &mut Frame, area: Rect, view: &View, p: &Palette)
     let hints: &[&str] = match phase {
         SpeakingPhase::Idle => &["r record", "q back"],
         SpeakingPhase::Recording => &["r stop", "q back"],
-        SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => &["q back"],
+        SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } | SpeakingPhase::UnknownUpload { .. } => &["q back"],
         SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
             &["enter next", "r retry", "q back"]
         }

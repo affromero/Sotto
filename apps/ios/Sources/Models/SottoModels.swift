@@ -308,6 +308,11 @@ struct SottoClassDetail: Decodable, Identifiable, Equatable {
     let vocabulary: [SottoClassVocabularyItem]?
     let submitted: Bool
     let sections: [SottoClassSection]
+    var learnerAnswers: [String: Int]? = nil
+    var writingDrafts: [String: String]? = nil
+    var progressRevision: Int? = nil
+    var attempt: Int? = nil
+    var skillRequirements: SottoSkillRequirements? = nil
 }
 
 struct SottoLesson: Decodable, Equatable {
@@ -458,7 +463,9 @@ struct SottoWritingPrompt: Decodable, Identifiable, Equatable {
     /// Latest submission first; the class detail sends at most one.
     let responses: [SottoWritingResponse]?
 
-    var latestResponse: SottoWritingResponse? { responses?.first }
+    var response: SottoWritingResponse? = nil
+    var savedDraft: String? = nil
+    var latestResponse: SottoWritingResponse? { response ?? responses?.first }
 }
 
 struct SottoWritingResponse: Decodable, Equatable {
@@ -515,19 +522,6 @@ struct SottoPracticeSessionSummary: Decodable, Equatable, Identifiable {
     let completedAt: String?
 }
 
-struct SottoPracticeStart: Decodable, Identifiable, Equatable {
-    var id: String { sessionId }
-
-    let status: String
-    let sessionId: String
-    let kind: String?
-    let reason: String?
-    let episodeId: String?
-    let items: [SottoPracticeItem]?
-    let speakingPrompts: [SottoSpeakingPrompt]?
-    let writingPrompts: [SottoWritingPrompt]?
-}
-
 struct SottoPracticeItem: Decodable, Identifiable, Equatable {
     let id: String
     let prompt: String
@@ -574,6 +568,11 @@ struct SottoPracticeSubmitResult: Decodable, Equatable {
     let score: Double
     let correct: Int
     let total: Int
+    var answered: Int? = nil
+    var graded: Int? = nil
+    var itemFeedback: [SottoPracticeChoiceFeedback]? = nil
+    var writingFeedback: [SottoPracticeWritingFeedback]? = nil
+    var speakingFeedback: [SottoPracticeSpeakingFeedback]? = nil
 }
 
 struct SottoWorksheetResponse: Decodable, Equatable {

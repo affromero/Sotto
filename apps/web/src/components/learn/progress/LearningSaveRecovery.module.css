@@ -1,0 +1,16 @@
+.root {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+.root p {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+.root button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}

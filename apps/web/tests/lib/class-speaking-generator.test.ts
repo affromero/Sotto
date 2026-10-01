@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 
 // ---- Hoisted mock handles ----
 
@@ -26,10 +26,23 @@ const { mockResolveCapturedLearningAi } = vi.hoisted(() => ({
   mockResolveCapturedLearningAi: vi.fn(),
 }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
+const { mockTeachingResponse, mockBlindResponse } = vi.hoisted(() => ({
+  mockTeachingResponse: vi.fn(),
+  mockBlindResponse: vi.fn(),
+}));
 const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
   const generateResponse = vi.fn();
   return {
-    mockCreateAIProvider: vi.fn((..._args: unknown[]) => ({ generateResponse })),
+    mockCreateAIProvider: vi.fn((..._args: unknown[]) => ({
+      generateResponse: (...args: unknown[]) => {
+        const name = (args[2] as { jsonSchema?: { name: string } })?.jsonSchema?.name;
+        return name === 'class_teaching_quality'
+          ? mockTeachingResponse(...args)
+          : name === 'class_section_quality'
+            ? mockBlindResponse(...args)
+            : generateResponse(...args);
+      },
+    })),
     mockGenerateResponse: generateResponse,
   };
 });
@@ -46,6 +59,10 @@ const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    $queryRaw: async () => [],
+    courseClass: {
+      findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
+    },
     classSection: {
       create: (...args: unknown[]) => mockClassSectionCreate(...args),
     },
@@ -57,7 +74,13 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
   };
-  return { prisma: database, prismaUnfiltered: database };
+  return {
+    prisma: database,
+    prismaUnfiltered: {
+      ...database,
+      $transaction: async (write: (db: typeof database) => Promise<unknown>) => write(database),
+    },
+  };
 });
 
 vi.mock('@/lib/byok', () => ({
@@ -127,7 +150,7 @@ const SAMPLE_PHRASES_JSON = JSON.stringify([
 ]);
 
 const PARAMS: ClassSpeakingParams = {
-  execution: blockedProviderExecution('u1'),
+  execution: authorizedLearnerExecution('u1'),
   userId: 'u1',
   classId: 'class-1',
   level: 'A1',
@@ -146,6 +169,18 @@ const mockGenerateSpeech = vi.fn();
 const mockGetVoiceId = vi.fn(() => 'voice-abc');
 
 function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
+  mockTeachingResponse.mockImplementation(async (_system, messages) => ({
+    content: JSON.stringify({
+      items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
+        index: item.index,
+        acceptable: true,
+        issues: [],
+        feedback: [],
+      })),
+    }),
+    model: 'm',
+  }));
+
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
   mockResolveCapturedLearningAi.mockResolvedValue({
     provider: 'anthropic',
@@ -192,6 +227,13 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
 // ---- Tests ----
 
 describe('generateClassSpeaking', () => {
+  it('surfaces required reference audio failure instead of publishing incomplete speaking', async () => {
+    setupHappyPath({ withTts: true });
+    mockResolveTtsProvider.mockRejectedValue(new Error('Selected TTS provider is unavailable'));
+    await expect(
+      generateClassSpeaking({ ...PARAMS, ttsProvider: 'cartesia', referenceAudioRequired: true })
+    ).rejects.toThrow(/unavailable/);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
@@ -383,7 +425,7 @@ describe('generateClassSpeaking', () => {
       });
       mockCanResolveTts.mockResolvedValue(false);
 
-      await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/no usable phrases/);
+      await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/usable phrases/);
     });
 
     it('throws when LLM response JSON contains no valid phrase objects', async () => {
@@ -398,7 +440,7 @@ describe('generateClassSpeaking', () => {
       });
       mockCanResolveTts.mockResolvedValue(false);
 
-      await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/no usable phrases/);
+      await expect(generateClassSpeaking(PARAMS)).rejects.toThrow(/usable phrases/);
     });
   });
 
@@ -435,7 +477,7 @@ describe('composeSpeakingPrompts', () => {
     setupHappyPath();
 
     const prompts = await composeSpeakingPrompts({
-      execution: blockedProviderExecution('u1'),
+      execution: authorizedLearnerExecution('u1'),
       userId: 'u1',
       level: 'A1',
       nativeLang: 'en',
@@ -459,7 +501,7 @@ describe('composeSpeakingPrompts', () => {
     setupHappyPath();
 
     const prompts = await composeSpeakingPrompts({
-      execution: blockedProviderExecution('u1'),
+      execution: authorizedLearnerExecution('u1'),
       userId: 'u1',
       level: 'A1',
       nativeLang: 'en',

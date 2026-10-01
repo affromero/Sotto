@@ -26,6 +26,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Prepares learner classes from durable scheduled or immediate requests',
     stage: 'Content Pipeline',
   },
+  'practice-preparation': {
+    description: 'Prepares saved learner practice from durable requests',
+    stage: 'Content Pipeline',
+  },
   'content-extraction': {
     description: 'Extracts text from URLs, PDFs, and uploaded files',
     stage: 'Content Pipeline',

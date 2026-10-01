@@ -61,9 +61,11 @@ export async function setCourseNote(
     await database.courseNote.deleteMany({ where: { courseId } });
     return;
   }
-  await database.courseNote.upsert({
+  const input: Prisma.CourseNoteUpsertArgs = {
     where: { courseId },
     create: { courseId, body: trimmed },
     update: { body: trimmed },
-  });
+  };
+  if (transaction) await transaction.courseNote.upsert(input);
+  else await prisma.courseNote.upsert(input);
 }

@@ -90,6 +90,30 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
     });
   });
 
+  it('preserves synchronous writing receipts without dispatching them to Redis', async () => {
+    const record = await sottoTransaction(instance.database, (database) =>
+      sottoJobOutbox(database).enqueue(
+        prepareJob({
+          namespace: SIDEDOOR_STATE_ID,
+          handler: 'learning-writing',
+          version: 1,
+          payload: { responseId: 'writing-response' },
+          scopes: [{ subjectId: 'profile:test', generation: 1 }],
+          delivery: { attempts: 1, priority: 0, availableAt: 0 },
+        })
+      )
+    );
+    expect((await reconcileSottoJobs(options())).results).toMatchObject([
+      { id: record.job.id, status: 'delivered' },
+    ]);
+    expect(await queue.getJob(record.job.id)).toBeUndefined();
+    expect(
+      await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).receipt(record.job.id)
+      )
+    ).toMatchObject({ status: 'pending' });
+  });
+
   it('keeps unsupported work visible and still dispatches supported work', async () => {
     const unsupported = await fixture(99);
     const supported = await fixture();

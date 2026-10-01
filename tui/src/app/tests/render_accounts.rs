@@ -315,6 +315,7 @@
             View::CourseHome {
                 course: course("A"),
                 due: DueCounts {
+                recent: Vec::new(),
                     vocab: 3,
                     grammar: 1,
                     total_vocab: 20,
@@ -347,6 +348,8 @@
                 course("A"),
                 "s".into(),
                 vec![state::SpeakingPrompt {
+                    recording_id: None,
+                    reference_tts_url: None,
                     id: "p".into(),
                     target_phrase: "hola".into(),
                     translation: "hi".into(),

@@ -5,13 +5,20 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { startPractice, PracticeCourseNotFoundError } from '@/lib/practice-service';
+import { PracticeCourseNotFoundError } from '@/lib/practice-service';
+import {
+  requestPracticePreparation,
+  practicePreparationProgress,
+} from '@/lib/practice/preparation';
+import { resumePractice } from '@/lib/practice/resume';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
 const startSchema = z.object({
   kind: z.enum(['FULL', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'VOCAB']),
   focusTargetId: z.string().min(1).optional(),
+  requestId: z.uuid().optional(),
 });
 
 /** POST /api/courses/[courseId]/practice — start an ungated practice session. */
@@ -24,36 +31,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parsed = startSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse('Invalid practice kind', 400);
 
-    const result = await startPractice(
+    const operation = await requestPracticePreparation(
       courseId,
-      authed.userId,
       parsed.data.kind,
       sottoRequestExecution(request, authed),
       {
-        focusTargetId: parsed.data.focusTargetId ?? null,
+        focusTargetId: parsed.data.focusTargetId,
+        requestId: parsed.data.requestId,
       }
     );
-    if (result.status === 'unavailable') {
-      return NextResponse.json(result, { status: 200 });
-    }
-
-    // The learner cancelled while this was building. The generation itself
-    // cannot be recalled — it runs inline here — but the session it produced
-    // would otherwise sit in their history as one they never asked to keep.
-    if (request.signal.aborted) {
-      await prisma.practiceSession
-        .delete({ where: { id: result.sessionId } })
-        .catch((error: unknown) => {
-          logger.warn('Could not discard a cancelled practice session', {
-            sessionId: result.sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        });
-      return errorResponse('Practice cancelled', 499);
-    }
-
-    return NextResponse.json(result, { status: 201 });
+    if (operation.status === 'COMPLETED')
+      return NextResponse.json(await resumePractice(operation.sessionId, authed.userId));
+    return NextResponse.json(practicePreparationProgress(operation), { status: 202 });
   } catch (error: unknown) {
+    if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
     if (error instanceof PracticeCourseNotFoundError) return errorResponse('Course not found', 404);
     const message = error instanceof Error ? error.message : 'Failed to start practice';
     logger.error('Failed to start practice', { error: message });

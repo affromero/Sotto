@@ -75,10 +75,10 @@ pub(crate) fn collect_exam_answers(
 /// (or failed) every prompt, writing has graded (or failed) every prompt. Pure;
 /// drives whether the class can be submitted. Reused for exams.
 pub(crate) fn class_ready_to_submit(sections: &[ClassSection]) -> bool {
-    sections.iter().all(section_complete)
+    !sections.is_empty() && sections.iter().all(section_complete)
 }
 
-fn section_complete(section: &ClassSection) -> bool {
+pub(crate) fn section_complete(section: &ClassSection) -> bool {
     match &section.progress {
         SectionProgress::Mc { selected, .. } | SectionProgress::Listening { selected, .. } => {
             selected.iter().all(Option::is_some)
@@ -87,18 +87,14 @@ fn section_complete(section: &ClassSection) -> bool {
         // (Graded or Failed). In-flight phases (Idle/Recording/Uploading/
         // Polling/Submitting/Editing) are NOT ready, so the class/exam can't be
         // submitted while a prompt is still being worked on.
-        SectionProgress::Speaking { phase, .. } => {
-            matches!(
-                phase,
-                SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. }
-            )
-        }
-        SectionProgress::Writing { phase, .. } => {
-            matches!(
-                phase,
-                WritingPhase::Graded { .. } | WritingPhase::Failed { .. }
-            )
-        }
+        SectionProgress::Speaking { prompts, index, phase } => !prompts.is_empty() && prompts.iter().enumerate().all(|(i, prompt)| {
+            let state = if i == *index { Some(phase) } else { match section.work.get(&prompt.id) { Some(ProductiveWork::Speaking(saved)) => Some(saved), _ => None } };
+            matches!(state, Some(SpeakingPhase::Graded { score: Some(_), .. }))
+        }),
+        SectionProgress::Writing { prompts, index, input, phase } => !prompts.is_empty() && prompts.iter().enumerate().all(|(i, prompt)| {
+            if i == *index { matches!(phase, WritingPhase::Graded { .. }) && !input.is_empty() }
+            else { matches!(section.work.get(&prompt.id), Some(ProductiveWork::Writing { text, phase: WritingPhase::Graded { .. } }) if !text.trim().is_empty()) }
+        })
     }
 }
 
@@ -120,9 +116,15 @@ fn section_complete(section: &ClassSection) -> bool {
 /// in-flight flag is cleared). If `view` is not a `CourseHome`, it is returned
 /// unchanged (the learner navigated away before the response arrived).
 pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> View {
-    let View::CourseHome { course, due, .. } = view else {
-        return view;
+    let (course, due) = match view {
+        View::CourseHome { course, due, .. } => (course, due),
+        View::PracticePreparing { course, .. } => (course, DueCounts::default()),
+        other => return other,
     };
+    if matches!(resp, types::StartPracticeResponse::ReadyFull(_) | types::StartPracticeResponse::ReadyWriting(_))
+        || serde_json::to_value(resp).ok().is_some_and(|value| value.get("skillRequirements").is_some()) {
+        return practice_view(course, resp).unwrap_or_else(|course| course_home_notice(*course, due, Unavailable::Malformed));
+    }
 
     match resp {
         types::StartPracticeResponse::Ready(ready) => match ReviewKind::from_kind(ready.kind) {
@@ -151,16 +153,14 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
         types::StartPracticeResponse::Unavailable(unavailable) => {
             course_home_notice(course, due, Unavailable::from(unavailable.reason))
         }
-        types::StartPracticeResponse::ReadyWriting(_) => course_home_notice(
-            course,
-            due,
-            Unavailable::NotInTerminal(skill_name(types::PracticeKind::Writing)),
-        ),
-        types::StartPracticeResponse::ReadyFull(_) => course_home_notice(
-            course,
-            due,
-            Unavailable::NotInTerminal(skill_name(types::PracticeKind::Full)),
-        ),
+        types::StartPracticeResponse::ReadyWriting(_) | types::StartPracticeResponse::ReadyFull(_) => unreachable!("handled above"),
+        types::StartPracticeResponse::Preparing(ready) => {
+            let Ok(request_id) = ready.session_id.parse() else { return course_home_notice(course, due, Unavailable::Malformed); };
+            View::PracticePreparing {
+            course, request_id, kind: types::PracticeKind::Full,
+            status: ready.preparation_status.to_string(), message: ready.message.clone(),
+            can_recover: ready.can_recover, in_flight: false, admission_unknown: false, recovery_confirmation: false,
+        }},
     }
 }
 

@@ -40,6 +40,11 @@ impl App {
                 sections: Some(sections),
                 cursor,
                 ..
+            }
+            | View::Practice {
+                sections: Some(sections),
+                cursor,
+                ..
             } => match sections.get_mut(*cursor).map(|s| &mut s.progress) {
                 Some(SectionProgress::Listening { ask, .. }) => Some(ask.as_mut()),
                 _ => None,

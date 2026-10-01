@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createSkillRequirements } from '@sotto/shared';
 import {
   mockCourseFindFirst,
   mockCourseClassFindFirst,
@@ -13,6 +14,7 @@ import {
   mockLessonQuestionCreate,
   mockClassSubmissionDeleteMany,
   mockCourseUpdate,
+  mockCourseUpdateMany,
   mockTransaction,
   mockGenerateSectionQuestions,
   mockGenerateClassIntro,
@@ -25,8 +27,9 @@ import {
   SAMPLE_B1_LESSON,
   SAMPLE_COURSE,
   SAMPLE_QUESTIONS,
+  mockResolveSkillRequirements,
 } from './fixtures';
-import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
+import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
 import {
   createNextClass,
   ClassGenerationCancelledError,
@@ -36,6 +39,9 @@ import {
 describe('createNextClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveSkillRequirements.mockImplementation(async (_execution, context) =>
+      createSkillRequirements({ ...context, ttsProvider: 'cartesia', sttProvider: 'openai' })
+    );
     // Default: $transaction runs all ops (each op is already a resolved promise from mocked methods)
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
@@ -67,7 +73,11 @@ describe('createNextClass', () => {
     mockClassSubmissionDeleteMany.mockResolvedValue({ count: 0 });
     mockCourseClassCreate.mockResolvedValue({ id: 'class-new' });
     mockCourseClassDelete.mockResolvedValue({});
-    mockCourseClassFindUnique.mockResolvedValue({ status: 'GENERATING' });
+    mockCourseClassFindUnique.mockResolvedValue({
+      status: 'GENERATING',
+      attempt: 1,
+      course: { userId: 'u1' },
+    });
     mockCourseClassUpdate.mockResolvedValue({});
     mockCourseUpdate.mockResolvedValue({});
   });
@@ -76,7 +86,7 @@ describe('createNextClass', () => {
     mockCourseFindFirst.mockResolvedValue(null);
 
     await expect(
-      createNextClass('course-1', 'u1', blockedProviderExecution('u1'))
+      createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
     ).rejects.toBeInstanceOf(CourseNotFoundError);
   });
 
@@ -88,7 +98,7 @@ describe('createNextClass', () => {
       lesson: { level: 'A1' },
     });
 
-    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
+    const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
     expect(result).toEqual({ kind: 'gated', activeClassId: 'class-active', status: 'IN_PROGRESS' });
   });
@@ -107,7 +117,7 @@ describe('createNextClass', () => {
     mockCourseClassFindMany.mockResolvedValue([]);
     mockCourseClassDelete.mockResolvedValue({});
 
-    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
+    const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
     expect(result.kind).toBe('created');
     expect(mockCourseClassDelete).toHaveBeenCalledWith({ where: { id: 'class-stale-a1' } });
@@ -129,7 +139,7 @@ describe('createNextClass', () => {
     // All lessons already passed
     mockCourseClassFindMany.mockResolvedValue([{ lessonId: 'lesson-1' }]);
 
-    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
+    const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
     expect(result).toEqual({ kind: 'done' });
   });
@@ -140,7 +150,7 @@ describe('createNextClass', () => {
     // No lessons passed yet
     mockCourseClassFindMany.mockResolvedValue([]);
 
-    const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
+    const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
     expect(result.kind).toBe('created');
     expect((result as { kind: 'created'; classId: string }).classId).toBe('class-new');
@@ -152,7 +162,7 @@ describe('createNextClass', () => {
       expect.objectContaining({ level: 'A1', title: 'Introduction' })
     );
     // Should have updated course.activeClassId
-    expect(mockCourseUpdate).toHaveBeenCalledWith(
+    expect(mockCourseUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ activeClassId: 'class-new' }) })
     );
   });
@@ -169,7 +179,7 @@ describe('createNextClass', () => {
     const result = await createNextClass(
       'course-1',
       'u1',
-      blockedProviderExecution('u1'),
+      authorizedLearnerExecution('u1'),
       {},
       {
         deferAudio: true,
@@ -190,9 +200,9 @@ describe('createNextClass', () => {
     mockGenerateSectionQuestions.mockRejectedValue(new Error('AI failure'));
     mockCourseClassDelete.mockResolvedValue({});
 
-    await expect(createNextClass('course-1', 'u1', blockedProviderExecution('u1'))).rejects.toThrow(
-      'AI failure'
-    );
+    await expect(
+      createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
+    ).rejects.toThrow('AI failure');
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'class-new' } })
     );
@@ -205,9 +215,9 @@ describe('createNextClass', () => {
     mockGenerateClassListening.mockRejectedValue(new Error('TTS unavailable'));
     mockCourseClassDelete.mockResolvedValue({});
 
-    await expect(createNextClass('course-1', 'u1', blockedProviderExecution('u1'))).rejects.toThrow(
-      'TTS unavailable'
-    );
+    await expect(
+      createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
+    ).rejects.toThrow('TTS unavailable');
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'class-new' } })
     );
@@ -222,7 +232,7 @@ describe('createNextClass', () => {
     mockCourseClassFindUnique.mockResolvedValue(null);
 
     await expect(
-      createNextClass('course-1', 'u1', blockedProviderExecution('u1'))
+      createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
     ).rejects.toBeInstanceOf(ClassGenerationCancelledError);
     expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
   });
@@ -248,7 +258,7 @@ describe('createNextClass', () => {
         sourceUrl: 'https://example.com/a',
       });
 
-      const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'), {
+      const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'), {
         sourceUrl: 'https://example.com/a',
       });
 
@@ -276,7 +286,7 @@ describe('createNextClass', () => {
     });
 
     it('topic mode builds about the topic at currentLevel without extracting a URL', async () => {
-      const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'), {
+      const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'), {
         topic: 'Mars rovers',
       });
 
@@ -293,7 +303,7 @@ describe('createNextClass', () => {
     });
 
     it('starts normal classes at the course currentLevel instead of the first unpassed A1 lesson', async () => {
-      const result = await createNextClass('course-1', 'u1', blockedProviderExecution('u1'));
+      const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
       expect(result.kind).toBe('created');
       expect(mockCourseClassCreate).toHaveBeenCalledWith(
@@ -318,7 +328,7 @@ describe('createNextClass', () => {
       mockPrepareClassSource.mockRejectedValue(new ClassSourceError('Could not read that link.'));
 
       await expect(
-        createNextClass('course-1', 'u1', blockedProviderExecution('u1'), {
+        createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'), {
           sourceUrl: 'https://paywalled.com/x',
         })
       ).rejects.toBeInstanceOf(ClassSourceError);

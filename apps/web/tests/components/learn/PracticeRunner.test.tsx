@@ -28,7 +28,9 @@ const full: Extract<PracticeStart, { status: 'ready_full' }> = {
   writingPrompts: [{ id: 'w0', task: 'Setze ins Perfekt.\nMia geht ins Kino.' }],
 };
 
+let testNumber = 0;
 beforeEach(() => {
+  full.sessionId = `session-${++testNumber}`;
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(response({ status: 'READY', audioUrl: '/lesson.mp3' }));
   vi.stubGlobal('fetch', fetchMock);
@@ -109,7 +111,9 @@ describe('practice sections', () => {
 describe('listening availability', () => {
   const listening: PracticeStart = {
     status: 'ready',
-    sessionId: 'session',
+    get sessionId() {
+      return `listening-${testNumber}`;
+    },
     kind: 'LISTENING',
     items: [],
     episodeId: 'audio',
@@ -160,4 +164,74 @@ it('keeps speaking practice open when the server refuses completion', async () =
   fireEvent.click(screen.getByRole('button', { name: 'Finish practice' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/record every speaking/i);
   expect(onDone).not.toHaveBeenCalled();
+});
+
+it('shows graded speaking results until the learner explicitly closes them', async () => {
+  fetchMock.mockResolvedValue(
+    response({ score: 0.4, correct: 0, total: 4, answered: 0, graded: 4 })
+  );
+  const onDone = vi.fn();
+  render(
+    <PracticeRunner
+      courseId="course"
+      start={{ status: 'ready_speaking', sessionId: 'session', prompts: [] }}
+      onDone={onDone}
+    />
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Finish practice' }));
+  const result = await screen.findByRole('region', { name: 'Practice result' });
+  expect(result).toHaveTextContent('4 speaking and writing exercises graded.');
+  expect(onDone).not.toHaveBeenCalled();
+  fireEvent.click(within(result).getByRole('button', { name: 'Done' }));
+  expect(onDone).toHaveBeenCalled();
+});
+
+it('reopens every productive correction and speaking explanation from the saved receipt', () => {
+  render(
+    <PracticeRunner
+      courseId="course"
+      onDone={vi.fn()}
+      start={{
+        ...full,
+        submissionResult: {
+          score: 0.8,
+          correct: 1,
+          total: 3,
+          answered: 1,
+          graded: 2,
+          writingFeedback: [
+            {
+              promptId: 'w0',
+              task: 'Greet Ana.',
+              grade: {
+                text: 'Hola Ana.',
+                overallScore: 0.8,
+                feedback: 'A clear greeting.',
+                corrections: [{ old: 'Ola', new: 'Hola', why: 'Use the Spanish greeting.' }],
+              },
+            },
+          ],
+          speakingFeedback: [
+            {
+              promptId: 's0',
+              targetPhrase: 'Hola Ana.',
+              evidence: {
+                recordingId: 'recording',
+                status: 'SCORED',
+                transcript: 'Hola Ana',
+                overallScore: 0.8,
+                feedback: 'Both words are present.',
+              },
+            },
+          ],
+        },
+      }}
+    />
+  );
+  expect(screen.getByRole('region', { name: 'Practice result' })).toHaveTextContent(
+    '2 speaking and writing exercises graded.'
+  );
+  expect(screen.getByText('Ola → Hola. Use the Spanish greeting.')).toBeVisible();
+  expect(screen.getByText('Both words are present.')).toBeVisible();
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 });

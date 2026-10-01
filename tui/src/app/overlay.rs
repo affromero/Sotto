@@ -636,13 +636,19 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
         ],
         View::SpeakingReview { .. } => vec![("r", "record / stop"), ("enter", "next prompt")],
         View::Result { .. } => vec![("enter", "continue")],
-        View::Class { .. } => vec![
+        View::PracticePreparing { .. } => vec![
+            ("r", "check status / retry original request"),
+            ("x", "cancel preparation"),
+            ("R", "acknowledge and recover"),
+        ],
+        View::Class { .. } | View::Practice { .. } => vec![
             ("space", "play / pause (listening)"),
             ("r", "record (speaking)"),
             ("↑/↓ 1-9", "answer (questions)"),
             ("a", "ask (listening)"),
             ("Ctrl-D", "submit (writing)"),
         ],
+        View::ClassRepair { .. } => vec![("n", "repair saved class")],
         View::ClassOutcome { .. } | View::ClassDone { .. } => vec![("n", "next class")],
         View::Exam { .. } => vec![
             ("space", "play / pause (listening)"),

@@ -1,3 +1,10 @@
+import { type CefrLevel } from '@sotto/shared';
+import { resolveSkillRequirementsInTransaction } from '../learning/skill-requirements';
+import { readSkillRequirements } from '../learning/skill-requirements';
+import { selectClassRepairSkills } from '../learning/classes/class-repair';
+import { claimClassRegenerationInTransaction } from '../learning/classes/class-generation-state';
+import { readPristine } from './regeneration/pristine';
+import { learningSpeechFingerprint } from '../learning/speech-configuration';
 import { createHash, randomUUID } from 'node:crypto';
 import { sqlStateBackend } from 'thesidedoor-core/storage/sql';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
@@ -23,6 +30,28 @@ import {
   PreparationConflictError,
   type ClassPreparation,
 } from './preparation-state';
+
+function targetFingerprint(target: {
+  id: string;
+  courseId: string;
+  lessonId: string;
+  createdAt: Date;
+  sourceUrl: string | null;
+  sourceTitle: string | null;
+}) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        target.id,
+        target.courseId,
+        target.lessonId,
+        target.createdAt.getTime(),
+        target.sourceUrl,
+        target.sourceTitle,
+      ])
+    )
+    .digest('hex');
+}
 
 export const CLASS_PREPARATION_QUEUE = 'class-preparation';
 export const classPreparationPayload = z
@@ -73,7 +102,53 @@ export async function validateClassPreparation(
     throw new PreparationConflictError('The preparation owner changed.');
   if (!allowTerminal && (operation.status !== 'RUNNING' || Date.now() >= operation.expiresAt))
     throw new PreparationConflictError('The preparation task is no longer authorized.');
-  if (!allowTerminal) await classPreparationGrant(database, operation).validate(operation.grant);
+  if (!allowTerminal) {
+    await classPreparationGrant(database, operation).validate(operation.grant);
+    if (operation.intent) {
+      const target = await database.courseClass.findFirst({
+        where: {
+          id: operation.intent.classId,
+          courseId,
+          attempt: operation.intent.attempt,
+          status: 'GENERATING',
+        },
+      });
+      if (
+        !target ||
+        targetFingerprint(target) !== operation.intent.classFingerprint ||
+        JSON.stringify(readSkillRequirements(target.skillRequirements)) !==
+          JSON.stringify(operation.requirements)
+      )
+        throw new PreparationConflictError('The admitted class repair attempt changed.');
+    }
+    if (operation.requirements) {
+      const course = await database.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: {
+          nativeLang: true,
+          targetLang: true,
+          currentLevel: true,
+        },
+      });
+      if (
+        !operation.intent &&
+        (course.nativeLang !== operation.requirements.nativeLang ||
+          course.targetLang !== operation.requirements.targetLang ||
+          course.currentLevel !== (operation.courseLevel ?? operation.requirements.level))
+      )
+        throw new PreparationConflictError('The admitted class language or level changed.');
+      if (
+        (await learningSpeechFingerprint(
+          database,
+          async () => ({ userId: operation.userId }),
+          operation.requirements
+        )) !== operation.speechFingerprint
+      )
+        throw new PreparationConflictError(
+          'The selected speech model, endpoint or credential changed.'
+        );
+    }
+  }
   return operation;
 }
 
@@ -84,6 +159,12 @@ export async function requestClassPreparation(
   input: {
     sourceUrl?: string;
     topic?: string;
+    intent?: {
+      kind: 'REGENERATE' | 'REPAIR';
+      classId: string;
+      expectedAttempt: number;
+      pristineSnapshot?: string;
+    };
     availableAt?: number;
     maxProviderRequests?: number;
     deferAudio?: boolean;
@@ -183,6 +264,49 @@ export async function requestClassPreparation(
         expiresAt: availableAt + 86_400_000,
         maxRequests: maxProviderRequests ?? 1000,
       };
+      const course = await database.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: {
+          nativeLang: true,
+          targetLang: true,
+          currentLevel: true,
+        },
+      });
+      const target = input.intent
+        ? await database.courseClass.findFirst({
+            where: { id: input.intent.classId, courseId, course: { userId: actor.userId } },
+            include: {
+              lesson: true,
+              course: true,
+              sections: {
+                include: {
+                  questions: true,
+                  prompts: true,
+                  writingPrompts: true,
+                  episode: { include: { script: true } },
+                },
+              },
+            },
+          })
+        : null;
+      if (input.intent && (!target || target.status === 'PASSED'))
+        throw new PreparationConflictError('Class not found or already passed.');
+      const requirements =
+        (target && readSkillRequirements(target.skillRequirements)) ??
+        (await resolveSkillRequirementsInTransaction(database, execution, {
+          scope: 'CLASS',
+          nativeLang: course.nativeLang,
+          targetLang: course.targetLang,
+          level: (target && !target.sourceUrl && !target.sourceTitle
+            ? target.lesson.level
+            : course.currentLevel) as CefrLevel,
+        }));
+      const speechFingerprint = await learningSpeechFingerprint(
+        database,
+        execution.authorize,
+        requirements,
+        execution.signal
+      );
       const proposed: ClassPreparation = {
         id,
         courseId,
@@ -199,7 +323,25 @@ export async function requestClassPreparation(
         maxProviderRequests,
         timeZone,
         deferAudio: input.deferAudio === true,
-        inputFingerprint,
+        inputFingerprint: createHash('sha256')
+          .update(
+            JSON.stringify({
+              inputFingerprint,
+              requirements,
+              speechFingerprint,
+              intent: input.intent
+                ? {
+                    kind: input.intent.kind,
+                    classId: input.intent.classId,
+                    expectedAttempt: input.intent.expectedAttempt,
+                  }
+                : null,
+            })
+          )
+          .digest('hex'),
+        requirements,
+        courseLevel: course.currentLevel,
+        speechFingerprint,
         status: 'QUEUED',
         classId: null,
         audioEpisodeIds: [],
@@ -208,6 +350,18 @@ export async function requestClassPreparation(
       };
       const store = classPreparationStore(database, courseId);
       let current = await store.read();
+      if (
+        input.intent &&
+        current?.intent &&
+        current.inputFingerprint === proposed.inputFingerprint &&
+        current.userId === proposed.userId &&
+        current.courseCreatedAt === proposed.courseCreatedAt &&
+        current.userCreatedAt === proposed.userCreatedAt &&
+        current.instanceId === proposed.instanceId &&
+        current.intent.classId === input.intent.classId &&
+        current.status === 'COMPLETED'
+      )
+        return current;
       if (current?.status === 'FAILED') {
         current = await settleCancelledPreparation(database, current);
         if (current.status !== 'CANCELLED')
@@ -217,6 +371,39 @@ export async function requestClassPreparation(
       }
       const admitted = admitPreparation(current, proposed);
       if (admitted.id !== id) return admitted;
+      if (input.intent && target) {
+        if (
+          input.intent.pristineSnapshot &&
+          (await readPristine(database, target.id, actor.userId)).snapshot !==
+            input.intent.pristineSnapshot
+        )
+          throw new PreparationConflictError('The pristine class changed before admission.');
+        if (target.attempt !== input.intent.expectedAttempt)
+          throw new PreparationConflictError(
+            'The class attempt changed. Reload before starting a new regeneration.'
+          );
+        const attempt = await claimClassRegenerationInTransaction(
+          database,
+          execution,
+          target.id,
+          target,
+          requirements
+        );
+        admitted.intent = {
+          kind: input.intent.kind,
+          classId: target.id,
+          attempt,
+          priorStatus: target.status,
+          classFingerprint: targetFingerprint(target),
+          skills:
+            input.intent.kind === 'REPAIR'
+              ? await selectClassRepairSkills(database, target, requirements)
+              : (
+                  Object.keys(requirements.skills) as Array<keyof typeof requirements.skills>
+                ).filter((skill) => requirements.skills[skill].state === 'REQUIRED'),
+        };
+        admitted.classId = target.id;
+      }
       await classPreparationGrant(database, admitted).create(preparationGrantSpec(admitted));
       const storage = classPreparationBackend(database, courseId);
       const snapshot = await storage.read();
@@ -315,7 +502,7 @@ export async function cancelClassPreparation(courseId: string, execution: SottoP
   );
 }
 
-async function settleCancelledPreparation(
+export async function settleCancelledPreparation(
   database: Prisma.TransactionClient,
   operation: ClassPreparation
 ) {
@@ -328,7 +515,18 @@ async function settleCancelledPreparation(
   await executions.requireParentDrained(operation.id, record.fingerprint);
   const audio = await settlePreparationAudio(database, operation);
   if (!audio.settled) return operation;
-  if (operation.classId && operation.result !== 'created') {
+  if (operation.intent) {
+    await database.courseClass.updateMany({
+      where: {
+        id: operation.intent.classId,
+        courseId: operation.courseId,
+        attempt: operation.intent.attempt,
+        status: 'GENERATING',
+      },
+      data: { status: 'FAILED', failedAt: new Date() },
+    });
+  }
+  if (!operation.intent && operation.classId && operation.result !== 'created') {
     const unpublished = await database.courseClass.findFirst({
       where: { id: operation.classId, courseId: operation.courseId, status: 'GENERATING' },
       select: { id: true },

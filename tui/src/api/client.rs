@@ -62,10 +62,12 @@ impl SottoClient {
         &self,
         course_id: &str,
         kind: types::PracticeKind,
+        request_id: uuid::Uuid,
     ) -> Result<types::StartPracticeResponse> {
         let body = types::StartPracticeRequest {
             kind,
             focus_target_id: None,
+            request_id: Some(request_id),
         };
         let resp = self
             .inner
@@ -73,6 +75,34 @@ impl SottoClient {
             .await
             .map_err(|e| eyre!("failed to start practice: {e}"))?;
         Ok(resp.into_inner())
+    }
+
+    pub async fn resume_practice(&self, session_id: &str) -> Result<types::StartPracticeResponse> {
+        Ok(self.inner.resume_practice(session_id).await.map_err(|e| eyre!("failed to resume practice: {e}"))?.into_inner())
+    }
+
+    pub async fn practice_generation_action(&self, session_id: &str, recover: bool) -> Result<types::StartPracticePreparing> {
+        let body = types::PracticeGenerationAction {
+            action: if recover { types::PracticeGenerationActionAction::Recover } else { types::PracticeGenerationActionAction::Cancel },
+            acknowledge_unknown_outcome: Some(recover),
+        };
+        Ok(self.inner.practice_generation_action(session_id, &body).await.map_err(|e| eyre!("failed to change preparation: {e}"))?.into_inner())
+    }
+
+    pub async fn save_learning_progress(&self, class: bool, id: &str, progress: types::LearningProgressRequest) -> Result<types::LearningProgressResponse> {
+        let kind = if class { "classes" } else { "practice" };
+        let response = self.http.patch(format!("{}/api/v1/{kind}/{id}", self.base_url))
+            .json(&progress).send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(eyre!("progress was not saved ({status}): {}", response.text().await?));
+        }
+        Ok(response.json().await?)
+    }
+
+    pub async fn submit_practice_writing(&self, session_id: &str, prompt_id: &str, text: String) -> Result<WritingGradeResponse> {
+        let url = format!("{}/api/v1/practice/{session_id}/writing/{prompt_id}", self.base_url);
+        self.submit_writing_at(&url, text).await
     }
 
     /// Submit graded answers for a practice session and return the score.
@@ -218,11 +248,29 @@ impl SottoClient {
                     .map_err(|e| eyre!("could not parse next-class (done): {e}"))?;
                 Ok(NextClassOutcome::Done)
             }
+            409 => {
+                let body: serde_json::Value = resp.json().await?;
+                match body["activeClassId"].as_str() {
+                    Some(class_id) => Ok(NextClassOutcome::Created { class_id: class_id.to_string() }),
+                    None => Err(eyre!("The class gate could not be resolved: {body}")),
+                }
+            }
             status => {
                 let body = resp.text().await.unwrap_or_default();
                 Err(eyre!("next-class failed ({status}): {body}"))
             }
         }
+    }
+
+    pub async fn repair_class(&self, class_id: &str, expected_attempt: i64) -> Result<NextClassOutcome> {
+        let response = self.http.post(format!("{}/api/v1/classes/{class_id}", self.base_url))
+            .json(&serde_json::json!({ "scope": "sections", "expectedAttempt": expected_attempt })).send().await?;
+        if response.status().as_u16() != 202 {
+            return Err(eyre!("Class repair was not accepted ({}): {}", response.status(), response.text().await?));
+        }
+        let receipt: types::ClassRegenerationAccepted = response.json().await?;
+        if receipt.status.to_string() != "GENERATING" { return Err(eyre!("Invalid class repair acknowledgement")); }
+        Ok(NextClassOutcome::Created { class_id: class_id.to_string() })
     }
 
     /// Fetch a class with its sections.

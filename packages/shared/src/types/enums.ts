@@ -26,12 +26,7 @@ export type EpisodeSource = 'WEB' | 'API' | 'AGENT' | 'IMPORT' | 'ADMIN' | 'CLAS
 export type Speaker = string;
 
 export type InteractionStatus =
-  | 'PENDING'
-  | 'ANSWERING'
-  | 'ANSWERED'
-  | 'RESOLVED'
-  | 'INCORPORATING'
-  | 'INCORPORATED';
+  'PENDING' | 'ANSWERING' | 'ANSWERED' | 'RESOLVED' | 'INCORPORATING' | 'INCORPORATED';
 
 export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT';
 
@@ -58,44 +53,22 @@ export type PlacementSource = 'TEST' | 'NOTES' | 'NOTES_VERIFIED' | 'MANUAL';
 export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 
 export type ClassStatus =
-  | 'LOCKED'
-  | 'GENERATING'
-  | 'AVAILABLE'
-  | 'IN_PROGRESS'
-  | 'SUBMITTED'
-  | 'PASSED'
-  | 'FAILED';
+  'LOCKED' | 'GENERATING' | 'AVAILABLE' | 'IN_PROGRESS' | 'SUBMITTED' | 'PASSED' | 'FAILED';
 
 export type SectionStatus =
-  | 'PENDING'
-  | 'GENERATING'
-  | 'READY'
-  | 'IN_PROGRESS'
-  | 'SUBMITTED'
-  | 'PASSED'
-  | 'FAILED';
+  'PENDING' | 'GENERATING' | 'READY' | 'IN_PROGRESS' | 'SUBMITTED' | 'PASSED' | 'FAILED';
 
 export type SpeakingGradeStatus = 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
 
 export type EdgeType =
-  | 'VOCAB_VOCAB'
-  | 'VOCAB_GRAMMAR'
-  | 'VOCAB_CLASS'
-  | 'VOCAB_EPISODE'
-  | 'GRAMMAR_GRAMMAR';
+  'VOCAB_VOCAB' | 'VOCAB_GRAMMAR' | 'VOCAB_CLASS' | 'VOCAB_EPISODE' | 'GRAMMAR_GRAMMAR';
 
 // Ungated single-skill practice. VOCAB is first-class (spaced-repetition recall)
 // and is intentionally NOT part of SkillType (which gates the four class sections).
 export type PracticeKind =
-  | 'FULL'
-  | 'GRAMMAR'
-  | 'READING'
-  | 'LISTENING'
-  | 'SPEAKING'
-  | 'WRITING'
-  | 'VOCAB';
+  'FULL' | 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'VOCAB';
 
-export type PracticeStatus = 'ACTIVE' | 'COMPLETED';
+export type PracticeStatus = 'GENERATING' | 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export type FocusTargetKind = 'WORD' | 'PHRASE' | 'SENTENCE';
 
@@ -106,12 +79,7 @@ export type FocusTargetSource = 'TRANSCRIPT' | 'CLASS' | 'PRACTICE' | 'NOTES' | 
 export type ExamInstitution = 'GOETHE' | 'DELE' | 'CAMBRIDGE' | 'CEFR_GENERIC';
 
 export type MockExamStatus =
-  | 'GENERATING'
-  | 'READY'
-  | 'IN_PROGRESS'
-  | 'SUBMITTED'
-  | 'SCORED'
-  | 'FAILED';
+  'GENERATING' | 'READY' | 'IN_PROGRESS' | 'SUBMITTED' | 'SCORED' | 'FAILED';
 
 // The learner's chosen teaching approach, grounded in SLA research. Shapes how
 // content is generated so a learner can switch methods if one is not working.

@@ -4,9 +4,9 @@ import { delegationBindingSchema } from 'thesidedoor-core/runtime/delegation';
 import { sqlStateBackend } from 'thesidedoor-core/storage/sql';
 import type { Prisma } from '@/generated/prisma/client';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
-import { classPreparationGrant } from './preparation-grant';
 import { classPreparationStore, validateClassPreparation } from './preparation';
 import { PreparationConflictError, type ClassPreparation } from './preparation-state';
+import { learningPreparationGrant } from '../learning/preparation/preparation-grant';
 
 const lineageSchema = z
   .object({
@@ -18,6 +18,8 @@ const lineageSchema = z
     grant: delegationBindingSchema,
     episodeCreatedAt: z.number().int().nonnegative(),
     audioGenerationKey: z.string().min(1),
+    kind: z.enum(['class', 'practice']).optional(),
+    sessionId: z.uuid().optional(),
   })
   .strict();
 
@@ -34,12 +36,17 @@ function lineageBackend(database: Prisma.TransactionClient, episodeId: string) {
 /** Called within the segment/outbox admission transaction, before audio children commit. */
 export async function registerPreparationAudio(
   database: Prisma.TransactionClient,
-  operation: ClassPreparation,
+  operation: Pick<ClassPreparation, 'id' | 'courseId' | 'userId'> & { sessionId?: string },
   episodeId: string,
-  audioGenerationKey: string
+  audioGenerationKey: string,
+  kind: 'class' | 'practice' = 'class'
 ) {
-  const current = await validateClassPreparation(database, operation.courseId, operation.id);
-  if (current.deferAudio)
+  const practice = kind === 'practice' ? await import('../practice/preparation') : null;
+  const current = practice
+    ? (await practice.validatePracticePreparation(database, operation.sessionId!, operation.id))
+        .operation
+    : await validateClassPreparation(database, operation.courseId, operation.id);
+  if ('deferAudio' in current && current.deferAudio)
     throw new PreparationConflictError('Scheduled audio requires learner review.');
   const episode = await database.episode.findUnique({
     where: { id: episodeId },
@@ -58,6 +65,7 @@ export async function registerPreparationAudio(
     userId: current.userId,
     grant: current.grant,
     episodeCreatedAt: episode.createdAt.getTime(),
+    ...(kind === 'practice' ? { kind, sessionId: operation.sessionId } : {}),
   });
   const backend = lineageBackend(database, episodeId);
   const existing = await backend.read();
@@ -72,6 +80,12 @@ export async function registerPreparationAudio(
       throw new PreparationConflictError('The listening episode preparation changed.');
   } else if (!(await backend.compareAndSwap(null, { revision: randomUUID(), state: lineage }))) {
     throw new PreparationConflictError('Listening preparation changed concurrently.');
+  }
+  if (practice && 'sessionId' in current) {
+    if (!current.audioEpisodeIds.includes(episodeId)) current.audioEpisodeIds.push(episodeId);
+    current.updatedAt = Date.now();
+    await practice.writePracticePreparation(database, current);
+    return;
   }
   await classPreparationStore(database, current.courseId).transact((state) => {
     if (!state || state.id !== current.id) throw new PreparationConflictError();
@@ -109,11 +123,28 @@ export async function validatePreparationAudio(
 ) {
   const lineage = await readPreparationAudioBinding(database, episodeId);
   if (!lineage || lineage.audioGenerationKey !== audioGenerationKey) return;
-  const grant = await classPreparationGrant(database, {
-    id: lineage.operationId,
-    courseId: lineage.courseId,
-    userId: lineage.userId,
-  }).read(lineage.grant);
+  const grant = await learningPreparationGrant(
+    database,
+    {
+      id: lineage.operationId,
+      courseId: lineage.courseId,
+      userId: lineage.userId,
+    },
+    lineage.kind ?? 'class'
+  ).read(lineage.grant);
   if (grant.status === 'revoked' || Date.now() >= grant.grant.expiresAt)
     throw new PreparationConflictError('The listening preparation is no longer authorized.');
+  if (lineage.kind === 'practice') {
+    if (!lineage.sessionId)
+      throw new PreparationConflictError('The listening practice identity is missing.');
+    const { validatePracticePreparation, validatePracticeSpeechConfiguration } =
+      await import('../practice/preparation');
+    const practice = await validatePracticePreparation(
+      database,
+      lineage.sessionId,
+      lineage.operationId,
+      true
+    );
+    await validatePracticeSpeechConfiguration(database, practice);
+  }
 }

@@ -3058,6 +3058,7 @@ dependencies = [
  "hound",
  "progenitor",
  "ratatui",
+ "regress",
  "reqwest",
  "rodio",
  "serde",
@@ -3066,6 +3067,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml",
+ "uuid",
 ]
 
 [[package]]

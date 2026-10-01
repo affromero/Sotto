@@ -147,6 +147,7 @@ vi.mock('@/lib/providers/ai', () => ({
   ]),
 }));
 vi.mock('@/lib/learning-ai', () => ({
+  capturedLearningAiOptions: async () => ({}),
   resolveCapturedLearningAi: vi.fn().mockResolvedValue({
     provider: 'anthropic',
     model: 'claude-haiku-4-5-20251001',
@@ -169,6 +170,7 @@ vi.mock('@/lib/server-config', () => ({
 vi.mock('@/lib/audio/media-process', () => ({ isMediaCleanupFailure: vi.fn(() => false) }));
 
 import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
+import { resolveCapturedSttProvider } from '@/lib/providers/stt';
 
 function job(): Job<SpeakingGradingPayload> {
   return {
@@ -194,6 +196,33 @@ describe('durable speaking grading', () => {
       options.onSettled();
       return { text: 'Guten Morgen', segments: [], words: [] };
     });
+  });
+
+  it('rejects a queued credential revision change before sending the recording', async () => {
+    const selection = {
+      providerId: 'openai',
+      model: 'whisper-1',
+      baseUrl: null,
+      credentialFingerprint: 'original',
+    };
+    mocks.database.speakingRecording.findUnique.mockResolvedValue({
+      ...mocks.recording,
+      sttProvider: 'openai',
+      sttSelection: selection,
+    });
+    vi.mocked(resolveCapturedSttProvider).mockResolvedValueOnce({
+      providerId: 'openai',
+      apiKey: 'key',
+      model: 'whisper-1',
+      source: 'credential',
+      provider: { transcribe: mocks.transcribe },
+      selection: { ...selection, credentialFingerprint: 'replacement' },
+    });
+    await expect(processSpeakingGrading(job())).rejects.toThrow('credential changed');
+    expect(mocks.transcribe).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'SCORED' }) })
+    );
   });
 
   it('reads attributed storage and publishes only after terminal provider responses', async () => {

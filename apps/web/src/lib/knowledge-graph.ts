@@ -1,11 +1,12 @@
 // The learner's per-course vocabulary/grammar memory graph + SRS scheduling.
 // Seeds nodes from a lesson, updates SRS from class outcomes, and surfaces the
 // due/weak items that drive the next class's adaptive content and the graph viz.
-import { prisma } from './prisma';
+import { prisma, prismaUnfiltered } from './prisma';
 import { reviewCard } from './srs';
 import { normalizeLearningTargetText } from './learning-targets';
 import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel } from '@sotto/shared';
+import type { LearningDatabase } from './learning/database';
 
 export interface VocabItem {
   lemma: string;
@@ -29,11 +30,12 @@ export async function seedLessonItems(
   classId: string,
   level: CefrLevel,
   vocab: VocabItem[],
-  grammarPoints: string[]
+  grammarPoints: string[],
+  database: LearningDatabase = prismaUnfiltered
 ): Promise<void> {
   for (const v of vocab) {
     if (!v.lemma) continue;
-    await prisma.learnerVocab.upsert({
+    await database.learnerVocab.upsert({
       where: { courseId_lemma: { courseId, lemma: v.lemma } },
       create: {
         courseId,
@@ -49,7 +51,7 @@ export async function seedLessonItems(
   }
   for (const key of grammarPoints) {
     if (!key) continue;
-    await prisma.learnerGrammar.upsert({
+    await database.learnerGrammar.upsert({
       where: { courseId_topicKey: { courseId, topicKey: key } },
       create: { courseId, topicKey: key, title: humanizeKey(key), cefrLevel: level },
       update: {},
@@ -66,13 +68,14 @@ export async function seedLessonItems(
 export async function upsertLiveVocab(
   courseId: string,
   items: VocabItem[],
-  level?: CefrLevel
+  level?: CefrLevel,
+  database: LearningDatabase = prismaUnfiltered
 ): Promise<number> {
   const lemmas = items.map((i) => i.lemma).filter(Boolean);
   if (lemmas.length === 0) return 0;
   const existing = new Set(
     (
-      await prisma.learnerVocab.findMany({
+      await database.learnerVocab.findMany({
         where: { courseId, lemma: { in: lemmas } },
         select: { lemma: true },
       })
@@ -82,7 +85,7 @@ export async function upsertLiveVocab(
   let added = 0;
   for (const v of items) {
     if (!v.lemma) continue;
-    await prisma.learnerVocab.upsert({
+    await database.learnerVocab.upsert({
       where: { courseId_lemma: { courseId, lemma: v.lemma } },
       create: {
         courseId,
@@ -146,9 +149,10 @@ export async function applyReviewOutcome(
   grammarPoints: string[],
   vocabQuality: number,
   grammarQuality: number,
-  now: Date
+  now: Date,
+  database: LearningDatabase = prismaUnfiltered
 ): Promise<void> {
-  const vocab = await prisma.learnerVocab.findMany({
+  const vocab = await database.learnerVocab.findMany({
     where: { courseId, lemma: { in: vocabLemmas } },
   });
   for (const v of vocab) {
@@ -163,10 +167,10 @@ export async function applyReviewOutcome(
       vocabQuality,
       now
     );
-    await prisma.learnerVocab.update({ where: { id: v.id }, data: { ...u, lastReviewed: now } });
+    await database.learnerVocab.update({ where: { id: v.id }, data: { ...u, lastReviewed: now } });
   }
 
-  const grammar = await prisma.learnerGrammar.findMany({
+  const grammar = await database.learnerGrammar.findMany({
     where: { courseId, topicKey: { in: grammarPoints } },
   });
   for (const g of grammar) {
@@ -181,7 +185,10 @@ export async function applyReviewOutcome(
       grammarQuality,
       now
     );
-    await prisma.learnerGrammar.update({ where: { id: g.id }, data: { ...u, lastReviewed: now } });
+    await database.learnerGrammar.update({
+      where: { id: g.id },
+      data: { ...u, lastReviewed: now },
+    });
   }
 }
 

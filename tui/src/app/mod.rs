@@ -9,6 +9,8 @@ mod onboard;
 mod overlay;
 #[path = "runtime/practice.rs"]
 mod practice;
+#[path = "runtime/practice-lifecycle.rs"]
+mod practice_lifecycle;
 #[path = "runtime/render.rs"]
 mod render;
 mod state;
@@ -83,6 +85,9 @@ pub(crate) struct App {
     /// The course carried across the `next-class` round trip, so the resolved
     /// class (or the done screen) can keep offering "next class".
     pending_course: Option<Course>,
+    pending_admissions: std::collections::BTreeMap<uuid::Uuid, (String, types::PracticeKind)>,
+    practice_cache: std::collections::BTreeMap<String, View>,
+    progress_sequence: u64,
     /// The active theme, resolved from `config.theme` at startup and mutated
     /// live by the theme picker. Its [`Palette`] is threaded into rendering.
     theme: Theme,
@@ -106,6 +111,7 @@ type ClientFactory = Arc<dyn Fn(&Profile) -> Result<Arc<dyn Api>> + Send + Sync>
 mod tests {
     include!("tests/support.rs");
     include!("tests/practice.rs");
+    include!("tests/full-practice.rs");
     include!("tests/class_flow.rs");
     include!("tests/exam_placement.rs");
     include!("tests/ask_settings.rs");

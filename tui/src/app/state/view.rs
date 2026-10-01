@@ -72,6 +72,26 @@ pub(crate) enum View {
         index: usize,
         phase: SpeakingPhase,
     },
+    PracticePreparing {
+        course: Course,
+        request_id: uuid::Uuid,
+        kind: types::PracticeKind,
+        status: String,
+        message: String,
+        can_recover: bool,
+        in_flight: bool,
+        admission_unknown: bool,
+        recovery_confirmation: bool,
+    },
+    Practice {
+        course: Course,
+        session_id: String,
+        sections: Option<Vec<ClassSection>>,
+        cursor: usize,
+        submitting: bool,
+        progress: ProgressSave,
+        requirements: Vec<String>,
+    },
     /// The graded outcome of a completed (vocab/listening) review.
     Result {
         course: Course,
@@ -81,6 +101,8 @@ pub(crate) enum View {
     Class {
         course: Course,
         class_id: String,
+        attempt: i64,
+        progress: ProgressSave,
         /// The fetched class sections; `None` while the class load is in flight.
         sections: Option<Vec<ClassSection>>,
         /// Index of the section currently shown.
@@ -89,7 +111,8 @@ pub(crate) enum View {
         submitting: bool,
     },
     /// The graded outcome of a submitted class, with a "next class" option.
-    ClassOutcome { course: Course, result: ClassResult },
+    ClassOutcome { course: Course, class_id: String, attempt: i64, result: ClassResult },
+    ClassRepair { course: Course, class_id: String, attempt: i64, message: String },
     /// The course has no further classes (next-class returned `{ done: true }`).
     ClassDone { course: Course },
     /// An in-progress mock exam: walk `sections` in order, then submit + score.
@@ -239,6 +262,8 @@ impl View {
         View::Class {
             course,
             class_id,
+            attempt: 0,
+            progress: ProgressSave::default(),
             sections: None,
             cursor: 0,
             submitting: false,
@@ -284,6 +309,23 @@ impl View {
             selected,
             prompt_scroll: 0,
             submitting: false,
+        }
+    }
+}
+
+impl View {
+    pub(crate) fn learning_key(&self) -> Option<String> {
+        match self {
+            Self::Practice { session_id, .. } => Some(session_id.clone()),
+            Self::Class { class_id, attempt, .. } => Some(format!("CLASS/{class_id}/{attempt}")),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn learning_progress_mut(&mut self) -> Option<&mut ProgressSave> {
+        match self {
+            Self::Practice { progress, .. } | Self::Class { progress, .. } => Some(progress),
+            _ => None,
         }
     }
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { WritingPromptData, WritingResponse } from '../classTypes';
+import { retainedLearningProgress, useLearningProgress } from '../progress/useLearningProgress';
 
 interface WritingDraft {
   text: string;
@@ -22,6 +23,7 @@ export interface WritingDrafts {
   isOverLimit: boolean;
   isSubmitting: boolean;
   error: string;
+  progressRecovery?: { endpoint: string; material: string; error: string };
   /**
    * Grades the prompts the learner edited. `includingUnchanged` re-grades every
    * non-empty answer instead, which is what an always-available submit falls
@@ -41,22 +43,53 @@ const trimmed = (value: string) => value.trim();
 export function useWritingDrafts(
   prompts: WritingPromptData[],
   endpointBase: string,
-  onGraded?: (promptId: string, response: WritingResponse) => void
+  onGraded?: (promptId: string, response: WritingResponse) => void,
+  progressRevision = 0,
+  material = ''
 ): WritingDrafts {
   const [drafts, setDrafts] = useState<Record<string, WritingDraft>>(() =>
     Object.fromEntries(
       prompts.map((prompt) => [
         prompt.id,
         {
-          text: prompt.response?.text ?? '',
+          text:
+            retainedLearningProgress(
+              endpointBase.replace(/\/writing$/, ''),
+              { writingDrafts: { [prompt.id]: prompt.savedDraft ?? prompt.response?.text ?? '' } },
+              progressRevision,
+              material
+            ).writingDrafts?.[prompt.id] ?? '',
           submittedText: prompt.response ? trimmed(prompt.response.text) : undefined,
-          result: prompt.response ?? null,
+          result:
+            trimmed(
+              retainedLearningProgress(
+                endpointBase.replace(/\/writing$/, ''),
+                {
+                  writingDrafts: { [prompt.id]: prompt.savedDraft ?? prompt.response?.text ?? '' },
+                },
+                progressRevision,
+                material
+              ).writingDrafts?.[prompt.id] ?? ''
+            ) === trimmed(prompt.response?.text ?? '')
+              ? (prompt.response ?? null)
+              : null,
         },
       ])
     )
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const saveError = useLearningProgress(
+    endpointBase.replace(/\/writing$/, ''),
+    {
+      writingDrafts: Object.fromEntries(
+        Object.entries(drafts).map(([id, draft]) => [id, draft.text])
+      ),
+    },
+    true,
+    progressRevision,
+    material
+  );
 
   // submit() reads the latest drafts without being re-created on every keystroke.
   const latest = useRef(drafts);
@@ -65,7 +98,14 @@ export function useWritingDrafts(
   const setText = useCallback((promptId: string, text: string) => {
     setDrafts((current) => ({
       ...current,
-      [promptId]: { ...(current[promptId] ?? { result: null }), text },
+      [promptId]: {
+        ...(current[promptId] ?? { result: null }),
+        text,
+        result:
+          trimmed(text) === current[promptId]?.submittedText
+            ? (current[promptId]?.result ?? null)
+            : null,
+      },
     }));
   }, []);
 
@@ -91,6 +131,10 @@ export function useWritingDrafts(
   const submit = useCallback(
     async (includingUnchanged = false) => {
       const current = latest.current;
+      if (Object.values(current).some((draft) => trimmed(draft.text).length < MIN_CHARS)) {
+        setError('Write an answer for every writing exercise before finishing.');
+        return false;
+      }
       const ids = includingUnchanged
         ? Object.entries(current)
             .filter(([, draft]) => {
@@ -165,6 +209,11 @@ export function useWritingDrafts(
     isOverLimit,
     isSubmitting,
     error,
+    progressRecovery: {
+      endpoint: endpointBase.replace(/\/writing$/, ''),
+      material,
+      error: saveError,
+    },
     submit,
   };
 }

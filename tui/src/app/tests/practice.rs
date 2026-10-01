@@ -72,6 +72,7 @@
         app.view = View::CourseHome {
             course: course("A"),
             due: DueCounts {
+                recent: Vec::new(),
                 vocab: 3,
                 grammar: 0,
                 total_vocab: 9,
@@ -86,7 +87,7 @@
         let after_first = app.request_gen;
         assert_eq!(after_first, before + 1, "first start should dispatch once");
         assert!(
-            matches!(app.view, View::CourseHome { starting: true, .. }),
+            matches!(app.view, View::PracticePreparing { in_flight: true, .. }),
             "start should be marked in flight"
         );
 

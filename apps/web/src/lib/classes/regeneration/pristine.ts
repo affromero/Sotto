@@ -9,6 +9,7 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { readPreparationAudioBinding } from '../preparation-audio';
 import { classPreparationStore } from '../preparation';
 import { classPreparationGrant } from '../preparation-grant';
+import type { SkillRequirements } from '@sotto/shared';
 
 export const pristineSnapshotSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export class PristineRegenerationConflict extends Error {
@@ -20,7 +21,25 @@ export class PristineRegenerationConflict extends Error {
   }
 }
 
-async function readPristine(database: Prisma.TransactionClient, classId: string, userId: string) {
+const savedAnswersSchema = z.record(z.string(), z.number().int().nonnegative());
+const savedDraftsSchema = z.record(z.string(), z.string());
+
+function containsSavedWork(answers: unknown, drafts: unknown): boolean {
+  const parsedAnswers = savedAnswersSchema.safeParse(answers ?? {});
+  const parsedDrafts = savedDraftsSchema.safeParse(drafts ?? {});
+  return (
+    !parsedAnswers.success ||
+    !parsedDrafts.success ||
+    Object.keys(parsedAnswers.data).length > 0 ||
+    Object.values(parsedDrafts.data).some((draft) => draft.trim().length > 0)
+  );
+}
+
+export async function readPristine(
+  database: Prisma.TransactionClient,
+  classId: string,
+  userId: string
+) {
   const cls = await database.courseClass.findFirst({
     where: { id: classId, course: { userId } },
     include: {
@@ -50,6 +69,7 @@ async function readPristine(database: Prisma.TransactionClient, classId: string,
     !cls ||
     !['AVAILABLE', 'FAILED'].includes(cls.status) ||
     cls.submission ||
+    containsSavedWork(cls.learnerAnswers, cls.writingDrafts) ||
     cls.submittedAt ||
     cls.passedAt ||
     (cls.status !== 'FAILED' && cls.failedAt) ||
@@ -157,7 +177,8 @@ export async function validatePristineRegeneration(
 export async function claimPristineRegeneration(
   classId: string,
   execution: SottoProviderExecution,
-  expected: string
+  expected: string,
+  requirements?: SkillRequirements
 ) {
   pristineSnapshotSchema.parse(expected);
   return sottoTransaction(
@@ -166,19 +187,23 @@ export async function claimPristineRegeneration(
       await execution.authorize(database);
       const { cls, snapshot } = await readPristine(database, classId, execution.userId);
       if (snapshot !== expected) throw new PristineRegenerationConflict();
+      const attempt = Math.max(cls.attempt, ...cls.sections.map((section) => section.attempt)) + 1;
       const claimed = await database.courseClass.updateMany({
         where: { id: classId, status: cls.status, updatedAt: cls.updatedAt, attempt: cls.attempt },
         data: {
           status: 'GENERATING',
           failedAt: null,
-          attempt: cls.attempt + 1,
+          attempt,
           adaptiveSeed: Prisma.JsonNull,
           worksheetPdfUrl: null,
+          ...(requirements
+            ? { skillRequirements: requirements as unknown as Prisma.InputJsonValue }
+            : {}),
         },
       });
       if (claimed.count !== 1) throw new PristineRegenerationConflict();
       await database.classSection.deleteMany({ where: { classId } });
-      return cls;
+      return { ...cls, attempt };
     },
     { signal: execution.signal }
   );

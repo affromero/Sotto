@@ -88,6 +88,33 @@ Add provider and storage settings in `/welcome` or Admin for the workflow you ar
 
 ## 5. Provider Paths
 
+Classes and FULL practice require five grammar questions, five reading questions,
+three writing tasks, four listening questions when TTS is configured, and four
+speaking prompts when STT is configured. Speaking reference audio requires both
+providers. Missing speech access exempts the corresponding oral skill. A failing,
+disabled, or invalid selected provider produces an error and keeps the work
+incomplete. Grammar, reading, and writing remain required.
+
+Generation is admitted through durable class and practice preparation jobs. Run
+web and workers together with `npm run dev`, or start `npm run dev:workers`
+alongside `npm run dev:web`. Leaving the page does not cancel preparation. Resume
+saved work from the course page; use its cancellation and recovery controls for
+interrupted generation. Unknown provider outcomes remain fenced until execution
+cleanup is confirmed. Recovery does not waive required exercises.
+
+Answers, drafts, recordings, and feedback belong to the saved learning attempt.
+If another client changes progress, check saved progress before explicitly saving
+your local edits. Classes advance only after every required skill passes. Practice
+finishes after every exercise is answered or graded, including low scores.
+Reading vocabulary is extracted from the exact passage and linked to course memory
+without requiring audio.
+
+Upgrades apply the `20260930100000_learning_requirements` Prisma migration before
+starting the updated web and workers. Older progress and receipts remain readable.
+An incomplete older class can be repaired without discarding retained successful
+sections. Native clients should be updated with the server to consume preparation
+responses and restored feedback. No additional environment variables are required.
+
 ### 5.1 One-Credential Hosted Provider
 
 OpenAI can cover AI, TTS, and STT. Select OpenAI for all three capabilities and save one credential in `/welcome` or Admin.

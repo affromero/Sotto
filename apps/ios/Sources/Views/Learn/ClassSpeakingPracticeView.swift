@@ -7,9 +7,18 @@ enum SpeakingPromptSource: Equatable {
     case classSession(classId: String)
     case practice(sessionId: String)
     case exam(examId: String)
+
+    var path: String {
+        switch self {
+        case let .classSession(id): "/api/v1/classes/\(id)"
+        case let .practice(id): "/api/v1/practice/\(id)"
+        case let .exam(id): "/api/v1/exams/\(id)"
+        }
+    }
 }
 
 struct ClassSpeakingPracticeView: View {
+    @EnvironmentObject private var model: SottoAppModel
     let source: SpeakingPromptSource
     let prompts: [SottoSpeakingPrompt]
     let onSelectionHelp: ((String, String) -> Void)?
@@ -34,6 +43,7 @@ struct ClassSpeakingPracticeView: View {
                 ClassSpeakingPromptCard(
                     source: source,
                     prompt: prompt,
+                    saved: model.speakingState(source: source, promptId: prompt.id),
                     onSelectionHelp: onSelectionHelp
                 )
             }
@@ -56,29 +66,23 @@ private struct ClassSpeakingPromptCard: View {
     @State private var isRecording = false
     @State private var statusText: String?
     @State private var errorMessage: String?
-    @State private var feedback: SottoSpeakingPollResponse?
+    @ObservedObject var saved: NativeSpeakingState
+    private var feedback: SottoSpeakingPollResponse? {
+        get { saved.feedback }
+        nonmutating set { saved.feedback = newValue }
+    }
     @State private var task: Task<Void, Never>?
 
     init(
         source: SpeakingPromptSource,
         prompt: SottoSpeakingPrompt,
+        saved: NativeSpeakingState,
         onSelectionHelp: ((String, String) -> Void)?
     ) {
         self.source = source
         self.prompt = prompt
         self.onSelectionHelp = onSelectionHelp
-        if let recording = prompt.latestRecording {
-            _feedback = State(
-                initialValue: SottoSpeakingPollResponse(
-                    status: recording.status,
-                    transcript: recording.transcript,
-                    overallScore: recording.overallScore,
-                    rubricScores: recording.rubricScores,
-                    feedback: recording.feedback,
-                    phonemeScores: recording.phonemeScores
-                )
-            )
-        }
+        self.saved = saved
     }
 
     var body: some View {
@@ -128,13 +132,28 @@ private struct ClassSpeakingPromptCard: View {
                     Label(isRecording ? "Stop" : "Record", systemImage: isRecording ? "stop.fill" : "mic.fill")
                 }
                 .buttonStyle(SottoPrimaryButtonStyle())
+                .disabled(!isRecording && !saved.canRecord)
 
-                if let urlString = prompt.referenceTtsUrl, let url = URL(string: urlString) {
-                    Link(destination: url) {
-                        Label("Reference voice", systemImage: "speaker.wave.2")
-                    }
-                    .buttonStyle(SottoSecondaryButtonStyle())
+                if let reference = prompt.referenceTtsUrl {
+                    LearnerAudioPlayer(reference: reference)
                 }
+            }
+
+            if saved.recordingId != nil && !saved.canRecord || saved.uploadUnknown {
+                Button("Check saved recording") {
+                    task?.cancel()
+                    task = Task {
+                        if saved.uploadUnknown {
+                            do {
+                                if let recording = try await model.latestSpeakingRecording(source: source, promptId: prompt.id) {
+                                    saved.receive(recording)
+                                }
+                                if saved.uploadUnknown { errorMessage = "The upload outcome is not confirmed. Check again before recording another attempt." }
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                        if let id = saved.recordingId { await resumeFeedback(recordingId: id) }
+                    }
+                }.buttonStyle(SottoSecondaryButtonStyle())
             }
 
             if let statusText {
@@ -161,6 +180,10 @@ private struct ClassSpeakingPromptCard: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(SottoTheme.line)
         )
+        .task(id: "\(prompt.latestRecording?.id ?? "")/\(prompt.latestRecording?.status ?? "")") {
+            if let recording = prompt.latestRecording { saved.receive(recording) }
+            if let id = saved.recordingId, !saved.canRecord { await resumeFeedback(recordingId: id) }
+        }
         .onDisappear {
             recorder?.stop()
             task?.cancel()
@@ -195,6 +218,8 @@ private struct ClassSpeakingPromptCard: View {
             recorder = nextRecorder
             audioURL = url
             isRecording = true
+            saved.previousRecordingId = saved.recordingId
+            saved.recordingId = nil
             feedback = nil
             errorMessage = nil
             statusText = "Recording..."
@@ -213,13 +238,26 @@ private struct ClassSpeakingPromptCard: View {
         uploadAndPoll(audioURL)
     }
 
+    private func resumeFeedback(recordingId: String) async {
+        do {
+            statusText = "Checking saved recording..."
+            feedback = try await waitForFeedback(recordingId: recordingId)
+            statusText = feedback?.status == "SCORED" ? "Feedback ready." : feedback?.status.capitalized
+        } catch {
+            if !Task.isCancelled { errorMessage = "Your recording is saved. \(error.localizedDescription)" }
+        }
+    }
+
     private func uploadAndPoll(_ url: URL) {
+        saved.uploadUnknown = true
         task?.cancel()
         task = Task { @MainActor in
             do {
                 statusText = "Uploading voice sample..."
                 errorMessage = nil
                 let uploaded = try await upload(url)
+                saved.recordingId = uploaded.recordingId
+                saved.uploadUnknown = false
 
                 statusText = "Scoring pronunciation..."
                 let result = try await waitForFeedback(recordingId: uploaded.recordingId)
@@ -238,7 +276,7 @@ private struct ClassSpeakingPromptCard: View {
         for _ in 0..<50 {
             try Task.checkCancellation()
             let result = try await poll(recordingId: recordingId)
-            if result.status != "PENDING" && result.status != "PROCESSING" {
+            if result.status == "SCORED" || result.status == "FAILED" {
                 return result
             }
             try await Task.sleep(nanoseconds: 1_500_000_000)

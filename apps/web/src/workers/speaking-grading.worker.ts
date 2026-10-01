@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import type { Job } from 'bullmq';
 import type { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { resolveCapturedLearningAi } from '@/lib/learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
 import { resolveCapturedSttProvider, getConfiguredSttProviderId } from '@/lib/providers/stt';
 import { aiProviderRules } from '@/lib/providers/ai';
 import {
@@ -25,6 +25,8 @@ import { isMediaCleanupFailure } from '@/lib/audio/media-process';
 import { readSottoWorkerJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { speakingGradingPayloadSchema } from '@/lib/sidedoor/jobs/stitch/speaking-grading-work';
 import { captureSpeakingRecordingStorage } from '@/lib/sidedoor/storage/core/speaking-storage';
+import { readSkillRequirements } from '@/lib/learning/skill-requirements';
+import { sttSelectionSchema } from '@/lib/learning/speech-selection';
 
 async function readSpeakingWork(database: Prisma.TransactionClient, recordingId: string) {
   const recording = await database.speakingRecording.findUnique({
@@ -42,20 +44,28 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
   if (recording.sectionId) {
     const section = await database.classSection.findUnique({
       where: { id: recording.sectionId },
-      select: { class: { select: { course: { select: { targetLang: true } } } } },
+      select: {
+        attempt: true,
+        class: { select: { skillRequirements: true, course: { select: { targetLang: true } } } },
+      },
     });
     if (!section) throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
-    targetLang = section.class.course.targetLang;
+    if (section.attempt != null && section.attempt !== recording.attempt)
+      throw new Error('The speaking exercise attempt changed');
+    targetLang =
+      readSkillRequirements(section.class.skillRequirements)?.targetLang ??
+      section.class.course.targetLang;
   } else if (recording.practiceSessionId) {
     const session = await database.practiceSession.findUnique({
       where: { id: recording.practiceSessionId },
-      select: { course: { select: { targetLang: true } } },
+      select: { skillRequirements: true, course: { select: { targetLang: true } } },
     });
     if (!session)
       throw new Error(
         `PracticeSession not found for practiceSessionId: ${recording.practiceSessionId}`
       );
-    targetLang = session.course.targetLang;
+    targetLang =
+      readSkillRequirements(session.skillRequirements)?.targetLang ?? session.course.targetLang;
   } else if (recording.examSectionId) {
     const section = await database.examSection.findUnique({
       where: { id: recording.examSectionId },
@@ -86,7 +96,9 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     userId: recording.userId,
     audioUrl: recording.audioUrl,
     targetPhrase: recording.prompt.targetPhrase,
-    preferredSttModel: recording.user.preferredSttModel,
+    preferredSttModel: recording.sttSelection ? null : recording.user.preferredSttModel,
+    sttProvider: recording.sttProvider,
+    sttSelection: recording.sttSelection ? sttSelectionSchema.parse(recording.sttSelection) : null,
     targetLang,
     storage: source.input,
     ownership,
@@ -197,6 +209,8 @@ async function executeSpeakingGrading(
   const execution: SottoProviderExecution = {
     userId: inputs.userId,
     signal,
+    isolatedWorkspace: { directory, markCleanupUnconfirmed },
+    onCleanupError: markCleanupUnconfirmed,
     authorize: async (database) => {
       await requireCurrentWork(database, work);
       return { userId: inputs.userId };
@@ -214,10 +228,17 @@ async function executeSpeakingGrading(
     const resolvedStt = await resolveCapturedSttProvider({
       userId: inputs.userId,
       execution,
-      requestedProvider: getConfiguredSttProviderId(),
-      requestedModel: inputs.preferredSttModel ?? undefined,
+      requestedProvider:
+        (inputs.sttProvider as Parameters<
+          typeof resolveCapturedSttProvider
+        >[0]['requestedProvider']) ?? getConfiguredSttProviderId(),
+      requestedModel: inputs.sttSelection?.model ?? inputs.preferredSttModel ?? undefined,
       language: inputs.targetLang,
     });
+    if (inputs.sttSelection && !isDeepStrictEqual(inputs.sttSelection, resolvedStt.selection))
+      throw new Error(
+        'The selected speech model, endpoint or credential changed. Record a new attempt with the current provider settings.'
+      );
     const sttResult = await resolvedStt.provider.transcribe(audioBuffer, {
       language: inputs.targetLang,
       signal,
@@ -236,6 +257,7 @@ async function executeSpeakingGrading(
       transcript: sttResult.text,
       wordTimings: sttResult.words,
       targetLang: inputs.targetLang,
+      aiOptions: await capturedLearningAiOptions(ai),
       aiProvider: ai.provider,
       aiModel: ai.model,
       aiApiKey: ai.apiKey,

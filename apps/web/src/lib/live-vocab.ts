@@ -16,6 +16,57 @@ import {
 } from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
 
+/** Shared extraction request. Reading consumers validate source and assessment attribution strictly. */
+export async function requestVocabularyExtraction(p: {
+  userId: string;
+  execution: SottoProviderExecution;
+  nativeLang: string;
+  targetLang: string;
+  level: string;
+  text: string;
+  label: 'TRANSCRIPT' | 'COURSE_NOTES';
+  usageCategory: string;
+  readingQuestions?: readonly { question: string; options: readonly string[] }[];
+}): Promise<string> {
+  if (p.text.length > MAX_SOURCE_CHARS && p.readingQuestions)
+    throw new Error('The reading passage exceeds the vocabulary extraction limit.');
+  const ai = await resolveCapturedLearningAi(p.userId, p.execution);
+  const systemPrompt = loadAndRender(
+    p.readingQuestions ? 'live/extract-reading-vocab.md' : 'live/extract-vocab.md',
+    {
+      TARGET: p.targetLang,
+      NATIVE: p.nativeLang,
+      LEVEL: p.level,
+      MAX: String(MAX_ITEMS),
+    }
+  );
+  const res = await createAIProvider(ai.provider).generateResponse(
+    systemPrompt,
+    [
+      {
+        role: 'user',
+        content: p.readingQuestions
+          ? JSON.stringify({ passageText: p.text, questions: p.readingQuestions })
+          : fenceUntrustedText(p.label, p.text),
+      },
+    ],
+    {
+      ...(await capturedLearningAiOptions(ai)),
+      maxTokens: p.readingQuestions ? 2048 : 1024,
+      temperature: 0.2,
+    }
+  );
+  logUsage({
+    service: ai.provider,
+    model: res.model,
+    category: p.usageCategory,
+    inputTokens: res.inputTokens,
+    outputTokens: res.outputTokens,
+    userId: p.userId,
+  });
+  return res.content;
+}
+
 const MAX_ITEMS = 12;
 const MAX_GRAMMAR_ITEMS = 8;
 const MAX_SOURCE_CHARS = 12000;
@@ -166,30 +217,7 @@ async function extractAndStoreVocabFromText(p: {
   if (!text) return 0;
 
   try {
-    const ai = await resolveCapturedLearningAi(p.userId, p.execution);
-    const systemPrompt = loadAndRender('live/extract-vocab.md', {
-      TARGET: p.targetLang,
-      NATIVE: p.nativeLang,
-      LEVEL: p.level,
-      MAX: String(MAX_ITEMS),
-    });
-    const client = createAIProvider(ai.provider);
-    const res = await client.generateResponse(
-      systemPrompt,
-      [{ role: 'user', content: fenceUntrustedText(p.label, text) }],
-      { ...(await capturedLearningAiOptions(ai)), maxTokens: 1024, temperature: 0.2 }
-    );
-
-    logUsage({
-      service: ai.provider,
-      model: res.model,
-      category: p.usageCategory,
-      inputTokens: res.inputTokens,
-      outputTokens: res.outputTokens,
-      userId: p.userId,
-    });
-
-    const items = parseLiveVocab(res.content);
+    const items = parseLiveVocab(await requestVocabularyExtraction({ ...p, text }));
     if (items.length === 0) return 0;
     return await upsertLiveVocab(p.courseId, items, p.level as CefrLevel);
   } catch (error: unknown) {

@@ -30,6 +30,8 @@ import {
 } from '@/lib/sidedoor/credentials/runtime/credential-execution';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { prismaUnfiltered } from '../prisma';
+import { learningCredentialFingerprint } from '../classes/preparation-selection';
+import type { SttSelection } from '../learning/speech-selection';
 
 export type { SttProviderId } from './stt-registry';
 export { getConfiguredSttProviderId } from './stt/config';
@@ -156,7 +158,7 @@ export function createSttProvider(
       }
       const config: WhisperProviderConfig = {
         baseURL,
-        model: infra('sttModel') || model || getSttProviderMeta('local').defaultModel,
+        model: model || infra('sttModel') || getSttProviderMeta('local').defaultModel,
         name: 'Local Whisper',
       };
       // Keyless: local servers ignore the key but the SDK needs a non-empty string.
@@ -180,6 +182,7 @@ interface ResolvedSttProvider {
 
 export interface CapturedSttProvider extends ResolvedSttProvider {
   provider: SttProvider;
+  selection: SttSelection;
 }
 
 /** Capture the selected personal credential and transport binding in the worker admission transaction. */
@@ -212,11 +215,27 @@ export async function resolveCapturedSttProvider(context: {
   };
   const resolved = credential
     ? await resolveSttSelection(
-        { ...context, requestedProvider },
+        {
+          ...context,
+          requestedProvider,
+          requestedModel:
+            context.requestedModel ??
+            (requestedProvider === 'local' ? infra('sttModel') || undefined : undefined),
+        },
         sottoExecutionCredentialFields(credential).apiKey,
         'credential'
       )
-    : await resolveSttSelection({ ...context, requestedProvider }, '', 'local');
+    : await resolveSttSelection(
+        {
+          ...context,
+          requestedProvider,
+          requestedModel:
+            context.requestedModel ??
+            (requestedProvider === 'local' ? infra('sttModel') || undefined : undefined),
+        },
+        '',
+        'local'
+      );
   if (!resolved.apiKey && requestedProvider !== 'local')
     throw new Error(
       `No credential is available for STT provider "${requestedProvider}". Add one in Settings.`
@@ -227,6 +246,12 @@ export async function resolveCapturedSttProvider(context: {
   );
   return {
     ...resolved,
+    selection: {
+      providerId: resolved.providerId,
+      model: resolved.model,
+      baseUrl: requestedProvider === 'local' ? infra('sttBaseUrl') || null : null,
+      credentialFingerprint: learningCredentialFingerprint(credential),
+    },
     provider: createSttProvider(resolved.providerId, resolved.apiKey, resolved.model, transport),
   };
 }

@@ -16,13 +16,20 @@ import { getAutoModelConfig } from './auto-model-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy } from './classes/class-language-policy';
+import { reviewTeachingContent } from './classes/quality/teaching-quality';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import { captureSpeakingPromptStorage } from '@/lib/sidedoor/storage/core/speaking-storage';
+import {
+  assertClassGeneration,
+  withClassGeneration,
+} from './learning/classes/class-generation-state';
 
 const SPEAKING_PROMPT_COUNT = 4;
 
 export interface ClassSpeakingParams {
+  ttsProvider?: import('./providers/tts-registry').TtsProviderId | null;
+  referenceAudioRequired?: boolean;
   execution: SottoProviderExecution;
   userId: string;
   classId: string;
@@ -42,6 +49,8 @@ export interface ClassSpeakingResult {
 // Content-only speaking generation: LLM phrases + reference TTS, with no parent
 // rows. `refId` namespaces the TTS audio (a class id or a practice session id).
 export interface SpeakingPromptsParams {
+  ttsProvider?: import('./providers/tts-registry').TtsProviderId | null;
+  referenceAudioRequired?: boolean;
   execution: SottoProviderExecution;
   userId: string;
   level: string;
@@ -140,16 +149,30 @@ export async function composeSpeakingPrompts(
     .filter(isValidRawPrompt)
     .slice(0, SPEAKING_PROMPT_COUNT);
 
-  if (phrases.length === 0) {
-    throw new Error('Speaking prompt generation produced no usable phrases.');
+  if (rawPrompts.length !== SPEAKING_PROMPT_COUNT || phrases.length !== SPEAKING_PROMPT_COUNT) {
+    throw new Error(
+      `Speaking prompt generation must produce all ${SPEAKING_PROMPT_COUNT} usable phrases.`
+    );
   }
+
+  await reviewTeachingContent({
+    ai,
+    provider: client,
+    userId: p.userId,
+    level: p.level,
+    nativeLang: p.nativeLang,
+    targetLang: p.targetLang,
+    kind: 'speaking',
+    items: phrases,
+  });
 
   // Step 3: resolve TTS for reference audio (graceful degrade on failure).
   // Prefer the saved provider so a self-hoster using Kokoro renders reference
   // audio with the local sidecar. Otherwise use the configured model default.
-  const ttsAvailable = await canResolveTts(p.userId);
-  let requestedTtsProvider: string | null = null;
-  if (ttsAvailable) {
+  const ttsAvailable =
+    p.ttsProvider === undefined ? await canResolveTts(p.userId) : p.ttsProvider !== null;
+  let requestedTtsProvider: string | null = p.ttsProvider ?? null;
+  if (ttsAvailable && p.ttsProvider === undefined) {
     const configured = getConfiguredTtsProviderId();
     if (configured) {
       requestedTtsProvider = configured;
@@ -191,6 +214,7 @@ export async function composeSpeakingPrompts(
       });
       referenceTtsAudio.push(audioBuffer);
     } catch (err) {
+      if (p.referenceAudioRequired) throw err;
       logger.warn('Reference TTS generation failed for speaking prompt', {
         refId: p.refId,
         index: String(i),
@@ -210,13 +234,18 @@ export async function composeSpeakingPrompts(
 }
 
 export async function publishSpeakingPromptReferences(options: {
+  classAttempt?: { classId: string; attempt: number };
+  required?: boolean;
   prompts: ReadonlyArray<{ id: string; composed: ComposedSpeakingPrompt }>;
   userId: string;
   execution: SottoProviderExecution;
 }): Promise<ReadonlyMap<string, string>> {
   const references = new Map<string, string>();
   for (const { id, composed } of options.prompts) {
-    if (!composed.referenceTtsAudio) continue;
+    if (!composed.referenceTtsAudio) {
+      if (options.required) throw new Error('Required speaking reference audio was not generated.');
+      continue;
+    }
     try {
       const reference = await writeStorageReference({
         database: prismaUnfiltered,
@@ -226,6 +255,12 @@ export async function publishSpeakingPromptReferences(options: {
         body: composed.referenceTtsAudio,
         contentType: 'audio/mpeg',
         captureAdmission: async (database) => {
+          if (options.classAttempt)
+            await assertClassGeneration(
+              database,
+              options.classAttempt.classId,
+              options.classAttempt.attempt
+            );
           const recipient = await options.execution.authorize(database);
           if (recipient.userId !== options.userId)
             throw new Error('Speaking reference recipient changed');
@@ -238,6 +273,12 @@ export async function publishSpeakingPromptReferences(options: {
           };
         },
         validateAdmission: async (database, captured, committedReference) => {
+          if (options.classAttempt)
+            await assertClassGeneration(
+              database,
+              options.classAttempt.classId,
+              options.classAttempt.attempt
+            );
           const recipient = await options.execution.authorize(database);
           if (recipient.userId !== options.userId)
             throw new Error('Speaking reference recipient changed');
@@ -260,6 +301,7 @@ export async function publishSpeakingPromptReferences(options: {
       });
       references.set(id, reference);
     } catch (error) {
+      if (options.required) throw error;
       logger.warn('Reference TTS publication failed for speaking prompt', {
         promptId: id,
         error: error instanceof Error ? error.message : String(error),
@@ -274,6 +316,8 @@ export async function publishSpeakingPromptReferences(options: {
 export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<ClassSpeakingResult> {
   const attempt = p.attempt ?? 1;
   const prompts = await composeSpeakingPrompts({
+    ttsProvider: p.ttsProvider,
+    referenceAudioRequired: p.referenceAudioRequired,
     execution: p.execution,
     userId: p.userId,
     level: p.level,
@@ -285,34 +329,44 @@ export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<Cla
     note: p.note,
   });
 
-  const section = await prisma.classSection.create({
-    data: {
-      classId: p.classId,
-      skill: 'SPEAKING',
-      attempt,
-      seed: `${p.classId}-SPEAKING-${attempt}`,
-      spec: { objective: p.objective },
-      status: 'READY',
-      generatedAt: new Date(),
-    },
-  });
+  const { section, savedPrompts } = await withClassGeneration(
+    p.execution,
+    p.classId,
+    attempt,
+    async (database) => {
+      const section = await database.classSection.create({
+        data: {
+          classId: p.classId,
+          skill: 'SPEAKING',
+          attempt,
+          seed: `${p.classId}-SPEAKING-${attempt}`,
+          spec: { objective: p.objective },
+          status: 'READY',
+          generatedAt: new Date(),
+        },
+      });
 
-  await prisma.speakingPrompt.createMany({
-    data: prompts.map((prompt, i) => ({
-      sectionId: section.id,
-      order: i + 1,
-      targetPhrase: prompt.targetPhrase,
-      translation: prompt.translation,
-      ipa: prompt.ipa,
-      referenceTtsUrl: null,
-    })),
-  });
-  const savedPrompts = await prisma.speakingPrompt.findMany({
-    where: { sectionId: section.id },
-    orderBy: { order: 'asc' },
-    select: { id: true },
-  });
+      await database.speakingPrompt.createMany({
+        data: prompts.map((prompt, i) => ({
+          sectionId: section.id,
+          order: i + 1,
+          targetPhrase: prompt.targetPhrase,
+          translation: prompt.translation,
+          ipa: prompt.ipa,
+          referenceTtsUrl: null,
+        })),
+      });
+      const savedPrompts = await database.speakingPrompt.findMany({
+        where: { sectionId: section.id },
+        orderBy: { order: 'asc' },
+        select: { id: true },
+      });
+      return { section, savedPrompts };
+    }
+  );
   await publishSpeakingPromptReferences({
+    classAttempt: { classId: p.classId, attempt },
+    required: p.referenceAudioRequired,
     prompts: savedPrompts.map((saved, index) => ({ id: saved.id, composed: prompts[index]! })),
     userId: p.userId,
     execution: p.execution,

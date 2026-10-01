@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createSkillRequirements } from '@sotto/shared';
 import {
   mockCourseClassFindFirst,
+  mockResolveSkillRequirements,
   mockCourseClassFindUnique,
   mockCourseClassUpdate,
   mockCourseClassDelete,
@@ -8,10 +10,9 @@ import {
   mockClassSectionUpdate,
   mockClassSectionDeleteMany,
   mockLessonQuestionCreate,
-  mockLessonQuestionDeleteMany,
-  mockSpeakingRecordingDeleteMany,
   mockClassSubmissionDeleteMany,
   mockCourseUpdate,
+  mockCourseUpdateMany,
   mockTransaction,
   mockGenerateSectionQuestions,
   mockGenerateClassIntro,
@@ -22,17 +23,22 @@ import {
   SAMPLE_COURSE,
   SAMPLE_QUESTIONS,
 } from './fixtures';
-import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
-import {
-  getClassForUser,
-  regenerateCurrentClass,
-  regenerateFailedSections,
-  deleteClassForUser,
-} from '@/lib/class-service';
+import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
+import { getClassForUser, regenerateCurrentClass, deleteClassForUser } from '@/lib/class-service';
 
 describe('regenerateCurrentClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveSkillRequirements.mockResolvedValue(
+      createSkillRequirements({
+        scope: 'CLASS',
+        nativeLang: 'en',
+        targetLang: 'es',
+        level: 'A2',
+        ttsProvider: 'cartesia',
+        sttProvider: 'openai',
+      })
+    );
     mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
     mockGenerateClassListening.mockResolvedValue({
@@ -60,12 +66,16 @@ describe('regenerateCurrentClass', () => {
     mockClassSectionDeleteMany.mockResolvedValue({ count: 4 });
     mockClassSubmissionDeleteMany.mockResolvedValue({ count: 1 });
     mockLessonQuestionCreate.mockResolvedValue({});
-    mockCourseClassFindUnique.mockResolvedValue({ status: 'GENERATING' });
+    mockCourseClassFindUnique.mockResolvedValue({
+      status: 'GENERATING',
+      attempt: 2,
+      course: { userId: 'u1' },
+    });
     mockCourseClassUpdate.mockResolvedValue({});
     mockCourseUpdate.mockResolvedValue({});
   });
 
-  it('clears the current class and rebuilds it with a bumped attempt', async () => {
+  it('retains historical material and rebuilds it with a bumped attempt', async () => {
     mockCourseClassFindFirst.mockResolvedValue({
       id: 'class-1',
       courseId: 'course-1',
@@ -77,7 +87,7 @@ describe('regenerateCurrentClass', () => {
       course: SAMPLE_COURSE,
     });
 
-    const result = await regenerateCurrentClass('class-1', 'u1', blockedProviderExecution('u1'));
+    const result = await regenerateCurrentClass('class-1', 'u1', authorizedLearnerExecution('u1'));
 
     expect(result).toBe(true);
     expect(mockCourseClassUpdate).toHaveBeenCalledWith(
@@ -86,8 +96,8 @@ describe('regenerateCurrentClass', () => {
         data: expect.objectContaining({ status: 'GENERATING', attempt: 2 }),
       })
     );
-    expect(mockClassSubmissionDeleteMany).toHaveBeenCalledWith({ where: { classId: 'class-1' } });
-    expect(mockClassSectionDeleteMany).toHaveBeenCalledWith({ where: { classId: 'class-1' } });
+    expect(mockClassSubmissionDeleteMany).not.toHaveBeenCalled();
+    expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
     expect(mockClassSectionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ skill: 'GRAMMAR', attempt: 2, seed: 'class-1-GRAMMAR-2' }),
@@ -110,10 +120,32 @@ describe('regenerateCurrentClass', () => {
       course: SAMPLE_COURSE,
     });
 
-    const result = await regenerateCurrentClass('class-1', 'u1', blockedProviderExecution('u1'));
+    const result = await regenerateCurrentClass('class-1', 'u1', authorizedLearnerExecution('u1'));
 
     expect(result).toBe(false);
     expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it('settles this attempt as failed when the course acquired another active class', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      courseId: 'course-1',
+      status: 'AVAILABLE',
+      attempt: 1,
+      sourceUrl: null,
+      sourceTitle: null,
+      lesson: SAMPLE_LESSON,
+      course: SAMPLE_COURSE,
+    });
+    mockCourseUpdateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(
+      regenerateCurrentClass('class-1', 'u1', authorizedLearnerExecution('u1'))
+    ).rejects.toThrow('active course class changed');
+    expect(mockCourseClassUpdate).toHaveBeenLastCalledWith({
+      where: { id: 'class-1', attempt: 2, status: 'GENERATING', course: { userId: 'u1' } },
+      data: { status: 'FAILED', failedAt: expect.any(Date) },
+    });
+    expect(mockCourseUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -154,146 +186,8 @@ describe('deleteClassForUser', () => {
   });
 });
 
-// ---- regenerateFailedSections ----
-
-describe('regenerateFailedSections', () => {
-  const execution = blockedProviderExecution('u1');
-  const FAILED_SECTION = {
-    id: 'sec-grammar',
-    skill: 'GRAMMAR',
-    attempt: 1,
-    passThreshold: 0.6,
-    passed: false,
-  };
-
-  const SAMPLE_CLASS_WITH_FAILED = {
-    id: 'class-1',
-    courseId: 'course-1',
-    sections: [FAILED_SECTION],
-    lesson: SAMPLE_LESSON,
-    course: {
-      nativeLang: 'en',
-      targetLang: 'es',
-    },
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
-    mockGenerateSectionQuestions.mockResolvedValue(SAMPLE_QUESTIONS);
-    mockClassSectionUpdate.mockResolvedValue({});
-    mockLessonQuestionDeleteMany.mockResolvedValue({});
-    mockLessonQuestionCreate.mockResolvedValue({});
-    mockCourseClassUpdate.mockResolvedValue({});
-  });
-
-  it('returns false when the class is not found or not owned by the user', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(null);
-
-    const result = await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns false when there are no failed sections', async () => {
-    mockCourseClassFindFirst.mockResolvedValue({
-      ...SAMPLE_CLASS_WITH_FAILED,
-      sections: [], // no failed sections (Prisma filtered them out)
-    });
-
-    const result = await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns true and bumps the attempt for each failed section', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(SAMPLE_CLASS_WITH_FAILED);
-
-    const result = await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(result).toBe(true);
-    // attempt should be bumped to 2
-    expect(mockClassSectionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'sec-grammar' },
-        data: expect.objectContaining({ attempt: 2, seed: 'class-1-GRAMMAR-2' }),
-      })
-    );
-  });
-
-  it('deletes old questions and creates new ones for each failed section', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(SAMPLE_CLASS_WITH_FAILED);
-
-    await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(mockLessonQuestionDeleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { sectionId: 'sec-grammar' } })
-    );
-    expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(1);
-    // New questions should be created inside $transaction
-    expect(mockLessonQuestionCreate).toHaveBeenCalledTimes(SAMPLE_QUESTIONS.length);
-  });
-
-  it('sets the class status back to IN_PROGRESS after regeneration', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(SAMPLE_CLASS_WITH_FAILED);
-
-    await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(mockCourseClassUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'class-1' },
-        data: expect.objectContaining({ status: 'IN_PROGRESS', failedAt: null }),
-      })
-    );
-  });
-
-  it('handles multiple failed sections and regenerates all', async () => {
-    const twoFailed = {
-      ...SAMPLE_CLASS_WITH_FAILED,
-      sections: [
-        { id: 'sec-grammar', skill: 'GRAMMAR', attempt: 2, passed: false },
-        { id: 'sec-reading', skill: 'READING', attempt: 2, passed: false },
-      ],
-    };
-    mockCourseClassFindFirst.mockResolvedValue(twoFailed);
-
-    const result = await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(result).toBe(true);
-    expect(mockGenerateSectionQuestions).toHaveBeenCalledTimes(2);
-    expect(mockClassSectionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ attempt: 3, seed: 'class-1-GRAMMAR-3' }),
-      })
-    );
-    expect(mockClassSectionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ attempt: 3, seed: 'class-1-READING-3' }),
-      })
-    );
-  });
-
-  it('resets a failed SPEAKING section in place: clears recordings, no MC regeneration', async () => {
-    mockCourseClassFindFirst.mockResolvedValue({
-      ...SAMPLE_CLASS_WITH_FAILED,
-      sections: [{ id: 'sec-speaking', skill: 'SPEAKING', attempt: 1, passed: false }],
-    });
-
-    const result = await regenerateFailedSections('class-1', 'u1', execution);
-
-    expect(result).toBe(true);
-    expect(mockSpeakingRecordingDeleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { sectionId: 'sec-speaking' } })
-    );
-    // A speaking section has no MC questions to regenerate.
-    expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
-    expect(mockClassSectionUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ attempt: 2, seed: 'class-1-SPEAKING-2', status: 'READY' }),
-      })
-    );
-  });
-});
+// Failed and incomplete repair admission is covered with real PostgreSQL in
+// classes/preparation-postgres.test.ts; selective material is covered in learning/class-repair.test.ts.
 
 // ---- getClassForUser ----
 

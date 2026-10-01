@@ -215,19 +215,18 @@ struct SottoAPIClient {
         try await get("/api/v1/classes/\(classId)")
     }
 
-    func regenerateClass(classId: String) async throws {
-        let _: ClassRegenerationResponse = try await post(
+    func regenerateClass(classId: String, expectedAttempt: Int) async throws {
+        let _: NextClassBackgroundResponse = try await post(
             "/api/v1/classes/\(classId)",
-            body: RegenerateClassRequest(scope: "class"),
-            acceptedStatuses: [200],
-            timeout: SottoAPIClient.generationTimeout
+            body: RegenerateClassRequest(scope: "class", expectedAttempt: expectedAttempt),
+            acceptedStatuses: [202]
         )
     }
 
-    func startClassRegeneration(classId: String) async throws {
+    func startClassRegeneration(classId: String, expectedAttempt: Int) async throws {
         let _: NextClassBackgroundResponse = try await post(
             "/api/v1/classes/\(classId)?background=1",
-            body: RegenerateClassRequest(scope: "class"),
+            body: RegenerateClassRequest(scope: "class", expectedAttempt: expectedAttempt),
             acceptedStatuses: [202]
         )
     }
@@ -236,14 +235,26 @@ struct SottoAPIClient {
         let _: DeleteClassResponse = try await delete("/api/v1/classes/\(classId)")
     }
 
-    func startPractice(courseId: String, kind: String) async throws -> SottoPracticeStart {
+    func startPractice(courseId: String, kind: String, requestId: UUID = UUID()) async throws -> SottoPracticeStart {
         // The server builds a script and its audio here; the web client warns
         // this runs one to three minutes.
         try await post(
             "/api/v1/courses/\(courseId)/practice",
-            body: StartPracticeRequest(kind: kind),
+            body: StartPracticeRequest(kind: kind, requestId: requestId.uuidString),
+            acceptedStatuses: [200, 201, 202],
             timeout: SottoAPIClient.generationTimeout
         )
+    }
+
+    func practiceGenerationAction(sessionId: String, action: String, acknowledgeUnknownOutcome: Bool = false) async throws -> SottoPracticeStart {
+        try await post("/api/v1/practice/\(sessionId)/generation",
+            body: PracticeGenerationAction(action: action, acknowledgeUnknownOutcome: acknowledgeUnknownOutcome),
+            acceptedStatuses: [200, 202])
+    }
+
+    func saveLearningProgress(path: String, expectedRevision: Int, answers: [String: Int], writingDrafts: [String: String]) async throws -> SottoLearningProgressResponse {
+        try await patch(path, body: LearningProgressRequest(expectedRevision: expectedRevision,
+            answers: answers, writingDrafts: writingDrafts))
     }
 
     func fetchCourseTopics(courseId: String) async throws -> [SottoTopicSuggestion] {
@@ -825,6 +836,7 @@ private struct CreateProfileRequest: Encodable {
 
 private struct StartPracticeRequest: Encodable {
     let kind: String
+    let requestId: String
 }
 
 private struct CreateCourseRequest: Encodable {
@@ -907,10 +919,7 @@ private struct SelectionHelpRequest: Encodable {
 
 private struct RegenerateClassRequest: Encodable {
     let scope: String
-}
-
-private struct ClassRegenerationResponse: Decodable {
-    let regenerated: Bool
+    let expectedAttempt: Int
 }
 
 private struct DeleteClassResponse: Decodable {

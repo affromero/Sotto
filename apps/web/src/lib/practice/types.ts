@@ -31,8 +31,4 @@ export interface PracticeAnswer {
   selectedIndex: number;
 }
 
-export interface SubmitPracticeResult {
-  score: number;
-  correct: number;
-  total: number;
-}
+export type SubmitPracticeResult = import('@sotto/shared').PracticeReceipt;

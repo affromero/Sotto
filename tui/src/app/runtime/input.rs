@@ -196,6 +196,28 @@ impl App {
 
         // Screen-specific keys take priority over the generic mapping below.
         match &self.view {
+            View::PracticePreparing { .. } => match key.code {
+                KeyCode::Char('r') => return Some(Action::Retry),
+                KeyCode::Char('x') => return Some(Action::PracticeCancel),
+                KeyCode::Char('R') => return Some(Action::PracticeRecover),
+                _ => {}
+            },
+            View::Class {
+                submitting: false, ..
+            } if key.code == KeyCode::Char('N') => {
+                return Some(Action::NextClass);
+            }
+            View::Practice { .. } | View::Class { .. } if key.code == KeyCode::Char('R') => {
+                return Some(Action::PracticeReconcile);
+            }
+            View::Practice { .. } | View::Class { .. }
+                if key.code == KeyCode::Char('r') && !self.speaking_screen() =>
+            {
+                return Some(Action::Retry);
+            }
+            _ if self.speaking_screen() && key.code == KeyCode::Char('p') => {
+                return Some(Action::PlayReference);
+            }
             // Persistent error screen: `r` retries the failed action.
             View::Error { .. } if matches!(key.code, KeyCode::Char('r')) => {
                 return Some(Action::Retry);
@@ -217,7 +239,7 @@ impl App {
                 return Some(Action::ToggleRecord);
             }
             // Class result: `n` continues to the next class.
-            View::ClassOutcome { .. } | View::ClassDone { .. }
+            View::ClassRepair { .. } | View::ClassOutcome { .. } | View::ClassDone { .. }
                 if matches!(key.code, KeyCode::Char('n')) =>
             {
                 return Some(Action::NextClass);
@@ -346,6 +368,11 @@ impl App {
                 sections: Some(sections),
                 cursor,
                 ..
+            }
+            | View::Practice {
+                sections: Some(sections),
+                cursor,
+                ..
             } => sections.get(*cursor),
             _ => None,
         }
@@ -354,7 +381,10 @@ impl App {
     /// True in a section-walk flow (a class OR an exam), so input is routed to
     /// the shared `app::class` section handlers.
     pub(super) fn in_section_walk(&self) -> bool {
-        matches!(self.view, View::Class { .. } | View::Exam { .. })
+        matches!(
+            self.view,
+            View::Class { .. } | View::Exam { .. } | View::Practice { .. }
+        )
     }
 
     // --- Input handlers ----------------------------------------------------
@@ -431,8 +461,10 @@ impl App {
                 *cursor = list_down(*cursor, courses.len());
                 self.render();
             }
-            View::CourseHome { menu_cursor, .. } => {
-                *menu_cursor = list_down(*menu_cursor, SkillChoice::MENU.len());
+            View::CourseHome {
+                menu_cursor, due, ..
+            } => {
+                *menu_cursor = list_down(*menu_cursor, SkillChoice::MENU.len() + due.recent.len());
                 self.render();
             }
             View::ItemReview {
@@ -603,7 +635,10 @@ impl App {
         };
 
         // The client is good — commit the switch.
+        self.cache_practice();
         self.client = client;
+        self.pending_admissions.clear();
+        self.practice_cache.clear();
         let user = profile
             .name
             .clone()
@@ -637,6 +672,15 @@ impl App {
                 // Ignore a repeat Select while a start is already in flight so
                 // key-mashing cannot spawn duplicate server work.
                 if !*starting {
+                    if let Some(session) = menu_cursor
+                        .checked_sub(SkillChoice::MENU.len())
+                        .and_then(|index| due.recent.get(index))
+                    {
+                        let course = course.clone();
+                        let session = session.clone();
+                        self.resume_recent_practice(course, session);
+                        return;
+                    }
                     let skill = SkillChoice::MENU
                         .get(*menu_cursor)
                         .copied()
@@ -679,8 +723,13 @@ impl App {
             }
             View::Result { .. } => self.dismiss_result(),
             // Class and exam share the section-walk Select handler.
-            View::Class { .. } | View::Exam { .. } => self.class_on_select(),
-            View::ClassOutcome { .. } | View::ClassDone { .. } => self.on_next_class(),
+            View::Class { .. } | View::Exam { .. } | View::Practice { .. } => {
+                self.class_on_select()
+            }
+            View::PracticePreparing { .. } => self.practice_check_status(false),
+            View::ClassRepair { .. } | View::ClassOutcome { .. } | View::ClassDone { .. } => {
+                self.on_next_class()
+            }
             // Exams end with a band/score; Enter returns to the course home.
             View::ExamOutcome { course, .. } => {
                 let course = course.clone();
@@ -755,6 +804,7 @@ impl App {
     }
 
     pub(super) fn on_back(&mut self) {
+        self.cache_practice();
         match &self.view {
             View::CourseHome { .. } => {
                 // Back to the course list; refetch so counts are current.
@@ -768,6 +818,9 @@ impl App {
             | View::SpeakingReview { course, .. }
             | View::Result { course, .. }
             | View::Class { course, .. }
+            | View::Practice { course, .. }
+            | View::PracticePreparing { course, .. }
+            | View::ClassRepair { course, .. }
             | View::ClassOutcome { course, .. }
             | View::ClassDone { course, .. }
             | View::Exam { course, .. }
@@ -802,6 +855,16 @@ impl App {
     }
 
     pub(super) fn on_retry(&mut self) {
+        if let Some(progress) = self.view.learning_progress_mut() {
+            progress.conflict = false;
+            progress.dirty = true;
+            self.save_practice_progress();
+            return;
+        }
+        if matches!(self.view, View::PracticePreparing { .. }) {
+            self.practice_check_status(true);
+            return;
+        }
         if let View::Error { retry, .. } = &self.view {
             match retry {
                 RetryKind::Courses => self.fetch_courses(),

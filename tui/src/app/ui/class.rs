@@ -1,13 +1,8 @@
 fn draw_class(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {
-    let View::Class {
-        course,
-        sections,
-        cursor,
-        submitting,
-        ..
-    } = view
-    else {
-        return;
+    let (course, sections, cursor, submitting, flow) = match view {
+        View::Class { course, sections, cursor, submitting, .. } => (course, sections, cursor, submitting, "class"),
+        View::Practice { course, sections, cursor, submitting, .. } => (course, sections, cursor, submitting, "practice"),
+        _ => return,
     };
 
     let Some(sections) = sections else {
@@ -28,11 +23,11 @@ fn draw_class(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {
         return;
     };
     let title = format!(
-        "{} · class — section {}/{} ({})",
+        "{} · {flow}, section {}/{} ({})",
         course.title,
         cursor + 1,
         sections.len(),
-        skill_label(section.skill)
+        section.label.as_deref().unwrap_or(skill_label(section.skill))
     );
     let inner = panel(frame, area, &title, p);
 
@@ -50,7 +45,20 @@ fn draw_class(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {
         return;
     }
 
-    draw_section(frame, inner, section, p);
+    let details = match view {
+        View::Practice { requirements, progress, .. } => Some((requirements.clone(), progress)),
+        View::Class { progress, .. } => Some((vec!["N repair missing or failed sections".into()], progress)),
+        _ => None,
+    };
+    let body = if let Some((mut notices, progress)) = details {
+        if progress.conflict { notices.push("Local work is preserved. Press r to retry saving, or R to save it over the latest saved version.".into()); }
+        if notices.is_empty() { inner } else {
+            let chunks = Layout::vertical([Constraint::Length(notices.len().min(3) as u16), Constraint::Fill(1)]).split(inner);
+            frame.render_widget(Paragraph::new(notices.join("\n")).wrap(Wrap { trim: true }), chunks[0]);
+            chunks[1]
+        }
+    } else { inner };
+    draw_section(frame, body, section, p);
 }
 
 fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection, p: &Palette) {
@@ -179,13 +187,18 @@ fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection, p: &Palet
                 lines.push(Line::default());
             }
             lines.push(speaking_phase_line(phase, p));
+            if let SpeakingPhase::Graded { transcript, feedback, .. } = phase {
+                if let Some(transcript) = transcript { lines.push(Line::from(transcript.clone())); }
+                if let Some(feedback) = feedback { lines.push(Line::from(feedback.clone())); }
+            }
             frame.render_widget(
                 Paragraph::new(Text::from(lines)).wrap(Wrap { trim: true }),
                 chunks[0],
             );
             let hints: &[&str] = match phase {
-                SpeakingPhase::Idle => &["r record", "q back"],
+                SpeakingPhase::Idle => &["r record", "p reference audio", "q back"],
                 SpeakingPhase::Recording => &["r stop", "q back"],
+                SpeakingPhase::UnknownUpload { .. } => &["r check saved work", "q back"],
                 SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => &["q back"],
                 SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
                     &["enter next", "r retry", "q back"]
@@ -360,7 +373,7 @@ fn speaking_phase_line(phase: &SpeakingPhase, p: &Palette) -> Line<'static> {
             ),
             Style::default().fg(p.pink).add_modifier(Modifier::BOLD),
         )),
-        SpeakingPhase::Failed { message } => {
+        SpeakingPhase::UnknownUpload { message } | SpeakingPhase::Failed { message } => {
             Line::from(Span::styled(message.clone(), Style::default().fg(p.pink)))
         }
     }

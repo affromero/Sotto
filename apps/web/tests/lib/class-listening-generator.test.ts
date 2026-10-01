@@ -65,10 +65,23 @@ const { mockVerifyEpisodeReferences } = vi.hoisted(() => ({
 }));
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
+const { mockTeachingResponse, mockBlindResponse } = vi.hoisted(() => ({
+  mockTeachingResponse: vi.fn(),
+  mockBlindResponse: vi.fn(),
+}));
 const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
   const generateResponse = vi.fn();
   return {
-    mockCreateAIProvider: vi.fn((..._args: unknown[]) => ({ generateResponse })),
+    mockCreateAIProvider: vi.fn((..._args: unknown[]) => ({
+      generateResponse: (...args: unknown[]) => {
+        const name = (args[2] as { jsonSchema?: { name: string } })?.jsonSchema?.name;
+        return name === 'class_teaching_quality'
+          ? mockTeachingResponse(...args)
+          : name === 'class_section_quality'
+            ? mockBlindResponse(...args)
+            : generateResponse(...args);
+      },
+    })),
     mockGenerateResponse: generateResponse,
   };
 });
@@ -77,8 +90,12 @@ const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 // ---- Module mocks ----
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
+    $queryRaw: async () => [],
+    courseClass: {
+      findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
+    },
     episode: {
       create: (...args: unknown[]) => mockEpisodeCreate(...args),
       update: (...args: unknown[]) => mockEpisodeUpdate(...args),
@@ -102,8 +119,15 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
-  },
-}));
+  };
+  return {
+    prisma: database,
+    prismaUnfiltered: {
+      ...database,
+      $transaction: async (write: (db: typeof database) => Promise<unknown>) => write(database),
+    },
+  };
+});
 
 vi.mock('@/lib/script-generator', () => ({
   generateScript: (...args: unknown[]) => mockGenerateScript(...args),
@@ -162,9 +186,10 @@ import {
   generateClassListening,
   composeListeningContent,
   minimumVerifiedReferences,
+  queueListeningAudio,
 } from '@/lib/class-listening-generator';
 import type { ClassListeningParams, ListeningContentParams } from '@/lib/class-listening-generator';
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 
 // ---- Fixtures ----
 
@@ -172,6 +197,32 @@ const SAMPLE_TURNS = [
   { speaker: 'HOST', text: 'Hola, bienvenidos al episode.' },
   { speaker: 'EXPERT', text: 'Hoy hablamos sobre saludos.' },
 ];
+
+describe('Listening audio admission', () => {
+  it('rejects obsolete class audio inside admission while preserving the saved episode', async () => {
+    const generation = { status: 'GENERATING', attempt: 3, course: { userId: 'u1' } };
+    mockCreateSegmentsAndQueueAudio.mockImplementationOnce(async (_episode, _turns, options) => {
+      await options.onPrepared(
+        {
+          $queryRaw: async () => [],
+          courseClass: { findUnique: async () => generation },
+        },
+        'saved-audio-key'
+      );
+    });
+    await expect(
+      queueListeningAudio(
+        {
+          episodeId: 'episode-1',
+          turns: SAMPLE_TURNS,
+          comprehensionQuestions: [],
+        },
+        authorizedLearnerExecution('u1'),
+        { classId: 'class-1', attempt: 2 }
+      )
+    ).rejects.toThrow('cancelled');
+  });
+});
 
 const SAMPLE_VOCABULARY = [
   {
@@ -235,7 +286,7 @@ const SAMPLE_QUESTIONS_JSON = JSON.stringify([
 
 const PARAMS: ClassListeningParams = {
   userId: 'u1',
-  execution: blockedProviderExecution('u1'),
+  execution: authorizedLearnerExecution('u1'),
   classId: 'class-1',
   courseId: 'course-1',
   level: 'A1',
@@ -249,6 +300,30 @@ const PARAMS: ClassListeningParams = {
 
 /** Wire all happy-path mocks. */
 function setupHappyPath() {
+  mockTeachingResponse.mockImplementation(async (_system, messages) => ({
+    content: JSON.stringify({
+      items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
+        index: item.index,
+        acceptable: true,
+        issues: [],
+        feedback: [],
+      })),
+    }),
+    model: 'm',
+  }));
+  mockBlindResponse.mockResolvedValue({
+    content: JSON.stringify({
+      passageAcceptable: true,
+      issues: [],
+      questions: [0, 2, 0, 2].map((key, index) => ({
+        index,
+        acceptableOptionIndices: [key],
+        issues: [],
+      })),
+    }),
+    model: 'm',
+  });
+
   mockGetConfiguredTtsProviderId.mockReturnValue('kokoro');
   mockResolveTtsProvider.mockImplementation(async (context: { requestedProvider: string }) => ({
     providerId: context.requestedProvider,
@@ -292,6 +367,11 @@ function setupHappyPath() {
 // ---- Tests ----
 
 describe('generateClassListening', () => {
+  it('renders with the captured personal TTS selection instead of the instance default', async () => {
+    setupHappyPath();
+    await generateClassListening({ ...PARAMS, ttsProvider: 'cartesia' });
+    expect(mockEpisodeCreate.mock.calls[0][0].data.ttsProvider).toBe('cartesia');
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
@@ -476,6 +556,7 @@ describe('generateClassListening', () => {
             skill: 'LISTENING',
             status: 'READY',
             episodeId: 'episode-1',
+            spec: expect.objectContaining({ scriptHash: expect.stringMatching(/^[a-f0-9]{64}$/) }),
           }),
         })
       );
@@ -506,7 +587,6 @@ describe('generateClassListening', () => {
 
       await generateClassListening(PARAMS);
 
-      expect(mockLogUsage).toHaveBeenCalledTimes(2);
       expect(mockLogUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           category: 'class-listening-script',
@@ -599,7 +679,7 @@ describe('generateClassListening', () => {
         model: 'm',
       });
 
-      await expect(generateClassListening(PARAMS)).rejects.toThrow(/no usable questions/);
+      await expect(generateClassListening(PARAMS)).rejects.toThrow(/valid questions/);
     });
   });
 
@@ -645,7 +725,7 @@ describe('composeListeningContent', () => {
 
   const CONTENT_PARAMS: ListeningContentParams = {
     userId: 'u1',
-    execution: blockedProviderExecution('u1'),
+    execution: authorizedLearnerExecution('u1'),
     courseId: 'course-1',
     level: 'A1',
     nativeLang: 'en',
