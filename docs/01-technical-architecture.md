@@ -204,6 +204,13 @@ Resolver output should be either:
 
 No worker should silently route to a different provider because another API key is present.
 
+Local model selection and compatible API connections use `captureCompatibleModel`
+and `captureCompatibleApi` from `thesidedoor-core/ai/providers`. Sidedoor validates
+the SDK endpoint and captures the optional key without reading environment
+credentials. Sotto owns the settings UI, `local:` routing prefix, reviewed endpoint
+identity, learning defaults, and credential authorization. AI and speech credentials
+retain their separate local slots.
+
 ---
 
 ## 7. Local Agents

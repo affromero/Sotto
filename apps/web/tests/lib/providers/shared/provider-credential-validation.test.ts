@@ -11,32 +11,32 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('validates a local key against the explicitly captured compatible URL', async () => {
-  const probe = captureSottoCredentialProbe(
-    'ai',
-    'local',
-    { apiKey: 'private-key' },
-    'http://localhost:11434/v1'
-  );
-  expect(probe).toMatchObject({
-    binding: { protocol: 'compatible', endpoint: 'http://localhost:11434/v1' },
-  });
-  const requests: { url: string; authorization: string | null }[] = [];
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    requests.push({
-      url: String(input),
-      authorization: new Headers(init?.headers).get('authorization'),
+it.each(['http://localhost:11434/v1', 'http://localhost:11434/v1/'])(
+  'retains the reviewed local URL while probing its compatible API: %s',
+  async (endpoint) => {
+    const probe = captureSottoCredentialProbe('ai', 'local', { apiKey: 'private-key' }, endpoint);
+    expect(probe).toMatchObject({
+      binding: { protocol: 'compatible', endpoint },
     });
-    return Response.json({ object: 'list', data: [{ id: 'served-model' }] });
-  });
-  expect(await validateSottoCredentialProbe(probe)).toMatchObject({ readiness: { code: 'ready' } });
-  expect(requests).toEqual([
-    { url: 'http://localhost:11434/v1/models', authorization: 'Bearer private-key' },
-  ]);
-  expect(() => captureSottoCredentialProbe('ai', 'local', { apiKey: 'private-key' })).toThrow(
-    'Save the local AI endpoint'
-  );
-});
+    const requests: { url: string; authorization: string | null }[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({
+        url: String(input),
+        authorization: new Headers(init?.headers).get('authorization'),
+      });
+      return Response.json({ object: 'list', data: [{ id: 'served-model' }] });
+    });
+    expect(await validateSottoCredentialProbe(probe)).toMatchObject({
+      readiness: { code: 'ready' },
+    });
+    expect(requests).toEqual([
+      { url: 'http://localhost:11434/v1/models', authorization: 'Bearer private-key' },
+    ]);
+    expect(() => captureSottoCredentialProbe('ai', 'local', { apiKey: 'private-key' })).toThrow(
+      'Save the local AI endpoint'
+    );
+  }
+);
 
 it.each([
   {

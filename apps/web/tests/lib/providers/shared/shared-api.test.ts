@@ -4,10 +4,7 @@ const serverConfiguration = vi.hoisted(() => ({ values: {} as Record<string, str
 vi.mock('@/lib/site-config', () => ({
   getSiteConfig: async () => serverConfiguration.values,
 }));
-vi.mock('@/lib/server-config', () => ({
-  getServerInfra: async () => serverConfiguration.values,
-  infra: (key: string) => serverConfiguration.values[key] ?? undefined,
-}));
+import { invalidateServerInfra } from '@/lib/server-config';
 import {
   generateSharedApi,
   streamSharedApi,
@@ -32,6 +29,7 @@ const selection: SharedApiSelection = {
 };
 afterEach(() => {
   serverConfiguration.values = {};
+  invalidateServerInfra();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -290,7 +288,7 @@ describe('shared API execution', () => {
   });
   it('preserves local endpoint paths, model prefixes and the configured local credential', async () => {
     serverConfiguration.values = {
-      aiBaseUrl: 'http://localhost:11434/custom/api',
+      aiBaseUrl: 'http://localhost:11434/custom/api/',
       aiModel: 'host-model',
     };
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -310,7 +308,7 @@ describe('shared API execution', () => {
     const { createAIProvider } = await import('@/lib/providers/ai');
     expect(
       await createAIProvider('local').generateResponse('', [], {
-        model: 'local:host-model',
+        model: 'local: host-model ',
         apiKeyOverride: ' local-secret ',
         skipModeration: true,
       })
@@ -319,6 +317,30 @@ describe('shared API execution', () => {
       model: 'host-model',
       inputTokens: null,
       outputTokens: null,
+    });
+  });
+  it('uses the configured local backend without borrowing an ambient cloud key', async () => {
+    serverConfiguration.values = {
+      aiBaseUrl: 'http://localhost:11434/v1',
+      aiModel: 'host-model',
+    };
+    vi.stubEnv('OPENAI_API_KEY', 'unrelated-cloud-key');
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('http://localhost:11434/v1/chat/completions');
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer local');
+      expect(JSON.parse(String(init?.body))).toMatchObject({ model: 'host-model' });
+      return Response.json({
+        choices: [
+          { message: { role: 'assistant', content: 'Keyless answer' }, finish_reason: 'stop' },
+        ],
+      });
+    });
+    const { createAIProvider } = await import('@/lib/providers/ai');
+    expect(
+      await createAIProvider('local').generateResponse('', [], { skipModeration: true })
+    ).toMatchObject({
+      content: 'Keyless answer',
+      model: 'host-model',
     });
   });
   it.each([
