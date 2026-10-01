@@ -95,7 +95,11 @@ export function createSottoCredentialSettingsHandler(endpoint: SottoCredentialEn
             const input = { ...command, request, identity, scope: scope(command.provider) };
             if (request.method === 'POST') {
               const save = credentialSaveRequestSchema.parse(command);
-              const result = await saveSottoCredential(prismaUnfiltered, { ...input, ...save });
+              const result = await saveSottoCredential(prismaUnfiltered, {
+                ...input,
+                ...save,
+                expectedEndpoint: request.headers.get('x-sotto-reviewed-ai-endpoint') ?? undefined,
+              });
               request.signal.throwIfAborted();
               return Response.json({ ...result, context: command.context });
             }

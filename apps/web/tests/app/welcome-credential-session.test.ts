@@ -106,8 +106,12 @@ it('reuses a saved receipt across placement and final retries without reposting 
 it('rebinds the same local key when its URL changes and reuses only matching receipts', async () => {
   const boundary = createWelcomeCredentialBoundary();
   let writes = 0;
+  const reviewedEndpoints: Array<string | null> = [];
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (init?.method === 'POST') writes++;
+    if (init?.method === 'POST') {
+      writes++;
+      reviewedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint'));
+    }
     return boundary.handle(input, init);
   });
   const session = new WelcomeCredentialSession();
@@ -125,6 +129,10 @@ it('rebinds the same local key when its URL changes and reuses only matching rec
   expect(await session.save([second], signal)).toEqual({ status: 'ready' });
   expect(await session.save([second], signal)).toEqual({ status: 'ready' });
   expect(writes).toBe(2);
+  expect(reviewedEndpoints).toEqual([
+    'http://localhost:11434/v1',
+    'https://models.example/v1',
+  ]);
   expect(boundary.saved.get('ai-keys:local')).toEqual({ apiKey: 'same-key' });
 });
 

@@ -78,7 +78,11 @@ export function LocalAiSettings({ initialBaseUrl, initialModel }: LocalAiSetting
 
   async function saveKey() {
     if (!apiKey.trim()) return;
-    const result = await credentials.save('local', { values: { apiKey: apiKey.trim() } });
+    const result = await credentials.save(
+      'local',
+      { values: { apiKey: apiKey.trim() } },
+      savedBaseUrl
+    );
     if (result?.status === 'confirmed') finishKeyEdit();
   }
 
@@ -105,6 +109,9 @@ export function LocalAiSettings({ initialBaseUrl, initialModel }: LocalAiSetting
           type="url"
           value={baseUrl}
           onChange={(event) => {
+            credentials.edited();
+            setApiKey('');
+            setEditingKey(false);
             setBaseUrl(event.target.value);
             setConfigMessage('');
           }}
@@ -116,6 +123,7 @@ export function LocalAiSettings({ initialBaseUrl, initialModel }: LocalAiSetting
           label="Model ID"
           value={model}
           onChange={(event) => {
+            credentials.edited();
             setModel(event.target.value);
             setConfigMessage('');
           }}

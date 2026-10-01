@@ -33,7 +33,12 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
     createHandler = (await import('@/lib/sidedoor/credentials/config/credential-http'))
       .createSottoCredentialSettingsHandler;
   });
-  async function request(endpoint: SottoCredentialEndpoint, method: string, body?: unknown) {
+  async function request(
+    endpoint: SottoCredentialEndpoint,
+    method: string,
+    body?: unknown,
+    expectedEndpoint?: string
+  ) {
     const admitted = await fixture.transaction((tx) => fixture.admission(tx));
     return new Request(`http://localhost/api/v1/settings/${endpoint}`, {
       method,
@@ -41,6 +46,9 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
         cookie: admitted.request.headers.get('cookie')!,
         origin: 'http://localhost',
         'content-type': 'application/json',
+        ...(expectedEndpoint
+          ? { 'x-sotto-reviewed-ai-endpoint': expectedEndpoint }
+          : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
@@ -81,7 +89,12 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
         return Response.json({ photos: [], page: 1, per_page: 1, total_results: 0 });
       });
       const saved = await handler(
-        await request(endpoint, 'POST', credentialSaveRequest(draft, provider === 'local'))
+        await request(
+          endpoint,
+          'POST',
+          credentialSaveRequest(draft, provider === 'local'),
+          provider === 'local' ? 'http://localhost:11434/v1' : undefined
+        )
       );
       expect(saved.status).toBe(200);
       expect(await saved.json()).toMatchObject({ status: 'saved', revision: draft.operationId });
@@ -143,8 +156,65 @@ suite('credential settings HTTP with canonical PostgreSQL storage', () => {
       return Response.json({ object: 'list', data: [{ id: 'served-model' }] });
     });
     expect(
-      (await handler(await request('ai-keys', 'POST', credentialSaveRequest(draft, true)))).status
+      (
+        await handler(
+          await request(
+            'ai-keys',
+            'POST',
+            credentialSaveRequest(draft, true),
+            'http://localhost:11434/v1'
+          )
+        )
+      ).status
     ).toBe(409);
+    expect(
+      await fixture.transaction((tx) =>
+        resolveSottoProfileCredential(tx, 'alice', 'ai', 'local', false)
+      )
+    ).toBeNull();
+  });
+  it('rejects a stale local confirmation before probing its new endpoint', async () => {
+    const reviewedEndpoint = 'http://localhost:11434/v1';
+    const changedEndpoint = 'http://localhost:9999/v1';
+    await fixture.transaction((tx) =>
+      sidedoorStateStore(tx).transact((state) => {
+        state.configuration.site = { ...EMPTY_INFRA, aiBaseUrl: reviewedEndpoint };
+      })
+    );
+    const handler = createHandler('ai-keys');
+    const displayed = credentialSettingsSnapshotSchema.parse(
+      await (await handler(await request('ai-keys', 'GET'))).json()
+    );
+    const draft = prepareCredentialSave(displayed, 'local', { values: { apiKey: 'local-secret' } });
+    const probedEndpoints: string[] = [];
+    vi.stubGlobal('fetch', async (input: URL | string) => {
+      probedEndpoints.push(String(input));
+      throw new TypeError('Offline');
+    });
+
+    const pending = await handler(
+      await request(
+        'ai-keys',
+        'POST',
+        credentialSaveRequest(draft, false),
+        reviewedEndpoint
+      )
+    );
+    expect(pending.status).toBe(200);
+    expect(await pending.json()).toMatchObject({ status: 'needs_confirmation' });
+    expect(probedEndpoints).toEqual([`${reviewedEndpoint}/models`]);
+
+    await setSiteConfig({ aiBaseUrl: changedEndpoint }, 'alice', fixture.database);
+    const confirmed = await handler(
+      await request(
+        'ai-keys',
+        'POST',
+        credentialSaveRequest(draft, true),
+        reviewedEndpoint
+      )
+    );
+    expect(confirmed.status).toBe(409);
+    expect(probedEndpoints).toEqual([`${reviewedEndpoint}/models`]);
     expect(
       await fixture.transaction((tx) =>
         resolveSottoProfileCredential(tx, 'alice', 'ai', 'local', false)

@@ -93,6 +93,7 @@ export async function saveSottoCredential(
       expectedRevision: string | null;
       operationId: string;
       allowUnverified: boolean;
+      expectedEndpoint?: string;
     }
 ) {
   input = captureRequest(input);
@@ -128,6 +129,12 @@ export async function saveSottoCredential(
       );
       if (probe.kind === 'unsupported')
         throw new AccessError('invalid', 'This provider does not use saved API credentials');
+      if (
+        input.provider === 'local' &&
+        input.scope === 'ai' &&
+        input.expectedEndpoint !== probe.binding.endpoint
+      )
+        throw new OwnedCredentialConflictError();
       const now = Date.now();
       const prepared = storage.owned.prepareReplacement(storage.target, {
         expectedHeadRevision: expectedRevision,

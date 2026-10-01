@@ -222,10 +222,18 @@ export async function resolveCapturedLearningAi(
       ? { provider: learner.preferredAiProvider, model: learner.preferredAiModel }
       : null);
   if (preferred?.provider === 'local' && preferred.model.startsWith('local:')) {
-    return {
-      ...(await resolveLocalLearningAi(preferred.model, preferred.endpoint)),
-      execution: { ...execution, userId },
-    };
+    if (pendingSelection?.endpoint)
+      return {
+        ...(await resolveLocalLearningAi(preferred.model, pendingSelection.endpoint)),
+        execution: { ...execution, userId },
+      };
+    return resolveCapturedLearningAiForProvider(
+      userId,
+      'local',
+      preferred.model,
+      execution,
+      false
+    );
   }
   if (preferred && getProviderForModel(preferred.model) === preferred.provider) {
     if (preferred.provider === 'codex' || preferred.provider === 'claude-code') {

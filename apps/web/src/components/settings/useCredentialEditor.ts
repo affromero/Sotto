@@ -20,7 +20,7 @@ import {
 } from '@/lib/sidedoor/credentials/config/credential-browser';
 
 type Pending =
-  | { kind: 'save'; command: CredentialSaveDraft }
+  | { kind: 'save'; command: CredentialSaveDraft; expectedEndpoint?: string }
   | { kind: 'remove'; command: CredentialRemovalRequest };
 export function useCredentialEditor(endpoint: CredentialEndpoint) {
   const [snapshot, setSnapshot] = useState<CredentialSettingsSnapshot | null>(null);
@@ -155,7 +155,13 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
         mode === 'reconcile'
           ? await reconcileCredentialSettings(endpoint, operation.command, operation.kind, signal)
           : operation.kind === 'save'
-            ? await saveCredentialSettings(endpoint, operation.command, mode === 'confirm', signal)
+            ? await saveCredentialSettings(
+                endpoint,
+                operation.command,
+                mode === 'confirm',
+                signal,
+                operation.expectedEndpoint
+              )
             : await removeCredentialSettings(endpoint, operation.command, signal);
       signal.throwIfAborted();
       return publish(result, operation);
@@ -176,13 +182,17 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
       }
     }
   }
-  function save(provider: string, edit: CredentialEdit) {
+  function save(provider: string, edit: CredentialEdit, expectedEndpoint?: string) {
     if (pending.current || feedback?.action === 'reload') return Promise.resolve(undefined);
     const captured = displayed.current.get(provider);
     if (!captured) return Promise.resolve(undefined);
     try {
       return run(
-        { kind: 'save', command: prepareCredentialSave(captured, provider, edit) },
+        {
+          kind: 'save',
+          command: prepareCredentialSave(captured, provider, edit),
+          ...(expectedEndpoint ? { expectedEndpoint } : {}),
+        },
         'submit'
       );
     } catch {

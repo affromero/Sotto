@@ -21,6 +21,7 @@ import {
 
 interface Entry {
   endpoint: CredentialEndpoint;
+  expectedEndpoint?: string;
   signature: string;
   draft: CredentialSaveDraft;
   state: 'editing' | 'confirmation' | 'uncertain' | 'saved';
@@ -345,6 +346,9 @@ export class WelcomeCredentialSession {
           };
           entry = {
             endpoint: edit.endpoint,
+            ...(edit.endpoint === 'ai-keys' && edit.provider === 'local' && edit.baseUrl
+              ? { expectedEndpoint: edit.baseUrl }
+              : {}),
             signature,
             state: 'editing',
             draft: prepareCredentialSave(
@@ -362,7 +366,13 @@ export class WelcomeCredentialSession {
         entry.state = 'uncertain';
         let result: CredentialMutationResult;
         try {
-          result = await saveCredentialSettings(entry.endpoint, entry.draft, confirmed, signal);
+          result = await saveCredentialSettings(
+            entry.endpoint,
+            entry.draft,
+            confirmed,
+            signal,
+            entry.expectedEndpoint
+          );
         } catch (error) {
           if (!signal.aborted && !(error instanceof CredentialReconciliationError))
             entry.state = 'editing';
