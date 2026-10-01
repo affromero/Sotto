@@ -222,6 +222,43 @@ describe('contextual vocabulary coverage', () => {
     ]);
   });
 
+  it('identifies a capitalized target and replaces its sentence position without changing attribution', async () => {
+    const yesterday = {
+      ...made,
+      question: '_____ war Montag. Heute ist Dienstag.',
+      options: ['Gestern', 'Morgen', 'Heute', 'Übermorgen'],
+      explanation: 'Montag war der Tag vor heute.',
+    };
+    const replacement = {
+      ...yesterday,
+      question: 'Heute ist Dienstag. Montag war _____.',
+      options: ['gestern', 'morgen', 'heute', 'übermorgen'],
+    };
+    mockGenerateResponse
+      .mockResolvedValueOnce(response([yesterday]))
+      .mockResolvedValueOnce(response([replacement]));
+    const result = await generateSectionQuestions({
+      ...params,
+      targetVocab: [{ lemma: 'gestern', gloss: 'yesterday' }],
+    });
+    expect(result).toEqual([expect.objectContaining(replacement)]);
+    const correction = mockGenerateResponse.mock.calls[1][1][0].content;
+    const feedback = JSON.parse(
+      correction.split('Vocabulary coverage feedback: ')[1].split('\n')[0]
+    );
+    expect(feedback).toMatchObject({
+      missingTargets: ['gestern'],
+      unexpectedAnswers: [{ index: 0, answer: 'Gestern' }],
+    });
+    expect(correction).toContain('move a lowercase target away from the start of a sentence');
+    const reviewed = JSON.parse(mockReviewResponse.mock.calls[0][1][0].content);
+    expect(reviewed.questions).toEqual([
+      { index: 0, question: replacement.question, options: replacement.options },
+    ]);
+    expect(reviewed.questions[0]).not.toHaveProperty('correctIndex');
+    expect(reviewed.questions[0]).not.toHaveProperty('explanation');
+  });
+
   it('rejects repeated coverage defects without unlocking a malformed JSON repair', async () => {
     mockGenerateResponse.mockResolvedValue(response([seen]));
     await expect(generateSectionQuestions(params)).rejects.toThrow(/quality/i);

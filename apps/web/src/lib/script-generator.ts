@@ -125,6 +125,28 @@ export type GeneratedVocabularyEntry = {
   difficulty: string | null;
 };
 
+function alignVocabularyMarkers(
+  turns: ScriptTurn[],
+  vocabulary: GeneratedVocabularyEntry[]
+): ScriptTurn[] {
+  const byNumber = new Map(vocabulary.map((entry) => [entry.number, entry]));
+  if (byNumber.size !== vocabulary.length)
+    throw new Error('Script vocabulary contains duplicate entry numbers.');
+  return turns.map((turn) => ({
+    ...turn,
+    text: turn.text.replace(/\[V(\d+):([^\]]+)\]/g, (marker, number: string, word: string) => {
+      const current = byNumber.get(Number(number));
+      if (current?.word === word) return marker;
+      const matches = vocabulary.filter((entry) => entry.word === word);
+      if (matches.length === 1) return `[V${matches[0].number}:${word}]`;
+      if (matches.length > 1)
+        throw new Error('Script vocabulary marker has an ambiguous entry identity.');
+      if (!current) throw new Error('Script vocabulary marker has no matching entry.');
+      return marker;
+    }),
+  }));
+}
+
 export type ScriptPlace = {
   name: string;
   modernName?: string | null;
@@ -786,7 +808,7 @@ export function parseScriptResponse(response: {
     (validated.references as Array<Record<string, unknown>>) || []
   );
   const { references, numberMap } = deduplicateReferences(normalized);
-  const turns = remapCitations(validated.turns, numberMap);
+  const citationTurns = remapCitations(validated.turns, numberMap);
 
   const vocabulary = ((validated.vocabulary ?? []) as Array<Record<string, unknown>>).map((v) => ({
     number: v.number as number,
@@ -797,6 +819,8 @@ export function parseScriptResponse(response: {
     exampleSentence: (v.exampleSentence as string) ?? null,
     difficulty: (v.difficulty as string) ?? null,
   }));
+
+  const turns = alignVocabularyMarkers(citationTurns, vocabulary);
 
   const markdown = turns
     .map((turn) => {
