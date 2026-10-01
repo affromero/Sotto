@@ -293,7 +293,15 @@ describe('startPractice — GRAMMAR', () => {
       },
     ]);
     const result = await startPractice('c1', 'u1', 'READING', blockedProviderExecution('u1'));
-    expect(result).toMatchObject({ items: [{ passageText: 'Mia war im Kino.' }] });
+    expect(result).toMatchObject({
+      items: [
+        {
+          prompt: 'Wo war Mia?',
+          options: ['Kino', 'Park', 'Bonn', 'Berlin'],
+          passageText: 'Mia war im Kino.',
+        },
+      ],
+    });
     expect(mockPracticeSessionCreate.mock.calls[0][0].data.items[0]).toMatchObject({
       passageText: 'Mia war im Kino.',
     });

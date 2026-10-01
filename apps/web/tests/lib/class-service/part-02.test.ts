@@ -196,23 +196,15 @@ describe('getClassForUser', () => {
     vi.clearAllMocks();
   });
 
-  it('delegates to prisma.courseClass.findFirst with correct where clause', async () => {
+  it('returns no class when the learner has no matching owned class', async () => {
     mockCourseClassFindFirst.mockResolvedValue(null);
 
-    await getClassForUser('class-1', 'u1');
+    expect(await getClassForUser('class-1', 'u1')).toBeNull();
 
     expect(mockCourseClassFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'class-1', course: { userId: 'u1' } },
       })
     );
-  });
-
-  it('returns null when class is not found', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(null);
-
-    const result = await getClassForUser('class-x', 'u1');
-
-    expect(result).toBeNull();
   });
 });

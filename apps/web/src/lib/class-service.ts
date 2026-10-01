@@ -855,17 +855,4 @@ export async function getClassForUser(classId: string, userId: string) {
   return cls;
 }
 
-export {
-  submitClass,
-  ClassIncompleteError,
-  type SubmitResult,
-} from './learning/classes/class-submission';
-
-/** Repair only failed or incomplete skills, keeping complete current material and its evidence. */
-export async function regenerateFailedSections(
-  classId: string,
-  userId: string,
-  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
-): Promise<boolean> {
-  return regenerateCurrentClass(classId, userId, execution, undefined, { repair: true });
-}
+export { submitClass, ClassIncompleteError } from './learning/classes/class-submission';

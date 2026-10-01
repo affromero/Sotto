@@ -108,7 +108,10 @@ describe('learner speech access', () => {
     'rejects saved invalid selection %s instead of waiving listening',
     async (provider) => {
       boundary.configuration.ttsProvider = provider;
-      await expect(resolveSkillRequirements(execution, context)).rejects.toThrow(/TTS provider/);
+      await expect(resolveSkillRequirements(execution, context)).rejects.toMatchObject({
+        name: 'LearningConfigurationError',
+        message: expect.stringMatching(/TTS provider/),
+      });
     }
   );
 

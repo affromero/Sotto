@@ -4,7 +4,7 @@ import { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { getDueItems, upsertLiveVocab } from './knowledge-graph';
 import type { PracticeMcItem, PracticeMcItemPublic } from './practice/types';
-export type { PracticeAnswer, PracticeMcItemPublic, SubmitPracticeResult } from './practice/types';
+export type { PracticeMcItemPublic } from './practice/types';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent, queueListeningAudio } from './class-listening-generator';
 import {
@@ -90,7 +90,7 @@ export interface StartPracticeOptions {
   lifecycle?: PracticeBuildLifecycle;
 }
 
-export interface PracticeBuildLifecycle {
+interface PracticeBuildLifecycle {
   populate: (data: Prisma.PracticeSessionUncheckedCreateInput) => Promise<{ id: string }>;
 }
 

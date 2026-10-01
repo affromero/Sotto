@@ -12,7 +12,7 @@ import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/pro
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { Prisma } from '@/generated/prisma/client';
 
-export class LearningConfigurationError extends Error {
+class LearningConfigurationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'LearningConfigurationError';

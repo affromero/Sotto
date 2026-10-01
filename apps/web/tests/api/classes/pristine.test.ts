@@ -20,7 +20,6 @@ vi.mock('@/lib/classes/regeneration/pristine', async (importOriginal) => ({
 }));
 vi.mock('@/lib/api-keys', () => ({ authenticateRequest: async () => ({ userId: 'u1' }) }));
 vi.mock('@/lib/class-service', () => ({
-  regenerateFailedSections: vi.fn(),
   getClassForUser: (...args: unknown[]) => mockGetClass(...args),
   deleteClassForUser: vi.fn(),
 }));
