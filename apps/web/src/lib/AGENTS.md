@@ -46,8 +46,9 @@ question structure before review, then uses the same captured provider and
 authority for a separate solve without the proposed key or explanations. Both
 normal and JSON-repaired candidates must pass. Two generation attempts and one
 optional repair bound the work, with at most one review per valid candidate.
-Semantic retries include the normalized rejected passage and questions as untrusted
-content without keys or explanations, alongside bounded review issue codes.
+Semantic retries include the normalized rejected passage and indexed questions,
+including rejected keys and explanations, as untrusted correction context alongside
+bounded review issue codes. Blind reviewers still receive neither keys nor explanations.
 Rewrite generated content for meaning and evidence; supplied source passages remain
 immutable. Parser repair remains separate from semantic revision.
 These review requests consume the existing preparation budget. Provider errors

@@ -52,6 +52,14 @@ export class TeachingQualityRejectionError extends SectionQualityError {
   }
 }
 
+/** An inconsistent or malformed review cannot guide a semantic replacement. */
+export class ReviewerProtocolError extends SectionQualityError {
+  constructor() {
+    super();
+    this.name = 'ReviewerProtocolError';
+  }
+}
+
 /** Review exact learner-visible teaching content after independent question solving. */
 export async function reviewTeachingContent(options: {
   ai: CapturedLearningAi;
@@ -104,7 +112,7 @@ export async function reviewTeachingContent(options: {
       kind: options.kind,
       reason: 'invalid_verdict',
     });
-    throw new SectionQualityError();
+    throw new ReviewerProtocolError();
   }
   if (
     parsed.items.length !== options.items.length ||
@@ -115,18 +123,20 @@ export async function reviewTeachingContent(options: {
       kind: options.kind,
       reason: 'indices',
     });
-    throw new SectionQualityError();
+    throw new ReviewerProtocolError();
   }
   if (
     parsed.items.some((item) =>
-      item.acceptable ? item.feedback.length > 0 : item.feedback.length === 0
+      item.acceptable
+        ? item.issues.length > 0 || item.feedback.length > 0
+        : item.issues.length === 0 || item.feedback.length === 0
     )
   ) {
     logger.warn('Teaching review protocol rejected content', {
       kind: options.kind,
-      reason: 'feedback',
+      reason: 'inconsistent_verdict',
     });
-    throw new SectionQualityError();
+    throw new ReviewerProtocolError();
   }
   if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
     const issues = [...new Set(parsed.items.flatMap((item) => item.issues))];

@@ -16,6 +16,7 @@ vi.mock('@/lib/learning-ai', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
 import { logger } from '@/lib/logger';
+import { ReviewerProtocolError } from '@/lib/classes/quality/teaching-quality';
 
 const params = {
   userId: 'fixture',
@@ -271,12 +272,18 @@ describe('intro teaching gate', () => {
     JSON.stringify({
       items: [{ index: 0, acceptable: true, issues: [], feedback: ['Unneeded instruction.'] }],
     }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: true, issues: ['uncertain'], feedback: [] }],
+    }),
+    JSON.stringify({
+      items: [{ index: 0, acceptable: false, issues: [], feedback: ['Correct the auxiliary.'] }],
+    }),
   ])('fails closed on malformed review protocol %s without replacement', async (content) => {
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
       .mockResolvedValue({ content, model: 'captured-model' });
-    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    await expect(generateClassIntro(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
     expect(boundary.generate.mock.calls).toHaveLength(2);
   });
 
@@ -290,9 +297,6 @@ describe('intro teaching gate', () => {
           feedback: ['The example uses the wrong auxiliary.'],
         },
       ],
-    }),
-    JSON.stringify({
-      items: [{ index: 0, acceptable: true, issues: ['uncertain'], feedback: [] }],
     }),
   ])('uses one bounded replacement for semantic rejection %s', async (content) => {
     boundary.generate
