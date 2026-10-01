@@ -8,6 +8,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('captures a local binding before its required saved key exists', async () => {
+  vi.stubGlobal('fetch', () => {
+    throw new Error('Missing credentials must not reach the local endpoint');
+  });
+  const selection = selectedApi({
+    provider: 'local',
+    label: 'Local',
+    transport: 'compatible',
+    apiKey: '',
+    endpoint: 'http://localhost:11434/v1/',
+  });
+  expect(await createSelectedApiRegistry(selection).validateCredentials('local')).toMatchObject({
+    status: 'missing',
+    readiness: { code: 'missing_credentials' },
+  });
+});
+
 it.each(['anthropic', 'openai', 'google'])(
   'does not dispatch with empty saved %s credentials',
   async (provider) => {

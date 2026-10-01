@@ -1,4 +1,4 @@
-import type { SelectedApi } from 'thesidedoor-core/ai/providers';
+import { captureCompatibleApi, type SelectedApi } from 'thesidedoor-core/ai/providers';
 import { providerCompatibleConnection } from 'thesidedoor-core/providers/catalog';
 
 /** Capture endpoint configuration without resolving or borrowing any credentials. */
@@ -47,5 +47,12 @@ export function selectedApi(input: {
       baseUrl: endpoint,
       webSearchType: 'web_search_preview',
     };
-  return { descriptor, transport, credentials: { apiKey }, baseUrl: endpoint, requiresKey: true };
+  return captureCompatibleApi({
+    provider,
+    label,
+    endpoint,
+    apiKey,
+    capabilities: descriptor.capabilities,
+    requiresKey: true,
+  });
 }

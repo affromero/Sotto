@@ -1,5 +1,6 @@
 import { abortable, interruptibleStream } from 'thesidedoor-core/runtime/stream';
 import { providerCompatibleConnection } from 'thesidedoor-core/providers/catalog';
+import { captureCompatibleModel } from 'thesidedoor-core/ai/providers';
 import { captureApiEndpoint, selectedApi } from '@/lib/providers/shared/api-selection';
 import { moderateOrThrow, type ModerationPort } from '../moderation';
 import type { TokenUsage } from 'thesidedoor-core/ai';
@@ -451,14 +452,14 @@ class LocalProvider extends SharedCompatibleProvider {
         throw new Error(
           'No local AI model is saved. Choose a model served by your local server, such as "qwen3", "gemma3", or "llama3.3".'
         );
-      const selection = compatibleSelection(
-        'local',
-        'Local',
-        opts?.apiKeyOverride?.trim() || 'local',
+      return captureCompatibleModel({
+        provider: 'local',
+        label: 'Local',
+        transport: 'local',
+        endpoint: baseUrl,
         model,
-        baseUrl
-      );
-      return { ...selection, descriptor: { ...selection.descriptor, transport: 'local' } };
+        apiKey: opts?.apiKeyOverride?.trim() || 'local',
+      });
     });
   }
 }
