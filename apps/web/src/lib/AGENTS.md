@@ -464,7 +464,8 @@ secret. It imports no provider clients or application state.
 learner generations and checks erasure fences. Request resolution revalidates the
 original admission and resolves personal keys or explicit household grants in one
 Serializable transaction. Its low-level storage factory is for authorized callers.
-Transcription retains its AI or TTS key slot.
+Cloud transcription retains its AI or TTS key slot. Local transcription has its
+own slot so a separate speech server never receives the local AI credential.
 
 `providers/credential-validation.ts` captures one API or service selection and
 delegates credential proof to Sidedoor. It supplies personal auxiliary fields

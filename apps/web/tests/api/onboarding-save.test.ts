@@ -156,6 +156,82 @@ suite('Atomic onboarding with shared authority', () => {
       sttModel: getSttProviderMeta('openai').defaultModel,
     };
   }
+  it('authenticates curriculum generation with the saved local key during setup', async () => {
+    const endpoint = 'http://localhost:8000/v1';
+    await instance.configureInfrastructure({ aiBaseUrl: endpoint });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'setup-local-secret');
+    const sent: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      sent.push(request);
+      if (request.headers.get('authorization') !== 'Bearer setup-local-secret')
+        return Response.json({ error: { message: 'Saved key required' } }, { status: 401 });
+      return Response.json({
+        id: 'setup-response',
+        object: 'chat.completion',
+        created: 1,
+        model: 'test-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                title: 'French curriculum',
+                lessons: [
+                  {
+                    slug: 'greetings',
+                    level: 'A1',
+                    order: 1,
+                    title: 'Greetings',
+                    objective: 'Say hello',
+                    grammarPoints: ['Present tense'],
+                    vocabThemes: ['Greetings'],
+                    targetVocab: [{ lemma: 'bonjour', gloss: 'hello' }],
+                  },
+                ],
+              }),
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+      });
+    });
+    try {
+      const response = await POST(
+        await request(
+          {
+            ...base,
+            course: { native: 'en', target: 'fr', level: 'A1' },
+            infra: { aiProvider: 'local', aiBaseUrl: endpoint, aiModel: 'test-model' },
+          },
+          identity.ownerToken
+        )
+      );
+      expect(
+        sent.map((request) => ({
+          url: request.url,
+          authorization: request.headers.get('authorization'),
+        }))
+      ).toEqual([
+        {
+          url: endpoint + '/chat/completions',
+          authorization: 'Bearer setup-local-secret',
+        },
+      ]);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(
+        await instance.database.course.findUnique({
+          where: { id: body.courseId },
+          select: { nativeLang: true, targetLang: true },
+        })
+      ).toEqual({ nativeLang: 'en', targetLang: 'fr' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   async function noLearnerChanges(userId = identity.ownerId) {
     expect(await instance.database.course.count()).toBe(0);
     expect(await instance.database.courseNote.count()).toBe(0);
@@ -399,13 +475,10 @@ suite('Atomic onboarding with shared authority', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(generate).toHaveBeenCalledWith(
-      identity.ownerId,
-      expect.any(Object),
-      'en',
-      'de',
-      { provider: 'codex', model: 'codex' }
-    );
+    expect(generate).toHaveBeenCalledWith(identity.ownerId, expect.any(Object), 'en', 'de', {
+      provider: 'codex',
+      model: 'codex',
+    });
   });
   it('passes the new local endpoint to curriculum generation', async () => {
     const curriculum = await instance.database.curriculum.findUniqueOrThrow({
@@ -417,19 +490,20 @@ suite('Atomic onboarding with shared authority', () => {
 
     const response = await POST(
       await request(
-        { ...base, infra: { aiProvider: 'local', aiModel: 'qwen3', aiBaseUrl: 'http://localhost:11434/v1' } },
+        {
+          ...base,
+          infra: { aiProvider: 'local', aiModel: 'qwen3', aiBaseUrl: 'http://localhost:11434/v1' },
+        },
         identity.ownerToken
       )
     );
 
     expect(response.status).toBe(200);
-    expect(generate).toHaveBeenCalledWith(
-      identity.ownerId,
-      expect.any(Object),
-      'en',
-      'de',
-      { provider: 'local', model: 'local:test-model', endpoint: 'http://localhost:11434/v1' }
-    );
+    expect(generate).toHaveBeenCalledWith(identity.ownerId, expect.any(Object), 'en', 'de', {
+      provider: 'local',
+      model: 'local:test-model',
+      endpoint: 'http://localhost:11434/v1',
+    });
   });
   it('does not complete a save after the issuing session signs out during curriculum lookup', async () => {
     duringCurriculumRead(() => identity.access.logout(identity.ownerToken));

@@ -6,6 +6,7 @@ import {
   getProviderForModel,
   providerRequiresAiKey,
 } from './providers/ai-registry';
+import { AccessError } from 'thesidedoor-core/access';
 import type { AiProviderId } from './providers/ai-registry';
 import { getAutoModelConfig, resolveDisabledSystemAiProviders } from './auto-model-config';
 import { getServerInfra, infra } from './server-config';
@@ -53,7 +54,8 @@ export async function resolveCapturedLearningAiForProvider(
   provider: AiProviderId,
   model: string,
   execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
-  allowSharing: boolean
+  allowSharing: boolean,
+  localEndpoint?: string
 ): Promise<CapturedLearningAi> {
   if (provider === 'claude-code' && process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim()) {
     const { captureIsolatedLearningAi } = await import('./agents/isolated/isolated-learning-ai');
@@ -74,11 +76,19 @@ export async function resolveCapturedLearningAiForProvider(
     throw new Error('The selected AI credential recipient changed');
   if (!credential && providerRequiresAiKey(provider))
     throw new Error(`AI credential for provider "${provider}" is required.`);
-  if (!credential && provider === 'local')
+  if (provider === 'local') {
+    const selected = await resolveLocalLearningAi(
+      model,
+      localEndpoint ?? credential?.binding.endpoint
+    );
+    if (credential && selected.endpoint !== credential.binding.endpoint)
+      throw new AccessError('conflict', 'The local AI endpoint changed; review the saved key.');
     return {
-      ...(await resolveLocalLearningAi(model)),
+      ...selected,
+      ...(credential ? { apiKey: sottoExecutionCredentialFields(credential).apiKey } : {}),
       execution: { ...execution, userId, credential },
     };
+  }
   return {
     provider,
     model,
@@ -222,17 +232,13 @@ export async function resolveCapturedLearningAi(
       ? { provider: learner.preferredAiProvider, model: learner.preferredAiModel }
       : null);
   if (preferred?.provider === 'local' && preferred.model.startsWith('local:')) {
-    if (pendingSelection?.endpoint)
-      return {
-        ...(await resolveLocalLearningAi(preferred.model, pendingSelection.endpoint)),
-        execution: { ...execution, userId },
-      };
     return resolveCapturedLearningAiForProvider(
       userId,
       'local',
       preferred.model,
       execution,
-      false
+      false,
+      pendingSelection?.endpoint
     );
   }
   if (preferred && getProviderForModel(preferred.model) === preferred.provider) {
@@ -330,6 +336,15 @@ async function resolveLearningAiWithKey(
   aiKey: { provider: AiProviderId; apiKey: string } | null
 ): Promise<ResolvedLearningAi> {
   if (aiKey) {
+    if (aiKey.provider === 'local') {
+      const configured = await getServerInfra();
+      if (configured.aiProvider?.trim() !== 'local')
+        throw new Error('Select a local AI model in Settings before using the saved local key.');
+      return {
+        ...(await resolveLocalLearningAi(configured.aiModel ?? '', configured.aiBaseUrl ?? '')),
+        apiKey: aiKey.apiKey,
+      };
+    }
     // Prefer the owner-configured model for this provider (set via the onboarding
     // wizard or /admin/providers) so a chosen model actually drives generation.
     // If the config can't be read (e.g. DB unavailable), fall back to the

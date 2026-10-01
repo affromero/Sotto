@@ -34,10 +34,14 @@ function credentialModality(scope: CredentialScope, provider: string): ProviderM
   return scope;
 }
 
-/** Transcription keeps using the same stored key as its existing AI or TTS integration. */
+/** Cloud transcription shares its service key. Local AI and speech use separate servers. */
 export function sottoCredentialSlot(scope: CredentialScope, provider: string) {
   const modality =
-    scope === 'stt' ? (sttUsesTtsCredentials(provider as SttProviderId) ? 'tts' : 'ai') : scope;
+    scope === 'stt' && provider !== 'local'
+      ? sttUsesTtsCredentials(provider as SttProviderId)
+        ? 'tts'
+        : 'ai'
+      : scope;
   const selected = credentialModality(scope, provider);
   providerCredentials(provider, selected);
   return { modality, provider };
@@ -315,7 +319,7 @@ export async function inspectSottoProfileCredential(
   };
 }
 
-/** Internal listing after profile authorization. Physical slots keep STT attached to its AI/TTS key. */
+/** Internal listing after profile authorization. Cloud STT uses its service's AI/TTS key. */
 export async function listSottoProfileCredentials(
   database: Prisma.TransactionClient,
   userId: string,
