@@ -33,6 +33,13 @@ export const SECTION_QUALITY_JSON_SCHEMA = {
   schema: z.toJSONSchema(verdictSchema, { target: 'draft-7' }),
 };
 
+export type SectionReviewFeedback = z.infer<typeof verdictSchema>;
+
+export interface SectionReviewAssessment {
+  issues: string[];
+  feedback?: SectionReviewFeedback;
+}
+
 export class SectionQualityError extends Error {
   constructor(message = 'Class generation failed its educational quality check.') {
     super(message);
@@ -56,12 +63,12 @@ export function assessSectionReview(
   content: string,
   questions: GeneratedQuestion[],
   immutablePassage: boolean
-): string[] {
+): SectionReviewAssessment {
   let verdict: z.infer<typeof verdictSchema>;
   try {
     verdict = verdictSchema.parse(JSON.parse(content));
   } catch {
-    return ['invalid_review'];
+    return { issues: ['invalid_review'] };
   }
   if (!verdict.passageAcceptable && immutablePassage) {
     throw new SectionQualityError(
@@ -74,7 +81,7 @@ export function assessSectionReview(
     verdict.questions.length !== questions.length ||
     questions.some((_, index) => !indices.has(index))
   )
-    return ['invalid_review'];
+    return { issues: ['invalid_review'] };
   const issues = new Set<string>(verdict.issues);
   if (!verdict.passageAcceptable) issues.add('unnatural_passage');
   for (const result of verdict.questions) {
@@ -84,5 +91,5 @@ export function assessSectionReview(
       issues.add('incorrect_key');
     }
   }
-  return [...issues];
+  return { issues: [...issues], feedback: issues.size ? verdict : undefined };
 }
