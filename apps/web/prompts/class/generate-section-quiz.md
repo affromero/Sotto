@@ -23,6 +23,8 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 - Reading passages should be concrete and memorable: a small scene, message, short article, diary entry, notice, or story tied to the objective and vocabulary.
 - Reading questions must test actual comprehension of the passage, not grammar form in disguise.
 - Every correct reading answer must have clear evidence in the passage. Write distractors that the passage rules out; do not require unstated facts or assumed intentions.
+- Check the assumptions in each reading question itself, as well as its answer. Keep natural paraphrases, but do not narrow a general statement into an unstated detail, such as treating a journey as proof of vehicle travel.
+- For causal reading questions, distinguish the reason known when an action happens from information discovered afterward. Finding an object later does not establish why someone went back earlier. Ask what, where, or when unless the passage supports the proposed cause or motive through stated facts or reasonable inference.
 - For reading, use level-appropriate supporting vocabulary whenever natural phrasing requires it. Do not force target vocabulary into unsuitable collocations or situations to cover a list.
 - Spread coverage across the listed grammar points and vocabulary.
 - Each question has exactly 4 options and exactly 1 correct answer. Match {{LEVEL}} difficulty.
