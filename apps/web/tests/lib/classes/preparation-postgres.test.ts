@@ -35,7 +35,8 @@ import {
 } from '@/lib/classes/preparation';
 import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
-import { resolveCapturedLearningAi } from '@/lib/learning-ai';
+import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
+import { createAIProvider } from '@/lib/providers/ai';
 import { processClassPreparation } from '@/workers/classes/class-preparation.worker';
 import { recoverIsolatedPreparationExecution } from '@/lib/agents/isolated/isolated-agent-recovery';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -353,6 +354,59 @@ suite('durable preparation admission and provider accounting', () => {
       'succeeded',
     ]);
     expect(JSON.stringify(activity)).not.toContain('Private input');
+  });
+
+  it('keeps a saved local key when resolving the admitted class model', async () => {
+    const endpoint = 'http://localhost:8000/v1';
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'fixture-model',
+      aiBaseUrl: endpoint,
+    });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'preparation-local-secret');
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredAiProvider: 'local', preferredAiModel: 'local:fixture-model' },
+    });
+    const operation = await running();
+    const sent: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      sent.push(request);
+      if (request.headers.get('authorization') !== 'Bearer preparation-local-secret')
+        return Response.json({ error: { message: 'Saved key required' } }, { status: 401 });
+      return Response.json({
+        id: 'preparation-response',
+        object: 'chat.completion',
+        created: 1,
+        model: 'fixture-model',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'Hallo!' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+      });
+    });
+    const ai = await resolveCapturedLearningAi(identity.ownerId, {
+      ...execution,
+      learningSelection: operation.selection,
+    });
+    const result = await createAIProvider(ai.provider).generateResponse(
+      'Teach German',
+      [{ role: 'user', content: 'Say hello' }],
+      { ...(await capturedLearningAiOptions(ai)), skipModeration: true }
+    );
+    expect(result.content).toBe('Hallo!');
+    expect(
+      sent.map((request) => ({
+        url: request.url,
+        authorization: request.headers.get('authorization'),
+      }))
+    ).toEqual([
+      {
+        url: endpoint + '/chat/completions',
+        authorization: 'Bearer preparation-local-secret',
+      },
+    ]);
   });
 
   it('applies request accounting only after captured credential and destination admission', async () => {

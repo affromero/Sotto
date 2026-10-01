@@ -25,7 +25,6 @@ import {
   sottoCredentialStorage,
   captureSottoCredentialOwner,
   resolveSottoRequestCredential,
-  sottoCredentialSlot,
   listSottoProfileCredentials,
 } from '@/lib/sidedoor/credentials/runtime/provider-credentials';
 
@@ -514,17 +513,45 @@ suite('Sotto provider ownership with PostgreSQL', () => {
       ).rejects.toMatchObject({ code: 'conflict' });
     });
   });
-  it('keeps transcription attached to the existing AI or TTS key slot', () => {
-    expect(sottoCredentialSlot('stt', 'openai')).toEqual({ modality: 'ai', provider: 'openai' });
-    expect(sottoCredentialSlot('stt', 'elevenlabs')).toEqual({
-      modality: 'tts',
-      provider: 'elevenlabs',
-    });
-    expect(sottoCredentialSlot('stt', 'cartesia')).toEqual({
-      modality: 'tts',
-      provider: 'cartesia',
-    });
-  });
+  it.each([
+    { provider: 'openai', scope: 'ai' as const },
+    { provider: 'elevenlabs', scope: 'tts' as const },
+    { provider: 'cartesia', scope: 'tts' as const },
+    { provider: 'local', scope: 'ai' as const },
+  ])(
+    'shares $provider credentials with speech only for a cloud integration',
+    async ({ provider, scope }) => {
+      await transaction(async (tx) => {
+        const { request, identity } = await admission(tx);
+        const storage = await sottoCredentialStorage(tx, scope, provider);
+        const owner = await captureSottoCredentialOwner(tx, 'alice');
+        await storage.owned.replace(
+          storage.owned.prepareReplacement(
+            { ...storage.slot, owner },
+            {
+              expectedHeadRevision: null,
+              credentialRevision: randomUUID(),
+              values: { apiKey: 'saved-service-key' },
+              binding: {
+                protocol: provider === 'local' ? 'compatible' : provider,
+                endpoint: 'http://localhost:11434/v1',
+              },
+              availability: 'enabled',
+              label: null,
+              metadata: { createdAt: 1, updatedAt: 1, lastUsedAt: null },
+            }
+          )
+        );
+        const speech = await resolveSottoRequestCredential(tx, request, identity, 'stt', provider);
+        if (provider === 'local') expect(speech).toBeNull();
+        else expect(speech?.credential.values).toEqual({ apiKey: 'saved-service-key' });
+        expect(
+          (await resolveSottoRequestCredential(tx, request, identity, scope, provider))?.credential
+            .values
+        ).toEqual({ apiKey: 'saved-service-key' });
+      });
+    }
+  );
 
   it('does not replace a disabled personal key with a household key', async () => {
     await transaction(async (tx) => {

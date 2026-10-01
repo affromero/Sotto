@@ -13,7 +13,8 @@ import {
   type CapturedLearningAi,
 } from '@/lib/learning-ai';
 import { createAIProvider } from '@/lib/providers/ai';
-import { invalidateServerInfra } from '@/lib/server-config';
+import { resolveCapturedSttProvider } from '@/lib/providers/stt';
+import { getServerInfra, invalidateServerInfra } from '@/lib/server-config';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 
 const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
@@ -21,6 +22,10 @@ vi.mock('@/lib/prisma', async () => {
   const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
   const database = prismaTestBoundary(binding);
   return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('openai', async () => {
+  const { createRequire } = await import('node:module');
+  return { default: createRequire(import.meta.url)('openai') };
 });
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
@@ -121,6 +126,48 @@ suite('Local learning generation', () => {
     const ai = await resolveCapturedLearningAi(identity.ownerId, execution());
     await generate(ai, endpoint, 'local-learning-secret');
   });
+  it('transcribes on a separate local speech server without sending the saved AI key', async () => {
+    const speechEndpoint = 'http://localhost:8000/v1';
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'qwen3',
+      aiBaseUrl: endpoint,
+      sttProvider: 'local',
+      sttBaseUrl: speechEndpoint,
+      sttModel: 'whisper-small',
+    });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'private-ai-secret');
+    await saveLocalPreference();
+    const speechRequests: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      speechRequests.push(request);
+      if (request.headers.get('authorization') !== 'Bearer local')
+        return new Response(null, { status: 401 });
+      return Response.json({
+        text: 'Hallo!',
+        language: 'de',
+        segments: [{ start: 0, end: 1, text: 'Hallo!' }],
+      });
+    });
+    await getServerInfra();
+    const stt = await resolveCapturedSttProvider({
+      userId: identity.ownerId,
+      execution: execution(),
+      requestedProvider: 'local',
+      requestedModel: 'whisper-small',
+    });
+    expect(await stt.provider.transcribe(Buffer.from('audio'))).toMatchObject({
+      text: 'Hallo!',
+    });
+    expect(speechRequests.map((request) => request.url)).toEqual([
+      `${speechEndpoint}/audio/transcriptions`,
+    ]);
+    expect(speechRequests[0].headers.get('authorization')).toBe('Bearer local');
+    const ai = await resolveCapturedLearningAi(identity.ownerId, execution());
+    expect(ai.apiKey).toBe('private-ai-secret');
+    expect(ai.endpoint).toBe(endpoint);
+  });
   it('uses the shared local endpoint without a personal preference', async () => {
     await instance.configureInfrastructure({
       aiProvider: 'local',
@@ -128,6 +175,60 @@ suite('Local learning generation', () => {
       aiBaseUrl: endpoint,
     });
     await generate(await resolveCapturedLearningAi(identity.ownerId, execution()));
+  });
+  it('uses the saved local key and shared model without a personal preference', async () => {
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'qwen3',
+      aiBaseUrl: endpoint,
+    });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'shared-local-secret');
+    await generate(
+      await resolveCapturedLearningAi(identity.ownerId, execution()),
+      endpoint,
+      'shared-local-secret'
+    );
+  });
+  it('rejects a retained local key when another shared provider owns the model', async () => {
+    await instance.configureInfrastructure({ aiBaseUrl: endpoint });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'retained-local-secret');
+    await instance.configureInfrastructure({
+      aiProvider: 'openai',
+      aiModel: 'cloud-model',
+      aiBaseUrl: endpoint,
+    });
+    await expect(resolveCapturedLearningAi(identity.ownerId, execution())).rejects.toThrow();
+    expect(requests).toEqual([]);
+  });
+  it('uses the saved local key for the wizard endpoint', async () => {
+    await instance.configureInfrastructure({ aiBaseUrl: endpoint });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'wizard-local-secret');
+    const ai = await resolveCapturedLearningAi(identity.ownerId, execution(), {
+      provider: 'local',
+      model: 'local:qwen3',
+      endpoint,
+    });
+    await generate(ai, endpoint, 'wizard-local-secret');
+  });
+  it('rejects a wizard endpoint that differs from the saved key before dispatch', async () => {
+    await instance.configureInfrastructure({ aiBaseUrl: endpoint });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'first-endpoint-secret');
+    await expect(
+      resolveCapturedLearningAi(identity.ownerId, execution(), {
+        provider: 'local',
+        model: 'local:qwen3',
+        endpoint: 'http://localhost:9999/v1',
+      })
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect(requests).toEqual([]);
+  });
+  it('uses a keyless wizard endpoint before a shared endpoint is configured', async () => {
+    const ai = await resolveCapturedLearningAi(identity.ownerId, execution(), {
+      provider: 'local',
+      model: 'local:qwen3',
+      endpoint,
+    });
+    await generate(ai);
   });
   it('uses the wizard endpoint before settings are saved', async () => {
     await instance.configureInfrastructure({ aiBaseUrl: 'http://localhost:9999/v1' });
