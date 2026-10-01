@@ -74,13 +74,13 @@
     }
 
     #[tokio::test]
-    async fn malformed_class_backs_out_to_course_home() {
+    async fn incomplete_saved_class_offers_repair_without_advancing_the_gate() {
         let mut app = test_app();
         app.enter_course_home(course("A"));
         app.view = View::class_view(course("A"), "cls1".into());
         let req_gen = app.request_gen;
 
-        // Empty sections -> malformed -> back to CourseHome.
+        // Empty sections retain their identity and offer an explicit repair.
         app.on_class_loaded(
             req_gen,
             class_detail(serde_json::json!({
@@ -88,7 +88,10 @@
                 "submitted": false, "sections": []
             })),
         );
-        assert!(matches!(app.view, View::CourseHome { .. }));
+        assert!(matches!(app.view, View::ClassRepair { ref class_id, attempt: 1, .. } if class_id == "cls1"));
+        app.on_next_class();
+        assert!(matches!(app.view, View::Loading));
+        assert_eq!(app.pending_course.as_ref().map(|course| course.id.as_str()), Some("A"));
     }
 
     #[tokio::test]
@@ -145,6 +148,8 @@
         View::Class {
             course: course("A"),
             class_id: "cls1".into(),
+            attempt: 1,
+            progress: Default::default(),
             sections: Some(built),
             cursor: 0,
             submitting: false,
@@ -344,7 +349,7 @@
     }
 
     #[tokio::test]
-    async fn no_mc_transcript_only_class_advances_instead_of_stalling() {
+    async fn transcript_only_saved_class_requires_repair_before_completion() {
         // A class with a single transcript-only listening section (no MC
         // questions). Completing it must advance via next-class, not stall on
         // View::Class. The submit route rejects empty answers (.min(1)), so this
@@ -364,26 +369,28 @@
         // It must NOT stall on View::Class; the next-class dispatch shows Loading
         // and bumps the generation.
         assert!(
-            matches!(app.view, View::Loading),
+            matches!(app.view, View::ClassRepair { .. }),
             "no-MC class must advance (Loading after next-class dispatch), not stall on Class"
         );
         assert_eq!(
             app.request_gen,
-            before + 1,
-            "next-class dispatch bumps the gen"
+            before,
+            "repair requires an explicit learner action"
         );
 
-        // The next-class result drives the outcome (here the stub reports done).
+        app.on_next_class();
+        assert!(matches!(app.view, View::Loading));
+        // The accepted repair result resumes this same saved class.
         let req_gen = app.request_gen;
-        app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Done));
+        app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
         assert!(
-            matches!(app.view, View::ClassDone { .. }),
-            "no-MC completion resolves to an advance/outcome screen"
+            matches!(app.view, View::Class { ref class_id, .. } if class_id == "cls1"),
+            "repair resumes the same saved class"
         );
     }
 
     #[tokio::test]
-    async fn no_mc_speaking_only_class_advances_after_last_prompt() {
+    async fn speaking_only_saved_class_requires_repair_after_last_prompt() {
         // A speaking-only class: after the last prompt is graded, Enter advances
         // past the final section into the no-MC completion path (next-class).
         let mut app = test_app();
@@ -407,14 +414,113 @@
         app.on_select(); // last graded prompt -> advance past last section -> next-class
 
         assert!(
-            matches!(app.view, View::Loading),
+            matches!(app.view, View::ClassRepair { .. }),
             "speaking-only class must advance, not stall"
         );
         assert_eq!(
             app.request_gen,
-            before + 1,
-            "advance dispatches next-class once"
+            before,
+            "repair requires an explicit learner action"
         );
     }
 
     // --- P6c: exams (hermetic, StubApi) -----------------------------------
+
+#[tokio::test]
+async fn an_active_partial_class_can_request_repair_without_advancing_the_course() {
+    let mut app = test_app();
+    app.view = View::class_view(course("A"), "partial-class".into());
+    if let View::Class { attempt, .. } = &mut app.view { *attempt = 4; }
+    let action = app.map_key(key(KeyCode::Char('N')));
+    assert!(matches!(action, Some(Action::NextClass)));
+    app.on_next_class();
+    assert!(matches!(app.view, View::Loading));
+    assert_eq!(app.pending_course.as_ref().map(|course| course.id.as_str()), Some("A"));
+    let req_gen = app.request_gen;
+    app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Created { class_id: "partial-class".into() }));
+    assert!(matches!(&app.view, View::Class { class_id, .. } if class_id == "partial-class"));
+}
+
+
+#[tokio::test]
+async fn class_repair_waits_for_saved_drafts_and_restores_retained_work_in_the_new_attempt() {
+    let mut app = test_app();
+    app.view = class_with_sections(serde_json::json!([{
+        "id": "writing", "skill": "WRITING", "status": "READY",
+        "episode": null, "questions": [], "prompts": [],
+        "writingPrompts": [{ "id": "w0", "task": "Greet Ana.", "order": 0 }]
+    }]));
+    for letter in "Hola Ana.".chars() { app.on_writing_input(letter); }
+    app.on_next_class();
+    let sequence = match &app.view {
+        View::Class { progress, .. } => progress.in_flight.expect("draft save pending"),
+        other => panic!("repair discarded the writing screen: {other:?}"),
+    };
+    assert!(app.pending_course.is_none());
+    app.on_next_class();
+    assert!(matches!(app.view, View::Class { .. }));
+    app.on_practice_progress_saved("CLASS/cls1/1".into(), sequence,
+        Arc::new(Ok(serde_json::from_value(serde_json::json!({
+            "saved": true, "progressRevision": 1
+        })).unwrap())));
+    app.on_next_class();
+    assert!(matches!(app.view, View::Loading));
+    app.on_next_class_resolved(app.request_gen, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
+    app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
+        "id": "cls1", "attempt": 2, "status": "IN_PROGRESS", "order": 1,
+        "passThreshold": 0.7, "submitted": false, "progressRevision": 1,
+        "writingDrafts": { "w0": "Hola Ana." },
+        "sections": [{ "id": "writing", "skill": "WRITING", "status": "READY",
+            "episode": null, "questions": [], "prompts": [],
+            "writingPrompts": [{ "id": "w0", "task": "Greet Ana.", "order": 0, "savedDraft": "Hola Ana." }] }]
+    })));
+    assert!(matches!(app.view, View::Class { attempt: 2, .. }));
+    assert!(matches!(app.current_section().map(|section| &section.progress),
+        Some(SectionProgress::Writing { input, .. }) if input.text() == "Hola Ana."));
+}
+
+#[tokio::test]
+async fn class_repair_keeps_an_unknown_recording_on_its_original_prompt() {
+    let mut app = test_app();
+    app.view = class_with_sections(serde_json::json!([{
+        "id": "speaking", "skill": "SPEAKING", "status": "READY",
+        "episode": null, "questions": [], "writingPrompts": [],
+        "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+    }]));
+    app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("Lost acknowledgement".into())));
+    app.on_next_class();
+    assert!(app.view.has_uncertain_upload());
+    assert!(matches!(app.view, View::Class { attempt: 1, .. }));
+    assert!(app.pending_course.is_none());
+}
+
+#[tokio::test]
+async fn class_saved_recording_identity_recovers_only_a_new_upload_after_lost_acknowledgement() {
+    let mut app = test_app();
+    let detail = |recording_id: &str| class_detail(serde_json::json!({
+        "id": "cls1", "attempt": 1, "status": "IN_PROGRESS", "order": 1,
+        "passThreshold": 0.7, "submitted": false,
+        "sections": [{ "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0,
+                "latestRecording": { "id": recording_id, "status": "SCORED",
+                    "overallScore": 0.9, "transcript": "Hola", "feedback": "Recognized greeting" } }] }]
+    }));
+    app.view = View::class_view(course("A"), "cls1".into());
+    app.on_class_loaded(app.request_gen, detail("previous-recording"));
+    if let View::Class { progress, .. } = &mut app.view { progress.conflict = true; }
+    app.cache_practice();
+    app.view = View::class_view(course("A"), "cls1".into());
+    app.on_class_loaded(app.request_gen, detail("recognized-recording"));
+    app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("Lost acknowledgement".into())));
+    app.cache_practice();
+    app.view = View::class_view(course("A"), "cls1".into());
+    app.on_class_loaded(app.request_gen, detail("recognized-recording"));
+    assert!(app.view.has_uncertain_upload());
+    app.cache_practice();
+    app.view = View::class_view(course("A"), "cls1".into());
+    app.on_class_loaded(app.request_gen, detail("new-recording"));
+    assert!(!app.view.has_uncertain_upload());
+    assert!(matches!(app.current_section().map(|section| &section.progress),
+        Some(SectionProgress::Speaking { phase: SpeakingPhase::Graded { score: Some(90), .. }, .. })));
+}

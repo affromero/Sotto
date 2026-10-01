@@ -15,6 +15,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
+import {
+  clearSpeakingUpload,
+  pendingSpeakingUpload,
+  recoverSpeakingUpload,
+  retainSpeakingUpload,
+} from './speaking/speakingUploadRecovery';
 import { ClassGlyph } from './ClassGlyph';
 import { ContinueBar, ScoreDial } from './ClassWidgets';
 import type { ClassSpeakingPrompt, ClassSpeakingRecording } from './classTypes';
@@ -49,7 +55,8 @@ interface ScoringResult {
   status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
 }
 
-type CardPhase = 'idle' | 'recording' | 'uploading' | 'grading' | 'scored' | 'failed';
+type CardPhase =
+  'idle' | 'recording' | 'uploading' | 'grading' | 'scored' | 'failed' | 'upload_unknown';
 
 interface CardState {
   phase: CardPhase;
@@ -78,6 +85,7 @@ interface PromptCardProps {
   index: number;
   total: number;
   onScored: (promptId: string, result: ScoringResult) => void;
+  onPending: (promptId: string) => void;
   feedbackHref: string;
 }
 
@@ -87,14 +95,34 @@ function PromptCard({
   index,
   total,
   onScored,
+  onPending,
   feedbackHref,
 }: PromptCardProps) {
-  const [state, setState] = useState<CardState>({
-    phase: 'idle',
-    recordingId: null,
-    result: null,
-    error: null,
+  const [state, setState] = useState<CardState>(() => {
+    const pending = pendingSpeakingUpload(endpointBase, prompt.id);
+    const saved = prompt.latestRecording;
+    if (pending && (!saved || saved.id === pending.baseline))
+      return {
+        phase: 'upload_unknown',
+        recordingId: null,
+        result: null,
+        error: 'Upload outcome is unknown. Check saved recording before recording another attempt.',
+      };
+    if (pending) clearSpeakingUpload(endpointBase, prompt.id);
+    return {
+      phase: saved
+        ? saved.status === 'SCORED'
+          ? 'scored'
+          : saved.status === 'FAILED'
+            ? 'failed'
+            : 'grading'
+        : 'idle',
+      recordingId: saved?.id ?? null,
+      result: saved ? { ...saved, recordingId: saved.id } : null,
+      error: saved?.status === 'FAILED' ? 'Scoring failed. Record another attempt.' : null,
+    };
   });
+  const acknowledgedId = useRef(prompt.latestRecording?.id ?? null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorder = useAudioRecorder({ maxSeconds: 60, minSeconds: 2 });
 
@@ -106,6 +134,7 @@ function PromptCard({
 
   const uploadRecording = useCallback(
     async (blob: Blob) => {
+      retainSpeakingUpload(endpointBase, prompt.id, acknowledgedId.current);
       setState((prev) => ({ ...prev, phase: 'uploading', error: null }));
       try {
         const form = new FormData();
@@ -113,20 +142,26 @@ function PromptCard({
         const res = await fetch(`${endpointBase}/${prompt.id}`, { method: 'POST', body: form });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
+          const rejected = [400, 401, 403, 404, 413, 415].includes(res.status);
+          if (rejected) clearSpeakingUpload(endpointBase, prompt.id);
           setState((prev) => ({
             ...prev,
-            phase: 'failed',
+            phase: rejected ? 'failed' : 'upload_unknown',
             error: body.error ?? 'Upload failed.',
           }));
           return;
         }
         const data = (await res.json()) as { recordingId: string };
+        if (!data.recordingId) throw new Error('Upload acknowledgement is incomplete');
+        acknowledgedId.current = data.recordingId;
+        clearSpeakingUpload(endpointBase, prompt.id);
         setState((prev) => ({ ...prev, phase: 'grading', recordingId: data.recordingId }));
       } catch {
         setState((prev) => ({
           ...prev,
-          phase: 'failed',
-          error: 'A network error occurred during upload.',
+          phase: 'upload_unknown',
+          error:
+            'Upload outcome is unknown. Check saved recording before recording another attempt.',
         }));
       }
     },
@@ -186,7 +221,28 @@ function PromptCard({
     };
   }, [state.phase, state.recordingId, pollResult]);
 
+  async function checkSavedUpload() {
+    try {
+      const result = await recoverSpeakingUpload(endpointBase, prompt.id);
+      acknowledgedId.current = result.recordingId;
+      setState({
+        phase:
+          result.status === 'SCORED' ? 'scored' : result.status === 'FAILED' ? 'failed' : 'grading',
+        recordingId: result.recordingId,
+        result,
+        error: result.status === 'FAILED' ? 'Scoring failed. Record another attempt.' : null,
+      });
+      if (result.status === 'SCORED') onScored(prompt.id, result);
+    } catch (failure: unknown) {
+      setState((previous) => ({
+        ...previous,
+        error: failure instanceof Error ? failure.message : 'Saved recording could not be checked.',
+      }));
+    }
+  }
+
   async function handleStart() {
+    onPending(prompt.id);
     recorder.reset();
     setState({ phase: 'recording', recordingId: null, result: null, error: null });
     await recorder.startRecording();
@@ -197,6 +253,7 @@ function PromptCard({
   }
 
   function handleReset() {
+    onPending(prompt.id);
     recorder.reset();
     setState({ phase: 'idle', recordingId: null, result: null, error: null });
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
@@ -258,11 +315,23 @@ function PromptCard({
               label={phase === 'uploading' ? 'Uploading your recording' : 'Grading your speaking'}
             />
           </div>
+        ) : phase === 'upload_unknown' ? (
+          <div className={styles.failedRow} role="alert">
+            <span className={styles.failedText}>{error}</span>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => void checkSavedUpload()}
+            >
+              Check saved recording
+            </button>
+          </div>
         ) : phase === 'scored' && result ? (
           <div className={styles.scoredZone}>
             <div className={styles.phoneme} role="group" aria-label="Pronunciation breakdown">
               {RUBRIC_AXES.map((axis) => {
                 const raw = rubric?.[axis.key];
+                if (typeof raw !== 'number') return null;
                 const v = typeof raw === 'number' ? Math.round(raw * 100) : 0;
                 const band = v >= 88 ? styles.phBarHi : v >= 74 ? styles.phBarMid : styles.phBarLo;
                 return (
@@ -374,7 +443,17 @@ export function SpeakingSection({
 }: SpeakingSectionProps) {
   const [idx, setIdx] = useState(0);
   // overall score per prompt id (0..100)
-  const [scores, setScores] = useState<Record<string, number>>({});
+  const [scores, setScores] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      prompts.flatMap((prompt) =>
+        !pendingSpeakingUpload(endpointBase, prompt.id) &&
+        prompt.latestRecording?.status === 'SCORED' &&
+        prompt.latestRecording.overallScore != null
+          ? [[prompt.id, Math.round(prompt.latestRecording.overallScore * 100)]]
+          : []
+      )
+    )
+  );
 
   const total = prompts.length;
   const cur = prompts[idx];
@@ -392,6 +471,12 @@ export function SpeakingSection({
   useEffect(() => {
     onScore(overall);
   }, [overall, onScore]);
+
+  const handlePending = useCallback((promptId: string) => {
+    setScores((previous) =>
+      Object.fromEntries(Object.entries(previous).filter(([id]) => id !== promptId))
+    );
+  }, []);
 
   const handleScored = useCallback(
     (promptId: string, result: ScoringResult) => {
@@ -442,8 +527,8 @@ export function SpeakingSection({
         </div>
         <h1 className={styles.title}>Say it out loud.</h1>
         <p className={styles.modLede}>
-          Record each phrase. Pronunciation, rhythm, and completeness are scored from your audio.
-          Phrase {idx + 1} of {total}.
+          Record each phrase. Feedback measures recognized words and available word timing. Phrase{' '}
+          {idx + 1} of {total}.
         </p>
 
         {cur && (
@@ -454,6 +539,7 @@ export function SpeakingSection({
             index={idx}
             total={total}
             onScored={handleScored}
+            onPending={handlePending}
             feedbackHref={feedbackHref}
           />
         )}

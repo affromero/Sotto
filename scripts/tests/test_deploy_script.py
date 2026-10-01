@@ -207,13 +207,16 @@ class DeploymentFailureTests(unittest.TestCase):
 
     def test_schema_difference_never_replaces_running_services(self):
         state, output = self.run_deployment('schema-unreviewed')
-        self.assertIn('exact reviewed previous and candidate schema hashes', output)
+        self.assertIn('separately reviewed migration procedure', output)
+        self.assertNotIn('Backing up the application database', output)
+        self.assertNotIn('Running database migrations', output)
         self.assertTrue(state['pulled'])
 
-    def test_reviewed_schema_transition_reaches_verified_backup_gate(self):
+    def test_matching_review_hashes_cannot_bypass_schema_difference(self):
         state, output = self.run_deployment('schema-reviewed', reviewed_schema=True)
-        self.assertIn('Accepted reviewed schema transition', output)
-        self.assertIn('Backing up the application database', output)
+        self.assertIn('separately reviewed migration procedure', output)
+        self.assertNotIn('Backing up the application database', output)
+        self.assertNotIn('Running database migrations', output)
         self.assertEqual(state['workers'], OLD, output)
 
     def test_worker_failure_restores_images_routing_slot_and_checks_public_health(self):

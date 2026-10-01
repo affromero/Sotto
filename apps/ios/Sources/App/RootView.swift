@@ -19,7 +19,10 @@ struct RootView: View {
                             model.signOut()
                         }
                     } else if let selectedClass = model.selectedClass {
-                        ClassSessionView(classDetail: selectedClass)
+                        let state = model.learningSessionState(path: "/api/v1/classes/\(selectedClass.id)",
+                            attempt: selectedClass.attempt ?? 1, revision: selectedClass.progressRevision ?? 0)
+                        ClassSessionView(classDetail: selectedClass, progress: state.progress, drafts: state.drafts)
+                            .id("\(selectedClass.id)/\(selectedClass.attempt ?? 1)")
                             .environmentObject(model)
                     } else {
                         CourseListView()
@@ -46,7 +49,9 @@ struct RootView: View {
         .environment(\.sottoLayout, layout)
         .sheet(isPresented: practiceSheetBinding) {
             if let practiceStart = model.practiceStart {
-                PracticeStartView(start: practiceStart)
+                let state = model.learningSessionState(path: "/api/v1/practice/\(practiceStart.sessionId)",
+                    attempt: 1, revision: practiceStart.progressRevision ?? 0)
+                PracticeStartView(start: practiceStart, progress: state.progress, drafts: state.drafts)
                     .environmentObject(model)
             }
         }

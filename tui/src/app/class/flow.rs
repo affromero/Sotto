@@ -5,6 +5,51 @@ impl App {
     /// the done screen. Dispatches `next-class`, which either creates/returns a
     /// class id (enter Class) or reports the course done.
     pub(super) fn on_next_class(&mut self) {
+        let repair = match &self.view {
+            View::ClassOutcome { course, class_id, attempt, result } if !result.passed =>
+                Some((course.clone(), class_id.clone(), *attempt)),
+            View::ClassRepair { course, class_id, attempt, .. } | View::Class { course, class_id, attempt, submitting: false, .. } =>
+                Some((course.clone(), class_id.clone(), *attempt)),
+            _ => None,
+        };
+        if let Some((course, id, attempt)) = repair {
+                let cache_key = format!("CLASS/{id}/{attempt}");
+                if matches!(self.view, View::ClassRepair { .. })
+                    && let Some(cached) = self.practice_cache.get(&cache_key)
+                    && (cached.has_uncertain_upload() || matches!(cached, View::Class { progress, .. }
+                        if progress.dirty || progress.in_flight.is_some() || progress.conflict)) {
+                    self.view = cached.clone();
+                    self.status_bar.set_error("Check and save your retained work before repairing this class.".into());
+                    self.render(); return;
+                }
+                // Keep pending learner work attached to its active attempt until it settles.
+                if self.view.has_uncertain_upload() || self.current_section().is_some_and(|section|
+                    matches!(&section.progress,
+                        SectionProgress::Writing { phase: WritingPhase::Submitting, .. } |
+                        SectionProgress::Speaking { phase: SpeakingPhase::Recording | SpeakingPhase::Polling { .. }, .. })) {
+                    self.status_bar.set_error("Check pending writing or recording feedback before repairing this class.".into());
+                    self.render(); return;
+                }
+                if let Some(progress) = self.view.learning_progress_mut() {
+                    if progress.conflict {
+                        self.status_bar.set_error("Reconcile your saved progress before repairing this class.".into());
+                        self.render(); return;
+                    }
+                    if progress.dirty || progress.in_flight.is_some() {
+                        self.save_practice_progress();
+                        self.status_bar.set_error("Saving your work. Request repair again after the save is confirmed.".into());
+                        self.render(); return;
+                    }
+                }
+                self.cache_practice();
+                let req_gen = self.bump_gen(); let client = Arc::clone(&self.client);
+                self.stop_audio(); self.view = View::Loading; self.pending_course = Some(course);
+                self.dispatch(req_gen, async move {
+                    tokio::time::timeout(std::time::Duration::from_secs(30), client.repair_class(&id, attempt)).await
+                        .map_err(|_| color_eyre::eyre::eyre!("Class repair acknowledgement was lost. Open its saved class to check status."))?
+                }, Action::NextClassResolved);
+                self.render(); return;
+        }
         let course = match &self.view {
             View::CourseHome { course, .. }
             | View::ClassOutcome { course, .. }
@@ -14,10 +59,7 @@ impl App {
         self.dispatch_next_class(course);
     }
 
-    /// Dispatch `next-class` for `course`: stop audio, show Loading, and carry
-    /// the course forward for the result screen's "next class" action. Shared by
-    /// the menu entry ([`on_next_class`]) and the no-MC class completion path
-    /// ([`class_advance_no_mc`]).
+    /// Dispatch `next-class` for the course and carry it through the pending result.
     fn dispatch_next_class(&mut self, course: Course) {
         let req_gen = self.bump_gen();
         self.stop_audio();
@@ -33,17 +75,13 @@ impl App {
         self.render();
     }
 
-    /// Advance after completing a class that has NO multiple-choice sections
-    /// (transcript-only listening / speaking-only / writing-only). The class
-    /// submit route rejects an empty `answers` array (`.min(1)`), so such a
-    /// class cannot be graded through it; instead we re-resolve via `next-class`
-    /// so the learner advances (or sees the current gate state) rather than
-    /// stalling on the last section. Works from `View::Class` (unlike
-    /// [`on_next_class`], whose menu sources do not include `View::Class`).
-    fn class_advance_no_mc(&mut self) {
-        if let View::Class { course, .. } = &self.view {
-            let course = course.clone();
-            self.dispatch_next_class(course);
+    /// Historical classes without complete material remain gated and offer durable repair.
+    fn show_class_repair(&mut self, message: &str) {
+        if let View::Class { course, class_id, attempt, .. } = &self.view {
+            self.view = View::ClassRepair {
+                course: course.clone(), class_id: class_id.clone(), attempt: *attempt, message: message.into(),
+            };
+            self.render();
         }
     }
 
@@ -102,7 +140,7 @@ impl App {
             } | View::Exam {
                 submitting: true,
                 ..
-            }
+            } | View::Practice { submitting: true, .. }
         )
     }
 
@@ -182,6 +220,7 @@ impl App {
         } else {
             false
         };
+        self.mark_practice_progress();
         if advanced_section {
             self.class_next_section();
         }
@@ -199,7 +238,7 @@ impl App {
             }) => {
                 if matches!(
                     phase,
-                    SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. }
+                    SpeakingPhase::Graded { score: Some(_), .. }
                 ) {
                     if *index + 1 < prompts.len() {
                         SectionAdvance::NextSpeakingPrompt
@@ -220,7 +259,7 @@ impl App {
                 // read the feedback); other phases stay put.
                 if matches!(
                     phase,
-                    WritingPhase::Graded { .. } | WritingPhase::Failed { .. }
+                    WritingPhase::Graded { .. }
                 ) {
                     if *index + 1 < prompts.len() {
                         SectionAdvance::NextWritingPrompt
@@ -236,17 +275,19 @@ impl App {
             }
             _ => SectionAdvance::None,
         };
+        if let Some(section) = self.current_section_mut() { section.remember_productive_work(); }
         match advance {
             SectionAdvance::NextSpeakingPrompt => {
                 // New prompt target: bump the generation so a late poll from the
                 // previous prompt is dropped rather than applied here.
                 self.bump_gen();
                 if let Some(section) = self.current_section_mut()
-                    && let SectionProgress::Speaking { index, phase, .. } = &mut section.progress
+                    && let SectionProgress::Speaking { index, phase, prompts } = &mut section.progress
                 {
                     *index += 1;
-                    *phase = SpeakingPhase::Idle;
+                    *phase = prompts.get(*index).and_then(|prompt| section.work.get(&prompt.id)).and_then(|work| match work { crate::app::state::ProductiveWork::Speaking(saved) => Some(saved.clone()), _ => None }).unwrap_or(SpeakingPhase::Idle);
                 }
+                self.class_resume_current_speaking();
                 self.render();
             }
             SectionAdvance::NextWritingPrompt => {
@@ -257,12 +298,16 @@ impl App {
                         index,
                         input,
                         phase,
-                        ..
+                        prompts,
                     } = &mut section.progress
                 {
                     *index += 1;
-                    *input = WritingInput::new();
-                    *phase = WritingPhase::Editing;
+                    if let Some(prompt) = prompts.get(*index) {
+                        match section.work.get(&prompt.id) {
+                            Some(crate::app::state::ProductiveWork::Writing { text, phase: saved }) => { *input = WritingInput::from_text(text); *phase = saved.clone(); },
+                            _ => { *input = WritingInput::new(); *phase = WritingPhase::Editing; },
+                        }
+                    }
                 }
                 self.render();
             }
@@ -284,7 +329,8 @@ impl App {
                 sections: Some(sections),
                 cursor,
                 ..
-            } if *cursor + 1 < sections.len() => {
+            }
+            | View::Practice { sections: Some(sections), cursor, .. } if *cursor + 1 < sections.len() => {
                 *cursor += 1;
                 true
             }
@@ -300,11 +346,13 @@ impl App {
             self.bump_gen();
             self.stop_audio();
             self.class_fetch_current_episode();
+            self.class_resume_current_speaking();
         } else {
             // Last section done — submit through the active flow.
             match self.current_flow().map(|(flow, _)| flow) {
                 Some(FlowKind::Class) => self.submit_class(),
                 Some(FlowKind::Exam) => self.submit_exam(),
+                Some(FlowKind::Practice) => self.submit_full_practice(),
                 None => {}
             }
         }
@@ -376,6 +424,7 @@ impl App {
                 self.render();
             }
             SpeakingPhase::Recording => self.class_stop_and_upload(),
+            SpeakingPhase::UnknownUpload { .. } => self.refresh_saved_speaking_upload(),
             SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => {}
         }
     }
@@ -415,6 +464,7 @@ impl App {
                 match flow {
                     FlowKind::Class => client.upload_class_speaking(&id, &prompt_id, wav).await,
                     FlowKind::Exam => client.upload_exam_speaking(&id, &prompt_id, wav).await,
+                    FlowKind::Practice => client.upload_speaking(&id, &prompt_id, wav).await,
                 }
             },
             Action::ClassSpeakingUploaded,
@@ -422,58 +472,25 @@ impl App {
         self.render();
     }
 
-    fn class_poll_grade(&self, recording_id: String, req_gen: u64) {
-        let (flow, id) = match self.current_flow() {
-            Some((flow, Some(id))) => (flow, id),
+    pub(super) fn class_poll_grade(&self, recording_id: String, req_gen: u64) {
+        let (flow, id, prompt_id) = match (self.current_flow(), self.current_speaking_prompt_id()) {
+            (Some((flow, Some(id))), Some(prompt_id)) => (flow, id, prompt_id),
             _ => return,
         };
-        let prompt_id = match self.current_speaking_prompt_id() {
-            Some(id) => id,
-            None => return,
-        };
         let client = Arc::clone(&self.client);
-        self.dispatch(
-            req_gen,
-            async move {
-                match flow {
-                    FlowKind::Class => {
-                        client
-                            .poll_class_speaking(&id, &prompt_id, &recording_id)
-                            .await
-                    }
-                    FlowKind::Exam => {
-                        client
-                            .poll_exam_speaking(&id, &prompt_id, &recording_id)
-                            .await
-                    }
-                }
-            },
-            Action::ClassSpeakingPolled,
-        );
+        self.dispatch(req_gen, async move { poll_flow_speaking(client, flow, id, prompt_id, recording_id).await }, Action::ClassSpeakingPolled);
     }
 
     fn class_schedule_poll(&self, recording_id: String, req_gen: u64) {
         let (flow, id, prompt_id) = match (self.current_flow(), self.current_speaking_prompt_id()) {
-            (Some((flow, Some(id))), Some(p)) => (flow, id, p),
+            (Some((flow, Some(id))), Some(prompt_id)) => (flow, id, prompt_id),
             _ => return,
         };
         let client = Arc::clone(&self.client);
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-            let result = match flow {
-                FlowKind::Class => {
-                    client
-                        .poll_class_speaking(&id, &prompt_id, &recording_id)
-                        .await
-                }
-                FlowKind::Exam => {
-                    client
-                        .poll_exam_speaking(&id, &prompt_id, &recording_id)
-                        .await
-                }
-            }
-            .map_err(|e| e.to_string());
+            let result = poll_flow_speaking(client, flow, id, prompt_id, recording_id).await.map_err(|error| error.to_string());
             let _ = tx.send(Action::ClassSpeakingPolled(req_gen, Arc::new(result)));
         });
     }
@@ -485,6 +502,7 @@ impl App {
             && let SectionProgress::Writing { input, .. } = &mut section.progress
         {
             input.push_char(c);
+            self.mark_practice_progress();
             self.render();
         }
     }
@@ -494,6 +512,7 @@ impl App {
             && let SectionProgress::Writing { input, .. } = &mut section.progress
         {
             input.newline();
+            self.mark_practice_progress();
             self.render();
         }
     }
@@ -503,6 +522,7 @@ impl App {
             && let SectionProgress::Writing { input, .. } = &mut section.progress
         {
             input.backspace();
+            self.mark_practice_progress();
             self.render();
         }
     }
@@ -549,6 +569,7 @@ impl App {
                 match flow {
                     FlowKind::Class => client.submit_class_writing(&id, &prompt_id, text).await,
                     FlowKind::Exam => client.submit_exam_writing(&id, &prompt_id, text).await,
+                    FlowKind::Practice => client.submit_practice_writing(&id, &prompt_id, text).await,
                 }
             },
             Action::ClassWritingGraded,
@@ -579,13 +600,9 @@ impl App {
             }
             _ => return,
         };
-        // The class submit route requires a non-empty `answers` array
-        // (`.min(1)`), so a class with no MC sections cannot be submitted
-        // through it. Advance via `next-class` instead — from `View::Class`,
-        // which `on_next_class` does not accept — so the learner moves on rather
-        // than stalling on the last section.
+        // A historical class without multiple-choice material needs repair.
         if answers.is_empty() {
-            self.class_advance_no_mc();
+            self.show_class_repair("This saved class is missing required exercises. Press n to repair it and preserve earlier work.");
             return;
         }
         let req_gen = self.bump_gen();
@@ -646,4 +663,30 @@ impl App {
 
     // --- Result reducers ---------------------------------------------------
 
+}
+
+async fn poll_flow_speaking(client: Arc<dyn crate::api::Api>, flow: FlowKind, id: String, prompt_id: String, recording_id: String) -> color_eyre::Result<types::SpeakingPollResponse> {
+    let request = async {
+        match flow {
+            FlowKind::Class => client.poll_class_speaking(&id, &prompt_id, &recording_id).await,
+            FlowKind::Exam => client.poll_exam_speaking(&id, &prompt_id, &recording_id).await,
+            FlowKind::Practice => client.poll_speaking(&id, &prompt_id, &recording_id).await,
+        }
+    };
+    tokio::time::timeout(std::time::Duration::from_secs(30), request).await.map_err(|_| color_eyre::eyre::eyre!("Recording status check timed out."))?
+}
+
+impl App {
+    fn refresh_saved_speaking_upload(&mut self) {
+        let Some(id) = self.flow_id() else { return; };
+        let flow = match &self.view { View::Class { .. } => FlowKind::Class, View::Exam { .. } => FlowKind::Exam, View::Practice { .. } => FlowKind::Practice, _ => return };
+        let req_gen = self.request_gen;
+        if let Some(key) = self.view.learning_key() { self.practice_cache.insert(key, self.view.clone()); }
+        let client = Arc::clone(&self.client);
+        match flow {
+            FlowKind::Class => self.dispatch(req_gen, async move { client.class(&id).await }, Action::ClassLoaded),
+            FlowKind::Practice => self.dispatch(req_gen, async move { client.resume_practice(&id).await }, Action::PracticeStarted),
+            FlowKind::Exam => { self.status_bar.set_error("Upload acknowledgement was lost. Reopen the exam to check saved work.".into()); },
+        }
+    }
 }

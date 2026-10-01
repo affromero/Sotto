@@ -34,6 +34,7 @@
         View::CourseHome {
             course: course(),
             due: DueCounts {
+                recent: Vec::new(),
                 vocab: 4,
                 grammar: 0,
                 total_vocab: 12,
@@ -145,17 +146,20 @@
     fn can_review_vocab_requires_due_or_tracked_vocab() {
         assert!(!can_review_vocab(&DueCounts::default()));
         assert!(can_review_vocab(&DueCounts {
+            recent: Vec::new(),
             vocab: 3,
             grammar: 0,
             total_vocab: 0,
         }));
         assert!(can_review_vocab(&DueCounts {
+            recent: Vec::new(),
             vocab: 0,
             grammar: 0,
             total_vocab: 10,
         }));
         // Grammar-only due does not enable the vocab review.
         assert!(!can_review_vocab(&DueCounts {
+            recent: Vec::new(),
             vocab: 0,
             grammar: 5,
             total_vocab: 0,
@@ -468,7 +472,7 @@
     }
 
     #[test]
-    fn writing_ready_routes_to_not_in_terminal() {
+    fn writing_ready_opens_all_productive_prompts() {
         let resp = start_response(serde_json::json!({
             "status": "ready_writing",
             "sessionId": "sess-write",
@@ -478,11 +482,11 @@
         let next = reduce_start(course_home(), &resp);
 
         match next {
-            View::CourseHome { notice, .. } => match notice {
-                Some(Unavailable::NotInTerminal(skill)) => assert_eq!(skill, "Writing"),
-                other => panic!("expected NotInTerminal, got {other:?}"),
+            View::Practice { sections: Some(sections), .. } => {
+                assert!(matches!(&sections[0].progress, SectionProgress::Writing { prompts, .. } if prompts[0].task.contains("your day")));
+                assert!(!class_ready_to_submit(&sections));
             },
-            other => panic!("expected CourseHome, got {other:?}"),
+            other => panic!("expected writing practice, got {other:?}"),
         }
     }
 
@@ -670,9 +674,79 @@
         assert_eq!(SkillChoice::Grammar.kind(), types::PracticeKind::Grammar);
         assert_eq!(SkillChoice::Reading.kind(), types::PracticeKind::Reading);
         // Grammar + Reading are now wired into the menu (5 entries).
-        assert_eq!(SkillChoice::MENU.len(), 5);
+        assert!(SkillChoice::MENU.contains(&SkillChoice::Writing));
+        assert!(SkillChoice::MENU.contains(&SkillChoice::Full));
         assert!(SkillChoice::MENU.contains(&SkillChoice::Grammar));
         assert!(SkillChoice::MENU.contains(&SkillChoice::Reading));
     }
 
     // --- P6b: classes ------------------------------------------------------
+
+    #[test]
+    fn full_practice_preserves_focus_vocabulary_passages_and_saved_work() {
+        let response = start_response(serde_json::json!({
+            "status": "ready_full", "kind": "FULL", "sessionId": "full-1",
+            "progressRevision": 7, "learnerAnswers": { "g0": 1 },
+            "writingDrafts": { "w0": "Mein Entwurf" },
+            "items": [
+                { "id": "f0", "prompt": "Review weak point", "options": ["a", "b"] },
+                { "id": "v0", "prompt": "Vocabulary", "options": ["a", "b"] },
+                { "id": "g0", "prompt": "Choose article", "options": ["a", "b"] },
+                { "id": "r0", "prompt": "Where?", "options": ["Berlin", "Bonn"], "passageText": "Mia wohnt in Berlin." }
+            ],
+            "speakingPrompts": [
+                { "id": "s0", "targetPhrase": "Hallo", "translation": "Hello", "referenceTtsUrl": null, "latestRecording": { "recordingId": "rec-pending", "status": "GRADING" } },
+                { "id": "s1", "targetPhrase": "Danke", "translation": "Thanks", "referenceTtsUrl": null, "latestRecording": { "recordingId": "rec-done", "status": "SCORED", "overallScore": 0.83, "feedback": "Clear." } }
+            ],
+            "writingPrompts": [{ "id": "w0", "task": "Introduce yourself", "guidance": null, "response": { "text": "Earlier", "overallScore": 0.8, "feedback": "Review articles.", "corrections": [] } }]
+        }));
+        let View::Practice { sections: Some(sections), progress, .. } = reduce_start(course_home(), &response) else { panic!("practice expected") };
+        assert_eq!(progress.revision, 7);
+        let answers = collect_class_answers(&sections);
+        assert!(answers.iter().any(|answer| answer.question_id == "g0" && answer.selected_index == 1));
+        let all_ids = sections.iter().flat_map(|section| match &section.progress { SectionProgress::Mc { questions, .. } => questions.iter().map(|question| question.id.clone()).collect::<Vec<_>>(), _ => vec![] }).collect::<Vec<_>>();
+        assert!(["f0", "v0", "g0", "r0"].iter().all(|id| all_ids.iter().any(|found| found == id)));
+        assert!(sections.iter().any(|section| matches!(&section.progress, SectionProgress::Mc { questions, .. } if questions.iter().any(|question| question.prompt.contains("Mia wohnt")))));
+        let speaking = sections.iter().find(|section| section.skill == types::SkillType::Speaking).unwrap();
+        assert!(matches!(&speaking.progress, SectionProgress::Speaking { phase: SpeakingPhase::Polling { recording_id }, .. } if recording_id == "rec-pending"));
+        assert!(matches!(speaking.work.get("s1"), Some(ProductiveWork::Speaking(SpeakingPhase::Graded { score: Some(83), .. }))));
+        let writing = sections.iter().find(|section| section.skill == types::SkillType::Writing).unwrap();
+        assert!(matches!(&writing.progress, SectionProgress::Writing { input, phase: WritingPhase::Editing, .. } if input.text() == "Mein Entwurf"));
+        assert!(!class_ready_to_submit(&sections));
+    }
+
+    #[test]
+    fn writing_completion_requires_a_grade_for_every_prompt() {
+        let response = start_response(serde_json::json!({
+            "status": "ready_writing", "sessionId": "write-1", "prompts": [
+                { "id": "w0", "task": "Describe today", "guidance": null },
+                { "id": "w1", "task": "Describe tomorrow", "guidance": null }
+            ]
+        }));
+        let View::Practice { sections: Some(mut sections), .. } = reduce_start(course_home(), &response) else { panic!("writing expected") };
+        let section = &mut sections[0];
+        if let SectionProgress::Writing { phase, index, input, .. } = &mut section.progress { *index = 1; *input = WritingInput::from_text("My answer"); *phase = WritingPhase::Graded { score: 90, feedback: "Correct".into() }; }
+        assert!(!class_ready_to_submit(&sections), "grading the last prompt cannot waive earlier work");
+        sections[0].work.insert("w0".into(), ProductiveWork::Writing { text: "First answer".into(), phase: WritingPhase::Failed { message: "Retry".into() } });
+        assert!(!class_ready_to_submit(&sections), "provider errors do not count as a grade");
+        sections[0].work.insert("w0".into(), ProductiveWork::Writing { text: "First answer".into(), phase: WritingPhase::Graded { score: 30, feedback: "Keep practising".into() } });
+        assert!(class_ready_to_submit(&sections), "low scores still complete practice");
+        assert!(collect_class_answers(&sections).is_empty(), "productive-only completion has no MC answers");
+    }
+
+    #[test]
+    fn completed_practice_restores_the_receipt_without_another_grade() {
+        let response = start_response(serde_json::json!({
+            "status": "ready_writing", "sessionId": "write-1", "prompts": [],
+            "submissionResult": { "score": 0.834, "correct": 0, "total": 3, "answered": 0, "graded": 3, "itemFeedback": [],
+                "writingFeedback": [{ "promptId": "w0", "task": "Greet Ana.", "grade": { "text": "Hola Ana.", "overallScore": 0.8, "feedback": "Clear.", "corrections": [{ "old": "Ola", "new": "Hola", "why": "Use the greeting." }] } }],
+                "speakingFeedback": [{ "promptId": "s0", "targetPhrase": "Hola Ana.", "evidence": { "recordingId": "r0", "status": "SCORED", "transcript": "Hola Ana", "overallScore": 0.8, "feedback": "Both words are present." } }]
+            }
+        }));
+        let View::Result { result, .. } = reduce_start(course_home(), &response) else { panic!("receipt expected") };
+        assert_eq!(result.score, 83);
+        assert_eq!(result.graded, 3);
+        assert_eq!(result.answered, 0);
+        assert!(result.feedback.iter().any(|feedback| feedback.contains("Ola → Hola") && feedback.contains("Use the greeting.")));
+        assert!(result.feedback.iter().any(|feedback| feedback.contains("Both words are present.")));
+    }

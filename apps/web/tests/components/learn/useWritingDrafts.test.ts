@@ -21,8 +21,11 @@ const graded = {
   json: async () => ({ overallScore: 0.9, corrections: [], feedback: 'Better' }),
 };
 
+let endpoint = '';
+let testNumber = 0;
 describe('useWritingDrafts', () => {
   beforeEach(() => {
+    endpoint = `/api/test-writing-${++testNumber}/writing`;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(graded));
   });
 
@@ -31,9 +34,7 @@ describe('useWritingDrafts', () => {
   });
 
   it('treats an already graded answer as nothing to send', () => {
-    const { result } = renderHook(() =>
-      useWritingDrafts([prompt('p1', 'Fertig.')], '/api/writing')
-    );
+    const { result } = renderHook(() => useWritingDrafts([prompt('p1', 'Fertig.')], endpoint));
 
     expect(result.current.hasChanges).toBe(false);
     expect(result.current.changedIds).toEqual([]);
@@ -41,7 +42,7 @@ describe('useWritingDrafts', () => {
 
   it('sends only the prompt that was edited', async () => {
     const { result } = renderHook(() =>
-      useWritingDrafts([prompt('p1', 'Fertig.'), prompt('p2', 'Auch fertig.')], '/api/writing')
+      useWritingDrafts([prompt('p1', 'Fertig.'), prompt('p2', 'Auch fertig.')], endpoint)
     );
 
     act(() => result.current.setText('p2', 'Doch nicht fertig.'));
@@ -52,11 +53,11 @@ describe('useWritingDrafts', () => {
     });
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith('/api/writing/p2', expect.anything());
+    expect(fetch).toHaveBeenCalledWith(`${endpoint}/p2`, expect.anything());
   });
 
   it('stops re-sending an answer once it is graded', async () => {
-    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], '/api/writing'));
+    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], endpoint));
 
     act(() => result.current.setText('p1', 'Mein erster Satz.'));
     await act(async () => {
@@ -73,7 +74,7 @@ describe('useWritingDrafts', () => {
 
   it('re-grades everything when asked with nothing changed', async () => {
     const { result } = renderHook(() =>
-      useWritingDrafts([prompt('p1', 'Fertig.'), prompt('p2', 'Auch fertig.')], '/api/writing')
+      useWritingDrafts([prompt('p1', 'Fertig.'), prompt('p2', 'Auch fertig.')], endpoint)
     );
 
     await act(async () => {
@@ -84,17 +85,25 @@ describe('useWritingDrafts', () => {
   });
 
   it('ignores whitespace-only edits', () => {
-    const { result } = renderHook(() =>
-      useWritingDrafts([prompt('p1', 'Fertig.')], '/api/writing')
-    );
+    const { result } = renderHook(() => useWritingDrafts([prompt('p1', 'Fertig.')], endpoint));
 
     act(() => result.current.setText('p1', '  Fertig.  '));
 
     expect(result.current.hasChanges).toBe(false);
   });
 
+  it('hides an earlier grade when its draft changes and restores unsent edits after leaving', () => {
+    const hook = renderHook(() => useWritingDrafts([prompt('p1', 'Fertig.')], endpoint));
+    act(() => hook.result.current.setText('p1', 'A revised answer'));
+    expect(hook.result.current.drafts.p1.result).toBeNull();
+    hook.unmount();
+    const resumed = renderHook(() => useWritingDrafts([prompt('p1', 'Fertig.')], endpoint));
+    expect(resumed.result.current.drafts.p1.text).toBe('A revised answer');
+    expect(resumed.result.current.hasChanges).toBe(true);
+  });
+
   it('never sends an empty answer', async () => {
-    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], '/api/writing'));
+    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], endpoint));
 
     act(() => result.current.setText('p1', '   '));
     await act(async () => {
@@ -106,7 +115,7 @@ describe('useWritingDrafts', () => {
   });
 
   it('holds back an answer over the route limit', () => {
-    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], '/api/writing'));
+    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], endpoint));
 
     act(() => result.current.setText('p1', 'a'.repeat(4001)));
 
@@ -119,7 +128,7 @@ describe('useWritingDrafts', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'Too long' }) })
     );
-    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], '/api/writing'));
+    const { result } = renderHook(() => useWritingDrafts([prompt('p1')], endpoint));
 
     act(() => result.current.setText('p1', 'Mein Satz.'));
     let outcome = true;

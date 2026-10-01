@@ -6,6 +6,7 @@
 // 5. Upserts each generated vocab word into the learner's knowledge graph.
 // 6. Generates comprehension MC questions over the transcript.
 // 7. Creates the ClassSection + LessonQuestion rows (status: READY).
+import { learningScriptHash } from './learning/script-hash';
 import { prisma } from './prisma';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -21,10 +22,35 @@ import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classLanguagePolicy, isImmersionLevel } from './classes/class-language-policy';
 import { verifyEpisodeReferences } from './reference-verification/verify-episode';
+import { z } from 'zod';
+import { reviewTeachingContent } from './classes/quality/teaching-quality';
+import {
+  assertClassGeneration,
+  withClassGeneration,
+} from './learning/classes/class-generation-state';
+import {
+  SECTION_QUALITY_JSON_SCHEMA,
+  sectionReviewInput,
+  assessSectionReview,
+  SectionQualityError,
+} from './classes/section-quality';
 
 const LISTENING_QUIZ_COUNT = 4;
+const listeningQuizSchema = z
+  .array(
+    z
+      .object({
+        question: z.string().trim().min(1),
+        options: z.array(z.string().trim().min(1)).length(4),
+        correctIndex: z.number().int().min(0).max(3),
+        explanation: z.string().trim().min(1),
+      })
+      .strict()
+  )
+  .length(LISTENING_QUIZ_COUNT);
 
 export interface ClassListeningParams {
+  ttsProvider?: import('./providers/tts-registry').TtsProviderId | null;
   /** Scheduled preparation leaves scripts for explicit learner review before audio spending. */
   deferAudio?: boolean;
   userId: string;
@@ -61,6 +87,7 @@ interface ListeningComprehensionQuestion {
 // and returns both. The caller decides where to persist the questions (a class
 // section, or a practice session). No ClassSection/LessonQuestion rows here.
 export interface ListeningContentParams {
+  ttsProvider?: import('./providers/tts-registry').TtsProviderId | null;
   deferAudio?: boolean;
   userId: string;
   execution: SottoProviderExecution;
@@ -92,17 +119,22 @@ export interface ListeningContent {
 /** Admit audio only after the caller has persisted the final learning association. */
 export async function queueListeningAudio(
   content: ListeningContent,
-  execution: SottoProviderExecution
+  execution: SottoProviderExecution,
+  classAttempt?: { classId: string; attempt: number }
 ) {
   const registerAudioEpisode = execution.registerAudioEpisode;
   await createSegmentsAndQueueAudio(content.episodeId, content.turns, {
     authorize: execution.authorize,
-    ...(registerAudioEpisode
-      ? {
-          onPrepared: (database, audioGenerationKey) =>
-            registerAudioEpisode(database, content.episodeId, audioGenerationKey),
-        }
-      : {}),
+    onPrepared: async (database, audioGenerationKey) => {
+      if (classAttempt)
+        await assertClassGeneration(
+          database,
+          classAttempt.classId,
+          classAttempt.attempt,
+          execution.userId
+        );
+      await registerAudioEpisode?.(database, content.episodeId, audioGenerationKey);
+    },
   });
 }
 
@@ -132,7 +164,8 @@ export async function composeListeningContent(
     select: { preferredTtsModel: true },
   });
   await getServerInfra();
-  const configuredTtsProvider = getConfiguredTtsProviderId();
+  const configuredTtsProvider =
+    p.ttsProvider === undefined ? getConfiguredTtsProviderId() : p.ttsProvider;
   if (!p.deferAudio && !configuredTtsProvider) {
     throw new Error(
       'AI audio is not enabled. Select a speech provider in Settings before starting listening practice.'
@@ -340,25 +373,54 @@ export async function composeListeningContent(
       throw new Error('Listening quiz generation returned malformed output.');
     }
 
-    const questions = rawQuestions
-      .filter(
-        (q) =>
-          typeof q.question === 'string' &&
-          Array.isArray(q.options) &&
-          q.options.length === 4 &&
-          typeof q.correctIndex === 'number'
-      )
-      .slice(0, LISTENING_QUIZ_COUNT)
-      .map((q) => ({
-        question: q.question,
-        options: (q.options as string[]).slice(0, 4),
-        correctIndex: Math.max(0, Math.min(3, q.correctIndex as number)),
-        explanation: typeof q.explanation === 'string' ? q.explanation : '',
-      }));
-
-    if (questions.length === 0) {
-      throw new Error('Listening quiz generation produced no usable questions.');
-    }
+    const parsedQuiz = listeningQuizSchema.safeParse(rawQuestions);
+    if (!parsedQuiz.success)
+      throw new Error('Listening quiz generation must produce all 4 valid questions.');
+    const questions = parsedQuiz.data;
+    const reviewedQuestions = questions.map((question) => ({
+      ...question,
+      passageText: transcript,
+    }));
+    const blindReview = await provider.generateResponse(
+      loadAndRender('class/review-section-quiz.md', {
+        LEVEL: p.level,
+        TARGET: p.targetLang,
+        NATIVE: p.nativeLang,
+        SKILL: 'LISTENING',
+        REVIEW_SCHEMA: JSON.stringify(SECTION_QUALITY_JSON_SCHEMA.schema),
+        LANGUAGE_POLICY: classLanguagePolicy(p),
+      }),
+      [{ role: 'user', content: sectionReviewInput(reviewedQuestions) }],
+      {
+        ...(await capturedLearningAiOptions(ai)),
+        temperature: 0,
+        maxTokens: 2048,
+        jsonSchema: SECTION_QUALITY_JSON_SCHEMA,
+      }
+    );
+    logUsage({
+      service: ai.provider,
+      model: blindReview.model,
+      category: 'class-listening-review',
+      inputTokens: blindReview.inputTokens,
+      outputTokens: blindReview.outputTokens,
+      userId: p.userId,
+      episodeId,
+    });
+    if (assessSectionReview(blindReview.content, reviewedQuestions, true).issues.length)
+      throw new SectionQualityError(
+        'Listening questions are not supported by the exact audio script.'
+      );
+    await reviewTeachingContent({
+      ai,
+      provider,
+      userId: p.userId,
+      level: p.level,
+      nativeLang: p.nativeLang,
+      targetLang: p.targetLang,
+      kind: 'listening',
+      items: reviewedQuestions,
+    });
 
     return { episodeId, comprehensionQuestions: questions, turns: result.turns };
   } catch (err) {
@@ -377,6 +439,7 @@ export async function generateClassListening(
 ): Promise<ClassListeningResult> {
   const attempt = p.attempt ?? 1;
   const content = await composeListeningContent({
+    ttsProvider: p.ttsProvider,
     userId: p.userId,
     execution: p.execution,
     courseId: p.courseId,
@@ -395,32 +458,36 @@ export async function generateClassListening(
   const { episodeId, comprehensionQuestions } = content;
 
   try {
-    const section = await prisma.classSection.create({
-      data: {
-        classId: p.classId,
-        skill: 'LISTENING',
-        attempt,
-        seed: `${p.classId}-LISTENING-${attempt}`,
-        spec: { objective: p.objective },
-        status: 'READY',
-        episodeId,
-        generatedAt: new Date(),
-      },
+    const section = await withClassGeneration(p.execution, p.classId, attempt, async (database) => {
+      const section = await database.classSection.create({
+        data: {
+          classId: p.classId,
+          skill: 'LISTENING',
+          attempt,
+          seed: `${p.classId}-LISTENING-${attempt}`,
+          spec: { objective: p.objective, scriptHash: learningScriptHash(content.turns) },
+          status: 'READY',
+          episodeId,
+          generatedAt: new Date(),
+        },
+      });
+
+      await database.lessonQuestion.createMany({
+        data: comprehensionQuestions.map((q, i) => ({
+          sectionId: section.id,
+          order: i + 1,
+          skill: 'LISTENING' as const,
+          question: q.question,
+          options: q.options,
+          correctIndex: q.correctIndex,
+          explanation: q.explanation,
+        })),
+      });
+      return section;
     });
 
-    await prisma.lessonQuestion.createMany({
-      data: comprehensionQuestions.map((q, i) => ({
-        sectionId: section.id,
-        order: i + 1,
-        skill: 'LISTENING' as const,
-        question: q.question,
-        options: q.options,
-        correctIndex: q.correctIndex,
-        explanation: q.explanation,
-      })),
-    });
-
-    if (!p.deferAudio) await queueListeningAudio(content, p.execution);
+    if (!p.deferAudio)
+      await queueListeningAudio(content, p.execution, { classId: p.classId, attempt });
 
     logger.info('Listening section generated', {
       classId: p.classId,

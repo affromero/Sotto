@@ -6,14 +6,20 @@
  * away. This reads a session back into exactly the shape `startPractice`
  * returns, which is what `PracticeRunner` already knows how to render.
  *
- * It restores the material, not the learner's in-flight answers: multiple
- * choice selections live only in the runner's client state, so a resumed
- * session shows every question unanswered. Speaking and writing responses are
- * persisted per prompt and are unaffected.
+ * Restores saved choices, drafts, latest evidence and the completion receipt.
  *
  * Lives outside practice-service.ts, which is already at its length ceiling.
  */
 import { prisma } from '../prisma';
+import { readSkillRequirements } from '../learning/skill-requirements';
+import { z } from 'zod';
+import {
+  practiceReceiptSchema,
+  speakingEvidenceSchema,
+  writingFeedbackSchema,
+} from '@sotto/shared';
+import { practicePreparationSchema } from './preparation-state';
+import { practicePreparationProgress, reconcilePracticePreparation } from './preparation';
 import {
   PracticeSessionNotFoundError,
   type PracticeMcItemPublic,
@@ -40,55 +46,144 @@ export async function resumePractice(
 ): Promise<StartPracticeResult> {
   const session = await prisma.practiceSession.findFirst({
     where: { id: sessionId, course: { userId } },
-    select: { id: true, kind: true, status: true, items: true, episodeId: true },
+    select: {
+      id: true,
+      kind: true,
+      status: true,
+      items: true,
+      episodeId: true,
+      skillRequirements: true,
+      learnerAnswers: true,
+      writingDrafts: true,
+      submissionResult: true,
+      progressRevision: true,
+      generationState: true,
+    },
   });
   if (!session) throw new PracticeSessionNotFoundError('Practice session not found');
-  if (session.status !== 'ACTIVE') {
+  if (session.generationState) {
+    const stored = practicePreparationSchema.parse(session.generationState);
+    const operation = ['CANCELLING', 'RUNNING'].includes(stored.status)
+      ? await reconcilePracticePreparation(sessionId, userId)
+      : stored;
+    if (operation.unavailableReason)
+      return { status: 'unavailable', reason: operation.unavailableReason };
+    if (
+      operation.status !== 'COMPLETED' &&
+      session.status !== 'ACTIVE' &&
+      session.status !== 'COMPLETED'
+    )
+      return practicePreparationProgress(operation);
+  }
+  if (session.status !== 'ACTIVE' && !session.submissionResult) {
     throw new PracticeSessionNotFoundError('Practice session is already complete');
   }
 
   const items = ((session.items as unknown as StoredMcItem[]) ?? []).map(toPublic);
+  const answers = z
+    .record(z.string(), z.number().int().min(0).max(3))
+    .safeParse(session.learnerAnswers);
+  const drafts = z.record(z.string(), z.string()).safeParse(session.writingDrafts);
+  const requirements = readSkillRequirements(session.skillRequirements);
+  const progress = {
+    progressRevision: session.progressRevision,
+    ...(requirements ? { skillRequirements: requirements } : {}),
+    ...(answers.success ? { learnerAnswers: answers.data } : {}),
+    ...(drafts.success ? { writingDrafts: drafts.data } : {}),
+    ...(session.submissionResult
+      ? {
+          submissionResult: practiceReceiptSchema.parse(session.submissionResult),
+        }
+      : {}),
+  };
 
   if (session.kind === 'SPEAKING' || session.kind === 'FULL') {
     const prompts = await prisma.speakingPrompt.findMany({
       where: { practiceSessionId: session.id },
       orderBy: { order: 'asc' },
-      select: { id: true, targetPhrase: true, translation: true, referenceTtsUrl: true },
+      select: {
+        id: true,
+        targetPhrase: true,
+        translation: true,
+        referenceTtsUrl: true,
+        recordings: {
+          where: { userId },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            transcript: true,
+            overallScore: true,
+            rubricScores: true,
+            feedback: true,
+          },
+        },
+      },
     });
+    const speakingPrompts = prompts.map(({ recordings, ...prompt }) => ({
+      ...prompt,
+      latestRecording: recordings[0]
+        ? speakingEvidenceSchema.parse({ ...recordings[0], recordingId: recordings[0].id })
+        : null,
+    }));
     if (session.kind === 'SPEAKING') {
-      return { status: 'ready_speaking', sessionId: session.id, prompts };
+      return {
+        ...progress,
+        status: 'ready_speaking',
+        sessionId: session.id,
+        prompts: speakingPrompts,
+      };
     }
 
-    const writingPrompts = await prisma.writingPrompt.findMany({
-      where: { practiceSessionId: session.id },
-      orderBy: { order: 'asc' },
-      select: { id: true, task: true, guidance: true, ideas: true },
-    });
+    const writingPrompts = await readWritingPrompts(session.id, userId);
     return {
       status: 'ready_full',
+      ...progress,
       sessionId: session.id,
       kind: 'FULL',
       items,
       episodeId: session.episodeId ?? undefined,
-      speakingPrompts: prompts,
+      speakingPrompts,
       writingPrompts,
     };
   }
 
   if (session.kind === 'WRITING') {
-    const prompts = await prisma.writingPrompt.findMany({
-      where: { practiceSessionId: session.id },
-      orderBy: { order: 'asc' },
-      select: { id: true, task: true, guidance: true, ideas: true },
-    });
-    return { status: 'ready_writing', sessionId: session.id, prompts };
+    const prompts = await readWritingPrompts(session.id, userId);
+    return { ...progress, status: 'ready_writing', sessionId: session.id, prompts };
   }
 
   return {
     status: 'ready',
+    ...progress,
     sessionId: session.id,
     kind: session.kind,
     items,
     episodeId: session.episodeId ?? undefined,
   };
+}
+
+async function readWritingPrompts(sessionId: string, userId: string) {
+  const prompts = await prisma.writingPrompt.findMany({
+    where: { practiceSessionId: sessionId },
+    orderBy: { order: 'asc' },
+    select: {
+      id: true,
+      task: true,
+      guidance: true,
+      ideas: true,
+      responses: {
+        where: { userId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: { text: true, overallScore: true, corrections: true, feedback: true },
+      },
+    },
+  });
+  return prompts.map(({ responses, ...prompt }) => {
+    const latest = responses[0];
+    const grade = writingFeedbackSchema.safeParse(latest);
+    return { ...prompt, savedDraft: latest?.text, response: grade.success ? grade.data : null };
+  });
 }

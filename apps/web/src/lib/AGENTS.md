@@ -36,9 +36,39 @@ focused expressions. Preserve exact word attribution for SRS, and carry reading
 `passageText` through both start and resume projections. Writing generation
 requires supplied source text and a constrained exercise type. Listening checks
 the explicitly configured TTS provider before script generation; missing
-credentials are errors, never a reason to choose another provider. Full practice
-and class submission require usable listening audio and graded speaking work
-before updating progress. Class mastery also requires passing both oral sections.
+credentials are errors, never a reason to choose another provider. Classes and
+FULL practice require grammar, reading, and writing. Listening requires configured
+TTS access; speaking requires configured STT access. Missing access exempts only
+the corresponding oral skill. Invalid configuration, failed work, and unsettled
+evidence never waive requirements. Classes require mastery in every required
+section; complete practice remains finishable at low scores.
+
+`learning/skill-requirements.ts`, `speech-configuration.ts`, and `speech-selection.ts`
+capture versioned requirements and explicit provider bindings without paid probes.
+`learning/script-hash.ts` binds listening questions to the preserved script.
+`learning/session-evaluation.ts` validates complete material and current evidence.
+`learning/reading-vocabulary.ts` extracts passage vocabulary independently of
+listening and credits only assessed targets backed by course memory.
+`learning/progress.ts` and `progress-route.ts` persist revision-bound choices and
+writing drafts. Conflicts preserve local work until the learner reconciles it.
+`learning/database.ts` defines the transaction boundary shared by these helpers.
+
+`learning/classes/current-sections.ts` selects the latest section before filtering
+its state. `class-material.ts` validates counts, reading provenance, exact scripts,
+and owned reference audio. `class-generation-state.ts` and `class-repair.ts` retain
+attempt identity and surviving learner work. `class-submission.ts` commits receipts,
+assessed-target review, mastery, and conditional course progression atomically.
+`learning/preparation/preparation-grant.ts` and `preparation-provider.ts` share
+captured authority and request journals across class, practice, and writing work.
+`learning/writing/writing-execution.ts` admits synchronous grading with a durable
+receipt; `writing-submission.ts` binds it to the latest prompt and learner text.
+Unknown provider or cleanup outcomes remain fenced rather than replaying paid work.
+
+`practice/material.ts` validates preserved FULL material before completion.
+`practice/preparation-state.ts` and `preparation.ts` admit durable queued generation,
+visible status, cancellation, and explicit recovery. `practice/submission.ts` seals
+feedback and SRS effects once; `practice/resume.ts` restores choices, drafts,
+latest productive evidence, preparation state, and completed results.
 
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
@@ -85,16 +115,15 @@ preserves correct numbered identities and legitimate surface variations, and rej
 duplicate numbers, ambiguous remapping, or missing identities. It never rewrites
 spoken text, infers a translation, or adds provider calls.
 
-`classes/regeneration/pristine.ts` supports optional guarded class regeneration.
-The existing class GET with `pristineSnapshot=1` returns an opaque content hash;
-the synchronous class POST accepts it alongside `scope: 'class'`. Revalidate
-ownership, the full snapshot, absence of learner work, and settled linked jobs
-before deleting pristine sections in the serializable admission transaction.
-Conflicts return 409; async guarded requests return 400. Never delete submissions
-through this guarded path. Available classes and failed generation attempts may
-be claimed when pristine. Failed attempts may retain incomplete generation sections;
-learner interaction states, scores, submissions, and unsettled jobs still block
-regeneration. Claim the inspected status atomically and clear the prior failure time.
+`classes/regeneration/pristine.ts` supports guarded durable class regeneration.
+The class GET with `pristineSnapshot=1` returns an opaque content hash. Class POST
+requires `expectedAttempt` and accepts the hash alongside `scope: 'class'`.
+Revalidate ownership, the snapshot, absence of learner work, and settled linked
+jobs in the serializable admission transaction. Successful admission returns HTTP
+202 with its durable identity; conflicts return 409. Preserve submissions and
+attempt history. Section repair retains complete unsubmitted work, replaces only
+selected incomplete sections, and preserves old material until publication.
+Never claim a replacement while earlier provider or execution cleanup is unresolved.
 
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks
@@ -368,7 +397,7 @@ Retain tombstones and cleanup identities while durable jobs can be replayed.
 | `note-upload.ts`               | Shared uploaded-file text extraction: `isUploadFile()`, `clipImportedText()`, `extractUploadText()`, `extractUploadTexts()` (text files direct, office/PDF/epub via Markit, clipped). Used by course-notes import and notes-based placement                                                                                                                                                                                                                                    | Uses `extractors/markit`                                                                                 |
 | `class-generation.ts`          | Class content generation: builds ClassSection questions and SpeakingPrompts from Lesson spec + adaptive SRS seed                                                                                                                                                                                                                                                                                                                                                               | Uses `llm.ts`, `prisma.ts`                                                                               |
 | `class-source.ts`              | `prepareClassSource()` — sourced classes: `extractContent()` a real link/paper/video → CEFR-level it to a target-language passage (prompt `class/level-source.md`) used as the reading passage AND the listening `sourceContent`. Throws `ClassSourceError` (fails closed, never fabricates a source)                                                                                                                                                                          | Uses `extractors/`, `learning-ai.ts`, `providers/ai.ts`                                                  |
-| `class-service.ts`             | Class orchestration: `createNextClass()` (gating + generation), `getClassForUser()`, `regenerateFailedSections()`, `CourseNotFoundError`                                                                                                                                                                                                                                                                                                                                       | Uses `prisma.ts`, `queue.ts`                                                                             |
+| `class-service.ts`             | Class orchestration: `createNextClass()` (gating + generation), `getClassForUser()`, `regenerateCurrentClass()`, `CourseNotFoundError`                                                                                                                                                                                                                                                                                                                                         | Uses `prisma.ts`, `queue.ts`                                                                             |
 | `class-listening-generator.ts` | `composeListeningContent()` (content-only core: CLASS Episode + `generateScript()` + comprehension questions + graph nodes) and `generateClassListening()` (= core + ClassSection/LessonQuestion persistence). Reused by practice. Optional `note` personalizes generation                                                                                                                                                                                                     | Uses `prisma.ts`, `queue.ts`                                                                             |
 | `class-speaking-generator.ts`  | `composeSpeakingPrompts()` (content-only core: LLM phrases + reference TTS, namespaced by `refId`) and `generateClassSpeaking()` (= core + ClassSection/SpeakingPrompt persistence). Reused by practice. Optional `note`                                                                                                                                                                                                                                                       | Uses `providers/tts.ts`, `prisma.ts`                                                                     |
 | `class-writing-generator.ts`   | `composeWritingPrompts()` (content-only core: LLM writing tasks, no TTS) and `generateClassWriting()` (= core + ClassSection/WritingPrompt persistence). Reused by practice. Optional `note`                                                                                                                                                                                                                                                                                   | Uses `llm.ts`, `prisma.ts`                                                                               |

@@ -6,6 +6,8 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var profiles: [SottoProfile] = []
     @Published private(set) var courses: [SottoCourse] = []
     @Published var selectedClass: SottoClassDetail?
+    var learningSessions: [String: NativeLearningSessionState] = [:]
+    var pendingPracticeAdmissions: [String: UUID] = [:]
     @Published var practiceStart: SottoPracticeStart?
     @Published private(set) var practiceOverview: SottoPracticeOverview?
     @Published var classResult: SottoClassSubmitResult?
@@ -525,7 +527,7 @@ final class SottoAppModel: ObservableObject {
 
         do {
             let startedAt = Date()
-            try await client.startClassRegeneration(classId: selectedClass.id)
+            try await client.startClassRegeneration(classId: selectedClass.id, expectedAttempt: selectedClass.attempt ?? 1)
             self.selectedClass = try await waitForRefreshedClass(
                 client: client,
                 classId: selectedClass.id,
@@ -607,23 +609,10 @@ final class SottoAppModel: ObservableObject {
         errorMessage = nil
 
         do {
-            practiceStart = try await client.fetchPractice(sessionId: sessionId)
-            practiceResult = nil
-        } catch {
-            report(error)
-        }
-
-        isLoading = false
-    }
-
-    func startPractice(courseId: String, kind: String) async {
-        guard let client = makeClient() else { return }
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            practiceStart = try await client.startPractice(courseId: courseId, kind: kind)
-            practiceResult = nil
+            let resumed = try await client.fetchPractice(sessionId: sessionId)
+            guard isCurrentLearningClient(client) else { return }
+            practiceStart = resumed
+            practiceResult = resumed.submissionResult
         } catch {
             report(error)
         }
@@ -686,7 +675,9 @@ final class SottoAppModel: ObservableObject {
         errorMessage = nil
 
         do {
-            practiceResult = try await client.submitPractice(sessionId: practiceStart.sessionId, answers: answers)
+            let result = try await client.submitPractice(sessionId: practiceStart.sessionId, answers: answers)
+            guard isCurrentLearningClient(client), self.practiceStart?.sessionId == practiceStart.sessionId else { return }
+            practiceResult = result
         } catch {
             report(error)
         }

@@ -10,6 +10,15 @@ import { WritingSection } from './WritingSection';
 import { useWritingDrafts } from './writing/useWritingDrafts';
 import type { WritingPromptData } from './classTypes';
 import styles from './PracticeRunner.module.css';
+import type {
+  SkillRequirements,
+  PracticeReceipt,
+  SpeakingEvidence,
+  WritingFeedback,
+} from '@sotto/shared';
+import { practiceReceiptSchema } from '@sotto/shared';
+import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
+import { retainedLearningProgress, useLearningProgress } from './progress/useLearningProgress';
 
 // ---- Types (mirror the practice API) ----
 
@@ -25,6 +34,7 @@ interface PracticeSpeakingItem {
   targetPhrase: string;
   translation: string;
   referenceTtsUrl?: string | null;
+  latestRecording?: SpeakingEvidence | null;
 }
 
 interface PracticeWritingItem {
@@ -32,9 +42,11 @@ interface PracticeWritingItem {
   task: string;
   guidance?: string | null;
   ideas?: string[];
+  response?: WritingFeedback | null;
+  savedDraft?: string;
 }
 
-export type PracticeStart =
+type PracticeStartContent =
   | {
       status: 'ready';
       sessionId: string;
@@ -54,11 +66,15 @@ export type PracticeStart =
       writingPrompts: PracticeWritingItem[];
     };
 
-interface SubmitResult {
-  score: number;
-  correct: number;
-  total: number;
-}
+export type PracticeStart = PracticeStartContent & {
+  progressRevision?: number;
+  writingDrafts?: Record<string, string>;
+  skillRequirements?: SkillRequirements;
+  learnerAnswers?: Record<string, number>;
+  submissionResult?: SubmitResult | null;
+};
+
+type SubmitResult = PracticeReceipt;
 
 interface PracticeRunnerProps {
   courseId: string;
@@ -165,8 +181,44 @@ function ResultPanel({ result, onDone }: { result: SubmitResult; onDone: () => v
     <div className={styles.resultPanel} role="region" aria-label="Practice result">
       <ScoreDial value={Math.round(result.score * 100)} size={92} stroke={7} />
       <p className={styles.resultLine}>
-        {result.correct} of {result.total} correct, reviewed and scheduled for spaced repetition.
+        {result.correct} of {result.answered ?? result.total} choices correct.
+        {result.graded ? ` ${result.graded} speaking and writing exercises graded.` : ''}
       </p>
+      {result.itemFeedback && (
+        <ol className={styles.questionList}>
+          {result.itemFeedback.map((item) => (
+            <li key={item.itemId} className={styles.question}>
+              <p>{item.prompt}</p>
+              <p>
+                Your answer: {item.selectedAnswer}.{' '}
+                {item.correct ? 'Correct.' : `Correct answer: ${item.correctAnswer}.`}
+              </p>
+              <p>{item.explanation}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+      {result.writingFeedback?.map(({ promptId, task, grade }) => (
+        <article key={promptId} className={styles.question}>
+          <p>{task}</p>
+          <p>{grade.text}</p>
+          <p>Writing score: {Math.round(grade.overallScore * 100)}%</p>
+          {grade.corrections.map((correction, index) => (
+            <p key={index}>
+              {correction.old} → {correction.new}. {correction.why}
+            </p>
+          ))}
+          <p>{grade.feedback}</p>
+        </article>
+      ))}
+      {result.speakingFeedback?.map(({ promptId, targetPhrase, evidence }) => (
+        <article key={promptId} className={styles.question}>
+          <p>{targetPhrase}</p>
+          <p>{evidence.transcript}</p>
+          <p>Speaking score: {Math.round((evidence.overallScore ?? 0) * 100)}%</p>
+          <p>{evidence.feedback}</p>
+        </article>
+      ))}
       <button type="button" className={styles.primaryButton} onClick={onDone}>
         Done
       </button>
@@ -318,29 +370,32 @@ function McRunner({
   start: Extract<PracticeStart, { status: 'ready' }>;
   onDone: () => void;
 }) {
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [submitted, setSubmitted] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number>>(
+    () =>
+      retainedLearningProgress(
+        `/api/v1/practice/${start.sessionId}`,
+        { answers: start.learnerAnswers ?? {} },
+        start.progressRevision ?? 0
+      ).answers ?? {}
+  );
   const [phase, setPhase] = useState<'answering' | 'submitting' | 'result' | 'error'>('answering');
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [error, setError] = useState('');
-
-  /// Only the choices that moved since the last submit; everything when
-  /// nothing moved, so the always-available button still re-grades.
-  const changedAnswers = useMemo(
-    () =>
-      Object.entries(answers)
-        .filter(([itemId, selectedIndex]) => submitted[itemId] !== selectedIndex)
-        .map(([itemId, selectedIndex]) => ({ itemId, selectedIndex })),
-    [answers, submitted]
+  const saveError = useLearningProgress(
+    `/api/v1/practice/${start.sessionId}`,
+    { answers },
+    phase === 'answering',
+    start.progressRevision ?? 0
   );
 
   const submit = useCallback(async () => {
     setPhase('submitting');
     setError('');
 
-    const payload = changedAnswers.length
-      ? changedAnswers
-      : Object.entries(answers).map(([itemId, selectedIndex]) => ({ itemId, selectedIndex }));
+    const payload = Object.entries(answers).map(([itemId, selectedIndex]) => ({
+      itemId,
+      selectedIndex,
+    }));
 
     try {
       const res = await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
@@ -355,13 +410,12 @@ function McRunner({
         return;
       }
       setResult((await res.json()) as SubmitResult);
-      setSubmitted(answers);
       setPhase('result');
     } catch {
       setError('Network error. Please try again.');
       setPhase('answering');
     }
-  }, [answers, changedAnswers, start.sessionId]);
+  }, [answers, start.sessionId]);
 
   if (phase === 'result' && result) {
     return <ResultPanel result={result} onDone={onDone} />;
@@ -369,6 +423,9 @@ function McRunner({
 
   return (
     <div className={styles.runner}>
+      {saveError && (
+        <LearningSaveRecovery endpoint={`/api/v1/practice/${start.sessionId}`} error={saveError} />
+      )}
       {start.episodeId && (
         <div className={styles.audioBlock}>
           <ListeningAudio episodeId={start.episodeId} />
@@ -422,6 +479,7 @@ async function finishPractice(sessionId: string) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? 'Could not finish practice. Please try again.');
   }
+  return practiceReceiptSchema.parse(await response.json());
 }
 
 function SpeakingRunner({
@@ -433,13 +491,13 @@ function SpeakingRunner({
 }) {
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState('');
+  const [result, setResult] = useState<SubmitResult | null>(null);
 
   async function finish() {
     setFinishing(true);
     setError('');
     try {
-      await finishPractice(start.sessionId);
-      onDone();
+      setResult(await finishPractice(start.sessionId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not finish practice.');
     } finally {
@@ -447,6 +505,7 @@ function SpeakingRunner({
     }
   }
 
+  if (result) return <ResultPanel result={result} onDone={onDone} />;
   return (
     <div className={styles.runner}>
       <SpeakingExercise
@@ -484,6 +543,7 @@ function WritingRunner({
 }) {
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState('');
+  const [result, setResult] = useState<SubmitResult | null>(null);
 
   const prompts: WritingPromptData[] = useMemo(
     () =>
@@ -493,17 +553,23 @@ function WritingRunner({
         task: p.task,
         guidance: p.guidance ?? null,
         ideas: p.ideas ?? [],
-        response: null,
+        response: p.response ?? null,
+        savedDraft: start.writingDrafts?.[p.id] ?? p.savedDraft,
       })),
-    [start.prompts]
+    [start.prompts, start.writingDrafts]
   );
 
-  const drafts = useWritingDrafts(prompts, `/api/v1/practice/${start.sessionId}/writing`);
+  const drafts = useWritingDrafts(
+    prompts,
+    `/api/v1/practice/${start.sessionId}/writing`,
+    undefined,
+    start.progressRevision ?? 0
+  );
 
   async function finish() {
     setFinishing(true);
     // Grade what was written, then apply SRS from the graded responses.
-    const graded = await drafts.submit(!drafts.hasChanges);
+    const graded = await drafts.submit();
     if (!graded) {
       setFinishing(false);
       return;
@@ -511,8 +577,7 @@ function WritingRunner({
 
     setError('');
     try {
-      await finishPractice(start.sessionId);
-      onDone();
+      setResult(await finishPractice(start.sessionId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not finish practice.');
     } finally {
@@ -520,6 +585,7 @@ function WritingRunner({
     }
   }
 
+  if (result) return <ResultPanel result={result} onDone={onDone} />;
   return (
     <div className={styles.runner}>
       <WritingSection drafts={drafts} prompts={prompts} />
@@ -557,11 +623,23 @@ function FullRunner({
   start: Extract<PracticeStart, { status: 'ready_full' }>;
   onDone: () => void;
 }) {
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [submitted, setSubmitted] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number>>(
+    () =>
+      retainedLearningProgress(
+        `/api/v1/practice/${start.sessionId}`,
+        { answers: start.learnerAnswers ?? {} },
+        start.progressRevision ?? 0
+      ).answers ?? {}
+  );
   const [phase, setPhase] = useState<'answering' | 'submitting' | 'result' | 'error'>('answering');
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [error, setError] = useState('');
+  const saveError = useLearningProgress(
+    `/api/v1/practice/${start.sessionId}`,
+    { answers },
+    phase === 'answering',
+    start.progressRevision ?? 0
+  );
   const [audioStatus, setAudioStatus] = useState(
     start.episodeId ? 'Audio generating' : 'Audio unavailable'
   );
@@ -574,37 +652,33 @@ function FullRunner({
         task: p.task,
         guidance: p.guidance ?? null,
         ideas: p.ideas ?? [],
-        response: null,
+        response: p.response ?? null,
+        savedDraft: start.writingDrafts?.[p.id] ?? p.savedDraft,
       })),
-    [start.writingPrompts]
+    [start.writingPrompts, start.writingDrafts]
   );
 
-  const drafts = useWritingDrafts(writingPrompts, `/api/v1/practice/${start.sessionId}/writing`);
-
-  /// Only the choices that moved since the last submit.
-  const changedAnswers = useMemo(
-    () =>
-      Object.entries(answers)
-        .filter(([itemId, selectedIndex]) => submitted[itemId] !== selectedIndex)
-        .map(([itemId, selectedIndex]) => ({ itemId, selectedIndex })),
-    [answers, submitted]
+  const drafts = useWritingDrafts(
+    writingPrompts,
+    `/api/v1/practice/${start.sessionId}/writing`,
+    undefined,
+    start.progressRevision ?? 0
   );
-
-  const hasChanges = changedAnswers.length > 0 || drafts.hasChanges;
 
   const submit = useCallback(async () => {
     setPhase('submitting');
     setError('');
 
-    const graded = await drafts.submit(!hasChanges);
+    const graded = await drafts.submit();
     if (!graded) {
       setPhase('answering');
       return;
     }
 
-    const payload = hasChanges
-      ? changedAnswers
-      : Object.entries(answers).map(([itemId, selectedIndex]) => ({ itemId, selectedIndex }));
+    const payload = Object.entries(answers).map(([itemId, selectedIndex]) => ({
+      itemId,
+      selectedIndex,
+    }));
 
     try {
       const res = await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
@@ -619,13 +693,12 @@ function FullRunner({
         return;
       }
       setResult((await res.json()) as SubmitResult);
-      setSubmitted(answers);
       setPhase('result');
     } catch {
       setError('Network error. Please try again.');
       setPhase('answering');
     }
-  }, [answers, changedAnswers, drafts, hasChanges, start.sessionId]);
+  }, [answers, drafts, start.sessionId]);
 
   if (phase === 'result' && result) {
     return <ResultPanel result={result} onDone={onDone} />;
@@ -633,12 +706,15 @@ function FullRunner({
 
   return (
     <div className={styles.runner}>
+      {saveError && (
+        <LearningSaveRecovery endpoint={`/api/v1/practice/${start.sessionId}`} error={saveError} />
+      )}
       <p className={styles.progressHint}>
         Open a section to practice. Your answers stay here while you move between sections.
       </p>
       {MC_SECTIONS.map(({ prefix, title }) => {
         const items = start.items.filter((item) => item.id.startsWith(prefix));
-        if (prefix === 'f' && items.length === 0) return null;
+        if ((prefix === 'f' || prefix === 'v') && items.length === 0) return null;
         return (
           <PracticeSection
             key={prefix}
@@ -646,7 +722,9 @@ function FullRunner({
             progress={`${prefix === 'l' ? `${audioStatus} · ` : ''}${items.filter((item) => answers[item.id] !== undefined).length} of ${items.length} answered`}
           >
             {prefix === 'l' &&
-              (start.episodeId ? (
+              (start.skillRequirements?.skills.LISTENING.state === 'EXEMPT_NO_PROVIDER' ? (
+                <p role="status">Listening is exempt because no TTS provider is connected.</p>
+              ) : start.episodeId ? (
                 <ListeningAudio
                   key={start.episodeId}
                   episodeId={start.episodeId}
@@ -675,7 +753,9 @@ function FullRunner({
       })}
 
       <PracticeSection title="Speaking" progress={`${start.speakingPrompts.length} exercises`}>
-        {start.speakingPrompts.length > 0 ? (
+        {start.skillRequirements?.skills.SPEAKING.state === 'EXEMPT_NO_PROVIDER' ? (
+          <p role="status">Speaking is exempt because no STT provider is connected.</p>
+        ) : start.speakingPrompts.length > 0 ? (
           <SpeakingExercise
             endpointBase={`/api/v1/practice/${start.sessionId}/speaking`}
             prompts={start.speakingPrompts}
@@ -719,6 +799,8 @@ function FullRunner({
 }
 
 export function PracticeRunner({ courseId, start, onDone }: PracticeRunnerProps) {
+  if (start.submissionResult)
+    return <ResultPanel result={start.submissionResult} onDone={onDone} />;
   if (start.status === 'ready_full') {
     return <FullRunner courseId={courseId} start={start} onDone={onDone} />;
   }

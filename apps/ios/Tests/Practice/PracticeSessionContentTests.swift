@@ -51,6 +51,44 @@ final class PracticeSessionContentTests: XCTestCase {
         XCTAssertEqual(session.speakingPrompts?.count, 1)
     }
 
+    func testFocusedProductiveSessionsDecodeTheirCanonicalPrompts() throws {
+        let speaking = try start(#"{"status":"ready_speaking","sessionId":"s","prompts":[{"id":"p","targetPhrase":"Hola","translation":"Hello","latestRecording":{"recordingId":"r","status":"GRADING"}}]}"#)
+        XCTAssertEqual(speaking.speakingPrompts?.first?.latestRecording?.id, "r")
+        XCTAssertEqual(speaking.speakingPrompts?.first?.latestRecording?.status, "GRADING")
+        let writing = try start(#"{"status":"ready_writing","sessionId":"w","prompts":[{"id":"p","task":"Greet Ana","savedDraft":"Buenas tardes","response":{"text":"Hola","overallScore":0.8,"corrections":[],"feedback":"Clear"}}]}"#)
+        XCTAssertEqual(writing.writingPrompts?.first?.savedDraft, "Buenas tardes")
+        XCTAssertEqual(writing.writingPrompts?.first?.latestResponse?.text, "Hola")
+    }
+
+    func testProviderExemptionsAndFocusedRequirementsDecodeWithoutInventedCounts() throws {
+        let saved = try start(#"{"status":"ready_full","sessionId":"text-only","kind":"FULL","items":[],"skillRequirements":{"skills":{"GRAMMAR":{"state":"REQUIRED","expectedCount":5},"READING":{"state":"REQUIRED","expectedCount":5},"WRITING":{"state":"REQUIRED","expectedCount":3},"LISTENING":{"state":"EXEMPT_NO_PROVIDER","reason":"NO_TTS_PROVIDER"},"SPEAKING":{"state":"EXEMPT_NO_PROVIDER","reason":"NO_STT_PROVIDER"}},"referenceAudioRequired":false}}"#)
+        XCTAssertEqual(saved.skillRequirements?.exemptions, ["LISTENING", "SPEAKING"])
+        XCTAssertNil(saved.skillRequirements?.skills["LISTENING"]?.expectedCount)
+        let focused = try start(#"{"status":"ready_writing","sessionId":"focused","prompts":[],"skillRequirements":{"skills":{"GRAMMAR":{"state":"NOT_REQUESTED"},"WRITING":{"state":"REQUIRED","expectedCount":3}},"referenceAudioRequired":false}}"#)
+        XCTAssertEqual(focused.skillRequirements?.skills["WRITING"]?.expectedCount, 3)
+    }
+
+    func testQueuedPreparationRetainsItsRecoveryIdentity() throws {
+        let prepared = try start(#"{"status":"preparing","sessionId":"admission","preparationStatus":"UNRESOLVED","message":"Interrupted","canRecover":true}"#)
+        XCTAssertEqual(prepared.sessionId, "admission")
+        XCTAssertEqual(prepared.preparationStatus, "UNRESOLVED")
+        XCTAssertEqual(prepared.canRecover, true)
+    }
+
+    func testReopenedPracticePreservesAnswersDraftsAndCompleteReceipt() throws {
+        let saved = try start(#"{"status":"ready_full","sessionId":"saved","kind":"FULL","items":[],"learnerAnswers":{"g0":2},"writingDrafts":{"w0":"Hola"},"progressRevision":3,"submissionResult":{"score":0.8,"correct":9,"answered":10,"graded":3,"total":13,"writingFeedback":[{"promptId":"w0","task":"Greet Ana","grade":{"text":"Hola","overallScore":0.8,"corrections":[{"old":"Ola","new":"Hola","why":"Use the greeting."}],"feedback":"Clear"}}]}}"#)
+        XCTAssertEqual(saved.learnerAnswers, ["g0": 2])
+        XCTAssertEqual(saved.writingDrafts, ["w0": "Hola"])
+        XCTAssertEqual(saved.progressRevision, 3)
+        XCTAssertEqual(saved.submissionResult?.answered, 10)
+        XCTAssertEqual(saved.submissionResult?.writingFeedback?.first?.grade.corrections?.first?.why, "Use the greeting.")
+    }
+
+    func testUnavailablePracticeDoesNotRequireAnInventedSession() throws {
+        let unavailable = try start(#"{"status":"unavailable","reason":"no_content"}"#)
+        XCTAssertEqual(unavailable.reason, "no_content")
+    }
+
     func testEpisodeAudioArrivesLate() throws {
         let pending = try JSONDecoder().decode(
             SottoEpisode.self,

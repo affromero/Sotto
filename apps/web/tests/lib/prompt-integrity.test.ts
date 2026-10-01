@@ -93,6 +93,7 @@ const EXPECTED_FILES = [
   'curriculum/generate-curriculum.md',
   'curriculum/generate-level-lessons.md',
   'live/extract-vocab.md',
+  'live/extract-reading-vocab.md',
   'live/extract-learning-targets.md',
   'exams/exam-feedback.md',
 ];
@@ -132,6 +133,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'TARGET',
   ],
   'live/extract-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
+  'live/extract-reading-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
   'live/extract-learning-targets.md': ['LEVEL', 'MAX_GRAMMAR', 'MAX_VOCAB', 'NATIVE', 'TARGET'],
   'exams/exam-feedback.md': ['EXAM_NAME', 'LEVEL', 'OVERALL', 'SECTIONS'],
   'generation/script-generator.md': [
@@ -210,6 +212,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'ALIGNMENT_SUMMARY',
     'TARGET',
     'TARGET_PHRASE',
+    'TIMING_EVIDENCE',
     'TRANSCRIPT',
   ].sort(),
   'speaking/generate-speaking-prompts.md': [

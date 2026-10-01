@@ -30,14 +30,14 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockGetClassForUser = vi.fn();
 const mockSubmitClass = vi.fn();
-const mockRegenerateFailedSections = vi.fn();
-const mockRegenerateCurrentClass = vi.fn();
 const mockDeleteClassForUser = vi.fn();
 const mockReadPreparation = vi.fn();
 const mockCancelPreparation = vi.fn();
+const mockRequestPreparation = vi.fn();
 
 vi.mock('@/lib/classes/preparation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/classes/preparation')>()),
+  requestClassPreparation: (...args: unknown[]) => mockRequestPreparation(...args),
   readClassPreparation: (...args: unknown[]) => mockReadPreparation(...args),
   cancelClassPreparation: (...args: unknown[]) => mockCancelPreparation(...args),
 }));
@@ -50,8 +50,6 @@ vi.mock('@/lib/class-service', () => {
     ClassIncompleteError,
     getClassForUser: (...args: unknown[]) => mockGetClassForUser(...args),
     submitClass: (...args: unknown[]) => mockSubmitClass(...args),
-    regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
-    regenerateCurrentClass: (...args: unknown[]) => mockRegenerateCurrentClass(...args),
     deleteClassForUser: (...args: unknown[]) => mockDeleteClassForUser(...args),
     CourseNotFoundError,
     ClassGenerationCancelledError,
@@ -372,117 +370,63 @@ describe('GET /api/v1/classes/[classId]', () => {
 
 // ---- POST /api/v1/classes/[classId] (regenerate) ----
 
-describe('POST /api/v1/classes/[classId] (regenerate)', () => {
+describe('POST /api/v1/classes/[classId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+    mockCourseClassFindFirst.mockResolvedValue({ courseId: 'course-1', status: 'AVAILABLE' });
+    mockRequestPreparation.mockResolvedValue({ id: 'operation-1', status: 'QUEUED' });
   });
-
-  it('returns 401 when unauthenticated', async () => {
+  it('returns 401 without a learner', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', { expectedAttempt: 1 }),
       classParams('class-1')
     );
-
-    expect(res.status).toBe(401);
+    expect(response.status).toBe(401);
   });
-
-  it('returns {regenerated:true} when regeneration succeeds', async () => {
-    mockRegenerateFailedSections.mockResolvedValue(true);
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
+  it.each([
+    { expectedAttempt: 1 },
+    { scope: 'sections', expectedAttempt: 1 },
+    { scope: 'class', expectedAttempt: 1 },
+  ])('returns a durable preparation identity for %j', async (body) => {
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', body),
       classParams('class-1')
     );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({ regenerated: true });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({
+      started: true,
+      status: 'GENERATING',
+      courseId: 'course-1',
+      operationId: 'operation-1',
+      scope: body?.scope === 'class' ? 'class' : 'sections',
+    });
   });
-
-  it('regenerates the current class when scope=class', async () => {
-    mockRegenerateCurrentClass.mockResolvedValue(true);
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', { scope: 'class' }),
+  it('returns a conflict for uncertain earlier work', async () => {
+    mockRequestPreparation.mockRejectedValue(
+      new PreparationConflictError('Execution cleanup is not confirmed.')
+    );
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', { expectedAttempt: 1 }),
       classParams('class-1')
     );
-
-    expect(res.status).toBe(200);
-    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith(
-      'class-1',
-      'u1',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
-      undefined
-    );
-    expect(mockRegenerateFailedSections).not.toHaveBeenCalled();
-    const body = await res.json();
-    expect(body).toEqual({ regenerated: true, scope: 'class' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/cleanup.*confirmed/i),
+    });
   });
-
-  it('starts current class regeneration in the background when requested', async () => {
-    mockCourseClassFindFirst.mockResolvedValue({ status: 'AVAILABLE' });
-    mockRegenerateCurrentClass.mockResolvedValue(true);
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1?background=1', 'POST', {
-        scope: 'class',
-      }),
-      classParams('class-1')
-    );
-
-    expect(res.status).toBe(202);
-    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith(
-      'class-1',
-      'u1',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) })
-    );
-    const body = await res.json();
-    expect(body).toEqual({ started: true, scope: 'class', status: 'AVAILABLE' });
-  });
-
-  it('does not start a duplicate background regeneration for a generating class', async () => {
-    mockCourseClassFindFirst.mockResolvedValue({ status: 'GENERATING' });
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1?background=1', 'POST', {
-        scope: 'class',
-      }),
-      classParams('class-1')
-    );
-
-    expect(res.status).toBe(202);
-    expect(mockRegenerateCurrentClass).not.toHaveBeenCalled();
-    const body = await res.json();
-    expect(body).toEqual({ started: true, scope: 'class', status: 'GENERATING' });
-  });
-
-  it('rejects background current class regeneration for a missing class', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(null);
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1?background=1', 'POST', {
-        scope: 'class',
-      }),
-      classParams('class-1')
-    );
-
-    expect(res.status).toBe(400);
-    expect(mockRegenerateCurrentClass).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 when there are no failed sections to regenerate', async () => {
-    mockRegenerateFailedSections.mockResolvedValue(false);
-
-    const res = await POST(
-      makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
-      classParams('class-1')
-    );
-
-    expect(res.status).toBe(400);
-  });
+  it.each([null, { courseId: 'course-1', status: 'PASSED' }])(
+    'rejects an unavailable target: %j',
+    async (target) => {
+      mockCourseClassFindFirst.mockResolvedValue(target);
+      const response = await POST(
+        makeRequest('http://localhost/api/v1/classes/class-1', 'POST'),
+        classParams('class-1')
+      );
+      expect(response.status).toBe(400);
+    }
+  );
 });
 
 // ---- DELETE /api/v1/classes/[classId] ----
@@ -741,6 +685,20 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
     expect(body).toMatchObject({ classId: 'current-class', status: classStatus });
     expect(body).not.toHaveProperty('operationId');
   });
+  it.each(['FAILED', 'CANCELLED'])(
+    'keeps %s visible for the matching repair attempt',
+    async (status) => {
+      generationState(status, 'current-class', 500, 3, 'FAILED');
+      mockReadPreparation.mockResolvedValue({
+        ...(await mockReadPreparation()),
+        intent: { kind: 'REPAIR', classId: 'current-class', attempt: 3 },
+      });
+      expect(await progress()).toMatchObject({
+        operationId: 'operation-1',
+        operationStatus: status,
+      });
+    }
+  );
   it('keeps cancellation visible for the original class attempt', async () => {
     generationState('CANCELLED', 'current-class', 500);
     expect(await progress()).toMatchObject({

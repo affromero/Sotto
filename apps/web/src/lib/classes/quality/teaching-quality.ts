@@ -68,7 +68,7 @@ export async function reviewTeachingContent(options: {
   level: string;
   nativeLang: string;
   targetLang: string;
-  kind: 'intro' | 'explanations' | 'writing';
+  kind: 'intro' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
   if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();

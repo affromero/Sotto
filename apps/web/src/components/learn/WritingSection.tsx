@@ -23,6 +23,7 @@ import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 
 import { ContinueBar, ScoreDial } from './ClassWidgets';
 import type { WritingCorrection, WritingPromptData } from './classTypes';
+import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
 import type { WritingDrafts } from './writing/useWritingDrafts';
 import styles from './WritingSection.module.css';
 
@@ -324,6 +325,7 @@ export function WritingSection({
         </div>
       )}
 
+      {drafts.progressRecovery?.error && <LearningSaveRecovery {...drafts.progressRecovery} />}
       {drafts.error && (
         <p className={styles.errorBanner} role="alert">
           {drafts.error}

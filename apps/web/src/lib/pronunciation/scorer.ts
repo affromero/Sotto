@@ -24,6 +24,7 @@ import { logUsage } from '../usage-logger';
 // ---------------------------------------------------------------------------
 
 export interface PronunciationInput {
+  aiOptions?: Awaited<ReturnType<typeof import('../learning-ai').capturedLearningAiOptions>>;
   signal?: AbortSignal;
   fetch?: typeof fetch;
   /** The phrase the learner was asked to say. */
@@ -50,7 +51,7 @@ interface RubricScores {
   /** Share of words produced correctly (0..1). */
   accuracy: number;
   /** Smoothness and naturalness of delivery (0..1). */
-  fluency: number;
+  fluency?: number;
   /** Fraction of the target phrase the learner attempted (0..1). */
   completeness: number;
 }
@@ -89,13 +90,23 @@ function clamp01(v: number): number {
  *   - Final score = 1 − (penalised_gap_fraction), mapped to 0.5..1.0 so an
  *     otherwise fluent delivery with one long pause still gets a reasonable score.
  *
- * Returns 0.7 when no timings are available (neutral default).
+ * Returns null when valid timing evidence is unavailable.
  */
 function computeFluency(
   timings: Array<{ word: string; start: number; end: number }> | undefined
-): number {
-  if (!timings || timings.length === 0) return 0.7;
-  if (timings.length === 1) return 0.85; // single-word: can't measure internal gaps
+): number | null {
+  if (
+    !timings ||
+    timings.length < 2 ||
+    timings.some(
+      (timing) =>
+        !Number.isFinite(timing.start) ||
+        !Number.isFinite(timing.end) ||
+        timing.start < 0 ||
+        timing.end <= timing.start
+    )
+  )
+    return null;
 
   const sorted = [...timings].sort((a, b) => a.start - b.start);
 
@@ -167,6 +178,13 @@ function parseLlmRubric(raw: string): LlmRubric | null {
     if (accuracy === null || fluency === null || completeness === null || feedback === null) {
       return null;
     }
+    if (
+      [accuracy, fluency, completeness].some(
+        (score) => !Number.isFinite(score) || score < 0 || score > 1
+      ) ||
+      !feedback.trim()
+    )
+      return null;
 
     return {
       accuracy: clamp01(accuracy),
@@ -221,6 +239,10 @@ export class SelfContainedScorer implements PronunciationScorer {
       TARGET_PHRASE: input.targetPhrase,
       TRANSCRIPT: input.transcript,
       ALIGNMENT_SUMMARY: alignmentSummary,
+      TIMING_EVIDENCE:
+        deterministicFluency === null
+          ? 'Unavailable. Fluency is unmeasured and excluded from the overall score.'
+          : JSON.stringify(input.wordTimings),
     });
 
     const ai = createAIProvider(input.aiProvider);
@@ -228,8 +250,9 @@ export class SelfContainedScorer implements PronunciationScorer {
       systemPrompt,
       [{ role: 'user', content: 'Score this pronunciation attempt.' }],
       {
+        ...input.aiOptions,
         signal: input.signal,
-        fetch: input.fetch,
+        fetch: input.fetch ?? input.aiOptions?.fetch,
         model: input.aiModel,
         apiKeyOverride: input.aiApiKey,
         endpoint: input.aiEndpoint,
@@ -253,25 +276,31 @@ export class SelfContainedScorer implements PronunciationScorer {
 
     // Step 4 — blend deterministic + LLM signals
     let finalAccuracy: number;
-    let finalFluency: number;
+    let finalFluency: number | null;
     let finalCompleteness: number;
     let feedback: string;
 
     finalAccuracy = (deterministicAccuracy + llmRubric.accuracy) / 2;
-    finalFluency = (deterministicFluency + llmRubric.fluency) / 2;
+    finalFluency =
+      deterministicFluency === null ? null : (deterministicFluency + llmRubric.fluency) / 2;
     finalCompleteness = (deterministicCompleteness + llmRubric.completeness) / 2;
-    feedback = llmRubric.feedback;
+    feedback =
+      llmRubric.feedback +
+      (finalFluency === null
+        ? ' Fluency is unmeasured because word timing data is unavailable.'
+        : '');
 
     // Step 5 — weighted overall score
     const overallScore = clamp01(
-      finalAccuracy * 0.5 + finalFluency * 0.25 + finalCompleteness * 0.25
+      (finalAccuracy * 0.5 + (finalFluency ?? 0) * 0.25 + finalCompleteness * 0.25) /
+        (finalFluency === null ? 0.75 : 1)
     );
 
     return {
       overallScore,
       rubricScores: {
         accuracy: clamp01(finalAccuracy),
-        fluency: clamp01(finalFluency),
+        ...(finalFluency === null ? {} : { fluency: clamp01(finalFluency) }),
         completeness: clamp01(finalCompleteness),
       },
       feedback,

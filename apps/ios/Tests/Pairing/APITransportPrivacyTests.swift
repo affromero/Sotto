@@ -25,6 +25,81 @@ final class APITransportPrivacyTests: XCTestCase {
         }
     }
 
+    func testPracticeAdmissionAccepts202AndRetainsTheRequestUUIDOnRetry() async throws {
+        let requestID = UUID()
+        let body = "{\"status\":\"preparing\",\"sessionId\":\"\(requestID.uuidString)\",\"preparationStatus\":\"QUEUED\",\"message\":\"Saved\",\"canRecover\":false}"
+        let server = try LocalHTTPServer { _ in .init(status: 202, headers: [:], body: body) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let first = try await client.startPractice(courseId: "course", kind: "FULL", requestId: requestID)
+        let retry = try await client.startPractice(courseId: "course", kind: "FULL", requestId: requestID)
+        XCTAssertEqual(first.sessionId, retry.sessionId)
+        for request in server.requests {
+            let json = try XCTUnwrap(request.components(separatedBy: "\r\n\r\n").last).data(using: .utf8)
+            let payload = try JSONSerialization.jsonObject(with: XCTUnwrap(json)) as? [String: String]
+            XCTAssertEqual(payload?["requestId"], requestID.uuidString)
+            XCTAssertEqual(payload?["kind"], "FULL")
+            XCTAssertTrue(request.lowercased().contains("x-sotto-profile-id: learner"))
+        }
+    }
+
+    func testClassRegenerationAccepts202AndPinsTheObservedAttempt() async throws {
+        let server = try LocalHTTPServer { _ in
+            .init(status: 202, headers: [:], body: #"{"started":true,"status":"GENERATING","scope":"class","operationId":"9ad1cf1c-ec3a-4605-8a85-d0a5b95160ac","courseId":"course"}"#)
+        }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "class-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        try await client.startClassRegeneration(classId: "class-saved", expectedAttempt: 4)
+        let request = try XCTUnwrap(server.requests.first)
+        XCTAssertTrue(request.hasPrefix("POST /api/v1/classes/class-saved?background=1 "))
+        let json = try XCTUnwrap(request.components(separatedBy: "\r\n\r\n").last).data(using: .utf8)
+        let payload = try JSONSerialization.jsonObject(with: XCTUnwrap(json)) as? [String: Any]
+        XCTAssertEqual(payload?["expectedAttempt"] as? Int, 4)
+        XCTAssertEqual(payload?["scope"] as? String, "class")
+    }
+
+    func testProgressSavesAllAnswersAndDraftsAtTheExpectedRevision() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"saved":true,"progressRevision":4}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let saved = try await client.saveLearningProgress(path: "/api/v1/practice/saved",
+            expectedRevision: 3, answers: ["g0": 2, "v0": 1], writingDrafts: ["w0": "Hola\nAna"])
+        XCTAssertEqual(saved.progressRevision, 4)
+        let request = try XCTUnwrap(server.requests.first)
+        XCTAssertTrue(request.hasPrefix("PATCH /api/v1/practice/saved "))
+        let json = try XCTUnwrap(request.components(separatedBy: "\r\n\r\n").last).data(using: .utf8)
+        let payload = try JSONSerialization.jsonObject(with: XCTUnwrap(json)) as? [String: Any]
+        XCTAssertEqual(payload?["expectedRevision"] as? Int, 3)
+        XCTAssertEqual(payload?["answers"] as? [String: Int], ["g0": 2, "v0": 1])
+        XCTAssertEqual(payload?["writingDrafts"] as? [String: String], ["w0": "Hola\nAna"])
+    }
+
+    @MainActor
+    func testConflictRecoveryPreservesLocalEditsUntilTheLearnerConfirms() async throws {
+        let fixture = ProgressConflictFixture()
+        let server = try LocalHTTPServer { request in fixture.respond(request) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/practice/saved", revision: 1)
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Local draft"])
+        await progress.flush()
+        XCTAssertNotNil(progress.errorMessage)
+        XCTAssertEqual(fixture.answers, ["g0": 1])
+        XCTAssertEqual(progress.answers, ["g0": 2])
+        try await progress.prepareReconciliation()
+        XCTAssertEqual(fixture.answers, ["g0": 1], "Reading the latest revision does not overwrite remote work.")
+        progress.confirmReconciliation()
+        await progress.flush()
+        XCTAssertNil(progress.errorMessage)
+        XCTAssertEqual(fixture.answers, ["g0": 2])
+        XCTAssertEqual(fixture.drafts, ["w0": "Local draft"])
+    }
+
     func test307DoesNotForwardHouseholdPasswordToAnotherOrigin() async throws {
         try await rejectRedirect(status: 307)
     }
@@ -156,6 +231,32 @@ private final class LocalHTTPServer: @unchecked Sendable {
             }
             if done || error != nil { connection.cancel() }
             else { self.receive(connection, data: buffer) }
+        }
+    }
+}
+
+private final class ProgressConflictFixture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var revision = 2
+    private var savedAnswers = ["g0": 1]
+    private var savedDrafts = ["w0": "Remote draft"]
+    var answers: [String: Int] { lock.withLock { savedAnswers } }
+    var drafts: [String: String] { lock.withLock { savedDrafts } }
+
+    func respond(_ request: String) -> LocalHTTPServer.Response {
+        lock.withLock {
+            if request.hasPrefix("GET ") {
+                return .json("{\"status\":\"ready_writing\",\"sessionId\":\"saved\",\"prompts\":[],\"progressRevision\":\(revision)}")
+            }
+            let body = request.components(separatedBy: "\r\n\r\n").last ?? ""
+            let payload = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any]
+            guard payload?["expectedRevision"] as? Int == revision else {
+                return .init(status: 409, headers: [:], body: #"{"error":"Progress changed in another device."}"#)
+            }
+            savedAnswers = payload?["answers"] as? [String: Int] ?? savedAnswers
+            savedDrafts = payload?["writingDrafts"] as? [String: String] ?? savedDrafts
+            revision += 1
+            return .json("{\"saved\":true,\"progressRevision\":\(revision)}")
         }
     }
 }

@@ -10,6 +10,7 @@ final class WritingDraftStore: ObservableObject {
         var text: String
         var submittedText: String?
         var grade: SottoWritingGrade?
+        var unknownText: String? = nil
 
         var trimmed: String {
             text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,12 +33,22 @@ final class WritingDraftStore: ObservableObject {
     /// as cards appear; an existing draft is left alone so re-rendering never
     /// discards typing.
     func register(_ prompt: SottoWritingPrompt) {
-        guard drafts[prompt.id] == nil else { return }
+        if var current = drafts[prompt.id] {
+            if let previous = prompt.latestResponse, let score = previous.overallScore,
+               current.trimmed == previous.text.trimmingCharacters(in: .whitespacesAndNewlines) {
+                current.submittedText = current.trimmed
+                current.grade = SottoWritingGrade(overallScore: score,
+                    corrections: previous.corrections ?? [], feedback: previous.feedback ?? "")
+                drafts[prompt.id] = current
+            }
+            return
+        }
 
         let previous = prompt.latestResponse
-        let text = previous?.text ?? ""
+        let text = prompt.savedDraft ?? previous?.text ?? ""
         var grade: SottoWritingGrade?
-        if let previous, let score = previous.overallScore {
+        if let previous, let score = previous.overallScore,
+            text.trimmingCharacters(in: .whitespacesAndNewlines) == previous.text.trimmingCharacters(in: .whitespacesAndNewlines) {
             grade = SottoWritingGrade(
                 overallScore: score,
                 corrections: previous.corrections ?? [],
@@ -47,15 +58,27 @@ final class WritingDraftStore: ObservableObject {
 
         drafts[prompt.id] = Draft(
             text: text,
-            submittedText: previous?.text.trimmingCharacters(in: .whitespacesAndNewlines),
+            submittedText: grade == nil ? nil : previous?.text.trimmingCharacters(in: .whitespacesAndNewlines),
             grade: grade
         )
+    }
+
+    var texts: [String: String] { drafts.mapValues(\.text) }
+
+    func register(_ prompts: [SottoWritingPrompt], savedDrafts: [String: String]) {
+        for var prompt in prompts {
+            prompt.savedDraft = savedDrafts[prompt.id] ?? prompt.savedDraft
+            register(prompt)
+        }
     }
 
     func binding(for promptId: String) -> Binding<String> {
         Binding(
             get: { self.drafts[promptId]?.text ?? "" },
-            set: { self.drafts[promptId]?.text = $0 }
+            set: {
+                self.drafts[promptId]?.text = $0
+                if self.drafts[promptId]?.hasChanged == true { self.drafts[promptId]?.grade = nil }
+            }
         )
     }
 
@@ -84,6 +107,26 @@ final class WritingDraftStore: ObservableObject {
         model: SottoAppModel,
         includingUnchanged: Bool = false
     ) async -> Bool {
+        await submit(source: source, includingUnchanged: includingUnchanged,
+            loadLatest: { id in try await model.latestWritingPrompt(source: source, promptId: id) },
+            grade: { id, answer in
+                switch source {
+                case let .classSession(classId):
+                    return try await model.submitClassWriting(classId: classId, promptId: id, text: answer)
+                case let .practice(sessionId):
+                    return try await model.submitPracticeWriting(sessionId: sessionId, promptId: id, text: answer)
+                case let .exam(examId):
+                    return try await model.submitExamWriting(examId: examId, promptId: id, text: answer)
+                }
+            })
+    }
+
+    func submit(
+        source: WritingPromptSource,
+        includingUnchanged: Bool = false,
+        loadLatest: (String) async throws -> SottoWritingPrompt?,
+        grade: (String, String) async throws -> SottoWritingGrade
+    ) async -> Bool {
         let ids = includingUnchanged
             ? drafts.filter { !$0.value.trimmed.isEmpty && !$0.value.isOverLimit }.keys.sorted()
             : changedPromptIds
@@ -98,16 +141,31 @@ final class WritingDraftStore: ObservableObject {
             let answer = draft.trimmed
 
             do {
-                let grade: SottoWritingGrade
-                switch source {
-                case let .classSession(classId):
-                    grade = try await model.submitClassWriting(classId: classId, promptId: id, text: answer)
-                case let .practice(sessionId):
-                    grade = try await model.submitPracticeWriting(sessionId: sessionId, promptId: id, text: answer)
-                case let .exam(examId):
-                    grade = try await model.submitExamWriting(examId: examId, promptId: id, text: answer)
+                if let unknown = draft.unknownText {
+                    let prompt = try await loadLatest(id)
+                    if let prompt, let previous = prompt.latestResponse,
+                       previous.overallScore != nil,
+                       previous.text.trimmingCharacters(in: .whitespacesAndNewlines) == unknown {
+                        drafts[id]?.unknownText = nil
+                        register(prompt)
+                        if unknown == answer { continue }
+                    } else {
+                        // Class and practice routes reconcile the original request before dispatch.
+                        // Exams do not yet offer that durable request contract.
+                        if case .exam = source {
+                            errorMessage = "The previous writing outcome is not confirmed. Check again before asking for another grade."
+                            return false
+                        }
+                        guard answer == unknown else {
+                            errorMessage = "Restore the previous answer to check its grade before submitting edited text."
+                            return false
+                        }
+                    }
                 }
-                drafts[id]?.grade = grade
+                drafts[id]?.unknownText = answer
+                let result = try await grade(id, answer)
+                drafts[id]?.unknownText = nil
+                drafts[id]?.grade = result
                 drafts[id]?.submittedText = answer
             } catch {
                 if error is CancellationError || (error as? URLError)?.code == .cancelled {

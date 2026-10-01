@@ -45,19 +45,37 @@ impl App {
         // New target: invalidate prior in-flight requests, clear any stale
         // notice, and mark the start in flight so a repeat Select is ignored.
         let req_gen = self.bump_gen();
-        if let View::CourseHome {
-            notice, starting, ..
-        } = &mut self.view
-        {
-            *notice = None;
-            *starting = true;
-        }
+        let request_id = uuid::Uuid::new_v4();
+        self.pending_admissions
+            .insert(request_id, (course.id.clone(), skill.kind()));
+        self.view = View::PracticePreparing {
+            course: course.clone(),
+            request_id,
+            kind: skill.kind(),
+            status: "ADMITTING".into(),
+            message: "Saving your practice request.".into(),
+            can_recover: false,
+            in_flight: true,
+            admission_unknown: true,
+            recovery_confirmation: false,
+        };
         let client = Arc::clone(&self.client);
         let course_id = course.id.clone();
         let kind = skill.kind();
         self.dispatch(
             req_gen,
-            async move { client.start_practice(&course_id, kind).await },
+            async move {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(30),
+                    client.start_practice(&course_id, kind, request_id),
+                )
+                .await
+                .map_err(|_| {
+                    color_eyre::eyre::eyre!(
+                        "The request acknowledgement was lost. Check status or retry this request."
+                    )
+                })?
+            },
             Action::PracticeStarted,
         );
         self.render();
@@ -176,7 +194,9 @@ impl App {
             }
             SpeakingPhase::Recording => self.stop_and_upload(),
             // Upload/poll already in flight: ignore further toggles.
-            SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => {}
+            SpeakingPhase::Uploading
+            | SpeakingPhase::Polling { .. }
+            | SpeakingPhase::UnknownUpload { .. } => {}
         }
     }
 
@@ -313,8 +333,25 @@ impl App {
         }
         match result.as_ref() {
             Ok(resp) => {
-                if let View::CourseHome { due, .. } = &mut self.view {
+                if let View::CourseHome { due, course, .. } = &mut self.view {
                     *due = DueCounts::from(resp);
+                    for (request_id, (course_id, kind)) in &self.pending_admissions {
+                        if course_id == &course.id
+                            && !due
+                                .recent
+                                .iter()
+                                .any(|session| session.id == request_id.to_string())
+                        {
+                            due.recent.insert(
+                                0,
+                                state::RecentPractice {
+                                    id: request_id.to_string(),
+                                    kind: *kind,
+                                    status: "Check admission".into(),
+                                },
+                            );
+                        }
+                    }
                 }
             }
             // CourseHome stays usable (zeroed counts) on a due-load failure, so
@@ -337,8 +374,64 @@ impl App {
                 // Reduce against the current view (pure, unit-tested in
                 // state.rs). reduce_start clears the `starting` flag and routes
                 // by kind into the right review screen.
-                let next = reduce_start(std::mem::replace(&mut self.view, View::Loading), resp);
-                self.view = next;
+                if let types::StartPracticeResponse::Preparing(ready) = resp {
+                    if let View::PracticePreparing {
+                        request_id,
+                        status,
+                        message,
+                        can_recover,
+                        in_flight,
+                        admission_unknown,
+                        recovery_confirmation,
+                        ..
+                    } = &mut self.view
+                    {
+                        if ready.session_id != request_id.to_string() {
+                            self.status_bar
+                                .set_error("Practice request identity changed.".into());
+                            return;
+                        }
+                        *status = ready.preparation_status.to_string();
+                        *message = ready.message.clone();
+                        *can_recover = ready.can_recover;
+                        *in_flight = false;
+                        *admission_unknown = false;
+                        *recovery_confirmation = false;
+                    }
+                } else {
+                    if let View::PracticePreparing {
+                        request_id,
+                        in_flight,
+                        message,
+                        ..
+                    } = &mut self.view
+                    {
+                        let id = serde_json::to_value(resp).ok().and_then(|value| {
+                            value
+                                .get("sessionId")
+                                .and_then(|value| value.as_str())
+                                .map(str::to_string)
+                        });
+                        if id.is_some_and(|id| id != request_id.to_string()) {
+                            *in_flight = false;
+                            *message = "The returned session belongs to another request. Check the saved request status.".into();
+                            self.render();
+                            return;
+                        }
+                    }
+                    if let View::PracticePreparing { request_id, .. } = &self.view {
+                        self.pending_admissions.remove(request_id);
+                    }
+                    let next = reduce_start(std::mem::replace(&mut self.view, View::Loading), resp);
+                    self.view = next;
+                    if let View::Practice { session_id, .. } = &self.view
+                        && let Some(mut cached) = self.practice_cache.remove(session_id).filter(|view| matches!(view, View::Practice { progress, .. } if progress.dirty || progress.in_flight.is_some() || progress.conflict || view.has_uncertain_upload())) {
+                        state::refresh_cached_practice(&mut cached, &self.view);
+                        self.view = cached;
+                    }
+                    self.class_fetch_current_episode();
+                    self.class_resume_current_speaking();
+                }
                 // Listening needs its episode fetched as a follow-up.
                 if let View::ListeningReview { episode_id, .. } = &self.view {
                     let episode_id = episode_id.clone();
@@ -348,7 +441,15 @@ impl App {
             }
             Err(message) => {
                 // Clear the in-flight flag so the learner can retry.
-                if let View::CourseHome { starting, .. } = &mut self.view {
+                if let View::PracticePreparing {
+                    in_flight,
+                    message: detail,
+                    ..
+                } = &mut self.view
+                {
+                    *in_flight = false;
+                    *detail = message.clone();
+                } else if let View::CourseHome { starting, .. } = &mut self.view {
                     *starting = false;
                 }
                 self.status_bar.set_error(message.clone());
@@ -370,9 +471,9 @@ impl App {
                 // Both vocab and listening reviews submit answers and end on the
                 // Result screen.
                 let course = match &self.view {
-                    View::ItemReview { course, .. } | View::ListeningReview { course, .. } => {
-                        Some(course.clone())
-                    }
+                    View::ItemReview { course, .. }
+                    | View::ListeningReview { course, .. }
+                    | View::Practice { course, .. } => Some(course.clone()),
                     _ => None,
                 };
                 if let Some(course) = course {
@@ -387,7 +488,8 @@ impl App {
                 // Clear the in-flight flag so the learner can resubmit.
                 match &mut self.view {
                     View::ItemReview { submitting, .. }
-                    | View::ListeningReview { submitting, .. } => *submitting = false,
+                    | View::ListeningReview { submitting, .. }
+                    | View::Practice { submitting, .. } => *submitting = false,
                     _ => {}
                 }
                 self.status_bar.set_error(message.clone());
@@ -469,8 +571,10 @@ impl App {
             }
             Err(message) => {
                 if let View::SpeakingReview { phase, .. } = &mut self.view {
-                    *phase = SpeakingPhase::Failed {
-                        message: message.clone(),
+                    *phase = SpeakingPhase::UnknownUpload {
+                        message: format!(
+                            "Upload outcome is unknown. Reopen practice to check saved work. {message}"
+                        ),
                     };
                 }
                 self.status_bar.set_error(message.clone());

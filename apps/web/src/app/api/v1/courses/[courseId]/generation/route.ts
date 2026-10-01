@@ -201,7 +201,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     cls &&
     ['FAILED', 'CANCELLED', 'COMPLETED'].includes(operation.status) &&
     (cls.id === operation.classId
-      ? cls.attempt > 1
+      ? cls.attempt > (operation.intent?.attempt ?? 1)
       : cls.createdAt.getTime() > operation.updatedAt);
   if (
     !terminalOperationSuperseded &&

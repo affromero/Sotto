@@ -13,6 +13,16 @@ import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write
 import { resolveStorageInput } from '@/lib/sidedoor/storage/core/storage-inputs';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { readSkillRequirements } from '@/lib/learning/skill-requirements';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import {
+  getConfiguredSttProviderId,
+  resolveCapturedSttProvider,
+  type SttProviderId,
+} from '@/lib/providers/stt';
+import { getServerInfra } from '@/lib/server-config';
+import { isCurrentClassSection } from '@/lib/learning/classes/current-sections';
 
 type RecordingParent =
   | { sectionId: string; practiceSessionId?: never; examSectionId?: never }
@@ -20,6 +30,9 @@ type RecordingParent =
   | { sectionId?: never; practiceSessionId?: never; examSectionId: string };
 
 interface SpeakingRecordingSnapshot {
+  attempt: number;
+  sttProvider: string | null;
+  targetLang: string;
   prompt: Awaited<ReturnType<typeof captureSpeakingPromptStorage>>;
   profile: { subjectId: string; generation: number };
   parent: RecordingParent;
@@ -31,6 +44,10 @@ async function captureSnapshot(
   userId: string,
   parent: RecordingParent
 ): Promise<SpeakingRecordingSnapshot> {
+  if ('sectionId' in parent)
+    await database.$queryRaw`SELECT c.id FROM "CourseClass" c JOIN "ClassSection" s ON s."classId" = c.id WHERE s.id = ${parent.sectionId} FOR UPDATE OF c`;
+  else if ('practiceSessionId' in parent)
+    await database.$queryRaw`SELECT id FROM "PracticeSession" WHERE id = ${parent.practiceSessionId} FOR UPDATE`;
   const [prompt, profile] = await Promise.all([
     captureSpeakingPromptStorage(database, promptId),
     database.user.findUnique({ where: { id: userId }, select: { createdAt: true } }),
@@ -44,7 +61,63 @@ async function captureSnapshot(
     return candidate.kind === 'exam' && candidate.id === parent.examSectionId;
   });
   if (!association) throw new AccessError('conflict', 'The speaking prompt parent changed');
+  const section =
+    'sectionId' in parent
+      ? await database.classSection.findUnique({
+          where: { id: parent.sectionId },
+          select: {
+            classId: true,
+            skill: true,
+            attempt: true,
+            class: {
+              select: {
+                status: true,
+                skillRequirements: true,
+                course: { select: { targetLang: true } },
+              },
+            },
+          },
+        })
+      : null;
+  const practice =
+    'practiceSessionId' in parent
+      ? await database.practiceSession.findUnique({
+          where: { id: parent.practiceSessionId },
+          select: {
+            status: true,
+            skillRequirements: true,
+            course: { select: { targetLang: true } },
+          },
+        })
+      : null;
+  if (section && !['AVAILABLE', 'IN_PROGRESS'].includes(section.class.status))
+    throw new AccessError('conflict', 'This class no longer accepts recordings');
+  if (section && !(await isCurrentClassSection(database, section)))
+    throw new AccessError('conflict', 'This speaking prompt belongs to an earlier class attempt');
+  if (practice && practice.status !== 'ACTIVE')
+    throw new AccessError('conflict', 'This practice no longer accepts recordings');
+  const requirements = readSkillRequirements(
+    section?.class.skillRequirements ?? practice?.skillRequirements
+  );
+  if (requirements && requirements.skills.SPEAKING.state !== 'REQUIRED')
+    throw new AccessError('conflict', 'Speaking is not required in this session');
+  const exam =
+    'examSectionId' in parent
+      ? await database.examSection.findUnique({
+          where: { id: parent.examSectionId },
+          select: { exam: { select: { course: { select: { targetLang: true } } } } },
+        })
+      : null;
+  const targetLang =
+    requirements?.targetLang ??
+    section?.class.course.targetLang ??
+    practice?.course.targetLang ??
+    exam?.exam.course.targetLang;
+  if (!targetLang) throw new AccessError('conflict', 'The speaking language is unavailable');
   return {
+    attempt: section?.attempt ?? 1,
+    sttProvider: requirements?.sttProvider ?? null,
+    targetLang,
     prompt,
     profile: { subjectId: `profile:${userId}`, generation: profile.createdAt.getTime() },
     parent,
@@ -62,6 +135,28 @@ export async function createSpeakingRecording(options: {
   contentType: string;
 }) {
   const { request, admission, promptId, parent } = options;
+  const initial = await sottoTransaction(
+    prisma,
+    async (database) => {
+      await requireOriginalSottoAdmission(database, request, admission);
+      const snapshot = await captureSnapshot(database, promptId, admission.userId, parent);
+      const user = await database.user.findUniqueOrThrow({
+        where: { id: admission.userId },
+        select: { preferredSttModel: true },
+      });
+      return { snapshot, model: user.preferredSttModel };
+    },
+    { signal: request.signal }
+  );
+  await getServerInfra();
+  const stt = await resolveCapturedSttProvider({
+    userId: admission.userId,
+    execution: sottoRequestExecution(request, admission),
+    requestedProvider:
+      (initial.snapshot.sttProvider as SttProviderId | null) ?? getConfiguredSttProviderId(),
+    requestedModel: initial.model ?? undefined,
+    language: initial.snapshot.targetLang,
+  });
   const recordingId = randomUUID();
   const operationId = randomUUID();
   let fingerprint: string | undefined;
@@ -75,6 +170,11 @@ export async function createSpeakingRecording(options: {
     captureAdmission: async (database) => {
       await requireOriginalSottoAdmission(database, request, admission);
       const snapshot = await captureSnapshot(database, promptId, admission.userId, parent);
+      if (!isDeepStrictEqual(snapshot, initial.snapshot))
+        throw new AccessError(
+          'conflict',
+          'The speaking exercise changed before recording publication'
+        );
       if (
         await database.speakingRecording.findUnique({
           where: { id: recordingId },
@@ -117,6 +217,9 @@ export async function createSpeakingRecording(options: {
       const recording = await database.speakingRecording.create({
         data: {
           id: recordingId,
+          attempt: captured.attempt,
+          sttProvider: captured.sttProvider,
+          sttSelection: stt.selection,
           ...captured.parent,
           promptId,
           userId: admission.userId,

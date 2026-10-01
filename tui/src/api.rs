@@ -50,10 +50,20 @@ pub(crate) struct SpeakingUploadResponse {
 /// body the codegen does not need). Mirrors `gradeWriting`'s `WritingGrade`.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct WritingCorrection {
+    pub old: String,
+    pub new: String,
+    pub why: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct WritingGradeResponse {
     /// 0..1 overall writing score.
     pub overall_score: f64,
     pub feedback: String,
+    #[serde(default)]
+    pub corrections: Vec<WritingCorrection>,
 }
 
 /// Outcome of `next-class`. The route returns two genuinely different bodies by
@@ -86,7 +96,26 @@ pub(crate) trait Api: Send + Sync {
         &self,
         course_id: &str,
         kind: types::PracticeKind,
+        request_id: uuid::Uuid,
     ) -> Result<types::StartPracticeResponse>;
+    async fn resume_practice(&self, session_id: &str) -> Result<types::StartPracticeResponse>;
+    async fn practice_generation_action(
+        &self,
+        session_id: &str,
+        recover: bool,
+    ) -> Result<types::StartPracticePreparing>;
+    async fn save_learning_progress(
+        &self,
+        class: bool,
+        id: &str,
+        progress: types::LearningProgressRequest,
+    ) -> Result<types::LearningProgressResponse>;
+    async fn submit_practice_writing(
+        &self,
+        session_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse>;
     async fn submit_practice(
         &self,
         session_id: &str,
@@ -114,6 +143,8 @@ pub(crate) trait Api: Send + Sync {
     // --- Classes (the gated CEFR curriculum flow) ---
     /// Create/advance to the next gated class, or report the course done.
     async fn next_class(&self, course_id: &str) -> Result<NextClassOutcome>;
+    async fn repair_class(&self, class_id: &str, expected_attempt: i64)
+    -> Result<NextClassOutcome>;
     /// Fetch a class with its ordered, mixed-skill sections.
     async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse>;
     /// Submit a class's MC answers and get the grade result.

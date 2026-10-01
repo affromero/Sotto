@@ -6,6 +6,13 @@ import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import styles from './SpeakingExercise.module.css';
+import {
+  clearSpeakingUpload,
+  pendingSpeakingUpload,
+  recoverSpeakingUpload,
+  retainSpeakingUpload,
+} from '@/components/learn/speaking/speakingUploadRecovery';
+import type { SpeakingEvidence } from '@sotto/shared';
 
 // ---- Types ----
 
@@ -15,6 +22,7 @@ interface Prompt {
   translation: string;
   ipa?: string | null;
   referenceTtsUrl?: string | null;
+  latestRecording?: SpeakingEvidence | null;
 }
 
 interface RubricScores {
@@ -32,7 +40,8 @@ interface ScoringResult {
   status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
 }
 
-type PromptPhase = 'idle' | 'recording' | 'uploading' | 'grading' | 'scored' | 'failed';
+type PromptPhase =
+  'idle' | 'recording' | 'uploading' | 'grading' | 'scored' | 'failed' | 'upload_unknown';
 
 interface PromptState {
   phase: PromptPhase;
@@ -52,8 +61,8 @@ interface SpeakingExerciseProps {
 
 const POLL_INTERVAL_MS = 1500;
 const RUBRIC_LABELS: Record<string, string> = {
-  accuracy: 'Accuracy',
-  fluency: 'Fluency',
+  accuracy: 'Recognized words',
+  fluency: 'Timing fluency',
   completeness: 'Completeness',
 };
 
@@ -67,13 +76,37 @@ interface PromptCardProps {
 }
 
 function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
-  const [state, setState] = useState<PromptState>({
-    phase: 'idle',
-    recordingId: null,
-    result: null,
-    error: null,
+  const [state, setState] = useState<PromptState>(() => {
+    const pending = pendingSpeakingUpload(endpointBase, prompt.id);
+    if (
+      pending &&
+      (!prompt.latestRecording || prompt.latestRecording.recordingId === pending.baseline)
+    )
+      return {
+        phase: 'upload_unknown',
+        recordingId: null,
+        result: null,
+        error: 'Upload outcome is unknown. Check saved recording before recording another attempt.',
+      };
+    if (pending) clearSpeakingUpload(endpointBase, prompt.id);
+    return {
+      phase: prompt.latestRecording
+        ? prompt.latestRecording.status === 'SCORED'
+          ? 'scored'
+          : prompt.latestRecording.status === 'FAILED'
+            ? 'failed'
+            : 'grading'
+        : 'idle',
+      recordingId: prompt.latestRecording?.recordingId ?? null,
+      result: prompt.latestRecording ?? null,
+      error:
+        prompt.latestRecording?.status === 'FAILED'
+          ? 'Scoring failed. Record another attempt.'
+          : null,
+    };
   });
 
+  const acknowledgedId = useRef(prompt.latestRecording?.recordingId ?? null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const referenceAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRef, setIsPlayingRef] = useState(false);
@@ -94,6 +127,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
   // ---- Upload after recording stops ----
   const uploadRecording = useCallback(
     async (blob: Blob) => {
+      retainSpeakingUpload(endpointBase, prompt.id, acknowledgedId.current);
       setState((prev) => ({ ...prev, phase: 'uploading', error: null }));
 
       try {
@@ -104,15 +138,20 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
+          const rejected = [400, 401, 403, 404, 413, 415].includes(res.status);
+          if (rejected) clearSpeakingUpload(endpointBase, prompt.id);
           setState((prev) => ({
             ...prev,
-            phase: 'failed',
+            phase: rejected ? 'failed' : 'upload_unknown',
             error: (body as { error?: string }).error ?? 'Upload failed.',
           }));
           return;
         }
 
         const data: { recordingId: string } = await res.json();
+        if (!data.recordingId) throw new Error('Upload acknowledgement is incomplete');
+        acknowledgedId.current = data.recordingId;
+        clearSpeakingUpload(endpointBase, prompt.id);
         setState((prev) => ({
           ...prev,
           phase: 'grading',
@@ -121,8 +160,9 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
       } catch {
         setState((prev) => ({
           ...prev,
-          phase: 'failed',
-          error: 'A network error occurred during upload.',
+          phase: 'upload_unknown',
+          error:
+            'Upload outcome is unknown. Check saved recording before recording another attempt.',
         }));
       }
     },
@@ -145,7 +185,12 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
         const res = await fetch(
           `${endpointBase}/${prompt.id}?recordingId=${encodeURIComponent(recordingId)}`
         );
-        if (!res.ok) return;
+        if (!res.ok) {
+          pollTimerRef.current = setTimeout(() => {
+            void pollResult(recordingId);
+          }, POLL_INTERVAL_MS);
+          return;
+        }
 
         const data: ScoringResult = await res.json();
 
@@ -180,6 +225,25 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, [state.phase, state.recordingId, pollResult]);
+
+  async function checkSavedUpload() {
+    try {
+      const result = await recoverSpeakingUpload(endpointBase, prompt.id);
+      acknowledgedId.current = result.recordingId;
+      setState({
+        phase:
+          result.status === 'SCORED' ? 'scored' : result.status === 'FAILED' ? 'failed' : 'grading',
+        recordingId: result.recordingId,
+        result,
+        error: result.status === 'FAILED' ? 'Scoring failed. Record another attempt.' : null,
+      });
+    } catch (failure: unknown) {
+      setState((previous) => ({
+        ...previous,
+        error: failure instanceof Error ? failure.message : 'Saved recording could not be checked.',
+      }));
+    }
+  }
 
   // ---- Reference audio playback ----
   function playReference() {
@@ -387,6 +451,18 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
             </div>
           )}
 
+          {phase === 'upload_unknown' && (
+            <div className={styles.failedRow} role="alert">
+              <span className={styles.failedText}>{error}</span>
+              <button
+                type="button"
+                className={styles.retryButton}
+                onClick={() => void checkSavedUpload()}
+              >
+                Check saved recording
+              </button>
+            </div>
+          )}
           {phase === 'failed' && (
             <div className={styles.failedRow} role="alert">
               <span className={styles.failedText}>{error}</span>
@@ -442,6 +518,12 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
                 return <RubricBar key={key} label={RUBRIC_LABELS[key] ?? key} score={val} />;
               })}
             </div>
+          )}
+          {result.rubricScores?.fluency == null && (
+            <p className={styles.feedback}>
+              Timing fluency was not measured. Feedback measures recognized words and available
+              timing.
+            </p>
           )}
 
           {/* Feedback */}

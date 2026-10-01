@@ -78,10 +78,20 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   await expect(page).toHaveURL(/\/(dashboard|learn)$/);
   await page.goto(`/learn/class/${fixture.classId}`);
   await page.getByRole('button', { name: 'Begin the class' }).click();
-  for (const next of ['Reading', 'Listening']) {
-    await page.getByRole('button', { name: 'Option 1: Hallo' }).click();
-    await expect(page.getByText('Hallo is a greeting.').first()).toBeVisible();
-    await page.getByRole('button', { name: 'See result', exact: true }).click();
+  for (const [skill, next] of [
+    ['GRAMMAR', 'Reading'],
+    ['READING', 'Listening'],
+  ] as const) {
+    for (let index = 0; index < fixture.counts[skill]; index++) {
+      await page.getByRole('button', { name: 'Option 1: Hallo' }).click();
+      await expect(page.getByText('Hallo is a greeting.').first()).toBeVisible();
+      await page
+        .getByRole('button', {
+          name: index + 1 === fixture.counts[skill] ? 'See result' : 'Next',
+          exact: true,
+        })
+        .click();
+    }
     await page.getByRole('button', { name: `Continue · ${next}` }).click();
   }
   const audio = page.getByLabel('Lesson audio', { exact: true });
@@ -91,14 +101,27 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     .toBeGreaterThan(0.3);
   await page.getByRole('button', { name: 'Pause audio', exact: true }).click();
   expect(await audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(true);
-  await page.getByRole('button', { name: 'Option 1: Hallo' }).click();
+  await expect(page.getByRole('button', { name: 'Option 1: Hallo' })).toHaveCount(
+    fixture.counts.LISTENING
+  );
+  for (let index = 0; index < fixture.counts.LISTENING; index++) {
+    await page.getByRole('button', { name: 'Option 1: Hallo' }).nth(index).click();
+  }
   await page.getByRole('button', { name: 'Continue · Speaking' }).click();
-  await page.getByRole('button', { name: 'Start recording your pronunciation' }).click();
-  await expect(page.getByText(/listening · [2-9]s/)).toBeVisible();
-  await page.getByRole('button', { name: 'Stop recording' }).click();
-  await expect(page.getByText('Clear pronunciation.').first()).toBeVisible({ timeout: 30_000 });
+  for (let index = 0; index < fixture.counts.SPEAKING; index++) {
+    await page.getByRole('button', { name: 'Start recording your pronunciation' }).click();
+    await expect(page.getByText(/listening · [2-9]s/)).toBeVisible();
+    await page.getByRole('button', { name: 'Stop recording' }).click();
+    await expect(page.getByText('Clear pronunciation.').first()).toBeVisible({ timeout: 30_000 });
+    if (index + 1 < fixture.counts.SPEAKING) {
+      await page.getByRole('button', { name: 'Next phrase' }).click();
+    }
+  }
   await page.getByRole('button', { name: 'Continue · Writing' }).click();
-  await page.getByRole('textbox').fill('Guten Morgen, mein Freund!');
+  await expect(page.getByRole('textbox')).toHaveCount(fixture.counts.WRITING);
+  for (let index = 0; index < fixture.counts.WRITING; index++) {
+    await page.getByRole('textbox').nth(index).fill('Guten Morgen, mein Freund!');
+  }
   await page.getByRole('button', { name: 'Check writing', exact: true }).click();
   await expect(page.getByText('Your greeting is clear.').first()).toBeVisible();
   await page.getByRole('button', { name: 'Finish class', exact: true }).click();
@@ -119,9 +142,13 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   });
   expect(saved.submission).toMatchObject({ passed: true });
   expect(saved.sections.every((section) => section.passed)).toBe(true);
-  expect(
-    saved.sections.flatMap((section) => section.prompts.flatMap((prompt) => prompt.recordings))
-  ).toEqual([expect.objectContaining({ status: 'SCORED', transcript: 'Guten Morgen.' })]);
+  const recordings = saved.sections.flatMap((section) =>
+    section.prompts.flatMap((prompt) => prompt.recordings)
+  );
+  expect(recordings).toHaveLength(fixture.counts.SPEAKING);
+  for (const recording of recordings) {
+    expect(recording).toMatchObject({ status: 'SCORED', transcript: 'Guten Morgen.' });
+  }
 });
 
 test('full practice keeps skill sections usable on desktop and a 375px screen', async ({
@@ -236,12 +263,16 @@ test('full practice keeps skill sections usable on desktop and a 375px screen', 
       .toBe(true);
     await expect(grammar.getByRole('button', { name: 'Option 1: gesehen' })).toBeVisible();
     await expect(writing.getByRole('textbox')).toHaveValue('Mia ist ins Kino gegangen.');
-    const optionBounds = await grammar
-      .getByRole('button', { name: 'Option 1: gesehen' })
-      .boundingBox();
-    expect(optionBounds).not.toBeNull();
-    expect(optionBounds!.x).toBeGreaterThanOrEqual(0);
-    expect(optionBounds!.x + optionBounds!.width).toBeLessThanOrEqual(width);
+    await expect
+      .poll(async () => {
+        const bounds = await grammar
+          .getByRole('button', { name: 'Option 1: gesehen' })
+          .boundingBox();
+        return (
+          bounds !== null && bounds.width > 0 && bounds.x >= 0 && bounds.x + bounds.width <= width
+        );
+      })
+      .toBe(true);
     await page.getByRole('button', { name: 'Practice menu' }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath(`practice-${width}.png`) });
   }

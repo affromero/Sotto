@@ -1,3 +1,4 @@
+import { reconcileWritingResponse } from '@/lib/learning/writing/writing-execution';
 import type { Queue } from 'bullmq';
 import { reconcileOutboxPage, type JobDeliveryResult } from 'thesidedoor-core/runtime/outbox';
 import { runTaskLoop } from 'thesidedoor-core/runtime/task-loop';
@@ -9,6 +10,7 @@ import {
 } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { completeInitialStitchFailure } from '@/lib/sidedoor/jobs/initial/initial-stitch-failure';
 import {
+  isSottoSynchronousJob,
   requireSottoJobVersion,
   SottoJobContractError,
 } from '@/lib/sidedoor/jobs/core/job-contracts';
@@ -55,6 +57,26 @@ export async function reconcileSottoJobs(options: ReconciliationOptions) {
           'Durable job index does not match its receipt'
         );
       if (receipt.status !== 'pending') return receipt.status;
+      if (isSottoSynchronousJob(receipt.handler, receipt.version)) {
+        return sottoTransaction(
+          database,
+          async (tx) => {
+            const record = await sottoJobOutbox(tx).read(reference.id);
+            if (!record) throw new Error('Synchronous writing receipt is unavailable.');
+            const payload = record.job.payload as { responseId?: string };
+            if (!payload.responseId)
+              throw new Error('Synchronous writing response identity is unavailable.');
+            await reconcileWritingResponse(tx, payload.responseId, {
+              id: reference.id,
+              fingerprint: reference.fingerprint,
+            });
+            return (await sottoJobOutbox(tx).read(reference.id))?.complete
+              ? 'complete'
+              : 'delivered';
+          },
+          { signal }
+        );
+      }
       requireSottoJobVersion(receipt.handler, receipt.version);
       const queue = queues.get(receipt.handler);
       if (!queue || queue.name !== receipt.handler)

@@ -4,14 +4,12 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
-import {
-  deleteClassForUser,
-  getClassForUser,
-  regenerateCurrentClass,
-  regenerateFailedSections,
-} from '@/lib/class-service';
+import { deleteClassForUser, getClassForUser } from '@/lib/class-service';
+import { requestClassPreparation } from '@/lib/classes/preparation';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
 import { z } from 'zod';
+import { patchLearningProgress } from '@/lib/learning/progress-route';
 import {
   pristineSnapshotSchema,
   PristineRegenerationConflict,
@@ -21,16 +19,8 @@ import {
 
 type RouteParams = { params: Promise<{ classId: string }> };
 
-function wantsBackgroundRegeneration(request: NextRequest): boolean {
-  return (
-    request.nextUrl.searchParams.get('background') === '1' ||
-    request.headers.get('prefer')?.toLowerCase().includes('respond-async') === true
-  );
-}
-
-function logBackgroundRegenerationFailure(error: unknown, classId: string): void {
-  const message = error instanceof Error ? error.message : 'Failed to regenerate class';
-  logger.error('Background class regeneration failed', { classId, error: message });
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  return patchLearningProgress(request, 'CLASS', (await params).classId);
 }
 
 /** GET /api/classes/[classId]: owned practice class with immediate answer feedback. */
@@ -53,7 +43,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         pristineSnapshot
       );
 
-    const submitted = cls.submission !== null;
+    const submitted =
+      cls.submission !== null && (cls.status === 'PASSED' || cls.status === 'FAILED');
     const sections = cls.sections.map((s) => ({
       id: s.id,
       skill: s.skill,
@@ -111,14 +102,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           task: p.task,
           guidance: p.guidance,
           ideas: p.ideas,
-          response: r
-            ? {
-                text: r.text,
-                overallScore: r.overallScore,
-                corrections: r.corrections,
-                feedback: r.feedback,
-              }
-            : null,
+          savedDraft: (cls.writingDrafts as Record<string, string> | null)?.[p.id] ?? r?.text,
+          response:
+            r && r.overallScore !== null
+              ? {
+                  text: r.text,
+                  overallScore: r.overallScore,
+                  corrections: r.corrections,
+                  feedback: r.feedback,
+                }
+              : null,
         };
       }),
     }));
@@ -143,6 +136,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       ...(pristineSnapshot ? { pristineSnapshot } : {}),
       id: cls.id,
+      skillRequirements: cls.skillRequirements,
+      readingVocabulary: cls.readingVocabulary,
+      attempt: cls.attempt,
+      learnerAnswers: cls.learnerAnswers,
+      writingDrafts: cls.writingDrafts,
+      progressRevision: cls.progressRevision,
       courseId: cls.courseId,
       status: cls.status,
       order: cls.order,
@@ -168,7 +167,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       sections,
     });
   } catch (error: unknown) {
-    if (error instanceof PristineRegenerationConflict) return errorResponse(error.message, 409);
+    if (error instanceof PristineRegenerationConflict || error instanceof PreparationConflictError)
+      return errorResponse(error.message, 409);
     logger.error('Failed to load class', {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-/** POST /api/classes/[classId] — regenerate failed sections, or the current class with {scope:"class"}. */
+/** Admit durable repair, or full regeneration with {scope:"class"}. */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const authed = await authenticateRequest(request);
@@ -184,60 +184,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { classId } = await params;
     const parsed = z
       .object({
-        scope: z.unknown().optional(),
+        scope: z.enum(['class', 'sections']).optional(),
         pristineSnapshot: pristineSnapshotSchema.optional(),
+        expectedAttempt: z.number().int().positive(),
       })
       .safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return errorResponse('Invalid regeneration request', 400);
     const body = parsed.data;
     if (body.pristineSnapshot && body.scope !== 'class')
       return errorResponse('Pristine regeneration requires class scope', 400);
-    if (body.pristineSnapshot && wantsBackgroundRegeneration(request))
-      return errorResponse('Pristine regeneration requires a synchronous request', 400);
 
-    if (body.scope === 'class') {
-      if (wantsBackgroundRegeneration(request)) {
-        const cls = await prisma.courseClass.findFirst({
-          where: { id: classId, course: { userId: authed.userId } },
-          select: { status: true },
-        });
-        if (!cls || cls.status === 'PASSED') {
-          return errorResponse('Class not found or already passed.', 400);
-        }
-        if (cls.status !== 'GENERATING') {
-          void regenerateCurrentClass(
-            classId,
-            authed.userId,
-            sottoRequestExecution(request, authed)
-          ).catch((error: unknown) => {
-            logBackgroundRegenerationFailure(error, classId);
-          });
-        }
-        return NextResponse.json(
-          { started: true, scope: 'class', status: cls.status },
-          { status: 202 }
-        );
-      }
-
-      const ok = await regenerateCurrentClass(
-        classId,
-        authed.userId,
+    {
+      const cls = await prisma.courseClass.findFirst({
+        where: { id: classId, course: { userId: authed.userId } },
+        select: { courseId: true, status: true },
+      });
+      if (!cls || cls.status === 'PASSED')
+        return errorResponse('Class not found or already passed.', 400);
+      const operation = await requestClassPreparation(
+        cls.courseId,
         sottoRequestExecution(request, authed),
-        body.pristineSnapshot
+        {
+          intent: {
+            kind: body.scope === 'class' ? 'REGENERATE' : 'REPAIR',
+            classId,
+            expectedAttempt: body.expectedAttempt,
+            ...(body.pristineSnapshot ? { pristineSnapshot: body.pristineSnapshot } : {}),
+          },
+        }
       );
-      if (!ok) return errorResponse('Class not found or already passed.', 400);
-      return NextResponse.json({ regenerated: true, scope: 'class' });
+      return NextResponse.json(
+        {
+          started: true,
+          scope: body.scope === 'class' ? 'class' : 'sections',
+          status: 'GENERATING',
+          operationId: operation.id,
+          courseId: cls.courseId,
+        },
+        { status: 202 }
+      );
     }
-
-    const ok = await regenerateFailedSections(
-      classId,
-      authed.userId,
-      sottoRequestExecution(request, authed)
-    );
-    if (!ok) return errorResponse('No failed sections to regenerate (or class not found).', 400);
-    return NextResponse.json({ regenerated: true });
   } catch (error: unknown) {
-    if (error instanceof PristineRegenerationConflict) return errorResponse(error.message, 409);
+    if (error instanceof PristineRegenerationConflict || error instanceof PreparationConflictError)
+      return errorResponse(error.message, 409);
     const message = error instanceof Error ? error.message : 'Failed to regenerate sections';
     logger.error('Failed to regenerate sections', { error: message });
     return errorResponse(message, 500);

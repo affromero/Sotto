@@ -28,10 +28,8 @@ vi.mock('@/lib/knowledge-graph', () => ({
 }));
 
 const mockGetClassForUser = vi.fn();
-const mockRegenerateFailedSections = vi.fn();
 vi.mock('@/lib/class-service', () => ({
   getClassForUser: (...args: unknown[]) => mockGetClassForUser(...args),
-  regenerateFailedSections: (...args: unknown[]) => mockRegenerateFailedSections(...args),
   CourseNotFoundError: class extends Error {},
 }));
 

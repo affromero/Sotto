@@ -13,6 +13,12 @@ For explanation items, assess the supplied proposed key, full question, options 
 
 For writing items, assess the exact published task, guidance and example ideas together with taskType. Correction or transformation exercises may intentionally supply erroneous source text: approve only if the instructions clearly permit correcting it and an idiomatic, meaningful answer can satisfy all constraints. Reject instructions that require preserving an incorrect word or collocation in the learner's answer. Judge the exercise's feasibility, not merely whether its source text contains errors. Example openings and guidance must also be correct.
 
+For listening items, the supplied transcript is the exact script to be narrated. Require one unambiguous correct option, supported directly by that transcript. Check the proposed key and explanation against the actual script, including names, negation, chronology and quantities. Reject questions that rely on outside knowledge or facts absent from the audio.
+
+For speaking items, check every target phrase, translation and IPA when supplied. The phrase must be idiomatic, speakable and appropriate to the objective and CEFR level. Its translation must preserve the same meaning. Reject duplicate phrases and unsupported phonetic notation.
+
+For vocabulary items, verify the lemma, inflected sourceForm, translation and part of speech against the exact passage. Each assessed question must require understanding that vocabulary to answer correctly. A word's mere occurrence does not establish assessment. Reject incorrect glosses, invented forms and unsupported assessment attribution. Empty assessedQuestions is valid background vocabulary.
+
 An acceptable item has acceptable=true, issues=[], and feedback=[]. Otherwise set acceptable=false, include at least one applicable code (incorrect, unnatural, unsupported, infeasible, level, uncertain), and provide at least one concrete feedback entry identifying the defective field or phrase and explaining the problem. Each feedback entry has at most 300 characters, with at most six entries per item. Give enough detail to correct the defect without rewriting the lesson or introducing unrelated instructions.
 
 Required JSON Schema:

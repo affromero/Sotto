@@ -91,6 +91,42 @@
     }
 
     #[test]
+    fn class_resume_restores_choices_drafts_corrections_and_pending_recording() {
+        let mut value = serde_json::to_value(mixed_class()).unwrap();
+        value["learnerAnswers"] = serde_json::json!({ "g0": 1, "r0": 0, "l0": 1 });
+        value["writingDrafts"] = serde_json::json!({ "w0": "Hola.\n" });
+        value["sections"][3]["prompts"][0]["latestRecording"] = serde_json::json!({
+            "id": "recording-saved", "status": "GRADING"
+        });
+        value["sections"][4]["writingPrompts"][0]["response"] = serde_json::json!({
+            "text": "Hola.", "overallScore": 0.8, "feedback": "A clear greeting.",
+            "corrections": [{ "old": "Hola", "new": "Buenos días", "why": "Use a formal greeting." }]
+        });
+        let cls = class_response(value);
+        let sections = class_sections(&cls).unwrap();
+        assert_eq!(collect_class_answers(&sections).len(), 3);
+        assert!(matches!(&sections[0].progress, SectionProgress::Mc { selected, .. } if selected == &[Some(1)]));
+        assert!(matches!(&sections[3].progress, SectionProgress::Speaking {
+            phase: SpeakingPhase::Polling { recording_id }, .. } if recording_id == "recording-saved"));
+        assert!(matches!(&sections[4].progress, SectionProgress::Writing {
+            input, phase: WritingPhase::Graded { score: 80, feedback }, .. }
+            if input.text().ends_with('\n') && feedback.contains("Use a formal greeting.")));
+        assert!(!class_ready_to_submit(&sections));
+    }
+
+    #[test]
+    fn class_resume_keeps_an_edited_draft_ungraded() {
+        let mut value = serde_json::to_value(mixed_class()).unwrap();
+        value["writingDrafts"] = serde_json::json!({ "w0": "My new answer." });
+        value["sections"][4]["writingPrompts"][0]["response"] = serde_json::json!({
+            "text": "An earlier answer.", "overallScore": 0.9, "feedback": "Earlier feedback.", "corrections": []
+        });
+        let sections = class_sections(&class_response(value)).unwrap();
+        assert!(matches!(&sections[4].progress, SectionProgress::Writing { input, phase: WritingPhase::Editing, .. }
+            if input.text() == "My new answer."));
+    }
+
+    #[test]
     fn empty_class_is_malformed() {
         let cls = class_response(serde_json::json!({
             "id": "c", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
@@ -224,144 +260,65 @@
         }
     }
 
+
+    fn grade_all_productive(sections: &mut [ClassSection]) {
+        for section in sections {
+            match &mut section.progress {
+                SectionProgress::Speaking { prompts, phase, .. } => {
+                    *phase = SpeakingPhase::Graded { score: Some(80), transcript: Some("Answer".into()), feedback: Some("Clear".into()) };
+                    for prompt in prompts { section.work.insert(prompt.id.clone(), ProductiveWork::Speaking(phase.clone())); }
+                }
+                SectionProgress::Writing { prompts, phase, input, .. } => {
+                    *input = WritingInput::from_text("My response");
+                    *phase = WritingPhase::Graded { score: 75, feedback: "Review verb agreement".into() };
+                    for prompt in prompts { section.work.insert(prompt.id.clone(), ProductiveWork::Writing { text: input.text(), phase: phase.clone() }); }
+                }
+                _ => {},
+            }
+        }
+    }
+
     #[test]
-    fn class_ready_to_submit_requires_every_section_terminal() {
+    fn class_completion_requires_answers_and_every_productive_grade() {
         let mut sections = class_sections(&mixed_class()).expect("well-formed");
-        // Unanswered MC -> not ready.
         assert!(!class_ready_to_submit(&sections));
-
-        // Answer every MC/listening question. Speaking/writing are still in
-        // their initial (Idle/Editing) phases, so the class is NOT yet ready —
-        // the learner must work each prompt to a graded/failed state first.
         answer_all_mc(&mut sections);
-        assert!(
-            !class_ready_to_submit(&sections),
-            "MC answered but speaking/writing still in flight -> not ready"
-        );
-
-        // Drive speaking + writing to a terminal phase.
-        for s in sections.iter_mut() {
-            match &mut s.progress {
-                SectionProgress::Speaking { phase, .. } => {
-                    *phase = SpeakingPhase::Graded {
-                        score: Some(80),
-                        transcript: Some("ok".into()),
-                        feedback: Some("good".into()),
-                    };
-                }
-                SectionProgress::Writing { phase, .. } => {
-                    *phase = WritingPhase::Graded {
-                        score: 75,
-                        feedback: "nice".into(),
-                    };
-                }
-                _ => {}
-            }
-        }
-        assert!(
-            class_ready_to_submit(&sections),
-            "every section terminal -> ready"
-        );
+        assert!(!class_ready_to_submit(&sections));
+        grade_all_productive(&mut sections);
+        assert!(class_ready_to_submit(&sections));
+        let speaking = sections.iter_mut().find(|section| section.skill == types::SkillType::Speaking).unwrap();
+        if let SectionProgress::Speaking { phase, .. } = &mut speaking.progress { *phase = SpeakingPhase::Idle; }
+        assert!(!class_ready_to_submit(&sections), "every productive grade remains required");
     }
 
     #[test]
-    fn speaking_section_is_not_ready_until_terminal() {
-        // A class with a speaking section: in-flight phases are not submittable;
-        // only Graded/Failed are.
+    fn speaking_failures_and_missing_scores_cannot_finish_a_class() {
         let mut sections = class_sections(&mixed_class()).expect("well-formed");
         answer_all_mc(&mut sections);
-        // Drive writing terminal so only the speaking phase is under test.
-        for s in sections.iter_mut() {
-            if let SectionProgress::Writing { phase, .. } = &mut s.progress {
-                *phase = WritingPhase::Failed {
-                    message: "x".into(),
-                };
-            }
-        }
-
-        let set_speaking = |sections: &mut [ClassSection], p: SpeakingPhase| {
-            for s in sections.iter_mut() {
-                if let SectionProgress::Speaking { phase, .. } = &mut s.progress {
-                    *phase = p.clone();
-                }
-            }
-        };
-
-        for not_ready in [
-            SpeakingPhase::Idle,
-            SpeakingPhase::Recording,
-            SpeakingPhase::Uploading,
-            SpeakingPhase::Polling {
-                recording_id: "r".into(),
-            },
+        grade_all_productive(&mut sections);
+        for phase in [
+            SpeakingPhase::Idle, SpeakingPhase::Recording, SpeakingPhase::Uploading,
+            SpeakingPhase::Polling { recording_id: "r".into() },
+            SpeakingPhase::Failed { message: "Provider unavailable".into() },
+            SpeakingPhase::Graded { score: None, transcript: None, feedback: None },
         ] {
-            set_speaking(&mut sections, not_ready.clone());
-            assert!(
-                !class_ready_to_submit(&sections),
-                "speaking phase {not_ready:?} must not be submittable",
-            );
-        }
-        for ready in [
-            SpeakingPhase::Graded {
-                score: Some(90),
-                transcript: Some("t".into()),
-                feedback: Some("f".into()),
-            },
-            SpeakingPhase::Failed {
-                message: "m".into(),
-            },
-        ] {
-            set_speaking(&mut sections, ready.clone());
-            assert!(
-                class_ready_to_submit(&sections),
-                "speaking phase {ready:?} is terminal -> submittable",
-            );
+            for section in &mut sections { if let SectionProgress::Speaking { phase: current, .. } = &mut section.progress { *current = phase.clone(); } }
+            assert!(!class_ready_to_submit(&sections), "{phase:?}");
         }
     }
 
     #[test]
-    fn writing_section_is_not_ready_until_terminal() {
+    fn writing_errors_and_empty_responses_cannot_finish_a_class() {
         let mut sections = class_sections(&mixed_class()).expect("well-formed");
         answer_all_mc(&mut sections);
-        // Drive speaking terminal so only the writing phase is under test.
-        for s in sections.iter_mut() {
-            if let SectionProgress::Speaking { phase, .. } = &mut s.progress {
-                *phase = SpeakingPhase::Failed {
-                    message: "x".into(),
-                };
-            }
+        grade_all_productive(&mut sections);
+        for phase in [WritingPhase::Editing, WritingPhase::Submitting, WritingPhase::Failed { message: "Provider unavailable".into() }] {
+            for section in &mut sections { if let SectionProgress::Writing { phase: current, .. } = &mut section.progress { *current = phase.clone(); } }
+            assert!(!class_ready_to_submit(&sections), "{phase:?}");
         }
-
-        let set_writing = |sections: &mut [ClassSection], p: WritingPhase| {
-            for s in sections.iter_mut() {
-                if let SectionProgress::Writing { phase, .. } = &mut s.progress {
-                    *phase = p.clone();
-                }
-            }
-        };
-
-        for not_ready in [WritingPhase::Editing, WritingPhase::Submitting] {
-            set_writing(&mut sections, not_ready.clone());
-            assert!(
-                !class_ready_to_submit(&sections),
-                "writing phase {not_ready:?} must not be submittable",
-            );
-        }
-        for ready in [
-            WritingPhase::Graded {
-                score: 70,
-                feedback: "f".into(),
-            },
-            WritingPhase::Failed {
-                message: "m".into(),
-            },
-        ] {
-            set_writing(&mut sections, ready.clone());
-            assert!(
-                class_ready_to_submit(&sections),
-                "writing phase {ready:?} is terminal -> submittable",
-            );
-        }
+        grade_all_productive(&mut sections);
+        for section in &mut sections { if let SectionProgress::Writing { input, .. } = &mut section.progress { *input = WritingInput::new(); } }
+        assert!(!class_ready_to_submit(&sections), "a grade must apply to actual response text");
     }
 
     #[test]

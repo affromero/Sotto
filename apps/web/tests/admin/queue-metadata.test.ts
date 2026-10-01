@@ -3,6 +3,9 @@ import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { QUEUE_METADATA, PIPELINE_STAGE_ORDER } from '@/app/(admin)/admin/queues/queue-metadata';
 
 describe('queue-metadata', () => {
+  it('places saved practice preparation in the content pipeline', () => {
+    expect(QUEUE_METADATA['practice-preparation']).toMatchObject({ stage: 'Content Pipeline' });
+  });
   it('explains durable class preparation in the content pipeline', () => {
     expect(QUEUE_METADATA['class-preparation'].stage).toBe('Content Pipeline');
     expect(QUEUE_METADATA['class-preparation'].description).toMatch(/durable.*requests/i);

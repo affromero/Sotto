@@ -1,262 +1,166 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { practicePreparingSchema } from '@sotto/shared';
 
-const { PracticeCourseNotFoundError, PracticeSessionNotFoundError } = vi.hoisted(() => {
-  class PracticeCourseNotFoundError extends Error {}
-  class PracticeSessionNotFoundError extends Error {}
-  return { PracticeCourseNotFoundError, PracticeSessionNotFoundError };
-});
-
-const mockAuthenticateRequest = vi.fn();
-const mockStartPractice = vi.fn();
-const mockSubmitPractice = vi.fn();
-const mockCourseFindFirst = vi.fn();
-const mockLearnerVocabCount = vi.fn();
-const mockLearnerGrammarCount = vi.fn();
-const mockPracticeSessionFindMany = vi.fn();
-const mockPracticeSessionDelete = vi.fn();
-
-vi.mock('@/lib/api-keys', () => ({
-  authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
+const mocks = vi.hoisted(() => ({
+  authenticate: vi.fn(),
+  admit: vi.fn(),
+  resume: vi.fn(),
+  submit: vi.fn(),
+  course: vi.fn(),
+  vocab: vi.fn(),
+  grammar: vi.fn(),
+  sessions: vi.fn(),
 }));
-vi.mock('@/lib/practice-service', () => ({
-  startPractice: (...a: unknown[]) => mockStartPractice(...a),
-  submitPractice: (...a: unknown[]) => mockSubmitPractice(...a),
-  PracticeCourseNotFoundError,
-  PracticeSessionNotFoundError,
+vi.mock('@/lib/api-keys', () => ({ authenticateRequest: mocks.authenticate }));
+vi.mock('@/lib/practice/preparation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/practice/preparation')>()),
+  requestPracticePreparation: mocks.admit,
+}));
+vi.mock('@/lib/practice/resume', () => ({ resumePractice: mocks.resume }));
+vi.mock('@/lib/practice-service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/practice-service')>()),
+  submitPractice: mocks.submit,
 }));
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
-    learnerVocab: { count: (...a: unknown[]) => mockLearnerVocabCount(...a) },
-    learnerGrammar: { count: (...a: unknown[]) => mockLearnerGrammarCount(...a) },
-    practiceSession: {
-      findMany: (...a: unknown[]) => mockPracticeSessionFindMany(...a),
-      delete: (...a: unknown[]) => mockPracticeSessionDelete(...a),
-    },
+    course: { findFirst: mocks.course },
+    learnerVocab: { count: mocks.vocab },
+    learnerGrammar: { count: mocks.grammar },
+    practiceSession: { findMany: mocks.sessions },
   },
 }));
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
 import {
   POST as startPost,
   GET as overviewGet,
 } from '@/app/api/v1/courses/[courseId]/practice/route';
 import { POST as submitPost } from '@/app/api/v1/practice/[sessionId]/submit/route';
+import { PracticeCourseNotFoundError, PracticeSessionNotFoundError } from '@/lib/practice-service';
+import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
-const COURSE_PARAMS = { params: Promise.resolve({ courseId: 'c1' }) };
-const SESSION_PARAMS = { params: Promise.resolve({ sessionId: 'ps1' }) };
-
-function jsonReq(url: string, body: unknown): NextRequest {
-  return new NextRequest(url, {
+const courseParams = { params: Promise.resolve({ courseId: 'c1' }) };
+const sessionParams = { params: Promise.resolve({ sessionId: 'ps1' }) };
+const jsonReq = (body: unknown) =>
+  new NextRequest('http://localhost/api/v1/practice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-}
-
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+  vi.resetAllMocks();
+  mocks.authenticate.mockResolvedValue({ userId: 'u1' });
+  mocks.admit.mockResolvedValue({ id: randomUUID(), sessionId: randomUUID(), status: 'QUEUED' });
 });
 
-describe('POST /api/v1/courses/[courseId]/practice', () => {
-  it('starts a session and returns 201 with items (ungated — no 409)', async () => {
-    mockStartPractice.mockResolvedValue({
-      status: 'ready',
-      sessionId: 'ps1',
-      kind: 'VOCAB',
-      items: [{ id: 'v0', prompt: 'hi', options: ['a', 'b'] }],
-    });
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'VOCAB' }),
-      COURSE_PARAMS
+describe('Practice HTTP contract', () => {
+  it('acknowledges durable FULL preparation with a saved identity and public status', async () => {
+    const response = await startPost(
+      jsonReq({ kind: 'FULL', requestId: randomUUID(), focusTargetId: 'ft1' }),
+      courseParams
     );
-    expect(res.status).toBe(201);
-    expect((await res.json()).sessionId).toBe('ps1');
-  });
-
-  it('discards the built session when the learner cancelled while it was building', async () => {
-    mockStartPractice.mockResolvedValue({
-      status: 'ready',
-      sessionId: 'ps-abandoned',
-      kind: 'VOCAB',
-      items: [{ id: 'v0', prompt: 'hi', options: ['a', 'b'] }],
-    });
-    mockPracticeSessionDelete.mockResolvedValue({});
-
-    const controller = new AbortController();
-    controller.abort();
-    const req = new NextRequest('http://localhost/api/v1/courses/c1/practice', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'VOCAB' }),
-      signal: controller.signal,
-    });
-
-    const res = await startPost(req, COURSE_PARAMS);
-
-    expect(res.status).toBe(499);
-    expect(mockPracticeSessionDelete).toHaveBeenCalledWith({ where: { id: 'ps-abandoned' } });
-  });
-
-  it('still returns the session when the learner did not cancel', async () => {
-    mockStartPractice.mockResolvedValue({
-      status: 'ready',
-      sessionId: 'ps-kept',
-      kind: 'VOCAB',
-      items: [{ id: 'v0', prompt: 'hi', options: ['a', 'b'] }],
-    });
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'VOCAB' }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(201);
-    expect(mockPracticeSessionDelete).not.toHaveBeenCalled();
-  });
-
-  it('returns 200 + unavailable when there is not enough content', async () => {
-    mockStartPractice.mockResolvedValue({ status: 'unavailable', reason: 'not_enough_vocab' });
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'VOCAB' }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(200);
-    expect((await res.json()).reason).toBe('not_enough_vocab');
-  });
-
-  it('accepts FULL catch-up practice as a real kind', async () => {
-    mockStartPractice.mockResolvedValue({
-      status: 'ready_full',
-      sessionId: 'ps1',
-      kind: 'FULL',
-      items: [],
-      speakingPrompts: [],
-      writingPrompts: [],
-    });
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'FULL' }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(201);
-    expect(mockStartPractice).toHaveBeenCalledWith(
+    expect(response.status).toBe(202);
+    const progress = practicePreparingSchema.parse(await response.json());
+    expect(progress.preparationStatus).toBe('QUEUED');
+    expect(progress.message).toMatch(/saved/);
+    expect(progress.canRecover).toBe(false);
+    expect(progress).not.toHaveProperty('selection');
+    expect(progress).not.toHaveProperty('grant');
+    expect(mocks.admit).toHaveBeenCalledWith(
       'c1',
-      'u1',
       'FULL',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
-      { focusTargetId: null }
+      expect.objectContaining({ userId: 'u1' }),
+      expect.objectContaining({ focusTargetId: 'ft1' })
     );
   });
 
-  it('passes a selected focus target through to practice start', async () => {
-    mockStartPractice.mockResolvedValue({
-      status: 'ready',
-      sessionId: 'ps1',
-      kind: 'READING',
-      items: [],
+  it('returns already published material when the original admission acknowledgement is retried', async () => {
+    mocks.admit.mockResolvedValue({ sessionId: 'ps1', status: 'COMPLETED' });
+    mocks.resume.mockResolvedValue({ status: 'ready', sessionId: 'ps1', kind: 'VOCAB', items: [] });
+    const response = await startPost(
+      jsonReq({ kind: 'VOCAB', requestId: randomUUID() }),
+      courseParams
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'ready', sessionId: 'ps1' });
+  });
+
+  it.each([{ kind: 'invalid' }, { kind: 'FULL', requestId: 'invalid' }])(
+    'rejects malformed practice admission %j',
+    async (body) => {
+      expect((await startPost(jsonReq(body), courseParams)).status).toBe(400);
+    }
+  );
+
+  it('surfaces an admission conflict rather than claiming a practice was created', async () => {
+    mocks.admit.mockRejectedValue(
+      new PreparationConflictError('The request was already discarded.')
+    );
+    const response = await startPost(jsonReq({ kind: 'FULL' }), courseParams);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringMatching(/discarded/) });
+  });
+
+  it('requires authentication and an owned course', async () => {
+    mocks.authenticate.mockResolvedValue(null);
+    expect((await startPost(jsonReq({ kind: 'VOCAB' }), courseParams)).status).toBe(401);
+    mocks.authenticate.mockResolvedValue({ userId: 'u1' });
+    mocks.admit.mockRejectedValue(new PracticeCourseNotFoundError('Unknown course'));
+    expect((await startPost(jsonReq({ kind: 'VOCAB' }), courseParams)).status).toBe(404);
+  });
+
+  it('returns the saved completion receipt including explanations and productive grading counts', async () => {
+    const result = {
+      score: 0.4,
+      correct: 1,
+      total: 4,
+      answered: 2,
+      graded: 2,
+      itemFeedback: [
+        {
+          itemId: 'v0',
+          prompt: 'Choose a greeting',
+          selectedIndex: 1,
+          correctIndex: 0,
+          selectedAnswer: 'Bye',
+          correctAnswer: 'Hello',
+          correct: false,
+          explanation: 'Hello opens a conversation.',
+        },
+      ],
+    };
+    mocks.submit.mockResolvedValue(result);
+    const response = await submitPost(
+      jsonReq({ answers: [{ itemId: 'v0', selectedIndex: 1 }] }),
+      sessionParams
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(result);
+  });
+
+  it('returns a missing-session error instead of another learner’s results', async () => {
+    mocks.submit.mockRejectedValue(new PracticeSessionNotFoundError('Unknown session'));
+    expect((await submitPost(jsonReq({ answers: [] }), sessionParams)).status).toBe(404);
+  });
+
+  it('rejects an invalid answer body', async () => {
+    expect((await submitPost(jsonReq({ answers: 'invalid' }), sessionParams)).status).toBe(400);
+  });
+
+  it('shows due counts and preparation failures in the owner’s recent history', async () => {
+    mocks.course.mockResolvedValue({ id: 'c1' });
+    mocks.vocab.mockResolvedValueOnce(7).mockResolvedValueOnce(20);
+    mocks.grammar.mockResolvedValue(3);
+    mocks.sessions.mockResolvedValue([{ id: 'ps1', kind: 'FULL', status: 'FAILED', score: null }]);
+    const response = await overviewGet(
+      new NextRequest('http://localhost/api/v1/practice'),
+      courseParams
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      due: { vocab: 7, grammar: 3 },
+      totalVocab: 20,
+      recent: [{ status: 'FAILED' }],
     });
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', {
-        kind: 'READING',
-        focusTargetId: 'ft1',
-      }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(201);
-    expect(mockStartPractice).toHaveBeenCalledWith(
-      'c1',
-      'u1',
-      'READING',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
-      {
-        focusTargetId: 'ft1',
-      }
-    );
-  });
-
-  it('400s on an invalid kind', async () => {
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'NONSENSE' }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(400);
-    expect(mockStartPractice).not.toHaveBeenCalled();
-  });
-
-  it("404s when the course is not the user's", async () => {
-    mockStartPractice.mockRejectedValue(new PracticeCourseNotFoundError('nope'));
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'GRAMMAR' }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(404);
-  });
-
-  it('401s without auth', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-    const res = await startPost(
-      jsonReq('http://localhost/api/v1/courses/c1/practice', { kind: 'VOCAB' }),
-      COURSE_PARAMS
-    );
-    expect(res.status).toBe(401);
-  });
-});
-
-describe('POST /api/v1/practice/[sessionId]/submit', () => {
-  it('grades and returns the score', async () => {
-    mockSubmitPractice.mockResolvedValue({ score: 0.8, correct: 4, total: 5 });
-    const res = await submitPost(
-      jsonReq('http://localhost/api/v1/practice/ps1/submit', {
-        answers: [{ itemId: 'v0', selectedIndex: 1 }],
-      }),
-      SESSION_PARAMS
-    );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ score: 0.8, correct: 4, total: 5 });
-  });
-
-  it('404s for an unknown / unowned session', async () => {
-    mockSubmitPractice.mockRejectedValue(new PracticeSessionNotFoundError('nope'));
-    const res = await submitPost(
-      jsonReq('http://localhost/api/v1/practice/ps1/submit', { answers: [] }),
-      SESSION_PARAMS
-    );
-    expect(res.status).toBe(404);
-  });
-
-  it('400s on a malformed body', async () => {
-    const res = await submitPost(
-      jsonReq('http://localhost/api/v1/practice/ps1/submit', { answers: 'nope' }),
-      SESSION_PARAMS
-    );
-    expect(res.status).toBe(400);
-    expect(mockSubmitPractice).not.toHaveBeenCalled();
-  });
-});
-
-describe('GET /api/v1/courses/[courseId]/practice', () => {
-  it('returns due counts + recent sessions for the owner', async () => {
-    mockCourseFindFirst.mockResolvedValue({ id: 'c1' });
-    mockLearnerVocabCount.mockResolvedValueOnce(7).mockResolvedValueOnce(20); // due, then total
-    mockLearnerGrammarCount.mockResolvedValue(3);
-    mockPracticeSessionFindMany.mockResolvedValue([
-      { id: 'ps1', kind: 'VOCAB', status: 'COMPLETED', score: 0.8 },
-    ]);
-
-    const req = new NextRequest('http://localhost/api/v1/courses/c1/practice', { method: 'GET' });
-    const res = await overviewGet(req, COURSE_PARAMS);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.due).toEqual({ vocab: 7, grammar: 3 });
-    expect(json.recent).toHaveLength(1);
-  });
-
-  it("404s when the course is not the user's", async () => {
-    mockCourseFindFirst.mockResolvedValue(null);
-    const req = new NextRequest('http://localhost/api/v1/courses/c1/practice', { method: 'GET' });
-    const res = await overviewGet(req, COURSE_PARAMS);
-    expect(res.status).toBe(404);
   });
 });

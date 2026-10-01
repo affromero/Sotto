@@ -1,9 +1,10 @@
+import { skillRequirementsSchema } from '@sotto/shared';
 import { z } from 'zod';
 import { OptimisticStateStore } from 'thesidedoor-core/storage/optimistic';
 import type { AtomicStateBackend } from 'thesidedoor-core/storage/optimistic';
 import { delegationBindingSchema } from 'thesidedoor-core/runtime/delegation';
 
-const preparationSchema = z
+export const preparationSchema = z
   .object({
     id: z.uuid(),
     courseId: z.string().min(1),
@@ -17,6 +18,23 @@ const preparationSchema = z
     timeZone: z.string().min(1).max(100),
     deferAudio: z.boolean(),
     maxProviderRequests: z.number().int().min(1).max(256).nullable(),
+    requirements: skillRequirementsSchema.optional(),
+    intent: z
+      .object({
+        kind: z.enum(['REGENERATE', 'REPAIR']),
+        classId: z.string().min(1),
+        attempt: z.number().int().positive(),
+        priorStatus: z.string().min(1),
+        classFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+        skills: z.array(z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'])),
+      })
+      .strict()
+      .optional(),
+    courseLevel: z.string().optional(),
+    speechFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     selection: z
       .object({
         provider: z.string().min(1),
@@ -98,7 +116,12 @@ export function admitPreparation(current: ClassPreparation | null, proposed: Cla
   throw new PreparationConflictError();
 }
 
-export function startPreparation(current: ClassPreparation, now: number): ClassPreparation {
+type PreparationLifecycle = Pick<
+  ClassPreparation,
+  'status' | 'audioEpisodeIds' | 'expiresAt' | 'availableAt' | 'updatedAt' | 'failure'
+>;
+
+export function startPreparation<T extends PreparationLifecycle>(current: T, now: number): T {
   if (current.status === 'CANCELLING' && current.audioEpisodeIds.length === 0)
     return { ...current, status: 'CANCELLED', updatedAt: now };
   if (current.status === 'RUNNING')
@@ -110,7 +133,7 @@ export function startPreparation(current: ClassPreparation, now: number): ClassP
   return { ...current, status: 'RUNNING', updatedAt: now };
 }
 
-export function cancelPreparation(current: ClassPreparation, now: number): ClassPreparation {
+export function cancelPreparation<T extends PreparationLifecycle>(current: T, now: number): T {
   if (current.status === 'COMPLETED' && current.audioEpisodeIds.length > 0)
     return { ...current, status: 'CANCELLING', updatedAt: now };
   if (current.status === 'QUEUED') return { ...current, status: 'CANCELLED', updatedAt: now };

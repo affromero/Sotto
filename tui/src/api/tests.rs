@@ -380,3 +380,87 @@
             "the live identity call must carry the bearer key"
         );
     }
+
+    #[tokio::test]
+    async fn practice_admission_retries_keep_the_request_identity_and_accept_queued_work() {
+        let request_id: uuid::Uuid = "9ad1cf1c-ec3a-4605-8a85-d0a5b95160ac".parse().unwrap();
+        for _ in 0..2 {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(capture_with_response(listener, "202 Accepted", r#"{"status":"preparing","sessionId":"9ad1cf1c-ec3a-4605-8a85-d0a5b95160ac","preparationStatus":"QUEUED","message":"Waiting for worker","canRecover":false}"#));
+            let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+            let response = client.start_practice("course-1", types::PracticeKind::Full, request_id).await.unwrap();
+            assert!(matches!(response, types::StartPracticeResponse::Preparing(saved) if saved.session_id == request_id.to_string()));
+            let request = server.await.unwrap();
+            assert!(request.starts_with("POST /api/v1/courses/course-1/practice "));
+            assert!(request.to_lowercase().contains("authorization: bearer test-key"));
+            let body: serde_json::Value = serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+            assert_eq!(body["requestId"], request_id.to_string());
+            assert_eq!(body["kind"], "FULL");
+        }
+    }
+
+    #[tokio::test]
+    async fn practice_progress_sends_revision_and_all_local_work_with_bearer() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(capture_with_response(listener, "200 OK", r#"{"saved":true,"progressRevision":8}"#));
+        let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+        let body = serde_json::from_value(serde_json::json!({ "expectedRevision": 7, "answers": { "g0": 1, "f0": 2 }, "writingDrafts": { "w0": "My unfinished draft" } })).unwrap();
+        let response = client.save_learning_progress(false, "session-1", body).await.unwrap();
+        assert_eq!(response.progress_revision.get(), 8);
+        let request = server.await.unwrap();
+        assert!(request.starts_with("PATCH /api/v1/practice/session-1 "));
+        assert!(request.to_lowercase().contains("authorization: bearer test-key"));
+        let body: serde_json::Value = serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(body["expectedRevision"], 7);
+        assert_eq!(body["answers"]["f0"], 2);
+        assert_eq!(body["writingDrafts"]["w0"], "My unfinished draft");
+    }
+
+    #[tokio::test]
+    async fn practice_writing_returns_inline_corrections() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(capture_with_response(listener, "200 OK", r#"{"overallScore":0.7,"feedback":"Check agreement","corrections":[{"old":"Yo es","new":"Yo soy","why":"First person of ser"}]}"#));
+        let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+        let grade = client.submit_practice_writing("session-1", "w0", "Yo es estudiante".into()).await.unwrap();
+        assert_eq!(grade.corrections[0].new, "Yo soy");
+        assert!(grade.corrections[0].why.contains("First person"));
+        let request = server.await.unwrap();
+        assert!(request.starts_with("POST /api/v1/practice/session-1/writing/w0 "));
+        assert!(request.to_lowercase().contains("authorization: bearer test-key"));
+        let body: serde_json::Value = serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(body["text"], "Yo es estudiante");
+    }
+
+    #[tokio::test]
+    async fn class_repair_accepts_queued_work_and_pins_the_observed_attempt() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(capture_with_response(listener, "202 Accepted",
+            r#"{"started":true,"scope":"sections","status":"GENERATING","operationId":"9ad1cf1c-ec3a-4605-8a85-d0a5b95160ac","courseId":"course1"}"#));
+        let client = SottoClient::new(&format!("http://{addr}"), "class-key").unwrap();
+        assert_eq!(client.repair_class("class-saved", 4).await.unwrap(),
+            NextClassOutcome::Created { class_id: "class-saved".into() });
+        let request = server.await.unwrap();
+        assert!(request.starts_with("POST /api/v1/classes/class-saved "));
+        assert!(request.to_lowercase().contains("authorization: bearer class-key"));
+        let body: serde_json::Value = serde_json::from_str(request.split("\r\n\r\n").last().unwrap()).unwrap();
+        assert_eq!(body["expectedAttempt"], 4);
+        assert_eq!(body["scope"], "sections");
+    }
+
+    #[tokio::test]
+    async fn a_gated_class_can_be_resumed_from_the_next_class_action() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(capture_with_response(listener, "409 Conflict",
+            r#"{"activeClassId":"class-existing","status":"IN_PROGRESS"}"#));
+        let client = SottoClient::new(&format!("http://{addr}"), "class-key").unwrap();
+        assert_eq!(client.next_class("course1").await.unwrap(),
+            NextClassOutcome::Created { class_id: "class-existing".into() });
+        let request = server.await.unwrap();
+        assert!(request.starts_with("POST /api/v1/courses/course1/next-class "));
+        assert!(request.to_lowercase().contains("authorization: bearer class-key"));
+    }

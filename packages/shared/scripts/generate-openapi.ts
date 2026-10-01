@@ -8,6 +8,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
+import {
+  classRegenerationRequestSchema,
+  classRegenerationAcceptedSchema,
+  practicePreparingSchema,
+  learningProgressRequestSchema,
+  learningProgressResponseSchema,
+  practiceGenerationActionSchema,
+} from '../src/learning-evidence';
 import { endpoints, type EndpointDef } from '../src/contracts/endpoints';
 import {
   addLearningTargetRequestSchema,
@@ -105,6 +113,7 @@ type JsonSchema = { [key: string]: JsonValue };
 // discriminated oneOf over the four named variant components.
 const START_PRACTICE_RESPONSE_NAME = 'StartPracticeResponse';
 const startPracticeVariants: Record<string, string> = {
+  preparing: 'StartPracticePreparing',
   unavailable: 'StartPracticeUnavailable',
   ready: 'StartPracticeReady',
   ready_speaking: 'StartPracticeReadySpeaking',
@@ -116,6 +125,12 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  ClassRegenerationRequest: classRegenerationRequestSchema,
+  ClassRegenerationAccepted: classRegenerationAcceptedSchema,
+  StartPracticePreparing: practicePreparingSchema,
+  LearningProgressRequest: learningProgressRequestSchema,
+  LearningProgressResponse: learningProgressResponseSchema,
+  PracticeGenerationAction: practiceGenerationActionSchema,
   CefrLevel: cefrLevelSchema,
   PracticeKind: practiceKindSchema,
   PracticeStatus: practiceStatusSchema,
@@ -282,6 +297,11 @@ function to30Object(node: { [key: string]: JsonValue }): JsonSchema {
   const out: JsonSchema = {};
   for (const [key, value] of Object.entries(node)) {
     if (DROP_KEYWORDS.has(key)) continue;
+    if ((key === 'exclusiveMinimum' || key === 'exclusiveMaximum') && typeof value === 'number') {
+      out[key === 'exclusiveMinimum' ? 'minimum' : 'maximum'] = value;
+      out[key] = true;
+      continue;
+    }
 
     // 3.0 has no `const`; express the single value as a one-element enum.
     if (key === 'const') {

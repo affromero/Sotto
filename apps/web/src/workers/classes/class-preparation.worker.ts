@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { createNextClass } from '@/lib/class-service';
+import { createNextClass, regenerateCurrentClass } from '@/lib/class-service';
 import { ClassSourceError } from '@/lib/class-source';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { readSottoWorkerJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
@@ -12,11 +12,13 @@ import {
   classPreparationStore,
   validateClassPreparation,
   recordClassPreparationFailure,
+  settleCancelledPreparation,
 } from '@/lib/classes/preparation';
 import { PreparationConflictError, startPreparation } from '@/lib/classes/preparation-state';
 import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { registerPreparationAudio } from '@/lib/classes/preparation-audio';
+import { publishClassGeneration } from '@/lib/learning/classes/class-generation-state';
 
 /** A crashed generation is fenced as unresolved; replay never repeats unproven external work. */
 export async function processClassPreparation(job: Job<unknown>, workerSignal?: AbortSignal) {
@@ -92,6 +94,65 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
         return { userId: current.userId };
       };
       try {
+        if (operation.intent) {
+          const target = operation.intent;
+          await regenerateCurrentClass(
+            target.classId,
+            operation.userId,
+            {
+              userId: operation.userId,
+              authorize,
+              signal,
+              onCleanupError: markCleanupUnconfirmed,
+              learningSelection: operation.selection,
+              isolatedWorkspace: { directory, markCleanupUnconfirmed },
+              registerAudioEpisode: (database, episodeId, key) =>
+                registerPreparationAudio(database, operation, episodeId, key),
+              providerRequest: preparationProviderRequest(operation, signal, () => {
+                outcomeUnknown = true;
+                markCleanupUnconfirmed();
+                controller.abort(
+                  new PreparationConflictError('The provider outcome is unresolved.')
+                );
+              }),
+            },
+            undefined,
+            {
+              repair: target.kind === 'REPAIR',
+              skills: target.skills,
+              attempt: target.attempt,
+              requirements: operation.requirements,
+              deferAudio: operation.deferAudio,
+              publish: (adaptiveSeed, source) =>
+                sottoTransaction(
+                  prisma,
+                  async (database) => {
+                    await authorize(database);
+                    await publishClassGeneration(database, {
+                      classId: target.classId,
+                      attempt: target.attempt,
+                      userId: operation.userId,
+                      status: target.kind === 'REPAIR' ? 'IN_PROGRESS' : 'AVAILABLE',
+                      data: { adaptiveSeed, ...source },
+                    });
+                    await classPreparationGrant(database, operation).complete(operation.grant);
+                    await classPreparationStore(database, courseId).transact((current) => {
+                      if (!current || current.id !== operationId)
+                        throw new PreparationConflictError();
+                      Object.assign(current, {
+                        status: 'COMPLETED',
+                        result: 'created',
+                        updatedAt: Date.now(),
+                      });
+                    });
+                    await sottoJobOutbox(database).complete(operationId, work.fingerprint);
+                  },
+                  { signal }
+                ),
+            }
+          );
+          return;
+        }
         const result = await createNextClass(
           courseId,
           operation.userId,
@@ -104,18 +165,16 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
             isolatedWorkspace: { directory, markCleanupUnconfirmed },
             registerAudioEpisode: (database, episodeId, audioGenerationKey) =>
               registerPreparationAudio(database, operation, episodeId, audioGenerationKey),
-            ...(operation.maxProviderRequests === null
-              ? {}
-              : {
-                  providerRequest: preparationProviderRequest(operation, signal, () => {
-                    outcomeUnknown = true;
-                    markCleanupUnconfirmed();
-                  }),
-                }),
+            providerRequest: preparationProviderRequest(operation, signal, () => {
+              outcomeUnknown = true;
+              markCleanupUnconfirmed();
+              controller.abort(new PreparationConflictError('The provider outcome is unresolved.'));
+            }),
           },
           { sourceUrl: work.payload.sourceUrl, topic: work.payload.topic },
           {
             deferAudio: operation.deferAudio,
+            requirements: operation.requirements,
             create: (data) =>
               sottoTransaction(
                 prisma,
@@ -139,15 +198,13 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
                 prisma,
                 async (database) => {
                   await authorize(database);
+                  await publishClassGeneration(database, {
+                    classId,
+                    attempt: 1,
+                    userId: operation.userId,
+                    data: { adaptiveSeed },
+                  });
                   await classPreparationGrant(database, operation).complete(operation.grant);
-                  await database.courseClass.update({
-                    where: { id: classId },
-                    data: { status: 'AVAILABLE', adaptiveSeed },
-                  });
-                  await database.course.update({
-                    where: { id: courseId },
-                    data: { activeClassId: classId },
-                  });
                   await classPreparationStore(database, courseId).transact((current) => {
                     if (!current || current.id !== operationId)
                       throw new PreparationConflictError();
@@ -198,5 +255,14 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
         controller.abort();
       }
     },
+  });
+  await sottoTransaction(prisma, async (database) => {
+    const current = await classPreparationStore(database, courseId).read();
+    if (
+      current?.id === operationId &&
+      current.intent &&
+      ['FAILED', 'CANCELLING', 'CANCELLED'].includes(current.status)
+    )
+      await settleCancelledPreparation(database, current);
   });
 }

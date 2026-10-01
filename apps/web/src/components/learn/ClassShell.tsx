@@ -14,6 +14,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
+import { retainedLearningProgress, useLearningProgress } from './progress/useLearningProgress';
 import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
@@ -90,6 +92,8 @@ function isClassPresentationStillRendering(cls: ClassData): boolean {
  */
 function ClassWritingStage({
   classId,
+  progressRevision,
+  attempt,
   prompts,
   gate,
   nextName,
@@ -98,6 +102,8 @@ function ClassWritingStage({
   onContinue,
 }: {
   classId: string;
+  progressRevision: number;
+  attempt: number;
   prompts: WritingPromptData[];
   gate: number;
   nextName: string | null;
@@ -105,7 +111,13 @@ function ClassWritingStage({
   onFeedback: (promptId: string, response: WritingResponse) => void;
   onContinue: () => void;
 }) {
-  const drafts = useWritingDrafts(prompts, `/api/v1/classes/${classId}/writing`, onFeedback);
+  const drafts = useWritingDrafts(
+    prompts,
+    `/api/v1/classes/${classId}/writing`,
+    onFeedback,
+    progressRevision,
+    String(attempt)
+  );
 
   return (
     <WritingSection
@@ -140,6 +152,13 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   const [scores, setScores] = useState<Record<string, number>>({});
   // selected option index per questionId, accumulated across all sections
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const saveError = useLearningProgress(
+    `/api/v1/classes/${classId}`,
+    { answers },
+    Boolean(cls && !cls.submitted),
+    cls?.progressRevision ?? 0,
+    String(cls?.attempt ?? 1)
+  );
   const [feedbackNotes, setFeedbackNotes] = useState<ClassFeedbackNote[]>([]);
   const [liveSpeakingRecordings, setLiveSpeakingRecordings] = useState<
     Record<string, ClassSpeakingRecording>
@@ -208,17 +227,25 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     const res = await fetch(`/api/v1/classes/${classId}?background=1`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'respond-async' },
-      body: JSON.stringify({ scope: 'class' }),
+      body: JSON.stringify({ scope: 'class', expectedAttempt: cls?.attempt ?? 1 }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(body.error ?? 'Failed to regenerate class.');
     }
-  }, [classId]);
+  }, [classId, cls?.attempt]);
 
   const applyLoadedClass = useCallback(
     (data: ClassData) => {
       setCls(data);
+      setAnswers(
+        retainedLearningProgress(
+          `/api/v1/classes/${classId}`,
+          { answers: data.learnerAnswers ?? {} },
+          data.progressRevision ?? 0,
+          String(data.attempt ?? 1)
+        ).answers ?? {}
+      );
       const ordered = orderSections(data.sections);
 
       if (data.submitted && data.submission) {
@@ -249,7 +276,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       }
       setView('hub');
     },
-    [initialSectionId]
+    [classId, initialSectionId]
   );
 
   const waitForClassRefresh = useCallback(async (): Promise<ClassData> => {
@@ -429,7 +456,11 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     setRegenerating(true);
     setErrorMessage('');
     try {
-      const res = await fetch(`/api/v1/classes/${classId}`, { method: 'POST' });
+      const res = await fetch(`/api/v1/classes/${classId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'sections', expectedAttempt: cls?.attempt ?? 1 }),
+      });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setErrorMessage(body.error ?? 'Failed to regenerate. Please try again.');
@@ -644,6 +675,8 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
           <ClassWritingStage
             key={seg.id}
             classId={classId}
+            progressRevision={cls?.progressRevision ?? 0}
+            attempt={cls?.attempt ?? 1}
             prompts={seg.writingPrompts}
             gate={gate}
             nextName={nextName}
@@ -699,6 +732,13 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
       <main className={styles.cstage}>
         <div className={styles.cstageInner}>
+          {saveError && (
+            <LearningSaveRecovery
+              endpoint={`/api/v1/classes/${classId}`}
+              material={String(cls?.attempt ?? 1)}
+              error={saveError}
+            />
+          )}
           {errorMessage && (view === 'hour' || view === 'hub' || view === 'summary') && (
             <p className={styles.errorBanner} role="alert">
               {errorMessage}

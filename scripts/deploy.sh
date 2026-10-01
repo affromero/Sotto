@@ -363,22 +363,14 @@ for kind in WEB WORKERS; do
 done
 schema_hash_script='const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");const root="/app/apps/web/prisma",hash=crypto.createHash("sha256");function add(file){const full=path.join(root,file);if(fs.statSync(full).isDirectory()){for(const name of fs.readdirSync(full).sort())add(path.join(file,name));}else{hash.update(file);hash.update(fs.readFileSync(full));}}add("schema.prisma");if(fs.existsSync(path.join(root,"migrations")))add("migrations");console.log(hash.digest("hex"));'
 candidate_schema=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$schema_hash_script")
-schema_changed=false
 while IFS= read -r previous_image; do
   [ -z "$previous_image" ] && continue
   previous_schema=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$schema_hash_script")
   if [ "$previous_schema" != "$candidate_schema" ]; then
-    schema_changed=true
-    if [ "${SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH:-}" != "$previous_schema" ] || \
-       [ "${SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH:-}" != "$candidate_schema" ]; then
-      echo "ERROR: schema or migration assets differ. Supply the exact reviewed previous and candidate schema hashes." >&2
-      exit 1
-    fi
+    echo "ERROR: schema or migration assets differ. Use a separately reviewed migration procedure before deploying this release." >&2
+    exit 1
   fi
 done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
-if [ "$schema_changed" = true ]; then
-  echo "Accepted reviewed schema transition: $SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH -> $SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH"
-fi
 
 WORKERS_CHANGED=false
 CADDY_CHANGED=false

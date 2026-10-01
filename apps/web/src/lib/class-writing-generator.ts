@@ -2,7 +2,7 @@
 // (no TTS, unlike speaking). composeWritingPrompts is the content-only core
 // (reused by practice); generateClassWriting adds the ClassSection + WritingPrompt
 // persistence.
-import { prisma } from './prisma';
+import { withClassGeneration } from './learning/classes/class-generation-state';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
@@ -114,9 +114,9 @@ export async function composeWritingPrompts(
     } catch {
       raw = [];
     }
-    if (raw.some((item) => !isValidRawPrompt(item))) {
+    if (raw.length !== WRITING_PROMPT_COUNT || raw.some((item) => !isValidRawPrompt(item))) {
       throw new Error(
-        'Writing generation must supply source text and a supported exercise type for every task.'
+        `Writing generation must supply source text and a supported exercise type for all ${WRITING_PROMPT_COUNT} tasks.`
       );
     }
     const valid = raw.filter(isValidRawPrompt).slice(0, WRITING_PROMPT_COUNT);
@@ -200,26 +200,29 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
     note: p.note,
   });
 
-  const section = await prisma.classSection.create({
-    data: {
-      classId: p.classId,
-      skill: 'WRITING',
-      attempt,
-      seed: `${p.classId}-WRITING-${attempt}`,
-      spec: { objective: p.objective },
-      status: 'READY',
-      generatedAt: new Date(),
-    },
-  });
+  const section = await withClassGeneration(p.execution, p.classId, attempt, async (database) => {
+    const section = await database.classSection.create({
+      data: {
+        classId: p.classId,
+        skill: 'WRITING',
+        attempt,
+        seed: `${p.classId}-WRITING-${attempt}`,
+        spec: { objective: p.objective },
+        status: 'READY',
+        generatedAt: new Date(),
+      },
+    });
 
-  await prisma.writingPrompt.createMany({
-    data: prompts.map((c, i) => ({
-      sectionId: section.id,
-      order: i + 1,
-      task: c.task,
-      guidance: c.guidance,
-      ideas: c.ideas,
-    })),
+    await database.writingPrompt.createMany({
+      data: prompts.map((c, i) => ({
+        sectionId: section.id,
+        order: i + 1,
+        task: c.task,
+        guidance: c.guidance,
+        ideas: c.ideas,
+      })),
+    });
+    return section;
   });
 
   logger.info('Writing section generated', {

@@ -962,6 +962,7 @@ model Course {
   grammar          LearnerGrammar[]
   vocabEdges       VocabEdge[]
   practiceSessions PracticeSession[]
+  practiceRequests PracticeRequestReceipt[]
   note             CourseNote?
   mockExams        MockExam[]
   focusTargets     LearnerFocusTarget[]
@@ -1028,6 +1029,9 @@ enum PracticeKind {
 }
 
 enum PracticeStatus {
+  GENERATING
+  FAILED
+  CANCELLED
   ACTIVE
   COMPLETED
 }
@@ -1050,6 +1054,7 @@ enum FocusTargetSource {
 // A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
 // the next class only unlocks once this one is PASSED.
 model CourseClass {
+  readingVocabulary Json? // exact reading source and assessed vocabulary provenance
   id              String      @id @default(cuid())
   courseId        String
   lessonId        String
@@ -1057,6 +1062,10 @@ model CourseClass {
   status          ClassStatus @default(LOCKED)
   attempt         Int         @default(1) // whole-class retry counter
   adaptiveSeed    Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
+  skillRequirements Json? // versioned required skills and genuine provider exemptions
+  learnerAnswers Json? // selections saved before final submission
+  writingDrafts Json? // learner drafts saved independently of grades
+  progressRevision Int @default(0) // rejects stale saves across tabs
   passThreshold   Float       @default(0.7) // fraction of sections that must pass
   worksheetPdfUrl String?
   sourceUrl       String? // sourced class: the real article/paper/link it was built from (null = curriculum class)
@@ -1129,6 +1138,9 @@ model LessonQuestion {
 
 // One submission per class attempt; aggregates the graded MC answers.
 model ClassSubmission {
+  attempt      Int? // class attempt that produced this receipt; null for historical submissions
+  receipt      Json? // immutable result for the current submission attempt
+  history      Json? // prior receipts and submitted answers retained across retakes
   id           String   @id @default(cuid())
   classId      String   @unique
   userId       String
@@ -1197,6 +1209,9 @@ model SpeakingPrompt {
 
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
 model SpeakingRecording {
+  attempt           Int                 @default(1)
+  sttProvider       String? // provider selected by the immutable learning contract
+  sttSelection      Json?   // immutable model, endpoint and credential revision metadata, never secrets
   id                String              @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1255,6 +1270,8 @@ model WritingPrompt {
 // A learner's writing response, graded synchronously by the LLM (corrections +
 // score), unlike speaking which is graded async by a worker.
 model WritingResponse {
+  gradingState      Json? // durable synchronous grade and provider outcome journal
+  attempt           Int      @default(1)
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1484,13 +1501,31 @@ model VocabEdge {
 
 // Ungated single-skill practice within a course. Distinct from the gated
 // CourseClass: short, repeatable, and only consolidates the memory graph (SRS).
+model PracticeRequestReceipt {
+  id        String   @id // client admission identity survives explicit session deletion
+  courseId  String
+  createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+}
+
 model PracticeSession {
+  listeningScriptHash String? // binds comprehension questions to the preserved listening script
+  generationSpec    Json? // captured private context, frozen requirements and source identity
+  generationState   Json? // nonsecret durable preparation and delegation metadata
+  readingVocabulary Json? // exact reading source and assessed vocabulary provenance
   id             String         @id @default(cuid())
   courseId       String
   kind           PracticeKind
   status         PracticeStatus @default(ACTIVE)
   items          Json // generated practice items (recall cards / questions / prompt refs)
   seed           String
+  skillRequirements Json? // immutable skill coverage, language and CEFR contract
+  learnerAnswers Json? // resumable multiple-choice selections, without answer keys
+  writingDrafts Json? // learner drafts saved independently of grades
+  progressRevision Int @default(0) // rejects stale saves across tabs
+  submissionResult Json? // stable completion receipt for idempotent submissions
   score          Float? // 0..1, set on submit
   vocabLemmas    String[]       @default([]) // lemmas this session reviews (SRS targets)
   grammarKeys    String[]       @default([]) // grammar topicKeys this session reviews

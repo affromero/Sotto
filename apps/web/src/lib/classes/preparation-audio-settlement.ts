@@ -4,16 +4,17 @@ import { initialStitchPayloadSchema } from '@/lib/sidedoor/jobs/initial/initial-
 import type { Prisma } from '@/generated/prisma/client';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
-import { classPreparationGrant } from './preparation-grant';
 import { readPreparationAudioBinding } from './preparation-audio';
 import { PreparationConflictError, type ClassPreparation } from './preparation-state';
+import { learningPreparationGrant } from '../learning/preparation/preparation-grant';
 
 /** Caller owns the Serializable cancellation transaction. Revocation fences new admissions. */
 export async function settlePreparationAudio(
   database: Prisma.TransactionClient,
-  operation: ClassPreparation
+  operation: Pick<ClassPreparation, 'id' | 'courseId' | 'userId' | 'grant' | 'audioEpisodeIds'>,
+  kind: 'class' | 'practice' = 'class'
 ): Promise<{ settled: boolean; blockingJobs: string[] }> {
-  const grant = await classPreparationGrant(database, operation).read(operation.grant);
+  const grant = await learningPreparationGrant(database, operation, kind).read(operation.grant);
   if (grant.status !== 'revoked')
     throw new PreparationConflictError('Revoke preparation before settling audio.');
   const outbox = sottoJobOutbox(database);
@@ -24,7 +25,8 @@ export async function settlePreparationAudio(
     if (
       !lineage ||
       lineage.operationId !== operation.id ||
-      lineage.grant.fingerprint !== operation.grant.fingerprint
+      lineage.grant.fingerprint !== operation.grant.fingerprint ||
+      (lineage.kind ?? 'class') !== kind
     )
       throw new PreparationConflictError('The audio cancellation lineage changed.');
     let cursor: string | null = null;

@@ -24,6 +24,7 @@ export function sottoJobFailureCode(error: unknown): string {
 
 const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new Map([
   ['class-preparation', [1]],
+  ['practice-preparation', [1]],
   ['content-extraction', [1]],
   ['deep-research', [1]],
   ['creative-planning', [1]],
@@ -71,4 +72,9 @@ export function validateSottoQueueContract(
       'Durable job name does not match its queue'
     );
   requireSottoJobVersion(handler, Number(version[2]));
+}
+
+/** Synchronous request executors retain durable receipts without Redis delivery. */
+export function isSottoSynchronousJob(handler: string, version: number): boolean {
+  return handler === 'learning-writing' && version === 1;
 }

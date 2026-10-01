@@ -300,6 +300,26 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     expect(body).toMatchObject({ error: 'Script not found' });
   });
 
+  it.each(['classSection', 'practiceSession'] as const)(
+    'preserves the reviewed script linked to %s',
+    async (association) => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockEpisodeFindUnique.mockResolvedValue({
+        userId: 'user-1',
+        status: 'SCRIPT_READY',
+        [association]: { id: 'learning' },
+      });
+      const response = await PATCH(
+        createPatchRequest({ turns: validTurns }),
+        await createParams('pod-1')
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: expect.stringContaining('learning exercise'),
+      });
+    }
+  );
+
   it('updates script and returns new turns and version', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });

@@ -71,6 +71,41 @@ function rubricResponse(
 // ---------------------------------------------------------------------------
 
 describe('SelfContainedScorer', () => {
+  it('preserves an explicitly captured isolated adapter at the provider boundary', async () => {
+    const isolated = {
+      image: 'fixture-image',
+      cliVersion: '2.1.283' as const,
+      executionId: 'fixture-execution',
+      endpoint: 'https://api.anthropic.com',
+      credential: 'fixture-key',
+      expiresAt: Date.now() + 60_000,
+      maxOutputTokens: 256,
+      admit: async () => {},
+      authenticatedFetch: globalThis.fetch,
+      recordIdentity: async () => {},
+      recordCleanup: async () => {},
+    };
+    mockGenerateResponse.mockResolvedValue(rubricResponse(0.9, 0.8, 0.9));
+    const result = await new SelfContainedScorer().score(
+      makeInput({
+        aiOptions: {
+          model: 'fixture',
+          apiKeyOverride: undefined,
+          endpoint: undefined,
+          fetch: undefined,
+          moderation: undefined,
+          signal: undefined,
+          isolated,
+        },
+      })
+    );
+    expect(result.overallScore).toBeGreaterThan(0.8);
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ isolated })
+    );
+  });
   let scorer: SelfContainedScorer;
 
   beforeEach(() => {
@@ -92,7 +127,9 @@ describe('SelfContainedScorer', () => {
       makeInput({ aiProvider: 'local', aiModel: 'local:fixture', aiEndpoint: endpoint })
     );
     expect(result.overallScore).toBeGreaterThan(0.9);
-    expect(result.feedback).toBe('Clear pronunciation.');
+    expect(result.feedback).toContain('Clear pronunciation.');
+    expect(result.rubricScores).not.toHaveProperty('fluency');
+    expect(result.feedback).toContain('unmeasured');
   });
 
   describe('perfect transcript', () => {
@@ -210,28 +247,10 @@ describe('SelfContainedScorer', () => {
     });
   });
 
-  describe('LLM scores clamped to 0..1', () => {
-    it('clamps out-of-range LLM scores', async () => {
-      // LLM returns values outside 0..1
-      mockGenerateResponse.mockResolvedValue({
-        content: JSON.stringify({
-          accuracy: 1.5,
-          fluency: -0.2,
-          completeness: 2.0,
-          feedback: 'ok',
-        }),
-        model: 'claude-3-5-haiku-20241022',
-        inputTokens: 80,
-        outputTokens: 30,
-      });
-
-      const result = await scorer.score(makeInput());
-
-      expect(result.rubricScores.accuracy).toBeLessThanOrEqual(1);
-      expect(result.rubricScores.fluency).toBeGreaterThanOrEqual(0);
-      expect(result.rubricScores.completeness).toBeLessThanOrEqual(1);
-      expect(result.overallScore).toBeGreaterThanOrEqual(0);
-      expect(result.overallScore).toBeLessThanOrEqual(1);
+  describe('invalid rubric scores', () => {
+    it.each([-0.2, 1.5])('rejects out-of-range LLM score %s', async (accuracy) => {
+      mockGenerateResponse.mockResolvedValue(rubricResponse(accuracy, 0.5, 1));
+      await expect(scorer.score(makeInput())).rejects.toThrow('invalid JSON');
     });
   });
 
@@ -247,7 +266,7 @@ describe('SelfContainedScorer', () => {
 
       const result = await scorer.score(makeInput());
 
-      expect(result.feedback).toBe('Nice!');
+      expect(result.feedback).toContain('Nice!');
       expect(result.rubricScores.accuracy).toBeGreaterThan(0.8);
     });
   });

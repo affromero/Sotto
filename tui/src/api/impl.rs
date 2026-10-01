@@ -14,8 +14,25 @@ impl Api for SottoClient {
         &self,
         course_id: &str,
         kind: types::PracticeKind,
+        request_id: uuid::Uuid,
     ) -> Result<types::StartPracticeResponse> {
-        SottoClient::start_practice(self, course_id, kind).await
+        SottoClient::start_practice(self, course_id, kind, request_id).await
+    }
+
+    async fn resume_practice(&self, session_id: &str) -> Result<types::StartPracticeResponse> {
+        SottoClient::resume_practice(self, session_id).await
+    }
+
+    async fn practice_generation_action(&self, session_id: &str, recover: bool) -> Result<types::StartPracticePreparing> {
+        SottoClient::practice_generation_action(self, session_id, recover).await
+    }
+
+    async fn save_learning_progress(&self, class: bool, id: &str, progress: types::LearningProgressRequest) -> Result<types::LearningProgressResponse> {
+        SottoClient::save_learning_progress(self, class, id, progress).await
+    }
+
+    async fn submit_practice_writing(&self, session_id: &str, prompt_id: &str, text: String) -> Result<WritingGradeResponse> {
+        SottoClient::submit_practice_writing(self, session_id, prompt_id, text).await
     }
 
     async fn submit_practice(
@@ -50,6 +67,10 @@ impl Api for SottoClient {
 
     async fn download(&self, url: &str) -> Result<Vec<u8>> {
         SottoClient::download(self, url).await
+    }
+
+    async fn repair_class(&self, class_id: &str, expected_attempt: i64) -> Result<NextClassOutcome> {
+        SottoClient::repair_class(self, class_id, expected_attempt).await
     }
 
     async fn next_class(&self, course_id: &str) -> Result<NextClassOutcome> {

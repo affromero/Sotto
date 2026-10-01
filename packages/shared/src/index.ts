@@ -30,6 +30,16 @@ export type {
 } from './types/enums';
 
 // Types
+export {
+  learningSkills,
+  skillRequirementsSchema,
+  createSkillRequirements,
+  requiredLearningSkills,
+} from './learning-requirements';
+export type { SkillRequirements, SkillRequirement } from './learning-requirements';
+export * from './learning-evidence';
+export * from './reading-vocabulary';
+
 export type {
   EpisodeSummary,
   EpisodeDetail,

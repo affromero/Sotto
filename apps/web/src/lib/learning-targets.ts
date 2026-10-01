@@ -8,6 +8,7 @@ import { logger } from './logger';
 import { captureFocusTargetStorage } from '@/lib/sidedoor/storage/core/focus-target-storage';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import type { CefrLevel, FocusTargetKind, FocusTargetSource } from '@sotto/shared';
+import type { LearningDatabase } from './learning/database';
 
 const MAX_TARGET_TEXT = 500;
 const MAX_CONTEXT_TEXT = 2000;
@@ -256,13 +257,14 @@ export async function markFocusTargetsPracticed(
   courseId: string,
   focusTargetIds: string[],
   quality: number,
-  now: Date
+  now: Date,
+  database: LearningDatabase = prismaUnfiltered
 ): Promise<void> {
   const ids = [...new Set(focusTargetIds.filter(Boolean))];
   if (ids.length === 0) return;
   const clamped = Math.max(0, Math.min(1, quality));
   const priorityBoost = clamped >= 0.7 ? 0.12 : Math.min(0.65, 0.35 + (1 - clamped) * 0.3);
-  await prisma.learnerFocusTarget.updateMany({
+  await database.learnerFocusTarget.updateMany({
     where: { courseId, id: { in: ids } },
     data: { lastPracticedAt: now, priorityBoost },
   });

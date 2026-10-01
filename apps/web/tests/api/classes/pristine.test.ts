@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { PristineRegenerationConflict } from '@/lib/classes/regeneration/pristine';
-const mockRegenerateCurrentClass = vi.fn();
+const mockRequestPreparation = vi.fn();
+vi.mock('@/lib/classes/preparation', () => ({
+  requestClassPreparation: (...args: unknown[]) => mockRequestPreparation(...args),
+}));
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    courseClass: { findFirst: async () => ({ courseId: 'course-1', status: 'AVAILABLE' }) },
+  },
+}));
 const mockGetClass = vi.fn();
 const mockSnapshot = vi.fn();
 const mockValidate = vi.fn();
@@ -12,8 +20,6 @@ vi.mock('@/lib/classes/regeneration/pristine', async (importOriginal) => ({
 }));
 vi.mock('@/lib/api-keys', () => ({ authenticateRequest: async () => ({ userId: 'u1' }) }));
 vi.mock('@/lib/class-service', () => ({
-  regenerateCurrentClass: (...args: unknown[]) => mockRegenerateCurrentClass(...args),
-  regenerateFailedSections: vi.fn(),
   getClassForUser: (...args: unknown[]) => mockGetClass(...args),
   deleteClassForUser: vi.fn(),
 }));
@@ -42,30 +48,38 @@ describe('pristine regeneration HTTP admission', () => {
     expect(response.status).toBe(409);
     expect(await response.json()).not.toHaveProperty('pristineSnapshot');
   });
-  it('preserves the submitted pristine snapshot for synchronous regeneration', async () => {
-    mockRegenerateCurrentClass.mockResolvedValue(true);
+  it('preserves the submitted pristine snapshot for durable regeneration', async () => {
+    mockRequestPreparation.mockResolvedValue({ id: 'operation-1' });
     const snapshot = 'a'.repeat(64);
     const response = await POST(
       makeRequest('http://localhost/api/v1/classes/class-1', 'POST', {
         scope: 'class',
+        expectedAttempt: 1,
         pristineSnapshot: snapshot,
       }),
       classParams('class-1')
     );
-    expect(response.status).toBe(200);
-    expect(mockRegenerateCurrentClass).toHaveBeenCalledWith(
-      'class-1',
-      'u1',
+    expect(response.status).toBe(202);
+    expect(mockRequestPreparation).toHaveBeenCalledWith(
+      'course-1',
       expect.objectContaining({ userId: 'u1' }),
-      snapshot
+      {
+        intent: {
+          kind: 'REGENERATE',
+          classId: 'class-1',
+          expectedAttempt: 1,
+          pristineSnapshot: snapshot,
+        },
+      }
     );
   });
 
   it('returns a conflict instead of regenerating changed learner work', async () => {
-    mockRegenerateCurrentClass.mockRejectedValue(new PristineRegenerationConflict());
+    mockRequestPreparation.mockRejectedValue(new PristineRegenerationConflict());
     const response = await POST(
       makeRequest('http://localhost/api/v1/classes/class-1', 'POST', {
         scope: 'class',
+        expectedAttempt: 1,
         pristineSnapshot: 'a'.repeat(64),
       }),
       classParams('class-1')
@@ -74,15 +88,15 @@ describe('pristine regeneration HTTP admission', () => {
     expect(await response.json()).toMatchObject({ error: expect.stringContaining('learner work') });
   });
 
-  it.each([
-    ['http://localhost/api/v1/classes/class-1?background=1', 'a'.repeat(64)],
-    ['http://localhost/api/v1/classes/class-1', 'invalid'],
-  ])('rejects an unsafe pristine request at %s', async (url, pristineSnapshot) => {
-    const response = await POST(
-      makeRequest(url, 'POST', { scope: 'class', pristineSnapshot }),
-      classParams('class-1')
-    );
-    expect(response.status).toBe(400);
-    expect(mockRegenerateCurrentClass).not.toHaveBeenCalled();
-  });
+  it.each([['http://localhost/api/v1/classes/class-1', 'invalid']])(
+    'rejects an unsafe pristine request at %s',
+    async (url, pristineSnapshot) => {
+      const response = await POST(
+        makeRequest(url, 'POST', { scope: 'class', expectedAttempt: 1, pristineSnapshot }),
+        classParams('class-1')
+      );
+      expect(response.status).toBe(400);
+      expect(mockRequestPreparation).not.toHaveBeenCalled();
+    }
+  );
 });

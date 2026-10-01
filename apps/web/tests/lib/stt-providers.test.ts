@@ -80,6 +80,23 @@ describe('createSttProvider', () => {
     expect(provider).toBeDefined();
   });
 
+  it('transcribes with the captured local model after the saved default changes', async () => {
+    serverConfiguration.values.sttBaseUrl = 'http://localhost:8000/v1';
+    serverConfiguration.values.sttModel = 'replacement-default';
+    mockTranscriptionsCreate.mockResolvedValueOnce({ text: 'hola', segments: [] });
+    try {
+      await createSttProvider('local', undefined, 'captured-model').transcribe(
+        Buffer.from('audio')
+      );
+      expect(mockTranscriptionsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'captured-model' })
+      );
+    } finally {
+      delete serverConfiguration.values.sttBaseUrl;
+      delete serverConfiguration.values.sttModel;
+    }
+  });
+
   it('returns an elevenlabs provider for "elevenlabs"', () => {
     const provider = createSttProvider('elevenlabs', 'test-key');
     expect(provider).toBeDefined();

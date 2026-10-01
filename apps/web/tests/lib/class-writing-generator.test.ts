@@ -8,12 +8,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockClassSectionCreate = vi.fn();
 const mockWritingPromptCreateMany = vi.fn();
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
+    $queryRaw: async () => [],
+    courseClass: {
+      findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
+    },
     classSection: { create: (...a: unknown[]) => mockClassSectionCreate(...a) },
     writingPrompt: { createMany: (...a: unknown[]) => mockWritingPromptCreateMany(...a) },
-  },
-}));
+  };
+  return {
+    prisma: database,
+    prismaUnfiltered: {
+      ...database,
+      $transaction: async (write: (db: typeof database) => Promise<unknown>) => write(database),
+    },
+  };
+});
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
@@ -39,14 +50,11 @@ const mockLoadAndRender = vi.fn();
 vi.mock('@/lib/prompt-loader', () => ({
   loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a),
 }));
-vi.mock('@/lib/course-notes', () => ({
-  formatNotesForPrompt: (n: string) => (n ? `\nNOTE: ${n}\n` : ''),
-}));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { composeWritingPrompts, generateClassWriting } from '@/lib/class-writing-generator';
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 
 const SAMPLE = JSON.stringify([
   {
@@ -57,11 +65,16 @@ const SAMPLE = JSON.stringify([
     ideas: ['Gracias, me encantaría.', 'El jueves me viene bien.'],
   },
   { task: 'Correct the sentence.', taskType: 'correction', sourceText: 'Ayer yo va al cine.' },
+  {
+    task: 'Complete the supplied sentence.',
+    taskType: 'completion',
+    sourceText: 'Mañana vamos ___ cine. Use the contraction of a and el.',
+  },
 ]);
 
 const PARAMS = {
   userId: 'u1',
-  execution: blockedProviderExecution('u1'),
+  execution: authorizedLearnerExecution('u1'),
   level: 'A2',
   nativeLang: 'en',
   targetLang: 'es',
@@ -71,6 +84,8 @@ const PARAMS = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGenerateResponse.mockReset();
+  mockTeachingResponse.mockReset();
   mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
   mockTeachingResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
@@ -91,7 +106,7 @@ beforeEach(() => {
     model: 'm',
   });
   mockClassSectionCreate.mockResolvedValue({ id: 'section-w' });
-  mockWritingPromptCreateMany.mockResolvedValue({ count: 2 });
+  mockWritingPromptCreateMany.mockResolvedValue({ count: 3 });
 });
 
 describe('composeWritingPrompts', () => {
@@ -119,6 +134,7 @@ describe('composeWritingPrompts', () => {
     expect(reviewed.items.map((item: { content: unknown }) => item.content)).toEqual([
       { ...prompts[0], taskType: 'guided_reply' },
       { ...prompts[1], taskType: 'correction' },
+      { ...prompts[2], taskType: 'completion' },
     ]);
   });
 
@@ -133,6 +149,7 @@ describe('composeWritingPrompts', () => {
             feedback: ['The source cannot satisfy the required transformation.'],
           },
           { index: 1, acceptable: true, issues: [], feedback: [] },
+          { index: 2, acceptable: true, issues: [], feedback: [] },
         ],
       }),
       model: 'm',
@@ -150,6 +167,7 @@ describe('composeWritingPrompts', () => {
         task: 'Complete the supplied sentence with the correct form of tener.',
         guidance: 'Use the near future.',
       },
+      ...JSON.parse(SAMPLE).slice(1),
     ]);
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' })
@@ -170,6 +188,7 @@ describe('composeWritingPrompts', () => {
               feedback: ['The guidance requires an incorrect collocation.'],
             },
             { index: 1, acceptable: true, issues: [], feedback: [] },
+            { index: 2, acceptable: true, issues: [], feedback: [] },
           ],
         }),
         model: 'm',
@@ -188,13 +207,11 @@ describe('composeWritingPrompts', () => {
 
     const prompts = await composeWritingPrompts(PARAMS);
 
-    expect(prompts).toEqual([
-      {
-        task: 'Complete the supplied sentence with the correct form of tener.\n\nMañana ___ una cena con Ana a las ocho.',
-        guidance: 'Use the near future.',
-        ideas: [],
-      },
-    ]);
+    expect(prompts[0]).toEqual({
+      task: 'Complete the supplied sentence with the correct form of tener.\n\nMañana ___ una cena con Ana a las ocho.',
+      guidance: 'Use the near future.',
+      ideas: [],
+    });
     expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
     expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
     expect(JSON.parse(mockTeachingResponse.mock.calls[1][1][0].content).items[0].content).toEqual({
@@ -229,6 +246,7 @@ describe('composeWritingPrompts', () => {
             feedback: ['The guidance requires an incorrect collocation.'],
           },
           { index: 1, acceptable: true, issues: [], feedback: [] },
+          { index: 2, acceptable: true, issues: [], feedback: [] },
         ],
       }),
       model: 'm',
@@ -259,6 +277,7 @@ describe('composeWritingPrompts', () => {
               feedback: ['The guidance requires an incorrect collocation.'],
             },
             { index: 1, acceptable: true, issues: [], feedback: [] },
+            { index: 2, acceptable: true, issues: [], feedback: [] },
           ],
         }),
         model: 'm',
@@ -281,6 +300,7 @@ describe('composeWritingPrompts', () => {
             feedback: ['The guidance requires an incorrect collocation.'],
           },
           { index: 1, acceptable: true, issues: [], feedback: [] },
+          { index: 2, acceptable: true, issues: [], feedback: [] },
         ],
       }),
       model: 'm',
@@ -302,6 +322,11 @@ describe('composeWritingPrompts', () => {
         ideas: ['Gracias, me encantaría.', 'El jueves me viene bien.'],
       },
       { task: 'Correct the sentence.\n\nAyer yo va al cine.', guidance: null, ideas: [] },
+      {
+        task: 'Complete the supplied sentence.\n\nMañana vamos ___ cine. Use the contraction of a and el.',
+        guidance: null,
+        ideas: [],
+      },
     ]);
     expect(mockClassSectionCreate).not.toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
@@ -316,6 +341,7 @@ describe('composeWritingPrompts', () => {
           sourceText: 'Accept dinner on Thursday at 19:00.',
           ideas: ['one', 2, '  ', 'two', 'three', 'four'],
         },
+        ...JSON.parse(SAMPLE).slice(1),
       ]),
       inputTokens: 1,
       outputTokens: 1,
@@ -336,6 +362,7 @@ describe('composeWritingPrompts', () => {
           sourceText: 'Accept dinner on Thursday at 19:00.',
           ideas: 'not a list',
         },
+        ...JSON.parse(SAMPLE).slice(1),
       ]),
       inputTokens: 1,
       outputTokens: 1,
@@ -355,7 +382,7 @@ describe('composeWritingPrompts', () => {
       outputTokens: 1,
       model: 'm',
     });
-    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow(/no usable tasks/i);
+    await expect(composeWritingPrompts(PARAMS)).rejects.toThrow(/source text/i);
   });
 
   it('rejects personal writing prompts without supplied source material', async () => {

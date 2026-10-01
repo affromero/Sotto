@@ -25,12 +25,29 @@
             &self,
             _course_id: &str,
             _kind: types::PracticeKind,
+            _request_id: uuid::Uuid,
         ) -> Result<types::StartPracticeResponse> {
             Ok(serde_json::from_value(serde_json::json!({
                 "status": "unavailable",
                 "reason": "nothing_due"
             }))
             .expect("valid start JSON"))
+        }
+
+        async fn resume_practice(&self, _session_id: &str) -> Result<types::StartPracticeResponse> {
+            Err(color_eyre::eyre::eyre!("Session unavailable"))
+        }
+        async fn practice_generation_action(&self, session_id: &str, recover: bool) -> Result<types::StartPracticePreparing> {
+            Ok(serde_json::from_value(serde_json::json!({
+                "status": "preparing", "sessionId": session_id, "preparationStatus": "CANCELLED",
+                "canRecover": false, "message": if recover { "Recovered" } else { "Cancelled" }
+            }))?)
+        }
+        async fn save_learning_progress(&self, _class: bool, _id: &str, progress: types::LearningProgressRequest) -> Result<types::LearningProgressResponse> {
+            Ok(serde_json::from_value(serde_json::json!({ "saved": true, "progressRevision": progress.expected_revision + 1 }))?)
+        }
+        async fn submit_practice_writing(&self, session_id: &str, prompt_id: &str, text: String) -> Result<crate::api::WritingGradeResponse> {
+            self.submit_class_writing(session_id, prompt_id, text).await
         }
 
         async fn submit_practice(
@@ -40,8 +57,13 @@
         ) -> Result<types::SubmitPracticeResponse> {
             Ok(types::SubmitPracticeResponse {
                 score: 0.0,
-                correct: 0.0,
-                total: 0.0,
+                correct: 0,
+                total: 0,
+                answered: None,
+                graded: None,
+                item_feedback: Vec::new(),
+                speaking_feedback: Vec::new(),
+                writing_feedback: Vec::new(),
             })
         }
 
@@ -89,6 +111,10 @@
             Ok(Vec::new())
         }
 
+        async fn repair_class(&self, class_id: &str, expected_attempt: i64) -> Result<NextClassOutcome> {
+            if expected_attempt < 1 { return Err(color_eyre::eyre::eyre!("Invalid class attempt")); }
+            Ok(NextClassOutcome::Created { class_id: class_id.into() })
+        }
         async fn next_class(&self, _course_id: &str) -> Result<NextClassOutcome> {
             Ok(NextClassOutcome::Done)
         }
@@ -155,6 +181,7 @@
             _text: String,
         ) -> Result<crate::api::WritingGradeResponse> {
             Ok(crate::api::WritingGradeResponse {
+                corrections: Vec::new(),
                 overall_score: 0.9,
                 feedback: "Good.".into(),
             })
@@ -222,6 +249,7 @@
             _text: String,
         ) -> Result<crate::api::WritingGradeResponse> {
             Ok(crate::api::WritingGradeResponse {
+                corrections: Vec::new(),
                 overall_score: 0.8,
                 feedback: "Good.".into(),
             })

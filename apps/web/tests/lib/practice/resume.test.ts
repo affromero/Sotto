@@ -76,10 +76,22 @@ describe('resumePractice', () => {
       episodeId: 'ep-1',
     });
     mockSpeakingFindMany.mockResolvedValue([
-      { id: 'sp-1', targetPhrase: 'Guten Tag', translation: 'Good day', referenceTtsUrl: null },
+      {
+        id: 'sp-1',
+        targetPhrase: 'Guten Tag',
+        translation: 'Good day',
+        referenceTtsUrl: null,
+        recordings: [],
+      },
     ]);
     mockWritingFindMany.mockResolvedValue([
-      { id: 'wr-1', task: 'Antworte deiner Freundin', guidance: null, ideas: ['Gestern habe ich'] },
+      {
+        id: 'wr-1',
+        task: 'Antworte deiner Freundin',
+        guidance: null,
+        ideas: ['Gestern habe ich'],
+        responses: [],
+      },
     ]);
 
     const result = await resumePractice('sess-2', 'user-1');
@@ -104,6 +116,59 @@ describe('resumePractice', () => {
         where: { id: 'sess-1', course: { userId: 'other-user' } },
       })
     );
+  });
+
+  it('restores the latest pending recording and writing feedback without paid generation', async () => {
+    mockSessionFindFirst.mockResolvedValue({
+      id: 'full',
+      kind: 'FULL',
+      status: 'ACTIVE',
+      items: ITEMS,
+      progressRevision: 3,
+      learnerAnswers: { g0: 1 },
+      writingDrafts: { w: 'Edited greeting.' },
+    });
+    mockSpeakingFindMany.mockResolvedValue([
+      {
+        id: 's',
+        targetPhrase: 'Hola',
+        translation: 'Hello',
+        referenceTtsUrl: null,
+        recordings: [
+          {
+            id: 'new',
+            status: 'PENDING',
+            overallScore: null,
+            transcript: null,
+            rubricScores: null,
+            feedback: null,
+          },
+        ],
+      },
+    ]);
+    mockWritingFindMany.mockResolvedValue([
+      {
+        id: 'w',
+        task: 'Greet someone',
+        guidance: null,
+        ideas: [],
+        responses: [
+          { text: 'Hola.', overallScore: 0.8, corrections: [], feedback: 'Clear greeting.' },
+        ],
+      },
+    ]);
+    const result = await resumePractice('full', 'user');
+    expect(result).toMatchObject({
+      progressRevision: 3,
+      learnerAnswers: { g0: 1 },
+      writingDrafts: { w: 'Edited greeting.' },
+      speakingPrompts: [
+        { latestRecording: { recordingId: 'new', status: 'PENDING', overallScore: null } },
+      ],
+      writingPrompts: [
+        { response: { text: 'Hola.', feedback: 'Clear greeting.', overallScore: 0.8 } },
+      ],
+    });
   });
 
   it('refuses a session that was already graded', async () => {

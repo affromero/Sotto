@@ -63,7 +63,7 @@ describe('gradeWriting', () => {
     expect(grade.feedback).toBe('Great reply!');
   });
 
-  it('clamps the score to 0..1 and filters malformed corrections', async () => {
+  it('rejects invalid scores, corrections and feedback', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
         overallScore: 1.7,
@@ -75,10 +75,19 @@ describe('gradeWriting', () => {
       model: 'm',
     });
 
-    const grade = await gradeWriting(PARAMS);
-    expect(grade.overallScore).toBe(1);
-    expect(grade.corrections).toEqual([{ old: 'x', new: 'y', why: 'z' }]);
-    expect(grade.feedback).toBe('');
+    await expect(gradeWriting(PARAMS)).rejects.toThrow(/invalid scores or feedback/);
+  });
+
+  it('rejects corrections absent from the learner response', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        overallScore: 0.8,
+        corrections: [{ old: 'unwritten text', new: 'replacement', why: 'wrong word' }],
+        feedback: 'Review the correction.',
+      }),
+      model: 'm',
+    });
+    await expect(gradeWriting(PARAMS)).rejects.toThrow(/does not match/);
   });
 
   it('throws on malformed (non-JSON) output', async () => {

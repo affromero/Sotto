@@ -11,8 +11,8 @@ const mockLearnerGrammarUpdate = vi.fn();
 const mockLearnerFocusTargetFindMany = vi.fn();
 const mockVocabEdgeFindMany = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
     learnerVocab: {
       upsert: (...args: unknown[]) => mockLearnerVocabUpsert(...args),
       findMany: (...args: unknown[]) => mockLearnerVocabFindMany(...args),
@@ -29,8 +29,9 @@ vi.mock('@/lib/prisma', () => ({
     vocabEdge: {
       findMany: (...args: unknown[]) => mockVocabEdgeFindMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
 
 // Real srs.ts is used intentionally (pure function, no deps)
 

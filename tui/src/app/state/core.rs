@@ -25,6 +25,14 @@ pub(crate) struct DueCounts {
     pub vocab: u32,
     pub grammar: u32,
     pub total_vocab: u32,
+    pub recent: Vec<RecentPractice>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct RecentPractice {
+    pub id: String,
+    pub kind: types::PracticeKind,
+    pub status: String,
 }
 
 impl From<&types::PracticeOverviewResponse> for DueCounts {
@@ -36,6 +44,7 @@ impl From<&types::PracticeOverviewResponse> for DueCounts {
             vocab: count(overview.due.vocab),
             grammar: count(overview.due.grammar),
             total_vocab: count(overview.total_vocab),
+            recent: overview.recent.iter().map(|session| RecentPractice { id: session.id.clone(), kind: session.kind, status: session.status.to_string() }).collect(),
         }
     }
 }
@@ -152,16 +161,20 @@ pub(crate) enum SkillChoice {
     Reading,
     Listening,
     Speaking,
+    Writing,
+    Full,
 }
 
 impl SkillChoice {
     /// Menu order, top to bottom.
-    pub const MENU: [SkillChoice; 5] = [
+    pub const MENU: [SkillChoice; 7] = [
         SkillChoice::Vocab,
         SkillChoice::Grammar,
         SkillChoice::Reading,
         SkillChoice::Listening,
         SkillChoice::Speaking,
+        SkillChoice::Writing,
+        SkillChoice::Full,
     ];
 
     /// The practice kind to request when this skill is started.
@@ -172,6 +185,8 @@ impl SkillChoice {
             SkillChoice::Reading => types::PracticeKind::Reading,
             SkillChoice::Listening => types::PracticeKind::Listening,
             SkillChoice::Speaking => types::PracticeKind::Speaking,
+            SkillChoice::Writing => types::PracticeKind::Writing,
+            SkillChoice::Full => types::PracticeKind::Full,
         }
     }
 
@@ -183,6 +198,8 @@ impl SkillChoice {
             SkillChoice::Reading => "Reading",
             SkillChoice::Listening => "Listening",
             SkillChoice::Speaking => "Speaking",
+            SkillChoice::Writing => "Writing",
+            SkillChoice::Full => "Full practice",
         }
     }
 }
@@ -264,9 +281,11 @@ impl From<&types::EpisodeDetailResponse> for EpisodeDetail {
 /// One speaking prompt the learner says aloud.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SpeakingPrompt {
+    pub recording_id: Option<String>,
     pub id: String,
     pub target_phrase: String,
     pub translation: String,
+    pub reference_tts_url: Option<String>,
 }
 
 impl From<&types::PracticeSpeakingPrompt> for SpeakingPrompt {
@@ -275,6 +294,8 @@ impl From<&types::PracticeSpeakingPrompt> for SpeakingPrompt {
             id: p.id.clone(),
             target_phrase: p.target_phrase.clone(),
             translation: p.translation.clone(),
+            reference_tts_url: p.reference_tts_url.clone(),
+            recording_id: serde_json::to_value(p).ok().and_then(|value| value["latestRecording"]["recordingId"].as_str().or_else(|| value["latestRecording"]["id"].as_str()).map(str::to_string)),
         }
     }
 }
@@ -285,6 +306,8 @@ impl From<&types::ClassSpeakingPrompt> for SpeakingPrompt {
             id: p.id.clone(),
             target_phrase: p.target_phrase.clone(),
             translation: p.translation.clone(),
+            reference_tts_url: p.reference_tts_url.clone(),
+            recording_id: serde_json::to_value(p).ok().and_then(|value| value["latestRecording"]["recordingId"].as_str().or_else(|| value["latestRecording"]["id"].as_str()).map(str::to_string)),
         }
     }
 }
@@ -295,6 +318,8 @@ impl From<&types::ExamSpeakingPrompt> for SpeakingPrompt {
             id: p.id.clone(),
             target_phrase: p.target_phrase.clone(),
             translation: p.translation.clone(),
+            reference_tts_url: p.reference_tts_url.clone(),
+            recording_id: serde_json::to_value(p).ok().and_then(|value| value["latestRecording"]["recordingId"].as_str().or_else(|| value["latestRecording"]["id"].as_str()).map(str::to_string)),
         }
     }
 }
@@ -308,6 +333,8 @@ pub(crate) enum SpeakingPhase {
     Recording,
     /// Upload in flight.
     Uploading,
+    /// The upload acknowledgement was lost. Check saved work before recording again.
+    UnknownUpload { message: String },
     /// Grading poll loop in flight for `recording_id`.
     Polling { recording_id: String },
     /// Grading finished.
@@ -326,14 +353,25 @@ pub(crate) struct PracticeResult {
     pub score: u32,
     pub correct: u32,
     pub total: u32,
+    pub answered: u32,
+    pub graded: u32,
+    pub feedback: Vec<String>,
 }
 
 impl From<&types::SubmitPracticeResponse> for PracticeResult {
     fn from(resp: &types::SubmitPracticeResponse) -> Self {
         Self {
-            score: count(resp.score),
-            correct: count(resp.correct),
-            total: count(resp.total),
+            score: pct(resp.score),
+            correct: count(resp.correct as f64),
+            total: count(resp.total as f64),
+            answered: count(resp.answered.unwrap_or(resp.total) as f64),
+            graded: count(resp.graded.unwrap_or(resp.total) as f64),
+            feedback: resp.item_feedback.iter().map(|item| format!("{}\nYour answer: {}\nCorrect answer: {}\n{}", item.prompt, item.selected_answer, item.correct_answer, item.explanation))
+                .chain(resp.writing_feedback.iter().map(|item| format!("{}\n{}\n{}", item.task, item.grade.text,
+                    writing_feedback(&item.grade.feedback, &item.grade.corrections.iter().map(|fix| (fix.old.as_str(), fix.new.as_str(), fix.why.as_str())).collect::<Vec<_>>()))))
+                .chain(resp.speaking_feedback.iter().map(|item| format!("{}\n{}\n{}", item.target_phrase,
+                    item.evidence.transcript.as_deref().unwrap_or_default(), item.evidence.feedback.as_deref().unwrap_or_default())))
+                .collect(),
         }
     }
 }
@@ -395,6 +433,9 @@ pub(crate) struct WritingInput {
 }
 
 impl WritingInput {
+    pub fn from_text(text: &str) -> Self {
+        Self { lines: text.split('\n').map(str::to_string).collect() }
+    }
     pub fn new() -> Self {
         Self {
             lines: vec![String::new()],

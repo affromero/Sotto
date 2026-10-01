@@ -147,8 +147,12 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/practice/{sessionId}/submit',
         'GET /api/v1/episodes/{episodeId}',
         'GET /api/v1/practice/{sessionId}/speaking/{promptId}',
+        'GET /api/v1/practice/{sessionId}',
+        'PATCH /api/v1/practice/{sessionId}',
+        'POST /api/v1/practice/{sessionId}/generation',
         'POST /api/v1/courses/{courseId}/next-class',
         'GET /api/v1/classes/{classId}',
+        'POST /api/v1/classes/{classId}',
         'POST /api/v1/classes/{classId}/submit',
         'POST /api/v1/exams',
         'GET /api/v1/exams/{examId}',
@@ -316,6 +320,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
       discriminator: { propertyName: string; mapping: Record<string, string> };
     };
     expect(response.oneOf).toEqual([
+      { $ref: '#/components/schemas/StartPracticePreparing' },
       { $ref: '#/components/schemas/StartPracticeUnavailable' },
       { $ref: '#/components/schemas/StartPracticeReady' },
       { $ref: '#/components/schemas/StartPracticeReadySpeaking' },
@@ -325,6 +330,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(response.discriminator).toEqual({
       propertyName: 'status',
       mapping: {
+        preparing: '#/components/schemas/StartPracticePreparing',
         unavailable: '#/components/schemas/StartPracticeUnavailable',
         ready: '#/components/schemas/StartPracticeReady',
         ready_speaking: '#/components/schemas/StartPracticeReadySpeaking',
@@ -350,7 +356,10 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/health', 'get')).toEqual(['200', '503']);
     expect(codes('/api/v1/courses', 'get')).toEqual(['200']);
     expect(codes('/api/v1/courses/{courseId}/practice', 'get')).toEqual(['200']);
-    expect(codes('/api/v1/courses/{courseId}/practice', 'post')).toEqual(['200', '201']);
+    expect(codes('/api/v1/courses/{courseId}/practice', 'post')).toEqual(['200', '202']);
+    expect(codes('/api/v1/practice/{sessionId}', 'get')).toEqual(['200']);
+    expect(codes('/api/v1/practice/{sessionId}', 'patch')).toEqual(['200']);
+    expect(codes('/api/v1/practice/{sessionId}/generation', 'post')).toEqual(['200']);
     expect(codes('/api/v1/practice/{sessionId}/submit', 'post')).toEqual(['200']);
     expect(codes('/api/v1/episodes/{episodeId}', 'get')).toEqual(['200']);
     expect(codes('/api/v1/practice/{sessionId}/speaking/{promptId}', 'get')).toEqual(['200']);
@@ -451,6 +460,14 @@ describe('response schemas accept representative payloads', () => {
   });
 
   it('start practice — every union branch', () => {
+    const preparing = startPracticeResponseSchema.parse({
+      status: 'preparing',
+      sessionId: 's1',
+      preparationStatus: 'RUNNING',
+      message: 'Preparing saved practice.',
+      canRecover: false,
+    });
+    expect(preparing).toMatchObject({ status: 'preparing', preparationStatus: 'RUNNING' });
     expect(
       startPracticeResponseSchema.parse({
         status: 'unavailable',

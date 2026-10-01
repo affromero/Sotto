@@ -6,9 +6,11 @@ struct ClassSessionView: View {
     @EnvironmentObject private var model: SottoAppModel
     let classDetail: SottoClassDetail
 
+    @ObservedObject var progress: LearningProgressStore
+    @State private var hydrated = false
     @State private var answers: [String: Int] = [:]
     @State private var submittedAnswers: [String: Int] = [:]
-    @StateObject private var drafts = WritingDraftStore()
+    @ObservedObject var drafts: WritingDraftStore
     @State private var showingRemoveConfirmation = false
     @State private var selectionHelpRequest: LearnerSelectionHelpRequest?
     @State private var selectionHelp: SottoSelectionHelpResponse?
@@ -63,6 +65,7 @@ struct ClassSessionView: View {
                         completionPercent: completionPercent
                     )
 
+                    LearningSaveFailureView(progress: progress)
                     if let intro = currentClass.intro {
                         ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
                     }
@@ -158,8 +161,19 @@ struct ClassSessionView: View {
             } message: {
                 Text("This removes the current generated class and clears the active-class gate so you can generate a new one.")
             }
+            .task(id: currentClass.id) {
+                guard !hydrated else { return }
+                progress.configure(client: model.makeClient(), path: "/api/v1/classes/\(currentClass.id)",
+                    revision: currentClass.progressRevision ?? 0)
+                answers = progress.answers ?? currentClass.learnerAnswers ?? [:]
+                drafts.register(currentClass.sections.flatMap(\.writingPrompts), savedDrafts: currentClass.writingDrafts ?? [:])
+                hydrated = true
+            }
+            .onChange(of: answers) { _, _ in saveProgress() }
+            .onChange(of: drafts.texts) { _, _ in saveProgress() }
+            .onDisappear { Task { await progress.flush() } }
             .onChange(of: currentClass.sections.map(\.id)) { _, _ in
-                answers = [:]
+                answers = currentClass.learnerAnswers ?? [:]
             }
         }
     }
@@ -215,11 +229,11 @@ struct ClassSessionView: View {
                 let graded = await drafts.submit(
                     source: .classSession(classId: classId),
                     model: model,
-                    includingUnchanged: !hasChanges
+                    includingUnchanged: false
                 )
                 guard graded else { return }
 
-                let payload = hasChanges ? changedAnswers : everyAnswer
+                let payload = everyAnswer
                 if !payload.isEmpty {
                     await model.submitClassAnswers(payload)
                     submittedAnswers = answers
@@ -229,6 +243,11 @@ struct ClassSessionView: View {
             Label("Submit", systemImage: "checkmark.circle.fill")
         }
         .disabled(drafts.isOverLimit || drafts.isSubmitting)
+    }
+
+    private func saveProgress() {
+        guard hydrated, !currentClass.submitted else { return }
+        progress.update(answers: answers, writingDrafts: drafts.texts)
     }
 
     private var workbookSheetBinding: Binding<Bool> {

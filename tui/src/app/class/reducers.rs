@@ -42,21 +42,42 @@ impl App {
             return;
         }
         match result.as_ref() {
+            Ok(resp) if resp.status == types::ClassStatus::Generating => {
+                let class_id = resp.id.clone();
+                let client = Arc::clone(&self.client);
+                self.dispatch(req_gen, async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    tokio::time::timeout(std::time::Duration::from_secs(30), client.class(&class_id)).await
+                        .map_err(|_| color_eyre::eyre::eyre!("Class status timed out. Its saved preparation can be resumed."))?
+                }, Action::ClassLoaded);
+            },
             Ok(resp) => match class_sections(resp) {
                 Some(built) => {
-                    if let View::Class { sections, .. } = &mut self.view {
+                    if let View::Class { sections, cursor, progress, attempt, .. } = &mut self.view {
+                        *cursor = built.iter().position(|section| !crate::app::state::section_complete(section)).unwrap_or(0);
                         *sections = Some(built);
+                        let snapshot = serde_json::to_value(resp).unwrap_or_default();
+                        progress.revision = snapshot["progressRevision"].as_i64().unwrap_or_default();
+                        *attempt = snapshot["attempt"].as_i64().unwrap_or(1);
                     }
+                    if let View::Class { class_id, attempt, .. } = &self.view {
+                        let key = format!("CLASS/{class_id}/{attempt}");
+                        if let Some(mut cached) = self.practice_cache.remove(&key)
+                            && matches!(&cached, View::Class { attempt: saved, progress, .. } if saved == attempt &&
+                                (progress.dirty || progress.in_flight.is_some() || progress.conflict || cached.has_uncertain_upload())) {
+                                crate::app::state::refresh_cached_practice(&mut cached, &self.view);
+                                self.view = cached;
+                        }
+                    }
+                    self.class_resume_current_speaking();
                     // If the first section is listening, kick off its episode.
                     self.class_fetch_current_episode();
                 }
                 None => {
-                    // Malformed/empty class: surface and back out.
-                    self.status_bar
-                        .set_error("This class came back empty or malformed.".to_string());
-                    if let Some(course) = self.class_course() {
-                        self.enter_course_home(course);
+                    if let View::Class { attempt, .. } = &mut self.view {
+                        *attempt = serde_json::to_value(resp).unwrap_or_default()["attempt"].as_i64().unwrap_or(1);
                     }
+                    self.show_class_repair("This saved class is incomplete. Press n to repair its missing exercises.");
                 }
             },
             Err(message) => self.status_bar.set_error(message.clone()),
@@ -74,11 +95,12 @@ impl App {
         }
         match result.as_ref() {
             Ok(resp) => {
-                if let View::Class { course, .. } = &self.view {
-                    let course = course.clone();
+                if let View::Class { course, class_id, attempt, .. } = &self.view {
+                    let course = course.clone(); let class_id = class_id.clone(); let attempt = *attempt;
                     self.stop_audio();
                     self.view = View::ClassOutcome {
                         course,
+                        class_id, attempt,
                         result: ClassResult::from(resp),
                     };
                 }
@@ -156,8 +178,9 @@ impl App {
             Ok(resp) => {
                 let recording_id = resp.recording_id.clone();
                 if let Some(section) = self.current_section_mut()
-                    && let SectionProgress::Speaking { phase, .. } = &mut section.progress
+                    && let SectionProgress::Speaking { phase, prompts, index } = &mut section.progress
                 {
+                    if let Some(prompt) = prompts.get_mut(*index) { prompt.recording_id = Some(recording_id.clone()); }
                     *phase = SpeakingPhase::Polling {
                         recording_id: recording_id.clone(),
                     };
@@ -168,10 +191,11 @@ impl App {
                 if let Some(section) = self.current_section_mut()
                     && let SectionProgress::Speaking { phase, .. } = &mut section.progress
                 {
-                    *phase = SpeakingPhase::Failed {
-                        message: message.clone(),
+                    *phase = SpeakingPhase::UnknownUpload {
+                        message: format!("Upload outcome is unknown. Press r to check saved work. {message}"),
                     };
                 }
+                self.mark_practice_progress();
                 self.status_bar.set_error(message.clone());
             }
         }
@@ -207,14 +231,8 @@ impl App {
                 }
             }
             Err(message) => {
-                if let Some(section) = self.current_section_mut()
-                    && let SectionProgress::Speaking { phase, .. } = &mut section.progress
-                {
-                    *phase = SpeakingPhase::Failed {
-                        message: message.clone(),
-                    };
-                }
-                self.status_bar.set_error(message.clone());
+                self.status_bar.set_error(format!("Recording is saved. Status check failed: {message}"));
+                self.class_schedule_poll(recording_id, req_gen);
             }
         }
         self.render();
@@ -240,7 +258,7 @@ impl App {
                 {
                     *phase = WritingPhase::Graded {
                         score,
-                        feedback: resp.feedback.clone(),
+                        feedback: crate::app::state::writing_feedback(&resp.feedback, &resp.corrections.iter().map(|c| (c.old.as_str(), c.new.as_str(), c.why.as_str())).collect::<Vec<_>>()),
                     };
                 }
             }
@@ -271,7 +289,8 @@ impl App {
                 sections: Some(sections),
                 cursor,
                 ..
-            } => sections.get_mut(*cursor),
+            }
+            | View::Practice { sections: Some(sections), cursor, .. } => sections.get_mut(*cursor),
             _ => None,
         }
     }
@@ -284,6 +303,7 @@ impl App {
         match &self.view {
             View::Class { class_id, .. } => Some((FlowKind::Class, Some(class_id.clone()))),
             View::Exam { exam_id, .. } => Some((FlowKind::Exam, exam_id.clone())),
+            View::Practice { session_id, .. } => Some((FlowKind::Practice, Some(session_id.clone()))),
             _ => None,
         }
     }
@@ -291,14 +311,6 @@ impl App {
     /// The active flow's target id (class id or exam id), when known.
     fn flow_id(&self) -> Option<String> {
         self.current_flow().and_then(|(_, id)| id)
-    }
-
-    /// The course backing the active class/exam flow.
-    fn class_course(&self) -> Option<Course> {
-        match &self.view {
-            View::Class { course, .. } | View::Exam { course, .. } => Some(course.clone()),
-            _ => None,
-        }
     }
 
     fn current_speaking_prompt_id(&self) -> Option<String> {

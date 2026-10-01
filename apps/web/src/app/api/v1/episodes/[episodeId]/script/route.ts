@@ -86,7 +86,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { userId: true, status: true },
+    select: {
+      userId: true,
+      status: true,
+      classSection: { select: { id: true } },
+      practiceSession: { select: { id: true } },
+    },
   });
 
   if (!episode) {
@@ -97,6 +102,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
   if (episode.status !== 'SCRIPT_READY') {
     return errorResponse('Script can only be edited when status is SCRIPT_READY', 400);
+  }
+
+  if (episode.classSection || episode.practiceSession) {
+    return errorResponse(
+      'This script belongs to a learning exercise. Repair the exercise before changing its script.',
+      409
+    );
   }
 
   const body = await request.json();

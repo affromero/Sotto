@@ -44,6 +44,8 @@ pub(crate) struct ClassSection {
     pub id: String,
     pub skill: types::SkillType,
     pub progress: SectionProgress,
+    pub label: Option<String>,
+    pub work: std::collections::BTreeMap<String, ProductiveWork>,
 }
 
 impl ClassSection {
@@ -91,6 +93,8 @@ impl ClassSection {
             id: s.id.clone(),
             skill: s.skill,
             progress,
+            label: None,
+            work: Default::default(),
         }
     }
 }
@@ -127,12 +131,64 @@ pub(crate) fn class_sections(cls: &types::ClassDetailResponse) -> Option<Vec<Cla
     if !cls.sections.iter().all(section_is_valid) {
         return None;
     }
-    Some(
-        cls.sections
-            .iter()
-            .map(ClassSection::from_generated)
-            .collect(),
-    )
+    let snapshot = serde_json::to_value(cls).ok()?;
+    let mut built: Vec<_> = cls.sections.iter().map(ClassSection::from_generated).collect();
+    for (section, saved) in built.iter_mut().zip(&cls.sections) {
+        match &mut section.progress {
+            SectionProgress::Mc { questions, selected, index, .. } |
+            SectionProgress::Listening { questions, selected, index, .. } => {
+                for (question, choice) in questions.iter().zip(selected.iter_mut()) {
+                    *choice = snapshot["learnerAnswers"][&question.id].as_u64()
+                        .and_then(|value| usize::try_from(value).ok()).filter(|value| *value < question.options.len());
+                }
+                *index = selected.iter().position(Option::is_none).unwrap_or(0);
+            },
+            SectionProgress::Speaking { prompts, index, phase } => {
+                for (prompt, saved_prompt) in prompts.iter().zip(&saved.prompts) {
+                    let value = serde_json::to_value(saved_prompt).ok()?;
+                    let recording = &value["latestRecording"];
+                    let state = match recording["status"].as_str() {
+                        Some("SCORED") if recording["overallScore"].as_f64().is_some() =>
+                            SpeakingPhase::Graded { score: recording["overallScore"].as_f64().map(pct),
+                                transcript: recording["transcript"].as_str().map(str::to_string),
+                                feedback: recording["feedback"].as_str().map(str::to_string) },
+                        Some("FAILED") => SpeakingPhase::Failed { message: "This recording could not be graded. Record another attempt.".into() },
+                        Some(_) => SpeakingPhase::Polling { recording_id: recording["id"].as_str()?.to_string() },
+                        None => SpeakingPhase::Idle,
+                    };
+                    section.work.insert(prompt.id.clone(), ProductiveWork::Speaking(state));
+                }
+                *index = prompts.iter().position(|prompt| !matches!(section.work.get(&prompt.id),
+                    Some(ProductiveWork::Speaking(SpeakingPhase::Graded { .. })))).unwrap_or(0);
+                *phase = match section.work.get(&prompts[*index].id) {
+                    Some(ProductiveWork::Speaking(state)) => state.clone(), _ => SpeakingPhase::Idle,
+                };
+            },
+            SectionProgress::Writing { prompts, index, input, phase } => {
+                for (prompt, saved_prompt) in prompts.iter().zip(&saved.writing_prompts) {
+                    let value = serde_json::to_value(saved_prompt).ok()?;
+                    let response = &value["response"];
+                    let text = snapshot["writingDrafts"][&prompt.id].as_str()
+                        .or_else(|| value["savedDraft"].as_str()).or_else(|| response["text"].as_str()).unwrap_or_default().to_string();
+                    let state = if response["text"].as_str().is_some_and(|submitted| submitted.trim() == text.trim()) {
+                        match serde_json::from_value::<crate::api::WritingGradeResponse>(response.clone()) {
+                            Ok(grade) => WritingPhase::Graded { score: pct(grade.overall_score),
+                                feedback: writing_feedback(&grade.feedback, &grade.corrections.iter().map(|correction|
+                                    (correction.old.as_str(), correction.new.as_str(), correction.why.as_str())).collect::<Vec<_>>()) },
+                            Err(_) => WritingPhase::Editing,
+                        }
+                    } else { WritingPhase::Editing };
+                    section.work.insert(prompt.id.clone(), ProductiveWork::Writing { text, phase: state });
+                }
+                *index = prompts.iter().position(|prompt| !matches!(section.work.get(&prompt.id),
+                    Some(ProductiveWork::Writing { phase: WritingPhase::Graded { .. }, .. }))).unwrap_or(0);
+                if let Some(ProductiveWork::Writing { text, phase: state }) = section.work.get(&prompts[*index].id) {
+                    *input = WritingInput::from_text(text); *phase = state.clone();
+                }
+            },
+        }
+    }
+    Some(built)
 }
 
 /// Whether a section carries the content its skill requires:
@@ -212,6 +268,8 @@ impl ClassSection {
             id: s.id.clone(),
             skill: s.skill,
             progress,
+            label: None,
+            work: Default::default(),
         }
     }
 }
@@ -294,6 +352,7 @@ fn pct(score: f64) -> u32 {
 pub(crate) enum FlowKind {
     Class,
     Exam,
+    Practice,
 }
 
 // ===========================================================================
