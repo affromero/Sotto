@@ -43,8 +43,56 @@ export async function startProvider() {
       if (request.method === 'POST' && request.url === '/v1/chat/completions') {
         const body = JSON.parse(Buffer.concat(chunks).toString());
         const messages = body.messages.map((message) => message.content).join('\n');
+        const system = body.messages.find((message) => message.role === 'system')?.content || '';
         let content;
-        if (messages.includes('Grade the response.'))
+        if (
+          system.startsWith('Extract useful ') &&
+          system.includes('from the supplied reading passage')
+        ) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            input.passageText !== 'Anna sagt Hallo zu ihrem Freund.' ||
+            !Array.isArray(input.questions) ||
+            !input.questions.length ||
+            input.questions.some(
+              (question) =>
+                typeof question.question !== 'string' ||
+                !Array.isArray(question.options) ||
+                !question.options.includes('Hallo')
+            )
+          ) {
+            throw new Error('Unexpected reading extraction fixture');
+          }
+          content = JSON.stringify([
+            {
+              lemma: 'Hallo',
+              gloss: 'hello',
+              pos: 'interjection',
+              sourceForm: 'Hallo',
+              questionIndices: input.questions.map((_, index) => index),
+            },
+          ]);
+        } else if (system.startsWith('Independently review vocabulary teaching content')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            !Array.isArray(input.items) ||
+            input.items.length !== 1 ||
+            input.items[0].index !== 0 ||
+            input.items[0].content.lemma !== 'Hallo' ||
+            input.items[0].content.gloss !== 'hello' ||
+            input.items[0].content.sourceForm !== 'Hallo' ||
+            input.items[0].content.passageText !== 'Anna sagt Hallo zu ihrem Freund.'
+          ) {
+            throw new Error('Unexpected vocabulary review fixture');
+          }
+          content = JSON.stringify({
+            items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+          });
+        } else if (messages.includes('Grade the response.'))
           content = JSON.stringify({
             overallScore: 1,
             corrections: [],
