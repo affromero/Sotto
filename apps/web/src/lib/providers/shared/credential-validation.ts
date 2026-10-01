@@ -12,6 +12,8 @@ import {
   type ServiceCredentialSelection,
 } from 'thesidedoor-core/providers/service-validation';
 import type { CredentialScope } from '@/lib/sidedoor/access/state/state';
+import type { Prisma } from '@/generated/prisma/client';
+import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import { captureApiEndpoint, selectedApi } from '@/lib/providers/shared/api-selection';
 import { CARTESIA_TTS_API_VERSION } from '@/lib/providers/shared/speech-contracts';
 
@@ -25,7 +27,8 @@ export type SottoCredentialProbe =
 export function captureSottoCredentialProbe(
   scope: CredentialScope,
   provider: string,
-  values: CredentialValues
+  values: CredentialValues,
+  configuredEndpoint?: string
 ): SottoCredentialProbe {
   const identity = providerIdentity(provider);
   const modality: ProviderModality =
@@ -63,7 +66,11 @@ export function captureSottoCredentialProbe(
       },
     };
   }
-  const endpoint = captureApiEndpoint(provider);
+  const endpoint =
+    provider === 'local' && scope === 'ai'
+      ? configuredEndpoint?.trim()
+      : captureApiEndpoint(provider);
+  if (!endpoint) throw new Error('Save the local AI endpoint before adding its API key.');
   const transport =
     provider === 'anthropic' ? 'anthropic' : provider === 'openai' ? 'responses' : 'compatible';
   return {
@@ -77,6 +84,25 @@ export function captureSottoCredentialProbe(
       apiKey: typeof values.apiKey === 'string' ? values.apiKey : '',
     }),
   };
+}
+
+/** Local credentials bind to the authoritative URL in the caller's transaction. */
+export async function captureConfiguredSottoCredentialProbe(
+  database: Prisma.TransactionClient,
+  scope: CredentialScope,
+  provider: string,
+  values: CredentialValues
+): Promise<SottoCredentialProbe> {
+  const endpoint =
+    provider === 'local' && scope === 'ai'
+      ? (await sidedoorStateStore(database).read()).configuration.site?.aiBaseUrl
+      : undefined;
+  return captureSottoCredentialProbe(
+    scope,
+    provider,
+    values,
+    typeof endpoint === 'string' ? endpoint : undefined
+  );
 }
 
 export async function validateSottoCredentialProbe(

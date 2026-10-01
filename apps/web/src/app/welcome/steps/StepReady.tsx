@@ -158,7 +158,7 @@ export function StepReady({
     }
 
     // Translate the wizard's selections to real backend providers + infra.
-    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model);
+    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model, agent.apiKey);
     const liveTranslateKey = resolveLiveTranslateKey(agent.liveTranslationKey ?? '');
     const tts = resolveTts(
       voice.tts,

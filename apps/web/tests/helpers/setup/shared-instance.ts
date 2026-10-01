@@ -18,7 +18,7 @@ import {
   setSottoInstanceStorageCredential,
   sottoCredentialStorage,
 } from '@/lib/sidedoor/credentials/runtime/provider-credentials';
-import { captureSottoCredentialProbe } from '@/lib/providers/shared/credential-validation';
+import { captureConfiguredSottoCredentialProbe } from '@/lib/providers/shared/credential-validation';
 import { sharedConfigurationValueSchema } from '@/lib/sidedoor/access/state/state';
 import type { ServerInfraConfig } from '@/lib/site-config';
 
@@ -157,7 +157,7 @@ export async function createSharedTestInstance(label: string) {
     await sottoTransaction(database, async (tx) => {
       const storage = await sottoCredentialStorage(tx, scope, provider);
       const owner = await captureSottoCredentialOwner(tx, userId);
-      const probe = captureSottoCredentialProbe(scope, provider, values);
+      const probe = await captureConfiguredSottoCredentialProbe(tx, scope, provider, values);
       if (probe.kind === 'unsupported') throw new Error('Fixture requires a supported provider');
       await storage.owned.replace(
         storage.owned.prepareReplacement(

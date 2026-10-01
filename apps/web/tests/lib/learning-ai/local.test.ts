@@ -84,7 +84,11 @@ suite('Local learning generation', () => {
       data: { preferredAiProvider: 'local', preferredAiModel: 'local:qwen3' },
     });
   }
-  async function generate(ai: CapturedLearningAi, expectedEndpoint = endpoint) {
+  async function generate(
+    ai: CapturedLearningAi,
+    expectedEndpoint = endpoint,
+    expectedApiKey = 'local'
+  ) {
     const result = await createAIProvider(ai.provider).generateResponse(
       'Teach German',
       [{ role: 'user', content: 'Say hello' }],
@@ -95,6 +99,7 @@ suite('Local learning generation', () => {
       `${expectedEndpoint}/chat/completions`,
     ]);
     expect(await requests[0].json()).toMatchObject({ model: 'qwen3' });
+    expect(requests[0].headers.get('authorization')).toBe(`Bearer ${expectedApiKey}`);
   }
   it('uses the saved endpoint for subsequent lessons', async () => {
     await instance.configureInfrastructure({
@@ -104,6 +109,17 @@ suite('Local learning generation', () => {
     });
     await saveLocalPreference();
     await generate(await resolveCapturedLearningAi(identity.ownerId, execution()));
+  });
+  it('uses the saved local API key for normal learning generation', async () => {
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'qwen3',
+      aiBaseUrl: endpoint,
+    });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'local-learning-secret');
+    await saveLocalPreference();
+    const ai = await resolveCapturedLearningAi(identity.ownerId, execution());
+    await generate(ai, endpoint, 'local-learning-secret');
   });
   it('uses the shared local endpoint without a personal preference', async () => {
     await instance.configureInfrastructure({

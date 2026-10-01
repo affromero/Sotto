@@ -103,6 +103,39 @@ it('reuses a saved receipt across placement and final retries without reposting 
   expect(boundary.saved.get('ai-keys:google')).toEqual({ apiKey: google.apiKey });
 });
 
+it('rebinds the same local key when its URL changes and reuses only matching receipts', async () => {
+  const boundary = createWelcomeCredentialBoundary();
+  let writes = 0;
+  const reviewedEndpoints: Array<string | null> = [];
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      writes++;
+      reviewedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint'));
+    }
+    return boundary.handle(input, init);
+  });
+  const session = new WelcomeCredentialSession();
+  const signal = new AbortController().signal;
+  const first = {
+    endpoint: 'ai-keys' as const,
+    provider: 'local',
+    apiKey: 'same-key',
+    baseUrl: 'http://localhost:11434/v1',
+  };
+  const second = { ...first, baseUrl: 'https://models.example/v1' };
+  await session.load(signal);
+  expect(await session.save([first], signal)).toEqual({ status: 'ready' });
+  expect(session.receiptStatus(second)).toBeNull();
+  expect(await session.save([second], signal)).toEqual({ status: 'ready' });
+  expect(await session.save([second], signal)).toEqual({ status: 'ready' });
+  expect(writes).toBe(2);
+  expect(reviewedEndpoints).toEqual([
+    'http://localhost:11434/v1',
+    'https://models.example/v1',
+  ]);
+  expect(boundary.saved.get('ai-keys:local')).toEqual({ apiKey: 'same-key' });
+});
+
 it('resolves an omitted uncertain operation before accepting empty or changed selections', async () => {
   const boundary = createWelcomeCredentialBoundary();
   let offline = false;

@@ -124,6 +124,32 @@ describe('resolveAi', () => {
     expect(r.preferredAiModel).toBeNull();
   });
 
+  it.each(['local', 'custom'])(
+    'saves the optional %s key alongside its URL and model',
+    (provider) => {
+      expect(
+        resolveAi(provider, 'url', ' https://models.example/v1 ', ' served-model ', ' private-key ')
+      ).toEqual({
+        keyPost: {
+          endpoint: 'ai-keys',
+          provider: 'local',
+          apiKey: 'private-key',
+          baseUrl: 'https://models.example/v1',
+        },
+        preferredAiProvider: 'local',
+        preferredAiModel: 'local:served-model',
+        infra: {
+          aiProvider: 'local',
+          aiBaseUrl: 'https://models.example/v1',
+          aiModel: 'served-model',
+        },
+      });
+      expect(
+        resolveAi(provider, 'url', 'http://localhost:11434/v1', 'served-model', '  ').keyPost
+      ).toBeNull();
+    }
+  );
+
   it('resolves to nothing when no method/value is provided', () => {
     const r = resolveAi('claude', null, '', '');
     expect(r.keyPost).toBeNull();

@@ -18,6 +18,12 @@ const displayed = {
 };
 const draft = () =>
   prepareCredentialSave(displayed, 'openai', { values: { apiKey: 'private-test-key' } });
+const localDraft = () =>
+  prepareCredentialSave(
+    { ...displayed, heads: { local: null } },
+    'local',
+    { values: { apiKey: 'private-local-test-key' } }
+  );
 afterEach(() => vi.unstubAllGlobals());
 
 describe('credential browser transport', () => {
@@ -62,6 +68,28 @@ describe('credential browser transport', () => {
     expect(await saveCredentialSettings('ai-keys', command)).toEqual({
       status: 'needs_confirmation',
     });
+  });
+  it('sends the reviewed local endpoint on the initial save and confirmation retry', async () => {
+    const command = localDraft();
+    const reviewedEndpoints: Array<string | null> = [];
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      reviewedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint'));
+      return Response.json({
+        status: 'needs_confirmation',
+        operationId: command.operationId,
+        context: command.context,
+        validation: { status: 'inconclusive', readiness: { code: 'unreachable', checkedAt: 1 } },
+      });
+    });
+
+    const endpoint = 'http://localhost:11434/v1';
+    expect(await saveCredentialSettings('ai-keys', command, false, undefined, endpoint)).toEqual({
+      status: 'needs_confirmation',
+    });
+    expect(await saveCredentialSettings('ai-keys', command, true, undefined, endpoint)).toEqual({
+      status: 'needs_confirmation',
+    });
+    expect(reviewedEndpoints).toEqual([endpoint, endpoint]);
   });
   it('distinguishes a saved receipt from an unknown outcome when the follow-up read fails', async () => {
     const command = draft();

@@ -101,7 +101,8 @@ async function mutate(
   command: CredentialRemovalRequest,
   body: unknown,
   kind: 'save' | 'remove',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  extraHeaders?: Record<string, string>
 ): Promise<CredentialMutationResult> {
   if (command.context.scope !== endpoint) throw new Error('Credential edit context changed');
   signal?.throwIfAborted();
@@ -111,7 +112,7 @@ async function mutate(
       method: kind === 'save' ? 'POST' : 'DELETE',
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...extraHeaders },
       body: JSON.stringify(body),
       signal,
     });
@@ -153,9 +154,21 @@ export function saveCredentialSettings(
   endpoint: CredentialEndpoint,
   draft: CredentialSaveDraft,
   allowUnverified = false,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  expectedEndpoint?: string
 ) {
-  return mutate(endpoint, draft, credentialSaveRequest(draft, allowUnverified), 'save', signal);
+  const extraHeaders =
+    endpoint === 'ai-keys' && draft.provider === 'local' && expectedEndpoint
+      ? { 'x-sotto-reviewed-ai-endpoint': expectedEndpoint }
+      : undefined;
+  return mutate(
+    endpoint,
+    draft,
+    credentialSaveRequest(draft, allowUnverified),
+    'save',
+    signal,
+    extraHeaders
+  );
 }
 
 export function removeCredentialSettings(
