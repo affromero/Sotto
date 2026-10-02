@@ -73,7 +73,7 @@
     "knip": "6.38.0",
     "lint-staged": "^17.5.1",
     "postcss": "^8.5.28",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "prisma": "7.10.0",
     "sharp": "0.35.4",
     "sort-package-json": "^4.0.0",
