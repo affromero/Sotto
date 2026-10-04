@@ -1,6 +1,8 @@
 import * as Sentry from '@sentry/node';
+import { sentryCompatibilityOptions } from '@/lib/sentry/options';
 
 Sentry.init({
+  ...sentryCompatibilityOptions,
   dsn: process.env.SENTRY_DSN,
   tracesSampleRate: 1.0,
 });

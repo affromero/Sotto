@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NextRequest } from 'next/server';
+import type { Processor, QueueOptions, WorkerOptions } from 'bullmq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
 import {
@@ -49,15 +50,13 @@ vi.mock('bullmq', async (importOriginal) => {
   return {
     ...actual,
     Queue: class extends actual.Queue {
-      constructor(...args: ConstructorParameters<typeof actual.Queue>) {
-        if (!args[1]) throw new Error('Test queue requires explicit connection options');
-        super(args[0], { ...args[1], prefix: binding.queuePrefix });
+      constructor(name: string, options: QueueOptions) {
+        super(name, { ...options, prefix: binding.queuePrefix });
       }
     },
     Worker: class extends actual.Worker {
-      constructor(...args: ConstructorParameters<typeof actual.Worker>) {
-        if (!args[2]) throw new Error('Test worker requires explicit connection options');
-        super(args[0], args[1], { ...args[2], prefix: binding.queuePrefix });
+      constructor(name: string, processor: Processor, options: WorkerOptions) {
+        super(name, processor, { ...options, prefix: binding.queuePrefix });
       }
     },
   };
