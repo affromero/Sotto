@@ -22,10 +22,12 @@ Write the material the learner should see before any questions. It must explain 
 Rules:
 
 - Follow the language policy exactly.
+- Use natural, everyday wording at the learner's level in every field, including purpose, about, focus and tips. Describe what the learner will do in ordinary language; avoid unnatural literal translations or abstract descriptions of activities.
 - Keep it concise enough to read before practice: no more than 180 words total across prose fields.
 - Do not invent exam claims, official certification claims, or unsupported cultural facts.
 - Make tips specific to the grammar/vocabulary, not generic study advice.
 - Verify every complete example for idiomatic verb-object combinations and correct auxiliary/participle pairs. Use vocabulary only where it fits naturally; do not force every supplied word into an example.
+- Every examples[].target must be correct model language that the learner can reuse. Never put a knowingly incorrect or unnatural sentence there, even if its note identifies the mistake. Discuss a common mistake only in an explicitly labelled note or tip that also supplies the correct form.
 - Meanings must closely paraphrase the actual sentence. Do not add an unstated action, result, means of travel, or interpretation. Distinguish going on foot from travelling by vehicle.
 - Use plain, everyday wording at the learner's level for meanings. Reuse the example's core words or change their order when a different synonym would sound unnatural. Do not force lexical variety or replace ordinary actions with abstract noun phrases.
 - State the scope of every grammar rule. A verb-position rule for a main clause must explicitly say that it applies to main clauses. Do not present a common pattern as a universal rule.
