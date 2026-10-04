@@ -102,6 +102,46 @@ describe('generateScript', () => {
     vi.clearAllMocks();
   });
 
+  it('rejects correction outside learning and oversized UTF8 context before contacting the provider', async () => {
+    const learningRepair: NonNullable<GenerateScriptParams['learningRepair']> = {
+      candidate: {
+        turns: [{ speaker: 'HOST', text: 'Private rejected dialogue.' }],
+        soundCues: [],
+        references: [],
+        vocabulary: [],
+        places: [],
+      },
+      questions: [
+        {
+          question: 'Which place?',
+          options: ['A', 'B', 'C', 'D'],
+          correctIndex: 0,
+          explanation: 'The dialogue names A.',
+        },
+      ],
+      verdict: {
+        passageAcceptable: false,
+        issues: ['unnatural'],
+        questions: [{ index: 0, acceptableOptionIndices: [0], issues: [] }],
+      },
+    };
+    const params = {
+      topic: 'Original lesson',
+      depth: 'standard',
+      audienceLevel: 'A2',
+      focusAreas: [],
+      tone: 'casual',
+      durationTarget: 4,
+      learningRepair,
+    };
+    await expect(generateScript(params)).rejects.toThrow('requires learning generation');
+    learningRepair.candidate.turns[0].text = 'ä'.repeat(65536);
+    await expect(generateScript({ ...params, forLearning: true })).rejects.toThrow(
+      'bounded context'
+    );
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+  });
+
   describe('error handling and edge cases', () => {
     it('handles empty topic gracefully', async () => {
       const mockResponse = {

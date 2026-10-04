@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { assessSectionReview, SectionQualityError } from '@/lib/classes/section-quality';
+import {
+  assessSectionReview,
+  SectionQualityError,
+  captureBlindSectionFailure,
+} from '@/lib/classes/section-quality';
+import {
+  captureGenerationFailure,
+  generationFailureSchema,
+} from '@/lib/classes/quality/generation-failure';
+import { learningFailureReason } from '@/lib/classes/quality/teaching-failure-store';
 import type { GeneratedQuestion } from '@/lib/class-generation';
 
 const questions: GeneratedQuestion[] = [
@@ -88,5 +97,75 @@ describe('section review correction feedback', () => {
     expect(() =>
       assessSectionReview(JSON.stringify({ ...verdict, passageAcceptable: false }), questions, true)
     ).toThrow(SectionQualityError);
+    try {
+      assessSectionReview(
+        JSON.stringify({ ...verdict, passageAcceptable: false }),
+        questions,
+        true
+      );
+    } catch (error) {
+      expect((error as SectionQualityError).blindReviewFailure).toBeUndefined();
+    }
+  });
+
+  it('retains exact blind evidence in the existing private envelope without leaking it publicly', () => {
+    const exact = { ...verdict, passageAcceptable: false };
+    const material = questions.map((question) => ({
+      ...question,
+      passageText: 'Private exact script.',
+    }));
+    let error: unknown;
+    try {
+      assessSectionReview(JSON.stringify(exact), material, true, 'listening');
+    } catch (failure) {
+      error = failure;
+    }
+    expect(error).toBeInstanceOf(SectionQualityError);
+    expect(JSON.stringify(error)).not.toContain('Private');
+    const captured = captureGenerationFailure(error);
+    expect(captured.category).toBe('section_quality');
+    expect(generationFailureSchema.parse(captured)).toEqual(captured);
+    const record = JSON.parse(captured.teachingFailure!.reviews[0].candidate!);
+    expect(record).toEqual({
+      reviewType: 'blind_section',
+      verdictType: 'derived_compatibility_summary',
+      blindVerdict: exact,
+      transcript: 'Private exact script.',
+      questions,
+    });
+    expect(
+      captured.teachingFailure!.reviews[0].verdict.items.every((item) => !item.acceptable)
+    ).toBe(true);
+    expect(learningFailureReason(captured)).not.toContain('Private');
+    expect(learningFailureReason(captured)).not.toContain('blindVerdict');
+  });
+
+  it('retains the complete exact verdict when oversized script material is explicitly omitted', () => {
+    const evidence = captureBlindSectionFailure(
+      questions.map((question) => ({ ...question, passageText: 'ä'.repeat(32768) })),
+      verdict as Parameters<typeof captureBlindSectionFailure>[1]
+    );
+    const record = JSON.parse(evidence.reviews[0].candidate!);
+    expect(record.blindVerdict).toEqual(verdict);
+    expect(record.transcript).toBeNull();
+    expect(record.questions).toBeNull();
+    expect(record.omitted).toBe('size_limit');
+    expect(Buffer.byteLength(evidence.reviews[0].candidate!, 'utf8')).toBeLessThan(32768);
+  });
+
+  it.each([
+    { ...verdict, questions: [verdict.questions[0], verdict.questions[0]] },
+    {
+      ...verdict,
+      questions: verdict.questions.map((item) => ({ ...item, acceptableOptionIndices: [0, 0] })),
+    },
+    {
+      ...verdict,
+      questions: [{ ...verdict.questions[0], acceptableOptionIndices: [4] }, verdict.questions[1]],
+    },
+  ])('does not attach malformed blind verdicts as correction evidence', (invalid) => {
+    expect(assessSectionReview(JSON.stringify(invalid), questions, true, 'listening')).toEqual({
+      issues: ['invalid_review'],
+    });
   });
 });

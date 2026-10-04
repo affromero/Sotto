@@ -16,6 +16,29 @@ import {
 } from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
 
+export interface ReadingVocabularyQuestion {
+  question: string;
+  options: readonly string[];
+  correctIndex: number;
+}
+
+/** Keys are private assessment evidence and must be valid before any provider request. */
+export function assertReadingQuestionKeys(questions: readonly ReadingVocabularyQuestion[]) {
+  if (
+    !questions.length ||
+    questions.some(
+      (question) =>
+        !question.question.trim() ||
+        question.options.length !== 4 ||
+        question.options.some((option) => !option.trim()) ||
+        !Number.isInteger(question.correctIndex) ||
+        question.correctIndex < 0 ||
+        question.correctIndex >= question.options.length
+    )
+  )
+    throw new Error('Reading vocabulary requires valid private question keys.');
+}
+
 /** Shared extraction request. Reading consumers validate source and assessment attribution strictly. */
 export async function requestVocabularyExtraction(p: {
   userId: string;
@@ -26,8 +49,33 @@ export async function requestVocabularyExtraction(p: {
   text: string;
   label: 'TRANSCRIPT' | 'COURSE_NOTES';
   usageCategory: string;
-  readingQuestions?: readonly { question: string; options: readonly string[] }[];
+  readingQuestions?: readonly ReadingVocabularyQuestion[];
+  readingCorrection?: {
+    words: readonly unknown[];
+    issues: readonly string[];
+    feedback: ReadonlyArray<{ index: number; feedback: readonly string[] }>;
+  };
 }): Promise<string> {
+  if (p.readingQuestions) assertReadingQuestionKeys(p.readingQuestions);
+  if (p.readingCorrection && !p.readingQuestions)
+    throw new Error('Reading vocabulary correction requires keyed reading questions.');
+  if (
+    p.readingCorrection &&
+    (p.readingCorrection.words.length < 1 ||
+      p.readingCorrection.words.length > MAX_ITEMS ||
+      p.readingCorrection.issues.length > 6 ||
+      p.readingCorrection.feedback.length > 5 ||
+      p.readingCorrection.feedback.some(
+        ({ index, feedback }) =>
+          !Number.isInteger(index) ||
+          index < 0 ||
+          index >= p.readingCorrection!.words.length ||
+          feedback.length > 6 ||
+          feedback.some((entry) => !entry.trim() || entry.length > 300)
+      ) ||
+      Buffer.byteLength(JSON.stringify(p.readingCorrection), 'utf8') > 32 * 1024)
+  )
+    throw new Error('Reading vocabulary correction exceeds the bounded metadata contract.');
   if (p.text.length > MAX_SOURCE_CHARS && p.readingQuestions)
     throw new Error('The reading passage exceeds the vocabulary extraction limit.');
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
@@ -46,7 +94,15 @@ export async function requestVocabularyExtraction(p: {
       {
         role: 'user',
         content: p.readingQuestions
-          ? JSON.stringify({ passageText: p.text, questions: p.readingQuestions })
+          ? JSON.stringify({
+              passageText: p.text,
+              questions: p.readingQuestions.map(({ question, options, correctIndex }) => ({
+                question,
+                options,
+                correctIndex,
+              })),
+              ...(p.readingCorrection ? { correction: p.readingCorrection } : {}),
+            })
           : fenceUntrustedText(p.label, p.text),
       },
     ],

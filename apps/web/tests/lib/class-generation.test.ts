@@ -365,6 +365,66 @@ beforeEach(() => {
 });
 
 describe('generateSectionQuestions', () => {
+  it.each(['initial', 'semantic replacement'])(
+    'teaches lexical Perfekt auxiliary selection in the %s author request',
+    async (path) => {
+      const questions = SAMPLE_QUESTIONS.map((_, index) => ({
+        question: `Ergänze das Perfekt: Der Bus ${index + 1} _____ an der Haltestelle stehen geblieben.`,
+        options: index === 1 ? ['hat', 'ist', 'wird', 'kann'] : ['ist', 'hat', 'wird', 'kann'],
+        correctIndex: index === 1 ? 1 : 0,
+        explanation: '„Stehen bleiben“ bildet hier das Perfekt mit „sein“.',
+        passageRef: '',
+      }));
+      const rejected = questions.map((question, index) => ({
+        ...question,
+        explanation: index === 4 ? '„Sein“ beweist hier einen Ortswechsel.' : question.explanation,
+      }));
+      if (path === 'semantic replacement') {
+        mockGenerateResponse.mockResolvedValueOnce({
+          content: JSON.stringify({ passage: '', questions: rejected }),
+        });
+        mockTeachingResponse.mockResolvedValueOnce({
+          content: JSON.stringify({
+            items: questions.map((_, index) => ({
+              index,
+              acceptable: index !== 4,
+              issues: index === 4 ? ['incorrect'] : [],
+              feedback: index === 4 ? ['Anhalten beweist keinen Ortswechsel.'] : [],
+            })),
+          }),
+        });
+      }
+      mockGenerateResponse.mockResolvedValueOnce({
+        content: JSON.stringify({ passage: '', questions }),
+      });
+      const result = await generateSectionQuestions({
+        ...BASE,
+        skill: 'GRAMMAR',
+        targetLang: 'de',
+        objective: 'Erzähle im Perfekt.',
+        grammarPoints: ['Perfekt'],
+        targetVocab: [],
+      });
+      expect(result).toEqual(questions);
+      for (const call of mockGenerateResponse.mock.calls) {
+        expect(call[0]).toContain('actual verb, construction and meaning');
+        expect(call[0]).toContain('ordinary "bleiben" meaning "remain"');
+        expect(call[0]).toContain('"stoppen" instead forms "hat ... gestoppt"');
+        expect(call[0]).toContain('do not by themselves prove a change of location or state');
+      }
+      for (const call of mockReviewResponse.mock.calls) {
+        expect(call[1][0].content).not.toContain('correctIndex');
+        expect(call[1][0].content).not.toContain('explanation');
+      }
+      const finalTeaching = JSON.parse(mockTeachingResponse.mock.calls.at(-1)![1][0].content);
+      expect(finalTeaching.items[4].content).toMatchObject(questions[4]!);
+      if (path === 'semantic replacement') {
+        expect(mockGenerateResponse.mock.calls[1]![1][0].content).toContain(
+          'Anhalten beweist keinen Ortswechsel.'
+        );
+      }
+    }
+  );
   it('fails closed on a malformed teaching review without generating a replacement', async () => {
     mockTeachingResponse.mockResolvedValue({ content: 'not-json', model: 'm' });
 

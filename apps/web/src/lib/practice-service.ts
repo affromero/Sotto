@@ -521,7 +521,13 @@ async function startMc(
           ...course,
           execution,
           level: course.currentLevel,
-          questions: generatedItems.map((item) => ({ ...item, question: item.prompt })),
+          questions: generatedItems.map((item) => ({
+            id: item.id,
+            question: item.prompt,
+            options: item.options,
+            correctIndex: item.correctIndex,
+            passageText: item.passageText,
+          })),
         })
       : undefined;
   const session = await persistPracticeSession(
@@ -695,7 +701,13 @@ async function startFull(
     ...course,
     execution,
     level: course.currentLevel,
-    questions: readingItems.map((item) => ({ ...item, question: item.prompt })),
+    questions: readingItems.map((item) => ({
+      id: item.id,
+      question: item.prompt,
+      options: item.options,
+      correctIndex: item.correctIndex,
+      passageText: item.passageText,
+    })),
   });
 
   const session = await persistPracticeSession(

@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
 import { recordFullPracticeFailures } from '@/lib/learning/practice-generation-failures';
 
+const mockReadingProviderInput = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
   capturedLearningAiOptions: async () => ({}),
@@ -21,6 +22,7 @@ vi.mock('@/lib/providers/ai', () => ({
       options: { jsonSchema?: unknown }
     ) => {
       const input = JSON.parse(messages[0]!.content);
+      if (input.passageText) mockReadingProviderInput(input);
       const sourceForm = input.passageText?.split(' ')[0] ?? 'Hola';
       return {
         content: JSON.stringify(
@@ -307,6 +309,12 @@ describe('startPractice — GRAMMAR', () => {
       passageText: 'Mia war im Kino.',
     });
     expect(JSON.stringify(result)).not.toContain('correctIndex');
+    expect(mockReadingProviderInput).toHaveBeenCalledWith({
+      passageText: 'Mia war im Kino.',
+      questions: [
+        { question: 'Wo war Mia?', options: ['Kino', 'Park', 'Bonn', 'Berlin'], correctIndex: 0 },
+      ],
+    });
   });
   it('seeds from due items and generates questions', async () => {
     mockGetDueItems.mockResolvedValue({

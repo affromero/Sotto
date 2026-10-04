@@ -16,9 +16,11 @@ vi.mock('@/lib/learning-ai', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
 import { logger } from '@/lib/logger';
+import { createAIProvider } from '@/lib/providers/ai';
 import {
   ReviewerProtocolError,
   TeachingQualityRejectionError,
+  reviewTeachingContent,
 } from '@/lib/classes/quality/teaching-quality';
 
 const params = {
@@ -71,6 +73,43 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it('reviews vocabulary against the private key and allows faithful gloss synonyms without incidental attribution', async () => {
+    const content = {
+      lemma: 'zurückkommen',
+      sourceForm: 'zurückgekommen',
+      gloss: 'to return',
+      pos: 'verb',
+      passageText: 'Nora ist vor einer Woche zurückgekommen.',
+      assessedQuestions: [
+        {
+          question: 'Wann ist Nora zurückgekommen?',
+          options: ['Vor einer Woche', 'Gestern', 'Heute', 'Morgen'],
+          correctIndex: 0,
+        },
+      ],
+    };
+    boundary.generate.mockReset();
+    boundary.generate.mockResolvedValue({
+      content: JSON.stringify(approved),
+      model: 'captured-model',
+    });
+    await reviewTeachingContent({
+      ...params,
+      ai: await boundary.resolve(),
+      provider: createAIProvider('anthropic'),
+      kind: 'vocabulary',
+      items: [content],
+    });
+    const [system, messages] = boundary.generate.mock.calls[0]!;
+    expect(system).toContain('Accept faithful contextual synonyms');
+    expect(system).toContain(
+      'interpret the question or distinguish the supplied private correctIndex answer'
+    );
+    expect(system).toContain(
+      'Incidental locations, objects or events are unsupported associations'
+    );
+    expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content }] });
+  });
   it.each(['initial', 'structural repair', 'semantic replacement'])(
     'reviews the exact immersion usage note after %s without requiring a different meaning',
     async (path) => {

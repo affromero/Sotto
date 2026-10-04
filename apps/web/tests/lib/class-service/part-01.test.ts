@@ -28,6 +28,7 @@ import {
   SAMPLE_COURSE,
   SAMPLE_QUESTIONS,
   mockResolveSkillRequirements,
+  mockReadingProviderInput,
 } from './fixtures';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
 import {
@@ -154,6 +155,16 @@ describe('createNextClass', () => {
 
     expect(result.kind).toBe('created');
     expect((result as { kind: 'created'; classId: string }).classId).toBe('class-new');
+    expect(mockReadingProviderInput).toHaveBeenCalledWith({
+      passageText: 'Hola, Ana.',
+      questions: [
+        {
+          question: 'What greeting is used?',
+          options: ['Hola', 'Adiós', 'Ayer', 'Mañana'],
+          correctIndex: 0,
+        },
+      ],
+    });
     // Should have created a class record
     expect(mockCourseClassCreate).toHaveBeenCalled();
     // Should have called generateSectionQuestions for each MC skill (GRAMMAR + READING)
