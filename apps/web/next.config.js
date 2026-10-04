@@ -1,6 +1,6 @@
 const path = require('path');
 const { createRequire } = require('node:module');
-const { withSentryConfig } = require('@sentry/nextjs');
+const { withSentryConfig } = require('@sentry/nextjs/config');
 const coreRequire = createRequire(require.resolve('thesidedoor-core/storage'));
 const nativeBinding = coreRequire.resolve('thesidedoor-flock/build/Release/fs_ext.node');
 

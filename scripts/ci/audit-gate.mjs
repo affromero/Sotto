@@ -4,6 +4,7 @@
 // cannot silently outlive its justification; the gate hard-fails again once
 // the date passes. Remove entries as soon as the fix is installable.
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const ALLOW = {
   // deepmerge-ts <8.0.0 (stack exhaustion) via prisma@7 -> @prisma/config.
@@ -11,6 +12,15 @@ const ALLOW = {
   // until ~2026-08-23; only the prisma CLI's own config merging exercises it.
   'GHSA-ggr8-5vv4-36mx': '2026-08-25',
 };
+
+// No patched braces release exists. #160 tracks removal of this tooling-only
+// exception. A runtime dependency or expiry immediately restores the failure.
+const DEV_ONLY_ALLOW = {
+  'GHSA-vfj7-8cjw-p6xm': '2026-10-11',
+};
+const packages = JSON.parse(
+  readFileSync(new URL('../../package-lock.json', import.meta.url), 'utf8')
+).packages;
 
 let raw;
 try {
@@ -27,7 +37,10 @@ const report = JSON.parse(raw);
 // An offline/errored audit emits {error} (or no vulnerabilities key at all);
 // passing then would be vacuous — fail closed instead.
 if (report.error || !report.vulnerabilities) {
-  console.error('audit gate: npm audit did not produce a report:', report.error?.summary ?? raw.slice(0, 200));
+  console.error(
+    'audit gate: npm audit did not produce a report:',
+    report.error?.summary ?? raw.slice(0, 200)
+  );
   process.exit(1);
 }
 
@@ -41,9 +54,16 @@ for (const [name, vuln] of Object.entries(report.vulnerabilities)) {
   // No advisories of its own: transitive of another listed vulnerability,
   // which is judged on its own row.
   if (advisories.length === 0) continue;
-  const blocked = advisories.filter(
-    (id) => !(ALLOW[id] && now < new Date(`${ALLOW[id]}T00:00:00Z`))
-  );
+  const blocked = advisories.filter((id) => {
+    const expiry = ALLOW[id] ?? DEV_ONLY_ALLOW[id];
+    if (!expiry || now >= new Date(`${expiry}T00:00:00Z`)) return true;
+    if (!DEV_ONLY_ALLOW[id]) return false;
+    return (
+      !Array.isArray(vuln.nodes) ||
+      vuln.nodes.length === 0 ||
+      vuln.nodes.some((node) => packages[node]?.dev !== true)
+    );
+  });
   if (blocked.length > 0) {
     failures.push(`${name} (${vuln.severity}): ${blocked.join(', ')}`);
   }
@@ -54,5 +74,5 @@ if (failures.length > 0) {
   for (const line of failures) console.error(`  ${line}`);
   process.exit(1);
 }
-const allowed = Object.keys(ALLOW).join(', ');
+const allowed = [...Object.keys(ALLOW), ...Object.keys(DEV_ONLY_ALLOW)].join(', ');
 console.log(`audit gate: ok${allowed ? ` (allowlisted: ${allowed})` : ''}`);
