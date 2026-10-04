@@ -77,6 +77,18 @@ describe('generateScript', () => {
           /clause type: declarative main clause, subordinate clause, or question/
         );
         expect(providerInstruction).toMatch(/every explanation and rule matches its example/);
+        expect(providerInstruction).toMatch(/every spoken clause.*after adding vocabulary markers/);
+        expect(providerInstruction).toMatch(
+          /Wrap an existing word or phrase in its grammatical position/
+        );
+        expect(providerInstruction).toMatch(
+          /Preserve complete coordinated clauses and verb complements/
+        );
+        expect(providerInstruction).toContain('Ich wollte [V1:gestern] ins Kino gehen.');
+        expect(providerInstruction).toContain('[V1:Gestern] wollte ich ins Kino gehen.');
+        expect(providerInstruction).toMatch(
+          /Never insert a marked adverb between an initial subject/
+        );
         expect(providerInstruction).toMatch(
           /For A1\/A2, prefer correct concrete examples and omit a broad rule/
         );

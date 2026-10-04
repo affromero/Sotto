@@ -136,6 +136,15 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls[0][0]).toContain('plain, everyday wording');
     expect(boundary.generate.mock.calls[0][0]).toContain("verb's required complements");
     expect(boundary.generate.mock.calls[2][0]).toContain('plain, everyday wording');
+    for (const prompt of [boundary.generate.mock.calls[0][0], boundary.generate.mock.calls[2][0]]) {
+      expect(prompt).toContain('including purpose, about, focus and tips');
+      expect(prompt).toContain('Every examples[].target must be correct model language');
+      expect(prompt).toContain('even if its note identifies the mistake');
+      expect(prompt).toContain(
+        'explicitly labelled note or tip that also supplies the correct form'
+      );
+    }
+    expect(boundary.generate.mock.calls[2][0]).toContain('Recheck unchanged fields');
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(verdict.items[0].feedback[0]);
     expect(boundary.generate.mock.calls[1][0]).toContain('shortened visual claims');
     expect(boundary.generate).toHaveBeenCalledTimes(4);
