@@ -111,6 +111,9 @@ describe('resumePractice', () => {
     await expect(resumePractice('sess-1', 'other-user')).rejects.toBeInstanceOf(
       PracticeSessionNotFoundError
     );
+    await expect(resumePractice('sess-1', 'other-user')).rejects.toThrow(
+      'Practice session not found'
+    );
     expect(mockSessionFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'sess-1', course: { userId: 'other-user' } },

@@ -36,6 +36,7 @@ interface PreparationActivity {
   timeZone: string;
   maxProviderRequests: number | null;
   providerRequestsAdmitted: number | null;
+  failureReason?: string;
   events?: { sequence: number; at: number; type: string }[];
   truncated?: boolean;
   next?: number;
@@ -346,6 +347,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
           : `${activity.providerRequestsAdmitted ?? 0} of ${activity.maxProviderRequests} model requests admitted, including retries.`}
       </p>
       {activity.truncated && <p>Older activity is no longer retained.</p>}
+      {activity.failureReason && <p>{activity.failureReason}</p>}
       <ol>
         {activity.events?.map((event) => (
           <li key={event.sequence}>

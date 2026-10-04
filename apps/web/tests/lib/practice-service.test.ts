@@ -7,6 +7,7 @@ import { blockedProviderExecution } from '../helpers/runtime/provider-execution'
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
+import { recordFullPracticeFailures } from '@/lib/learning/practice-generation-failures';
 
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
@@ -479,6 +480,27 @@ describe('practice content topics', () => {
 });
 
 describe('startPractice — FULL', () => {
+  it('keeps every successful branch available without recording a generation failure', async () => {
+    let uncertain = false;
+    const results = await Promise.allSettled([
+      Promise.resolve('grammar'),
+      Promise.resolve('reading'),
+      Promise.resolve('listening'),
+      Promise.resolve('writing'),
+    ]);
+    expect(
+      recordFullPracticeFailures(results, () => {
+        uncertain = true;
+      })
+    ).toBeUndefined();
+    expect(uncertain).toBe(false);
+    expect(results.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+    ]);
+  });
   beforeEach(() => {
     mockComposeSpeakingPrompts.mockResolvedValue(
       Array.from({ length: 4 }, (_, index) => ({

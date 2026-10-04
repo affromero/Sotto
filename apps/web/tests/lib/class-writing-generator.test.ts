@@ -54,6 +54,7 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { composeWritingPrompts, generateClassWriting } from '@/lib/class-writing-generator';
+import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 
 const SAMPLE = JSON.stringify([
@@ -233,6 +234,46 @@ describe('composeWritingPrompts', () => {
     expect(mockGenerateResponse.mock.calls[1][2]).toEqual(
       expect.objectContaining({ temperature: 0, model: 'm', apiKeyOverride: 'k' })
     );
+  });
+
+  it('keeps both rejected writing sets and their verdicts in private terminal evidence', async () => {
+    const replacement = JSON.parse(SAMPLE);
+    replacement[0].guidance = 'Private replacement guidance.';
+    const verdict = {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['unnatural'],
+          feedback: ['Private feedback identifies an incorrect collocation.'],
+        },
+        { index: 1, acceptable: true, issues: [], feedback: [] },
+        { index: 2, acceptable: true, issues: [], feedback: [] },
+      ],
+    };
+    mockTeachingResponse.mockResolvedValue({ content: JSON.stringify(verdict), model: 'm' });
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: SAMPLE, model: 'm' })
+      .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'm' });
+
+    const error = await composeWritingPrompts(PARAMS).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    expect(error.teachingFailure?.kind).toBe('writing');
+    expect(error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))).toEqual(
+      mockTeachingResponse.mock.calls.map((call) =>
+        JSON.parse(call[1][0].content).items.map((item: { content: unknown }) => item.content)
+      )
+    );
+    expect(error.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
+      verdict,
+      verdict,
+    ]);
+    expect(JSON.stringify(error)).not.toContain(replacement[0].guidance);
+    expect(JSON.stringify(error)).not.toContain(verdict.items[0].feedback[0]);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
   });
 
   it('fails when the bounded replacement is malformed without another review', async () => {

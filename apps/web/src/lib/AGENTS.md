@@ -77,6 +77,12 @@ visible status, cancellation, and explicit recovery. `practice/submission.ts` se
 feedback and SRS effects once; `practice/resume.ts` restores choices, drafts,
 latest productive evidence, preparation state, and completed results.
 
+`learning/practice-generation-failures.ts` inspects every settled FULL branch before
+the original failure propagates, preserving cleanup uncertainty and bounded private
+stage summaries. `classes/quality/teaching-failure-store.ts` stores those summaries
+in sealed snapshots owned by the existing preparation job and cleanup policy.
+Learner responses receive static failure reasons after ownership and erasure checks.
+
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
 question structure before review, then uses the same captured provider and

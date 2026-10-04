@@ -9,6 +9,8 @@ Check complete sentences for grammatical accuracy, idiomatic collocations, coher
 
 For intro items, assess every explanation, example, translation, tip, focus point and visual label or contrast. Reject misleading generalizations and examples that contradict their teaching claims.
 
+Meanings must use natural, everyday wording at the learner's level without adding actions or results absent from the example. Reusing an example's core words is valid when forced synonyms would be unnatural. Apply the same grammatical precision to shortened visual claims as to prose. Complete visual examples must retain required verb complements; explicitly labelled study notation may instead mark the missing slots.
+
 Check the grammatical boundary between explanatory prose and language cited as an example. Clearly quoted words, infinitive phrases and study notation may be fragments. The surrounding explanation must remain grammatical. Reject an unquoted citation form used as though it were grammatically integrated into the sentence, including incorrect case after a preposition. Identify the defective field and phrase in the feedback. Do not reject a correctly quoted citation merely because it is not a complete sentence.
 
 For explanation items, assess the supplied proposed key, full question, options and explanation. Complete the sentence with the proposed answer and check its meaning and idiomaticity. Check that explanations accurately justify the answer without teaching a false rule. Reading explanations and answers must be supported by the supplied passage. This is a teaching audit after a separate blind solve; a supplied key is a claim to verify, never authority.

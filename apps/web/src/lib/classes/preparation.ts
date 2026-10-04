@@ -24,6 +24,12 @@ import { classPreparationGrant, preparationGrantSpec } from './preparation-grant
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { settlePreparationAudio } from './preparation-audio-settlement';
 import {
+  readLearningFailure,
+  writeLearningFailure,
+  learningFailureReason,
+  type LearningFailure,
+} from './quality/teaching-failure-store';
+import {
   admitPreparation,
   cancelPreparation,
   preparationStore,
@@ -463,6 +469,11 @@ export async function readPreparationActivity(
       await validateClassPreparation(database, courseId, operation.id, true);
       const grant = classPreparationGrant(database, operation);
       const record = await grant.read(operation.grant);
+      const privateFailure =
+        operation.status === 'FAILED' &&
+        operation.failure === 'generation_failed' &&
+        (await readLearningFailure(database, operation));
+      const failureReason = privateFailure ? learningFailureReason(privateFailure) : undefined;
       return {
         operationId: operation.id,
         status: operation.status,
@@ -474,6 +485,7 @@ export async function readPreparationActivity(
         providerRequestsAdmitted:
           operation.maxProviderRequests === null ? null : record.attempts.length,
         audioRequiresReview: operation.deferAudio,
+        ...(failureReason ? { failureReason } : {}),
         ...(await grant.activity(operation.grant, options)),
       };
     },
@@ -597,12 +609,13 @@ export async function recordClassPreparationFailure(
   operation: ClassPreparation,
   fingerprint: string,
   uncertain: boolean,
-  failure: 'generation_failed' | 'source_unreadable' = 'generation_failed'
+  failure: 'generation_failed' | 'source_unreadable' = 'generation_failed',
+  diagnostic?: LearningFailure
 ) {
   const admitted = await validateClassPreparation(database, operation.courseId, operation.id, true);
   if (admitted.status === 'COMPLETED') return;
   await classPreparationGrant(database, admitted).revoke(admitted.grant);
-  await classPreparationStore(database, operation.courseId).transact((current) => {
+  const failed = await classPreparationStore(database, operation.courseId).transact((current) => {
     if (!current || current.id !== operation.id) throw new PreparationConflictError();
     const cancelled = current.status === 'CANCELLING';
     Object.assign(current, {
@@ -618,7 +631,15 @@ export async function recordClassPreparationFailure(
       failure: uncertain ? 'interrupted' : cancelled ? null : failure,
       updatedAt: Date.now(),
     });
+    return current;
   });
+  if (
+    diagnostic &&
+    !['CANCELLING', 'CANCELLED'].includes(admitted.status) &&
+    ((failed.status === 'FAILED' && failed.failure === 'generation_failed') ||
+      (uncertain && failed.status === 'UNRESOLVED'))
+  )
+    await writeLearningFailure(database, failed, fingerprint, diagnostic);
   if (!uncertain) await sottoJobOutbox(database).complete(operation.id, fingerprint);
 }
 

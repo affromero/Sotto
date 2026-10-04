@@ -40,7 +40,8 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { generateSectionQuestions } from '@/lib/class-generation';
-import { SECTION_QUALITY_JSON_SCHEMA } from '@/lib/classes/section-quality';
+import { SECTION_QUALITY_JSON_SCHEMA, SectionQualityError } from '@/lib/classes/section-quality';
+import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
@@ -138,6 +139,35 @@ describe('contextual vocabulary coverage', () => {
     options: ['gesehen', 'gegessen', 'getrunken', 'geschrieben'],
     explanation: 'Mit den Augen sieht man einen Film.',
   };
+  it('reports a final coverage failure rather than an earlier teaching rejection', async () => {
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: JSON.stringify({ passage: '', questions: [made] }) })
+      .mockResolvedValueOnce({ content: JSON.stringify({ passage: '', questions: [seen] }) });
+    mockTeachingResponse.mockResolvedValue({
+      content: JSON.stringify({
+        items: [
+          {
+            index: 0,
+            acceptable: false,
+            issues: ['incorrect'],
+            feedback: ['Private earlier teaching feedback.'],
+          },
+        ],
+      }),
+      model: 'm',
+    });
+    const error = await generateSectionQuestions({
+      ...BASE,
+      skill: 'GRAMMAR',
+      vocabularyReview: true,
+      targetLang: 'de',
+      targetVocab: [{ lemma: 'gemacht', gloss: 'done' }],
+    }).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(SectionQualityError);
+    expect(error).not.toBeInstanceOf(TeachingQualityRejectionError);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+  });
   const params = {
     ...BASE,
     skill: 'GRAMMAR' as SkillType,
@@ -407,34 +437,6 @@ describe('generateSectionQuestions', () => {
       expect(call[1][0].content).not.toContain('correctIndex');
       expect(call[1][0].content).not.toContain('explanation');
     }
-  });
-
-  it('fails closed after a repaired candidate also fails teaching review', async () => {
-    mockGenerateResponse
-      .mockResolvedValueOnce({ content: SAMPLE })
-      .mockResolvedValueOnce({ content: '{' })
-      .mockResolvedValueOnce({ content: SAMPLE });
-    mockTeachingResponse.mockResolvedValue({
-      content: JSON.stringify({
-        items: SAMPLE_QUESTIONS.map((_, index) => ({
-          index,
-          acceptable: false,
-          issues: ['unnatural'],
-          feedback: ['The explanation teaches an incorrect collocation.'],
-        })),
-      }),
-      model: 'm',
-    });
-
-    await expect(generateSectionQuestions(BASE)).rejects.toThrow('educational quality');
-    expect(mockGenerateResponse).toHaveBeenCalledTimes(3);
-    expect(mockReviewResponse).toHaveBeenCalledTimes(2);
-    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
-    expect(
-      mockGenerateResponse.mock.calls.length +
-        mockReviewResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length
-    ).toBe(7);
   });
 
   it.each(['authorization denied', 'cancelled', 'budget exhausted'])(

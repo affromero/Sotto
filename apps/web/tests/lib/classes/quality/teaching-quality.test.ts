@@ -16,7 +16,10 @@ vi.mock('@/lib/learning-ai', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
 import { logger } from '@/lib/logger';
-import { ReviewerProtocolError } from '@/lib/classes/quality/teaching-quality';
+import {
+  ReviewerProtocolError,
+  TeachingQualityRejectionError,
+} from '@/lib/classes/quality/teaching-quality';
 
 const params = {
   userId: 'fixture',
@@ -68,6 +71,121 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it('keeps rejected A2 meanings and misleading visual claims out of published teaching', async () => {
+    const candidate = {
+      ...intro,
+      examples: [
+        {
+          target: 'Ich habe gestern einen Film gesehen.',
+          meaning: 'Der Film war gestern Gegenstand meines Sehens.',
+          note: 'Das Partizip steht im Hauptsatz am Ende.',
+        },
+        {
+          target: 'Wir sind zu Fuß nach Hause gegangen.',
+          meaning: 'Wir haben uns gehend nach Hause bewegt.',
+          note: 'Hier steht gehen mit sein.',
+        },
+      ],
+      visuals: {
+        contrast: {
+          title: 'Hilfsverb vergleichen',
+          leftLabel: 'Mit haben',
+          leftItems: ['Mara hat besucht'],
+          rightLabel: 'Mit sein',
+          rightItems: ['Wir sind nach Hause gegangen.'],
+        },
+        callouts: [
+          {
+            label: 'Merksatz',
+            text: 'Das Hilfsverb steht vorn im Satzbau.',
+            tone: 'blue',
+          },
+        ],
+      },
+    };
+    const verdict = {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['unnatural', 'incorrect'],
+          feedback: [
+            'examples[0].meaning: Gegenstand meines Sehens is an unnatural paraphrase.',
+            'examples[1].meaning: gehend nach Hause bewegt is an unnatural paraphrase.',
+            'visuals.callouts[0].text: the finite auxiliary occupies the second main-clause position.',
+            'visuals.contrast.leftItems: besuchen requires its object here.',
+          ],
+        },
+      ],
+    };
+    const replacement = {
+      ...intro,
+      examples: candidate.examples.map((example) => ({ ...example, meaning: example.target })),
+    };
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(verdict), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
+
+    const result = await generateClassIntro(params);
+
+    expect(result.examples).toEqual(replacement.examples);
+    expect(result.visuals).toBeUndefined();
+    expect(boundary.generate.mock.calls[0][0]).toContain('plain, everyday wording');
+    expect(boundary.generate.mock.calls[0][0]).toContain("verb's required complements");
+    expect(boundary.generate.mock.calls[2][0]).toContain('plain, everyday wording');
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(verdict.items[0].feedback[0]);
+    expect(boundary.generate.mock.calls[1][0]).toContain('shortened visual claims');
+    expect(boundary.generate).toHaveBeenCalledTimes(4);
+  });
+  it('retains both rejected candidates privately without changing the bounded replacement', async () => {
+    const replacement = { ...intro, about: 'Private replacement explanation.' };
+    const replacementVerdict = {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['incorrect'],
+          feedback: ['Private replacement feedback about the grammar rule.'],
+        },
+      ],
+    };
+    boundary.generate
+      .mockReset()
+      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'captured-model' })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(replacementVerdict),
+        model: 'captured-model',
+      });
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const error = await generateClassIntro(params).catch((failure: unknown) => failure);
+      expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+      if (!(error instanceof TeachingQualityRejectionError)) throw error;
+      expect(error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))).toEqual(
+        [[intro], [replacement]]
+      );
+      expect(error.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
+        rejected,
+        replacementVerdict,
+      ]);
+      expect(error.feedback[0].feedback).toEqual(replacementVerdict.items[0].feedback);
+      const serialized = JSON.stringify(error);
+      expect(serialized).not.toContain(replacement.about);
+      expect(serialized).not.toContain(replacementVerdict.items[0].feedback[0]);
+      expect(JSON.stringify(warning.mock.calls)).not.toContain(replacement.about);
+      expect(JSON.stringify(warning.mock.calls)).not.toContain(
+        replacementVerdict.items[0].feedback[0]
+      );
+      expect(boundary.generate).toHaveBeenCalledTimes(4);
+    } finally {
+      warning.mockRestore();
+    }
+  });
   it('reviews the exact visible intro without inventing missing visual labels', async () => {
     const result = await generateClassIntro(params);
     const call = boundary.generate.mock.calls[1];
@@ -247,7 +365,12 @@ describe('intro teaching gate', () => {
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
       .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' });
 
-    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    const error = await generateClassIntro(params).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    expect(error.teachingFailure?.reviews).toEqual([
+      { candidate: JSON.stringify([intro]), verdict: rejected },
+    ]);
     expect(boundary.generate).toHaveBeenCalledTimes(3);
   });
 

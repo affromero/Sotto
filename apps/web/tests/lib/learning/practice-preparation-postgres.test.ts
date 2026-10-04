@@ -26,6 +26,7 @@ import {
 } from '@/lib/practice/preparation';
 import { learningPreparationProviderRequest } from '@/lib/learning/preparation/preparation-provider';
 import { processPracticePreparation } from '@/workers/practice/practice-preparation.worker';
+import { readLearningFailure } from '@/lib/classes/quality/teaching-failure-store';
 import { resumePractice } from '@/lib/practice/resume';
 import { practicePreparingSchema } from '@sotto/shared';
 import {
@@ -131,6 +132,76 @@ suite('Durable practice preparation against PostgreSQL', () => {
       data: { operationId, fingerprint: record.fingerprint },
     } as Job<unknown>;
   }
+  it('retains unresolved execution and a pending outbox when a full-generation branch cannot confirm cleanup', async () => {
+    const endpoint = 'http://127.0.0.1:34991';
+    await setSiteConfig(
+      {
+        aiProvider: 'local',
+        aiModel: 'cleanup-fixture',
+        aiBaseUrl: endpoint + '/v1',
+        ttsProvider: 'local',
+        ttsBaseUrl: endpoint,
+        ttsVoices: 'fixture-voice',
+        sttProvider: null,
+      },
+      identity.ownerId
+    );
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: {
+        preferredAiProvider: 'local',
+        preferredAiModel: 'local:cleanup-fixture',
+        preferredTtsModel: 'local:local',
+      },
+    });
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    await instance.database.lesson.create({
+      data: {
+        curriculumId: course.curriculumId,
+        slug: 'cleanup-fixture',
+        level: 'A1',
+        order: 999,
+        title: 'Greetings',
+        objective: 'Greet Ana',
+        grammarPoints: ['present'],
+        targetVocab: [{ lemma: 'Hallo', gloss: 'hello' }],
+        vocabThemes: ['greetings'],
+      },
+    });
+    const cleanup = new Error('private-cleanup-provider-body');
+    cleanup.name = 'ProviderCleanupError';
+    vi.stubGlobal('fetch', async () => {
+      throw cleanup;
+    });
+    const operation = await requestPracticePreparation(courseId, 'FULL', execution, {
+      requestId: randomUUID(),
+    });
+    await expect(processPracticePreparation(await queuedJob(operation.id))).rejects.toThrow();
+    const current = await saved(operation.sessionId);
+    expect(current.operation).toMatchObject({ status: 'UNRESOLVED', failure: 'interrupted' });
+    await sottoTransaction(instance.database, async (database) => {
+      const parent = await sottoJobOutbox(database).read(operation.id);
+      expect(parent?.complete).toBe(false);
+      expect(
+        await sottoJobExecutions(database).blockingStatus(operation.id, parent!.fingerprint)
+      ).toBe('cleanup-unconfirmed');
+      const failure = await readLearningFailure(database, current.operation);
+      expect(failure?.stages?.map((stage) => stage.stage)).toEqual([
+        'grammar',
+        'reading',
+        'listening',
+        'writing',
+      ]);
+      expect(JSON.stringify(failure)).not.toContain('private-cleanup-provider-body');
+    });
+    const resumed = await resumePractice(operation.sessionId, identity.ownerId);
+    expect(resumed).toMatchObject({
+      status: 'preparing',
+      preparationStatus: 'UNRESOLVED',
+      canRecover: true,
+    });
+  });
+
   async function saved(sessionId: string) {
     return sottoTransaction(instance.database, (database) =>
       readPracticePreparation(database, sessionId)

@@ -19,6 +19,7 @@ import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { registerPreparationAudio } from '@/lib/classes/preparation-audio';
 import { publishClassGeneration } from '@/lib/learning/classes/class-generation-state';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 /** A crashed generation is fenced as unresolved; replay never repeats unproven external work. */
 export async function processClassPreparation(job: Job<unknown>, workerSignal?: AbortSignal) {
@@ -246,7 +247,8 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
             operation,
             work.fingerprint,
             Boolean(uncertain),
-            error instanceof ClassSourceError ? 'source_unreadable' : 'generation_failed'
+            error instanceof ClassSourceError ? 'source_unreadable' : 'generation_failed',
+            captureGenerationFailure(error)
           )
         );
         if (uncertain) throw error;
