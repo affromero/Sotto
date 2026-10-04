@@ -23,6 +23,24 @@ const FALLBACK = {
 };
 
 describe('classIntroFromSeed', () => {
+  it('preserves an immersion usage note without replacing it with a paraphrase', async () => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const example = {
+      target: 'Sie hat das Museum besucht.',
+      meaning: 'Du erzählst hier von einem Besuch im Museum.',
+      note: 'Das Verb „besuchen“ bildet das Perfekt mit „haben“.',
+    };
+    const stored = {
+      purpose: 'Erzähle von gestern.',
+      about: 'Mit dem Perfekt erzählst du von Vergangenem.',
+      focus: ['Perfekt mit haben'],
+      examples: [example],
+      tips: ['Achte auf das Hilfsverb.'],
+    };
+    const restored = classIntroFromSeed({ intro: stored }, { ...FALLBACK, level: 'A2' });
+    expect(restored.examples).toEqual([example]);
+    expect(restored.visuals).toBeUndefined();
+  });
   it.each([
     ['Perfekt for completed activities', 'Präteritum with war and hatte'],
     ['Use als for a past event', 'Use wenn for repeated conditions'],
